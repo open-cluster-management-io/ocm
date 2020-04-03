@@ -359,9 +359,8 @@ func getAgentName(secretKey string, coreClient corev1client.CoreV1Interface) (st
 	if err != nil {
 		if kerrors.IsNotFound(err) {
 			return "", nil
-		} else {
-			return "", fmt.Errorf("unable to get secret %q: %v", secretKey, err)
 		}
+		return "", fmt.Errorf("unable to get secret %q: %v", secretKey, err)
 	}
 
 	if secret.Data == nil {
