@@ -1,4 +1,4 @@
-package bootstrap
+package spokebootstrap
 
 import (
 	"crypto/tls"

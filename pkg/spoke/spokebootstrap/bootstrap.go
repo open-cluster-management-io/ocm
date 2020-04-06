@@ -1,8 +1,7 @@
-package bootstrap
+package spokebootstrap
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -12,7 +11,6 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes/scheme"
 	certificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
@@ -33,7 +31,7 @@ var (
 )
 
 // Bootstrap registers the spoke cluster and bootstraps the agent
-func Bootstrap(coreClient corev1client.CoreV1Interface, o *Options, stopCh <-chan struct{}) (*restclient.Config, func(), error) {
+func Bootstrap(coreClient corev1client.CoreV1Interface, o *Options) (*restclient.Config, func(), error) {
 	agentName, bootstrapped, err := recoverAgentState(coreClient, o)
 	if err != nil {
 		return nil, nil, err
@@ -69,12 +67,12 @@ func Bootstrap(coreClient corev1client.CoreV1Interface, o *Options, stopCh <-cha
 	}
 
 	// block until the spoke cluster on hub is approved
-	err = waitForSpokeClusterApproval(clientConfig, clusterName, stopCh)
+	err = waitForSpokeClusterApproval(clientConfig, clusterName)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return rotateCertificates(agentName, clientConfig, coreClient, o, stopCh)
+	return rotateCertificates(agentName, clientConfig, coreClient, o)
 }
 
 // recoverAgentState recovers the current state of the cluster agent
@@ -184,10 +182,6 @@ func bootstrapAgent(agentName string, coreClient corev1client.CoreV1Interface, o
 		}
 	}
 
-	if err := waitForServer(*bootstrapClientConfig, 1*time.Minute); err != nil {
-		klog.Errorf("Error waiting for apiserver to come up: %v", err)
-	}
-
 	certData, err := requestClusterCertificate(bootstrapClient.CertificateSigningRequests(), keyData, clusterName, agentName)
 	if err != nil {
 		return err
@@ -211,7 +205,7 @@ func bootstrapAgent(agentName string, coreClient corev1client.CoreV1Interface, o
 }
 
 // rotateCertificates rotates certificates before client certificate becomes expired.
-func rotateCertificates(agentName string, clientConfig *restclient.Config, coreClient corev1client.CoreV1Interface, o *Options, stopCh <-chan struct{}) (*restclient.Config, func(), error) {
+func rotateCertificates(agentName string, clientConfig *restclient.Config, coreClient corev1client.CoreV1Interface, o *Options) (*restclient.Config, func(), error) {
 	store, err := NewSecretStore(o.CertStoreSecret, certPairNamePrefix, coreClient, clientConfig.CertData, clientConfig.KeyData,
 		func(certData, keyData []byte) error {
 			return writeKubeconfig(restclient.AnonymousClientConfig(clientConfig),
@@ -246,7 +240,7 @@ func registerSpokeCluster(clientConfig *restclient.Config, clusterName string) e
 }
 
 // waitForSpokeClusterApproval waits until the spoke cluster is approved on hub
-func waitForSpokeClusterApproval(clientConfig *restclient.Config, clusterName string, stopCh <-chan struct{}) error {
+func waitForSpokeClusterApproval(clientConfig *restclient.Config, clusterName string) error {
 	// TODO wait until the spoke cluster is approved on hub
 	return nil
 }
@@ -258,33 +252,6 @@ func verifyKeyData(data []byte) bool {
 	}
 	_, err := keyutil.ParsePrivateKeyPEM(data)
 	return err == nil
-}
-
-func waitForServer(cfg restclient.Config, deadline time.Duration) error {
-	cfg.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
-	cfg.Timeout = 1 * time.Second
-	cli, err := restclient.UnversionedRESTClientFor(&cfg)
-	if err != nil {
-		return fmt.Errorf("couldn't create client: %v", err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.TODO(), deadline)
-	defer cancel()
-
-	var connected bool
-	wait.JitterUntil(func() {
-		if _, err := cli.Get().AbsPath("/healthz").Do(context.Background()).Raw(); err != nil {
-			klog.Errorf("Failed to connect to apiserver: %v", err)
-			return
-		}
-		cancel()
-		connected = true
-	}, 2*time.Second, 0.2, true, ctx.Done())
-
-	if !connected {
-		return errors.New("timed out waiting to connect to apiserver")
-	}
-	return nil
 }
 
 // resolveAgentName resolves the name of the agent.

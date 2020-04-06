@@ -32,13 +32,13 @@ func (a *Agent) RunAgent(ctx context.Context, controllerContext *controllercmd.C
 		klog.Fatal(err)
 	}
 
-	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
+	spokeKubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
 
 	// bootstrap the agent and register the spoke cluster
-	_, _, err = bootstrap.Bootstrap(kubeClient.CoreV1(), a.bootstrapOptions, ctx.Done())
+	_, _, err = bootstrap.Bootstrap(spokeKubeClient.CoreV1(), a.bootstrapOptions)
 	if err != nil {
 		return err
 	}
