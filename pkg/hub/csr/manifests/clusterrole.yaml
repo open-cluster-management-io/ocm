@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:open-cluster-management:spokecluster:{{ .SpokeClusterName }}-csrapproved
+rules:
+# Allow spoke agent to create/get/list/watch certificatesigningrequests
+- apiGroups: ["certificates.k8s.io"]
+  resources: ["certificatesigningrequests"]
+  verbs: ["create", "get", "list", "watch"]
+# Allow spoke agent to create/get/list/watch spoke cluster
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["spokeclusters"]
+  verbs: ["create", "get", "list", "watch"]

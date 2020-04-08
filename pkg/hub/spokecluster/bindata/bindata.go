@@ -96,7 +96,8 @@ roleRef:
 subjects:
 - kind: Group
   apiGroup: rbac.authorization.k8s.io
-  name: system:open-cluster-management:spokecluster:{{ .SpokeClusterName }}`)
+  name: system:open-cluster-management:{{ .SpokeClusterName }}
+`)
 
 func pkgHubSpokeclusterManifestsSpokeclusterClusterrolebindingYamlBytes() ([]byte, error) {
 	return _pkgHubSpokeclusterManifestsSpokeclusterClusterrolebindingYaml, nil
@@ -116,7 +117,8 @@ func pkgHubSpokeclusterManifestsSpokeclusterClusterrolebindingYaml() (*asset, er
 var _pkgHubSpokeclusterManifestsSpokeclusterNamespaceYaml = []byte(`apiVersion: v1
 kind: Namespace
 metadata:
-  name: {{ .SpokeClusterName }}`)
+  name: {{ .SpokeClusterName }}
+`)
 
 func pkgHubSpokeclusterManifestsSpokeclusterNamespaceYamlBytes() ([]byte, error) {
 	return _pkgHubSpokeclusterManifestsSpokeclusterNamespaceYaml, nil
