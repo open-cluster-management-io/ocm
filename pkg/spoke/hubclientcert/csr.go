@@ -1,4 +1,4 @@
-package spokebootstrap
+package hubclientcert
 
 import (
 	"context"
@@ -18,7 +18,6 @@ import (
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	certificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/client-go/util/certificate/csr"
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog"
 )
@@ -27,14 +26,8 @@ const (
 	clusterNameAnnotation = "open-cluster-management.io/cluster-name"
 )
 
-// requestNodeCertificate will create a certificate signing request for a node
-// (Organization and CommonName for the CSR will be set as expected for node
-// certificates) and send it to API server, then it will watch the object's
-// status, once approved by API server, it will return the API server's issued
-// certificate (pem-encoded). If there is any errors, or the watch timeouts, it
-// will return an error. This is intended for use on nodes (kubelet and
-// kubeadm).
-func requestClusterCertificate(client certificatesv1beta1.CertificateSigningRequestInterface, privateKeyData []byte, clusterName, agentName string) (certData []byte, err error) {
+// requestNodeCertificate will create a bootstrap certificate signing request for cluster
+func requestClusterCertificate(client certificatesv1beta1.CertificateSigningRequestInterface, privateKeyData []byte, clusterName, agentName string) error {
 	subject := &pkix.Name{
 		Organization: []string{fmt.Sprintf("%s%s", subjectPrefix, clusterName)},
 		CommonName:   fmt.Sprintf("%s%s", subjectPrefix, agentName),
@@ -42,11 +35,11 @@ func requestClusterCertificate(client certificatesv1beta1.CertificateSigningRequ
 
 	privateKey, err := keyutil.ParsePrivateKeyPEM(privateKeyData)
 	if err != nil {
-		return nil, fmt.Errorf("invalid private key for certificate request: %v", err)
+		return fmt.Errorf("invalid private key for certificate request: %v", err)
 	}
 	csrData, err := certutil.MakeCSR(privateKey, subject, nil, nil)
 	if err != nil {
-		return nil, fmt.Errorf("unable to generate certificate request: %v", err)
+		return fmt.Errorf("unable to generate certificate request: %v", err)
 	}
 
 	usages := []certificates.KeyUsage{
@@ -58,31 +51,66 @@ func requestClusterCertificate(client certificatesv1beta1.CertificateSigningRequ
 	// The Signer interface contains the Public() method to get the public key.
 	signer, ok := privateKey.(crypto.Signer)
 	if !ok {
-		return nil, fmt.Errorf("private key does not implement crypto.Signer")
+		return fmt.Errorf("private key does not implement crypto.Signer")
 	}
 
 	name, err := digestedName(signer.Public(), subject, usages)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	req, err := RequestCertificate(client, csrData, name, certificates.KubeAPIServerClientKubeletSignerName, usages, privateKey, clusterName)
+	_, created, err := RequestCertificate(client, csrData, name, certificates.KubeAPIServerClientKubeletSignerName, usages, privateKey, clusterName)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	klog.V(4).Infof("CSR %q created", name)
+	if created {
+		klog.V(4).Infof("Create csr for cluster %q: %s", clusterName, name)
+	} else {
+		klog.V(4).Infof("Reuse existing csr for cluster %q: %s", clusterName, name)
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3600*time.Second)
-	defer cancel()
+	return nil
+}
 
-	klog.Info("Waiting for client certificate to be issued")
-	return csr.WaitForCertificate(ctx, client, req)
+// renewClusterCertificate will create a renewal certificate signing request for cluster
+func renewClusterCertificate(client certificatesv1beta1.CertificateSigningRequestInterface, privateKeyData []byte, clusterName, agentName string) error {
+	subject := &pkix.Name{
+		Organization: []string{fmt.Sprintf("%s%s", subjectPrefix, clusterName)},
+		CommonName:   fmt.Sprintf("%s%s", subjectPrefix, agentName),
+	}
+
+	privateKey, err := keyutil.ParsePrivateKeyPEM(privateKeyData)
+	if err != nil {
+		return fmt.Errorf("invalid private key for certificate request: %v", err)
+	}
+	csrData, err := certutil.MakeCSR(privateKey, subject, nil, nil)
+	if err != nil {
+		return fmt.Errorf("unable to generate certificate request: %v", err)
+	}
+
+	usages := []certificates.KeyUsage{
+		certificates.UsageDigitalSignature,
+		certificates.UsageKeyEncipherment,
+		certificates.UsageClientAuth,
+	}
+
+	req, created, err := RequestCertificate(client, csrData, "", certificates.KubeAPIServerClientKubeletSignerName, usages, privateKey, clusterName)
+	if err != nil {
+		return err
+	}
+	if created {
+		klog.V(4).Infof("Create csr for cluster %q: %s", clusterName, req.Name)
+	} else {
+		klog.V(4).Infof("Reuse existing csr for cluster %q: %s", clusterName, req.Name)
+	}
+
+	return nil
 }
 
 // This digest should include all the relevant pieces of the CSR we care about.
 // We can't directly hash the serialized CSR because of random padding that we
 // regenerate every loop and we include usages which are not contained in the
-// CSR. This needs to be kept up to date as we add new fields to the node
+// CSR. This needs to be kept up to date as we add new fields to the cluster
 // certificates and with ensureCompatible.
 func digestedName(publicKey interface{}, subject *pkix.Name, usages []certificates.KeyUsage) (string, error) {
 	hash := sha512.New512_256()
@@ -122,7 +150,7 @@ func digestedName(publicKey interface{}, subject *pkix.Name, usages []certificat
 // status, once approved by API server, it will return the API server's issued
 // certificate (pem-encoded). If there is any errors, or the watch timeouts, it
 // will return an error.
-func RequestCertificate(client certificatesclient.CertificateSigningRequestInterface, csrData []byte, name string, signerName string, usages []certificates.KeyUsage, privateKey interface{}, clusterName string) (req *certificates.CertificateSigningRequest, err error) {
+func RequestCertificate(client certificatesclient.CertificateSigningRequestInterface, csrData []byte, name string, signerName string, usages []certificates.KeyUsage, privateKey interface{}, clusterName string) (req *certificates.CertificateSigningRequest, created bool, err error) {
 	csr := &certificates.CertificateSigningRequest{
 		// Username, UID, Groups will be injected by API server.
 		TypeMeta: metav1.TypeMeta{Kind: "CertificateSigningRequest"},
@@ -146,19 +174,18 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 	switch {
 	case err == nil:
 	case errors.IsAlreadyExists(err) && len(name) > 0:
-		klog.Infof("csr for this cluster already exists, reusing")
 		req, err = client.Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
-			return nil, formatError("cannot retrieve certificate signing request: %v", err)
+			return nil, false, formatError("cannot retrieve certificate signing request: %v", err)
 		}
 		if err := ensureCompatible(req, csr, privateKey); err != nil {
-			return nil, fmt.Errorf("retrieved csr is not compatible: %v", err)
+			return nil, false, fmt.Errorf("csr for this cluster already exists but is not valid: %v", err)
 		}
-		klog.Infof("csr for this cluster is still valid")
+		return req, false, nil
 	default:
-		return nil, formatError("cannot create certificate signing request: %v", err)
+		return nil, false, formatError("cannot create certificate signing request: %v", err)
 	}
-	return req, nil
+	return req, true, nil
 }
 
 // ensureCompatible ensures that a CSR object is compatible with an original CSR
@@ -219,4 +246,17 @@ func formatError(format string, err error) error {
 		return se
 	}
 	return fmt.Errorf(format, err)
+}
+
+func isCSRApproved(csr *certificates.CertificateSigningRequest) bool {
+	approved := false
+	for _, condition := range csr.Status.Conditions {
+		if condition.Type == certificates.CertificateDenied {
+			return false
+		} else if condition.Type == certificates.CertificateApproved {
+			approved = true
+		}
+	}
+
+	return approved
 }
