@@ -9,66 +9,27 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 )
 
-// SecretReader provides functions to read data from a designated secret
-type SecretReader interface {
-	Get(key string) ([]byte, bool, error)
-	GetString(key string) (string, bool, error)
-	GetData() (map[string][]byte, error)
-}
-
-// SecretWritter provides functions to write data into the designated secret
-type SecretWritter interface {
-	Set(key string, value []byte) (bool, error)
-	SetString(key string, value string) (bool, error)
-	SetData(data map[string][]byte) (bool, error)
-	Remove(keys ...string) (bool, error)
-}
-
-type SecretStore interface {
-	SecretReader
-	SecretWritter
-}
-
-type secretStore struct {
+// SecretStore provides functions to read/write data from/into a designated secret
+type SecretStore struct {
 	secretNamespace string
 	secretName      string
 
 	coreClient corev1client.CoreV1Interface
 }
 
-// NewSecretReader return a concrete implementation of SecretReader.
-func NewSecretReader(secretKey string, coreClient corev1client.CoreV1Interface) (SecretReader, error) {
-	namespace, name, err := cache.SplitMetaNamespaceKey(secretKey)
-	if err != nil {
-		return nil, fmt.Errorf("invalid secret name %q: %v", secretKey, err)
-	}
-
-	return &secretStore{
-		secretNamespace: namespace,
-		secretName:      name,
+// NewSecretStore return a SecretStore.
+func NewSecretStore(secretNamespace, secretName string, coreClient corev1client.CoreV1Interface) *SecretStore {
+	return &SecretStore{
+		secretNamespace: secretNamespace,
+		secretName:      secretName,
 		coreClient:      coreClient,
-	}, nil
+	}
 }
 
-// NewSecretStore return a concrete implementation of SecretStore.
-func NewSecretStore(secretKey string, coreClient corev1client.CoreV1Interface) (SecretStore, error) {
-	namespace, name, err := cache.SplitMetaNamespaceKey(secretKey)
-	if err != nil {
-		return nil, fmt.Errorf("invalid secret name %q: %v", secretKey, err)
-	}
-
-	return &secretStore{
-		secretNamespace: namespace,
-		secretName:      name,
-		coreClient:      coreClient,
-	}, nil
-}
-
-func (s *secretStore) getSecret() (*corev1.Secret, bool, error) {
+func (s *SecretStore) getSecret() (*corev1.Secret, bool, error) {
 	secret, err := s.coreClient.Secrets(s.secretNamespace).Get(context.Background(), s.secretName, metav1.GetOptions{})
 	if err != nil {
 		if kerrors.IsNotFound(err) {
@@ -80,7 +41,8 @@ func (s *secretStore) getSecret() (*corev1.Secret, bool, error) {
 	return secret, true, nil
 }
 
-func (s *secretStore) Get(key string) ([]byte, bool, error) {
+// Get returns data entry in the secret data with a given key
+func (s *SecretStore) Get(key string) ([]byte, bool, error) {
 	secret, exists, err := s.getSecret()
 	if err != nil || !exists {
 		return nil, exists, err
@@ -97,7 +59,31 @@ func (s *secretStore) Get(key string) ([]byte, bool, error) {
 	return nil, false, nil
 }
 
-func (s *secretStore) Set(key string, value []byte) (bool, error) {
+// GetString returns data entry as string in the secret data with a given key
+func (s *SecretStore) GetString(key string) (string, bool, error) {
+	value, exists, err := s.Get(key)
+	if err != nil || !exists {
+		return "", exists, err
+	}
+	return string(value), true, nil
+}
+
+// GetData returns the whole data map in the secret
+func (s *SecretStore) GetData() (map[string][]byte, error) {
+	secret, exist, err := s.getSecret()
+	if err != nil {
+		return nil, err
+	}
+
+	if exist && secret.Data != nil {
+		return secret.Data, nil
+	}
+
+	return map[string][]byte{}, nil
+}
+
+// Set sets the value of a particular data entry in the secret data
+func (s *SecretStore) Set(key string, value []byte) (bool, error) {
 	secret, exists, err := s.getSecret()
 	if err != nil {
 		return false, err
@@ -135,11 +121,13 @@ func (s *secretStore) Set(key string, value []byte) (bool, error) {
 	return true, nil
 }
 
-func (s *secretStore) SetString(key string, value string) (bool, error) {
+// SetString sets the value of a particular data entry in the secret data
+func (s *SecretStore) SetString(key string, value string) (bool, error) {
 	return s.Set(key, []byte(value))
 }
 
-func (s *secretStore) SetData(data map[string][]byte) (bool, error) {
+// SetData sets the secret data
+func (s *SecretStore) SetData(data map[string][]byte) (bool, error) {
 	secret, exists, err := s.getSecret()
 	if err != nil {
 		return false, err
@@ -170,61 +158,5 @@ func (s *secretStore) SetData(data map[string][]byte) (bool, error) {
 	}
 
 	klog.V(4).Infof("Data saved in secret %q", s.secretNamespace+"/"+s.secretName)
-	return true, nil
-}
-
-func (s *secretStore) GetString(key string) (string, bool, error) {
-	value, exists, err := s.Get(key)
-	if err != nil || !exists {
-		return "", exists, err
-	}
-	return string(value), true, nil
-}
-
-func (s *secretStore) GetData() (map[string][]byte, error) {
-	secret, exist, err := s.getSecret()
-	if err != nil {
-		return nil, err
-	}
-
-	if exist && secret.Data != nil {
-		return secret.Data, nil
-	}
-
-	return map[string][]byte{}, nil
-}
-
-func (s *secretStore) Remove(keys ...string) (bool, error) {
-	secret, exists, err := s.getSecret()
-	if err != nil {
-		return false, err
-	}
-
-	if !exists {
-		return false, nil
-	}
-
-	if secret.Data == nil {
-		secret.Data = make(map[string][]byte)
-	}
-
-	changed := false
-	for _, key := range keys {
-		if _, ok := secret.Data[key]; ok {
-			delete(secret.Data, key)
-			changed = true
-		}
-	}
-
-	if !changed {
-		return false, nil
-	}
-
-	_, err = s.coreClient.Secrets(s.secretNamespace).Update(context.Background(), secret, metav1.UpdateOptions{})
-	if err != nil {
-		return true, fmt.Errorf("unable to remove %q from secret %q: %v", keys, s.secretNamespace+"/"+s.secretName, err)
-	}
-
-	klog.V(4).Infof("Data %q removed from secret %q", keys, s.secretNamespace+"/"+s.secretName)
 	return true, nil
 }

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	certutil "k8s.io/client-go/util/cert"
 )
 
@@ -49,14 +48,16 @@ func isClientCertificateStillValid(certData []byte, clusterName string) (bool, e
 	return true, nil
 }
 
-func getAgentNameFromCertificates(certData []byte) (string, error) {
+// getClusterAgentNamesFromCertificates returns cluster name and agent name parsed
+// from commmon name in client certificate.
+func getClusterAgentNamesFromCertificates(certData []byte) (clusterName, agentName string, err error) {
 	certs, err := certutil.ParseCertsPEM(certData)
 	if err != nil {
-		return "", fmt.Errorf("unable to parse TLS certificates: %v", err)
+		return "", "", fmt.Errorf("unable to parse TLS certificates: %v", err)
 	}
 
 	if len(certs) == 0 {
-		return "", errors.New("unable to get agent name from client certificates")
+		return "", "", errors.New("unable to get agent name from client certificates")
 	}
 
 	for _, cert := range certs {
@@ -64,24 +65,18 @@ func getAgentNameFromCertificates(certData []byte) (string, error) {
 			continue
 		}
 
-		return cert.Subject.CommonName[len(subjectPrefix):], nil
+		names := strings.Split(cert.Subject.CommonName[len(subjectPrefix):], ":")
+		if len(names) != 2 {
+			return "", "", fmt.Errorf("invalid common name %q in certificate", cert.Subject.CommonName)
+		}
+
+		return names[0], names[1], nil
 	}
 
-	return "", errors.New("unable to get agent name from client certificates")
+	return "", "", errors.New("unable to get agent name from client certificates")
 }
 
-func nextRotationDeadline(leaf *x509.Certificate) time.Time {
-	notAfter := leaf.NotAfter
-	totalDuration := float64(notAfter.Sub(leaf.NotBefore))
-	deadline := leaf.NotBefore.Add(jitteryDuration(totalDuration))
-
-	return deadline
-}
-
-func jitteryDuration(totalDuration float64) time.Duration {
-	return wait.Jitter(time.Duration(totalDuration), 0.2) - time.Duration(totalDuration*0.3)
-}
-
+// getCertLeaf returns the cert leaf with the given common name
 func getCertLeaf(certData []byte, commonName string) (*x509.Certificate, error) {
 	certs, err := certutil.ParseCertsPEM(certData)
 	if err != nil {
