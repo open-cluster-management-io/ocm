@@ -10,9 +10,9 @@ import (
 )
 
 func NewAgent() *cobra.Command {
-	agentOptions := spoke.NewAgentOptions()
+	agentOptions := spoke.NewSpokeAgentOptions()
 	cmd := controllercmd.
-		NewControllerCommandConfig("agent", version.Get(), agentOptions.RunAgent).
+		NewControllerCommandConfig("agent", version.Get(), agentOptions.RunSpokeAgent).
 		NewCommand()
 	cmd.Use = "agent"
 	cmd.Short = "Start the Cluster Registration Agent"

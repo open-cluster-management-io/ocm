@@ -3,428 +3,215 @@ package hubclientcert
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
-	"path"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
-	certificatesinformersv1beta1 "k8s.io/client-go/informers/certificates/v1beta1"
-	"k8s.io/client-go/kubernetes"
+	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
+	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	certificateslistersv1beta1 "k8s.io/client-go/listers/certificates/v1beta1"
-	"k8s.io/client-go/rest"
+	certificateslisters "k8s.io/client-go/listers/certificates/v1beta1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog"
 )
 
 const (
-	kubeconfigFile    = "kubeconfig"
-	hubClientKeyFile  = "spoke-agent.key"
-	hubClientCertFile = "spoke-agent.crt"
-	clusterNameFile   = "cluster-name.txt"
-	agentNameFile     = "agent-name.txt"
-	tmpPrivateKeyFile = "spoke-agent.key.tmp"
-	subjectPrefix     = "system:open-cluster-management:"
+	// KubeconfigFile is the name of the kubeconfig file in kubeconfigSecret
+	KubeconfigFile = "kubeconfig"
+	// TLSKeyFile is the name of tls key file in kubeconfigSecret
+	TLSKeyFile = "tls.key"
+	// TLSCertFile is the name of the tls cert file in kubeconfigSecret
+	TLSCertFile = "tls.crt"
+
+	subjectPrefix         = "system:open-cluster-management:"
+	clusterNameAnnotation = "open-cluster-management.io/cluster-name"
 )
 
 // ClientCertForHubController maintains the client cert and kubeconfig for hub
 type ClientCertForHubController struct {
-	kubeconfigDir         string
-	kubeconfigSecretStore *SecretStore
-	clusterName           string
-	agentName             string
-	bootstrapped          bool
-	bootstrapClientConfig *restclient.Config
-	initialClientConfig   *restclient.Config
-	csrLister             certificateslistersv1beta1.CertificateSigningRequestLister
-	csrName               string
+	clusterName               string
+	agentName                 string
+	kubeconfigSecretNamespace string
+	kubeconfigSecretName      string
+	hubClientConfig           *restclient.Config
+	csrName                   string
+	hubCSRLister              certificateslisters.CertificateSigningRequestLister
+	hubCSRClient              csrclient.CertificateSigningRequestInterface
+	spokeCoreClient           corev1client.CoreV1Interface
+	keyData                   []byte
 }
 
 // NewClientCertForHubController return a ClientCertForHubController
-func NewClientCertForHubController(hubKubeconfigSecretNamespace, hubKubeconfigSecret, hubKubeconfigDir,
-	clusterName, agentName string, bootstrapClientConfig *restclient.Config, bootstrapped bool,
-	spokeCoreClient corev1client.CoreV1Interface) (*ClientCertForHubController, error) {
-	kubeconfigSecretStore := NewSecretStore(hubKubeconfigSecretNamespace, hubKubeconfigSecret, spokeCoreClient)
-
-	// build initial hub client config for building csr informer and creating csrs
-	var initialClientConfig *restclient.Config
-	var err error
-	if bootstrapped {
-		kubeconfigPath := path.Join(hubKubeconfigDir, kubeconfigFile)
-		initialClientConfig, err = loadHubClientConfig(kubeconfigPath)
-		if err != nil {
-			return nil, fmt.Errorf("unable to load hub kubeconfig: %q: %v", kubeconfigPath, err)
-		}
-	} else {
-		initialClientConfig = restclient.CopyConfig(bootstrapClientConfig)
+func NewClientCertForHubController(clusterName, agentName, hubKubeconfigSecretNamespace,
+	kubeconfigSecretName string, hubClientConfig *restclient.Config, spokeCoreClient corev1client.CoreV1Interface,
+	hubCSRClient csrclient.CertificateSigningRequestInterface, csrInformer certificatesinformers.CertificateSigningRequestInformer,
+	recorder events.Recorder, controllerNameOverride string) (factory.Controller, error) {
+	c := &ClientCertForHubController{
+		clusterName:               clusterName,
+		agentName:                 agentName,
+		kubeconfigSecretNamespace: hubKubeconfigSecretNamespace,
+		kubeconfigSecretName:      kubeconfigSecretName,
+		hubClientConfig:           hubClientConfig,
+		hubCSRLister:              csrInformer.Lister(),
+		hubCSRClient:              hubCSRClient,
+		spokeCoreClient:           spokeCoreClient,
 	}
 
-	return &ClientCertForHubController{
-		bootstrapClientConfig: bootstrapClientConfig,
-		kubeconfigSecretStore: kubeconfigSecretStore,
-		kubeconfigDir:         hubKubeconfigDir,
-		clusterName:           clusterName,
-		agentName:             agentName,
-		bootstrapped:          bootstrapped,
-		initialClientConfig:   initialClientConfig,
-	}, nil
-}
+	controllerName := "ClientCertForHubController"
+	if controllerNameOverride != "" {
+		controllerName = controllerNameOverride
+	}
 
-// ToController convert ClientCertForHubController to a real contoller
-func (c *ClientCertForHubController) ToController(csrInformer certificatesinformersv1beta1.CertificateSigningRequestInformer, recorder events.Recorder) factory.Controller {
-	c.csrLister = csrInformer.Lister()
 	return factory.New().
 		WithInformers(csrInformer.Informer()).
 		WithSync(c.sync).
 		ResyncEvery(5*time.Minute).
-		ToController("ClientCertForHubController", recorder)
-}
-
-// GetInitialHubClientConfig returns an inital hub client config for building csr
-// informer and creating csrs
-func (c *ClientCertForHubController) GetInitialHubClientConfig() *restclient.Config {
-	return c.initialClientConfig
-}
-
-// GetHubClientConfig returns client config for hub. It will block until
-// the client config is available
-func (c *ClientCertForHubController) GetHubClientConfig() (*rest.Config, error) {
-	if !c.bootstrapped {
-		wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
-			return c.bootstrapped, nil
-		})
-	}
-
-	kubeconfigPath := path.Join(c.kubeconfigDir, kubeconfigFile)
-	return loadHubClientConfig(kubeconfigPath)
+		ToController(controllerName, recorder), nil
 }
 
 func (c *ClientCertForHubController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	if c.csrName != "" {
-		return c.syncCSR()
-	}
-
-	backoff := wait.Backoff{
-		Duration: 2 * time.Second,
-		Factor:   2,
-		Jitter:   0.1,
-		Steps:    5,
-	}
-	if c.bootstrapped {
-		// check the expiry time fo client certificate and create renewal csr if necessary
-		certData, exists, err := c.kubeconfigSecretStore.Get(hubClientCertFile)
-		if err != nil {
-			return err
-		}
-		if !exists {
-			return errors.New("no cert data found")
-		}
-
-		commonName := fmt.Sprintf("%s%s:%s", subjectPrefix, c.clusterName, c.agentName)
-		leaf, err := getCertLeaf(certData, commonName)
-		if err != nil {
-			return err
-		}
-
-		// create renewal csr if the curent client certificate has less than 20% of its life remaining
-		total := leaf.NotAfter.Sub(leaf.NotBefore)
-		remaining := leaf.NotAfter.Sub(time.Now())
-		if remaining.Seconds()/total.Seconds() < 0.2 {
-			klog.Infof("Client certificate will expire in %v. Start certificate rotation", remaining.Round(time.Second))
-			if err := wait.ExponentialBackoff(backoff, c.rotateCerts); err != nil {
-				utilruntime.HandleError(fmt.Errorf("Reached backoff limit, still unable to rotate certs: %v", err))
-				wait.PollInfinite(32*time.Second, c.rotateCerts)
+	// get kubeconfigSecret
+	exists := true
+	secret, err := c.spokeCoreClient.Secrets(c.kubeconfigSecretNamespace).Get(context.Background(), c.kubeconfigSecretName, metav1.GetOptions{})
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			exists = false
+			secret = &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: c.kubeconfigSecretNamespace,
+					Name:      c.kubeconfigSecretName,
+				},
 			}
-		}
-	} else {
-		// create bootstrap csr
-		if err := wait.ExponentialBackoff(backoff, c.bootstrap); err != nil {
-			utilruntime.HandleError(fmt.Errorf("Reached backoff limit, still unable to bootstrap agent: %v", err))
+		} else {
+			return fmt.Errorf("unable to get secret %q: %v", c.kubeconfigSecretNamespace+"/"+c.kubeconfigSecretName, err)
 		}
 	}
-	return nil
-}
 
-func (c *ClientCertForHubController) syncCSR() error {
-	// skip if there is no ongoing csr
-	if c.csrName == "" {
+	// reconcile pending csr if exists
+	if c.csrName != "" {
+		updated, err := c.syncCSR(secret)
+		if err != nil {
+			return err
+		}
+		if !updated {
+			return nil
+		}
+
+		// write the new cert/key pair into the secret
+		if exists {
+			_, err = c.spokeCoreClient.Secrets(c.kubeconfigSecretNamespace).Update(context.Background(), secret, metav1.UpdateOptions{})
+		} else {
+			_, err = c.spokeCoreClient.Secrets(c.kubeconfigSecretNamespace).Create(context.Background(), secret, metav1.CreateOptions{})
+		}
+		if err != nil {
+			return err
+		}
+		klog.Info("A new client certificate is available")
 		return nil
 	}
 
+	// create a csr to request new client certificate if
+	// a. there is no client certificate
+	// b. client certificate exists and has less than 20% of its life remaining
+	if hasValidKubeconfig(secret) {
+		commonName := fmt.Sprintf("%s%s:%s", subjectPrefix, c.clusterName, c.agentName)
+		leaf, err := getCertLeaf(secret, commonName)
+		if err != nil {
+			return err
+		}
+
+		total := leaf.NotAfter.Sub(leaf.NotBefore)
+		remaining := leaf.NotAfter.Sub(time.Now())
+		if remaining.Seconds()/total.Seconds() > 0.2 {
+			return nil
+		}
+		klog.Infof("Ther current client certificate for hub expires in %v. Start certificate rotation", remaining.Round(time.Second))
+	} else {
+		klog.Info("No valid client certificate for hub is found. Bootstrap is required")
+	}
+
+	// create a csr
+	c.keyData, err = keyutil.MakeEllipticPrivateKeyPEM()
+	if err != nil {
+		return err
+	}
+
+	c.csrName, err = createCSR(c.hubCSRClient, c.keyData, c.clusterName, c.agentName)
+	if err != nil {
+		return err
+	}
+	klog.Infof("A csr %q is created", c.csrName)
+	return nil
+}
+
+func (c *ClientCertForHubController) syncCSR(secret *corev1.Secret) (bool, error) {
+	// skip if there is no ongoing csr
+	if c.csrName == "" {
+		return false, nil
+	}
+
 	// skip if csr no longer exists
-	csr, err := c.csrLister.Get(c.csrName)
+	csr, err := c.hubCSRLister.Get(c.csrName)
 	if err != nil {
 		if kerrors.IsNotFound(err) {
 			c.csrName = ""
-			return nil
+			return false, nil
 		}
-		return err
+		return false, err
 	}
 
 	// skip if csr is not approved yet
 	if !isCSRApproved(csr) {
-		return nil
+		return false, nil
 	}
 
 	// skip if csr has no certificate in its status yet
 	if csr.Status.Certificate == nil {
-		return nil
+		return false, nil
 	}
 
-	klog.V(4).Infof("Sync csr: %s", c.csrName)
+	klog.V(4).Infof("Sync csr %q", c.csrName)
 	// check if cert in csr status matches with the corresponding private key
-	keyData, exists, err := c.kubeconfigSecretStore.Get(tmpPrivateKeyFile)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		klog.Warningf("Private key is not found for certificate in csr: %s", c.csrName)
+	if c.keyData == nil {
+		klog.Warningf("No private key found for certificate in csr: %s", c.csrName)
 		c.csrName = ""
-		return nil
+		return false, nil
 	}
-	_, err = tls.X509KeyPair(csr.Status.Certificate, keyData)
+	_, err = tls.X509KeyPair(csr.Status.Certificate, c.keyData)
 	if err != nil {
 		klog.Warningf("Private key does not match with the certificate in csr: %s", c.csrName)
 		c.csrName = ""
-		return nil
+		return false, nil
 	}
 
 	// save the cert/key in secret
-	err = c.updateClientCert(csr.Status.Certificate)
-	if err != nil {
-		return err
-	}
-
-	if c.bootstrapped {
-		klog.Info("Client certificate rotated.")
-	} else {
-		// update the initial cient config to refer to the latest cert/key
-		c.initialClientConfig.TLSClientConfig.CertData = nil
-		c.initialClientConfig.TLSClientConfig.CertFile = path.Join(c.kubeconfigDir, hubClientCertFile)
-		c.initialClientConfig.TLSClientConfig.KeyData = nil
-		c.initialClientConfig.TLSClientConfig.KeyFile = path.Join(c.kubeconfigDir, hubClientKeyFile)
-
-		c.bootstrapped = true
-		klog.Info("Bootstrap is done and client certificate is available.")
-	}
-
-	// clear the csr name
-	c.csrName = ""
-	return nil
-}
-
-// rotateCerts creates renewal csr to rotate client certificates
-func (c *ClientCertForHubController) rotateCerts() (bool, error) {
-	// reuse temporary private key if exists
-	keyData, exists, err := c.kubeconfigSecretStore.Get(tmpPrivateKeyFile)
-	if err != nil {
-		utilruntime.HandleError(err)
-		return false, nil
-	}
-
-	// otherwise create a new one
-	if !exists {
-		keyData, err = keyutil.MakeEllipticPrivateKeyPEM()
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Unable to generate private key: %v", err))
-			return false, nil
-		}
-
-		// save the new private key in secret so that it can be reused on next startup
-		// if CSR request fails.
-		_, err = c.kubeconfigSecretStore.Set(tmpPrivateKeyFile, keyData)
-		if err != nil {
-			utilruntime.HandleError(err)
-			return false, nil
-		}
-	}
-
-	// create a csr for cert renewal
-	initialHubKubeClient, err := kubernetes.NewForConfig(c.initialClientConfig)
-	if err != nil {
-		utilruntime.HandleError(err)
-		return false, nil
-	}
-
-	c.csrName, err = requestClusterCertificate(initialHubKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
-		keyData, c.clusterName, c.agentName, true)
-	if err != nil {
-		utilruntime.HandleError(err)
-		return false, nil
-	}
-
-	return true, nil
-}
-
-func (c *ClientCertForHubController) bootstrap() (bool, error) {
-	// reuse temporary private key if exists
-	keyData, exists, err := c.kubeconfigSecretStore.Get(tmpPrivateKeyFile)
-	if err != nil {
-		utilruntime.HandleError(err)
-		return false, nil
-	}
-
-	// otherwise create a new one
-	if !exists {
-		keyData, err = keyutil.MakeEllipticPrivateKeyPEM()
-		if err != nil {
-			utilruntime.HandleError(err)
-			return false, nil
-		}
-
-		// save the new private key in secret so that it can be reused on next startup
-		// if CSR request fails.
-		_, err = c.kubeconfigSecretStore.Set(tmpPrivateKeyFile, keyData)
-		if err != nil {
-			utilruntime.HandleError(err)
-			return false, nil
-		}
-	}
-
-	// create a csr on hub for bootstrap
-	initialHubKubeClient, err := kubernetes.NewForConfig(c.initialClientConfig)
-	if err != nil {
-		utilruntime.HandleError(err)
-		return false, nil
-	}
-	c.csrName, err = requestClusterCertificate(initialHubKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
-		keyData, c.clusterName, c.agentName, false)
-	if err != nil {
-		utilruntime.HandleError(err)
-		return false, nil
-	}
-
-	return true, nil
-}
-
-// updateClientCert saves cert and its coressponding key into secret. if inital
-// kubeconfig dir exists, save the cert/key in that dir as well
-func (c *ClientCertForHubController) updateClientCert(certData []byte) error {
-	data, err := c.kubeconfigSecretStore.GetData()
-	if err != nil {
-		return err
-	}
-
-	keyData, ok := data[tmpPrivateKeyFile]
-	if !ok {
-		return errors.New("private key is not found for cert")
-	}
-
-	// put cert/key into secret data and delete temporary data
-	data[hubClientKeyFile] = keyData
-	data[hubClientCertFile] = certData
-	delete(data, tmpPrivateKeyFile)
-
-	// create a kubeconfig which refers to the key/cert files if it dose not exists.
-	// The secret could be shared with other component in separated deployments. So they
-	// are able to access the kubeconfig for hub as well.
-	if _, ok := data[kubeconfigFile]; !ok {
-		clientConfigTemplate := restclient.CopyConfig(c.bootstrapClientConfig)
-		kubeconfig := buildKubeconfig(clientConfigTemplate, hubClientCertFile, hubClientKeyFile)
-		kubeconfigData, err := clientcmd.Write(kubeconfig)
-		if err != nil {
-			return err
-		}
-		data[kubeconfigFile] = kubeconfigData
-	}
-
-	// save the change into secret
-	_, err = c.kubeconfigSecretStore.SetData(data)
-	return err
-}
-
-func loadHubClientConfig(kubeconfigPath string) (*restclient.Config, error) {
-	// Load structured kubeconfig data from the given path.
-	loader := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath}
-	loadedConfig, err := loader.Load()
-	if err != nil {
-		return nil, err
-	}
-
-	// Flatten the loaded data to a particular restclient.Config based on the current context.
-	return clientcmd.NewNonInteractiveClientConfig(
-		*loadedConfig,
-		loadedConfig.CurrentContext,
-		&clientcmd.ConfigOverrides{},
-		loader,
-	).ClientConfig()
-
-	/*
-		kubeconfigData, err := ioutil.ReadFile(kubeconfigPath)
-		if err != nil {
-			return nil, err
-		}
-		kubeConfig, err := clientcmd.NewClientConfigFromBytes(kubeconfigData)
-		if err != nil {
-			return nil, err
-		}
-		return kubeConfig.ClientConfig()
-	*/
-}
-
-// buildKubeconfig builds kubeconfig based on template rest config and a cert/key pair
-func buildKubeconfig(clientConfig *restclient.Config, certPath, keyPath string) clientcmdapi.Config {
-	// Get the CA data from the bootstrap client config.
-	caFile, caData := clientConfig.CAFile, []byte{}
-	if len(caFile) == 0 {
-		caData = clientConfig.CAData
-	}
-
-	// Build kubeconfig.
-	kubeconfig := clientcmdapi.Config{
-		// Define a cluster stanza based on the bootstrap kubeconfig.
-		Clusters: map[string]*clientcmdapi.Cluster{"default-cluster": {
-			Server:                   clientConfig.Host,
-			InsecureSkipTLSVerify:    clientConfig.Insecure,
-			CertificateAuthority:     caFile,
-			CertificateAuthorityData: caData,
-		}},
-		// Define auth based on the obtained client cert.
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{"default-auth": {
-			ClientCertificate: certPath,
-			ClientKey:         keyPath,
-		}},
-		// Define a context that connects the auth info and cluster, and set it as the default
-		Contexts: map[string]*clientcmdapi.Context{"default-context": {
-			Cluster:   "default-cluster",
-			AuthInfo:  "default-auth",
-			Namespace: "default",
-		}},
-		CurrentContext: "default-context",
-	}
-
-	return kubeconfig
-}
-
-// LoadClientConfigFromSecret returns a client config stored in a secret
-func LoadClientConfigFromSecret(namespace, name string, spokeCoreClient corev1client.CoreV1Interface) (*restclient.Config, error) {
-	secret, err := spokeCoreClient.Secrets(namespace).Get(context.Background(), name, metav1.GetOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("unable to load client config from secret %q: %v", namespace+"/"+name, err)
-	}
-
 	if secret.Data == nil {
 		secret.Data = map[string][]byte{}
 	}
+	secret.Data[TLSCertFile] = csr.Status.Certificate
+	secret.Data[TLSKeyFile] = c.keyData
 
-	kubeconfigData, ok := secret.Data[kubeconfigFile]
-	if !ok {
-		return nil, fmt.Errorf("no kubeconfig found in secret %q", namespace+"/"+name)
+	// create a kubeconfig with references to the key/cert files in kubeconfigSecret if it dose not exists.
+	// So other components deployed in separated deployments are able to access this kubeconfig for hub as
+	// well by sharing the secret
+	if _, ok := secret.Data[KubeconfigFile]; !ok {
+		kubeconfig := buildKubeconfig(restclient.CopyConfig(c.hubClientConfig), TLSCertFile, TLSKeyFile)
+		kubeconfigData, err := clientcmd.Write(kubeconfig)
+		if err != nil {
+			return false, err
+		}
+		secret.Data[KubeconfigFile] = kubeconfigData
 	}
 
-	clientConfig, err := clientcmd.RESTConfigFromKubeConfig(kubeconfigData)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse kubeconfig from secret %q: %v", namespace+"/"+name, err)
-	}
+	// clear the csr name and private key
+	c.csrName = ""
+	c.keyData = nil
 
-	return clientConfig, nil
+	return true, nil
 }
