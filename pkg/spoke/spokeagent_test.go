@@ -1,71 +1,84 @@
 package spoke
 
 import (
-	"context"
+	"io/ioutil"
+	"os"
+	"path"
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubefake "k8s.io/client-go/kubernetes/fake"
+	"github.com/open-cluster-management/registration/pkg/spoke/hubclientcert"
 )
 
 func TestGetOrGenerateClusterAgentNames(t *testing.T) {
-	fakeKubeClient := kubefake.NewSimpleClientset()
-
-	namespace := "default"
-	name := "hub-kubeconfig-secret"
-
-	// generate cluster/agent name without cluster name override
-	getOrGenerateClusterAgentNames("", namespace, name, fakeKubeClient.CoreV1())
-
-	secret, err := fakeKubeClient.CoreV1().Secrets(namespace).Get(context.Background(), name, metav1.GetOptions{})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	o := &SpokeAgentOptions{
+		HubKubeconfigDir: "/path/not/existing",
 	}
 
-	if secret.Data == nil {
-		t.Error("cluster/agent names are not generated")
-	}
-
-	clusterName := string(secret.Data[clusterNameSecretDataKey])
+	clusterName, agentName := o.getOrGenerateClusterAgentNames()
 	if clusterName == "" {
-		t.Error("cluster name is not generated")
+		t.Error("cluster name should not be empty")
 	}
 
-	agentName := string(secret.Data[agentNameSecretDataKey])
 	if agentName == "" {
-		t.Error("agent name is not generated")
+		t.Error("agent name should not be empty")
+	}
+}
+
+func TestGetOrGenerateClusterAgentNamesWithClusterNameOverride(t *testing.T) {
+	dir, err := ioutil.TempDir("", "prefix")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	o := &SpokeAgentOptions{
+		HubKubeconfigDir: "/path/not/existing",
+		ClusterName:      "cluster0",
 	}
 
-	// call getOrGenerateClusterAgentNames() another time and see if the saved cluster/agent names are reused
-	getOrGenerateClusterAgentNames("", namespace, name, fakeKubeClient.CoreV1())
+	clusterName, agentName := o.getOrGenerateClusterAgentNames()
 
-	secret, err = fakeKubeClient.CoreV1().Secrets(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	if clusterName != o.ClusterName {
+		t.Errorf("expect cluster name %q but got %q", o.ClusterName, clusterName)
+	}
+
+	if agentName == "" {
+		t.Error("agent name should not be empty")
+	}
+}
+
+func TestGetOrGenerateClusterAgentNamesWithExistingNames(t *testing.T) {
+	dir, err := ioutil.TempDir("", "prefix")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	cn, an := "cluster0", "agent0"
+
+	clusterNameFilePath := path.Join(dir, hubclientcert.ClusterNameFile)
+	err = ioutil.WriteFile(clusterNameFilePath, []byte(cn), 0644)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if string(secret.Data[clusterNameSecretDataKey]) != clusterName {
-		t.Error("cluster name saved in secret should be reused")
-	}
-
-	if string(secret.Data[agentNameSecretDataKey]) != agentName {
-		t.Error("agent name saved in secret should be reused")
-	}
-
-	// call getOrGenerateClusterAgentNames() one more time with cluster name overrided and see if it works
-	clusterNameOverride := "cluster0"
-	getOrGenerateClusterAgentNames(clusterNameOverride, namespace, name, fakeKubeClient.CoreV1())
-
-	secret, err = fakeKubeClient.CoreV1().Secrets(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	agentNameFilePath := path.Join(dir, hubclientcert.AgentNameFile)
+	err = ioutil.WriteFile(agentNameFilePath, []byte(an), 0644)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if string(secret.Data[clusterNameSecretDataKey]) != clusterNameOverride {
-		t.Errorf("cluster name override %q does not take effetct", clusterNameOverride)
+	o := &SpokeAgentOptions{
+		HubKubeconfigDir: dir,
 	}
 
-	if string(secret.Data[agentNameSecretDataKey]) != agentName {
-		t.Error("agent name saved in secret should be reused")
+	clusterName, agentName := o.getOrGenerateClusterAgentNames()
+
+	if clusterName != cn {
+		t.Errorf("expect cluster name %q but got %q", cn, clusterName)
+	}
+
+	if agentName != an {
+		t.Errorf("expect agent name %q but got %q", an, agentName)
 	}
 }

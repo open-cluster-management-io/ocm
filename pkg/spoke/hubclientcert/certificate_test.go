@@ -1,7 +1,6 @@
 package hubclientcert
 
 import (
-	"context"
 	"crypto"
 	"crypto/rand"
 	cryptorand "crypto/rand"
@@ -13,6 +12,7 @@ import (
 	"io/ioutil"
 	"math"
 	"math/big"
+	"os"
 	"path"
 	"testing"
 	"time"
@@ -20,7 +20,6 @@ import (
 	certificates "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
@@ -203,31 +202,12 @@ func TestIsCSRApprovedWithDeniedCSR(t *testing.T) {
 	}
 }
 
-func TestCreateCSR(t *testing.T) {
-	fakeKubeClient := kubefake.NewSimpleClientset()
-
-	keyData, err := keyutil.MakeEllipticPrivateKeyPEM()
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	clusterName := "cluster0"
-	agentName := "agent0"
-	csrName, err := createCSR(fakeKubeClient.CertificatesV1beta1().CertificateSigningRequests(), keyData, clusterName, agentName)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	_, err = fakeKubeClient.CertificatesV1beta1().CertificateSigningRequests().Get(context.Background(), csrName, metav1.GetOptions{})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-}
-
 func TestLoadClientConfig(t *testing.T) {
 	dir, err := ioutil.TempDir("", "prefix")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	defer os.RemoveAll(dir)
 
 	kubeconfigData, err := clientcmd.Write(newKubeconfig(nil, nil))
 	if err != nil {
@@ -257,9 +237,8 @@ func TestLoadClientConfig(t *testing.T) {
 	}
 }
 
-func TestGetCertLeaf(t *testing.T) {
-	commonName := "cluster0"
-	_, cert, err := newCertKey(commonName, 10*time.Second)
+func TestGetCertValidityPeriod(t *testing.T) {
+	_, cert, err := newCertKey("cluster0", 10*time.Second)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -274,19 +253,27 @@ func TestGetCertLeaf(t *testing.T) {
 		},
 	}
 
-	_, err = getCertLeaf(secret, commonName)
+	notBefore, notAfter, err := getCertValidityPeriod(secret)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+
+	if notBefore == nil {
+		t.Error("notBefore should not be nil")
+	}
+
+	if notAfter == nil {
+		t.Error("notAfter should not be nil")
+	}
 }
 
-func TestIsCertificatetValid(t *testing.T) {
+func TestIsCertificateValid(t *testing.T) {
 	_, cert, err := newCertKey("cluster0", 100*time.Second)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	valid, err := IsCertificatetValid(cert)
+	valid, err := IsCertificateValid(cert)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -295,7 +282,7 @@ func TestIsCertificatetValid(t *testing.T) {
 	}
 }
 
-func TestIsCertificatetValidWithExpiredCert(t *testing.T) {
+func TestIsCertificateValidWithExpiredCert(t *testing.T) {
 	_, cert, err := newCertKey("cluster0", 1*time.Second)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -303,7 +290,7 @@ func TestIsCertificatetValidWithExpiredCert(t *testing.T) {
 
 	time.Sleep(3 * time.Second)
 
-	valid, err := IsCertificatetValid(cert)
+	valid, err := IsCertificateValid(cert)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

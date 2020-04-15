@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/events"
 	certificates "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,20 +15,28 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/keyutil"
 )
+
+func newSecret(namespace, name, resourceVersion string, data map[string][]byte) *corev1.Secret {
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:       namespace,
+			Name:            name,
+			ResourceVersion: resourceVersion,
+		},
+		Data: data,
+	}
+
+	return secret
+}
 
 func TestSyncCSR(t *testing.T) {
 	secretNamespace := "default"
 	secretName := "secret"
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: secretNamespace,
-			Name:      secretName,
-		},
-	}
+	secret := newSecret(secretNamespace, secretName, "", nil)
 
-	commonName := "cluster0"
-	key, cert, err := newCertKey(commonName, 10*time.Second)
+	key, cert, err := newCertKey("cluster0", 10*time.Second)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -51,14 +61,15 @@ func TestSyncCSR(t *testing.T) {
 	csrInformer := informers.NewSharedInformerFactory(fakeKubeClient,
 		3*time.Minute).Certificates().V1beta1().CertificateSigningRequests()
 
+	// create csr informer/lister
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
 	go csrInformer.Informer().Run(ctx.Done())
 	if ok := cache.WaitForCacheSync(ctx.Done(), csrInformer.Informer().HasSynced); !ok {
 		t.Error("failed to wait for kubernetes caches to sync")
 	}
 
+	// create a fake client config as template
 	kubeconfigData, err := clientcmd.Write(newKubeconfig(key, cert))
 	clientConfig, err := clientcmd.RESTConfigFromKubeConfig(kubeconfigData)
 	if err != nil {
@@ -71,47 +82,82 @@ func TestSyncCSR(t *testing.T) {
 		hubCSRLister:    csrInformer.Lister(),
 		hubClientConfig: clientConfig,
 	}
-	changed, err := controller.syncCSR(secret)
+	newSecretConfig, err := controller.syncCSR(secret)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !changed {
+	if newSecretConfig == nil {
 		t.Error("secret should be changed")
 	}
 
+	// check if csrName/keyData are cleared
+	if controller.csrName != "" {
+		t.Error("controller.csrName should be empty")
+	}
+	if controller.keyData != nil {
+		t.Error("controller.keyData should be nil")
+	}
+
+	// validate the kubeconfig in secret
+	secret.Data = newSecretConfig
 	if !hasValidKubeconfig(secret) {
-		t.Error("kubeconfig is valid")
+		t.Error("kubeconfig should be valid")
 	}
 }
 
 // test bootstrap
-func TestSyncWithoutKubeconfig(t *testing.T) {
+func TestSyncWithoutHubKubeconfigSecret(t *testing.T) {
 	secretNamespace := "default"
 	secretName := "secret"
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: secretNamespace,
-			Name:      secretName,
-		},
-	}
 
 	clusterName := "cluster0"
 	agentName := "agent0"
+	fakeKubeClient := kubefake.NewSimpleClientset()
 
-	fakeKubeClient := kubefake.NewSimpleClientset(secret)
-	controller := &ClientCertForHubController{
-		clusterName:               clusterName,
-		agentName:                 agentName,
-		kubeconfigSecretNamespace: secretNamespace,
-		kubeconfigSecretName:      secretName,
-		spokeCoreClient:           fakeKubeClient.CoreV1(),
-		hubCSRClient:              fakeKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
+	// create secret informer/lister
+	secretInformer := informers.NewSharedInformerFactory(fakeKubeClient,
+		3*time.Minute).Core().V1().Secrets()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go secretInformer.Informer().Run(ctx.Done())
+	if ok := cache.WaitForCacheSync(ctx.Done(), secretInformer.Informer().HasSynced); !ok {
+		t.Error("failed to wait for kubernetes caches to sync")
 	}
-	err := controller.sync(nil, nil)
+
+	controller := &ClientCertForHubController{
+		clusterName:                  clusterName,
+		agentName:                    agentName,
+		hubKubeconfigSecretNamespace: secretNamespace,
+		hubKubeconfigSecretName:      secretName,
+		spokeCoreClient:              fakeKubeClient.CoreV1(),
+		hubCSRClient:                 fakeKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
+		spokeSecretLister:            secretInformer.Lister(),
+	}
+
+	eventRecorder := events.NewInMemoryRecorder("")
+	syncContext := factory.NewSyncContext("", eventRecorder)
+	err := controller.sync(nil, syncContext)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
+	secret, err := fakeKubeClient.CoreV1().Secrets(secretNamespace).Get(context.Background(), secretName, metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// check if cluster/agent name are stored into secret
+	if len(secret.Data) == 0 {
+		t.Errorf("secret should have data stored")
+	}
+	if string(secret.Data[ClusterNameFile]) != clusterName {
+		t.Errorf("expected cluster name %q but got: %s", clusterName, string(secret.Data[ClusterNameFile]))
+	}
+	if string(secret.Data[AgentNameFile]) != agentName {
+		t.Errorf("expected agent name %q but got: %s", agentName, string(secret.Data[AgentNameFile]))
+	}
+
+	// checkc if there is new csr created
 	csrs, err := fakeKubeClient.CertificatesV1beta1().CertificateSigningRequests().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -120,9 +166,14 @@ func TestSyncWithoutKubeconfig(t *testing.T) {
 	if len(csrs.Items) != 1 {
 		t.Errorf("expect 1 csr created, but got: %d", len(csrs.Items))
 	}
+
+	// check if csrName/keyData are set. Since GenerateName is not working for fake clent, check keyData only
+	if controller.keyData == nil {
+		t.Error("controller.keyData should be set")
+	}
 }
 
-func TestSyncWithKubeconfig(t *testing.T) {
+func TestSyncWithValidKubeconfig(t *testing.T) {
 	kubeconfigData, err := clientcmd.Write(newKubeconfig(nil, nil))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -130,7 +181,6 @@ func TestSyncWithKubeconfig(t *testing.T) {
 
 	clusterName := "cluster0"
 	agentName := "agent0"
-
 	key, cert, err := newCertKey(fmt.Sprintf("%s%s:%s", subjectPrefix, clusterName, agentName), 100*time.Second)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -138,32 +188,42 @@ func TestSyncWithKubeconfig(t *testing.T) {
 
 	secretNamespace := "default"
 	secretName := "secret"
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: secretNamespace,
-			Name:      secretName,
-		},
-		Data: map[string][]byte{
-			KubeconfigFile: kubeconfigData,
-			TLSCertFile:    cert,
-			TLSKeyFile:     key,
-		},
-	}
+	secret := newSecret(secretNamespace, secretName, "1", map[string][]byte{
+		KubeconfigFile: kubeconfigData,
+		TLSCertFile:    cert,
+		TLSKeyFile:     key,
+	})
 
 	fakeKubeClient := kubefake.NewSimpleClientset(secret)
-	controller := &ClientCertForHubController{
-		clusterName:               clusterName,
-		agentName:                 agentName,
-		kubeconfigSecretNamespace: secretNamespace,
-		kubeconfigSecretName:      secretName,
-		spokeCoreClient:           fakeKubeClient.CoreV1(),
-		hubCSRClient:              fakeKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
+
+	// create secret informer/lister
+	secretInformer := informers.NewSharedInformerFactory(fakeKubeClient,
+		3*time.Minute).Core().V1().Secrets()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go secretInformer.Informer().Run(ctx.Done())
+	if ok := cache.WaitForCacheSync(ctx.Done(), secretInformer.Informer().HasSynced); !ok {
+		t.Error("failed to wait for kubernetes caches to sync")
 	}
-	err = controller.sync(nil, nil)
+
+	controller := &ClientCertForHubController{
+		clusterName:                  clusterName,
+		agentName:                    agentName,
+		hubKubeconfigSecretNamespace: secretNamespace,
+		hubKubeconfigSecretName:      secretName,
+		spokeCoreClient:              fakeKubeClient.CoreV1(),
+		hubCSRClient:                 fakeKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
+		spokeSecretLister:            secretInformer.Lister(),
+	}
+
+	eventRecorder := events.NewInMemoryRecorder("")
+	syncContext := factory.NewSyncContext("", eventRecorder)
+	err = controller.sync(nil, syncContext)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
+	// check if there is any csr created
 	csrs, err := fakeKubeClient.CertificatesV1beta1().CertificateSigningRequests().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -171,6 +231,14 @@ func TestSyncWithKubeconfig(t *testing.T) {
 
 	if len(csrs.Items) != 0 {
 		t.Errorf("expect 0 csr created, but got: %d", len(csrs.Items))
+	}
+
+	// check if csrName/keyData are unset
+	if controller.csrName != "" {
+		t.Error("controller.csrName should be empty")
+	}
+	if controller.keyData != nil {
+		t.Error("controller.keyData should be nil")
 	}
 }
 
@@ -191,34 +259,44 @@ func TestSyncWithExpiringCert(t *testing.T) {
 
 	secretNamespace := "default"
 	secretName := "secret"
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: secretNamespace,
-			Name:      secretName,
-		},
-		Data: map[string][]byte{
-			KubeconfigFile: kubeconfigData,
-			TLSCertFile:    cert,
-			TLSKeyFile:     key,
-		},
-	}
+	secret := newSecret(secretNamespace, secretName, "1", map[string][]byte{
+		KubeconfigFile: kubeconfigData,
+		TLSCertFile:    cert,
+		TLSKeyFile:     key,
+	})
 
 	fakeKubeClient := kubefake.NewSimpleClientset(secret)
-	controller := &ClientCertForHubController{
-		clusterName:               clusterName,
-		agentName:                 agentName,
-		kubeconfigSecretNamespace: secretNamespace,
-		kubeconfigSecretName:      secretName,
-		spokeCoreClient:           fakeKubeClient.CoreV1(),
-		hubCSRClient:              fakeKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
+
+	// create secret informer/lister
+	secretInformer := informers.NewSharedInformerFactory(fakeKubeClient,
+		3*time.Minute).Core().V1().Secrets()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go secretInformer.Informer().Run(ctx.Done())
+	if ok := cache.WaitForCacheSync(ctx.Done(), secretInformer.Informer().HasSynced); !ok {
+		t.Error("failed to wait for kubernetes caches to sync")
 	}
 
+	controller := &ClientCertForHubController{
+		clusterName:                  clusterName,
+		agentName:                    agentName,
+		hubKubeconfigSecretNamespace: secretNamespace,
+		hubKubeconfigSecretName:      secretName,
+		spokeCoreClient:              fakeKubeClient.CoreV1(),
+		hubCSRClient:                 fakeKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
+		spokeSecretLister:            secretInformer.Lister(),
+	}
+
+	// wait for cert to be expired and run sync
 	time.Sleep(3 * time.Second)
-	err = controller.sync(nil, nil)
+	eventRecorder := events.NewInMemoryRecorder("")
+	syncContext := factory.NewSyncContext("", eventRecorder)
+	err = controller.sync(nil, syncContext)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
+	// check if there is any csr created
 	csrs, err := fakeKubeClient.CertificatesV1beta1().CertificateSigningRequests().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -226,5 +304,105 @@ func TestSyncWithExpiringCert(t *testing.T) {
 
 	if len(csrs.Items) != 1 {
 		t.Errorf("expect 1 csr created, but got: %d", len(csrs.Items))
+	}
+
+	// check if csrName/keyData are set. Since GenerateName is not working for fake clent, check keyData only
+	if controller.keyData == nil {
+		t.Error("controller.keyData should be set")
+	}
+}
+
+func TestCreateCSR(t *testing.T) {
+	fakeKubeClient := kubefake.NewSimpleClientset()
+
+	keyData, err := keyutil.MakeEllipticPrivateKeyPEM()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	controller := &ClientCertForHubController{
+		clusterName:  "cluster0",
+		agentName:    "agent0",
+		keyData:      keyData,
+		hubCSRClient: fakeKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
+	}
+
+	csrName, err := controller.createCSR()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	_, err = fakeKubeClient.CertificatesV1beta1().CertificateSigningRequests().Get(context.Background(), csrName, metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestSaveHubKubeconfigSecret(t *testing.T) {
+	secretNamespace := "default"
+	secretName := "secret"
+
+	fakeKubeClient := kubefake.NewSimpleClientset()
+
+	controller := &ClientCertForHubController{
+		hubKubeconfigSecretNamespace: secretNamespace,
+		hubKubeconfigSecretName:      secretName,
+		spokeCoreClient:              fakeKubeClient.CoreV1(),
+	}
+
+	key, value := "key", "value"
+	secret := newSecret(secretNamespace, secretName, "", map[string][]byte{
+		key: []byte(value),
+	})
+	err := controller.saveHubKubeconfigSecret(secret)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	secret, err = fakeKubeClient.CoreV1().Secrets(secretNamespace).Get(context.Background(), secretName, metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(secret.Data) == 0 {
+		t.Error("secret should have data stored")
+	}
+	if string(secret.Data[key]) != value {
+		t.Errorf("expected %q but get: %s", value, string(secret.Data[key]))
+	}
+}
+
+func TestSaveHubKubeconfigSecretWithExistingSecret(t *testing.T) {
+	secretNamespace := "default"
+	secretName := "secret"
+	secret := newSecret(secretNamespace, secretName, "1", nil)
+
+	fakeKubeClient := kubefake.NewSimpleClientset(secret)
+	controller := &ClientCertForHubController{
+		hubKubeconfigSecretNamespace: secretNamespace,
+		hubKubeconfigSecretName:      secretName,
+		spokeCoreClient:              fakeKubeClient.CoreV1(),
+	}
+
+	key, value := "key", "value"
+	secret.Data = map[string][]byte{
+		key: []byte(value),
+	}
+
+	err := controller.saveHubKubeconfigSecret(secret)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	secret, err = fakeKubeClient.CoreV1().Secrets(secretNamespace).Get(context.Background(), secretName, metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(secret.Data) == 0 {
+		t.Error("secret should have data stored")
+	}
+	if string(secret.Data[key]) != value {
+		t.Errorf("expected %q but get: %s", value, string(secret.Data[key]))
 	}
 }
