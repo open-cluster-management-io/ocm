@@ -7,7 +7,6 @@ import (
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -16,7 +15,7 @@ import (
 )
 
 // HasValidKubeconfig checks if there exists a valid kubeconfig in the given secret
-// Returns ture if the conditions below are met:
+// Returns true if the conditions below are met:
 //   1. KubeconfigFile exists
 //   2. TLSKeyFile exists
 //   3. TLSCertFile exists and the certificate is not expired
@@ -44,7 +43,7 @@ func hasValidKubeconfig(secret *corev1.Secret) bool {
 
 	valid, err := IsCertificateValid(certData)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to validate certificate in secret %s", secret.Namespace+"/"+secret.Name))
+		klog.V(4).Infof("unable to validate certificate in secret %s: %v", secret.Namespace+"/"+secret.Name, err)
 		return false
 	}
 

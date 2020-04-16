@@ -48,7 +48,7 @@ type ClientCertForHubController struct {
 	// hubKubeconfigSecretNamespace is the namespace of the hubKubeconfigSecret.
 	// The secret may contain the keys below:
 	//   1. kubeconfig: kubeconfig file for hub with references to tls key/cert files in the same directory
-	//   2. tls.ke: tls key file
+	//   2. tls.key: tls key file
 	//   3. tls.crt: tls cert file
 	//   4. cluster-name: cluster name
 	//   5. agent-name: agent name

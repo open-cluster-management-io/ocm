@@ -252,7 +252,7 @@ func TestSyncWithExpiringCert(t *testing.T) {
 	clusterName := "cluster0"
 	agentName := "agent0"
 
-	key, cert, err := newCertKey(fmt.Sprintf("%s%s:%s", subjectPrefix, clusterName, agentName), 1*time.Second)
+	key, cert, err := newCertKey(fmt.Sprintf("%s%s:%s", subjectPrefix, clusterName, agentName), -3*time.Second)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -287,8 +287,6 @@ func TestSyncWithExpiringCert(t *testing.T) {
 		spokeSecretLister:            secretInformer.Lister(),
 	}
 
-	// wait for cert to be expired and run sync
-	time.Sleep(3 * time.Second)
 	eventRecorder := events.NewInMemoryRecorder("")
 	syncContext := factory.NewSyncContext("", eventRecorder)
 	err = controller.sync(nil, syncContext)

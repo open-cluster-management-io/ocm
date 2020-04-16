@@ -65,7 +65,7 @@ func encodePrivateKeyPEM(key *rsa.PrivateKey) []byte {
 	return pem.EncodeToMemory(&block)
 }
 
-// encodeCertPEM returns PEM-endcoded certificate data
+// encodeCertPEM returns PEM-encoded certificate data
 func encodeCertPEM(cert *x509.Certificate) []byte {
 	block := pem.Block{
 		Type:  certutil.CertificateBlockType,
@@ -283,12 +283,10 @@ func TestIsCertificateValid(t *testing.T) {
 }
 
 func TestIsCertificateValidWithExpiredCert(t *testing.T) {
-	_, cert, err := newCertKey("cluster0", 1*time.Second)
+	_, cert, err := newCertKey("cluster0", -3*time.Second)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-
-	time.Sleep(3 * time.Second)
 
 	valid, err := IsCertificateValid(cert)
 	if err != nil {
@@ -333,7 +331,7 @@ func TestHasValidKubeconfigWithExpiredCert(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	key, cert, err := newCertKey("cluster0", 1*time.Second)
+	key, cert, err := newCertKey("cluster0", -3*time.Second)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -349,8 +347,6 @@ func TestHasValidKubeconfigWithExpiredCert(t *testing.T) {
 			TLSKeyFile:     key,
 		},
 	}
-
-	time.Sleep(3 * time.Second)
 
 	if hasValidKubeconfig(secret) {
 		t.Error("kubeconfig is invalid")
