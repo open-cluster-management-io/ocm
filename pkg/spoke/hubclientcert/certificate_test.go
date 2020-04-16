@@ -9,11 +9,8 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
-	"io/ioutil"
 	"math"
 	"math/big"
-	"os"
-	"path"
 	"testing"
 	"time"
 
@@ -199,41 +196,6 @@ func TestIsCSRApprovedWithDeniedCSR(t *testing.T) {
 
 	if isCSRApproved(csr) {
 		t.Error("csr is denied")
-	}
-}
-
-func TestLoadClientConfig(t *testing.T) {
-	dir, err := ioutil.TempDir("", "prefix")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
-	kubeconfigData, err := clientcmd.Write(newKubeconfig(nil, nil))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	kubeconfigPath := path.Join(dir, KubeconfigFile)
-	err = ioutil.WriteFile(kubeconfigPath, kubeconfigData, 0644)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	keyPath := path.Join(dir, TLSKeyFile)
-	err = ioutil.WriteFile(keyPath, []byte(keyPath), 0644)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	certPath := path.Join(dir, TLSCertFile)
-	err = ioutil.WriteFile(certPath, []byte(certPath), 0644)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	_, err = LoadClientConfig(kubeconfigPath)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
 	}
 }
 

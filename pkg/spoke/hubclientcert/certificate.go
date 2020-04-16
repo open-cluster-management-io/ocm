@@ -8,7 +8,6 @@ import (
 	certificates "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog"
@@ -48,25 +47,6 @@ func hasValidKubeconfig(secret *corev1.Secret) bool {
 	}
 
 	return valid
-}
-
-// LoadClientConfig loads client config from a kubeconfig file
-func LoadClientConfig(kubeconfigPath string) (*restclient.Config, error) {
-	// clientcmd.RESTConfigFromKubeConfig() and clientcmd.NewClientConfigFromBytes()
-	// do not handle very well when the kubeconfig file references cert/key files
-	// with relative file paths
-	loader := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath}
-	loadedConfig, err := loader.Load()
-	if err != nil {
-		return nil, err
-	}
-
-	return clientcmd.NewNonInteractiveClientConfig(
-		*loadedConfig,
-		loadedConfig.CurrentContext,
-		&clientcmd.ConfigOverrides{},
-		loader,
-	).ClientConfig()
 }
 
 // IsCertificateValid return true if all certs in client certificate are not expired.

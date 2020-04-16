@@ -81,6 +81,7 @@ func TestSyncCSR(t *testing.T) {
 		keyData:         key,
 		hubCSRLister:    csrInformer.Lister(),
 		hubClientConfig: clientConfig,
+		hubCSRClient:    fakeKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
 	}
 	newSecretConfig, err := controller.syncCSR(secret)
 	if err != nil {

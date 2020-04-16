@@ -201,9 +201,13 @@ func (c *ClientCertForHubController) syncCSR(secret *corev1.Secret) (map[string]
 	// skip if csr no longer exists
 	csr, err := c.hubCSRLister.Get(c.csrName)
 	if err != nil && kerrors.IsNotFound(err) {
-		klog.V(4).Infof("Unable to get csr %q. It might have already been deleted.", c.csrName)
-		c.reset()
-		return nil, nil
+		// fallback to fetching csr from hub apiserver in case it is not cached by informer yet
+		csr, err = c.hubCSRClient.Get(context.Background(), c.csrName, metav1.GetOptions{})
+		if err != nil && kerrors.IsNotFound(err) {
+			klog.V(4).Infof("Unable to get csr %q. It might have already been deleted.", c.csrName)
+			c.reset()
+			return nil, nil
+		}
 	}
 	if err != nil {
 		return nil, err

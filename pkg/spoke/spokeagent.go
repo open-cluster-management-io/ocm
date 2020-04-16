@@ -21,6 +21,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 )
 
@@ -91,7 +92,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	var stopBootstrap context.CancelFunc
 	if !ok {
 		// load bootstrap clent config
-		bootstrapClientConfig, err := hubclientcert.LoadClientConfig(o.BootstrapKubeconfig)
+		bootstrapClientConfig, err := clientcmd.BuildConfigFromFlags("", o.BootstrapKubeconfig)
 		if err != nil {
 			return fmt.Errorf("unable to load bootstrap kubeconfig from file %q: %v", o.BootstrapKubeconfig, err)
 		}
@@ -125,7 +126,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	}
 
 	kubeconfigPath := path.Join(o.HubKubeconfigDir, hubclientcert.KubeconfigFile)
-	hubClientConfig, err := hubclientcert.LoadClientConfig(kubeconfigPath)
+	hubClientConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 	if err != nil {
 		return err
 	}
