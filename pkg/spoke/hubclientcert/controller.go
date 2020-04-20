@@ -106,7 +106,7 @@ func (c *ClientCertForHubController) sync(ctx context.Context, syncCtx factory.S
 	// get hubKubeconfigSecret
 	secret, err := c.spokeSecretLister.Secrets(c.hubKubeconfigSecretNamespace).Get(c.hubKubeconfigSecretName)
 	switch {
-	case err != nil && kerrors.IsNotFound(err):
+	case kerrors.IsNotFound(err):
 		secret = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: c.hubKubeconfigSecretNamespace,
@@ -114,13 +114,14 @@ func (c *ClientCertForHubController) sync(ctx context.Context, syncCtx factory.S
 			},
 		}
 	case err != nil:
-		return fmt.Errorf("unable to get secret %q: %v", c.hubKubeconfigSecretNamespace+"/"+c.hubKubeconfigSecretName, err)
+		return fmt.Errorf("unable to get secret %q: %w", c.hubKubeconfigSecretNamespace+"/"+c.hubKubeconfigSecretName, err)
 	}
 
 	// reconcile pending csr if exists
 	if c.csrName != "" {
 		newSecretConfig, err := c.syncCSR(secret)
 		if err != nil {
+			c.reset()
 			return err
 		}
 		if len(newSecretConfig) == 0 {
@@ -132,8 +133,7 @@ func (c *ClientCertForHubController) sync(ctx context.Context, syncCtx factory.S
 		secret.Data = newSecretConfig
 
 		// save the changes into secret
-		err = c.saveHubKubeconfigSecret(secret)
-		if err != nil {
+		if err := c.saveHubKubeconfigSecret(secret); err != nil {
 			return err
 		}
 		syncCtx.Recorder().Event("ClientCertificateCreated", "A new client certificate is available")
@@ -149,8 +149,7 @@ func (c *ClientCertForHubController) sync(ctx context.Context, syncCtx factory.S
 	newSecretConfig[AgentNameFile] = []byte(c.agentName)
 	if !reflect.DeepEqual(newSecretConfig, secret.Data) {
 		secret.Data = newSecretConfig
-		err = c.saveHubKubeconfigSecret(secret)
-		if err != nil {
+		if err := c.saveHubKubeconfigSecret(secret); err != nil {
 			return err
 		}
 	}
@@ -167,13 +166,13 @@ func (c *ClientCertForHubController) sync(ctx context.Context, syncCtx factory.S
 		total := notAfter.Sub(*notBefore)
 		remaining := notAfter.Sub(time.Now())
 		if remaining.Seconds()/total.Seconds() > 0.2 {
-			// Do nothing if the client certificate is valid and has more than 80% of its life remaining
-			klog.V(4).Info("Client certificate is valid and has more than 80% of its life remaining")
+			// Do nothing if the client certificate is valid and has more than 20% of its life remaining
+			klog.V(4).Info("Client certificate is valid and has more than 20% of its life remaining")
 			return nil
 		}
 		syncCtx.Recorder().Eventf("CertificateRotationStarted", "The current client certificate for hub expires in %v. Start certificate rotation", remaining.Round(time.Second))
 	} else {
-		klog.Info("No valid client certificate for hub is found. Bootstrap is required")
+		syncCtx.Recorder().Event("NoValidCertificateFound", "No valid client certificate for hub is found. Bootstrap is required")
 	}
 
 	// create a csr
@@ -187,7 +186,7 @@ func (c *ClientCertForHubController) sync(ctx context.Context, syncCtx factory.S
 		c.reset()
 		return err
 	}
-	klog.Infof("A csr %q is created", c.csrName)
+	syncCtx.Recorder().Eventf("CSRCreated", "A csr %q is created", c.csrName)
 	return nil
 }
 
@@ -200,10 +199,10 @@ func (c *ClientCertForHubController) syncCSR(secret *corev1.Secret) (map[string]
 
 	// skip if csr no longer exists
 	csr, err := c.hubCSRLister.Get(c.csrName)
-	if err != nil && kerrors.IsNotFound(err) {
+	if kerrors.IsNotFound(err) {
 		// fallback to fetching csr from hub apiserver in case it is not cached by informer yet
 		csr, err = c.hubCSRClient.Get(context.Background(), c.csrName, metav1.GetOptions{})
-		if err != nil && kerrors.IsNotFound(err) {
+		if kerrors.IsNotFound(err) {
 			klog.V(4).Infof("Unable to get csr %q. It might have already been deleted.", c.csrName)
 			c.reset()
 			return nil, nil
@@ -265,11 +264,11 @@ func (c *ClientCertForHubController) createCSR() (string, error) {
 
 	privateKey, err := keyutil.ParsePrivateKeyPEM(c.keyData)
 	if err != nil {
-		return "", fmt.Errorf("invalid private key for certificate request: %v", err)
+		return "", fmt.Errorf("invalid private key for certificate request: %w", err)
 	}
 	csrData, err := certutil.MakeCSR(privateKey, subject, nil, nil)
 	if err != nil {
-		return "", fmt.Errorf("unable to generate certificate request: %v", err)
+		return "", fmt.Errorf("unable to generate certificate request: %w", err)
 	}
 
 	signerName := certificates.KubeAPIServerClientSignerName
@@ -304,9 +303,9 @@ func (c *ClientCertForHubController) saveHubKubeconfigSecret(secret *corev1.Secr
 	var err error
 	if secret.ResourceVersion == "" {
 		_, err = c.spokeCoreClient.Secrets(c.hubKubeconfigSecretNamespace).Create(context.Background(), secret, metav1.CreateOptions{})
-	} else {
-		_, err = c.spokeCoreClient.Secrets(c.hubKubeconfigSecretNamespace).Update(context.Background(), secret, metav1.UpdateOptions{})
+		return err
 	}
+	_, err = c.spokeCoreClient.Secrets(c.hubKubeconfigSecretNamespace).Update(context.Background(), secret, metav1.UpdateOptions{})
 	return err
 }
 

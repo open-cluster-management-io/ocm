@@ -86,7 +86,7 @@ func getCertValidityPeriod(secret *corev1.Secret) (*time.Time, *time.Time, error
 
 	certs, err := certutil.ParseCertsPEM(certData)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to parse TLS certificates: %v", err)
+		return nil, nil, fmt.Errorf("unable to parse TLS certificates: %w", err)
 	}
 
 	if len(certs) == 0 {
@@ -142,6 +142,7 @@ func buildKubeconfig(clientConfig *restclient.Config, certPath, keyPath string) 
 }
 
 func isCSRApproved(csr *certificates.CertificateSigningRequest) bool {
+	// TODO: need to make it work in csr v1 as well
 	approved := false
 	for _, condition := range csr.Status.Conditions {
 		if condition.Type == certificates.CertificateDenied {
