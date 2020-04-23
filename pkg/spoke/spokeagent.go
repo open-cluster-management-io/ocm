@@ -51,16 +51,27 @@ func NewSpokeAgentOptions() *SpokeAgentOptions {
 	}
 }
 
-// RunSpokeAgent starts the controllers on spoke agent to register to hub.
-// It handles the following scenarios:
+// RunSpokeAgent starts the controllers on spoke agent to register to the hub.
+//
+// The spoke agent uses three kubeconfigs for different concerns:
+// - The 'spoke' kubeconfig: used to communicate with the spoke cluster where
+//   the agent is running.
+// - The 'bootstrap' kubeconfig: used to communicate with the hub in order to
+//   submit a CertificateSigningRequest, begin the join flow with the hub, and
+//   to write the 'hub' kubeconfig.
+// - The 'hub' kubeconfig: used to communicate with the hub using a signed
+//   certificate from the hub.
+//
+// RunSpokeAgent handles the following scenarios:
 //   #1. Bootstrap kubeconfig is valid and there is no valid hub kubeconfig in secret
 //   #2. Both bootstrap kubeconfig and hub kubeconfig are valid
-//   #3. Bootstrap kubeconfig is invalid (e.g. certificte expired) and hub kubeconfig is valid
+//   #3. Bootstrap kubeconfig is invalid (e.g. certificate expired) and hub kubeconfig is valid
 //   #4. Neither bootstrap kubeconfig nor hub kubeconfig is valid
-// A temporary ClientCertForHubController with bootstrap kubeconfig is created and started if
-// hub kubeconfig does not exists or is invalid. It will be stopped once client config for hub
-// is ready. And then run other controllers, including another ClientCertForHubController which
-// is created for client certificate rotation.
+//
+// A temporary ClientCertForHubController with bootstrap kubeconfig is created
+// and started if the hub kubeconfig does not exist or is invalid and used to
+// create a valid hub kubeconfig. Once the hub kubeconfig is valid, the
+// temporary controller is stopped and the main controllers are started.
 func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	if err := o.Complete(); err != nil {
 		klog.Fatal(err)
@@ -90,7 +101,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	}
 
 	// create and start a ClientCertForHubController for spoke agent bootstrap to deal with scenario #1 and #4.
-	// Running the bootsrap ClientCertForHubController is optional. If always run it no matter if there already
+	// Running the bootstrap ClientCertForHubController is optional. If always run it no matter if there already
 	// exists a valid client config for hub or not, the controller will be started and then stopped immediately
 	// in scenario #2 and #3, which results in an error message in log: 'Observed a panic: timeout waiting for
 	// informer cache'
@@ -263,7 +274,7 @@ func (o *SpokeAgentOptions) hasValidHubClientConfig() (bool, error) {
 //   4. generate random cluster/agent names then
 func (o *SpokeAgentOptions) getOrGenerateClusterAgentNames() (string, string) {
 	clusterName := o.ClusterName
-	// if cluster name is not specified with nput argument, try to load it from file
+	// if cluster name is not specified with input argument, try to load it from file
 	if clusterName == "" {
 		// TODO, read cluster name from openshift struct if the spoke agent is running in an openshift cluster
 
