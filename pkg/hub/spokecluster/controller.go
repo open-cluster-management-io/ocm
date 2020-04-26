@@ -28,6 +28,7 @@ const (
 	spokeClusterFinalizer = "cluster.open-cluster-management.io/api-resource-cleanup"
 )
 
+// spokeClusterController reconciles instances of SpokeCluster on the hub.
 type spokeClusterController struct {
 	kubeClient    kubernetes.Interface
 	clusterClient clientset.Interface
