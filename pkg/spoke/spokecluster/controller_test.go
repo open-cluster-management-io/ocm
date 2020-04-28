@@ -37,12 +37,11 @@ func TestSyncSpokeCluster(t *testing.T) {
 			name:            "sync no spoke cluster",
 			startingObjects: []runtime.Object{},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("expected 1 call but got: %#v", actions)
+				if len(actions) != 0 {
+					t.Errorf("expected 0 call but got: %#v", actions)
 				}
-				assertAction(t, actions[0], "create")
-				assertSpokeCluster(t, actions[0].(clienttesting.CreateActionImpl).Object, testSpokeClusterName)
 			},
+			expectedErr: "unable to get spoke cluster with name \"testspokecluster\" from hub: spokecluster.cluster.open-cluster-management.io \"testspokecluster\" not found",
 		},
 		{
 			name:            "sync an unaccepted spoke cluster",
@@ -58,10 +57,7 @@ func TestSyncSpokeCluster(t *testing.T) {
 			startingObjects: []runtime.Object{newAcceptedSpokeCluster()},
 			nodes:           []runtime.Object{newNode("testnode1", newResourceList(32, 64), newResourceList(16, 32))},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 2 {
-					t.Errorf("expected 2 call but got: %#v", actions)
-				}
-				assertAction(t, actions[1], "update")
+				assertActions(t, actions, "get", "update")
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				assertCondition(t, actual, clusterv1.SpokeClusterConditionJoined, metav1.ConditionTrue)
 				assertStatusVersion(t, actual, kubeversion.Get())
@@ -73,10 +69,7 @@ func TestSyncSpokeCluster(t *testing.T) {
 			startingObjects: []runtime.Object{newJoinedSpokeCluster(newResourceList(32, 64), newResourceList(16, 32))},
 			nodes:           []runtime.Object{newNode("testnode1", newResourceList(32, 64), newResourceList(16, 32))},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("expected 1 call but got: %#v", actions)
-				}
-				assertAction(t, actions[0], "get")
+				assertActions(t, actions, "get")
 			},
 		},
 		{
@@ -87,10 +80,7 @@ func TestSyncSpokeCluster(t *testing.T) {
 				newNode("testnode2", newResourceList(32, 64), newResourceList(16, 32)),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 2 {
-					t.Errorf("expected 1 call but got: %#v", actions)
-				}
-				assertAction(t, actions[1], "update")
+				assertActions(t, actions, "get", "update")
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				assertCondition(t, actual, clusterv1.SpokeClusterConditionJoined, metav1.ConditionTrue)
 				assertStatusVersion(t, actual, kubeversion.Get())
@@ -117,8 +107,6 @@ func TestSyncSpokeCluster(t *testing.T) {
 
 			ctrl := spokeClusterController{
 				clusterName:          testSpokeClusterName,
-				spokeServerURL:       "https://127.0.0.1:32768",
-				spokeCABundle:        []byte("testspokeclusterca"),
 				hubClusterClient:     clusterClient,
 				hubClusterLister:     clusterInformerFactory.Cluster().V1().SpokeClusters().Lister(),
 				spokeDiscoveryClient: kubeClient.Discovery(),
@@ -134,7 +122,7 @@ func TestSyncSpokeCluster(t *testing.T) {
 				t.Errorf("expected %q error, got %q", c.expectedErr, syncErr.Error())
 				return
 			}
-			if syncErr != nil {
+			if len(c.expectedErr) == 0 && syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}
 
@@ -143,9 +131,14 @@ func TestSyncSpokeCluster(t *testing.T) {
 	}
 }
 
-func assertAction(t *testing.T, actual clienttesting.Action, expected string) {
-	if actual.GetVerb() != expected {
-		t.Errorf("expected %s action but got: %#v", expected, actual)
+func assertActions(t *testing.T, actualActions []clienttesting.Action, expectedActions ...string) {
+	if len(actualActions) != len(expectedActions) {
+		t.Errorf("expected %d call but got: %#v", len(expectedActions), actualActions)
+	}
+	for i, expected := range expectedActions {
+		if actualActions[i].GetVerb() != expected {
+			t.Errorf("expected %s action but got: %#v", expected, actualActions[i])
+		}
 	}
 }
 

@@ -158,7 +158,7 @@ func TestSyncWithoutHubKubeconfigSecret(t *testing.T) {
 		t.Errorf("expected agent name %q but got: %s", agentName, string(secret.Data[AgentNameFile]))
 	}
 
-	// checkc if there is new csr created
+	// check if there is new csr created
 	csrs, err := fakeKubeClient.CertificatesV1beta1().CertificateSigningRequests().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

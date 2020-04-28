@@ -27,7 +27,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	}
 
 	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
-	csrInformers := kubeinformers.NewSharedInformerFactory(kubeClient, 10*time.Minute)
+	kubeInfomers := kubeinformers.NewSharedInformerFactory(kubeClient, 10*time.Minute)
 
 	spokeClusterController := spokecluster.NewSpokeClusterController(
 		kubeClient,
@@ -38,12 +38,12 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 
 	csrController := csr.NewCSRApprovingController(
 		kubeClient,
-		csrInformers.Certificates().V1beta1().CertificateSigningRequests().Informer(),
+		kubeInfomers.Certificates().V1beta1().CertificateSigningRequests().Informer(),
 		controllerContext.EventRecorder,
 	)
 
 	go clusterInformers.Start(ctx.Done())
-	go csrInformers.Start(ctx.Done())
+	go kubeInfomers.Start(ctx.Done())
 
 	go spokeClusterController.Run(ctx, 1)
 	go csrController.Run(ctx, 1)

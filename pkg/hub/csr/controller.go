@@ -34,7 +34,7 @@ type csrApprovingController struct {
 func NewCSRApprovingController(kubeClient kubernetes.Interface, csrInformer factory.Informer, recorder events.Recorder) factory.Controller {
 	c := &csrApprovingController{
 		kubeClient:    kubeClient,
-		eventRecorder: recorder.WithComponentSuffix("csr-controller"),
+		eventRecorder: recorder.WithComponentSuffix("csr-approving-controller"),
 	}
 	return factory.New().
 		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
@@ -42,7 +42,7 @@ func NewCSRApprovingController(kubeClient kubernetes.Interface, csrInformer fact
 			return accessor.GetName()
 		}, csrInformer).
 		WithSync(c.sync).
-		ToController("CSRController", recorder)
+		ToController("CSRApprovingController", recorder)
 }
 
 func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
@@ -74,6 +74,7 @@ func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncC
 		return err
 	}
 	if !allowed {
+		//TODO find a way to avoid looking at this CSR again.
 		klog.V(4).Infof("Spoke cluster csr %q cannont be auto approved due to subject access review was not approved", csr.Name)
 		return nil
 	}
@@ -81,7 +82,7 @@ func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncC
 	// Auto approve the spoke cluster csr
 	csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
 		Type:    certificatesv1beta1.CertificateApproved,
-		Reason:  "AutoApproved",
+		Reason:  "AutoApprovedByHubCSRApprovingController",
 		Message: "Auto approving spoke cluster agent certificate after SubjectAccessReview.",
 	})
 	_, err = c.kubeClient.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(ctx, csr, metav1.UpdateOptions{})
@@ -165,14 +166,13 @@ func isSpokeClusterClientCertRenewal(csr *certificatesv1beta1.CertificateSigning
 
 // Check whether a CSR is in terminal state
 func isCSRInTerminalState(status *certificatesv1beta1.CertificateSigningRequestStatus) bool {
-	approved, denied := false, false
 	for _, c := range status.Conditions {
 		if c.Type == certificatesv1beta1.CertificateApproved {
-			approved = true
+			return true
 		}
 		if c.Type == certificatesv1beta1.CertificateDenied {
-			denied = true
+			return true
 		}
 	}
-	return approved || denied
+	return false
 }

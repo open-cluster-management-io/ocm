@@ -65,7 +65,7 @@ type ClientCertForHubController struct {
 	csrName string
 	// keyData is the private key data used to created a csr
 	// csrName and keyData store the internal state of the controller. They are set after controller creates a new csr
-	// and cleared once the csr is approved and processed by controller. There are 4 combination of thier values:
+	// and cleared once the csr is approved and processed by controller. There are 4 combination of their values:
 	//   1. csrName empty, keyData empty: means we aren't trying to create a new client cert, our current one is valid
 	//   2. csrName set, keyData empty: there was bug
 	//   3. csrName set, keyData set: we are waiting for a new cert to be signed.
@@ -74,10 +74,14 @@ type ClientCertForHubController struct {
 }
 
 // NewClientCertForHubController return a ClientCertForHubController
-func NewClientCertForHubController(clusterName, agentName, hubKubeconfigSecretNamespace,
-	kubeconfigSecretName string, hubClientConfig *restclient.Config, spokeCoreClient corev1client.CoreV1Interface,
-	hubCSRClient csrclient.CertificateSigningRequestInterface, hubCSRInformer certificatesinformers.CertificateSigningRequestInformer,
-	spokeSecretInformer corev1informers.SecretInformer, recorder events.Recorder, controllerNameOverride string) (factory.Controller, error) {
+func NewClientCertForHubController(
+	clusterName, agentName, hubKubeconfigSecretNamespace, kubeconfigSecretName string,
+	hubClientConfig *restclient.Config,
+	spokeCoreClient corev1client.CoreV1Interface,
+	hubCSRClient csrclient.CertificateSigningRequestInterface,
+	hubCSRInformer certificatesinformers.CertificateSigningRequestInformer,
+	spokeSecretInformer corev1informers.SecretInformer,
+	recorder events.Recorder, controllerName string) factory.Controller {
 	c := &ClientCertForHubController{
 		clusterName:                  clusterName,
 		agentName:                    agentName,
@@ -90,16 +94,11 @@ func NewClientCertForHubController(clusterName, agentName, hubKubeconfigSecretNa
 		spokeCoreClient:              spokeCoreClient,
 	}
 
-	controllerName := "ClientCertForHubController"
-	if controllerNameOverride != "" {
-		controllerName = controllerNameOverride
-	}
-
 	return factory.New().
 		WithInformers(hubCSRInformer.Informer(), spokeSecretInformer.Informer()).
 		WithSync(c.sync).
 		ResyncEvery(5*time.Minute).
-		ToController(controllerName, recorder), nil
+		ToController(controllerName, recorder)
 }
 
 func (c *ClientCertForHubController) sync(ctx context.Context, syncCtx factory.SyncContext) error {

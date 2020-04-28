@@ -9,7 +9,6 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -27,8 +26,6 @@ import (
 // spokeClusterController reconciles instances of SpokeCluster on the spoke cluster.
 type spokeClusterController struct {
 	clusterName          string
-	spokeServerURL       string
-	spokeCABundle        []byte
 	hubClusterClient     clientset.Interface
 	hubClusterLister     clusterv1listers.SpokeClusterLister
 	spokeDiscoveryClient discovery.DiscoveryInterface
@@ -37,8 +34,7 @@ type spokeClusterController struct {
 
 // NewSpokeClusterController creates a new spoke cluster controller on the spoke cluster.
 func NewSpokeClusterController(
-	clusterName, spokeServerURL string,
-	spokeCABundle []byte,
+	clusterName string,
 	hubClusterClient clientset.Interface,
 	hubSpokeClusterInformer clusterv1informer.SpokeClusterInformer,
 	spokeDiscoveryClient discovery.DiscoveryInterface,
@@ -46,25 +42,25 @@ func NewSpokeClusterController(
 	recorder events.Recorder) factory.Controller {
 	c := &spokeClusterController{
 		clusterName:          clusterName,
-		spokeServerURL:       spokeServerURL,
-		spokeCABundle:        spokeCABundle,
 		hubClusterClient:     hubClusterClient,
 		hubClusterLister:     hubSpokeClusterInformer.Lister(),
 		spokeDiscoveryClient: spokeDiscoveryClient,
 		spokeNodeLister:      spokeNodeInformer.Lister(),
 	}
+
 	return factory.New().
+		// TODO need to have conditional node capacity recalculation based on number of nodes here and decoupling
+		// the node capacity calculation to another controller.
 		WithInformers(hubSpokeClusterInformer.Informer(), spokeNodeInformer.Informer()).
 		WithSync(c.sync).
 		ResyncEvery(5*time.Minute).
 		ToController("SpokeClusterController", recorder)
 }
 
+// sync maintains the spoke-side status of a SpokeCluster, it maintains the SpokeClusterJoined condition according to
+// the value of the SpokeClusterHubAccepted condition and ensures resource and version are up to date.
 func (c spokeClusterController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	spokeCluster, err := c.hubClusterLister.Get(c.clusterName)
-	if errors.IsNotFound(err) {
-		return c.createSpokeCluster(ctx, syncCtx)
-	}
 	if err != nil {
 		return fmt.Errorf("unable to get spoke cluster with name %q from hub: %w", c.clusterName, err)
 	}
@@ -72,7 +68,7 @@ func (c spokeClusterController) sync(ctx context.Context, syncCtx factory.SyncCo
 	// current spoke cluster is not accepted, do nothing.
 	acceptedCondition := helpers.FindSpokeClusterCondition(spokeCluster.Status.Conditions, clusterv1.SpokeClusterConditionHubAccepted)
 	if !helpers.IsConditionTrue(acceptedCondition) {
-		klog.V(4).Infof("Spoke cluster %q is not accepted by hub yet", c.clusterName)
+		syncCtx.Recorder().Eventf("SpokeClusterIsNotAccepted", "Spoke cluster %q is not accepted by hub yet", c.clusterName)
 		return nil
 	}
 
@@ -119,27 +115,6 @@ func (c spokeClusterController) sync(ctx context.Context, syncCtx factory.SyncCo
 	return nil
 }
 
-func (c *spokeClusterController) createSpokeCluster(ctx context.Context, syncCtx factory.SyncContext) error {
-	spokeCluster := &clusterv1.SpokeCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: c.clusterName,
-		},
-		Spec: clusterv1.SpokeClusterSpec{
-			SpokeClientConfig: clusterv1.ClientConfig{
-				URL:      c.spokeServerURL,
-				CABundle: c.spokeCABundle,
-			},
-		},
-	}
-
-	if _, err := c.hubClusterClient.ClusterV1().SpokeClusters().Create(ctx, spokeCluster, metav1.CreateOptions{}); err != nil {
-		return fmt.Errorf("unable to create spoke cluster with name %q on hub: %w", c.clusterName, err)
-	}
-
-	syncCtx.Recorder().Eventf("SpokeClusterCreated", "Spoke cluster %q created on hub", c.clusterName)
-	return nil
-}
-
 func (c *spokeClusterController) getSpokeVersion() (*clusterv1.SpokeVersion, error) {
 	serverVersion, err := c.spokeDiscoveryClient.ServerVersion()
 	if err != nil {
@@ -167,15 +142,15 @@ func (c *spokeClusterController) getClusterResources() (capacity, allocatable cl
 
 	return clusterv1.ResourceList{
 			clusterv1.ResourceCPU:    cpuCapacity,
-			clusterv1.ResourceMemory: formatQuatityToMi(memoryCapacity),
+			clusterv1.ResourceMemory: formatQuantityToMi(memoryCapacity),
 		},
 		clusterv1.ResourceList{
 			clusterv1.ResourceCPU:    cpuAllocatable,
-			clusterv1.ResourceMemory: formatQuatityToMi(memoryAllocatable),
+			clusterv1.ResourceMemory: formatQuantityToMi(memoryAllocatable),
 		}, nil
 }
 
-func formatQuatityToMi(q resource.Quantity) resource.Quantity {
+func formatQuantityToMi(q resource.Quantity) resource.Quantity {
 	raw, _ := q.AsInt64()
 	raw /= (1024 * 1024)
 	rq, err := resource.ParseQuantity(fmt.Sprintf("%dMi", raw))
