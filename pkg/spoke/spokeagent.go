@@ -9,19 +9,20 @@ import (
 	"path"
 	"time"
 
+	clusterv1client "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
+	clusterv1informers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
 	"github.com/open-cluster-management/registration/pkg/spoke/hubclientcert"
+	"github.com/open-cluster-management/registration/pkg/spoke/spokecluster"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/spf13/pflag"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
-	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 )
@@ -41,6 +42,7 @@ type SpokeAgentOptions struct {
 	BootstrapKubeconfig string
 	HubKubeconfigSecret string
 	HubKubeconfigDir    string
+	SpokeServerUrl      string
 }
 
 // NewSpokeAgentOptions returns a SpokeAgentOptions
@@ -51,16 +53,27 @@ func NewSpokeAgentOptions() *SpokeAgentOptions {
 	}
 }
 
-// RunSpokeAgent starts the controllers on spoke agent to register to hub.
-// It handles the following scenarios:
+// RunSpokeAgent starts the controllers on spoke agent to register to the hub.
+//
+// The spoke agent uses three kubeconfigs for different concerns:
+// - The 'spoke' kubeconfig: used to communicate with the spoke cluster where
+//   the agent is running.
+// - The 'bootstrap' kubeconfig: used to communicate with the hub in order to
+//   submit a CertificateSigningRequest, begin the join flow with the hub, and
+//   to write the 'hub' kubeconfig.
+// - The 'hub' kubeconfig: used to communicate with the hub using a signed
+//   certificate from the hub.
+//
+// RunSpokeAgent handles the following scenarios:
 //   #1. Bootstrap kubeconfig is valid and there is no valid hub kubeconfig in secret
 //   #2. Both bootstrap kubeconfig and hub kubeconfig are valid
-//   #3. Bootstrap kubeconfig is invalid (e.g. certificte expired) and hub kubeconfig is valid
+//   #3. Bootstrap kubeconfig is invalid (e.g. certificate expired) and hub kubeconfig is valid
 //   #4. Neither bootstrap kubeconfig nor hub kubeconfig is valid
-// A temporary ClientCertForHubController with bootstrap kubeconfig is created and started if
-// hub kubeconfig does not exists or is invalid. It will be stopped once client config for hub
-// is ready. And then run other controllers, including another ClientCertForHubController which
-// is created for client certificate rotation.
+//
+// A temporary ClientCertForHubController with bootstrap kubeconfig is created
+// and started if the hub kubeconfig does not exist or is invalid and used to
+// create a valid hub kubeconfig. Once the hub kubeconfig is valid, the
+// temporary controller is stopped and the main controllers are started.
 func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	if err := o.Complete(); err != nil {
 		klog.Fatal(err)
@@ -72,16 +85,12 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 
 	klog.Infof("Cluster name is %q and agent name is %q", o.ClusterName, o.AgentName)
 
-	// create kube client for spoke cluster
+	// create kube client and shared informer factory for spoke cluster
 	spokeKubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
-
-	// create an informer for secrets on spoke cluster
-	spokeSecretInformer := informers.NewSharedInformerFactory(spokeKubeClient,
-		10*time.Minute).Core().V1().Secrets()
-	go spokeSecretInformer.Informer().Run(ctx.Done())
+	spokeKubeInformerFactory := informers.NewSharedInformerFactory(spokeKubeClient, 10*time.Minute)
 
 	// check if there already exists a valid client config for hub
 	ok, err := o.hasValidHubClientConfig()
@@ -90,27 +99,43 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	}
 
 	// create and start a ClientCertForHubController for spoke agent bootstrap to deal with scenario #1 and #4.
-	// Running the bootsrap ClientCertForHubController is optional. If always run it no matter if there already
+	// Running the bootstrap ClientCertForHubController is optional. If always run it no matter if there already
 	// exists a valid client config for hub or not, the controller will be started and then stopped immediately
 	// in scenario #2 and #3, which results in an error message in log: 'Observed a panic: timeout waiting for
 	// informer cache'
 	var stopBootstrap context.CancelFunc
 	if !ok {
-		// load bootstrap clent config
+		// create bootstrap client and shared informer factory from bootstrap hub kube config
 		bootstrapClientConfig, err := clientcmd.BuildConfigFromFlags("", o.BootstrapKubeconfig)
 		if err != nil {
 			return fmt.Errorf("unable to load bootstrap kubeconfig from file %q: %w", o.BootstrapKubeconfig, err)
 		}
+		bootstrapClient, err := kubernetes.NewForConfig(bootstrapClientConfig)
+		if err != nil {
+			return err
+		}
+		bootstrapInformerFactory := informers.NewSharedInformerFactory(bootstrapClient, 10*time.Minute)
 
-		// create and start a ClientCertForHubController for spoke agent bootstrap
-		hubCSRInformer, clientCertForHubController, err := o.buildClientCertForHubController(o.ClusterName, o.AgentName,
-			bootstrapClientConfig, spokeKubeClient, spokeSecretInformer, controllerContext.EventRecorder, "BoostrapClientCertForHubController")
+		// create a ClientCertForHubController for spoke agent bootstrap
+		clientCertForHubController, err := hubclientcert.NewClientCertForHubController(
+			o.ClusterName, o.AgentName, o.ComponentNamespace, o.HubKubeconfigSecret,
+			restclient.AnonymousClientConfig(bootstrapClientConfig),
+			spokeKubeClient.CoreV1(),
+			bootstrapClient.CertificatesV1beta1().CertificateSigningRequests(),
+			bootstrapInformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
+			spokeKubeInformerFactory.Core().V1().Secrets(),
+			controllerContext.EventRecorder,
+			"BoostrapClientCertForHubController",
+		)
 		if err != nil {
 			return err
 		}
 		var bootstrapCtx context.Context
 		bootstrapCtx, stopBootstrap = context.WithCancel(ctx)
-		go hubCSRInformer.Run(bootstrapCtx.Done())
+
+		go bootstrapInformerFactory.Start(bootstrapCtx.Done())
+		go spokeKubeInformerFactory.Start(bootstrapCtx.Done())
+
 		go clientCertForHubController.Run(bootstrapCtx, 1)
 	}
 
@@ -129,21 +154,73 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		stopBootstrap()
 	}
 
-	kubeconfigPath := path.Join(o.HubKubeconfigDir, hubclientcert.KubeconfigFile)
-	hubClientConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
-	if err != nil {
-		return err
-	}
-	controllerContext.EventRecorder.Event("HubClientConfigReady", "Client config for hub is ready.")
-	// build and start another ClientCertForHubController for client certificate rotation
-	hubCSRInformer, clientCertForHubController, err := o.buildClientCertForHubController(o.ClusterName, o.AgentName,
-		hubClientConfig, spokeKubeClient, spokeSecretInformer, controllerContext.EventRecorder, "")
+	// create hub clients and shared informer factories from hub kube config
+	hubClientConfig, err := clientcmd.BuildConfigFromFlags("", path.Join(o.HubKubeconfigDir, hubclientcert.KubeconfigFile))
 	if err != nil {
 		return err
 	}
 
-	go hubCSRInformer.Run(ctx.Done())
+	hubKubeClient, err := kubernetes.NewForConfig(hubClientConfig)
+	if err != nil {
+		return err
+	}
+
+	hubClusterClient, err := clusterv1client.NewForConfig(hubClientConfig)
+	if err != nil {
+		return err
+	}
+
+	hubKubeInformerFactory := informers.NewSharedInformerFactory(hubKubeClient, 10*time.Minute)
+	hubClusterInformerFactory := clusterv1informers.NewSharedInformerFactory(hubClusterClient, 10*time.Minute)
+
+	controllerContext.EventRecorder.Event("HubClientConfigReady", "Client config for hub is ready.")
+
+	// create another ClientCertForHubController for client certificate rotation
+	clientCertForHubController, err := hubclientcert.NewClientCertForHubController(
+		o.ClusterName, o.AgentName, o.ComponentNamespace, o.HubKubeconfigSecret,
+		restclient.AnonymousClientConfig(hubClientConfig),
+		spokeKubeClient.CoreV1(),
+		hubKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
+		hubKubeInformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
+		spokeKubeInformerFactory.Core().V1().Secrets(),
+		controllerContext.EventRecorder,
+		"",
+	)
+	if err != nil {
+		return err
+	}
+
+	// create SpokeClusterController to reconcile instances of SpokeCluster on the spoke cluster
+	caBundle := controllerContext.KubeConfig.CAData
+	if caBundle == nil && controllerContext.KubeConfig.CAFile != "" {
+		data, err := ioutil.ReadFile(controllerContext.KubeConfig.CAFile)
+		if err != nil {
+			return fmt.Errorf("unable to load CA data from file %q: %w", controllerContext.KubeConfig.CAFile, err)
+		}
+		caBundle = data
+	}
+
+	spokeServerURL, err := o.getSpokeServerURL(spokeKubeClient.CoreV1())
+	if err != nil {
+		return err
+	}
+
+	spokeClusterController := spokecluster.NewSpokeClusterController(
+		o.ClusterName, spokeServerURL,
+		caBundle,
+		hubClusterClient,
+		hubClusterInformerFactory.Cluster().V1().SpokeClusters(),
+		spokeKubeClient.Discovery(),
+		spokeKubeInformerFactory.Core().V1().Nodes(),
+		controllerContext.EventRecorder,
+	)
+
+	go hubKubeInformerFactory.Start(ctx.Done())
+	go hubClusterInformerFactory.Start(ctx.Done())
+	go spokeKubeInformerFactory.Start(ctx.Done())
+
 	go clientCertForHubController.Run(ctx, 1)
+	go spokeClusterController.Run(ctx, 1)
 
 	<-ctx.Done()
 	return nil
@@ -159,6 +236,8 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 		"The name of secret in component namespace storing kubeconfig for hub.")
 	fs.StringVar(&o.HubKubeconfigDir, "hub-kubeconfig-dir", o.HubKubeconfigDir,
 		"The mount path of hub-kubeconfig-secret in the container.")
+	fs.StringVar(&o.SpokeServerUrl, "spoke-server-url", o.SpokeServerUrl,
+		"A reachable URL of spoke cluster api server for hub cluster.")
 }
 
 // Validate verifies the inputs.
@@ -204,29 +283,6 @@ func generateAgentName() string {
 	return utilrand.String(spokeAgentNameLength)
 }
 
-// buildClientCertForHubController creates and returns a csr informer and a ClientCertForHubController
-func (o *SpokeAgentOptions) buildClientCertForHubController(clusterName, agentName string,
-	initialHubClientConfig *restclient.Config, spokeKubeClient kubernetes.Interface, spokeSecretInformer corev1informers.SecretInformer,
-	recorder events.Recorder, controllerNameOverride string) (cache.SharedIndexInformer, factory.Controller, error) {
-	initialHubKubeClient, err := kubernetes.NewForConfig(initialHubClientConfig)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// create an informer for csrs on hub cluster
-	hubCSRInformer := informers.NewSharedInformerFactory(initialHubKubeClient,
-		10*time.Minute).Certificates().V1beta1().CertificateSigningRequests()
-
-	clientCertForHubController, err := hubclientcert.NewClientCertForHubController(clusterName, agentName,
-		o.ComponentNamespace, o.HubKubeconfigSecret, restclient.AnonymousClientConfig(initialHubClientConfig),
-		spokeKubeClient.CoreV1(), initialHubKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
-		hubCSRInformer, spokeSecretInformer, recorder, controllerNameOverride)
-	if err != nil {
-		return nil, nil, err
-	}
-	return hubCSRInformer.Informer(), clientCertForHubController, nil
-}
-
 // hasValidHubClientConfig returns ture if the conditions below are met:
 //   1. KubeconfigFile exists
 //   2. TLSKeyFile exists
@@ -263,7 +319,7 @@ func (o *SpokeAgentOptions) hasValidHubClientConfig() (bool, error) {
 //   4. generate random cluster/agent names then
 func (o *SpokeAgentOptions) getOrGenerateClusterAgentNames() (string, string) {
 	clusterName := o.ClusterName
-	// if cluster name is not specified with nput argument, try to load it from file
+	// if cluster name is not specified with input argument, try to load it from file
 	if clusterName == "" {
 		// TODO, read cluster name from openshift struct if the spoke agent is running in an openshift cluster
 
@@ -290,4 +346,33 @@ func (o *SpokeAgentOptions) getOrGenerateClusterAgentNames() (string, string) {
 	}
 
 	return clusterName, agentName
+}
+
+// getSpokeServerURL returns the api server url of spoke cluster
+func (o *SpokeAgentOptions) getSpokeServerURL(spokeCoreClient corev1client.CoreV1Interface) (string, error) {
+	// use user specified spoke server url if exists
+	if o.SpokeServerUrl != "" {
+		return o.SpokeServerUrl, nil
+	}
+
+	// otherwise try to get it from the default/kubernetes endpoints
+	klog.Infof("Try to get spoke server URL from default/kubernetes endpoints")
+	kubeEndpoints, err := spokeCoreClient.Endpoints("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("unable to get server URL from default/kubernetes endpoint: %w", err)
+	}
+
+	if len(kubeEndpoints.Subsets) == 0 {
+		return "", fmt.Errorf("unable to get server URL from default/kubernetes endpoint: no subsets")
+	}
+
+	if len(kubeEndpoints.Subsets[0].Addresses) == 0 {
+		return "", fmt.Errorf("unable to get server URL from default/kubernetes endpoint: no addresses")
+	}
+
+	if len(kubeEndpoints.Subsets[0].Ports) == 0 {
+		return "", fmt.Errorf("unable to get server URL from default/kubernetes endpoint: no ports")
+	}
+
+	return fmt.Sprintf("%s:%d", kubeEndpoints.Subsets[0].Addresses[0].IP, kubeEndpoints.Subsets[0].Ports[0].Port), nil
 }

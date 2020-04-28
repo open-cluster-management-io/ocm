@@ -18,6 +18,9 @@ import (
 	"github.com/open-cluster-management/registration/pkg/version"
 )
 
+// The registration binary contains both the hub-side controllers for the
+// registration API and the spoke agent.
+
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
