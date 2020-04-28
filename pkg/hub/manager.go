@@ -14,7 +14,7 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 )
 
-// RunControllerManager starts the controllers on hub to manage spoke cluster registraiton.
+// RunControllerManager starts the controllers on hub to manage spoke cluster registration.
 func RunControllerManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
@@ -36,7 +36,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		controllerContext.EventRecorder,
 	)
 
-	csrController := csr.NewCSRController(
+	csrController := csr.NewCSRApprovingController(
 		kubeClient,
 		csrInformers.Certificates().V1beta1().CertificateSigningRequests().Informer(),
 		controllerContext.EventRecorder,

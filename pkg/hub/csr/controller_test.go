@@ -15,7 +15,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
-	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
@@ -23,6 +23,11 @@ import (
 )
 
 const testCSRName = "test_csr"
+
+var (
+	labels     = map[string]string{"open-cluster-management.io/cluster-name": "spokecluster1"}
+	signerName = certificatesv1beta1.KubeAPIServerClientSignerName
+)
 
 func TestSync(t *testing.T) {
 	cases := []struct {
@@ -36,63 +41,44 @@ func TestSync(t *testing.T) {
 			name:         "sync a deleted csr",
 			startingCSRs: []runtime.Object{},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("expected 1 call but got: %#v", actions)
-				}
-				assertAction(t, actions[0], "get")
+				assertAction(t, actions, "get")
 			},
 		},
 		{
 			name:         "sync a denied csr",
 			startingCSRs: []runtime.Object{newDeniedCSR()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("expected 1 call but got: %#v", actions)
-				}
-				assertAction(t, actions[0], "get")
+				assertAction(t, actions, "get")
 			},
 		},
 		{
-			name:         "sync an unrecognized csr",
-			startingCSRs: []runtime.Object{newUnrecognizedCSR()},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("expected 1 call but got: %#v", actions)
-				}
-				assertAction(t, actions[0], "get")
-			},
-		},
-		{
-			name:         "sync a hub cluster admin approved csr",
+			name:         "sync an approved csr",
 			startingCSRs: []runtime.Object{newApprovedCSR()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 5 {
-					t.Errorf("expected 5 call but got: %#v", actions)
-				}
-				assertAction(t, actions[4], "create")
-				assertClusterRoleBindingCreated(t, actions[4].(clienttesting.CreateActionImpl).Object)
+				assertAction(t, actions, "get")
+			},
+		},
+		{
+			name:         "sync an invalid csr",
+			startingCSRs: []runtime.Object{newInvalidCSR()},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				assertAction(t, actions, "get")
 			},
 		},
 		{
 			name:         "deny an auto approving csr",
-			startingCSRs: []runtime.Object{newRecognizedCSR()},
+			startingCSRs: []runtime.Object{newRenewalCSR()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 2 {
-					t.Errorf("expected 2 call but got: %#v", actions)
-				}
-				assertAction(t, actions[1], "create")
+				assertAction(t, actions, "get", "create")
 				assertSubjectAccessReviewCreated(t, actions[1].(clienttesting.CreateActionImpl).Object)
 			},
 		},
 		{
 			name:                 "allow an auto approving csr",
-			startingCSRs:         []runtime.Object{newRecognizedCSR()},
+			startingCSRs:         []runtime.Object{newRenewalCSR()},
 			autoApprovingAllowed: true,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 3 {
-					t.Errorf("expected 3 call but got: %#v", actions)
-				}
-				assertAction(t, actions[2], "update")
+				assertAction(t, actions, "get", "create", "update")
 				assertCondition(t, actions[2].(clienttesting.UpdateActionImpl).Object, certificatesv1beta1.CertificateApproved, "AutoApproved")
 			},
 		},
@@ -113,7 +99,7 @@ func TestSync(t *testing.T) {
 				},
 			)
 
-			ctrl := &csrController{kubeClient, eventstesting.NewTestingEventRecorder(t)}
+			ctrl := &csrApprovingController{kubeClient, eventstesting.NewTestingEventRecorder(t)}
 			syncErr := ctrl.sync(context.TODO(), newFakeSyncContext(t))
 			if len(c.expectedErr) > 0 && syncErr == nil {
 				t.Errorf("expected %q error", c.expectedErr)
@@ -132,57 +118,66 @@ func TestSync(t *testing.T) {
 	}
 }
 
-func TestRecognize(t *testing.T) {
+func TestIsSpokeClusterClientCertRenewal(t *testing.T) {
 	cases := []struct {
-		name                string
-		csr                 *certificatesv1beta1.CertificateSigningRequest
-		recognized          bool
-		expectedClusterName string
+		name      string
+		csr       *certificatesv1beta1.CertificateSigningRequest
+		isRenewal bool
 	}{
 		{
-			name:       "a wrong block type",
-			csr:        newCSR("", []string{}, "", "RSA PRIVATE KEY"),
-			recognized: false,
+			name:      "a spoke cluster csr without labels",
+			csr:       newCSR(map[string]string{}, nil, "", []string{}, "", ""),
+			isRenewal: false,
 		},
 		{
-			name:       "an empty organization",
-			csr:        newCSR("", []string{}, "", "CERTIFICATE REQUEST"),
-			recognized: false,
+			name:      "an invalid signer name",
+			csr:       newCSR(labels, nil, "", []string{}, "", ""),
+			isRenewal: false,
 		},
 		{
-			name:       "an invalid organization",
-			csr:        newCSR("", []string{"test"}, "", "CERTIFICATE REQUEST"),
-			recognized: false,
+			name:      "a wrong block type",
+			csr:       newCSR(labels, &signerName, "", []string{}, "", "RSA PRIVATE KEY"),
+			isRenewal: false,
 		},
 		{
-			name:       "an invalid common name",
-			csr:        newCSR("", []string{"system:open-cluster-management:spokecluster1"}, "", "CERTIFICATE REQUEST"),
-			recognized: false,
+			name:      "an empty organization",
+			csr:       newCSR(labels, &signerName, "", []string{}, "", "CERTIFICATE REQUEST"),
+			isRenewal: false,
 		},
 		{
-			name:                "a recognied csr",
-			csr:                 newRecognizedCSR(),
-			recognized:          true,
-			expectedClusterName: "spokecluster1",
+			name:      "an invalid organization",
+			csr:       newCSR(labels, &signerName, "", []string{"test"}, "", "CERTIFICATE REQUEST"),
+			isRenewal: false,
+		},
+		{
+			name:      "an invalid common name",
+			csr:       newCSR(labels, &signerName, "", []string{"system:open-cluster-management:spokecluster1"}, "", "CERTIFICATE REQUEST"),
+			isRenewal: false,
+		},
+		{
+			name:      "an common name does not equal user name",
+			csr:       newInvalidCSR(),
+			isRenewal: false,
+		},
+		{
+			name:      "a renewal csr",
+			csr:       newRenewalCSR(),
+			isRenewal: true,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			recognized, clusterName := recognize(c.csr)
-			if recognized != c.recognized {
-				t.Errorf("expected %t, but failed", c.recognized)
-			}
-			if clusterName != c.expectedClusterName {
-				t.Errorf("expected %q, but got %q", c.expectedClusterName, clusterName)
+			isRenewal := isSpokeClusterClientCertRenewal(c.csr)
+			if isRenewal != c.isRenewal {
+				t.Errorf("expected %t, but failed", c.isRenewal)
 			}
 		})
 	}
 }
 
-func newCSR(cn string, orgs []string, username string, reqBlockType string) *certificatesv1beta1.CertificateSigningRequest {
+func newCSR(labels map[string]string, signerName *string, cn string, orgs []string, username string, reqBlockType string) *certificatesv1beta1.CertificateSigningRequest {
 	insecureRand := rand.New(rand.NewSource(0))
-	signerName := "tester"
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), insecureRand)
 	if err != nil {
 		panic(err)
@@ -200,17 +195,22 @@ func newCSR(cn string, orgs []string, username string, reqBlockType string) *cer
 		panic(err)
 	}
 	return &certificatesv1beta1.CertificateSigningRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: labels,
+		},
 		Spec: certificatesv1beta1.CertificateSigningRequestSpec{
 			Username:   username,
 			Usages:     []certificatesv1beta1.KeyUsage{},
-			SignerName: &signerName,
+			SignerName: signerName,
 			Request:    pem.EncodeToMemory(&pem.Block{Type: reqBlockType, Bytes: csrb}),
 		},
 	}
 }
 
-func newRecognizedCSR() *certificatesv1beta1.CertificateSigningRequest {
+func newRenewalCSR() *certificatesv1beta1.CertificateSigningRequest {
 	csr := newCSR(
+		labels,
+		&signerName,
 		"system:open-cluster-management:spokecluster1:spokeagent1",
 		[]string{"system:open-cluster-management:spokecluster1"},
 		"system:open-cluster-management:spokecluster1:spokeagent1",
@@ -220,8 +220,10 @@ func newRecognizedCSR() *certificatesv1beta1.CertificateSigningRequest {
 	return csr
 }
 
-func newUnrecognizedCSR() *certificatesv1beta1.CertificateSigningRequest {
+func newInvalidCSR() *certificatesv1beta1.CertificateSigningRequest {
 	csr := newCSR(
+		labels,
+		&signerName,
 		"system:open-cluster-management:spokecluster1:spokeagent2",
 		[]string{"system:open-cluster-management:spokecluster1"},
 		"system:open-cluster-management:spokecluster1:spokeagent1",
@@ -232,7 +234,7 @@ func newUnrecognizedCSR() *certificatesv1beta1.CertificateSigningRequest {
 }
 
 func newDeniedCSR() *certificatesv1beta1.CertificateSigningRequest {
-	csr := newRecognizedCSR()
+	csr := newRenewalCSR()
 	csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
 		Type: certificatesv1beta1.CertificateDenied,
 	})
@@ -240,23 +242,21 @@ func newDeniedCSR() *certificatesv1beta1.CertificateSigningRequest {
 }
 
 func newApprovedCSR() *certificatesv1beta1.CertificateSigningRequest {
-	csr := newRecognizedCSR()
+	csr := newRenewalCSR()
 	csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
 		Type: certificatesv1beta1.CertificateApproved,
 	})
 	return csr
 }
 
-func assertAction(t *testing.T, actual clienttesting.Action, expected string) {
-	if actual.GetVerb() != expected {
-		t.Errorf("expected %s action but got: %#v", expected, actual)
+func assertAction(t *testing.T, actualActions []clienttesting.Action, expectedActions ...string) {
+	if len(actualActions) != len(expectedActions) {
+		t.Errorf("expected %d call but got: %#v", len(expectedActions), actualActions)
 	}
-}
-
-func assertClusterRoleBindingCreated(t *testing.T, actual runtime.Object) {
-	_, ok := actual.(*rbacv1.ClusterRoleBinding)
-	if !ok {
-		t.Errorf("expected clusterrolebinding created, but got: %#v", actual)
+	for i, expected := range expectedActions {
+		if actualActions[i].GetVerb() != expected {
+			t.Errorf("expected %s action but got: %#v", expected, actualActions[i])
+		}
 	}
 }
 

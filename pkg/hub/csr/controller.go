@@ -24,15 +24,15 @@ const (
 	spokeClusterNameLabel = "open-cluster-management.io/cluster-name"
 )
 
-// csrController reconciles instances of spoke cluster CertificateSigningRequests on the hub.
-type csrController struct {
+// csrApprovingController auto approve the renewal CertificateSigningRequests for an accepted spoke cluster on the hub.
+type csrApprovingController struct {
 	kubeClient    kubernetes.Interface
 	eventRecorder events.Recorder
 }
 
-// NewCSRController creates a new csr controller
-func NewCSRController(kubeClient kubernetes.Interface, csrInformer factory.Informer, recorder events.Recorder) factory.Controller {
-	c := &csrController{
+// NewCSRApprovingController creates a new csr approving controller
+func NewCSRApprovingController(kubeClient kubernetes.Interface, csrInformer factory.Informer, recorder events.Recorder) factory.Controller {
+	c := &csrApprovingController{
 		kubeClient:    kubeClient,
 		eventRecorder: recorder.WithComponentSuffix("csr-controller"),
 	}
@@ -45,7 +45,7 @@ func NewCSRController(kubeClient kubernetes.Interface, csrInformer factory.Infor
 		ToController("CSRController", recorder)
 }
 
-func (c *csrController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	csrName := syncCtx.QueueKey()
 	klog.V(4).Infof("Reconciling CertificateSigningRequests %q", csrName)
 	csr, err := c.kubeClient.CertificatesV1beta1().CertificateSigningRequests().Get(ctx, csrName, metav1.GetOptions{})
@@ -56,21 +56,19 @@ func (c *csrController) sync(ctx context.Context, syncCtx factory.SyncContext) e
 		return err
 	}
 
-	// Current csr is denied, do nothing.
-	approved, denied := getCertApprovalCondition(&csr.Status)
-	if denied || approved {
+	// Current csr is in terminal state, do nothing.
+	if isCSRInTerminalState(&csr.Status) {
 		return nil
 	}
 
-	// Recognize whether current csr is a spoker cluster csr.
+	// Check whether current csr is a renewal spoker cluster csr.
 	isRenewal := isSpokeClusterClientCertRenewal(csr)
 	if !isRenewal {
 		klog.V(4).Infof("CSR %q was not recognized", csr.Name)
 		return nil
 	}
 
-	// Using SubjectAccessReview API to authorize whether the current spoke agent has been authorized to renew its csr.
-	// A spoke agent is authorized after its cluster is accepted by hub cluster admin.
+	// Authorize whether the current spoke agent has been authorized to renew its csr.
 	allowed, err := c.authorize(ctx, csr)
 	if err != nil {
 		return err
@@ -80,7 +78,7 @@ func (c *csrController) sync(ctx context.Context, syncCtx factory.SyncContext) e
 		return nil
 	}
 
-	// Auto approve the spoker clsuter csr
+	// Auto approve the spoke cluster csr
 	csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
 		Type:    certificatesv1beta1.CertificateApproved,
 		Reason:  "AutoApproved",
@@ -94,8 +92,9 @@ func (c *csrController) sync(ctx context.Context, syncCtx factory.SyncContext) e
 	return nil
 }
 
-// TODO:
-func (c *csrController) authorize(ctx context.Context, csr *certificatesv1beta1.CertificateSigningRequest) (bool, error) {
+// Using SubjectAccessReview API to check whether a spoke agent has been authorized to renew its csr,
+// a spoke agent is authorized after its spoke cluster is accepted by hub cluster admin.
+func (c *csrApprovingController) authorize(ctx context.Context, csr *certificatesv1beta1.CertificateSigningRequest) (bool, error) {
 	extra := make(map[string]authorizationv1.ExtraValue)
 	for k, v := range csr.Spec.Extra {
 		extra[k] = authorizationv1.ExtraValue(v)
@@ -122,11 +121,11 @@ func (c *csrController) authorize(ctx context.Context, csr *certificatesv1beta1.
 	return sar.Status.Allowed, nil
 }
 
-// To recognize a valid spoke cluster csr, we check
-// 1. if organization field and commonName field in csr request is valid.
-// 2. if user name in csr is the same as commonName field in csr request.
+// To check a renewal spoke cluster csr, we check
+// 1. if the signer name in csr request is valid.
+// 2. if organization field and commonName field in csr request is valid.
+// 3. if user name in csr is the same as commonName field in csr request.
 func isSpokeClusterClientCertRenewal(csr *certificatesv1beta1.CertificateSigningRequest) bool {
-	//TODO: Add a max duration for this CSR. I think 30 days is long enough to start
 	spokeClusterName, existed := csr.Labels[spokeClusterNameLabel]
 	if !existed {
 		return false
@@ -164,7 +163,9 @@ func isSpokeClusterClientCertRenewal(csr *certificatesv1beta1.CertificateSigning
 	return csr.Spec.Username == x509cr.Subject.CommonName
 }
 
-func getCertApprovalCondition(status *certificatesv1beta1.CertificateSigningRequestStatus) (approved, denied bool) {
+// Check whether a CSR is in terminal state
+func isCSRInTerminalState(status *certificatesv1beta1.CertificateSigningRequestStatus) bool {
+	approved, denied := false, false
 	for _, c := range status.Conditions {
 		if c.Type == certificatesv1beta1.CertificateApproved {
 			approved = true
@@ -173,5 +174,5 @@ func getCertApprovalCondition(status *certificatesv1beta1.CertificateSigningRequ
 			denied = true
 		}
 	}
-	return
+	return approved || denied
 }

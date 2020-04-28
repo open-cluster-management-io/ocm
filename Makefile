@@ -11,7 +11,6 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 )
 
 $(call add-bindata,spokecluster,./pkg/hub/spokecluster/manifests/...,bindata,bindata,./pkg/hub/spokecluster/bindata/bindata.go)
-$(call add-bindata,csr,./pkg/hub/csr/manifests/...,bindata,bindata,./pkg/hub/csr/bindata/bindata.go)
 
 clean:
 	$(RM) ./registration
