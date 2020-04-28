@@ -5,15 +5,10 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"path/filepath"
 	"strings"
 
-	"github.com/open-cluster-management/registration/pkg/hub/csr/bindata"
-	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
-	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -25,8 +20,8 @@ import (
 )
 
 const (
-	manifestDir   = "pkg/hub/csr"
-	subjectPrefix = "system:open-cluster-management:"
+	subjectPrefix         = "system:open-cluster-management:"
+	spokeClusterNameLabel = "open-cluster-management.io/cluster-name"
 )
 
 // csrController reconciles instances of spoke cluster CertificateSigningRequests on the hub.
@@ -63,40 +58,15 @@ func (c *csrController) sync(ctx context.Context, syncCtx factory.SyncContext) e
 
 	// Current csr is denied, do nothing.
 	approved, denied := getCertApprovalCondition(&csr.Status)
-	if denied {
+	if denied || approved {
 		return nil
 	}
 
-	// Recognize whether current csr is a spoker clsuter csr.
-	recognized, spokeClusterName := recognize(csr)
-	if !recognized {
+	// Recognize whether current csr is a spoker cluster csr.
+	isRenewal := isSpokeClusterClientCertRenewal(csr)
+	if !isRenewal {
 		klog.V(4).Infof("CSR %q was not recognized", csr.Name)
 		return nil
-	}
-
-	// Current spoker clsuter csr is approved, apply the corresponding clusterrole/clusterrolebinding.
-	if approved {
-		resourceResults := resourceapply.ApplyDirectly(
-			resourceapply.NewKubeClientHolder(c.kubeClient),
-			syncCtx.Recorder(),
-			func(name string) ([]byte, error) {
-				config := struct {
-					SpokeClusterName string
-				}{
-					SpokeClusterName: spokeClusterName,
-				}
-				return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join(manifestDir, name)), config).Data, nil
-			},
-			"manifests/clusterrole.yaml",
-			"manifests/clusterrolebinding.yaml",
-		)
-		errs := []error{}
-		for _, result := range resourceResults {
-			if result.Error != nil {
-				errs = append(errs, fmt.Errorf("%q (%T): %w", result.File, result.Type, result.Error))
-			}
-		}
-		return operatorhelpers.NewMultiLineAggregate(errs)
 	}
 
 	// Using SubjectAccessReview API to authorize whether the current spoke agent has been authorized to renew its csr.
@@ -124,6 +94,7 @@ func (c *csrController) sync(ctx context.Context, syncCtx factory.SyncContext) e
 	return nil
 }
 
+// TODO:
 func (c *csrController) authorize(ctx context.Context, csr *certificatesv1beta1.CertificateSigningRequest) (bool, error) {
 	extra := make(map[string]authorizationv1.ExtraValue)
 	for k, v := range csr.Spec.Extra {
@@ -137,10 +108,10 @@ func (c *csrController) authorize(ctx context.Context, csr *certificatesv1beta1.
 			Groups: csr.Spec.Groups,
 			Extra:  extra,
 			ResourceAttributes: &authorizationv1.ResourceAttributes{
-				Group:       "certificates.k8s.io",
-				Resource:    "certificatesigningrequests",
-				Verb:        "create",
-				Subresource: "spokeclusteragent",
+				Group:       "register.open-cluster-management.io",
+				Resource:    "spokeclusters",
+				Verb:        "renew",
+				Subresource: "clientcertificates",
 			},
 		},
 	}
@@ -154,32 +125,43 @@ func (c *csrController) authorize(ctx context.Context, csr *certificatesv1beta1.
 // To recognize a valid spoke cluster csr, we check
 // 1. if organization field and commonName field in csr request is valid.
 // 2. if user name in csr is the same as commonName field in csr request.
-func recognize(csr *certificatesv1beta1.CertificateSigningRequest) (recognized bool, spokeClusterName string) {
+func isSpokeClusterClientCertRenewal(csr *certificatesv1beta1.CertificateSigningRequest) bool {
+	//TODO: Add a max duration for this CSR. I think 30 days is long enough to start
+	spokeClusterName, existed := csr.Labels[spokeClusterNameLabel]
+	if !existed {
+		return false
+	}
+
+	if csr.Spec.SignerName == nil || *csr.Spec.SignerName != certificatesv1beta1.KubeAPIServerClientSignerName {
+		return false
+	}
+
 	block, _ := pem.Decode(csr.Spec.Request)
 	if block == nil || block.Type != "CERTIFICATE REQUEST" {
 		klog.V(4).Infof("csr %q was not recognized: PEM block type is not CERTIFICATE REQUEST", csr.Name)
-		return false, ""
+		return false
 	}
 
 	x509cr, err := x509.ParseCertificateRequest(block.Bytes)
 	if err != nil {
 		klog.V(4).Infof("csr %q was not recognized: %w", csr.Name, err)
-		return false, ""
+		return false
 	}
 
 	if len(x509cr.Subject.Organization) != 1 {
-		return false, ""
+		return false
 	}
+
 	organization := x509cr.Subject.Organization[0]
-	if !strings.HasPrefix(organization, subjectPrefix) {
-		return false, ""
+	if organization != fmt.Sprintf("%s%s", subjectPrefix, spokeClusterName) {
+		return false
 	}
 
 	if !strings.HasPrefix(x509cr.Subject.CommonName, organization) {
-		return false, ""
+		return false
 	}
 
-	return csr.Spec.Username == x509cr.Subject.CommonName, strings.TrimPrefix(organization, subjectPrefix)
+	return csr.Spec.Username == x509cr.Subject.CommonName
 }
 
 func getCertApprovalCondition(status *certificatesv1beta1.CertificateSigningRequestStatus) (approved, denied bool) {

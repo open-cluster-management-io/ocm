@@ -5,13 +5,16 @@ metadata:
 rules:
 # Allow spoke agent to rotate its certificate
 - apiGroups: ["certificates.k8s.io"]
-  resources: ["certificatesigningrequests/spokeclusteragent"]
-  verbs: ["create"]
-# Allow spoke agent to get/list/watch its owner spoke cluster
+  resources: ["certificatesigningrequests"]
+  verbs: ["create", "get", "list", "watch"]
+- apiGroups: ["register.open-cluster-management.io"]
+  resources: ["spokeclusters/clientcertificates"]
+  verbs: ["renew"]
+# Allow spoke agent to get/list/update/watch its owner spoke cluster
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["spokeclusters"]
   resourceNames: ["{{ .SpokeClusterName }}"]
-  verbs: ["get", "list", "watch"]
+  verbs: ["get", "list", "update", "watch"]
 # Allow spoke agent to update the status of its owner spoke cluster
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["spokeclusters/status"]
