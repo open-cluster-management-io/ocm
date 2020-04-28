@@ -9,4 +9,4 @@ roleRef:
 subjects:
 - kind: Group
   apiGroup: rbac.authorization.k8s.io
-  name: system:open-cluster-management:spokecluster:{{ .SpokeClusterName }}
+  name: system:open-cluster-management:{{ .SpokeClusterName }}

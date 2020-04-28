@@ -56,13 +56,16 @@ metadata:
 rules:
 # Allow spoke agent to rotate its certificate
 - apiGroups: ["certificates.k8s.io"]
-  resources: ["certificatesigningrequests/spokeclusteragent"]
-  verbs: ["create"]
-# Allow spoke agent to get/list/watch its owner spoke cluster
+  resources: ["certificatesigningrequests"]
+  verbs: ["create", "get", "list", "watch"]
+- apiGroups: ["register.open-cluster-management.io"]
+  resources: ["spokeclusters/clientcertificates"]
+  verbs: ["renew"]
+# Allow spoke agent to get/list/update/watch its owner spoke cluster
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["spokeclusters"]
   resourceNames: ["{{ .SpokeClusterName }}"]
-  verbs: ["get", "list", "watch"]
+  verbs: ["get", "list", "update", "watch"]
 # Allow spoke agent to update the status of its owner spoke cluster
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["spokeclusters/status"]
@@ -96,7 +99,8 @@ roleRef:
 subjects:
 - kind: Group
   apiGroup: rbac.authorization.k8s.io
-  name: system:open-cluster-management:spokecluster:{{ .SpokeClusterName }}`)
+  name: system:open-cluster-management:{{ .SpokeClusterName }}
+`)
 
 func pkgHubSpokeclusterManifestsSpokeclusterClusterrolebindingYamlBytes() ([]byte, error) {
 	return _pkgHubSpokeclusterManifestsSpokeclusterClusterrolebindingYaml, nil
@@ -116,7 +120,8 @@ func pkgHubSpokeclusterManifestsSpokeclusterClusterrolebindingYaml() (*asset, er
 var _pkgHubSpokeclusterManifestsSpokeclusterNamespaceYaml = []byte(`apiVersion: v1
 kind: Namespace
 metadata:
-  name: {{ .SpokeClusterName }}`)
+  name: {{ .SpokeClusterName }}
+`)
 
 func pkgHubSpokeclusterManifestsSpokeclusterNamespaceYamlBytes() ([]byte, error) {
 	return _pkgHubSpokeclusterManifestsSpokeclusterNamespaceYaml, nil

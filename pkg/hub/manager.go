@@ -9,10 +9,12 @@ import (
 
 	clusterv1client "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	clusterv1informers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
+	"github.com/open-cluster-management/registration/pkg/hub/csr"
 	"github.com/open-cluster-management/registration/pkg/hub/spokecluster"
+	kubeinformers "k8s.io/client-go/informers"
 )
 
-// RunControllerManager starts the controllers on hub to manage spoke cluster registraiton.
+// RunControllerManager starts the controllers on hub to manage spoke cluster registration.
 func RunControllerManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
@@ -23,7 +25,9 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	if err != nil {
 		return err
 	}
+
 	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
+	csrInformers := kubeinformers.NewSharedInformerFactory(kubeClient, 10*time.Minute)
 
 	spokeClusterController := spokecluster.NewSpokeClusterController(
 		kubeClient,
@@ -32,9 +36,17 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		controllerContext.EventRecorder,
 	)
 
+	csrController := csr.NewCSRApprovingController(
+		kubeClient,
+		csrInformers.Certificates().V1beta1().CertificateSigningRequests().Informer(),
+		controllerContext.EventRecorder,
+	)
+
 	go clusterInformers.Start(ctx.Done())
+	go csrInformers.Start(ctx.Done())
 
 	go spokeClusterController.Run(ctx, 1)
+	go csrController.Run(ctx, 1)
 
 	<-ctx.Done()
 	return nil
