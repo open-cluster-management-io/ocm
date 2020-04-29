@@ -96,13 +96,15 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		return err
 	}
 
+	// if bootstrap is not needed, we consider there is already a spoke cluster exists on hub cluster
+	hasSpokeCluster := true
+
 	// create and start a ClientCertForHubController for spoke agent bootstrap to deal with scenario #1 and #4.
 	// Running the bootstrap ClientCertForHubController is optional. If always run it no matter if there already
 	// exists a valid client config for hub or not, the controller will be started and then stopped immediately
 	// in scenario #2 and #3, which results in an error message in log: 'Observed a panic: timeout waiting for
 	// informer cache'
 	var stopBootstrap context.CancelFunc
-	hasSpokeCluster := true
 	if !ok {
 		// create bootstrap client and shared informer factory from bootstrap hub kube config
 		bootstrapClientConfig, err := clientcmd.BuildConfigFromFlags("", o.BootstrapKubeconfig)
@@ -133,6 +135,8 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		)
 
 		// create a SpokeClusterCreatingControlle to create a spoke cluster on hub cluster
+		hasSpokeCluster = false
+
 		caBundle := controllerContext.KubeConfig.CAData
 		if caBundle == nil && controllerContext.KubeConfig.CAFile != "" {
 			data, err := ioutil.ReadFile(controllerContext.KubeConfig.CAFile)
@@ -141,8 +145,6 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			}
 			caBundle = data
 		}
-
-		hasSpokeCluster = false
 
 		// TODO there is a corner case, if the hub kubeconfig is ready, but the spoke cluster did not create, and the agent is
 		// restarted, the agent will not be able to create spoke cluster again due to the bootstrap kubeconfig has been switched
