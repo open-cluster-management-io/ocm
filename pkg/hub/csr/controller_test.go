@@ -41,35 +41,35 @@ func TestSync(t *testing.T) {
 			name:         "sync a deleted csr",
 			startingCSRs: []runtime.Object{},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertAction(t, actions, "get")
+				assertActions(t, actions, "get")
 			},
 		},
 		{
 			name:         "sync a denied csr",
 			startingCSRs: []runtime.Object{newDeniedCSR()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertAction(t, actions, "get")
+				assertActions(t, actions, "get")
 			},
 		},
 		{
 			name:         "sync an approved csr",
 			startingCSRs: []runtime.Object{newApprovedCSR()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertAction(t, actions, "get")
+				assertActions(t, actions, "get")
 			},
 		},
 		{
 			name:         "sync an invalid csr",
 			startingCSRs: []runtime.Object{newInvalidCSR()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertAction(t, actions, "get")
+				assertActions(t, actions, "get")
 			},
 		},
 		{
 			name:         "deny an auto approving csr",
 			startingCSRs: []runtime.Object{newRenewalCSR()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertAction(t, actions, "get", "create")
+				assertActions(t, actions, "get", "create")
 				assertSubjectAccessReviewCreated(t, actions[1].(clienttesting.CreateActionImpl).Object)
 			},
 		},
@@ -78,8 +78,8 @@ func TestSync(t *testing.T) {
 			startingCSRs:         []runtime.Object{newRenewalCSR()},
 			autoApprovingAllowed: true,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertAction(t, actions, "get", "create", "update")
-				assertCondition(t, actions[2].(clienttesting.UpdateActionImpl).Object, certificatesv1beta1.CertificateApproved, "AutoApproved")
+				assertActions(t, actions, "get", "create", "update")
+				assertCondition(t, actions[2].(clienttesting.UpdateActionImpl).Object, certificatesv1beta1.CertificateApproved, "AutoApprovedByHubCSRApprovingController")
 			},
 		},
 	}
@@ -249,7 +249,7 @@ func newApprovedCSR() *certificatesv1beta1.CertificateSigningRequest {
 	return csr
 }
 
-func assertAction(t *testing.T, actualActions []clienttesting.Action, expectedActions ...string) {
+func assertActions(t *testing.T, actualActions []clienttesting.Action, expectedActions ...string) {
 	if len(actualActions) != len(expectedActions) {
 		t.Errorf("expected %d call but got: %#v", len(expectedActions), actualActions)
 	}
