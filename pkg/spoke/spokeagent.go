@@ -6,10 +6,17 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/cobra"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/client-go/discovery"
+	cacheddiscovery "k8s.io/client-go/discovery/cached"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 
 	workclientset "github.com/open-cluster-management/api/client/work/clientset/versioned"
 	workinformers "github.com/open-cluster-management/api/client/work/informers/externalversions"
 	"github.com/open-cluster-management/work/pkg/spoke/controllers"
+	"github.com/open-cluster-management/work/pkg/spoke/resource"
 )
 
 // WorkloadAgentOptions defines the flags for workload agent
@@ -41,14 +48,47 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 	// Only watch the cluster namespace on hub
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(hubWorkClient, 5*time.Minute, workinformers.WithNamespace(o.SpokeClusterName))
 
+	// Build dynamic client and informer for spoke cluster
+	spokeRestConfig, err := clientcmd.BuildConfigFromFlags("" /* leave masterurl as empty */, o.SpokeKubeconfigFile)
+	if err != nil {
+		return err
+	}
+	spokeDynamicClient, err := dynamic.NewForConfig(spokeRestConfig)
+	if err != nil {
+		return err
+	}
+	spokeKubeClient, err := kubernetes.NewForConfig(spokeRestConfig)
+	if err != nil {
+		return err
+	}
+	spokeAPIExtensionClient, err := apiextensionsclient.NewForConfig(spokeRestConfig)
+	if err != nil {
+		return err
+	}
+	// Start restmapper gorountine that refresh cached APIGroupResources in the memory
+	// using discovery client
+	spokeDiscoveryClient, err := discovery.NewDiscoveryClientForConfig(spokeRestConfig)
+	if err != nil {
+		return err
+	}
+	cachedSpokeDiscoveryClient := cacheddiscovery.NewMemCacheClient(spokeDiscoveryClient)
+	restMapper := resource.NewMapper(cachedSpokeDiscoveryClient)
+	go restMapper.Run(ctx.Done())
+
 	manifestWorkController := controllers.NewManifestWorkController(
+		ctx,
+		controllerContext.EventRecorder,
+		spokeDynamicClient,
+		spokeKubeClient,
+		spokeAPIExtensionClient,
 		hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName),
 		workInformerFactory.Work().V1().ManifestWorks(),
 		workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks(o.SpokeClusterName),
+		restMapper,
 	)
 
 	go workInformerFactory.Start(ctx.Done())
-	go manifestWorkController.Run(ctx, controllerContext.EventRecorder)
+	go manifestWorkController.Run(ctx, 1)
 	<-ctx.Done()
 	return nil
 }
