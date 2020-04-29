@@ -96,9 +96,6 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		return err
 	}
 
-	// if bootstrap is not needed, we consider there is already a spoke cluster exists on hub cluster
-	hasSpokeCluster := true
-
 	// create and start a ClientCertForHubController for spoke agent bootstrap to deal with scenario #1 and #4.
 	// Running the bootstrap ClientCertForHubController is optional. If always run it no matter if there already
 	// exists a valid client config for hub or not, the controller will be started and then stopped immediately
@@ -135,7 +132,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		)
 
 		// create a SpokeClusterCreatingControlle to create a spoke cluster on hub cluster
-		hasSpokeCluster = false
+		hasSpokeCluster := false
 
 		caBundle := controllerContext.KubeConfig.CAData
 		if caBundle == nil && controllerContext.KubeConfig.CAFile != "" {
@@ -165,14 +162,14 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 
 		go clientCertForHubController.Run(bootstrapCtx, 1)
 		go spokeClusterCreatingController.Run(bootstrapCtx, 1)
+
+		// wait for the spoke cluster is created
+		wait.PollImmediateInfinite(1*time.Second, func() (bool, error) { return hasSpokeCluster, nil })
 	}
 
 	// wait for the client config for hub is ready
 	klog.Info("Waiting for client config for hub to be ready")
-	if err := wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
-		hasValidHubClientConfig, err := o.hasValidHubClientConfig()
-		return hasValidHubClientConfig && hasSpokeCluster, err
-	}); err != nil {
+	if err := wait.PollImmediateInfinite(1*time.Second, o.hasValidHubClientConfig); err != nil {
 		// TODO we need run the bootstrap CSR forever too to re-establish the client-cert if we ever lose it.
 		if stopBootstrap != nil {
 			stopBootstrap()
