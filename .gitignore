@@ -5,6 +5,8 @@ work
 *.so
 *.dylib
 
+nucleus
+
 # Test binary, build with `go test -c`
 *.test
 
