@@ -1,0 +1,133 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: spokeclusters.cluster.open-cluster-management.io
+spec:
+  group: cluster.open-cluster-management.io
+  names:
+    kind: SpokeCluster
+    listKind: SpokeClusterList
+    plural: spokeclusters
+    singular: spokecluster
+  scope: "Cluster"
+  subresources:
+    status: {}
+  preserveUnknownFields: false
+  validation:
+    openAPIV3Schema:
+      description: "SpokeCluster represents the desired state and current status of
+        spoke cluster. SpokeCluster is a cluster scoped resource. The name is the
+        cluster UID. \n The cluster join process follows a double opt-in process:
+        \n 1. agent on spoke cluster creates CSR on hub with cluster UID and agent
+        name. 2. agent on spoke cluster creates spokecluster on hub. 3. cluster admin
+        on hub approves the CSR for the spoke's cluster UID and agent name. 4. cluster
+        admin set spec.acceptSpokeCluster of spokecluster to true. 5. cluster admin
+        on spoke creates credential of kubeconfig to spoke. \n Once the hub creates
+        the cluster namespace, the spoke agent pushes the credential to the hub to
+        use against the spoke's kube-apiserver."
+      type: object
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: Spec represents a desired configuration for the agent on the
+            spoke cluster.
+          type: object
+          properties:
+            hubAcceptsClient:
+              description: AcceptSpokeCluster reprsents that hub accepts the join
+                of spoke agent. Its default value is false, and can only be set true
+                when the user on hub has an RBAC rule to UPDATE on the virtual subresource
+                of spokeclusters/accept. When the vaule is set true, a namespace whose
+                name is same as the name of SpokeCluster is created on hub representing
+                the spoke cluster, also role/rolebinding is created on the namespace
+                to grant the permision of access from agent on spoke. When the value
+                is set false, the namespace representing the spoke cluster is deleted.
+              type: boolean
+            spokeClientConfig:
+              description: SpokeClientConfig represents the apiserver address of the
+                spoke cluster
+              type: object
+              properties:
+                caBundle:
+                  description: CABundle is the ca bundle to connect to apiserver of
+                    the spoke cluster. System certs are used if it is not set.
+                  type: string
+                  format: byte
+                url:
+                  description: URL is the url of apiserver endpoint of the spoke cluster.
+                  type: string
+        status:
+          description: Status represents the current status of joined spoke cluster
+          type: object
+          properties:
+            allocatable:
+              description: Allocatable represents the total allocatable resources
+                on the spoke cluster.
+              type: object
+              additionalProperties:
+                type: string
+            capacity:
+              description: Capacity represents the total resource capacity from all
+                nodeStatuses on the spoke cluster.
+              type: object
+              additionalProperties:
+                type: string
+            conditions:
+              description: Conditions contains the different condition statuses for
+                this spoke cluster.
+              type: array
+              items:
+                description: StatusCondition contains condition information for a
+                  spoke cluster.
+                type: object
+                properties:
+                  lastTransitionTime:
+                    description: LastTransitionTime is the last time the condition
+                      changed from one status to another.
+                    type: string
+                    format: date-time
+                  message:
+                    description: Message is a human-readable message indicating details
+                      about the last status change.
+                    type: string
+                  reason:
+                    description: Reason is a (brief) reason for the condition's last
+                      status change.
+                    type: string
+                  status:
+                    description: Status is the status of the condition. One of True,
+                      False, Unknown.
+                    type: string
+                  type:
+                    description: Type is the type of the cluster condition.
+                    type: string
+            version:
+              description: Version represents the kubernetes version of the spoke
+                cluster.
+              type: object
+              properties:
+                kubernetes:
+                  description: Kubernetes is the kubernetes version of spoke cluster
+                  type: string
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

@@ -1,0 +1,38 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ .HubCoreName }}-controller
+  namespace: {{ .HubCoreNamespace }}
+  labels:
+    app: nucleushub-controller
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nucleushub-controller
+  template:
+    metadata:
+      labels:
+        app: nucleushub-controller
+    spec:
+      serviceAccountName: {{ .HubCoreName }}-sa
+      containers:
+      - name: hub-controller
+        image: {{ .RegistrationImage }}
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/registration"
+          - "controller"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 443
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 443
+          initialDelaySeconds: 2

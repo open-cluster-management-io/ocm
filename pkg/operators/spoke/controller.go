@@ -3,7 +3,6 @@ package spoke
 import (
 	"context"
 
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -17,7 +16,6 @@ type nucleusAgentController struct {
 // NewNucleusAgentController construct nucleus agent controller
 func NewNucleusAgentController(
 	kubeClient kubernetes.Interface,
-	kubeInformers informers.SharedInformerFactory,
 	recorder events.Recorder) factory.Controller {
 	controller := &nucleusAgentController{
 		kubeClient: kubeClient,
