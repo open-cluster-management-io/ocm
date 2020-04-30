@@ -26,8 +26,8 @@ func TestCreateSpokeCluster(t *testing.T) {
 			startingObjects: []runtime.Object{},
 			hasSpokeCluster: true,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertActions(t, actions, "create")
-				actual := actions[0].(clienttesting.CreateActionImpl).Object
+				assertActions(t, actions, "get", "create")
+				actual := actions[1].(clienttesting.CreateActionImpl).Object
 				assertSpokeExternalServerUrl(t, actual, testSpokeExternalServerUrl)
 				assertSpokeCABundle(t, actual, []byte("testcabundle"))
 			},
@@ -37,7 +37,7 @@ func TestCreateSpokeCluster(t *testing.T) {
 			startingObjects: []runtime.Object{newSpokeCluster([]clusterv1.StatusCondition{})},
 			hasSpokeCluster: true,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertActions(t, actions, "create")
+				assertActions(t, actions, "get")
 			},
 		},
 	}
@@ -50,7 +50,7 @@ func TestCreateSpokeCluster(t *testing.T) {
 				clusterName:            testSpokeClusterName,
 				spokeExternalServerUrl: testSpokeExternalServerUrl,
 				spokeCABundle:          []byte("testcabundle"),
-				hasSpokeClusterFunc:    func(isCreated bool) { hasSpokeCluster = isCreated },
+				setHasSpokeCluster:     func(isCreated bool) { hasSpokeCluster = isCreated },
 				hubClusterClient:       clusterClient,
 			}
 

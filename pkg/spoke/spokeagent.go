@@ -101,7 +101,6 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	// exists a valid client config for hub or not, the controller will be started and then stopped immediately
 	// in scenario #2 and #3, which results in an error message in log: 'Observed a panic: timeout waiting for
 	// informer cache'
-	var stopBootstrap context.CancelFunc
 	if !ok {
 		// create bootstrap client and shared informer factory from bootstrap hub kube config
 		bootstrapClientConfig, err := clientcmd.BuildConfigFromFlags("", o.BootstrapKubeconfig)
@@ -133,6 +132,9 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 
 		// create a SpokeClusterCreatingControlle to create a spoke cluster on hub cluster
 		hasSpokeCluster := false
+		setHasSpokeClusterFn := func(isSpokeClusterExists bool) {
+			hasSpokeCluster = isSpokeClusterExists
+		}
 
 		caBundle := controllerContext.KubeConfig.CAData
 		if caBundle == nil && controllerContext.KubeConfig.CAFile != "" {
@@ -150,12 +152,11 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			o.ClusterName, o.SpokeExternalServerUrl,
 			caBundle,
 			bootstrapClusterClient,
-			func(isCreated bool) { hasSpokeCluster = isCreated },
+			setHasSpokeClusterFn,
 			controllerContext.EventRecorder,
 		)
 
-		var bootstrapCtx context.Context
-		bootstrapCtx, stopBootstrap = context.WithCancel(ctx)
+		bootstrapCtx, stopBootstrap := context.WithCancel(ctx)
 
 		go bootstrapInformerFactory.Start(bootstrapCtx.Done())
 		go spokeKubeInformerFactory.Start(bootstrapCtx.Done())
@@ -163,22 +164,19 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		go clientCertForHubController.Run(bootstrapCtx, 1)
 		go spokeClusterCreatingController.Run(bootstrapCtx, 1)
 
-		// wait for the spoke cluster is created
-		wait.PollImmediateInfinite(1*time.Second, func() (bool, error) { return hasSpokeCluster, nil })
-	}
-
-	// wait for the client config for hub is ready
-	klog.Info("Waiting for client config for hub to be ready")
-	if err := wait.PollImmediateInfinite(1*time.Second, o.hasValidHubClientConfig); err != nil {
-		// TODO we need run the bootstrap CSR forever too to re-establish the client-cert if we ever lose it.
-		if stopBootstrap != nil {
+		// wait for the hub client config is ready and the spoke cluster is created.
+		klog.Info("Waiting for hub client config and spoke cluster to be ready")
+		if err := wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
+			hasValidHubClientConfig, err := o.hasValidHubClientConfig()
+			return hasValidHubClientConfig && hasSpokeCluster, err
+		}); err != nil {
+			// TODO need run the bootstrap CSR forever to re-establish the client-cert if it is ever lost.
 			stopBootstrap()
+			return err
 		}
-		return err
-	}
 
-	// stop the ClientCertForHubController for bootstrap once the client config for hub is ready
-	if stopBootstrap != nil {
+		// stop the clientCertForHubController and spokeClusterCreatingController for bootstrap
+		// once the hub client config and spoke cluster is ready
 		stopBootstrap()
 	}
 

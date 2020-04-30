@@ -13,13 +13,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type setHasSpokeClusterFunc func(bool)
+
 // spokeClusterCreatingController creates a spoke cluster on hub cluster during the spoke agent bootstrap phase
 type spokeClusterCreatingController struct {
-	isSpokeClusterExists   bool
 	clusterName            string
 	spokeExternalServerUrl string
 	spokeCABundle          []byte
-	hasSpokeClusterFunc    func(bool)
+	setHasSpokeCluster     setHasSpokeClusterFunc
 	hubClusterClient       clientset.Interface
 }
 
@@ -28,13 +29,13 @@ func NewSpokeClusterCreatingController(
 	clusterName, spokeExternalServerUrl string,
 	spokeCABundle []byte,
 	hubClusterClient clientset.Interface,
-	hasSpokeClusterFunc func(bool),
+	setHasSpokeClusterFn setHasSpokeClusterFunc,
 	recorder events.Recorder) factory.Controller {
 	c := &spokeClusterCreatingController{
 		clusterName:            clusterName,
 		spokeExternalServerUrl: spokeExternalServerUrl,
 		spokeCABundle:          spokeCABundle,
-		hasSpokeClusterFunc:    hasSpokeClusterFunc,
+		setHasSpokeCluster:     setHasSpokeClusterFn,
 		hubClusterClient:       hubClusterClient,
 	}
 	return factory.New().
@@ -44,34 +45,32 @@ func NewSpokeClusterCreatingController(
 }
 
 func (c *spokeClusterCreatingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	if c.isSpokeClusterExists {
-		return nil
-	}
-
-	spokeCluster := &clusterv1.SpokeCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: c.clusterName,
-		},
-		Spec: clusterv1.SpokeClusterSpec{
-			SpokeClientConfig: clusterv1.ClientConfig{
-				URL:      c.spokeExternalServerUrl,
-				CABundle: c.spokeCABundle,
+	_, err := c.hubClusterClient.ClusterV1().SpokeClusters().Get(ctx, c.clusterName, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		spokeCluster := &clusterv1.SpokeCluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: c.clusterName,
 			},
-		},
-	}
-
-	_, err := c.hubClusterClient.ClusterV1().SpokeClusters().Create(ctx, spokeCluster, metav1.CreateOptions{})
-	if errors.IsAlreadyExists(err) {
-		c.isSpokeClusterExists = true
-		c.hasSpokeClusterFunc(c.isSpokeClusterExists)
+			Spec: clusterv1.SpokeClusterSpec{
+				SpokeClientConfig: clusterv1.ClientConfig{
+					URL:      c.spokeExternalServerUrl,
+					CABundle: c.spokeCABundle,
+				},
+			},
+		}
+		_, err := c.hubClusterClient.ClusterV1().SpokeClusters().Create(ctx, spokeCluster, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("unable to create spoke cluster with name %q on hub: %w", c.clusterName, err)
+		}
+		c.setHasSpokeCluster(true)
+		syncCtx.Recorder().Eventf("SpokeClusterCreated", "Spoke cluster %q created on hub", c.clusterName)
 		return nil
 	}
+
 	if err != nil {
-		return fmt.Errorf("unable to create spoke cluster with name %q on hub: %w", c.clusterName, err)
+		return err
 	}
 
-	c.isSpokeClusterExists = true
-	c.hasSpokeClusterFunc(c.isSpokeClusterExists)
-	syncCtx.Recorder().Eventf("SpokeClusterCreated", "Spoke cluster %q created on hub", c.clusterName)
+	c.setHasSpokeCluster(true)
 	return nil
 }
