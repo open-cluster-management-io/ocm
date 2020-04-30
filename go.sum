@@ -279,8 +279,8 @@ github.com/onsi/ginkgo v1.11.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+
 github.com/onsi/gomega v0.0.0-20170829124025-dcabb60a477c/go.mod h1:C1qb7wdrVGGVU+Z6iS04AVkA3Q65CEZX59MT0QO5uiA=
 github.com/onsi/gomega v1.7.0 h1:XPnZz8VVBHjVsy1vzJmRwIcSwiUO+JFfrv/xGiigmME=
 github.com/onsi/gomega v1.7.0/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1CpauHY=
-github.com/open-cluster-management/api v0.0.0-20200506150956-355c9d6ef16b h1:vaOPmEZRgtXSa7SBkyrZKR7HStXTAAv1kQoc/nlZ66g=
-github.com/open-cluster-management/api v0.0.0-20200506150956-355c9d6ef16b/go.mod h1:RgKeB8PJ7upe2QXy/MpCejU/xm2G6/i0Y+/itWuPugs=
+github.com/open-cluster-management/api v0.0.0-20200512021938-5f0d5c12ea67 h1:JHbmXcawfV/Flb+csFz+FFHOG9EfEfcUH5cggNX8Yu4=
+github.com/open-cluster-management/api v0.0.0-20200512021938-5f0d5c12ea67/go.mod h1:RgKeB8PJ7upe2QXy/MpCejU/xm2G6/i0Y+/itWuPugs=
 github.com/opencontainers/go-digest v1.0.0-rc1/go.mod h1:cMLVZDEM3+U2I4VmLI6N8jQYUd2OVphdqWwCJHrFt2s=
 github.com/opencontainers/image-spec v1.0.1/go.mod h1:BtxoFyWECRxE4U/7sNtV5W15zMzWCbyJoFRP3s7yZA0=
 github.com/opencontainers/runc v0.0.0-20191031171055-b133feaeeb2e/go.mod h1:qT5XzbpPznkRYVz/mWwUaVBUv2rmF59PVA73FjuZG0U=

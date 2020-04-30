@@ -40,11 +40,15 @@ func RunNucleusOperator(ctx context.Context, controllerContext *controllercmd.Co
 		nucleusClient.NucleusV1().HubCores(),
 		nucleusInformer.Nucleus().V1().HubCores(),
 		controllerContext.EventRecorder)
-	agentController := spoke.NewNucleusAgentController(kubeClient, controllerContext.EventRecorder)
+	spokeController := spoke.NewNucleusSpokeController(
+		kubeClient,
+		nucleusClient.NucleusV1().SpokeCores(),
+		nucleusInformer.Nucleus().V1().SpokeCores(),
+		controllerContext.EventRecorder)
 
 	go nucleusInformer.Start(ctx.Done())
 	go hubcontroller.Run(ctx, 1)
-	go agentController.Run(ctx, 1)
+	go spokeController.Run(ctx, 1)
 	<-ctx.Done()
 	return nil
 }

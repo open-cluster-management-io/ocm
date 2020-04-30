@@ -96,3 +96,53 @@ func UpdateNucleusHubConditionFn(conds ...nucleusapiv1.StatusCondition) UpdateNu
 		return nil
 	}
 }
+
+type UpdateNucleusSpokeStatusFunc func(status *nucleusapiv1.SpokeCoreStatus) error
+
+func UpdateNucleusSpokeStatus(
+	ctx context.Context,
+	client nucleusv1client.SpokeCoreInterface,
+	nucleusSpokeCoreName string,
+	updateFuncs ...UpdateNucleusSpokeStatusFunc) (*nucleusapiv1.SpokeCoreStatus, bool, error) {
+	updated := false
+	var updatedSpokeClusterStatus *nucleusapiv1.SpokeCoreStatus
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		spokeCore, err := client.Get(ctx, nucleusSpokeCoreName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		oldStatus := &spokeCore.Status
+
+		newStatus := oldStatus.DeepCopy()
+		for _, update := range updateFuncs {
+			if err := update(newStatus); err != nil {
+				return err
+			}
+		}
+		if equality.Semantic.DeepEqual(oldStatus, newStatus) {
+			// We return the newStatus which is a deep copy of oldStatus but with all update funcs applied.
+			updatedSpokeClusterStatus = newStatus
+			return nil
+		}
+
+		spokeCore.Status = *newStatus
+		updatedSpokeCluster, err := client.UpdateStatus(ctx, spokeCore, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+		updatedSpokeClusterStatus = &updatedSpokeCluster.Status
+		updated = err == nil
+		return err
+	})
+
+	return updatedSpokeClusterStatus, updated, err
+}
+
+func UpdateNucleusSpokeConditionFn(conds ...nucleusapiv1.StatusCondition) UpdateNucleusSpokeStatusFunc {
+	return func(oldStatus *nucleusapiv1.SpokeCoreStatus) error {
+		for _, cond := range conds {
+			SetNucleusCondition(&oldStatus.Conditions, cond)
+		}
+		return nil
+	}
+}

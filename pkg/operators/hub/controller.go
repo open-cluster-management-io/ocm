@@ -9,6 +9,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -77,7 +78,10 @@ func NewNucleusHubController(
 
 	return factory.New().WithSync(controller.sync).
 		ResyncEvery(3*time.Minute).
-		WithInformers(nucleusInformer.Informer()).
+		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
+			accessor, _ := meta.Accessor(obj)
+			return accessor.GetName()
+		}, nucleusInformer.Informer()).
 		ToController("NucleusHubController", recorder)
 }
 
@@ -93,6 +97,10 @@ func (n *nucleusHubController) sync(ctx context.Context, controllerContext facto
 	klog.V(4).Infof("Reconciling HubCore %q", hubCoreName)
 
 	hubCore, err := n.nucleusLister.Get(hubCoreName)
+	if errors.IsNotFound(err) {
+		// HubCore not found, could have been deleted, do nothing.
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -137,7 +145,7 @@ func (n *nucleusHubController) sync(ctx context.Context, controllerContext facto
 			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
 		},
 		"manifests/hub/0000_00_clusters.open-cluster-management.io_spokeclusters.crd.yaml",
-		"manifests/hub/0000_00_work.open-cluster-management.io_workloads.crd.yaml",
+		"manifests/hub/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml",
 		"manifests/hub/hub-clusterrole.yaml",
 		"manifests/hub/hub-clusterrolebinding.yaml",
 		"manifests/hub/hub-namespace.yaml",
