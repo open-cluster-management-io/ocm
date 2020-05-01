@@ -22,6 +22,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/transport"
+	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog"
 )
 
@@ -90,6 +92,39 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	}
 	spokeKubeInformerFactory := informers.NewSharedInformerFactory(spokeKubeClient, 10*time.Minute)
 
+	// load bootstrap client config
+	bootstrapClientConfig, err := clientcmd.BuildConfigFromFlags("", o.BootstrapKubeconfig)
+	if err != nil {
+		return fmt.Errorf("unable to load bootstrap kubeconfig from file %q: %w", o.BootstrapKubeconfig, err)
+	}
+
+	// start a SpokeClusterCreatingController to make sure there is a spoke cluster on hub cluster
+	// if the bootstrap client config is valid
+	if isBootstrapClientConfigValid(bootstrapClientConfig) {
+		bootstrapClusterClient, err := clusterv1client.NewForConfig(bootstrapClientConfig)
+		if err != nil {
+			return err
+		}
+
+		caBundle := controllerContext.KubeConfig.CAData
+		if caBundle == nil && controllerContext.KubeConfig.CAFile != "" {
+			data, err := ioutil.ReadFile(controllerContext.KubeConfig.CAFile)
+			if err != nil {
+				return fmt.Errorf("unable to load CA data from file %q: %w", controllerContext.KubeConfig.CAFile, err)
+			}
+			caBundle = data
+		}
+
+		spokeClusterCreatingController := spokecluster.NewSpokeClusterCreatingController(
+			o.ClusterName, o.SpokeExternalServerUrl,
+			caBundle,
+			bootstrapClusterClient,
+			controllerContext.EventRecorder,
+		)
+
+		go spokeClusterCreatingController.Run(ctx, 1)
+	}
+
 	// check if there already exists a valid client config for hub
 	ok, err := o.hasValidHubClientConfig()
 	if err != nil {
@@ -103,19 +138,10 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	// informer cache'
 	if !ok {
 		// create bootstrap client and shared informer factory from bootstrap hub kube config
-		bootstrapClientConfig, err := clientcmd.BuildConfigFromFlags("", o.BootstrapKubeconfig)
-		if err != nil {
-			return fmt.Errorf("unable to load bootstrap kubeconfig from file %q: %w", o.BootstrapKubeconfig, err)
-		}
 		bootstrapKubeClient, err := kubernetes.NewForConfig(bootstrapClientConfig)
 		if err != nil {
 			return err
 		}
-		bootstrapClusterClient, err := clusterv1client.NewForConfig(bootstrapClientConfig)
-		if err != nil {
-			return err
-		}
-
 		bootstrapInformerFactory := informers.NewSharedInformerFactory(bootstrapKubeClient, 10*time.Minute)
 
 		// create a ClientCertForHubController for spoke agent bootstrap
@@ -130,53 +156,22 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			"BootstrapClientCertForHubController",
 		)
 
-		// create a SpokeClusterCreatingControlle to create a spoke cluster on hub cluster
-		hasSpokeCluster := false
-		setHasSpokeClusterFn := func(isSpokeClusterExists bool) {
-			hasSpokeCluster = isSpokeClusterExists
-		}
-
-		caBundle := controllerContext.KubeConfig.CAData
-		if caBundle == nil && controllerContext.KubeConfig.CAFile != "" {
-			data, err := ioutil.ReadFile(controllerContext.KubeConfig.CAFile)
-			if err != nil {
-				return fmt.Errorf("unable to load CA data from file %q: %w", controllerContext.KubeConfig.CAFile, err)
-			}
-			caBundle = data
-		}
-
-		// TODO there is a corner case, if the hub kubeconfig is ready, but the spoke cluster did not create, and the agent is
-		// restarted, the agent will not be able to create spoke cluster again due to the bootstrap kubeconfig has been switched
-		// to hub kubeconfig, in this case, the hub cluster admin need to create the spoke cluster on hub cluster manually
-		spokeClusterCreatingController := spokecluster.NewSpokeClusterCreatingController(
-			o.ClusterName, o.SpokeExternalServerUrl,
-			caBundle,
-			bootstrapClusterClient,
-			setHasSpokeClusterFn,
-			controllerContext.EventRecorder,
-		)
-
 		bootstrapCtx, stopBootstrap := context.WithCancel(ctx)
 
 		go bootstrapInformerFactory.Start(bootstrapCtx.Done())
 		go spokeKubeInformerFactory.Start(bootstrapCtx.Done())
 
 		go clientCertForHubController.Run(bootstrapCtx, 1)
-		go spokeClusterCreatingController.Run(bootstrapCtx, 1)
 
-		// wait for the hub client config is ready and the spoke cluster is created.
+		// wait for the hub client config is ready.
 		klog.Info("Waiting for hub client config and spoke cluster to be ready")
-		if err := wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
-			hasValidHubClientConfig, err := o.hasValidHubClientConfig()
-			return hasValidHubClientConfig && hasSpokeCluster, err
-		}); err != nil {
+		if err := wait.PollImmediateInfinite(1*time.Second, o.hasValidHubClientConfig); err != nil {
 			// TODO need run the bootstrap CSR forever to re-establish the client-cert if it is ever lost.
 			stopBootstrap()
 			return err
 		}
 
-		// stop the clientCertForHubController and spokeClusterCreatingController for bootstrap
-		// once the hub client config and spoke cluster is ready
+		// stop the clientCertForHubController for bootstrap once the hub client config is ready
 		stopBootstrap()
 	}
 
@@ -358,4 +353,29 @@ func (o *SpokeAgentOptions) getOrGenerateClusterAgentNames() (string, string) {
 	}
 
 	return clusterName, agentName
+}
+
+func isBootstrapClientConfigValid(bootstrapClientConfig *restclient.Config) bool {
+	transportConfig, err := bootstrapClientConfig.TransportConfig()
+	if err != nil {
+		return false
+	}
+	// has side effect of populating transport config data fields
+	if _, err := transport.TLSConfigFor(transportConfig); err != nil {
+		return false
+	}
+	certs, err := certutil.ParseCertsPEM(transportConfig.TLS.CertData)
+	if err != nil {
+		return false
+	}
+	if len(certs) == 0 {
+		return false
+	}
+	now := time.Now()
+	for _, cert := range certs {
+		if now.After(cert.NotAfter) {
+			return false
+		}
+	}
+	return true
 }

@@ -11,16 +11,14 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
 )
-
-type setHasSpokeClusterFunc func(bool)
 
 // spokeClusterCreatingController creates a spoke cluster on hub cluster during the spoke agent bootstrap phase
 type spokeClusterCreatingController struct {
 	clusterName            string
 	spokeExternalServerUrl string
 	spokeCABundle          []byte
-	setHasSpokeCluster     setHasSpokeClusterFunc
 	hubClusterClient       clientset.Interface
 }
 
@@ -29,18 +27,16 @@ func NewSpokeClusterCreatingController(
 	clusterName, spokeExternalServerUrl string,
 	spokeCABundle []byte,
 	hubClusterClient clientset.Interface,
-	setHasSpokeClusterFn setHasSpokeClusterFunc,
 	recorder events.Recorder) factory.Controller {
 	c := &spokeClusterCreatingController{
 		clusterName:            clusterName,
 		spokeExternalServerUrl: spokeExternalServerUrl,
 		spokeCABundle:          spokeCABundle,
-		setHasSpokeCluster:     setHasSpokeClusterFn,
 		hubClusterClient:       hubClusterClient,
 	}
 	return factory.New().
 		WithSync(c.sync).
-		ResyncEvery(5*time.Minute).
+		ResyncEvery(60*time.Minute).
 		ToController("SpokeClusterCreatingController", recorder)
 }
 
@@ -62,8 +58,13 @@ func (c *spokeClusterCreatingController) sync(ctx context.Context, syncCtx facto
 		if err != nil {
 			return fmt.Errorf("unable to create spoke cluster with name %q on hub: %w", c.clusterName, err)
 		}
-		c.setHasSpokeCluster(true)
 		syncCtx.Recorder().Eventf("SpokeClusterCreated", "Spoke cluster %q created on hub", c.clusterName)
+		return nil
+	}
+
+	// the cluster client may be expired
+	if errors.IsUnauthorized(err) {
+		klog.V(4).Infof("unable to get the spoke cluster %q from hub: %v", c.clusterName, err)
 		return nil
 	}
 
@@ -71,6 +72,5 @@ func (c *spokeClusterCreatingController) sync(ctx context.Context, syncCtx facto
 		return err
 	}
 
-	c.setHasSpokeCluster(true)
 	return nil
 }
