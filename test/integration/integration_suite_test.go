@@ -23,7 +23,11 @@ var k8sClient client.Client
 
 func TestIntegration(t *testing.T) {
 	RegisterFailHandler(Fail)
-	// TODO add test cases
+	// TODO test cases
+	// - spoke registration agent creates CSR, hub authorizes, spoke agent creates hub kubeconfig and connects back to hub for successful join
+	// - spoke registration agent recovery from invalid bootstrap kubeconfig
+	// - spoke registration agent recovery from invalid hub kubeconfig
+	// - spoke registration rotate its certificate after its certificate is expired
 	RunSpecsWithDefaultAndCustomReporters(t, "Integration Suite", []Reporter{printer.NewlineReporter{}})
 }
 
@@ -32,6 +36,7 @@ var _ = BeforeSuite(func(done Done) {
 
 	By("bootstrapping test environment")
 
+	// install cluster CRD and start a local kube-apiserver
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "..", "vendor", "github.com", "open-cluster-management", "api", "cluster", "v1"),
