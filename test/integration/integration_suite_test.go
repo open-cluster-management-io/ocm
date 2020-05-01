@@ -42,8 +42,7 @@ var _ = BeforeSuite(func(done Done) {
 			filepath.Join("..", "..", "vendor", "github.com", "open-cluster-management", "api", "cluster", "v1"),
 		},
 	}
-	var err error
-	cfg, err = testEnv.Start()
+	cfg, err := testEnv.Start()
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfg).ToNot(BeNil())
 
