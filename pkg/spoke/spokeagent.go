@@ -91,31 +91,33 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	}
 	spokeKubeInformerFactory := informers.NewSharedInformerFactory(spokeKubeClient, 10*time.Minute)
 
-	spokeCABundle, err := getSpokeCABundle(controllerContext.KubeConfig)
+	// get spoke cluster CA bundle
+	spokeClusterCABundle, err := getSpokeClusterCABundle(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
 
-	// load bootstrap client config
+	// load bootstrap client config and create bootstrap clients
 	bootstrapClientConfig, err := clientcmd.BuildConfigFromFlags("", o.BootstrapKubeconfig)
 	if err != nil {
 		return fmt.Errorf("unable to load bootstrap kubeconfig from file %q: %w", o.BootstrapKubeconfig, err)
 	}
-
+	bootstrapKubeClient, err := kubernetes.NewForConfig(bootstrapClientConfig)
+	if err != nil {
+		return err
+	}
 	bootstrapClusterClient, err := clusterv1client.NewForConfig(bootstrapClientConfig)
 	if err != nil {
 		return err
 	}
 
 	// start a SpokeClusterCreatingController to make sure there is a spoke cluster on hub cluster
-	// if the bootstrap client config is valid
 	spokeClusterCreatingController := spokecluster.NewSpokeClusterCreatingController(
 		o.ClusterName, o.SpokeExternalServerUrl,
-		spokeCABundle,
+		spokeClusterCABundle,
 		bootstrapClusterClient,
 		controllerContext.EventRecorder,
 	)
-
 	go spokeClusterCreatingController.Run(ctx, 1)
 
 	// check if there already exists a valid client config for hub
@@ -130,14 +132,9 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	// in scenario #2 and #3, which results in an error message in log: 'Observed a panic: timeout waiting for
 	// informer cache'
 	if !ok {
-		// create bootstrap client and shared informer factory from bootstrap hub kube config
-		bootstrapKubeClient, err := kubernetes.NewForConfig(bootstrapClientConfig)
-		if err != nil {
-			return err
-		}
+		// create a ClientCertForHubController for spoke agent bootstrap
 		bootstrapInformerFactory := informers.NewSharedInformerFactory(bootstrapKubeClient, 10*time.Minute)
 
-		// create a ClientCertForHubController for spoke agent bootstrap
 		clientCertForHubController := hubclientcert.NewClientCertForHubController(
 			o.ClusterName, o.AgentName, o.ComponentNamespace, o.HubKubeconfigSecret,
 			restclient.AnonymousClientConfig(bootstrapClientConfig),
@@ -348,7 +345,7 @@ func (o *SpokeAgentOptions) getOrGenerateClusterAgentNames() (string, string) {
 	return clusterName, agentName
 }
 
-func getSpokeCABundle(kubeConfig *rest.Config) ([]byte, error) {
+func getSpokeClusterCABundle(kubeConfig *rest.Config) ([]byte, error) {
 	if kubeConfig.CAData != nil {
 		return kubeConfig.CAData, nil
 	}

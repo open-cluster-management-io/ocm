@@ -3,6 +3,7 @@ package spokecluster
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	clientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
@@ -13,6 +14,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 )
+
+// well-known anonymous user
+const anonymous = "system:anonymous"
 
 // spokeClusterCreatingController creates a spoke cluster on hub cluster during the spoke agent bootstrap phase
 type spokeClusterCreatingController struct {
@@ -44,7 +48,7 @@ func (c *spokeClusterCreatingController) sync(ctx context.Context, syncCtx facto
 	_, err := c.hubClusterClient.ClusterV1().SpokeClusters().Get(ctx, c.clusterName, metav1.GetOptions{})
 	switch {
 	case errors.IsUnauthorized(err),
-		errors.IsForbidden(err):
+		errors.IsForbidden(err) && strings.Contains(err.Error(), anonymous):
 		klog.V(4).Infof("unable to get the spoke cluster %q from hub: %v", c.clusterName, err)
 		return nil
 	case errors.IsNotFound(err):
