@@ -41,6 +41,9 @@ const (
 	AgentNameFile         = "agent-name"
 )
 
+// ControllerSyncInterval is exposed so that integration tests can crank up the constroller sync speed.
+var ControllerSyncInterval = 5 * time.Minute
+
 // ClientCertForHubController maintains the client cert and kubeconfig for hub
 type ClientCertForHubController struct {
 	clusterName string
@@ -97,7 +100,7 @@ func NewClientCertForHubController(
 	return factory.New().
 		WithInformers(hubCSRInformer.Informer(), spokeSecretInformer.Informer()).
 		WithSync(c.sync).
-		ResyncEvery(5*time.Minute).
+		ResyncEvery(ControllerSyncInterval).
 		ToController(controllerName, recorder)
 }
 
@@ -241,14 +244,15 @@ func (c *ClientCertForHubController) syncCSR(secret *corev1.Secret) (map[string]
 	// create a kubeconfig with references to the key/cert files in kubeconfigSecret if it dose not exists.
 	// So other components deployed in separated deployments are able to access this kubeconfig for hub as
 	// well by sharing the secret
-	if _, ok := secret.Data[KubeconfigFile]; !ok {
+	kubeconfigData, ok := secret.Data[KubeconfigFile]
+	if !ok {
 		kubeconfig := buildKubeconfig(restclient.CopyConfig(c.hubClientConfig), TLSCertFile, TLSKeyFile)
-		kubeconfigData, err := clientcmd.Write(kubeconfig)
+		kubeconfigData, err = clientcmd.Write(kubeconfig)
 		if err != nil {
 			return nil, err
 		}
-		data[KubeconfigFile] = kubeconfigData
 	}
+	data[KubeconfigFile] = kubeconfigData
 
 	// clear the csr name and private key
 	c.reset()

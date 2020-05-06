@@ -1,62 +1,147 @@
 package integration_test
 
 import (
+	"context"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path"
 	"path/filepath"
 	"testing"
+	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
+
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
+
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/transport"
 
+	clusterclientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"github.com/open-cluster-management/registration/pkg/hub"
+	"github.com/open-cluster-management/registration/pkg/spoke/hubclientcert"
+	"github.com/open-cluster-management/registration/pkg/spoke/spokecluster"
+	"github.com/open-cluster-management/registration/test/integration/util"
+
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-var cfg *rest.Config
+const (
+	eventuallyTimeout  = 30 // seconds
+	eventuallyInterval = 1  // seconds
+)
+
+var spokeCfg *rest.Config
+var bootstrapKubeConfigFile string
+
 var testEnv *envtest.Environment
-var k8sClient client.Client
+var securePort int
+
+var kubeClient kubernetes.Interface
+var clusterClient clusterclientset.Interface
+
+var testNamespace string
 
 func TestIntegration(t *testing.T) {
-	RegisterFailHandler(Fail)
-	// TODO test cases
-	// - spoke registration agent creates CSR, hub authorizes, spoke agent creates hub kubeconfig and connects back to hub for successful join
-	// - spoke registration agent recovery from invalid bootstrap kubeconfig
-	// - spoke registration agent recovery from invalid hub kubeconfig
-	// - spoke registration rotate its certificate after its certificate is expired
-	RunSpecsWithDefaultAndCustomReporters(t, "Integration Suite", []Reporter{printer.NewlineReporter{}})
+	gomega.RegisterFailHandler(ginkgo.Fail)
+	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Integration Suite", []ginkgo.Reporter{printer.NewlineReporter{}})
 }
 
-var _ = BeforeSuite(func(done Done) {
-	logf.SetLogger(zap.LoggerTo(GinkgoWriter, true))
+var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
+	logf.SetLogger(zap.LoggerTo(ginkgo.GinkgoWriter, true))
 
-	By("bootstrapping test environment")
+	ginkgo.By("bootstrapping test environment")
+
+	var err error
+
+	// crank up the sync speed
+	transport.CertCallbackRefreshDuration = 5 * time.Second
+	hubclientcert.ControllerSyncInterval = 5 * time.Second
+	spokecluster.CreatingControllerSyncInterval = 1 * time.Second
 
 	// install cluster CRD and start a local kube-apiserver
+
+	err = util.GenerateSelfSignedCertKey()
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	apiServerFlags := append([]string{}, envtest.DefaultKubeAPIServerFlags...)
+	apiServerFlags = append(apiServerFlags,
+		fmt.Sprintf("--client-ca-file=%s", util.CAFile),
+		fmt.Sprintf("--tls-cert-file=%s", util.ServerCertFile),
+		fmt.Sprintf("--tls-private-key-file=%s", util.ServerKeyFile),
+	)
+
 	testEnv = &envtest.Environment{
+		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths: []string{
-			filepath.Join("..", "..", "vendor", "github.com", "open-cluster-management", "api", "cluster", "v1"),
+			filepath.Join(".", "vendor", "github.com", "open-cluster-management", "api", "cluster", "v1"),
 		},
+		KubeAPIServerFlags: apiServerFlags,
 	}
+
 	cfg, err := testEnv.Start()
-	Expect(err).ToNot(HaveOccurred())
-	Expect(cfg).ToNot(BeNil())
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	gomega.Expect(cfg).ToNot(gomega.BeNil())
 
 	err = clusterv1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-	Expect(err).ToNot(HaveOccurred())
-	Expect(k8sClient).ToNot(BeNil())
+	// prepare configs
+	securePort = testEnv.ControlPlane.APIServer.SecurePort
+	gomega.Expect(securePort).ToNot(gomega.BeZero())
+
+	spokeCfg, err = util.CreateSpokeKubeConfig(cfg, securePort)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	gomega.Expect(spokeCfg).ToNot(gomega.BeNil())
+
+	bootstrapKubeConfigFile = path.Join(util.TestDir, "bootstrap", "kubeconfig")
+	err = util.CreateBootstrapKubeConfig(bootstrapKubeConfigFile, securePort)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	// prepare clients
+	kubeClient, err = kubernetes.NewForConfig(cfg)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	gomega.Expect(kubeClient).ToNot(gomega.BeNil())
+
+	clusterClient, err = clusterclientset.NewForConfig(cfg)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	gomega.Expect(clusterClient).ToNot(gomega.BeNil())
+
+	// prepare test namespace
+	nsBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err != nil {
+		testNamespace = "open-cluster-management"
+	} else {
+		testNamespace = string(nsBytes)
+	}
+	err = util.PrepareSpokeAgentNamespace(kubeClient, testNamespace)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	// start hub controller
+	go func() {
+		err := hub.RunControllerManager(context.Background(), &controllercmd.ControllerContext{
+			KubeConfig:    cfg,
+			EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
+		})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	}()
+
 	close(done)
 }, 60)
 
-var _ = AfterSuite(func() {
-	By("tearing down the test environment")
+var _ = ginkgo.AfterSuite(func() {
+	ginkgo.By("tearing down the test environment")
+
 	err := testEnv.Stop()
-	Expect(err).ToNot(HaveOccurred())
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	err = os.RemoveAll(util.TestDir)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 })

@@ -18,6 +18,9 @@ import (
 // well-known anonymous user
 const anonymous = "system:anonymous"
 
+// CreatingControllerSyncInterval is exposed so that integration tests can crank up the constroller sync speed.
+var CreatingControllerSyncInterval = 60 * time.Minute
+
 // spokeClusterCreatingController creates a spoke cluster on hub cluster during the spoke agent bootstrap phase
 type spokeClusterCreatingController struct {
 	clusterName             string
@@ -40,7 +43,7 @@ func NewSpokeClusterCreatingController(
 	}
 	return factory.New().
 		WithSync(c.sync).
-		ResyncEvery(60*time.Minute).
+		ResyncEvery(CreatingControllerSyncInterval).
 		ToController("SpokeClusterCreatingController", recorder)
 }
 
