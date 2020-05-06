@@ -18,16 +18,14 @@ func TestCreateSpokeCluster(t *testing.T) {
 		name            string
 		startingObjects []runtime.Object
 		validateActions func(t *testing.T, actions []clienttesting.Action)
-		hasSpokeCluster bool
 		expectedErr     string
 	}{
 		{
 			name:            "create a new cluster",
 			startingObjects: []runtime.Object{},
-			hasSpokeCluster: true,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertActions(t, actions, "create")
-				actual := actions[0].(clienttesting.CreateActionImpl).Object
+				assertActions(t, actions, "get", "create")
+				actual := actions[1].(clienttesting.CreateActionImpl).Object
 				assertSpokeExternalServerUrl(t, actual, testSpokeExternalServerUrl)
 				assertSpokeCABundle(t, actual, []byte("testcabundle"))
 			},
@@ -35,22 +33,19 @@ func TestCreateSpokeCluster(t *testing.T) {
 		{
 			name:            "create an existed cluster",
 			startingObjects: []runtime.Object{newSpokeCluster([]clusterv1.StatusCondition{})},
-			hasSpokeCluster: true,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertActions(t, actions, "create")
+				assertActions(t, actions, "get")
 			},
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			hasSpokeCluster := false
 			clusterClient := clusterfake.NewSimpleClientset(c.startingObjects...)
 			ctrl := spokeClusterCreatingController{
 				clusterName:            testSpokeClusterName,
 				spokeExternalServerUrl: testSpokeExternalServerUrl,
 				spokeCABundle:          []byte("testcabundle"),
-				hasSpokeClusterFunc:    func(isCreated bool) { hasSpokeCluster = isCreated },
 				hubClusterClient:       clusterClient,
 			}
 
@@ -65,11 +60,6 @@ func TestCreateSpokeCluster(t *testing.T) {
 			}
 			if len(c.expectedErr) == 0 && syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
-			}
-
-			if hasSpokeCluster != c.hasSpokeCluster {
-				t.Errorf("expected %t error, but failed", c.hasSpokeCluster)
-				return
 			}
 
 			c.validateActions(t, clusterClient.Actions())

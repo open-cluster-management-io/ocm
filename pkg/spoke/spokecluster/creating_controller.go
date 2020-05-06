@@ -3,6 +3,7 @@ package spokecluster
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	clientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
@@ -11,15 +12,17 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
 )
+
+// well-known anonymous user
+const anonymous = "system:anonymous"
 
 // spokeClusterCreatingController creates a spoke cluster on hub cluster during the spoke agent bootstrap phase
 type spokeClusterCreatingController struct {
-	isSpokeClusterExists   bool
 	clusterName            string
 	spokeExternalServerUrl string
 	spokeCABundle          []byte
-	hasSpokeClusterFunc    func(bool)
 	hubClusterClient       clientset.Interface
 }
 
@@ -28,24 +31,31 @@ func NewSpokeClusterCreatingController(
 	clusterName, spokeExternalServerUrl string,
 	spokeCABundle []byte,
 	hubClusterClient clientset.Interface,
-	hasSpokeClusterFunc func(bool),
 	recorder events.Recorder) factory.Controller {
 	c := &spokeClusterCreatingController{
 		clusterName:            clusterName,
 		spokeExternalServerUrl: spokeExternalServerUrl,
 		spokeCABundle:          spokeCABundle,
-		hasSpokeClusterFunc:    hasSpokeClusterFunc,
 		hubClusterClient:       hubClusterClient,
 	}
 	return factory.New().
 		WithSync(c.sync).
-		ResyncEvery(5*time.Minute).
+		ResyncEvery(60*time.Minute).
 		ToController("SpokeClusterCreatingController", recorder)
 }
 
 func (c *spokeClusterCreatingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	if c.isSpokeClusterExists {
+	_, err := c.hubClusterClient.ClusterV1().SpokeClusters().Get(ctx, c.clusterName, metav1.GetOptions{})
+	switch {
+	case errors.IsUnauthorized(err),
+		errors.IsForbidden(err) && strings.Contains(err.Error(), anonymous):
+		klog.V(4).Infof("unable to get the spoke cluster %q from hub: %v", c.clusterName, err)
 		return nil
+	case errors.IsNotFound(err):
+	case err == nil:
+		return nil
+	case err != nil:
+		return err
 	}
 
 	spokeCluster := &clusterv1.SpokeCluster{
@@ -59,19 +69,10 @@ func (c *spokeClusterCreatingController) sync(ctx context.Context, syncCtx facto
 			},
 		},
 	}
-
-	_, err := c.hubClusterClient.ClusterV1().SpokeClusters().Create(ctx, spokeCluster, metav1.CreateOptions{})
-	if errors.IsAlreadyExists(err) {
-		c.isSpokeClusterExists = true
-		c.hasSpokeClusterFunc(c.isSpokeClusterExists)
-		return nil
-	}
+	_, err = c.hubClusterClient.ClusterV1().SpokeClusters().Create(ctx, spokeCluster, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to create spoke cluster with name %q on hub: %w", c.clusterName, err)
 	}
-
-	c.isSpokeClusterExists = true
-	c.hasSpokeClusterFunc(c.isSpokeClusterExists)
 	syncCtx.Recorder().Eventf("SpokeClusterCreated", "Spoke cluster %q created on hub", c.clusterName)
 	return nil
 }
