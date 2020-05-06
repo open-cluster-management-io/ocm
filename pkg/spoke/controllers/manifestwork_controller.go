@@ -8,6 +8,7 @@ import (
 	"time"
 
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -268,7 +269,6 @@ func (m *ManifestWorkController) applyUnstructrued(data []byte, recorder events.
 		Resource(gvr).
 		Namespace(required.GetNamespace()).
 		Get(context.TODO(), required.GetName(), metav1.GetOptions{})
-
 	if errors.IsNotFound(err) {
 		actual, err := m.spokeDynamicClient.Resource(gvr).Namespace(required.GetNamespace()).Create(
 			context.TODO(), required, metav1.CreateOptions{})
@@ -280,9 +280,16 @@ func (m *ManifestWorkController) applyUnstructrued(data []byte, recorder events.
 		return nil, false, err
 	}
 
-	// Do not update unstructured type right now. Need to figure out how to merge.
-
-	return existing, false, err
+	// Compare and update the unstrcuctured.
+	if isSameUnstructured(required, existing) {
+		return existing, false, nil
+	}
+	required.SetResourceVersion(existing.GetResourceVersion())
+	actual, err := m.spokeDynamicClient.Resource(gvr).Namespace(required.GetNamespace()).Update(
+		context.TODO(), required, metav1.UpdateOptions{})
+	recorder.Eventf(fmt.Sprintf(
+		"%s Updated", required.GetKind()), "Updated %s/%s", required.GetNamespace(), required.GetName())
+	return actual, true, err
 }
 
 func (m *ManifestWorkController) generateUpdateStatusFunc(manifestStatus workapiv1.ManifestResourceStatus) helper.UpdateManifestWorkStatusFunc {
@@ -303,4 +310,38 @@ func isDecodeError(err error) bool {
 // client can handle the object
 func isUnhandledError(err error) bool {
 	return err != nil && strings.HasPrefix(err.Error(), "cannot decode")
+}
+
+// isSameUnstructured compares the two unstructured object.
+// The comparison ignores the metadata and status field, and check if the two objects are sementically equal.
+func isSameUnstructured(obj1, obj2 *unstructured.Unstructured) bool {
+	obj1Copy := obj1.DeepCopy()
+	obj2Copy := obj2.DeepCopy()
+
+	// Comapre gvk, name, namespace at first
+	if obj1Copy.GroupVersionKind() != obj2Copy.GroupVersionKind() {
+		return false
+	}
+	if obj1Copy.GetName() != obj2Copy.GetName() {
+		return false
+	}
+	if obj1Copy.GetNamespace() != obj2Copy.GetNamespace() {
+		return false
+	}
+
+	// Compare label and annotations
+	if !equality.Semantic.DeepEqual(obj1Copy.GetLabels(), obj2Copy.GetLabels()) {
+		return false
+	}
+	if !equality.Semantic.DeepEqual(obj1Copy.GetAnnotations(), obj2Copy.GetAnnotations()) {
+		return false
+	}
+
+	// Compare sementically after removing metadata and status field
+	delete(obj1Copy.Object, "metadata")
+	delete(obj2Copy.Object, "metadata")
+	delete(obj1Copy.Object, "status")
+	delete(obj2Copy.Object, "status")
+
+	return equality.Semantic.DeepEqual(obj1Copy.Object, obj2Copy.Object)
 }

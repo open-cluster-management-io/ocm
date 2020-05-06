@@ -74,10 +74,12 @@ func newUnstructured(apiVersion, kind, namespace, name string) *unstructured.Uns
 	}
 }
 
-func newUnstructuredWithSpec(
-	apiVersion, kind, namespace, name string, spec map[string]interface{}) *unstructured.Unstructured {
+func newUnstructuredWithContent(
+	apiVersion, kind, namespace, name string, content map[string]interface{}) *unstructured.Unstructured {
 	object := newUnstructured(apiVersion, kind, namespace, name)
-	object.Object["spec"] = spec
+	for key, val := range content {
+		object.Object[key] = val
+	}
 
 	return object
 }
@@ -117,7 +119,7 @@ func newFakeMapper() *resource.Mapper {
 				"v1": {
 					{Name: "secrets", Namespaced: true, Kind: "Secret"},
 					{Name: "pods", Namespaced: true, Kind: "Pod"},
-					{Name: "newobject", Namespaced: true, Kind: "NewObject"},
+					{Name: "newobjects", Namespaced: true, Kind: "NewObject"},
 				},
 			},
 		},
@@ -127,18 +129,13 @@ func newFakeMapper() *resource.Mapper {
 	}
 }
 
-func newController(work *workapiv1.ManifestWork, mapper *resource.Mapper, objects ...runtime.Object) *testController {
+func newController(work *workapiv1.ManifestWork, mapper *resource.Mapper) *testController {
 	fakeWorkClient := fakeworkclient.NewSimpleClientset(work)
-	scheme := runtime.NewScheme()
-	dynamicClient := fakedynamic.NewSimpleDynamicClient(scheme)
-	kubeClient := fakekube.NewSimpleClientset(objects...)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fakeWorkClient, 5*time.Minute, workinformers.WithNamespace("cluster1"))
 
 	controller := &ManifestWorkController{
 		manifestWorkClient: fakeWorkClient.WorkV1().ManifestWorks("cluster1"),
 		manifestWorkLister: workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks("cluster1"),
-		spokeDynamicClient: dynamicClient,
-		spokeKubeclient:    kubeClient,
 		restMapper:         mapper,
 	}
 
@@ -146,11 +143,24 @@ func newController(work *workapiv1.ManifestWork, mapper *resource.Mapper, object
 	store.Add(work)
 
 	return &testController{
-		controller:    controller,
-		dynamicClient: dynamicClient,
-		workClient:    fakeWorkClient,
-		kubeClient:    kubeClient,
+		controller: controller,
+		workClient: fakeWorkClient,
 	}
+}
+
+func (t *testController) withKubeObject(objects ...runtime.Object) *testController {
+	kubeClient := fakekube.NewSimpleClientset(objects...)
+	t.controller.spokeKubeclient = kubeClient
+	t.kubeClient = kubeClient
+	return t
+}
+
+func (t *testController) withUnstructuredObject(objects ...runtime.Object) *testController {
+	scheme := runtime.NewScheme()
+	dynamicClient := fakedynamic.NewSimpleDynamicClient(scheme, objects...)
+	t.controller.spokeDynamicClient = dynamicClient
+	t.dynamicClient = dynamicClient
+	return t
 }
 
 func assertAction(t *testing.T, actual clienttesting.Action, expected string) {
@@ -191,6 +201,7 @@ type testCase struct {
 	name                  string
 	workManifest          []*unstructured.Unstructured
 	spokeObject           []runtime.Object
+	spokeDynamicObject    []runtime.Object
 	expectedWorkAction    []string
 	expectedKubeAction    []string
 	expectedDynamicAction []string
@@ -207,6 +218,7 @@ func newTestCase(name string) *testCase {
 		name:                  name,
 		workManifest:          []*unstructured.Unstructured{},
 		spokeObject:           []runtime.Object{},
+		spokeDynamicObject:    []runtime.Object{},
 		expectedWorkAction:    []string{},
 		expectedKubeAction:    []string{},
 		expectedDynamicAction: []string{},
@@ -221,6 +233,11 @@ func (t *testCase) withWorkManifest(objects ...*unstructured.Unstructured) *test
 
 func (t *testCase) withSpokeObject(objects ...runtime.Object) *testCase {
 	t.spokeObject = objects
+	return t
+}
+
+func (t *testCase) withSpokeDynamicObject(objects ...runtime.Object) *testCase {
+	t.spokeDynamicObject = objects
 	return t
 }
 
@@ -301,6 +318,12 @@ func TestSync(t *testing.T) {
 			withExpectedWorkAction("get", "update").
 			withExpectedDynamicAction("get", "create").
 			withExpectedCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}),
+		newTestCase("update single unstructured resource").
+			withWorkManifest(newUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}})).
+			withSpokeDynamicObject(newUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val2"}})).
+			withExpectedWorkAction("get", "update").
+			withExpectedDynamicAction("get", "update").
+			withExpectedCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}),
 		newTestCase("multiple create&update resource").
 			withWorkManifest(newUnstructured("v1", "Secret", "ns1", "test"), newUnstructured("v1", "Secret", "ns2", "test")).
 			withSpokeObject(newSecret("test", "ns1", "value2")).
@@ -313,7 +336,9 @@ func TestSync(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			work, workKey := newManifestWork(0, c.workManifest...)
 			work.Finalizers = []string{manifestWorkFinalizer}
-			controller := newController(work, newFakeMapper(), c.spokeObject...)
+			controller := newController(work, newFakeMapper()).
+				withKubeObject(c.spokeObject...).
+				withUnstructuredObject(c.spokeDynamicObject...)
 			syncContext := newFakeSyncContext(t, workKey)
 			err := controller.controller.sync(nil, syncContext)
 			if err != nil {
@@ -337,7 +362,7 @@ func TestDeleteWork(t *testing.T) {
 	work.Finalizers = []string{manifestWorkFinalizer}
 	now := metav1.Now()
 	work.ObjectMeta.SetDeletionTimestamp(&now)
-	controller := newController(work, newFakeMapper(), tc.spokeObject...)
+	controller := newController(work, newFakeMapper()).withKubeObject(tc.spokeObject...).withUnstructuredObject()
 	syncContext := newFakeSyncContext(t, workKey)
 	err := controller.controller.sync(nil, syncContext)
 	if err != nil {
@@ -369,7 +394,7 @@ func TestFailedToApplyResource(t *testing.T) {
 
 	work, workKey := newManifestWork(0, tc.workManifest...)
 	work.Finalizers = []string{manifestWorkFinalizer}
-	controller := newController(work, newFakeMapper(), tc.spokeObject...)
+	controller := newController(work, newFakeMapper()).withKubeObject(tc.spokeObject...).withUnstructuredObject()
 
 	// Add a reactor on fake client to throw error when creating secret on namespace ns2
 	controller.kubeClient.PrependReactor("create", "secrets", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -393,4 +418,54 @@ func TestFailedToApplyResource(t *testing.T) {
 	}
 
 	tc.validate(t, controller.dynamicClient, controller.workClient, controller.kubeClient)
+}
+
+// Test unstructured compare
+func TestIsSameUnstructured(t *testing.T) {
+	cases := []struct {
+		name     string
+		obj1     *unstructured.Unstructured
+		obj2     *unstructured.Unstructured
+		expected bool
+	}{
+		{
+			name:     "different kind",
+			obj1:     newUnstructured("v1", "Kind1", "ns1", "n1"),
+			obj2:     newUnstructured("v1", "Kind2", "ns1", "n1"),
+			expected: false,
+		},
+		{
+			name:     "different namespace",
+			obj1:     newUnstructured("v1", "Kind1", "ns1", "n1"),
+			obj2:     newUnstructured("v1", "Kind1", "ns2", "n1"),
+			expected: false,
+		},
+		{
+			name:     "different name",
+			obj1:     newUnstructured("v1", "Kind1", "ns1", "n1"),
+			obj2:     newUnstructured("v1", "Kind1", "ns1", "n2"),
+			expected: false,
+		},
+		{
+			name:     "different spec",
+			obj1:     newUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}}),
+			obj2:     newUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val2"}}),
+			expected: false,
+		},
+		{
+			name:     "same spec, different status",
+			obj1:     newUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}, "status": "status1"}),
+			obj2:     newUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}, "status": "status2"}),
+			expected: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual := isSameUnstructured(c.obj1, c.obj2)
+			if c.expected != actual {
+				t.Errorf("expected %t, but %t", c.expected, actual)
+			}
+		})
+	}
 }
