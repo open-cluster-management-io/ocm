@@ -1,0 +1,41 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: spoke-agent
+  labels:
+    app: spoke-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spoke-agent
+  template:
+    metadata:
+      labels:
+        app: spoke-agent
+    spec:
+      serviceAccountName: spoke-agent-sa
+      containers:
+      - name: spoke-agent
+        image: quay.io/open-cluster-management/registration:latest
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/registration"
+          - "agent"
+          - "--cluster-name=spokecluster1"
+          - "--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig"
+          - "--spoke-external-server-url=https://127.0.0.1"
+        volumeMounts:
+        - name: bootstrap-secret
+          mountPath: "/spoke/bootstrap"
+          readOnly: true
+        - name: hub-kubeconfig-secret
+          mountPath: "/spoke/hub-kubeconfig"
+          readOnly: true
+      volumes:
+      - name: bootstrap-secret
+        secret:
+          secretName: bootstrap-secret
+      - name: hub-kubeconfig-secret
+        secret:
+          secretName: hub-kubeconfig-secret

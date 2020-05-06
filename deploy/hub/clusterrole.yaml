@@ -1,0 +1,30 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:open-cluster-management:hub
+rules:
+# Allow hub to monitor and update status of csr
+- apiGroups: ["certificates.k8s.io"]
+  resources: ["certificatesigningrequests"]
+  verbs: ["create", "get", "list", "watch"]
+- apiGroups: ["certificates.k8s.io"]
+  resources: ["certificatesigningrequests/status"]
+  verbs: ["update"]
+# Allow hub to get/list/watch/create/delete namespace and service account
+- apiGroups: [""]
+  resources: ["namespaces", "serviceaccounts", "configmaps", "events"]
+  verbs: ["get", "list", "watch", "create", "delete", "update"]
+# Allow hub to manage clusterrole/clusterrolebinding/role/rolebinding
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["clusterroles", "clusterrolebindings", "roles", "rolebindings"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Allow hub to manage spokeclusters
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["spokeclusters"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["spokeclusters/status"]
+  verbs: ["update", "patch"]
+- apiGroups: ["register.open-cluster-management.io"]
+  resources: ["spokeclusters/clientcertificates"]
+  verbs: ["renew"]
