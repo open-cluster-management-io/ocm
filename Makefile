@@ -26,6 +26,12 @@ clean:
 	$(RM) ./registration
 .PHONY: clean
 
+deploy-hub:
+	kustomize build deploy/hub | kubectl apply -f -
+
+deploy-spoke:
+	kustomize build deploy/spoke | kubectl apply -f -
+
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...
 
 include ./test/integration-test.mk
