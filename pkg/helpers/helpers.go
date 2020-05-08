@@ -7,6 +7,7 @@ import (
 
 	spokeclusterclientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	spokeclusterv1 "github.com/open-cluster-management/api/cluster/v1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
@@ -94,6 +95,19 @@ func UpdateSpokeClusterConditionFn(cond spokeclusterv1.StatusCondition) UpdateSp
 		SetSpokeClusterCondition(&oldStatus.Conditions, cond)
 		return nil
 	}
+}
+
+// Check whether a CSR is in terminal state
+func IsCSRInTerminalState(status *certificatesv1beta1.CertificateSigningRequestStatus) bool {
+	for _, c := range status.Conditions {
+		if c.Type == certificatesv1beta1.CertificateApproved {
+			return true
+		}
+		if c.Type == certificatesv1beta1.CertificateDenied {
+			return true
+		}
+	}
+	return false
 }
 
 // IsValidHTTPSURL validate whether a URL is https URL
