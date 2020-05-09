@@ -13,7 +13,7 @@ import (
 func NewWorkloadAgent() *cobra.Command {
 	o := spoke.NewWorkloadAgentOptions()
 	cmd := controllercmd.
-		NewControllerCommandConfig("agent", version.Get(), o.RunWorkloadAgent).
+		NewControllerCommandConfig("work-agent", version.Get(), o.RunWorkloadAgent).
 		NewCommand()
 	cmd.Use = "agent"
 	cmd.Short = "Start the Cluster Registration Agent"

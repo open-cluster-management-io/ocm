@@ -187,3 +187,66 @@ func TestSetManifestCondition(t *testing.T) {
 		})
 	}
 }
+
+func TestMergeStatusConditions(t *testing.T) {
+	transitionTime := metav1.Now()
+
+	cases := []struct {
+		name               string
+		startingConditions []workapiv1.StatusCondition
+		newConditions      []workapiv1.StatusCondition
+		expectedConditions []workapiv1.StatusCondition
+	}{
+		{
+			name: "add status condition",
+			newConditions: []workapiv1.StatusCondition{
+				newCondition("one", "True", "my-reason", "my-message", nil),
+			},
+			expectedConditions: []workapiv1.StatusCondition{
+				newCondition("one", "True", "my-reason", "my-message", nil),
+			},
+		},
+		{
+			name: "merge status condition",
+			startingConditions: []workapiv1.StatusCondition{
+				newCondition("one", "True", "my-reason", "my-message", nil),
+			},
+			newConditions: []workapiv1.StatusCondition{
+				newCondition("one", "False", "my-reason", "my-message", nil),
+				newCondition("two", "True", "my-reason", "my-message", nil),
+			},
+			expectedConditions: []workapiv1.StatusCondition{
+				newCondition("one", "False", "my-reason", "my-message", nil),
+				newCondition("two", "True", "my-reason", "my-message", nil),
+			},
+		},
+		{
+			name: "remove useless status condition",
+			startingConditions: []workapiv1.StatusCondition{
+				newCondition("one", "False", "my-reason", "my-message", &transitionTime),
+				newCondition("two", "True", "my-reason", "my-message", nil),
+			},
+			newConditions: []workapiv1.StatusCondition{
+				newCondition("one", "False", "my-reason", "my-message", nil),
+			},
+			expectedConditions: []workapiv1.StatusCondition{
+				newCondition("one", "False", "my-reason", "my-message", &transitionTime),
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			merged := MergeStatusConditions(c.startingConditions, c.newConditions)
+			for i, expect := range c.expectedConditions {
+				actual := merged[i]
+				if expect.LastTransitionTime == (metav1.Time{}) {
+					actual.LastTransitionTime = metav1.Time{}
+				}
+				if !equality.Semantic.DeepEqual(actual, expect) {
+					t.Errorf(diff.ObjectDiff(actual, expect))
+				}
+			}
+		})
+	}
+}
