@@ -1,0 +1,182 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  name: manifestworks.work.open-cluster-management.io
+spec:
+  group: work.open-cluster-management.io
+  names:
+    kind: ManifestWork
+    listKind: ManifestWorkList
+    plural: manifestworks
+    singular: manifestwork
+  scope: "Namespaced"
+  preserveUnknownFields: false
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: ManifestWork represents a manifests workload that hub wants to
+        deploy on the spoke cluster. A manifest workload is defined as a set of kubernetes
+        resources. ManifestWork must be created in the cluster namespace on the hub,
+        so that agent on the corresponding spoke cluster can access this resource
+        and deploy on the spoke cluster.
+      type: object
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: Spec represents a desired configuration of work to be deployed
+            on the spoke cluster.
+          type: object
+          properties:
+            workload:
+              description: Workload represents the manifest workload to be deployed
+                on spoke cluster
+              type: object
+              properties:
+                manifests:
+                  description: Manifests represents a list of kuberenetes resources
+                    to be deployed on the spoke cluster.
+                  type: array
+                  items:
+                    type: object
+        status:
+          description: Status represents the current status of work
+          type: object
+          properties:
+            conditions:
+              description: 'Conditions contains the different condition statuses for
+                this work. Valid condition types are: 1. Applied represents workload
+                in ManifestWork is applied successfully on spoke cluster. 2. Progressing
+                represents workload in ManifestWork is being applied on spoke cluster.
+                3. Available represents workload in ManifestWork exists on the spoke
+                cluster. 4. Degraded represents the current state of workload does
+                not match the desired state for a certain period.'
+              type: array
+              items:
+                description: StatusCondition contains condition information for a
+                  spoke work.
+                type: object
+                properties:
+                  lastTransitionTime:
+                    description: LastTransitionTime is the last time the condition
+                      changed from one status to another.
+                    type: string
+                    format: date-time
+                  message:
+                    description: Message is a human-readable message indicating details
+                      about the last status change.
+                    type: string
+                  reason:
+                    description: Reason is a (brief) reason for the condition's last
+                      status change.
+                    type: string
+                  status:
+                    description: Status is the status of the condition. One of True,
+                      False, Unknown.
+                    type: string
+                  type:
+                    description: Type is the type of the spoke work condition.
+                    type: string
+            resourceStatus:
+              description: ResourceStatus represents the status of each resource in
+                manifestwork deployed on spoke cluster. The agent on spoke cluster
+                syncs the condition from spoke to the hub.
+              type: object
+              properties:
+                manifests:
+                  description: 'Manifests represents the condition of manifests deployed
+                    on spoke cluster. Valid condition types are: 1. Progressing represents
+                    the resource is being applied on spoke cluster. 2. Applied represents
+                    the resource is applied successfully on spoke cluster. 3. Available
+                    represents the resource exists on the spoke cluster. 4. Degraded
+                    represents the current state of resource does not match the desired
+                    state for a certain period.'
+                  type: array
+                  items:
+                    description: ManifestCondition represents the conditions of the
+                      resources deployed on spoke cluster
+                    type: object
+                    properties:
+                      conditions:
+                        description: Conditions represents the conditions of this
+                          resource on spoke cluster
+                        type: array
+                        items:
+                          description: StatusCondition contains condition information
+                            for a spoke work.
+                          type: object
+                          properties:
+                            lastTransitionTime:
+                              description: LastTransitionTime is the last time the
+                                condition changed from one status to another.
+                              type: string
+                              format: date-time
+                            message:
+                              description: Message is a human-readable message indicating
+                                details about the last status change.
+                              type: string
+                            reason:
+                              description: Reason is a (brief) reason for the condition's
+                                last status change.
+                              type: string
+                            status:
+                              description: Status is the status of the condition.
+                                One of True, False, Unknown.
+                              type: string
+                            type:
+                              description: Type is the type of the spoke work condition.
+                              type: string
+                      resourceMeta:
+                        description: ResourceMeta represents the gvk, name and namespace
+                          of a resoure
+                        type: object
+                        properties:
+                          group:
+                            description: Group is the API Group of the kubernetes
+                              resource
+                            type: string
+                          kind:
+                            description: Kind is the kind of the kubernetes resource
+                            type: string
+                          name:
+                            description: Name is the name of the kubernetes resource
+                            type: string
+                          namespace:
+                            description: Name is the namespace of the kubernetes resource
+                            type: string
+                          ordinal:
+                            description: Ordinal represents the index of the manifest
+                              on spec
+                            type: integer
+                            format: int32
+                          resource:
+                            description: Resource is the resource name of the kubernetes
+                              resource
+                            type: string
+                          version:
+                            description: Version is the version of the kubernetes
+                              resource
+                            type: string
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
