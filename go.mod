@@ -6,7 +6,7 @@ require (
 	github.com/jteeuwen/go-bindata v3.0.8-0.20151023091102-a0ff2567cfb7+incompatible
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
-	github.com/open-cluster-management/api v0.0.0-20200407195507-bec5ad33c0fe
+	github.com/open-cluster-management/api v0.0.0-20200512175145-bed9ce79e17e
 	github.com/openshift/build-machinery-go v0.0.0-20200211121458-5e3d6e570160
 	github.com/openshift/library-go v0.0.0-20200401114229-ffab8c6e83a9
 	github.com/spf13/cobra v0.0.5

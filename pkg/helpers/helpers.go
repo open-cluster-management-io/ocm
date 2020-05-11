@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"context"
+	"net/url"
 	"time"
 
 	spokeclusterclientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
@@ -93,4 +94,22 @@ func UpdateSpokeClusterConditionFn(cond spokeclusterv1.StatusCondition) UpdateSp
 		SetSpokeClusterCondition(&oldStatus.Conditions, cond)
 		return nil
 	}
+}
+
+// IsValidHTTPSURL validate whether a URL is https URL
+func IsValidHTTPSURL(serverURL string) bool {
+	if serverURL == "" {
+		return false
+	}
+
+	parsedServerURL, err := url.Parse(serverURL)
+	if err != nil {
+		return false
+	}
+
+	if parsedServerURL.Scheme != "https" {
+		return false
+	}
+
+	return true
 }

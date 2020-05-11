@@ -106,6 +106,44 @@ func TestUpdateStatusCondition(t *testing.T) {
 	}
 }
 
+func TestIsValidHTTPSURL(t *testing.T) {
+	cases := []struct {
+		name      string
+		serverURL string
+		isValid   bool
+	}{
+		{
+			name:      "an empty url",
+			serverURL: "",
+			isValid:   false,
+		},
+		{
+			name:      "an invalid url",
+			serverURL: "/path/path/path",
+			isValid:   false,
+		},
+		{
+			name:      "a http url",
+			serverURL: "http://127.0.0.1:8080",
+			isValid:   false,
+		},
+		{
+			name:      "a https url",
+			serverURL: "https://127.0.0.1:6443",
+			isValid:   true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			isValid := IsValidHTTPSURL(c.serverURL)
+			if isValid != c.isValid {
+				t.Errorf("expected %t, but %t", c.isValid, isValid)
+			}
+		})
+	}
+}
+
 func newCondition(name, status, reason, message string, lastTransition *metav1.Time) spokeclusterv1.StatusCondition {
 	ret := spokeclusterv1.StatusCondition{
 		Type:    name,

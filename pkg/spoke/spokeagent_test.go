@@ -1,12 +1,14 @@
 package spoke
 
 import (
+	"bytes"
 	"io/ioutil"
 	"os"
 	"path"
 	"testing"
 
 	"github.com/open-cluster-management/registration/pkg/spoke/hubclientcert"
+	"k8s.io/client-go/rest"
 )
 
 func TestGetOrGenerateClusterAgentNames(t *testing.T) {
@@ -80,5 +82,84 @@ func TestGetOrGenerateClusterAgentNamesWithExistingNames(t *testing.T) {
 
 	if agentName != an {
 		t.Errorf("expect agent name %q but got %q", an, agentName)
+	}
+}
+
+func TestValidate(t *testing.T) {
+	var err error
+
+	withoutBootstrapKubeconfig := &SpokeAgentOptions{}
+	err = withoutBootstrapKubeconfig.Validate()
+	if err == nil || err.Error() != "bootstrap-kubeconfig is required" {
+		t.Errorf("expect 'bootstrap-kubeconfig is required' error but got %v", err)
+	}
+
+	withoutClusterName := &SpokeAgentOptions{
+		BootstrapKubeconfig: "/spoke/bootstrap/kubeconfig",
+	}
+	err = withoutClusterName.Validate()
+	if err == nil || err.Error() != "cluster name is empty" {
+		t.Errorf("expect \"cluster name is empty\" error but got %v", err)
+	}
+
+	withoutAgentName := &SpokeAgentOptions{
+		BootstrapKubeconfig: "/spoke/bootstrap/kubeconfig",
+		ClusterName:         "testcluster",
+	}
+	err = withoutAgentName.Validate()
+	if err == nil || err.Error() != "agent name is empty" {
+		t.Errorf("expect \"agent name is empty\" error but got %v", err)
+	}
+
+	withoutSpokeExternalServerURLs := &SpokeAgentOptions{
+		BootstrapKubeconfig: "/spoke/bootstrap/kubeconfig",
+		ClusterName:         "testcluster",
+		AgentName:           "testagent",
+	}
+	err = withoutSpokeExternalServerURLs.Validate()
+	if err != nil {
+		t.Errorf("expect no error but got %v", err)
+	}
+
+	withInvalidSpokeExternalServerURL := &SpokeAgentOptions{
+		BootstrapKubeconfig:     "/spoke/bootstrap/kubeconfig",
+		ClusterName:             "testcluster",
+		AgentName:               "testagent",
+		SpokeExternalServerURLs: []string{"https://127.0.0.1:64433", "http://127.0.0.1:8080"},
+	}
+	err = withInvalidSpokeExternalServerURL.Validate()
+	if err == nil || err.Error() != "\"http://127.0.0.1:8080\" is invalid" {
+		t.Errorf("expect \"http://127.0.0.1:8080 is invalid\" error but got %v", err)
+	}
+}
+
+func TestGetSpokeClusterCABundle(t *testing.T) {
+	withoutSpokeExternalServerURLs := &SpokeAgentOptions{}
+	caData, err := withoutSpokeExternalServerURLs.getSpokeClusterCABundle(&rest.Config{})
+	if err != nil {
+		t.Errorf("expect no error but got %v", err)
+	}
+	if caData != nil {
+		t.Errorf("expect no ca data but got %v", caData)
+	}
+
+	withSpokeExternalServerURLs := &SpokeAgentOptions{SpokeExternalServerURLs: []string{"https://127.0.0.1:6443"}}
+	caData, err = withSpokeExternalServerURLs.getSpokeClusterCABundle(&rest.Config{})
+	if err == nil {
+		t.Errorf("expect error happened but no error")
+	}
+	if caData != nil {
+		t.Errorf("expect no ca data but got %v", caData)
+	}
+
+	expectedCAData := []byte("cadata")
+	caData, err = withSpokeExternalServerURLs.getSpokeClusterCABundle(&rest.Config{
+		TLSClientConfig: rest.TLSClientConfig{CAData: expectedCAData},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !bytes.Equal(caData, expectedCAData) {
+		t.Errorf("expected %v but got %v", expectedCAData, caData)
 	}
 }

@@ -20,23 +20,23 @@ const anonymous = "system:anonymous"
 
 // spokeClusterCreatingController creates a spoke cluster on hub cluster during the spoke agent bootstrap phase
 type spokeClusterCreatingController struct {
-	clusterName            string
-	spokeExternalServerUrl string
-	spokeCABundle          []byte
-	hubClusterClient       clientset.Interface
+	clusterName             string
+	spokeExternalServerURLs []string
+	spokeCABundle           []byte
+	hubClusterClient        clientset.Interface
 }
 
 // NewSpokeClusterCreatingController creates a new spoke cluster creating controller on the spoke cluster.
 func NewSpokeClusterCreatingController(
-	clusterName, spokeExternalServerUrl string,
+	clusterName string, spokeExternalServerURLs []string,
 	spokeCABundle []byte,
 	hubClusterClient clientset.Interface,
 	recorder events.Recorder) factory.Controller {
 	c := &spokeClusterCreatingController{
-		clusterName:            clusterName,
-		spokeExternalServerUrl: spokeExternalServerUrl,
-		spokeCABundle:          spokeCABundle,
-		hubClusterClient:       hubClusterClient,
+		clusterName:             clusterName,
+		spokeExternalServerURLs: spokeExternalServerURLs,
+		spokeCABundle:           spokeCABundle,
+		hubClusterClient:        hubClusterClient,
 	}
 	return factory.New().
 		WithSync(c.sync).
@@ -62,13 +62,19 @@ func (c *spokeClusterCreatingController) sync(ctx context.Context, syncCtx facto
 		ObjectMeta: metav1.ObjectMeta{
 			Name: c.clusterName,
 		},
-		Spec: clusterv1.SpokeClusterSpec{
-			SpokeClientConfig: clusterv1.ClientConfig{
-				URL:      c.spokeExternalServerUrl,
-				CABundle: c.spokeCABundle,
-			},
-		},
 	}
+
+	if len(c.spokeExternalServerURLs) != 0 {
+		spokeClientConfigs := []clusterv1.ClientConfig{}
+		for _, serverURL := range c.spokeExternalServerURLs {
+			spokeClientConfigs = append(spokeClientConfigs, clusterv1.ClientConfig{
+				URL:      serverURL,
+				CABundle: c.spokeCABundle,
+			})
+		}
+		spokeCluster.Spec.SpokeClientConfigs = spokeClientConfigs
+	}
+
 	_, err = c.hubClusterClient.ClusterV1().SpokeClusters().Create(ctx, spokeCluster, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to create spoke cluster with name %q on hub: %w", c.clusterName, err)

@@ -43,10 +43,10 @@ func TestCreateSpokeCluster(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.startingObjects...)
 			ctrl := spokeClusterCreatingController{
-				clusterName:            testSpokeClusterName,
-				spokeExternalServerUrl: testSpokeExternalServerUrl,
-				spokeCABundle:          []byte("testcabundle"),
-				hubClusterClient:       clusterClient,
+				clusterName:             testSpokeClusterName,
+				spokeExternalServerURLs: []string{testSpokeExternalServerUrl},
+				spokeCABundle:           []byte("testcabundle"),
+				hubClusterClient:        clusterClient,
 			}
 
 			syncErr := ctrl.sync(context.TODO(), newFakeSyncContext(t))
@@ -69,14 +69,20 @@ func TestCreateSpokeCluster(t *testing.T) {
 
 func assertSpokeExternalServerUrl(t *testing.T, actual runtime.Object, expected string) {
 	spokeCluster := actual.(*clusterv1.SpokeCluster)
-	if spokeCluster.Spec.SpokeClientConfig.URL != expected {
-		t.Errorf("expected %q error, but got %q", expected, spokeCluster.Spec.SpokeClientConfig.URL)
+	if len(spokeCluster.Spec.SpokeClientConfigs) != 1 {
+		t.Errorf("expected one spoke client config, but got %v", spokeCluster.Spec.SpokeClientConfigs)
+	}
+	if spokeCluster.Spec.SpokeClientConfigs[0].URL != expected {
+		t.Errorf("expected %q error, but got %q", expected, spokeCluster.Spec.SpokeClientConfigs[0].URL)
 	}
 }
 
 func assertSpokeCABundle(t *testing.T, actual runtime.Object, expected []byte) {
 	spokeCluster := actual.(*clusterv1.SpokeCluster)
-	if !bytes.Equal(spokeCluster.Spec.SpokeClientConfig.CABundle, expected) {
-		t.Errorf("expected %q error, but got %q", expected, spokeCluster.Spec.SpokeClientConfig.CABundle)
+	if len(spokeCluster.Spec.SpokeClientConfigs) != 1 {
+		t.Errorf("expected one spoke client config, but got %v", spokeCluster.Spec.SpokeClientConfigs)
+	}
+	if !bytes.Equal(spokeCluster.Spec.SpokeClientConfigs[0].CABundle, expected) {
+		t.Errorf("expected %q error, but got %q", expected, spokeCluster.Spec.SpokeClientConfigs[0].CABundle)
 	}
 }

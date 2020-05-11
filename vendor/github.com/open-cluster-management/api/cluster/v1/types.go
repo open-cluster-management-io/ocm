@@ -9,16 +9,20 @@ import (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// SpokeCluster represents the current status of spoke cluster.
-// SpokeCluster is cluster scoped resources. The name is the cluster UID.
-// The cluster join follows the double opt-in proceess:
+// SpokeCluster represents the desired state and current status of spoke
+// cluster. SpokeCluster is a cluster scoped resource. The name is the cluster
+// UID.
+//
+// The cluster join process follows a double opt-in process:
+//
 // 1. agent on spoke cluster creates CSR on hub with cluster UID and agent name.
 // 2. agent on spoke cluster creates spokecluster on hub.
 // 3. cluster admin on hub approves the CSR for the spoke's cluster UID and agent name.
 // 4. cluster admin set spec.acceptSpokeCluster of spokecluster to true.
-// 5. cluster admin on spoke creates credential of kubeconfig to spoke. Once hub creates the
-// cluster namespace, the spoke agent pushes the credential to hub to use against spoke's
-// kube-apiserver
+// 5. cluster admin on spoke creates credential of kubeconfig to spoke.
+//
+// Once the hub creates the cluster namespace, the spoke agent pushes the
+// credential to the hub to use against the spoke's kube-apiserver.
 type SpokeCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -32,11 +36,12 @@ type SpokeCluster struct {
 }
 
 // SpokeClusterSpec provides the information to securely connect to a remote server
-// and verify its identity
+// and verify its identity.
 type SpokeClusterSpec struct {
-	// SpokeClientConfig represents the apiserver address of the spoke cluster
+	// SpokeClientConfigs represents a list of the apiserver address of the spoke cluster.
+	// If it is empty, spoke cluster has no accessible address to be visited from hub.
 	// +optional
-	SpokeClientConfig ClientConfig `json:"spokeClientConfig,omitempty" protobuf:"bytes,1,opt,name=spokeClientConfig"`
+	SpokeClientConfigs []ClientConfig `json:"spokeClientConfigs,omitempty" protobuf:"bytes,1,opt,name=spokeClientConfigs"`
 
 	// AcceptSpokeCluster reprsents that hub accepts the join of spoke agent.
 	// Its default value is false, and can only be set true when the user on hub
@@ -50,36 +55,36 @@ type SpokeClusterSpec struct {
 	HubAcceptsClient bool `json:"hubAcceptsClient" protobuf:"bytes,2,opt,name=hubAcceptsClient"`
 }
 
-// ClientConfig represents apiserver address of the spoke cluster
+// ClientConfig represents the apiserver address of the spoke cluster.
 // TODO include credential to connect to spoke cluster kube-apiserver
 type ClientConfig struct {
-	// URL is the url of apiserver endpoint of the spoke cluster
+	// URL is the url of apiserver endpoint of the spoke cluster.
 	// +required
 	URL string `json:"url" protobuf:"bytes,1,opt,name=url"`
 
 	// CABundle is the ca bundle to connect to apiserver of the spoke cluster.
-	// System certs is used if it is not set.
+	// System certs are used if it is not set.
 	// +optional
 	CABundle []byte `json:"caBundle,omitempty" protobuf:"bytes,2,opt,name=caBundle"`
 }
 
-// SpokeClusterStatus represents the current status of joined spoke cluster
+// SpokeClusterStatus represents the current status of joined spoke cluster.
 type SpokeClusterStatus struct {
 	// Conditions contains the different condition statuses for this spoke cluster.
 	Conditions []StatusCondition `json:"conditions" protobuf:"bytes,1,rep,name=conditions"`
 
 	// Capacity represents the total resource capacity from all nodeStatuses
-	// on the spoke cluster
+	// on the spoke cluster.
 	Capacity ResourceList `json:"capacity,omitempty" protobuf:"bytes,2,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
 
-	// Allocatable represents the total allocatable resources on the spoke cluster
+	// Allocatable represents the total allocatable resources on the spoke cluster.
 	Allocatable ResourceList `json:"allocatable,omitempty" protobuf:"bytes,3,rep,name=allocatable,casttype=ResourceList,castkey=ResourceName"`
 
-	// Version represents the kubernetes version of the spoke cluster
+	// Version represents the kubernetes version of the spoke cluster.
 	Version SpokeVersion `json:"version,omitempty" protobuf:"bytes,4,opt,name=version"`
 }
 
-// SpokeVersion represents the Kubernetes version of spoke cluster
+// SpokeVersion represents version information about the spoke cluster.
 // TODO add spoke agent versions
 type SpokeVersion struct {
 	// Kubernetes is the kubernetes version of spoke cluster
@@ -137,7 +142,7 @@ type StatusCondition struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// SpokeClusterList is a collection of spoke cluster
+// SpokeClusterList is a collection of spoke cluster.
 type SpokeClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
