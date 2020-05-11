@@ -15,6 +15,8 @@ import (
 	"github.com/open-cluster-management/registration/pkg/spoke/spokecluster"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/pflag"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -182,7 +184,14 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	}
 
 	hubKubeInformerFactory := informers.NewSharedInformerFactory(hubKubeClient, 10*time.Minute)
-	hubClusterInformerFactory := clusterv1informers.NewSharedInformerFactory(hubClusterClient, 10*time.Minute)
+	// create an informer factory with cluster name field selector because we just need to handle the current spoke cluster
+	hubClusterInformerFactory := clusterv1informers.NewSharedInformerFactoryWithOptions(
+		hubClusterClient,
+		10*time.Minute,
+		clusterv1informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
+			listOptions.FieldSelector = fields.OneTermEqualSelector("metadata.name", o.ClusterName).String()
+		}),
+	)
 
 	controllerContext.EventRecorder.Event("HubClientConfigReady", "Client config for hub is ready.")
 
