@@ -2,7 +2,6 @@ package helper
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -136,17 +135,21 @@ func TestUpdateStatusCondition(t *testing.T) {
 }
 
 // TestSetManifestCondition tests SetManifestCondition function
-func TestSetManifestCondition(t *testing.T) {
+func TestMergeManifestConditions(t *testing.T) {
+	transitionTime := metav1.Now()
+
 	cases := []struct {
 		name               string
 		startingConditions []workapiv1.ManifestCondition
-		newCondition       workapiv1.ManifestCondition
+		newConditions      []workapiv1.ManifestCondition
 		expectedConditions []workapiv1.ManifestCondition
 	}{
 		{
 			name:               "add to empty",
 			startingConditions: []workapiv1.ManifestCondition{},
-			newCondition:       newManifestCondition(0, "resource1", newCondition("one", "True", "my-reason", "my-message", nil)),
+			newConditions: []workapiv1.ManifestCondition{
+				newManifestCondition(0, "resource1", newCondition("one", "True", "my-reason", "my-message", nil)),
+			},
 			expectedConditions: []workapiv1.ManifestCondition{
 				newManifestCondition(0, "resource1", newCondition("one", "True", "my-reason", "my-message", nil)),
 			},
@@ -156,33 +159,64 @@ func TestSetManifestCondition(t *testing.T) {
 			startingConditions: []workapiv1.ManifestCondition{
 				newManifestCondition(0, "resource1", newCondition("one", "True", "my-reason", "my-message", nil)),
 			},
-			newCondition: newManifestCondition(1, "resource1", newCondition("one", "True", "my-reason", "my-message", nil)),
+			newConditions: []workapiv1.ManifestCondition{
+				newManifestCondition(0, "resource1", newCondition("one", "True", "my-reason", "my-message", nil)),
+				newManifestCondition(0, "resource2", newCondition("two", "True", "my-reason", "my-message", nil)),
+			},
 			expectedConditions: []workapiv1.ManifestCondition{
 				newManifestCondition(0, "resource1", newCondition("one", "True", "my-reason", "my-message", nil)),
-				newManifestCondition(1, "resource1", newCondition("one", "True", "my-reason", "my-message", nil)),
+				newManifestCondition(0, "resource2", newCondition("two", "True", "my-reason", "my-message", nil)),
 			},
 		},
 		{
 			name: "update existing",
 			startingConditions: []workapiv1.ManifestCondition{
-				newManifestCondition(2, "resource1", newCondition("one", "True", "my-reason", "my-message", nil)),
-				newManifestCondition(1, "resource1", newCondition("one", "True", "my-reason", "my-message", nil)),
+				newManifestCondition(0, "resource1", newCondition("one", "True", "my-reason", "my-message", nil)),
 			},
-			newCondition: newManifestCondition(1, "resource2", newCondition("two", "True", "my-reason", "my-message", nil)),
+			newConditions: []workapiv1.ManifestCondition{
+				newManifestCondition(0, "resource1", newCondition("two", "True", "my-reason", "my-message", nil)),
+			},
 			expectedConditions: []workapiv1.ManifestCondition{
-				newManifestCondition(2, "resource1", newCondition("one", "True", "my-reason", "my-message", nil)),
-				newManifestCondition(1, "resource2", newCondition("two", "True", "my-reason", "my-message", nil)),
+				newManifestCondition(0, "resource1", newCondition("two", "True", "my-reason", "my-message", nil)),
+			},
+		},
+		{
+			name: "remove useless",
+			startingConditions: []workapiv1.ManifestCondition{
+				newManifestCondition(0, "resource1", newCondition("one", "True", "my-reason", "my-message", nil)),
+				newManifestCondition(1, "resource2", newCondition("two", "True", "my-reason", "my-message", &transitionTime)),
+			},
+			newConditions: []workapiv1.ManifestCondition{
+				newManifestCondition(0, "resource2", newCondition("two", "True", "my-reason", "my-message", nil)),
+			},
+			expectedConditions: []workapiv1.ManifestCondition{
+				newManifestCondition(0, "resource2", newCondition("two", "True", "my-reason", "my-message", &transitionTime)),
 			},
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			actual := c.startingConditions
-			SetManifestCondition(&actual, c.newCondition)
-			fmt.Printf("found con %v\n", actual)
-			if !equality.Semantic.DeepEqual(actual, c.expectedConditions) {
-				t.Errorf(diff.ObjectDiff(actual, c.expectedConditions))
+			merged := MergeManifestConditions(c.startingConditions, c.newConditions)
+
+			if len(merged) != len(c.expectedConditions) {
+				t.Errorf("expected condition size %d but got: %d", len(c.expectedConditions), len(merged))
+			}
+
+			for i, expectedCondition := range c.expectedConditions {
+				actualCondition := merged[i]
+				if len(actualCondition.Conditions) != len(expectedCondition.Conditions) {
+					t.Errorf("expected condition size %d but got: %d", len(expectedCondition.Conditions), len(actualCondition.Conditions))
+				}
+				for j, expect := range expectedCondition.Conditions {
+					if expect.LastTransitionTime == (metav1.Time{}) {
+						actualCondition.Conditions[j].LastTransitionTime = metav1.Time{}
+					}
+				}
+
+				if !equality.Semantic.DeepEqual(actualCondition, expectedCondition) {
+					t.Errorf(diff.ObjectDiff(actualCondition, expectedCondition))
+				}
 			}
 		})
 	}

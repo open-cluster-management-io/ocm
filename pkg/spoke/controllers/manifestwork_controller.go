@@ -130,35 +130,41 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	errs := []error{}
 	// Apply resources on spoke cluster.
 	resourceResults := m.applyManifest(manifestWork.Spec.Workload.Manifests, controllerContext.Recorder())
+	newManifestConditions := []workapiv1.ManifestCondition{}
 	for index, result := range resourceResults {
-		manifestCondition := helper.FindManifestConditionByIndex(int32(index), manifestWork.Status.ResourceStatus.Manifests)
-		if manifestCondition == nil {
-			manifestCondition = &workapiv1.ManifestCondition{
-				ResourceMeta: workapiv1.ManifestResourceMeta{
-					Ordinal: int32(index),
-				},
-				Conditions: []workapiv1.StatusCondition{},
+		if result.Error != nil {
+			errs = append(errs, result.Error)
+		}
+
+		manifestCondition := workapiv1.ManifestCondition{
+			ResourceMeta: workapiv1.ManifestResourceMeta{
+				Ordinal: int32(index),
+			},
+			Conditions: []workapiv1.StatusCondition{},
+		}
+
+		if result.Result != nil {
+			gvk := result.Result.GetObjectKind().GroupVersionKind()
+			manifestCondition.ResourceMeta.Group = gvk.Group
+			manifestCondition.ResourceMeta.Version = gvk.Version
+			manifestCondition.ResourceMeta.Kind = gvk.Kind
+
+			if accessor, err := meta.Accessor(result.Result); err != nil {
+				errs = append(errs, fmt.Errorf("cannot access metadata of %v: %w", result.Result, err))
+			} else {
+				manifestCondition.ResourceMeta.Namespace = accessor.GetNamespace()
+				manifestCondition.ResourceMeta.Name = accessor.GetName()
 			}
 		}
 
-		if result.Error != nil {
-			errs = append(errs, result.Error)
-			helper.SetStatusCondition(&manifestCondition.Conditions, workapiv1.StatusCondition{
-				Type:    string(workapiv1.ManifestApplied),
-				Status:  metav1.ConditionFalse,
-				Reason:  "AppliedManifestFailed",
-				Message: "Failed to apply manifest",
-			})
-		} else {
-			helper.SetStatusCondition(&manifestCondition.Conditions, workapiv1.StatusCondition{
-				Type:    string(workapiv1.ManifestApplied),
-				Status:  metav1.ConditionTrue,
-				Reason:  "AppliedManifestComplete",
-				Message: "Apply manifest complete",
-			})
-		}
-		helper.SetManifestCondition(&manifestWork.Status.ResourceStatus.Manifests, *manifestCondition)
+		// Add applied status condition
+		manifestCondition.Conditions = append(manifestCondition.Conditions, buildAppliedStatusCondition(result.Error != nil))
+
+		newManifestConditions = append(newManifestConditions, manifestCondition)
 	}
+
+	// merge the new manifest conditions with the existing manifest conditions
+	manifestWork.Status.ResourceStatus.Manifests = helper.MergeManifestConditions(manifestWork.Status.ResourceStatus.Manifests, newManifestConditions)
 
 	// TODO find resources to be deleted if it is not owned by manifestwork any longer
 
@@ -390,4 +396,22 @@ func allInCondition(conditionType string, manifests []workapiv1.ManifestConditio
 	}
 
 	return exists, exists
+}
+
+func buildAppliedStatusCondition(failed bool) workapiv1.StatusCondition {
+	if failed {
+		return workapiv1.StatusCondition{
+			Type:    string(workapiv1.ManifestApplied),
+			Status:  metav1.ConditionFalse,
+			Reason:  "AppliedManifestFailed",
+			Message: "Failed to apply manifest",
+		}
+	}
+
+	return workapiv1.StatusCondition{
+		Type:    string(workapiv1.ManifestApplied),
+		Status:  metav1.ConditionTrue,
+		Reason:  "AppliedManifestComplete",
+		Message: "Apply manifest complete",
+	}
 }
