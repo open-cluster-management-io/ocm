@@ -15,10 +15,14 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 $(call add-bindata,hub,./manifests/hub/...,bindata,bindata,./pkg/operators/hub/bindata/bindata.go)
 
 copy-crd:
-	cp ./vendor/github.com/open-cluster-management/api/cluster/v1/*.yaml ./manifests/hub/
-	cp ./vendor/github.com/open-cluster-management/api/work/v1/*.yaml ./manifests/hub/
+	bash -x hack/copy-crds.sh
 
 update-all: copy-crd update
+
+verify-crds:
+	bash -x hack/verify-crds.sh
+
+verify: verify-crds
 
 # This will call a macro called "build-image" which will generate image specific targets based on the parameters:
 # $0 - macro name
