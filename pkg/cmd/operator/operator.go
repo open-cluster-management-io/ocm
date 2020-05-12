@@ -9,10 +9,10 @@ import (
 	"github.com/open-cluster-management/nucleus/pkg/version"
 )
 
-// NewOperator generatee a command to start workload agent
+// NewOperatorCmd generatee a command to start workload agent
 func NewOperatorCmd() *cobra.Command {
 	cmd := controllercmd.
-		NewControllerCommandConfig("operator", version.Get(), operators.RunNucleusOperator).
+		NewControllerCommandConfig("nucleus-operator", version.Get(), operators.RunNucleusOperator).
 		NewCommand()
 	cmd.Use = "operator"
 	cmd.Short = "Start the nucleus operator"

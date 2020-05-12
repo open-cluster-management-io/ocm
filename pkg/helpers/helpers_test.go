@@ -73,14 +73,22 @@ func TestUpdateStatusCondition(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			fakeClusterClient := nucleusfake.NewSimpleClientset(&nucleusapiv1.HubCore{
-				ObjectMeta: metav1.ObjectMeta{Name: "testspokecluster"},
-				Status: nucleusapiv1.HubCoreStatus{
-					Conditions: c.startingConditions,
+			fakeClusterClient := nucleusfake.NewSimpleClientset(
+				&nucleusapiv1.HubCore{
+					ObjectMeta: metav1.ObjectMeta{Name: "testspokecluster"},
+					Status: nucleusapiv1.HubCoreStatus{
+						Conditions: c.startingConditions,
+					},
 				},
-			})
+				&nucleusapiv1.SpokeCore{
+					ObjectMeta: metav1.ObjectMeta{Name: "testspokecluster"},
+					Status: nucleusapiv1.SpokeCoreStatus{
+						Conditions: c.startingConditions,
+					},
+				},
+			)
 
-			status, updated, err := UpdateNucleusHubStatus(
+			hubstatus, updated, err := UpdateNucleusHubStatus(
 				context.TODO(),
 				fakeClusterClient.NucleusV1().HubCores(),
 				"testspokecluster",
@@ -92,14 +100,36 @@ func TestUpdateStatusCondition(t *testing.T) {
 			if updated != c.expextedUpdated {
 				t.Errorf("expected %t, but %t", c.expextedUpdated, updated)
 			}
+
+			spokestatus, updated, err := UpdateNucleusSpokeStatus(
+				context.TODO(),
+				fakeClusterClient.NucleusV1().SpokeCores(),
+				"testspokecluster",
+				UpdateNucleusSpokeConditionFn(c.newCondition),
+			)
+			if err != nil {
+				t.Errorf("unexpected err: %v", err)
+			}
+			if updated != c.expextedUpdated {
+				t.Errorf("expected %t, but %t", c.expextedUpdated, updated)
+			}
+
 			for i := range c.expectedConditions {
 				expected := c.expectedConditions[i]
-				actual := status.Conditions[i]
+				hubactual := hubstatus.Conditions[i]
 				if expected.LastTransitionTime == (metav1.Time{}) {
-					actual.LastTransitionTime = metav1.Time{}
+					hubactual.LastTransitionTime = metav1.Time{}
 				}
-				if !equality.Semantic.DeepEqual(expected, actual) {
-					t.Errorf(diff.ObjectDiff(expected, actual))
+				if !equality.Semantic.DeepEqual(expected, hubactual) {
+					t.Errorf(diff.ObjectDiff(expected, hubactual))
+				}
+
+				spokeactual := spokestatus.Conditions[i]
+				if expected.LastTransitionTime == (metav1.Time{}) {
+					spokeactual.LastTransitionTime = metav1.Time{}
+				}
+				if !equality.Semantic.DeepEqual(expected, spokeactual) {
+					t.Errorf(diff.ObjectDiff(expected, spokeactual))
 				}
 			}
 		})

@@ -13,11 +13,12 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 )
 
 $(call add-bindata,hub,./manifests/hub/...,bindata,bindata,./pkg/operators/hub/bindata/bindata.go)
+$(call add-bindata,spoke,./manifests/spoke/...,bindata,bindata,./pkg/operators/spoke/bindata/bindata.go)
 
 copy-crd:
 	bash -x hack/copy-crds.sh
 
-update-all: copy-crd update
+update-all: copy-crd update-bindata-hub update-bindata-spoke
 
 verify-crds:
 	bash -x hack/verify-crds.sh
