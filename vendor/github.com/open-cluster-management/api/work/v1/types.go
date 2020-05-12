@@ -55,11 +55,18 @@ type ManifestWorkSpec struct {
 	Workload ManifestsTemplate `json:"workload,omitempty" protobuf:"bytes,1,opt,name=workload"`
 }
 
+// Manifest represents a resource to be deployed on spoke cluster
+type Manifest struct {
+	// +kubebuilder:validation:EmbeddedResource
+	// +kubebuilder:pruning:PreserveUnknownFields
+	runtime.RawExtension `json:",inline" protobuf:"bytes,1,opt,name=rawExtension"`
+}
+
 // ManifestsTemplate represents the manifest workload to be deployed on spoke cluster
 type ManifestsTemplate struct {
 	// Manifests represents a list of kuberenetes resources to be deployed on the spoke cluster.
 	// +optional
-	Manifests []runtime.RawExtension `json:"manifests,omitempty" protobuf:"bytes,2,rep,name=manifests"`
+	Manifest []Manifest `json:"manifests,omitempty" protobuf:"bytes,1,rep,name=manifests"`
 }
 
 // ManifestResourceMeta represents the gvk, gvr, name and namespace of a resoure
