@@ -50,7 +50,11 @@ spec:
                     to be deployed on the spoke cluster.
                   type: array
                   items:
+                    description: Manifest represents a resource to be deployed on
+                      spoke cluster
                     type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                    x-kubernetes-embedded-resource: true
         status:
           description: Status represents the current status of work
           type: object
