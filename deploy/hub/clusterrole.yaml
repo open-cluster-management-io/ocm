@@ -18,6 +18,10 @@ rules:
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterroles", "clusterrolebindings", "roles", "rolebindings"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Allow hub to create subjectaccessreviews
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["create"]
 # Allow hub to manage spokeclusters
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["spokeclusters"]
@@ -28,3 +32,6 @@ rules:
 - apiGroups: ["register.open-cluster-management.io"]
   resources: ["spokeclusters/clientcertificates"]
   verbs: ["renew"]
+- apiGroups: ["register.open-cluster-management.io"]
+  resources: ["spokeclusters/acceptance"]
+  verbs: ["update"]
