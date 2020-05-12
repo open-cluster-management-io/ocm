@@ -21,8 +21,8 @@ import (
 
 // WorkloadAgentOptions defines the flags for workload agent
 type WorkloadAgentOptions struct {
-	SpokeKubeconfigFile string
-	SpokeClusterName    string
+	HubKubeconfigFile string
+	SpokeClusterName  string
 }
 
 // NewWorkloadAgentOptions returns the flags with default value set
@@ -34,14 +34,19 @@ func NewWorkloadAgentOptions() *WorkloadAgentOptions {
 func (o *WorkloadAgentOptions) AddFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
 	// This command only supports reading from config
-	flags.StringVar(&o.SpokeKubeconfigFile, "spoke-kubeconfig", o.SpokeKubeconfigFile, "Location of kubeconfig file to connect to spoke cluster.")
+	flags.StringVar(&o.HubKubeconfigFile, "hub-kubeconfig", o.HubKubeconfigFile, "Location of kubeconfig file to connect to hub cluster.")
 	flags.StringVar(&o.SpokeClusterName, "spoke-cluster-name", o.SpokeClusterName, "Name of spoke cluster.")
 }
 
 // RunWorkloadAgent starts the controllers on agent to process work from hub.
 func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	// build hub client and informer
-	hubWorkClient, err := workclientset.NewForConfig(controllerContext.KubeConfig)
+	hubRestConfig, err := clientcmd.BuildConfigFromFlags("" /* leave masterurl as empty */, o.HubKubeconfigFile)
+	if err != nil {
+		return err
+	}
+
+	hubWorkClient, err := workclientset.NewForConfig(hubRestConfig)
 	if err != nil {
 		return err
 	}
@@ -49,10 +54,7 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(hubWorkClient, 5*time.Minute, workinformers.WithNamespace(o.SpokeClusterName))
 
 	// Build dynamic client and informer for spoke cluster
-	spokeRestConfig, err := clientcmd.BuildConfigFromFlags("" /* leave masterurl as empty */, o.SpokeKubeconfigFile)
-	if err != nil {
-		return err
-	}
+	spokeRestConfig := controllerContext.KubeConfig
 	spokeDynamicClient, err := dynamic.NewForConfig(spokeRestConfig)
 	if err != nil {
 		return err

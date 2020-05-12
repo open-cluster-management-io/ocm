@@ -12,6 +12,13 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1";
 
+// Manifest represents a resource to be deployed on spoke cluster
+message Manifest {
+  // +kubebuilder:validation:EmbeddedResource
+  // +kubebuilder:pruning:PreserveUnknownFields
+  optional k8s.io.apimachinery.pkg.runtime.RawExtension rawExtension = 1;
+}
+
 // ManifestCondition represents the conditions of the resources deployed on
 // spoke cluster
 message ManifestCondition {
@@ -122,7 +129,7 @@ message ManifestWorkStatus {
 message ManifestsTemplate {
   // Manifests represents a list of kuberenetes resources to be deployed on the spoke cluster.
   // +optional
-  repeated k8s.io.apimachinery.pkg.runtime.RawExtension manifests = 2;
+  repeated Manifest manifests = 1;
 }
 
 // StatusCondition contains condition information for a spoke work.
