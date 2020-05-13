@@ -53,7 +53,7 @@ var (
 
 const (
 	nucleusHubFinalizer     = "nucleus.open-cluster-management.io/hub-core-cleanup"
-	nucluesHubCoreNamespace = "open-cluster-management"
+	nucluesHubCoreNamespace = "open-cluster-management-hub"
 	hubCoreApplied          = "Applied"
 	hubCoreAvailable        = "Available"
 )
