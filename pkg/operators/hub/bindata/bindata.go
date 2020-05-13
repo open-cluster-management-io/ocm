@@ -107,19 +107,26 @@ spec:
                 to grant the permision of access from agent on spoke. When the value
                 is set false, the namespace representing the spoke cluster is deleted.
               type: boolean
-            spokeClientConfig:
-              description: SpokeClientConfig represents the apiserver address of the
-                spoke cluster
-              type: object
-              properties:
-                caBundle:
-                  description: CABundle is the ca bundle to connect to apiserver of
-                    the spoke cluster. System certs are used if it is not set.
-                  type: string
-                  format: byte
-                url:
-                  description: URL is the url of apiserver endpoint of the spoke cluster.
-                  type: string
+            spokeClientConfigs:
+              description: SpokeClientConfigs represents a list of the apiserver address
+                of the spoke cluster. If it is empty, spoke cluster has no accessible
+                address to be visited from hub.
+              type: array
+              items:
+                description: ClientConfig represents the apiserver address of the
+                  spoke cluster. TODO include credential to connect to spoke cluster
+                  kube-apiserver
+                type: object
+                properties:
+                  caBundle:
+                    description: CABundle is the ca bundle to connect to apiserver
+                      of the spoke cluster. System certs are used if it is not set.
+                    type: string
+                    format: byte
+                  url:
+                    description: URL is the url of apiserver endpoint of the spoke
+                      cluster.
+                    type: string
         status:
           description: Status represents the current status of joined spoke cluster
           type: object
@@ -422,14 +429,17 @@ rules:
   verbs: ["get", "list", "watch", "create", "delete", "update"]
 - apiGroups: ["", "events.k8s.io"]
   resources: ["events"]
-  verbs: [create", "patch", "update"]
+  verbs: ["create", "patch", "update"]
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["create"]
 # Allow hub to manage clusterrole/clusterrolebinding/role/rolebinding
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterrolebindings", "rolebindings"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterroles", "roles"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "escalate"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "escalate", "bind"]
 # Allow hub to manage spokeclusters
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["spokeclusters"]
@@ -465,7 +475,8 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   namespace: {{ .HubCoreNamespace }}
-  name: {{ .HubCoreName }}-sa`)
+  name: {{ .HubCoreName }}-sa
+`)
 
 func manifestsHubHubClusterrolebindingYamlBytes() ([]byte, error) {
 	return _manifestsHubHubClusterrolebindingYaml, nil
@@ -511,15 +522,16 @@ spec:
           httpGet:
             path: /healthz
             scheme: HTTPS
-            port: 443
+            port: 8443
           initialDelaySeconds: 2
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /healthz
             scheme: HTTPS
-            port: 443
-          initialDelaySeconds: 2`)
+            port: 8443
+          initialDelaySeconds: 2
+`)
 
 func manifestsHubHubDeploymentYamlBytes() ([]byte, error) {
 	return _manifestsHubHubDeploymentYaml, nil
@@ -539,7 +551,8 @@ func manifestsHubHubDeploymentYaml() (*asset, error) {
 var _manifestsHubHubNamespaceYaml = []byte(`apiVersion: v1
 kind: Namespace
 metadata:
-  name: {{ .HubCoreNamespace }}`)
+  name: {{ .HubCoreNamespace }}
+`)
 
 func manifestsHubHubNamespaceYamlBytes() ([]byte, error) {
 	return _manifestsHubHubNamespaceYaml, nil

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -40,6 +41,14 @@ var (
 		"manifestworks.work.open-cluster-management.io",
 		"spokeclusters.cluster.open-cluster-management.io",
 	}
+	staticResourceFiles = []string{
+		"manifests/hub/0000_00_clusters.open-cluster-management.io_spokeclusters.crd.yaml",
+		"manifests/hub/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml",
+		"manifests/hub/hub-clusterrole.yaml",
+		"manifests/hub/hub-clusterrolebinding.yaml",
+		"manifests/hub/hub-namespace.yaml",
+		"manifests/hub/hub-serviceaccount.yaml",
+	}
 )
 
 const (
@@ -51,6 +60,7 @@ const (
 
 func init() {
 	utilruntime.Must(api.InstallKube(genericScheme))
+	utilruntime.Must(apiextensionsv1beta1.AddToScheme(genericScheme))
 }
 
 type nucleusHubController struct {
@@ -106,6 +116,12 @@ func (n *nucleusHubController) sync(ctx context.Context, controllerContext facto
 	}
 	hubCore = hubCore.DeepCopy()
 
+	config := hubConfig{
+		HubCoreName:       hubCore.Name,
+		HubCoreNamespace:  nucluesHubCoreNamespace,
+		RegistrationImage: hubCore.Spec.RegistrationImagePullSpec,
+	}
+
 	// Update finalizer at first
 	if hubCore.DeletionTimestamp.IsZero() {
 		hasFinalizer := false
@@ -124,16 +140,10 @@ func (n *nucleusHubController) sync(ctx context.Context, controllerContext facto
 
 	// HubCore is deleting, we remove its related resources on hub
 	if !hubCore.DeletionTimestamp.IsZero() {
-		if err := n.cleanUp(ctx, controllerContext, hubCore.Name, nucluesHubCoreNamespace); err != nil {
+		if err := n.cleanUp(ctx, controllerContext, config); err != nil {
 			return err
 		}
 		return n.removeWorkFinalizer(ctx, hubCore)
-	}
-
-	config := hubConfig{
-		HubCoreName:       hubCore.Name,
-		HubCoreNamespace:  nucluesHubCoreNamespace,
-		RegistrationImage: hubCore.Spec.RegistrationImagePullSpec,
 	}
 
 	clientHolder := resourceapply.NewKubeClientHolder(n.kubeClient).WithAPIExtensionsClient(n.apiExtensionClient)
@@ -144,12 +154,7 @@ func (n *nucleusHubController) sync(ctx context.Context, controllerContext facto
 		func(name string) ([]byte, error) {
 			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
 		},
-		"manifests/hub/0000_00_clusters.open-cluster-management.io_spokeclusters.crd.yaml",
-		"manifests/hub/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml",
-		"manifests/hub/hub-clusterrole.yaml",
-		"manifests/hub/hub-clusterrolebinding.yaml",
-		"manifests/hub/hub-namespace.yaml",
-		"manifests/hub/hub-serviceaccount.yaml",
+		staticResourceFiles...,
 	)
 	errs := []error{}
 	for _, result := range resourceResults {
@@ -260,7 +265,7 @@ func (n *nucleusHubController) removeCRD(ctx context.Context, name string) error
 }
 
 func (n *nucleusHubController) cleanUp(
-	ctx context.Context, controllerContext factory.SyncContext, name, namespace string) error {
+	ctx context.Context, controllerContext factory.SyncContext, config hubConfig) error {
 	// Remove crd
 	for _, name := range crdNames {
 		err := n.removeCRD(ctx, name)
@@ -271,34 +276,26 @@ func (n *nucleusHubController) cleanUp(
 	}
 
 	// Remove deployment
-	deploymentName := fmt.Sprintf("%s-controller", name)
-	err := n.kubeClient.AppsV1().Deployments(namespace).Delete(ctx, deploymentName, metav1.DeleteOptions{})
+	deploymentName := fmt.Sprintf("%s-controller", config.HubCoreName)
+	err := n.kubeClient.AppsV1().Deployments(config.HubCoreNamespace).Delete(ctx, deploymentName, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 	controllerContext.Recorder().Eventf("DeploymentDeleted", "deployment %s is deleted", deploymentName)
 
-	// Remove serviceaccount
-	serviceAccountName := fmt.Sprintf("%s-sa", name)
-	err = n.kubeClient.CoreV1().ServiceAccounts(namespace).Delete(ctx, serviceAccountName, metav1.DeleteOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return err
+	// Remove Static files
+	for _, file := range staticResourceFiles {
+		objectRaw := assets.MustCreateAssetFromTemplate(
+			file,
+			bindata.MustAsset(filepath.Join("", file)), config).Data
+		object, _, err := genericCodec.Decode(objectRaw, nil, nil)
+		if err != nil {
+			return err
+		}
+		err = helpers.CleanUpStaticObject(ctx, n.kubeClient, n.apiExtensionClient, object)
+		if err != nil {
+			return err
+		}
 	}
-	controllerContext.Recorder().Eventf("ServiceAccountDeleted", "serviceaccoount %s is deleted", serviceAccountName)
-
-	// Remove clusterrole
-	clusterRoleName := fmt.Sprintf("system:open-cluster-management:%s", name)
-	err = n.kubeClient.RbacV1().ClusterRoles().Delete(ctx, clusterRoleName, metav1.DeleteOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-	controllerContext.Recorder().Eventf("ClusterRoleDeleted", "clusterrole %s is deleted", clusterRoleName)
-
-	// Remove clusterrolebinding
-	err = n.kubeClient.RbacV1().ClusterRoleBindings().Delete(ctx, clusterRoleName, metav1.DeleteOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-	controllerContext.Recorder().Eventf("ClusterRoleDeleted", "clusterrole %s is deleted", clusterRoleName)
 	return nil
 }

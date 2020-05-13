@@ -43,6 +43,25 @@ spec:
                 on hub. The spoke agent generates a random name if it is not set,
                 or discovers the appropriate cluster name on openshift.
               type: string
+            externalServerURLs:
+              description: ExternalServerURLs represents the a list of apiserver urls
+                and ca bundles that is accessible externally If it is set empty, spoke
+                cluster has no externally accessible url that hub cluster can visit.
+              type: array
+              items:
+                description: ServerURL represents the apiserver url and ca bundle
+                  that is accessible externally
+                type: object
+                properties:
+                  caBundle:
+                    description: CABundle is the ca bundle to connect to apiserver
+                      of the spoke cluster. System certs are used if it is not set.
+                    type: string
+                    format: byte
+                  url:
+                    description: URL is the url of apiserver endpoint of the spoke
+                      cluster.
+                    type: string
             namespace:
               description: Namespace is the namespace to deploy the agent. The namespace
                 must have a prefix of "open-cluster-management-", and if it is not

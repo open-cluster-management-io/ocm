@@ -54,6 +54,18 @@ message HubCoreStatus {
   repeated StatusCondition conditions = 1;
 }
 
+// ServerURL represents the apiserver url and ca bundle that is accessible externally
+message ServerURL {
+  // URL is the url of apiserver endpoint of the spoke cluster.
+  // +required
+  optional string url = 1;
+
+  // CABundle is the ca bundle to connect to apiserver of the spoke cluster.
+  // System certs are used if it is not set.
+  // +optional
+  optional bytes caBundle = 2;
+}
+
 // SpokeCore represents a deployment of nucleus core agent on spoke cluster.
 // When the deployment of spoke core agent is deployed, it will requires a secret
 // with the name of bootstrap-hub-kubeconfig in the namespace defined in the spec.
@@ -98,6 +110,11 @@ message SpokeCoreSpec {
   // The spoke agent generates a random name if it is not set, or discovers the appropriate cluster name on openshift.
   // +optional
   optional string clusterName = 4;
+
+  // ExternalServerURLs represents the a list of apiserver urls and ca bundles that is accessible externally
+  // If it is set empty, spoke cluster has no externally accessible url that hub cluster can visit.
+  // +optional
+  repeated ServerURL externalServerURLs = 5;
 }
 
 // SpokeCoreStatus represents the current status of nucleus spoke agent.

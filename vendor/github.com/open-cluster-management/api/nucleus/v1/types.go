@@ -97,6 +97,23 @@ type SpokeCoreSpec struct {
 	// The spoke agent generates a random name if it is not set, or discovers the appropriate cluster name on openshift.
 	// +optional
 	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,4,opt,name=clusterName"`
+
+	// ExternalServerURLs represents the a list of apiserver urls and ca bundles that is accessible externally
+	// If it is set empty, spoke cluster has no externally accessible url that hub cluster can visit.
+	// +optional
+	ExternalServerURLs []ServerURL `json:"externalServerURLs,omitempty" protobuf:"bytes,5,opt,name=externalServerURLs"`
+}
+
+// ServerURL represents the apiserver url and ca bundle that is accessible externally
+type ServerURL struct {
+	// URL is the url of apiserver endpoint of the spoke cluster.
+	// +required
+	URL string `json:"url" protobuf:"bytes,1,opt,name=url"`
+
+	// CABundle is the ca bundle to connect to apiserver of the spoke cluster.
+	// System certs are used if it is not set.
+	// +optional
+	CABundle []byte `json:"caBundle,omitempty" protobuf:"bytes,2,opt,name=caBundle"`
 }
 
 // SpokeCoreStatus represents the current status of nucleus spoke agent.

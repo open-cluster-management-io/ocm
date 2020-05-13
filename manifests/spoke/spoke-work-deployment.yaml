@@ -15,7 +15,7 @@ spec:
       labels:
         app: spoke-work-agent
     spec:
-      serviceAccountName: {{ .SpokeCoreName }}-sa
+      serviceAccountName: {{ .SpokeCoreName }}-work-sa
       containers:
       - name: spoke-agent
         image: {{ .WorkImage }}
@@ -23,8 +23,8 @@ spec:
         args:
           - "/work"
           - "agent"
-          - "--cluster-name={{ .ClusterName }}"
-          - "--kubeconfig=/spoke/hub-kubeconfig"
+          - "--spoke-cluster-name={{ .ClusterName }}"
+          - "--hub-kubeconfig=/spoke/hub-kubeconfig/kubeconfig"
         volumeMounts:
         - name: hub-kubeconfig-secret
           mountPath: "/spoke/hub-kubeconfig"
@@ -33,14 +33,14 @@ spec:
           httpGet:
             path: /healthz
             scheme: HTTPS
-            port: 443
+            port: 8443
           initialDelaySeconds: 2
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /healthz
             scheme: HTTPS
-            port: 443
+            port: 8443
           initialDelaySeconds: 2
       volumes:
       - name: hub-kubeconfig-secret

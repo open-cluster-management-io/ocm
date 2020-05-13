@@ -49,6 +49,16 @@ func (HubCoreStatus) SwaggerDoc() map[string]string {
 	return map_HubCoreStatus
 }
 
+var map_ServerURL = map[string]string{
+	"":         "ServerURL represents the apiserver url and ca bundle that is accessible externally",
+	"url":      "URL is the url of apiserver endpoint of the spoke cluster.",
+	"caBundle": "CABundle is the ca bundle to connect to apiserver of the spoke cluster. System certs are used if it is not set.",
+}
+
+func (ServerURL) SwaggerDoc() map[string]string {
+	return map_ServerURL
+}
+
 var map_SpokeCore = map[string]string{
 	"":       "SpokeCore represents a deployment of nucleus core agent on spoke cluster. When the deployment of spoke core agent is deployed, it will requires a secret with the name of bootstrap-hub-kubeconfig in the namespace defined in the spec.",
 	"spec":   "Spec represents the desired deployment configuratioin of nucleus agent.",
@@ -75,6 +85,7 @@ var map_SpokeCoreSpec = map[string]string{
 	"registrationImagePullSpec": "RegistrationImagePullSpec represents the desired image configuration of registration agent.",
 	"workImagePullSpec":         "WorkImagePullSpec represents the desired image configuration of work agent.",
 	"clusterName":               "ClusterName is the name of the spoke cluster to be created on hub. The spoke agent generates a random name if it is not set, or discovers the appropriate cluster name on openshift.",
+	"externalServerURLs":        "ExternalServerURLs represents the a list of apiserver urls and ca bundles that is accessible externally If it is set empty, spoke cluster has no externally accessible url that hub cluster can visit.",
 }
 
 func (SpokeCoreSpec) SwaggerDoc() map[string]string {
