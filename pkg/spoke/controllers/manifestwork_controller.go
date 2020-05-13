@@ -129,7 +129,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 
 	errs := []error{}
 	// Apply resources on spoke cluster.
-	resourceResults := m.applyManifest(manifestWork.Spec.Workload.Manifest, controllerContext.Recorder())
+	resourceResults := m.applyManifest(manifestWork.Spec.Workload.Manifests, controllerContext.Recorder())
 	for index, result := range resourceResults {
 		manifestCondition := helper.FindManifestConditionByIndex(int32(index), manifestWork.Status.ResourceStatus.Manifests)
 		if manifestCondition == nil {
@@ -177,7 +177,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 
 func (m *ManifestWorkController) cleanupResourceOfWork(work *workapiv1.ManifestWork) []error {
 	errs := []error{}
-	for _, manifest := range work.Spec.Workload.Manifest {
+	for _, manifest := range work.Spec.Workload.Manifests {
 		gvr, object, err := m.decodeUnstructured(manifest.Raw)
 		if err != nil {
 			klog.Errorf("Failed to decode object: %v", err)

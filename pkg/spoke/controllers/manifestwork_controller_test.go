@@ -92,7 +92,7 @@ func newManifestWork(index int, objects ...*unstructured.Unstructured) (*workapi
 		},
 		Spec: workapiv1.ManifestWorkSpec{
 			Workload: workapiv1.ManifestsTemplate{
-				Manifest: []workapiv1.Manifest{},
+				Manifests: []workapiv1.Manifest{},
 			},
 		},
 	}
@@ -101,7 +101,7 @@ func newManifestWork(index int, objects ...*unstructured.Unstructured) (*workapi
 		objectStr, _ := object.MarshalJSON()
 		manifest := workapiv1.Manifest{}
 		manifest.Raw = objectStr
-		work.Spec.Workload.Manifest = append(work.Spec.Workload.Manifest, manifest)
+		work.Spec.Workload.Manifests = append(work.Spec.Workload.Manifests, manifest)
 	}
 
 	return work, fmt.Sprintf("%s", work.Name)
