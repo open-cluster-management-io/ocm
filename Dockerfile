@@ -1,5 +1,5 @@
 FROM docker.io/openshift/origin-release:golang-1.13 AS builder
-WORKDIR /go/src/github.com/open-cluster-management/work
+WORKDIR /go/src/github.com/open-cluster-management/nucleus
 COPY . .
 ENV GO_PACKAGE github.com/open-cluster-management/nucleus
 RUN make build --warn-undefined-variables
