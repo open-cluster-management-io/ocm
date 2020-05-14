@@ -3,8 +3,8 @@
 // pkg/hub/spokecluster/manifests/spokecluster-clusterrole.yaml
 // pkg/hub/spokecluster/manifests/spokecluster-clusterrolebinding.yaml
 // pkg/hub/spokecluster/manifests/spokecluster-namespace.yaml
-// pkg/hub/spokecluster/manifests/spokecluster-role.yaml
-// pkg/hub/spokecluster/manifests/spokecluster-rolebinding.yaml
+// pkg/hub/spokecluster/manifests/spokecluster-work-role.yaml
+// pkg/hub/spokecluster/manifests/spokecluster-work-rolebinding.yaml
 // DO NOT EDIT!
 
 package bindata
@@ -138,39 +138,50 @@ func pkgHubSpokeclusterManifestsSpokeclusterNamespaceYaml() (*asset, error) {
 	return a, nil
 }
 
-var _pkgHubSpokeclusterManifestsSpokeclusterRoleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+var _pkgHubSpokeclusterManifestsSpokeclusterWorkRoleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ .SpokeClusterName }}
+  name: {{ .SpokeClusterName }}:spoke-work
   namespace: {{ .SpokeClusterName }}
-# TODO add rules later
-# rules: []
+rules:
+# Allow spoke work agent to send event to hub
+- apiGroups: ["", "events.k8s.io"]
+  resources: ["events"]
+  verbs: ["create", "patch", "update"]
+# Allow spoke work agent to get/list/watch manifestworks
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["manifestworks"]
+  verbs: ["get", "list", "watch"]
+# Allow spoke work agent to update the status of manifestwork
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["manifestworks/status"]
+  verbs: ["patch", "update"]
 `)
 
-func pkgHubSpokeclusterManifestsSpokeclusterRoleYamlBytes() ([]byte, error) {
-	return _pkgHubSpokeclusterManifestsSpokeclusterRoleYaml, nil
+func pkgHubSpokeclusterManifestsSpokeclusterWorkRoleYamlBytes() ([]byte, error) {
+	return _pkgHubSpokeclusterManifestsSpokeclusterWorkRoleYaml, nil
 }
 
-func pkgHubSpokeclusterManifestsSpokeclusterRoleYaml() (*asset, error) {
-	bytes, err := pkgHubSpokeclusterManifestsSpokeclusterRoleYamlBytes()
+func pkgHubSpokeclusterManifestsSpokeclusterWorkRoleYaml() (*asset, error) {
+	bytes, err := pkgHubSpokeclusterManifestsSpokeclusterWorkRoleYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "pkg/hub/spokecluster/manifests/spokecluster-role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "pkg/hub/spokecluster/manifests/spokecluster-work-role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _pkgHubSpokeclusterManifestsSpokeclusterRolebindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+var _pkgHubSpokeclusterManifestsSpokeclusterWorkRolebindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ .SpokeClusterName }}
+  name: {{ .SpokeClusterName }}:spoke-work
   namespace: {{ .SpokeClusterName }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ .SpokeClusterName }}
+  name: {{ .SpokeClusterName }}:spoke-work
 subjects:
   # Bind the role with spoke agent user group, the role will be as a common role for all spoke agents
   # TODO: we will consider bind a specific role for each spoke agent by spoke agent name
@@ -179,17 +190,17 @@ subjects:
     name: system:open-cluster-management:{{ .SpokeClusterName }}
 `)
 
-func pkgHubSpokeclusterManifestsSpokeclusterRolebindingYamlBytes() ([]byte, error) {
-	return _pkgHubSpokeclusterManifestsSpokeclusterRolebindingYaml, nil
+func pkgHubSpokeclusterManifestsSpokeclusterWorkRolebindingYamlBytes() ([]byte, error) {
+	return _pkgHubSpokeclusterManifestsSpokeclusterWorkRolebindingYaml, nil
 }
 
-func pkgHubSpokeclusterManifestsSpokeclusterRolebindingYaml() (*asset, error) {
-	bytes, err := pkgHubSpokeclusterManifestsSpokeclusterRolebindingYamlBytes()
+func pkgHubSpokeclusterManifestsSpokeclusterWorkRolebindingYaml() (*asset, error) {
+	bytes, err := pkgHubSpokeclusterManifestsSpokeclusterWorkRolebindingYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "pkg/hub/spokecluster/manifests/spokecluster-rolebinding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "pkg/hub/spokecluster/manifests/spokecluster-work-rolebinding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -249,8 +260,8 @@ var _bindata = map[string]func() (*asset, error){
 	"pkg/hub/spokecluster/manifests/spokecluster-clusterrole.yaml":        pkgHubSpokeclusterManifestsSpokeclusterClusterroleYaml,
 	"pkg/hub/spokecluster/manifests/spokecluster-clusterrolebinding.yaml": pkgHubSpokeclusterManifestsSpokeclusterClusterrolebindingYaml,
 	"pkg/hub/spokecluster/manifests/spokecluster-namespace.yaml":          pkgHubSpokeclusterManifestsSpokeclusterNamespaceYaml,
-	"pkg/hub/spokecluster/manifests/spokecluster-role.yaml":               pkgHubSpokeclusterManifestsSpokeclusterRoleYaml,
-	"pkg/hub/spokecluster/manifests/spokecluster-rolebinding.yaml":        pkgHubSpokeclusterManifestsSpokeclusterRolebindingYaml,
+	"pkg/hub/spokecluster/manifests/spokecluster-work-role.yaml":          pkgHubSpokeclusterManifestsSpokeclusterWorkRoleYaml,
+	"pkg/hub/spokecluster/manifests/spokecluster-work-rolebinding.yaml":   pkgHubSpokeclusterManifestsSpokeclusterWorkRolebindingYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -301,8 +312,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 					"spokecluster-clusterrole.yaml":        {pkgHubSpokeclusterManifestsSpokeclusterClusterroleYaml, map[string]*bintree{}},
 					"spokecluster-clusterrolebinding.yaml": {pkgHubSpokeclusterManifestsSpokeclusterClusterrolebindingYaml, map[string]*bintree{}},
 					"spokecluster-namespace.yaml":          {pkgHubSpokeclusterManifestsSpokeclusterNamespaceYaml, map[string]*bintree{}},
-					"spokecluster-role.yaml":               {pkgHubSpokeclusterManifestsSpokeclusterRoleYaml, map[string]*bintree{}},
-					"spokecluster-rolebinding.yaml":        {pkgHubSpokeclusterManifestsSpokeclusterRolebindingYaml, map[string]*bintree{}},
+					"spokecluster-work-role.yaml":          {pkgHubSpokeclusterManifestsSpokeclusterWorkRoleYaml, map[string]*bintree{}},
+					"spokecluster-work-rolebinding.yaml":   {pkgHubSpokeclusterManifestsSpokeclusterWorkRolebindingYaml, map[string]*bintree{}},
 				}},
 			}},
 		}},
