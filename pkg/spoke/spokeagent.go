@@ -11,6 +11,7 @@ import (
 
 	clusterv1client "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	clusterv1informers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
+	"github.com/open-cluster-management/registration/pkg/helpers"
 	"github.com/open-cluster-management/registration/pkg/spoke/hubclientcert"
 	"github.com/open-cluster-management/registration/pkg/spoke/spokecluster"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -37,13 +38,13 @@ const (
 
 // SpokeAgentOptions holds configuration for spoke cluster agent
 type SpokeAgentOptions struct {
-	ComponentNamespace     string
-	ClusterName            string
-	AgentName              string
-	BootstrapKubeconfig    string
-	HubKubeconfigSecret    string
-	HubKubeconfigDir       string
-	SpokeExternalServerUrl string
+	ComponentNamespace      string
+	ClusterName             string
+	AgentName               string
+	BootstrapKubeconfig     string
+	HubKubeconfigSecret     string
+	HubKubeconfigDir        string
+	SpokeExternalServerURLs []string
 }
 
 // NewSpokeAgentOptions returns a SpokeAgentOptions
@@ -94,7 +95,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	spokeKubeInformerFactory := informers.NewSharedInformerFactory(spokeKubeClient, 10*time.Minute)
 
 	// get spoke cluster CA bundle
-	spokeClusterCABundle, err := getSpokeClusterCABundle(controllerContext.KubeConfig)
+	spokeClusterCABundle, err := o.getSpokeClusterCABundle(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
@@ -115,7 +116,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 
 	// start a SpokeClusterCreatingController to make sure there is a spoke cluster on hub cluster
 	spokeClusterCreatingController := spokecluster.NewSpokeClusterCreatingController(
-		o.ClusterName, o.SpokeExternalServerUrl,
+		o.ClusterName, o.SpokeExternalServerURLs,
 		spokeClusterCABundle,
 		bootstrapClusterClient,
 		controllerContext.EventRecorder,
@@ -238,8 +239,8 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 		"The name of secret in component namespace storing kubeconfig for hub.")
 	fs.StringVar(&o.HubKubeconfigDir, "hub-kubeconfig-dir", o.HubKubeconfigDir,
 		"The mount path of hub-kubeconfig-secret in the container.")
-	fs.StringVar(&o.SpokeExternalServerUrl, "spoke-external-server-url", o.SpokeExternalServerUrl,
-		"A reachable URL of spoke cluster api server for hub cluster.")
+	fs.StringArrayVar(&o.SpokeExternalServerURLs, "spoke-external-server-urls", o.SpokeExternalServerURLs,
+		"A list of reachable spoke cluster api server URLs for hub cluster.")
 }
 
 // Validate verifies the inputs.
@@ -256,8 +257,13 @@ func (o *SpokeAgentOptions) Validate() error {
 		return errors.New("agent name is empty")
 	}
 
-	if o.SpokeExternalServerUrl == "" {
-		return errors.New("spoke cluster external api server url is empty")
+	// if SpokeExternalServerURLs is specified we validate every URL in it, we expect the spoke external server URL is https
+	if len(o.SpokeExternalServerURLs) != 0 {
+		for _, serverURL := range o.SpokeExternalServerURLs {
+			if !helpers.IsValidHTTPSURL(serverURL) {
+				return errors.New(fmt.Sprintf("%q is invalid", serverURL))
+			}
+		}
 	}
 
 	return nil
@@ -354,7 +360,11 @@ func (o *SpokeAgentOptions) getOrGenerateClusterAgentNames() (string, string) {
 	return clusterName, agentName
 }
 
-func getSpokeClusterCABundle(kubeConfig *rest.Config) ([]byte, error) {
+// getSpokeClusterCABundle returns the spoke cluster Kubernetes client CA data when SpokeExternalServerURLs is specified
+func (o *SpokeAgentOptions) getSpokeClusterCABundle(kubeConfig *rest.Config) ([]byte, error) {
+	if len(o.SpokeExternalServerURLs) == 0 {
+		return nil, nil
+	}
 	if kubeConfig.CAData != nil {
 		return kubeConfig.CAData, nil
 	}

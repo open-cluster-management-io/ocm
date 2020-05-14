@@ -12,9 +12,9 @@ package v1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_ClientConfig = map[string]string{
-	"":         "ClientConfig represents apiserver address of the spoke cluster",
-	"url":      "URL is the url of apiserver endpoint of the spoke cluster",
-	"caBundle": "CABundle is the ca bundle to connect to apiserver of the spoke cluster. System certs is used if it is not set.",
+	"":         "ClientConfig represents the apiserver address of the spoke cluster.",
+	"url":      "URL is the url of apiserver endpoint of the spoke cluster.",
+	"caBundle": "CABundle is the ca bundle to connect to apiserver of the spoke cluster. System certs are used if it is not set.",
 }
 
 func (ClientConfig) SwaggerDoc() map[string]string {
@@ -22,7 +22,7 @@ func (ClientConfig) SwaggerDoc() map[string]string {
 }
 
 var map_SpokeCluster = map[string]string{
-	"":       "SpokeCluster represents the current status of spoke cluster. SpokeCluster is cluster scoped resources. The name is the cluster UID. The cluster join follows the double opt-in proceess: 1. agent on spoke cluster creates CSR on hub with cluster UID and agent name. 2. agent on spoke cluster creates spokecluster on hub. 3. cluster admin on hub approves the CSR for the spoke's cluster UID and agent name. 4. cluster admin set spec.acceptSpokeCluster of spokecluster to true. 5. cluster admin on spoke creates credential of kubeconfig to spoke. Once hub creates the cluster namespace, the spoke agent pushes the credential to hub to use against spoke's kube-apiserver",
+	"":       "SpokeCluster represents the desired state and current status of spoke cluster. SpokeCluster is a cluster scoped resource. The name is the cluster UID.\n\nThe cluster join process follows a double opt-in process:\n\n1. agent on spoke cluster creates CSR on hub with cluster UID and agent name. 2. agent on spoke cluster creates spokecluster on hub. 3. cluster admin on hub approves the CSR for the spoke's cluster UID and agent name. 4. cluster admin set spec.acceptSpokeCluster of spokecluster to true. 5. cluster admin on spoke creates credential of kubeconfig to spoke.\n\nOnce the hub creates the cluster namespace, the spoke agent pushes the credential to the hub to use against the spoke's kube-apiserver.",
 	"spec":   "Spec represents a desired configuration for the agent on the spoke cluster.",
 	"status": "Status represents the current status of joined spoke cluster",
 }
@@ -32,7 +32,7 @@ func (SpokeCluster) SwaggerDoc() map[string]string {
 }
 
 var map_SpokeClusterList = map[string]string{
-	"":         "SpokeClusterList is a collection of spoke cluster",
+	"":         "SpokeClusterList is a collection of spoke cluster.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
 	"items":    "Items is a list of spoke cluster.",
 }
@@ -42,9 +42,9 @@ func (SpokeClusterList) SwaggerDoc() map[string]string {
 }
 
 var map_SpokeClusterSpec = map[string]string{
-	"":                  "SpokeClusterSpec provides the information to securely connect to a remote server and verify its identity",
-	"spokeClientConfig": "SpokeClientConfig represents the apiserver address of the spoke cluster",
-	"hubAcceptsClient":  "AcceptSpokeCluster reprsents that hub accepts the join of spoke agent. Its default value is false, and can only be set true when the user on hub has an RBAC rule to UPDATE on the virtual subresource of spokeclusters/accept. When the vaule is set true, a namespace whose name is same as the name of SpokeCluster is created on hub representing the spoke cluster, also role/rolebinding is created on the namespace to grant the permision of access from agent on spoke. When the value is set false, the namespace representing the spoke cluster is deleted.",
+	"":                   "SpokeClusterSpec provides the information to securely connect to a remote server and verify its identity.",
+	"spokeClientConfigs": "SpokeClientConfigs represents a list of the apiserver address of the spoke cluster. If it is empty, spoke cluster has no accessible address to be visited from hub.",
+	"hubAcceptsClient":   "AcceptSpokeCluster reprsents that hub accepts the join of spoke agent. Its default value is false, and can only be set true when the user on hub has an RBAC rule to UPDATE on the virtual subresource of spokeclusters/accept. When the vaule is set true, a namespace whose name is same as the name of SpokeCluster is created on hub representing the spoke cluster, also role/rolebinding is created on the namespace to grant the permision of access from agent on spoke. When the value is set false, the namespace representing the spoke cluster is deleted.",
 }
 
 func (SpokeClusterSpec) SwaggerDoc() map[string]string {
@@ -52,11 +52,11 @@ func (SpokeClusterSpec) SwaggerDoc() map[string]string {
 }
 
 var map_SpokeClusterStatus = map[string]string{
-	"":            "SpokeClusterStatus represents the current status of joined spoke cluster",
+	"":            "SpokeClusterStatus represents the current status of joined spoke cluster.",
 	"conditions":  "Conditions contains the different condition statuses for this spoke cluster.",
-	"capacity":    "Capacity represents the total resource capacity from all nodeStatuses on the spoke cluster",
-	"allocatable": "Allocatable represents the total allocatable resources on the spoke cluster",
-	"version":     "Version represents the kubernetes version of the spoke cluster",
+	"capacity":    "Capacity represents the total resource capacity from all nodeStatuses on the spoke cluster.",
+	"allocatable": "Allocatable represents the total allocatable resources on the spoke cluster.",
+	"version":     "Version represents the kubernetes version of the spoke cluster.",
 }
 
 func (SpokeClusterStatus) SwaggerDoc() map[string]string {
@@ -64,7 +64,7 @@ func (SpokeClusterStatus) SwaggerDoc() map[string]string {
 }
 
 var map_SpokeVersion = map[string]string{
-	"":           "SpokeVersion represents the Kubernetes version of spoke cluster",
+	"":           "SpokeVersion represents version information about the spoke cluster.",
 	"kubernetes": "Kubernetes is the kubernetes version of spoke cluster",
 }
 
