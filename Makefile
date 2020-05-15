@@ -11,6 +11,8 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 )
 
 IMAGE_REGISTRY?=quay.io
+IMAGE_TAG?=latest
+IMAGE_NAME?=$(IMAGE_REGISTRY)/open-cluster-management/registration:$(IMAGE_TAG)
 KUBECONFIG ?= ./.kubeconfig
 
 $(call add-bindata,spokecluster,./pkg/hub/spokecluster/manifests/...,bindata,bindata,./pkg/hub/spokecluster/bindata/bindata.go)
@@ -28,7 +30,10 @@ clean:
 .PHONY: clean
 
 deploy-hub:
+	cp deploy/hub/kustomization.yaml deploy/hub/kustomization.yaml.tmp
+	cd deploy/hub && kustomize edit set image quay.io/open-cluster-management/registration:latest=$(IMAGE_NAME)
 	kustomize build deploy/hub | kubectl apply -f -
+	mv deploy/hub/kustomization.yaml.tmp deploy/hub/kustomization.yaml
 
 cluster-ip: 
   CLUSTER_IP?=$(shell kubectl get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}")
@@ -39,7 +44,10 @@ bootstrap-secret: cluster-ip
 	kubectl create secret generic bootstrap-secret --from-file=kubeconfig=dev-kubeconfig -n open-cluster-management
 
 deploy-spoke:
+	cp deploy/spoke/kustomization.yaml deploy/spoke/kustomization.yaml.tmp
+	cd deploy/spoke && kustomize edit set image quay.io/open-cluster-management/registration:latest=$(IMAGE_NAME)
 	kustomize build deploy/spoke | kubectl apply -f -
+	mv deploy/spoke/kustomization.yaml.tmp deploy/spoke/kustomization.yaml
 
 # test-e2e target is currently a NOP that deploys the hub and self-joins the
 # hosting cluster to itself as a spoke; it will be used to prototype e2e in ci.

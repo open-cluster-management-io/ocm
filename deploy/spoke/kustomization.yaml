@@ -30,3 +30,10 @@ resources:
 - ./clusterrole_binding.yaml
 - ./deployment.yaml
 - ./secret.yaml
+
+images:
+- name: quay.io/open-cluster-management/registration:latest
+  newName: quay.io/open-cluster-management/registration
+  newTag: latest
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
