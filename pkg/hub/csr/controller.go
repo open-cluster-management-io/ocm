@@ -17,6 +17,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
+
+	"github.com/open-cluster-management/registration/pkg/helpers"
 )
 
 const (
@@ -57,7 +59,7 @@ func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncC
 	}
 
 	// Current csr is in terminal state, do nothing.
-	if isCSRInTerminalState(&csr.Status) {
+	if helpers.IsCSRInTerminalState(&csr.Status) {
 		return nil
 	}
 
@@ -162,17 +164,4 @@ func isSpokeClusterClientCertRenewal(csr *certificatesv1beta1.CertificateSigning
 	}
 
 	return csr.Spec.Username == x509cr.Subject.CommonName
-}
-
-// Check whether a CSR is in terminal state
-func isCSRInTerminalState(status *certificatesv1beta1.CertificateSigningRequestStatus) bool {
-	for _, c := range status.Conditions {
-		if c.Type == certificatesv1beta1.CertificateApproved {
-			return true
-		}
-		if c.Type == certificatesv1beta1.CertificateDenied {
-			return true
-		}
-	}
-	return false
 }
