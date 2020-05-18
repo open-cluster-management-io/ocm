@@ -136,8 +136,8 @@ func (c *spokeClusterController) sync(ctx context.Context, syncCtx factory.SyncC
 		"manifests/spokecluster-clusterrole.yaml",
 		"manifests/spokecluster-clusterrolebinding.yaml",
 		"manifests/spokecluster-namespace.yaml",
-		"manifests/spokecluster-role.yaml",
-		"manifests/spokecluster-rolebinding.yaml",
+		"manifests/spokecluster-work-role.yaml",
+		"manifests/spokecluster-work-rolebinding.yaml",
 	)
 	errs := []error{}
 	for _, result := range resourceResults {
