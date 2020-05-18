@@ -307,7 +307,7 @@ func (m *ManifestWorkController) generateUpdateStatusFunc(manifestStatus workapi
 		newConditions := []workapiv1.StatusCondition{}
 
 		// handle condition type Applied
-		if inCondition, exists := isAllInCondition(string(workapiv1.ManifestApplied), manifestStatus.Manifests); exists {
+		if inCondition, exists := allInCondition(string(workapiv1.ManifestApplied), manifestStatus.Manifests); exists {
 			appliedCondition := workapiv1.StatusCondition{
 				Type: string(workapiv1.WorkApplied),
 			}
@@ -374,9 +374,9 @@ func isSameUnstructured(obj1, obj2 *unstructured.Unstructured) bool {
 	return equality.Semantic.DeepEqual(obj1Copy.Object, obj2Copy.Object)
 }
 
-// isAllInCondition checks status of conditions with a particular type in ManifestCondition array.
+// allInCondition checks status of conditions with a particular type in ManifestCondition array.
 // Return true, true only if conditions with the condition type exist and they are all in condition.
-func isAllInCondition(conditionType string, manifests []workapiv1.ManifestCondition) (inCondition bool, exists bool) {
+func allInCondition(conditionType string, manifests []workapiv1.ManifestCondition) (inCondition bool, exists bool) {
 	for _, manifest := range manifests {
 		for _, condition := range manifest.Conditions {
 			if condition.Type == conditionType {

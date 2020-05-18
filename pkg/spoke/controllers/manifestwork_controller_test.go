@@ -360,8 +360,8 @@ func TestSync(t *testing.T) {
 			withWorkManifest(newUnstructured("apps/v1", "Deployment", "ns1", "test")).
 			withExpectedWorkAction("get", "update").
 			withExpectedDynamicAction("get", "create").
-			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}),
-		withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
+			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
+			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
 		newTestCase("update single resource").
 			withWorkManifest(newUnstructured("v1", "Secret", "ns1", "test")).
 			withSpokeObject(newSecret("test", "ns1", "value2")).
@@ -618,7 +618,7 @@ func TestGenerateUpdateStatusFunc(t *testing.T) {
 	}
 }
 
-func TestIsAllInCondition(t *testing.T) {
+func TestAllInCondition(t *testing.T) {
 	cases := []struct {
 		name               string
 		conditionType      string
@@ -660,13 +660,13 @@ func TestIsAllInCondition(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			exists, actual := isAllInCondition(c.conditionType, c.manifestConditions)
-			if c.expected[0] != exists {
-				t.Errorf("expected %t, but %t", c.expected[0], exists)
+			inCondition, exists := allInCondition(c.conditionType, c.manifestConditions)
+			if c.expected[0] != inCondition {
+				t.Errorf("expected %t, but %t", c.expected[0], inCondition)
 			}
 
-			if c.expected[1] != actual {
-				t.Errorf("expected %t, but %t", c.expected[1], actual)
+			if c.expected[1] != exists {
+				t.Errorf("expected %t, but %t", c.expected[1], exists)
 			}
 		})
 	}

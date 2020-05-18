@@ -221,7 +221,7 @@ func TestMergeStatusConditions(t *testing.T) {
 			},
 		},
 		{
-			name: "remove useless status condition",
+			name: "remove old status condition",
 			startingConditions: []workapiv1.StatusCondition{
 				newCondition("one", "False", "my-reason", "my-message", &transitionTime),
 				newCondition("two", "True", "my-reason", "my-message", nil),
