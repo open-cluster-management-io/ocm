@@ -312,7 +312,7 @@ func isDecodeError(err error) bool {
 // isUnhandledError is to check if the error returned from resourceapply is due to that no typed
 // client can handle the object
 func isUnhandledError(err error) bool {
-	return err != nil && strings.HasPrefix(err.Error(), "cannot decode")
+	return err != nil && strings.HasPrefix(err.Error(), "unhandled type")
 }
 
 // isSameUnstructured compares the two unstructured object.

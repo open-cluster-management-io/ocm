@@ -125,6 +125,20 @@ func newFakeMapper() *resource.Mapper {
 				},
 			},
 		},
+		{
+			Group: metav1.APIGroup{
+				Name: "apps",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1", GroupVersion: "apps/v1"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1", GroupVersion: "apps/v1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1": {
+					{Name: "deployments", Group: "apps", Namespaced: true, Kind: "Deployment"},
+				},
+			},
+		},
 	}
 	return &resource.Mapper{
 		Mapper: restmapper.NewDiscoveryRESTMapper(resources),
@@ -308,6 +322,11 @@ func TestSync(t *testing.T) {
 			withWorkManifest(newUnstructured("v1", "Secret", "ns1", "test")).
 			withExpectedWorkAction("get", "update").
 			withExpectedKubeAction("get", "create").
+			withExpectedCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}),
+		newTestCase("create single deployment resource").
+			withWorkManifest(newUnstructured("apps/v1", "Deployment", "ns1", "test")).
+			withExpectedWorkAction("get", "update").
+			withExpectedDynamicAction("get", "create").
 			withExpectedCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}),
 		newTestCase("update single resource").
 			withWorkManifest(newUnstructured("v1", "Secret", "ns1", "test")).
