@@ -39,7 +39,7 @@ clean:
 
 deploy-hub: ensure-kustomize
 	cp deploy/hub/kustomization.yaml deploy/hub/kustomization.yaml.tmp
-	cd deploy/hub && kustomize edit set image quay.io/open-cluster-management/registration:latest=$(IMAGE_NAME)
+	cd deploy/hub && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/registration:latest=$(IMAGE_NAME)
 	$(KUSTOMIZE) build deploy/hub | kubectl apply -f -
 	mv deploy/hub/kustomization.yaml.tmp deploy/hub/kustomization.yaml
 
@@ -59,7 +59,7 @@ e2e-bootstrap-secret: cluster-ip
 
 deploy-spoke: ensure-kustomize
 	cp deploy/spoke/kustomization.yaml deploy/spoke/kustomization.yaml.tmp
-	cd deploy/spoke && kustomize edit set image quay.io/open-cluster-management/registration:latest=$(IMAGE_NAME)
+	cd deploy/spoke && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/registration:latest=$(IMAGE_NAME)
 	$(KUSTOMIZE) build deploy/spoke | kubectl apply -f -
 	mv deploy/spoke/kustomization.yaml.tmp deploy/spoke/kustomization.yaml
 
