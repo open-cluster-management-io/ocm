@@ -26,14 +26,14 @@ func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	command := newWorkCommand()
+	command := newNucleusCommand()
 	if err := command.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 }
 
-func newWorkCommand() *cobra.Command {
+func newNucleusCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "nucleus",
 		Short: "Nucleus Operator",
@@ -49,7 +49,8 @@ func newWorkCommand() *cobra.Command {
 		cmd.Version = v
 	}
 
-	cmd.AddCommand(operator.NewOperatorCmd())
+	cmd.AddCommand(operator.NewHubOperatorCmd())
+	cmd.AddCommand(operator.NewSpokeOperatorCmd())
 
 	return cmd
 }

@@ -15,8 +15,8 @@ import (
 	"github.com/open-cluster-management/nucleus/pkg/operators/spoke"
 )
 
-// RunNucleusOperator starts a new nucleus operator
-func RunNucleusOperator(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+// RunNucleusHubOperator starts a new nucleus hub operator
+func RunNucleusHubOperator(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	// Build kubclient client and informer for spoke cluster
 	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
@@ -40,6 +40,28 @@ func RunNucleusOperator(ctx context.Context, controllerContext *controllercmd.Co
 		nucleusClient.NucleusV1().HubCores(),
 		nucleusInformer.Nucleus().V1().HubCores(),
 		controllerContext.EventRecorder)
+
+	go nucleusInformer.Start(ctx.Done())
+	go hubcontroller.Run(ctx, 1)
+	<-ctx.Done()
+	return nil
+}
+
+// RunNucleusSpokeOperator starts a new nucleus spoke operator
+func RunNucleusSpokeOperator(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+	// Build kubclient client and informer for spoke cluster
+	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
+	if err != nil {
+		return err
+	}
+
+	// Build nucleus client and informer
+	nucleusClient, err := nucleusclient.NewForConfig(controllerContext.KubeConfig)
+	if err != nil {
+		return err
+	}
+	nucleusInformer := nucleusinformer.NewSharedInformerFactory(nucleusClient, 5*time.Minute)
+
 	spokeController := spoke.NewNucleusSpokeController(
 		kubeClient,
 		nucleusClient.NucleusV1().SpokeCores(),
@@ -47,7 +69,6 @@ func RunNucleusOperator(ctx context.Context, controllerContext *controllercmd.Co
 		controllerContext.EventRecorder)
 
 	go nucleusInformer.Start(ctx.Done())
-	go hubcontroller.Run(ctx, 1)
 	go spokeController.Run(ctx, 1)
 	<-ctx.Done()
 	return nil
