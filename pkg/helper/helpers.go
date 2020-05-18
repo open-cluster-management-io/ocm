@@ -2,7 +2,6 @@ package helper
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned/typed/work/v1"
@@ -15,32 +14,30 @@ import (
 // MergeManifestConditions return a new ManifestCondition array which merges the existing manifest
 // conditions and the new manifest conditions. Rules to match ManifestCondition between two arrays:
 // 1. match the manifest condition with the whole ManifestResourceMeta;
-// 2. if not matched, try to match with properties in ManifestResourceMeta other than ordinal
-// 3. otherwise, try to match with ordinal only in ManifestResourceMeta
+// 2. if not matched, try to match with properties other than ordinal in ManifestResourceMeta
+// If no existing manifest condition is matched, the new manifest condition will be used.
 func MergeManifestConditions(conditions, newConditions []workapiv1.ManifestCondition) []workapiv1.ManifestCondition {
 	merged := []workapiv1.ManifestCondition{}
 
 	// build search indices
 	metaIndex := map[workapiv1.ManifestResourceMeta]workapiv1.ManifestCondition{}
-	metaWithoutOridinalIndex := map[string]workapiv1.ManifestCondition{}
-	ordinalIndex := map[int32]workapiv1.ManifestCondition{}
+	metaWithoutOridinalIndex := map[workapiv1.ManifestResourceMeta]workapiv1.ManifestCondition{}
 
-	duplicateKeys := []string{}
+	duplicated := []workapiv1.ManifestResourceMeta{}
 	for _, condition := range conditions {
 		metaIndex[condition.ResourceMeta] = condition
-		if key := manifestResourceMetaKey(condition.ResourceMeta); key != "" {
-			if _, exists := metaWithoutOridinalIndex[key]; exists {
-				duplicateKeys = append(duplicateKeys, key)
+		if metaWithoutOridinal := resetOrdinal(condition.ResourceMeta); metaWithoutOridinal != (workapiv1.ManifestResourceMeta{}) {
+			if _, exists := metaWithoutOridinalIndex[metaWithoutOridinal]; exists {
+				duplicated = append(duplicated, metaWithoutOridinal)
 			} else {
-				metaWithoutOridinalIndex[key] = condition
+				metaWithoutOridinalIndex[metaWithoutOridinal] = condition
 			}
 		}
-		ordinalIndex[condition.ResourceMeta.Ordinal] = condition
 	}
 
-	// remove key from index if it is not unique
-	for _, key := range duplicateKeys {
-		delete(metaWithoutOridinalIndex, key)
+	// remove metaWithoutOridinal from index if it is not unique
+	for _, metaWithoutOridinal := range duplicated {
+		delete(metaWithoutOridinalIndex, metaWithoutOridinal)
 	}
 
 	// try to match and merge manifest conditions
@@ -50,12 +47,7 @@ func MergeManifestConditions(conditions, newConditions []workapiv1.ManifestCondi
 
 		// match with properties in ResourceMeta other than ordinal if not found yet
 		if !ok {
-			condition, ok = metaWithoutOridinalIndex[manifestResourceMetaKey(newCondition.ResourceMeta)]
-		}
-
-		// match with ordinal in ResourceMeta if not found yet
-		if !ok {
-			condition, ok = ordinalIndex[newCondition.ResourceMeta.Ordinal]
+			condition, ok = metaWithoutOridinalIndex[resetOrdinal(newCondition.ResourceMeta)]
 		}
 
 		// if there is existing condition, merge it with new condition
@@ -75,13 +67,15 @@ func MergeManifestConditions(conditions, newConditions []workapiv1.ManifestCondi
 	return merged
 }
 
-func manifestResourceMetaKey(meta workapiv1.ManifestResourceMeta) string {
-	key := fmt.Sprintf("%s:%s:%s:%s:%s:%s", meta.Group, meta.Version, meta.Kind, meta.Resource, meta.Namespace, meta.Name)
-	if len(key) == 5 {
-		return ""
+func resetOrdinal(meta workapiv1.ManifestResourceMeta) workapiv1.ManifestResourceMeta {
+	return workapiv1.ManifestResourceMeta{
+		Group:     meta.Group,
+		Version:   meta.Version,
+		Kind:      meta.Kind,
+		Resource:  meta.Resource,
+		Name:      meta.Name,
+		Namespace: meta.Namespace,
 	}
-
-	return key
 }
 
 func mergeManifestCondition(condition, newCondition workapiv1.ManifestCondition) workapiv1.ManifestCondition {

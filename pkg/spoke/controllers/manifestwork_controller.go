@@ -143,22 +143,32 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 			Conditions: []workapiv1.StatusCondition{},
 		}
 
-		if result.Result != nil {
+		if result.Result != nil && result.Result.GetObjectKind() != nil {
 			gvk := result.Result.GetObjectKind().GroupVersionKind()
+
+			// set gvk
 			manifestCondition.ResourceMeta.Group = gvk.Group
 			manifestCondition.ResourceMeta.Version = gvk.Version
 			manifestCondition.ResourceMeta.Kind = gvk.Kind
 
+			// set namespace/name
 			if accessor, err := meta.Accessor(result.Result); err != nil {
 				errs = append(errs, fmt.Errorf("cannot access metadata of %v: %w", result.Result, err))
 			} else {
 				manifestCondition.ResourceMeta.Namespace = accessor.GetNamespace()
 				manifestCondition.ResourceMeta.Name = accessor.GetName()
 			}
+
+			// set resource
+			if mapping, err := m.restMapper.MappingForGVK(gvk); err != nil {
+				errs = append(errs, fmt.Errorf("unable to get rest mapping of gvk %v: %w", gvk, err))
+			} else if mapping != nil {
+				manifestCondition.ResourceMeta.Resource = mapping.Resource.Resource
+			}
 		}
 
 		// Add applied status condition
-		manifestCondition.Conditions = append(manifestCondition.Conditions, buildAppliedStatusCondition(result.Error != nil))
+		manifestCondition.Conditions = append(manifestCondition.Conditions, buildAppliedStatusCondition(result.Error))
 
 		newManifestConditions = append(newManifestConditions, manifestCondition)
 	}
@@ -398,13 +408,13 @@ func allInCondition(conditionType string, manifests []workapiv1.ManifestConditio
 	return exists, exists
 }
 
-func buildAppliedStatusCondition(failed bool) workapiv1.StatusCondition {
-	if failed {
+func buildAppliedStatusCondition(err error) workapiv1.StatusCondition {
+	if err != nil {
 		return workapiv1.StatusCondition{
 			Type:    string(workapiv1.ManifestApplied),
 			Status:  metav1.ConditionFalse,
 			Reason:  "AppliedManifestFailed",
-			Message: "Failed to apply manifest",
+			Message: fmt.Sprintf("Failed to apply manifest: %v", err),
 		}
 	}
 

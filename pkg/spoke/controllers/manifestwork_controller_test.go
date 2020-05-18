@@ -52,6 +52,10 @@ func (f fakeSyncContext) Recorder() events.Recorder              { return f.reco
 
 func newSecret(name, namespace string, content string) *corev1.Secret {
 	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
