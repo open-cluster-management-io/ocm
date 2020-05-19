@@ -57,6 +57,7 @@ func newSpokeCore(name, namespace, clustername string) *nucleusapiv1.SpokeCore {
 			WorkImagePullSpec:         "testwork",
 			ClusterName:               clustername,
 			Namespace:                 namespace,
+			ExternalServerURLs:        []nucleusapiv1.ServerURL{},
 		},
 	}
 }
@@ -138,8 +139,6 @@ func ensureObject(t *testing.T, object runtime.Object, spokeCore *nucleusapiv1.S
 	}
 
 	switch o := object.(type) {
-	case *corev1.ServiceAccount:
-		ensureNameNamespace(t, access.GetName(), access.GetNamespace(), fmt.Sprintf("%s-sa", spokeCore.Name), spokeCore.Spec.Namespace)
 	case *appsv1.Deployment:
 		if strings.Contains(access.GetName(), "registration") {
 			ensureNameNamespace(
@@ -186,8 +185,8 @@ func TestSyncDeploy(t *testing.T) {
 	}
 
 	// Check if resources are created as expected
-	if len(createObjects) != 4 {
-		t.Errorf("Expect 4 objects created in the sync loop, actual %d", len(createObjects))
+	if len(createObjects) != 11 {
+		t.Errorf("Expect 11 objects created in the sync loop, actual %d", len(createObjects))
 	}
 	for _, object := range createObjects {
 		ensureObject(t, object, spokeCore)
@@ -276,4 +275,76 @@ func TestSyncWithNoSecret(t *testing.T) {
 
 	assertAction(t, nucleusAction[5], "update")
 	assertCondition(t, nucleusAction[5].(clienttesting.UpdateActionImpl).Object, spokeCoreApplied, metav1.ConditionTrue)
+}
+
+// TestSyncDelete test cleanup hub deploy
+func TestSyncDelete(t *testing.T) {
+	spokeCore := newSpokeCore("testspoke", "testns", "")
+	now := metav1.Now()
+	spokeCore.ObjectMeta.SetDeletionTimestamp(&now)
+	namespace := newNamespace("testns")
+	controller := newTestController(spokeCore, namespace)
+	syncContext := newFakeSyncContext(t, "testspoke")
+
+	err := controller.controller.sync(nil, syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	deleteActions := []clienttesting.DeleteActionImpl{}
+	kubeActions := controller.kubeClient.Actions()
+	for _, action := range kubeActions {
+		if action.GetVerb() == "delete" {
+			deleteAction := action.(clienttesting.DeleteActionImpl)
+			deleteActions = append(deleteActions, deleteAction)
+		}
+	}
+
+	if len(kubeActions) != 12 {
+		t.Errorf("Expected 7 delete actions, but got %d", len(kubeActions))
+	}
+}
+
+// TestGetServersFromSpokeCore tests getServersFromSpokeCore func
+func TestGetServersFromSpokeCore(t *testing.T) {
+	cases := []struct {
+		name     string
+		servers  []string
+		expected string
+	}{
+		{
+			name:     "Null",
+			servers:  nil,
+			expected: "",
+		},
+		{
+			name:     "Empty string",
+			servers:  []string{},
+			expected: "",
+		},
+		{
+			name:     "Single server",
+			servers:  []string{"https://server1"},
+			expected: "https://server1",
+		},
+		{
+			name:     "Multiple servers",
+			servers:  []string{"https://server1", "https://server2"},
+			expected: "https://server1,https://server2",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			spokeCore := newSpokeCore("testspoke", "testns", "")
+			for _, server := range c.servers {
+				spokeCore.Spec.ExternalServerURLs = append(spokeCore.Spec.ExternalServerURLs,
+					nucleusapiv1.ServerURL{URL: server})
+			}
+			actual := getServersFromSpokeCore(spokeCore)
+			if actual != c.expected {
+				t.Errorf("Expected to be same, actual %q, expected %q", actual, c.expected)
+			}
+		})
+	}
 }

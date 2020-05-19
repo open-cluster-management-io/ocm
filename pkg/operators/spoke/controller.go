@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -35,15 +36,26 @@ import (
 const (
 	nucleusSpokeFinalizer        = "nucleus.open-cluster-management.io/spoke-core-cleanup"
 	bootstrapHubKubeConfigSecret = "bootstrap-hub-kubeconfig"
-	hubKubeConfigSecret          = "hub-kubeconfig"
-	nucluesSpokeCoreNamespace    = "open-cluster-management"
+	hubKubeConfigSecret          = "hub-kubeconfig-secret"
+	nucleusSpokeCoreNamespace    = "open-cluster-management-core"
 	spokeCoreApplied             = "Applied"
 )
 
 var (
-	genericScheme = runtime.NewScheme()
-	genericCodecs = serializer.NewCodecFactory(genericScheme)
-	genericCodec  = genericCodecs.UniversalDeserializer()
+	genericScheme       = runtime.NewScheme()
+	genericCodecs       = serializer.NewCodecFactory(genericScheme)
+	genericCodec        = genericCodecs.UniversalDeserializer()
+	staticResourceFiles = []string{
+		"manifests/spoke/spoke-registration-serviceaccount.yaml",
+		"manifests/spoke/spoke-registration-clusterrole.yaml",
+		"manifests/spoke/spoke-registration-clusterrolebinding.yaml",
+		"manifests/spoke/spoke-registration-role.yaml",
+		"manifests/spoke/spoke-registration-rolebinding.yaml",
+		"manifests/spoke/spoke-work-serviceaccount.yaml",
+		"manifests/spoke/spoke-work-clusterrole.yaml",
+		"manifests/spoke/spoke-work-clusterrolebinding.yaml",
+		"manifests/spoke/spoke-work-clusterrolebinding-addition.yaml",
+	}
 )
 
 type nucleusSpokeController struct {
@@ -111,10 +123,11 @@ func (n *nucleusSpokeController) sync(ctx context.Context, controllerContext fac
 		ClusterName:               spokeCore.Spec.ClusterName,
 		BootStrapKubeConfigSecret: bootstrapHubKubeConfigSecret,
 		HubKubeConfigSecret:       hubKubeConfigSecret,
+		ExternalServerURL:         getServersFromSpokeCore(spokeCore),
 	}
 	// If namespace is not set, use the default namespace
 	if config.SpokeCoreNamespace == "" {
-		config.SpokeCoreNamespace = nucluesSpokeCoreNamespace
+		config.SpokeCoreNamespace = nucleusSpokeCoreNamespace
 	}
 
 	// Update finalizer at first
@@ -179,8 +192,7 @@ func (n *nucleusSpokeController) sync(ctx context.Context, controllerContext fac
 		func(name string) ([]byte, error) {
 			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
 		},
-		"manifests/spoke/spoke-clusterrolebinding.yaml",
-		"manifests/spoke/spoke-serviceaccount.yaml",
+		staticResourceFiles...,
 	)
 	errs := []error{}
 	for _, result := range resourceResults {
@@ -190,16 +202,16 @@ func (n *nucleusSpokeController) sync(ctx context.Context, controllerContext fac
 	}
 
 	if len(errs) > 0 {
-		appleErros := operatorhelpers.NewMultiLineAggregate(errs)
+		applyErrors := operatorhelpers.NewMultiLineAggregate(errs)
 		helpers.SetNucleusCondition(&spokeCore.Status.Conditions, nucleusapiv1.StatusCondition{
 			Type:    spokeCoreApplied,
 			Status:  metav1.ConditionFalse,
 			Reason:  "SpokeCoreApplyFailed",
-			Message: appleErros.Error(),
+			Message: applyErrors.Error(),
 		})
 		helpers.UpdateNucleusSpokeStatus(
 			ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(spokeCore.Status.Conditions...))
-		return appleErros
+		return applyErrors
 	}
 
 	// Create hub config secret
@@ -267,7 +279,6 @@ func (n *nucleusSpokeController) sync(ctx context.Context, controllerContext fac
 
 	// If hub kubeconfig does not exist, return err.
 	if hubSecret.Data["kubeconfig"] == nil {
-		klog.Infof("data is %#v", hubSecret.Data)
 		return fmt.Errorf("Failed to get kubeconfig from hub kubeconfig secret")
 	}
 
@@ -338,26 +349,28 @@ func (n *nucleusSpokeController) cleanUp(ctx context.Context, controllerContext 
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
+
 	// Remove secret
 	err = n.kubeClient.CoreV1().Secrets(config.SpokeCoreNamespace).Delete(ctx, config.HubKubeConfigSecret, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 	controllerContext.Recorder().Eventf("SecretDeleted", "secret %s is deleted", config.HubKubeConfigSecret)
-	// Remove service account
-	serviceAccountName := fmt.Sprintf("%s-sa", config.SpokeCoreName)
-	err = n.kubeClient.CoreV1().ServiceAccounts(config.SpokeCoreNamespace).Delete(ctx, serviceAccountName, metav1.DeleteOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return err
+
+	// Remove Static files
+	for _, file := range staticResourceFiles {
+		objectRaw := assets.MustCreateAssetFromTemplate(
+			file,
+			bindata.MustAsset(filepath.Join("", file)), config).Data
+		object, _, err := genericCodec.Decode(objectRaw, nil, nil)
+		if err != nil {
+			return err
+		}
+		err = helpers.CleanUpStaticObject(ctx, n.kubeClient, nil, object)
+		if err != nil {
+			return err
+		}
 	}
-	controllerContext.Recorder().Eventf("ServiceAccountDeleted", "serviceaccoount %s is deleted", serviceAccountName)
-	// Remove clusterrolebinding
-	clusterRoleBindingName := fmt.Sprintf("system:open-cluster-management:%s", config.SpokeCoreName)
-	err = n.kubeClient.RbacV1().ClusterRoleBindings().Delete(ctx, clusterRoleBindingName, metav1.DeleteOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-	controllerContext.Recorder().Eventf("ClusterRoleBindingDeleted", "clusterrole %s is deleted", clusterRoleBindingName)
 	return nil
 }
 
@@ -388,9 +401,21 @@ func readClusterNameFromSecret(secret *corev1.Secret) (string, error) {
 }
 
 func readKubuConfigFromSecret(secret *corev1.Secret, config spokeConfig) (string, error) {
-	if secret.Data["cluster-name"] == nil {
-		return "", fmt.Errorf("Unable to find cluster name in secret")
+	if secret.Data["kubeconfig"] == nil {
+		return "", fmt.Errorf("Unable to find kubeconfig in secret")
 	}
 
-	return string(secret.Data["cluster-name"]), nil
+	return string(secret.Data["kubeconfig"]), nil
+}
+
+// TODO also read CABundle from ExternalServerURLs and set into registration deployment
+func getServersFromSpokeCore(spokeCore *nucleusapiv1.SpokeCore) string {
+	if spokeCore.Spec.ExternalServerURLs == nil {
+		return ""
+	}
+	serverString := make([]string, 0, len(spokeCore.Spec.ExternalServerURLs))
+	for _, server := range spokeCore.Spec.ExternalServerURLs {
+		serverString = append(serverString, server.URL)
+	}
+	return strings.Join(serverString, ",")
 }

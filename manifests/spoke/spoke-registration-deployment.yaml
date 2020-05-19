@@ -6,7 +6,7 @@ metadata:
   labels:
     app: spoke-registration-agent
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: spoke-registration-agent
@@ -15,7 +15,7 @@ spec:
       labels:
         app: spoke-registration-agent
     spec:
-      serviceAccountName: {{ .SpokeCoreName }}-sa
+      serviceAccountName: {{ .SpokeCoreName }}-registration-sa
       containers:
       - name: spoke-agent
         image: {{ .RegistrationImage }}
@@ -25,7 +25,7 @@ spec:
           - "agent"
           - "--cluster-name={{ .ClusterName }}"
           - "--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig"
-          - "--spoke-external-server-url={{ .ExternalServerURL }}"
+          - "--spoke-external-server-urls={{ .ExternalServerURL }}"
         volumeMounts:
         - name: bootstrap-secret
           mountPath: "/spoke/bootstrap"
@@ -37,14 +37,14 @@ spec:
           httpGet:
             path: /healthz
             scheme: HTTPS
-            port: 443
+            port: 8443
           initialDelaySeconds: 2
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /healthz
             scheme: HTTPS
-            port: 443
+            port: 8443
           initialDelaySeconds: 2
       volumes:
       - name: bootstrap-secret

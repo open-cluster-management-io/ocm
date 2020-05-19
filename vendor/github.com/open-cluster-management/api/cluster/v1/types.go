@@ -38,9 +38,10 @@ type SpokeCluster struct {
 // SpokeClusterSpec provides the information to securely connect to a remote server
 // and verify its identity.
 type SpokeClusterSpec struct {
-	// SpokeClientConfig represents the apiserver address of the spoke cluster
+	// SpokeClientConfigs represents a list of the apiserver address of the spoke cluster.
+	// If it is empty, spoke cluster has no accessible address to be visited from hub.
 	// +optional
-	SpokeClientConfig ClientConfig `json:"spokeClientConfig,omitempty" protobuf:"bytes,1,opt,name=spokeClientConfig"`
+	SpokeClientConfigs []ClientConfig `json:"spokeClientConfigs,omitempty" protobuf:"bytes,1,opt,name=spokeClientConfigs"`
 
 	// AcceptSpokeCluster reprsents that hub accepts the join of spoke agent.
 	// Its default value is false, and can only be set true when the user on hub

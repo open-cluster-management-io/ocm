@@ -66,7 +66,7 @@ type Manifest struct {
 type ManifestsTemplate struct {
 	// Manifests represents a list of kuberenetes resources to be deployed on the spoke cluster.
 	// +optional
-	Manifest []Manifest `json:"manifests,omitempty" protobuf:"bytes,1,rep,name=manifests"`
+	Manifests []Manifest `json:"manifests,omitempty" protobuf:"bytes,1,rep,name=manifests"`
 }
 
 // ManifestResourceMeta represents the gvk, gvr, name and namespace of a resoure

@@ -54,19 +54,26 @@ spec:
                 to grant the permision of access from agent on spoke. When the value
                 is set false, the namespace representing the spoke cluster is deleted.
               type: boolean
-            spokeClientConfig:
-              description: SpokeClientConfig represents the apiserver address of the
-                spoke cluster
-              type: object
-              properties:
-                caBundle:
-                  description: CABundle is the ca bundle to connect to apiserver of
-                    the spoke cluster. System certs are used if it is not set.
-                  type: string
-                  format: byte
-                url:
-                  description: URL is the url of apiserver endpoint of the spoke cluster.
-                  type: string
+            spokeClientConfigs:
+              description: SpokeClientConfigs represents a list of the apiserver address
+                of the spoke cluster. If it is empty, spoke cluster has no accessible
+                address to be visited from hub.
+              type: array
+              items:
+                description: ClientConfig represents the apiserver address of the
+                  spoke cluster. TODO include credential to connect to spoke cluster
+                  kube-apiserver
+                type: object
+                properties:
+                  caBundle:
+                    description: CABundle is the ca bundle to connect to apiserver
+                      of the spoke cluster. System certs are used if it is not set.
+                    type: string
+                    format: byte
+                  url:
+                    description: URL is the url of apiserver endpoint of the spoke
+                      cluster.
+                    type: string
         status:
           description: Status represents the current status of joined spoke cluster
           type: object
