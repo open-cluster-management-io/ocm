@@ -38,3 +38,5 @@ clean:
 .PHONY: clean
 
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...
+
+include ./test/integration-test.mk
