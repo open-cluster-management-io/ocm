@@ -41,6 +41,49 @@ func SetManifestCondition(conds *[]workapiv1.ManifestCondition, cond workapiv1.M
 	existingCond.Conditions = cond.Conditions
 }
 
+// MergeStatusConditions returns a new status condition array with merged status conditions. It is based on newConditions,
+// and merges the corresponding existing conditions if exists.
+func MergeStatusConditions(conditions []workapiv1.StatusCondition, newConditions []workapiv1.StatusCondition) []workapiv1.StatusCondition {
+	merged := []workapiv1.StatusCondition{}
+
+	cm := map[string]workapiv1.StatusCondition{}
+	for _, condition := range conditions {
+		cm[condition.Type] = condition
+	}
+
+	for _, newCondition := range newConditions {
+		// merge two conditions if necessary
+		if condition, ok := cm[newCondition.Type]; ok {
+			merged = append(merged, mergeStatusCondition(condition, newCondition))
+			continue
+		}
+
+		newCondition.LastTransitionTime = metav1.NewTime(time.Now())
+		merged = append(merged, newCondition)
+	}
+
+	return merged
+}
+
+// mergeStatusCondition returns a new status condition which merges the properties from the two input conditions.
+// It assumes the two conditions have the same condition type.
+func mergeStatusCondition(condition, newCondition workapiv1.StatusCondition) workapiv1.StatusCondition {
+	merged := workapiv1.StatusCondition{
+		Type:    condition.Type,
+		Status:  newCondition.Status,
+		Reason:  newCondition.Reason,
+		Message: newCondition.Message,
+	}
+
+	if condition.Status == newCondition.Status {
+		merged.LastTransitionTime = condition.LastTransitionTime
+	} else {
+		merged.LastTransitionTime = metav1.NewTime(time.Now())
+	}
+
+	return merged
+}
+
 // SetStatusCondition set a condition in conditons list
 func SetStatusCondition(conditions *[]workapiv1.StatusCondition, newCondition workapiv1.StatusCondition) {
 	if conditions == nil {

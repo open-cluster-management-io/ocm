@@ -170,7 +170,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	}
 	if len(errs) > 0 {
 		err = utilerrors.NewAggregate(errs)
-		klog.Errorf("Reconcile work %s fails with err %v: ", manifestWorkName, err)
+		klog.Errorf("Reconcile work %s fails with err: %v", manifestWorkName, err)
 	}
 	return err
 }
@@ -295,10 +295,35 @@ func (m *ManifestWorkController) applyUnstructrued(data []byte, recorder events.
 	return actual, true, err
 }
 
+// generateUpdateStatusFunc returns a function which aggregates manifest conditions and generates work conditions.
+// Rules to generate work status conditions from manifest conditions
+// #1: Applied - work status condition (with type Applied) is applied if all manifest conditions (with type Applied) are applied
+// TODO: add rules for other condition types, like Progressing, Available, Degraded
 func (m *ManifestWorkController) generateUpdateStatusFunc(manifestStatus workapiv1.ManifestResourceStatus) helper.UpdateManifestWorkStatusFunc {
 	return func(oldStatus *workapiv1.ManifestWorkStatus) error {
 		oldStatus.ResourceStatus = manifestStatus
-		// TODO aggreagae manifest condition to generate work condition
+
+		// aggregate manifest condition to generate work condition
+		newConditions := []workapiv1.StatusCondition{}
+
+		// handle condition type Applied
+		if inCondition, exists := allInCondition(string(workapiv1.ManifestApplied), manifestStatus.Manifests); exists {
+			appliedCondition := workapiv1.StatusCondition{
+				Type: string(workapiv1.WorkApplied),
+			}
+			if inCondition {
+				appliedCondition.Status = metav1.ConditionTrue
+				appliedCondition.Reason = "AppliedManifestWorkComplete"
+				appliedCondition.Message = "Apply manifest work complete"
+			} else {
+				appliedCondition.Status = metav1.ConditionFalse
+				appliedCondition.Reason = "AppliedManifestWorkFailed"
+				appliedCondition.Message = "Failed to apply manifest work"
+			}
+			newConditions = append(newConditions, appliedCondition)
+		}
+
+		oldStatus.Conditions = helper.MergeStatusConditions(oldStatus.Conditions, newConditions)
 		return nil
 	}
 }
@@ -347,4 +372,22 @@ func isSameUnstructured(obj1, obj2 *unstructured.Unstructured) bool {
 	delete(obj2Copy.Object, "status")
 
 	return equality.Semantic.DeepEqual(obj1Copy.Object, obj2Copy.Object)
+}
+
+// allInCondition checks status of conditions with a particular type in ManifestCondition array.
+// Return true, true only if conditions with the condition type exist and they are all in condition.
+func allInCondition(conditionType string, manifests []workapiv1.ManifestCondition) (inCondition bool, exists bool) {
+	for _, manifest := range manifests {
+		for _, condition := range manifest.Conditions {
+			if condition.Type == conditionType {
+				exists = true
+			}
+
+			if condition.Type == conditionType && condition.Status == metav1.ConditionFalse {
+				return false, true
+			}
+		}
+	}
+
+	return exists, exists
 }
