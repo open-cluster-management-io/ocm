@@ -45,7 +45,6 @@ func (a *SpokeClusterAdmissionHook) Validate(admissionSpec *admissionv1beta1.Adm
 
 	// only validate the request for spokeclusters
 	if admissionSpec.Resource.Group != "cluster.open-cluster-management.io" ||
-		admissionSpec.Resource.Version != "v1" ||
 		admissionSpec.Resource.Resource != "spokeclusters" {
 		status.Allowed = true
 		return status
@@ -175,7 +174,7 @@ func (a *SpokeClusterAdmissionHook) allowUpdateAcceptField(userInfo authenticati
 				Group:       "register.open-cluster-management.io",
 				Resource:    "spokeclusters",
 				Verb:        "update",
-				Subresource: "acceptance",
+				Subresource: "accept",
 			},
 		},
 	}
