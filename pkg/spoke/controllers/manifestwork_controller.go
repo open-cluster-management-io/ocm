@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 
 	"github.com/open-cluster-management/work/pkg/helper"
 	"github.com/open-cluster-management/work/pkg/spoke/resource"
@@ -136,35 +138,13 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 			errs = append(errs, result.Error)
 		}
 
-		manifestCondition := workapiv1.ManifestCondition{
-			ResourceMeta: workapiv1.ManifestResourceMeta{
-				Ordinal: int32(index),
-			},
-			Conditions: []workapiv1.StatusCondition{},
+		resourceMeta, err := buildManifestResourceMeta(index, result.Result, m.restMapper)
+		if err != nil {
+			errs = append(errs, err)
 		}
-
-		if result.Result != nil && result.Result.GetObjectKind() != nil {
-			gvk := result.Result.GetObjectKind().GroupVersionKind()
-
-			// set gvk
-			manifestCondition.ResourceMeta.Group = gvk.Group
-			manifestCondition.ResourceMeta.Version = gvk.Version
-			manifestCondition.ResourceMeta.Kind = gvk.Kind
-
-			// set namespace/name
-			if accessor, err := meta.Accessor(result.Result); err != nil {
-				errs = append(errs, fmt.Errorf("cannot access metadata of %v: %w", result.Result, err))
-			} else {
-				manifestCondition.ResourceMeta.Namespace = accessor.GetNamespace()
-				manifestCondition.ResourceMeta.Name = accessor.GetName()
-			}
-
-			// set resource
-			if mapping, err := m.restMapper.MappingForGVK(gvk); err != nil {
-				errs = append(errs, fmt.Errorf("unable to get rest mapping of gvk %v: %w", gvk, err))
-			} else if mapping != nil {
-				manifestCondition.ResourceMeta.Resource = mapping.Resource.Resource
-			}
+		manifestCondition := workapiv1.ManifestCondition{
+			ResourceMeta: resourceMeta,
+			Conditions:   []workapiv1.StatusCondition{},
 		}
 
 		// Add applied status condition
@@ -424,4 +404,58 @@ func buildAppliedStatusCondition(err error) workapiv1.StatusCondition {
 		Reason:  "AppliedManifestComplete",
 		Message: "Apply manifest complete",
 	}
+}
+
+func buildManifestResourceMeta(index int, object runtime.Object, restMapper *resource.Mapper) (resourceMeta workapiv1.ManifestResourceMeta, err error) {
+	resourceMeta = workapiv1.ManifestResourceMeta{
+		Ordinal: int32(index),
+	}
+
+	if object == nil {
+		return resourceMeta, err
+	}
+
+	var gvk schema.GroupVersionKind
+	var namespace, name string
+
+	switch objectType := object.(type) {
+	case *unstructured.Unstructured:
+		if objectType == nil {
+			return resourceMeta, err
+		}
+		gvk = objectType.GroupVersionKind()
+		namespace = objectType.GetNamespace()
+		name = objectType.GetName()
+	default:
+		if reflect.ValueOf(objectType).IsNil() {
+			return resourceMeta, err
+		}
+		gvk = resourcehelper.GuessObjectGroupVersionKind(objectType)
+		if accessor, e := meta.Accessor(objectType); err != nil {
+			err = fmt.Errorf("cannot access metadata of %v: %w", objectType, e)
+		} else {
+			namespace = accessor.GetNamespace()
+			name = accessor.GetName()
+		}
+	}
+
+	// set gvk
+	resourceMeta.Group = gvk.Group
+	resourceMeta.Version = gvk.Version
+	resourceMeta.Kind = gvk.Kind
+
+	// set namespace/name
+	resourceMeta.Namespace = namespace
+	resourceMeta.Name = name
+
+	// set resource
+	if restMapper == nil {
+		return resourceMeta, err
+	}
+
+	if mapping, e := restMapper.MappingForGVK(gvk); e == nil {
+		resourceMeta.Resource = mapping.Resource.Resource
+	}
+
+	return resourceMeta, err
 }
