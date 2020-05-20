@@ -688,3 +688,62 @@ func TestAllInCondition(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildManifestResourceMeta(t *testing.T) {
+	var secret *corev1.Secret
+	var u *unstructured.Unstructured
+
+	cases := []struct {
+		name       string
+		object     runtime.Object
+		restMapper *resource.Mapper
+		expected   workapiv1.ManifestResourceMeta
+	}{
+		{
+			name:     "build meta for non-unstructured object",
+			object:   newSecret("test", "ns1", "value2"),
+			expected: workapiv1.ManifestResourceMeta{Version: "v1", Kind: "Secret", Namespace: "ns1", Name: "test"},
+		},
+		{
+			name:       "build meta for non-unstructured object with rest mapper",
+			object:     newSecret("test", "ns1", "value2"),
+			restMapper: newFakeMapper(),
+			expected:   workapiv1.ManifestResourceMeta{Version: "v1", Kind: "Secret", Resource: "secrets", Namespace: "ns1", Name: "test"},
+		},
+		{
+			name:     "build meta for non-unstructured nil",
+			object:   secret,
+			expected: workapiv1.ManifestResourceMeta{},
+		},
+		{
+			name:     "build meta for unstructured object",
+			object:   newUnstructured("v1", "Kind1", "ns1", "n1"),
+			expected: workapiv1.ManifestResourceMeta{Version: "v1", Kind: "Kind1", Namespace: "ns1", Name: "n1"},
+		},
+		{
+			name:       "build meta for unstructured object with rest mapper",
+			object:     newUnstructured("v1", "NewObject", "ns1", "n1"),
+			restMapper: newFakeMapper(),
+			expected:   workapiv1.ManifestResourceMeta{Version: "v1", Kind: "NewObject", Resource: "newobjects", Namespace: "ns1", Name: "n1"},
+		},
+		{
+			name:     "build meta for unstructured nil",
+			object:   u,
+			expected: workapiv1.ManifestResourceMeta{},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual, err := buildManifestResourceMeta(0, c.object, c.restMapper)
+			if err != nil {
+				t.Errorf("Should be success with no err: %v", err)
+			}
+
+			actual.Ordinal = c.expected.Ordinal
+			if !equality.Semantic.DeepEqual(actual, c.expected) {
+				t.Errorf(diff.ObjectDiff(actual, c.expected))
+			}
+		})
+	}
+}
