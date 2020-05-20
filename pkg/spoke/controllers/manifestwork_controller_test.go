@@ -22,7 +22,6 @@ import (
 	fakeworkclient "github.com/open-cluster-management/api/client/work/clientset/versioned/fake"
 	workinformers "github.com/open-cluster-management/api/client/work/informers/externalversions"
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
-	"github.com/open-cluster-management/work/pkg/helper"
 	"github.com/open-cluster-management/work/pkg/spoke/resource"
 )
 
@@ -53,6 +52,10 @@ func (f fakeSyncContext) Recorder() events.Recorder              { return f.reco
 
 func newSecret(name, namespace string, content string) *corev1.Secret {
 	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -207,7 +210,7 @@ func assertCondition(t *testing.T, conditions []workapiv1.StatusCondition, expec
 
 func assertManifestCondition(
 	t *testing.T, conds []workapiv1.ManifestCondition, index int32, expectedCondition string, expectedStatus metav1.ConditionStatus) {
-	cond := helper.FindManifestConditionByIndex(index, conds)
+	cond := findManifestConditionByIndex(index, conds)
 	if cond == nil {
 		t.Errorf("expected to find the condition with index %d", index)
 	}
@@ -345,6 +348,20 @@ func newManifestCondition(ordinal int32, resource string, conds ...workapiv1.Sta
 		ResourceMeta: workapiv1.ManifestResourceMeta{Ordinal: ordinal, Resource: resource},
 		Conditions:   conds,
 	}
+}
+
+func findManifestConditionByIndex(index int32, conds []workapiv1.ManifestCondition) *workapiv1.ManifestCondition {
+	// Finds the cond conds that ordinal is the same as index
+	if conds == nil {
+		return nil
+	}
+	for i, cond := range conds {
+		if index == cond.ResourceMeta.Ordinal {
+			return &conds[i]
+		}
+	}
+
+	return nil
 }
 
 // TestSync test cases when running sync

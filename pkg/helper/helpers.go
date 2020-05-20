@@ -11,34 +11,78 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
-// FindManifestConditionByIndex finds manifest condition by index in manifests
-func FindManifestConditionByIndex(index int32, conds []workapiv1.ManifestCondition) *workapiv1.ManifestCondition {
-	// Finds the cond conds that ordinal is the same as index
-	if conds == nil {
-		return nil
-	}
-	for i, cond := range conds {
-		if index == cond.ResourceMeta.Ordinal {
-			return &conds[i]
+// MergeManifestConditions return a new ManifestCondition array which merges the existing manifest
+// conditions and the new manifest conditions. Rules to match ManifestCondition between two arrays:
+// 1. match the manifest condition with the whole ManifestResourceMeta;
+// 2. if not matched, try to match with properties other than ordinal in ManifestResourceMeta
+// If no existing manifest condition is matched, the new manifest condition will be used.
+func MergeManifestConditions(conditions, newConditions []workapiv1.ManifestCondition) []workapiv1.ManifestCondition {
+	merged := []workapiv1.ManifestCondition{}
+
+	// build search indices
+	metaIndex := map[workapiv1.ManifestResourceMeta]workapiv1.ManifestCondition{}
+	metaWithoutOridinalIndex := map[workapiv1.ManifestResourceMeta]workapiv1.ManifestCondition{}
+
+	duplicated := []workapiv1.ManifestResourceMeta{}
+	for _, condition := range conditions {
+		metaIndex[condition.ResourceMeta] = condition
+		if metaWithoutOridinal := resetOrdinal(condition.ResourceMeta); metaWithoutOridinal != (workapiv1.ManifestResourceMeta{}) {
+			if _, exists := metaWithoutOridinalIndex[metaWithoutOridinal]; exists {
+				duplicated = append(duplicated, metaWithoutOridinal)
+			} else {
+				metaWithoutOridinalIndex[metaWithoutOridinal] = condition
+			}
 		}
 	}
 
-	return nil
+	// remove metaWithoutOridinal from index if it is not unique
+	for _, metaWithoutOridinal := range duplicated {
+		delete(metaWithoutOridinalIndex, metaWithoutOridinal)
+	}
+
+	// try to match and merge manifest conditions
+	for _, newCondition := range newConditions {
+		// match with ResourceMeta
+		condition, ok := metaIndex[newCondition.ResourceMeta]
+
+		// match with properties in ResourceMeta other than ordinal if not found yet
+		if !ok {
+			condition, ok = metaWithoutOridinalIndex[resetOrdinal(newCondition.ResourceMeta)]
+		}
+
+		// if there is existing condition, merge it with new condition
+		if ok {
+			merged = append(merged, mergeManifestCondition(condition, newCondition))
+			continue
+		}
+
+		// otherwise use the new condition
+		for i := range newCondition.Conditions {
+			newCondition.Conditions[i].LastTransitionTime = metav1.NewTime(time.Now())
+		}
+
+		merged = append(merged, newCondition)
+	}
+
+	return merged
 }
 
-func SetManifestCondition(conds *[]workapiv1.ManifestCondition, cond workapiv1.ManifestCondition) {
-	if conds == nil {
-		conds = &[]workapiv1.ManifestCondition{}
+func resetOrdinal(meta workapiv1.ManifestResourceMeta) workapiv1.ManifestResourceMeta {
+	return workapiv1.ManifestResourceMeta{
+		Group:     meta.Group,
+		Version:   meta.Version,
+		Kind:      meta.Kind,
+		Resource:  meta.Resource,
+		Name:      meta.Name,
+		Namespace: meta.Namespace,
 	}
+}
 
-	existingCond := FindManifestConditionByIndex(cond.ResourceMeta.Ordinal, *conds)
-	if existingCond == nil {
-		*conds = append(*conds, cond)
-		return
+func mergeManifestCondition(condition, newCondition workapiv1.ManifestCondition) workapiv1.ManifestCondition {
+	return workapiv1.ManifestCondition{
+		ResourceMeta: newCondition.ResourceMeta,
+		Conditions:   MergeStatusConditions(condition.Conditions, newCondition.Conditions),
 	}
-
-	existingCond.ResourceMeta = cond.ResourceMeta
-	existingCond.Conditions = cond.Conditions
 }
 
 // MergeStatusConditions returns a new status condition array with merged status conditions. It is based on newConditions,
@@ -69,7 +113,7 @@ func MergeStatusConditions(conditions []workapiv1.StatusCondition, newConditions
 // It assumes the two conditions have the same condition type.
 func mergeStatusCondition(condition, newCondition workapiv1.StatusCondition) workapiv1.StatusCondition {
 	merged := workapiv1.StatusCondition{
-		Type:    condition.Type,
+		Type:    newCondition.Type,
 		Status:  newCondition.Status,
 		Reason:  newCondition.Reason,
 		Message: newCondition.Message,
