@@ -105,7 +105,6 @@ spec:
           - "agent"
           - "--cluster-name=local-development"
           - "--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig"
-          - "--spoke-external-server-urls=https://127.0.0.1"
         volumeMounts:
         - name: bootstrap-secret
           mountPath: "/spoke/bootstrap"

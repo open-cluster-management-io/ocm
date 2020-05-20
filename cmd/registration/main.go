@@ -15,6 +15,7 @@ import (
 
 	"github.com/open-cluster-management/registration/pkg/cmd/hub"
 	"github.com/open-cluster-management/registration/pkg/cmd/spoke"
+	"github.com/open-cluster-management/registration/pkg/cmd/webhook"
 	"github.com/open-cluster-management/registration/pkg/version"
 )
 
@@ -55,6 +56,7 @@ func newRegistrationCommand() *cobra.Command {
 
 	cmd.AddCommand(hub.NewController())
 	cmd.AddCommand(spoke.NewAgent())
+	cmd.AddCommand(webhook.NewAdmissionHook())
 
 	return cmd
 }

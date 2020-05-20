@@ -28,3 +28,6 @@ rules:
 - apiGroups: ["register.open-cluster-management.io"]
   resources: ["spokeclusters/clientcertificates"]
   verbs: ["renew"]
+- apiGroups: ["register.open-cluster-management.io"]
+  resources: ["spokeclusters/accept"]
+  verbs: ["update"]
