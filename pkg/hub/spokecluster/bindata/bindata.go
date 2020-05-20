@@ -148,10 +148,10 @@ rules:
 - apiGroups: ["", "events.k8s.io"]
   resources: ["events"]
   verbs: ["create", "patch", "update"]
-# Allow spoke work agent to get/list/watch manifestworks
+# Allow spoke work agent to get/list/watch/update manifestworks
 - apiGroups: ["work.open-cluster-management.io"]
   resources: ["manifestworks"]
-  verbs: ["get", "list", "watch"]
+  verbs: ["get", "list", "watch", "update"]
 # Allow spoke work agent to update the status of manifestwork
 - apiGroups: ["work.open-cluster-management.io"]
   resources: ["manifestworks/status"]
