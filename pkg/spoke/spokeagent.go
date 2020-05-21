@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/open-cluster-management/work/pkg/spoke/controllers/manifestcontroller"
+
 	"github.com/open-cluster-management/work/pkg/spoke/controllers/finalizercontroller"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -17,7 +19,6 @@ import (
 
 	workclientset "github.com/open-cluster-management/api/client/work/clientset/versioned"
 	workinformers "github.com/open-cluster-management/api/client/work/informers/externalversions"
-	"github.com/open-cluster-management/work/pkg/spoke/controllers"
 	"github.com/open-cluster-management/work/pkg/spoke/resource"
 )
 
@@ -79,7 +80,7 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 	restMapper := resource.NewMapper(cachedSpokeDiscoveryClient)
 	go restMapper.Run(ctx.Done())
 
-	manifestWorkController := controllers.NewManifestWorkController(
+	manifestWorkController := manifestcontroller.NewManifestWorkController(
 		ctx,
 		controllerContext.EventRecorder,
 		spokeDynamicClient,

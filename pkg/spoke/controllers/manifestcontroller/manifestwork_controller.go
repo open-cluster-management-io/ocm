@@ -1,4 +1,4 @@
-package controllers
+package manifestcontroller
 
 import (
 	"context"
@@ -102,6 +102,11 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 		return err
 	}
 	manifestWork = manifestWork.DeepCopy()
+
+	// no work to do if we're deleted
+	if !manifestWork.DeletionTimestamp.IsZero() {
+		return nil
+	}
 
 	errs := []error{}
 	// Apply resources on spoke cluster.
