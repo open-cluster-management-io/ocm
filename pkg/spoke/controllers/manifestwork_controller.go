@@ -103,22 +103,6 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	}
 	manifestWork = manifestWork.DeepCopy()
 
-	// Update finalizer at first
-	if manifestWork.DeletionTimestamp.IsZero() {
-		hasFinalizer := false
-		for i := range manifestWork.Finalizers {
-			if manifestWork.Finalizers[i] == manifestWorkFinalizer {
-				hasFinalizer = true
-				break
-			}
-		}
-		if !hasFinalizer {
-			manifestWork.Finalizers = append(manifestWork.Finalizers, manifestWorkFinalizer)
-			_, err := m.manifestWorkClient.Update(ctx, manifestWork, metav1.UpdateOptions{})
-			return err
-		}
-	}
-
 	// Work is deleting, we remove its related resources on spoke cluster
 	// TODO: once we make this work initially, the finalizer would live in a different loop.
 	// It will have different backoff considerations.

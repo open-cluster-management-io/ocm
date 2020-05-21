@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/open-cluster-management/work/pkg/spoke/controllers/finalizercontroller"
+
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/cobra"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -88,8 +90,15 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 		workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks(o.SpokeClusterName),
 		restMapper,
 	)
+	addFinalizerController := finalizercontroller.NewAddFinalizerController(
+		controllerContext.EventRecorder,
+		hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName),
+		workInformerFactory.Work().V1().ManifestWorks(),
+		workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks(o.SpokeClusterName),
+	)
 
 	go workInformerFactory.Start(ctx.Done())
+	go addFinalizerController.Run(ctx, 1)
 	go manifestWorkController.Run(ctx, 1)
 	<-ctx.Done()
 	return nil
