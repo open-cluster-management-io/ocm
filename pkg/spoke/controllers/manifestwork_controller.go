@@ -411,48 +411,28 @@ func buildManifestResourceMeta(index int, object runtime.Object, restMapper *res
 		Ordinal: int32(index),
 	}
 
-	if object == nil {
+	if object == nil || reflect.ValueOf(object).IsNil() {
 		return resourceMeta, err
 	}
 
-	var gvk schema.GroupVersionKind
-	var namespace, name string
-
-	switch objectType := object.(type) {
-	case *unstructured.Unstructured:
-		if objectType == nil {
-			return resourceMeta, err
-		}
-		gvk = objectType.GroupVersionKind()
-		namespace = objectType.GetNamespace()
-		name = objectType.GetName()
-	default:
-		if reflect.ValueOf(objectType).IsNil() {
-			return resourceMeta, err
-		}
-		gvk = resourcehelper.GuessObjectGroupVersionKind(objectType)
-		if accessor, e := meta.Accessor(objectType); err != nil {
-			err = fmt.Errorf("cannot access metadata of %v: %w", objectType, e)
-		} else {
-			namespace = accessor.GetNamespace()
-			name = accessor.GetName()
-		}
-	}
-
 	// set gvk
+	gvk := resourcehelper.GuessObjectGroupVersionKind(object)
 	resourceMeta.Group = gvk.Group
 	resourceMeta.Version = gvk.Version
 	resourceMeta.Kind = gvk.Kind
 
 	// set namespace/name
-	resourceMeta.Namespace = namespace
-	resourceMeta.Name = name
+	if accessor, e := meta.Accessor(object); e != nil {
+		err = fmt.Errorf("cannot access metadata of %v: %w", object, e)
+	} else {
+		resourceMeta.Namespace = accessor.GetNamespace()
+		resourceMeta.Name = accessor.GetName()
+	}
 
 	// set resource
 	if restMapper == nil {
 		return resourceMeta, err
 	}
-
 	if mapping, e := restMapper.MappingForGVK(gvk); e == nil {
 		resourceMeta.Resource = mapping.Resource.Resource
 	}
