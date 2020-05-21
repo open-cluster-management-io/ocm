@@ -37,7 +37,7 @@ const (
 	nucleusSpokeFinalizer        = "nucleus.open-cluster-management.io/spoke-core-cleanup"
 	bootstrapHubKubeConfigSecret = "bootstrap-hub-kubeconfig"
 	hubKubeConfigSecret          = "hub-kubeconfig-secret"
-	nucleusSpokeCoreNamespace    = "open-cluster-management-core"
+	nucleusSpokeCoreNamespace    = "open-cluster-management-spoke"
 	spokeCoreApplied             = "Applied"
 )
 
