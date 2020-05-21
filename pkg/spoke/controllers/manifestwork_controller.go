@@ -103,16 +103,6 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	}
 	manifestWork = manifestWork.DeepCopy()
 
-	// Work is deleting, we remove its related resources on spoke cluster
-	// TODO: once we make this work initially, the finalizer would live in a different loop.
-	// It will have different backoff considerations.
-	if !manifestWork.DeletionTimestamp.IsZero() {
-		if errs := m.cleanupResourceOfWork(manifestWork); len(errs) != 0 {
-			return utilerrors.NewAggregate(errs)
-		}
-		return m.removeWorkFinalizer(ctx, manifestWork)
-	}
-
 	errs := []error{}
 	// Apply resources on spoke cluster.
 	resourceResults := m.applyManifest(manifestWork.Spec.Workload.Manifests, controllerContext.Recorder())
@@ -153,53 +143,6 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 		klog.Errorf("Reconcile work %s fails with err: %v", manifestWorkName, err)
 	}
 	return err
-}
-
-func (m *ManifestWorkController) cleanupResourceOfWork(work *workapiv1.ManifestWork) []error {
-	errs := []error{}
-	for _, manifest := range work.Spec.Workload.Manifests {
-		gvr, object, err := m.decodeUnstructured(manifest.Raw)
-		if err != nil {
-			klog.Errorf("Failed to decode object: %v", err)
-			errs = append(errs, err)
-			continue
-		}
-
-		err = m.spokeDynamicClient.
-			Resource(gvr).
-			Namespace(object.GetNamespace()).
-			Delete(context.TODO(), object.GetName(), metav1.DeleteOptions{})
-		switch {
-		case errors.IsNotFound(err):
-			// no-oop
-		case err != nil:
-			errs = append(errs, fmt.Errorf(
-				"Failed to delete resource %v with key %s/%s: %w",
-				gvr, object.GetNamespace(), object.GetName(), err))
-			continue
-		}
-		klog.V(4).Infof("Successfully delete resource %v with key %s/%s", gvr, object.GetNamespace(), object.GetName())
-	}
-
-	return errs
-}
-
-func (m *ManifestWorkController) removeWorkFinalizer(ctx context.Context, manifestWork *workapiv1.ManifestWork) error {
-	copiedFinalizers := []string{}
-	for i := range manifestWork.Finalizers {
-		if manifestWork.Finalizers[i] == manifestWorkFinalizer {
-			continue
-		}
-		copiedFinalizers = append(copiedFinalizers, manifestWork.Finalizers[i])
-	}
-
-	if len(manifestWork.Finalizers) != len(copiedFinalizers) {
-		manifestWork.Finalizers = copiedFinalizers
-		_, err := m.manifestWorkClient.Update(ctx, manifestWork, metav1.UpdateOptions{})
-		return err
-	}
-
-	return nil
 }
 
 func (m *ManifestWorkController) applyManifest(manifests []workapiv1.Manifest, recorder events.Recorder) []resourceapply.ApplyResult {

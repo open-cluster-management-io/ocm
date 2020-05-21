@@ -298,39 +298,6 @@ func TestSync(t *testing.T) {
 	}
 }
 
-// TestDeleteWork tests the action when work is deleted
-func TestDeleteWork(t *testing.T) {
-	tc := newTestCase("delete multiple resources").
-		withWorkManifest(spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"), spoketesting.NewUnstructured("v1", "Secret", "ns2", "test")).
-		withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
-		withExpectedWorkAction("update").
-		withExpectedDynamicAction("delete", "delete")
-
-	work, workKey := spoketesting.NewManifestWork(0, tc.workManifest...)
-	work.Finalizers = []string{manifestWorkFinalizer}
-	now := metav1.Now()
-	work.ObjectMeta.SetDeletionTimestamp(&now)
-	controller := newController(work, spoketesting.NewFakeRestMapper()).withKubeObject(tc.spokeObject...).withUnstructuredObject()
-	syncContext := spoketesting.NewFakeSyncContext(t, workKey)
-	err := controller.controller.sync(nil, syncContext)
-	if err != nil {
-		t.Errorf("Should be success with no err: %v", err)
-	}
-
-	tc.validate(t, controller.dynamicClient, controller.workClient, controller.kubeClient)
-
-	// Verify that finalizer is removed
-	workActions := controller.workClient.Actions()
-	actual, ok := workActions[len(workActions)-1].(clienttesting.UpdateActionImpl)
-	if !ok {
-		t.Errorf("Expected to get update action")
-	}
-	actualWork := actual.Object.(*workapiv1.ManifestWork)
-	if len(actualWork.Finalizers) != 0 {
-		t.Errorf("Expected 0 finailizer but got %#v", actualWork.Finalizers)
-	}
-}
-
 // Test applying resource failed
 func TestFailedToApplyResource(t *testing.T) {
 	tc := newTestCase("multiple create&update resource").
