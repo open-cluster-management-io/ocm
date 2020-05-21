@@ -29,9 +29,8 @@ $(call add-bindata,spokecluster-e2e,./deploy/spoke/...,bindata,bindata,./test/e2
 # $1 - target suffix
 # $2 - Dockerfile path
 # $3 - context directory for image build
-# It will generate target "image-$(1)" for builing the image an binding it as a prerequisite to target "images".
+# It will generate target "image-$(1)" for building the image and binding it as a prerequisite to target "images".
 $(call build-image,registration,$(IMAGE_REGISTRY)/registration,./Dockerfile,.)
-
 
 clean:
 	$(RM) ./registration
@@ -65,10 +64,16 @@ deploy-spoke: ensure-kustomize
 
 deploy-all: deploy-hub bootstrap-secret deploy-spoke
 
-# test-e2e target is currently a NOP that deploys the hub and self-joins the
-# hosting cluster to itself as a spoke; it will be used to prototype e2e in ci.
-test-e2e: ensure-kustomize deploy-hub e2e-bootstrap-secret
-	go test ./test/e2e -v -ginkgo.v
+build: build-e2e
+
+build-e2e:
+	go test -c ./test/e2e
+
+test-e2e: build-e2e ensure-kustomize deploy-hub e2e-bootstrap-secret
+	./e2e.test -test.v -ginkgo.v
+
+clean-e2e:
+	$(RM) ./e2e.test
 
 ensure-kustomize:
 ifeq "" "$(wildcard $(KUSTOMIZE))"

@@ -3,6 +3,7 @@ registration
 dev-kubeconfig
 e2e-kubeconfig
 integration.test
+e2e.test
 *.exe
 *.dll
 *.so
