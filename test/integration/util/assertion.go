@@ -9,6 +9,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 
 	workclientset "github.com/open-cluster-management/api/client/work/clientset/versioned"
@@ -29,7 +31,7 @@ func AssertWorkCondition(namespace, name string, workClient workclientset.Interf
 		}
 
 		// check work status condition
-		return HaveCondition(work.Status.Conditions, string(workapiv1.WorkApplied), metav1.ConditionTrue)
+		return HaveCondition(work.Status.Conditions, expectedType, expectedWorkStatus)
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }
 
@@ -71,7 +73,7 @@ func AssertFinalizerAdded(namespace, name string, workClient workclientset.Inter
 }
 
 // check if all manifests are applied
-func AssertManifestsApplied(manifests []workapiv1.Manifest, kubeClient kubernetes.Interface, eventuallyTimeout, eventuallyInterval int) {
+func AssertExistenceOfConfigMaps(manifests []workapiv1.Manifest, kubeClient kubernetes.Interface, eventuallyTimeout, eventuallyInterval int) {
 	gomega.Eventually(func() bool {
 		for _, manifest := range manifests {
 			expected := manifest.Object.(*corev1.ConfigMap)
@@ -81,6 +83,23 @@ func AssertManifestsApplied(manifests []workapiv1.Manifest, kubeClient kubernete
 			}
 
 			if !reflect.DeepEqual(actual.Data, expected.Data) {
+				return false
+			}
+		}
+
+		return true
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+}
+
+// check the existence of resource with GVR, namespace and name
+func AssertExistenceOfResources(gvrs []schema.GroupVersionResource, namespaces, names []string, dynamicClient dynamic.Interface, eventuallyTimeout, eventuallyInterval int) {
+	gomega.Expect(gvrs).To(gomega.HaveLen(len(namespaces)))
+	gomega.Expect(gvrs).To(gomega.HaveLen(len(names)))
+
+	gomega.Eventually(func() bool {
+		for i := range gvrs {
+			_, err := GetResource(namespaces[i], names[i], gvrs[i], dynamicClient)
+			if err != nil {
 				return false
 			}
 		}
