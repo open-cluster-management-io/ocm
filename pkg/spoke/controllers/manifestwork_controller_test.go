@@ -731,6 +731,11 @@ func TestBuildManifestResourceMeta(t *testing.T) {
 			object:   u,
 			expected: workapiv1.ManifestResourceMeta{},
 		},
+		{
+			name:     "build meta with nil",
+			object:   nil,
+			expected: workapiv1.ManifestResourceMeta{},
+		},
 	}
 
 	for _, c := range cases {
