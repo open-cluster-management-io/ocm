@@ -29,7 +29,7 @@ func AssertWorkCondition(namespace, name string, workClient workclientset.Interf
 		}
 
 		// check work status condition
-		return HaveCondition(work.Status.Conditions, string(workapiv1.WorkApplied), metav1.ConditionTrue)
+		return HaveCondition(work.Status.Conditions, expectedType, expectedWorkStatus)
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }
 

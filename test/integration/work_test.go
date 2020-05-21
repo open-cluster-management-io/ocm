@@ -72,16 +72,19 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		ginkgo.It("should create work and then apply it successfully", func() {
 			util.AssertManifestsApplied(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
-			/* comment this block until PR work/8 (https://github.com/open-cluster-management/work/pull/8) is merged
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
-			*/
 		})
 
 		ginkgo.It("should update work and then apply it successfully", func() {
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
 			newManifests := []workapiv1.Manifest{
 				util.ToManifest(util.NewConfigmap(o.SpokeClusterName, "cm2", map[string]string{"x": "y"})),
 			}
+			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			work.Spec.Workload.Manifests = newManifests
 
 			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
@@ -113,20 +116,23 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		ginkgo.It("should create work and then apply it successfully", func() {
 			util.AssertManifestsApplied(manifests[1:], spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
-			/* comment this block until PR work/8 (https://github.com/open-cluster-management/work/pull/8) is merged
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionFalse,
 				[]metav1.ConditionStatus{metav1.ConditionFalse, metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
-			*/
 		})
 
 		ginkgo.It("should update work and then apply it successfully", func() {
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionFalse,
+				[]metav1.ConditionStatus{metav1.ConditionFalse, metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
 			newManifests := []workapiv1.Manifest{
 				util.ToManifest(util.NewConfigmap(o.SpokeClusterName, "cm1", map[string]string{"a": "b"})),
 				util.ToManifest(util.NewConfigmap(o.SpokeClusterName, "cm2", map[string]string{"x": "y"})),
 				util.ToManifest(util.NewConfigmap(o.SpokeClusterName, "cm3", map[string]string{"e": "f"})),
 			}
-			work.Spec.Workload.Manifests = newManifests
 
+			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			work.Spec.Workload.Manifests = newManifests
 			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
