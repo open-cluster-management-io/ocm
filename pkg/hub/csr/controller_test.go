@@ -119,6 +119,8 @@ func TestSync(t *testing.T) {
 }
 
 func TestIsSpokeClusterClientCertRenewal(t *testing.T) {
+	invalidSignerName := "invalidsigner"
+
 	cases := []struct {
 		name      string
 		csr       *certificatesv1beta1.CertificateSigningRequest
@@ -131,7 +133,7 @@ func TestIsSpokeClusterClientCertRenewal(t *testing.T) {
 		},
 		{
 			name:      "an invalid signer name",
-			csr:       newCSR(labels, nil, "", []string{}, "", ""),
+			csr:       newCSR(labels, &invalidSignerName, "", []string{}, "", ""),
 			isRenewal: false,
 		},
 		{
@@ -158,6 +160,11 @@ func TestIsSpokeClusterClientCertRenewal(t *testing.T) {
 			name:      "an common name does not equal user name",
 			csr:       newInvalidCSR(),
 			isRenewal: false,
+		},
+		{
+			name:      "a renewal csr without signer name",
+			csr:       newCSRWithSignerName(nil),
+			isRenewal: true,
 		},
 		{
 			name:      "a renewal csr",
@@ -207,10 +214,10 @@ func newCSR(labels map[string]string, signerName *string, cn string, orgs []stri
 	}
 }
 
-func newRenewalCSR() *certificatesv1beta1.CertificateSigningRequest {
+func newCSRWithSignerName(signer *string) *certificatesv1beta1.CertificateSigningRequest {
 	csr := newCSR(
 		labels,
-		&signerName,
+		signer,
 		"system:open-cluster-management:spokecluster1:spokeagent1",
 		[]string{"system:open-cluster-management:spokecluster1"},
 		"system:open-cluster-management:spokecluster1:spokeagent1",
@@ -218,6 +225,10 @@ func newRenewalCSR() *certificatesv1beta1.CertificateSigningRequest {
 	)
 	csr.Name = testCSRName
 	return csr
+}
+
+func newRenewalCSR() *certificatesv1beta1.CertificateSigningRequest {
+	return newCSRWithSignerName(&signerName)
 }
 
 func newInvalidCSR() *certificatesv1beta1.CertificateSigningRequest {

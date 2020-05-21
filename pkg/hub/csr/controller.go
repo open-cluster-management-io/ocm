@@ -134,7 +134,10 @@ func isSpokeClusterClientCertRenewal(csr *certificatesv1beta1.CertificateSigning
 		return false
 	}
 
-	if csr.Spec.SignerName == nil || *csr.Spec.SignerName != certificatesv1beta1.KubeAPIServerClientSignerName {
+	// The CSR signer name must be provided on Kubernetes v1.18.0 and above, so if the signer name is empty,
+	// we should be on an old server, we skip the signer name check
+	if (csr.Spec.SignerName != nil && len(*csr.Spec.SignerName) != 0) &&
+		*csr.Spec.SignerName != certificatesv1beta1.KubeAPIServerClientSignerName {
 		return false
 	}
 
