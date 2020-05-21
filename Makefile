@@ -51,11 +51,11 @@ install-olm: ensure-operator-sdk
 	$(OPERATOR_SDK) olm status --olm-namespace $(OLM_NAMESPACE) ; if [ $$? -ne 0 ] ; then $(OPERATOR_SDK) olm install --version 0.14.1 ; fi
 	$(KUBECTL) get ns open-cluster-management ; if [ $$? -ne 0 ] ; then $(KUBECTL) create ns open-cluster-management ; fi
 
-deploy-hub:
+deploy-hub: ensure-operator-sdk
 	$(OPERATOR_SDK) run --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/nucleus-hub/olm-catalog/nucleus-hub --olm-namespace $(OLM_NAMESPACE)
 	$(KUBECTL) apply -f deploy/nucleus-hub/crds/nucleus_open-clustere-management_hubcores.cr.yaml
 
-clean-hub:
+clean-hub: ensure-operator-sdk
 	$(KUBECTL) delete -f deploy/nucleus-hub/crds/nucleus_open-clustere-management_hubcores.cr.yaml
 	$(OPERATOR_SDK) cleanup --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/nucleus-hub/olm-catalog/nucleus-hub --olm-namespace $(OLM_NAMESPACE)
 
@@ -69,11 +69,11 @@ bootstrap-secret: cluster-ip
 	$(KUBECTL) delete secret bootstrap-hub-kubeconfig -n open-cluster-management-spoke --ignore-not-found
 	$(KUBECTL) create secret generic bootstrap-hub-kubeconfig --from-file=kubeconfig=dev-kubeconfig -n open-cluster-management-spoke
 
-deploy-spoke: bootstrap-secret
+deploy-spoke: ensure-operator-sdk bootstrap-secret
 	$(OPERATOR_SDK) run --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/nucleus-spoke/olm-catalog/nucleus-spoke --olm-namespace $(OLM_NAMESPACE)
 	$(KUBECTL) apply -f deploy/nucleus-spoke/crds/nucleus_open-clustere-management_spokecores.cr.yaml
 
-clean-spoke:
+clean-spoke: ensure-operator-sdk
 	$(KUBECTL) delete -f deploy/nucleus-spoke/crds/nucleus_open-clustere-management_spokecores.cr.yaml
 	$(OPERATOR_SDK) cleanup --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/nucleus-spoke/olm-catalog/nucleus-spoke --olm-namespace $(OLM_NAMESPACE)
 
