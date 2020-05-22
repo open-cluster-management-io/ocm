@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:open-cluster-management:{{ .HubCoreName }}-registration-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:open-cluster-management:{{ .HubCoreName }}-registration-controller
+subjects:
+- kind: ServiceAccount
+  namespace: {{ .HubCoreNamespace }}
+  name: {{ .HubCoreName }}-registration-controller-sa

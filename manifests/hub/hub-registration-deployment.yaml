@@ -1,23 +1,23 @@
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: {{ .HubCoreName }}-controller
+  name: {{ .HubCoreName }}-registration-controller
   namespace: {{ .HubCoreNamespace }}
   labels:
-    app: nucleushub-controller
+    app: nucleushub-registration-controller
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: nucleushub-controller
+      app: nucleushub-registration-controller
   template:
     metadata:
       labels:
-        app: nucleushub-controller
+        app: nucleushub-registration-controller
     spec:
-      serviceAccountName: {{ .HubCoreName }}-sa
+      serviceAccountName: {{ .HubCoreName }}-registration-controller-sa
       containers:
-      - name: hub-controller
+      - name: hub-registration-controller
         image: {{ .RegistrationImage }}
         imagePullPolicy: IfNotPresent
         args:

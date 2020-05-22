@@ -1,7 +1,8 @@
 package hub
 
 import (
-	"fmt"
+	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -18,17 +19,20 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/workqueue"
+	fakeapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 )
 
 type testController struct {
-	controller         *nucleusHubController
-	kubeClient         *fakekube.Clientset
-	apiExtensionClient *fakeapiextensions.Clientset
-	nucleusClient      *fakenucleusclient.Clientset
+	controller            *nucleusHubController
+	kubeClient            *fakekube.Clientset
+	apiExtensionClient    *fakeapiextensions.Clientset
+	apiRegistrationClient *fakeapiregistration.Clientset
+	nucleusClient         *fakenucleusclient.Clientset
 }
 
 type fakeSyncContext struct {
@@ -66,8 +70,9 @@ func newTestController(hubcore *nucleusapiv1.HubCore) *testController {
 	nucleusInformers := nucleusinformers.NewSharedInformerFactory(fakeNucleusClient, 5*time.Minute)
 
 	hubController := &nucleusHubController{
-		nucleusClient: fakeNucleusClient.NucleusV1().HubCores(),
-		nucleusLister: nucleusInformers.Nucleus().V1().HubCores().Lister(),
+		nucleusClient:     fakeNucleusClient.NucleusV1().HubCores(),
+		nucleusLister:     nucleusInformers.Nucleus().V1().HubCores().Lister(),
+		currentGeneration: make([]int64, len(deploymentFiles)),
 	}
 
 	store := nucleusInformers.Nucleus().V1().HubCores().Informer().GetStore()
@@ -93,9 +98,22 @@ func (t *testController) withCRDObject(objects ...runtime.Object) *testControlle
 	return t
 }
 
+func (t *testController) withAPIServiceObject(objects ...runtime.Object) *testController {
+	fakeAPIRegistrationClient := fakeapiregistration.NewSimpleClientset(objects...)
+	t.controller.apiRegistrationClient = fakeAPIRegistrationClient.ApiregistrationV1()
+	t.apiRegistrationClient = fakeAPIRegistrationClient
+	return t
+}
+
 func assertAction(t *testing.T, actual clienttesting.Action, expected string) {
 	if actual.GetVerb() != expected {
 		t.Errorf("expected %s action but got: %#v", expected, actual)
+	}
+}
+
+func assertEqualNumber(t *testing.T, actual, expected int) {
+	if actual != expected {
+		t.Errorf("expected %d number of actions but got: %d", expected, actual)
 	}
 }
 
@@ -132,11 +150,8 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *nucleusapiv1.Hub
 
 	switch o := object.(type) {
 	case *corev1.Namespace:
-		ensureNameNamespace(t, access.GetName(), "", nucluesHubCoreNamespace, "")
-	case *corev1.ServiceAccount:
-		ensureNameNamespace(t, access.GetName(), access.GetNamespace(), fmt.Sprintf("%s-sa", hubCore.Name), nucluesHubCoreNamespace)
+		ensureNameNamespace(t, access.GetName(), "", nucleusHubCoreNamespace, "")
 	case *appsv1.Deployment:
-		ensureNameNamespace(t, access.GetName(), access.GetNamespace(), fmt.Sprintf("%s-controller", hubCore.Name), nucluesHubCoreNamespace)
 		if hubCore.Spec.RegistrationImagePullSpec != o.Spec.Template.Spec.Containers[0].Image {
 			t.Errorf("Image does not match to the expected.")
 		}
@@ -146,7 +161,7 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *nucleusapiv1.Hub
 // TestSyncDeploy tests sync manifests of hub component
 func TestSyncDeploy(t *testing.T) {
 	hubCore := newHubCore("testhub")
-	controller := newTestController(hubCore).withCRDObject().withKubeObject()
+	controller := newTestController(hubCore).withCRDObject().withKubeObject().withAPIServiceObject()
 	syncContext := newFakeSyncContext(t, "testhub")
 
 	err := controller.controller.sync(nil, syncContext)
@@ -154,28 +169,45 @@ func TestSyncDeploy(t *testing.T) {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 
-	createObjects := []runtime.Object{}
+	createKubeObjects := []runtime.Object{}
 	kubeActions := controller.kubeClient.Actions()
 	for _, action := range kubeActions {
 		if action.GetVerb() == "create" {
 			object := action.(clienttesting.CreateActionImpl).Object
-			createObjects = append(createObjects, object)
+			createKubeObjects = append(createKubeObjects, object)
 		}
 	}
 
 	// Check if resources are created as expected
-	if len(createObjects) != 5 {
-		t.Errorf("Expect 5 objects created in the sync loop, actual %q", len(createObjects))
-	}
-	for _, object := range createObjects {
+	assertEqualNumber(t, len(createKubeObjects), 12)
+	for _, object := range createKubeObjects {
 		ensureObject(t, object, hubCore)
 	}
 
-	nucleusAction := controller.nucleusClient.Actions()
-	if len(nucleusAction) != 2 {
-		t.Errorf("Expect 2 actions in the sync loop")
+	createCRDObjects := []runtime.Object{}
+	crdActions := controller.apiExtensionClient.Actions()
+	for _, action := range crdActions {
+		if action.GetVerb() == "create" {
+			object := action.(clienttesting.CreateActionImpl).Object
+			createCRDObjects = append(createCRDObjects, object)
+		}
 	}
+	// Check if resources are created as expected
+	assertEqualNumber(t, len(createCRDObjects), 2)
 
+	createAPIServiceObjects := []runtime.Object{}
+	apiServiceActions := controller.apiRegistrationClient.Actions()
+	for _, action := range apiServiceActions {
+		if action.GetVerb() == "create" {
+			object := action.(clienttesting.CreateActionImpl).Object
+			createAPIServiceObjects = append(createAPIServiceObjects, object)
+		}
+	}
+	// Check if resources are created as expected
+	assertEqualNumber(t, len(createAPIServiceObjects), 1)
+
+	nucleusAction := controller.nucleusClient.Actions()
+	assertEqualNumber(t, len(nucleusAction), 2)
 	assertAction(t, nucleusAction[1], "update")
 	assertCondition(t, nucleusAction[1].(clienttesting.UpdateActionImpl).Object, hubCoreApplied, metav1.ConditionTrue)
 }
@@ -185,7 +217,7 @@ func TestSyncDelete(t *testing.T) {
 	hubCore := newHubCore("testhub")
 	now := metav1.Now()
 	hubCore.ObjectMeta.SetDeletionTimestamp(&now)
-	controller := newTestController(hubCore).withCRDObject().withKubeObject()
+	controller := newTestController(hubCore).withCRDObject().withKubeObject().withAPIServiceObject()
 	syncContext := newFakeSyncContext(t, "testhub")
 
 	err := controller.controller.sync(nil, syncContext)
@@ -193,27 +225,42 @@ func TestSyncDelete(t *testing.T) {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 
-	deleteActions := []clienttesting.DeleteActionImpl{}
+	deleteKubeActions := []clienttesting.DeleteActionImpl{}
 	kubeActions := controller.kubeClient.Actions()
 	for _, action := range kubeActions {
 		if action.GetVerb() == "delete" {
-			deleteAction := action.(clienttesting.DeleteActionImpl)
-			deleteActions = append(deleteActions, deleteAction)
+			deleteKubeAction := action.(clienttesting.DeleteActionImpl)
+			deleteKubeActions = append(deleteKubeActions, deleteKubeAction)
 		}
 	}
+	assertEqualNumber(t, len(deleteKubeActions), 10)
 
-	for _, action := range deleteActions {
+	deleteCRDActions := []clienttesting.DeleteActionImpl{}
+	crdActions := controller.apiExtensionClient.Actions()
+	for _, action := range crdActions {
+		if action.GetVerb() == "delete" {
+			deleteCRDAction := action.(clienttesting.DeleteActionImpl)
+			deleteCRDActions = append(deleteCRDActions, deleteCRDAction)
+		}
+	}
+	// Check if resources are created as expected
+	assertEqualNumber(t, len(deleteCRDActions), 4)
+
+	deleteAPIServiceActions := []clienttesting.DeleteActionImpl{}
+	apiServiceActions := controller.apiRegistrationClient.Actions()
+	for _, action := range apiServiceActions {
+		if action.GetVerb() == "delete" {
+			deleteAPIServiceAction := action.(clienttesting.DeleteActionImpl)
+			deleteAPIServiceActions = append(deleteAPIServiceActions, deleteAPIServiceAction)
+		}
+	}
+	// Check if resources are created as expected
+	assertEqualNumber(t, len(deleteAPIServiceActions), 1)
+
+	for _, action := range deleteKubeActions {
 		switch action.Resource.Resource {
-		case "clusterroles":
-			ensureNameNamespace(t, action.Name, "", fmt.Sprintf("system:open-cluster-management:%s", hubCore.Name), "")
-		case "clusterrolebindings":
-			ensureNameNamespace(t, action.Name, "", fmt.Sprintf("system:open-cluster-management:%s", hubCore.Name), "")
 		case "namespaces":
-			ensureNameNamespace(t, action.Name, "", nucluesHubCoreNamespace, "")
-		case "serviceaccounts":
-			ensureNameNamespace(t, action.Name, action.Namespace, fmt.Sprintf("%s-sa", hubCore.Name), nucluesHubCoreNamespace)
-		case "deployments":
-			ensureNameNamespace(t, action.Name, action.Namespace, fmt.Sprintf("%s-controller", hubCore.Name), nucluesHubCoreNamespace)
+			ensureNameNamespace(t, action.Name, "", nucleusHubCoreNamespace, "")
 		}
 	}
 }
@@ -228,7 +275,7 @@ func TestDeleteCRD(t *testing.T) {
 			Name: crdNames[0],
 		},
 	}
-	controller := newTestController(hubCore).withCRDObject(crd).withKubeObject()
+	controller := newTestController(hubCore).withCRDObject(crd).withKubeObject().withAPIServiceObject()
 
 	// Return crd with the first get, and return not found with the 2nd get
 	getCount := 0
@@ -250,5 +297,47 @@ func TestDeleteCRD(t *testing.T) {
 	err = controller.controller.sync(nil, syncContext)
 	if err != nil {
 		t.Errorf("Expected no error when sync: %v", err)
+	}
+}
+
+func TestEnsureServingCertAndCA(t *testing.T) {
+	hubCore := newHubCore("testhub")
+	controller := newTestController(hubCore).withCRDObject().withKubeObject().withAPIServiceObject()
+	ca, certificate, key, err := controller.controller.ensureServingCertAndCA(context.TODO(), "ns1", "kubeconfig", "webhook")
+	if err != nil {
+		t.Errorf("Expect no error when generating serving cert: %v", err)
+	}
+	certs, err := cert.ParseCertsPEM(certificate)
+	if err != nil {
+		t.Errorf("Expect no error when parsing cert")
+	}
+	if len(certs) != 2 {
+		t.Errorf("Expect 2 cert is parsed, actual %d", len(certs))
+	}
+	for _, cert := range certs {
+		if cert.Subject.CommonName != "webhook.ns1.svc" && cert.Subject.CommonName != "nucleus-webhook" {
+			t.Errorf("Common name in cert is not correct, actual %s", cert.Subject.CommonName)
+		}
+	}
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kubeconfig",
+			Namespace: "ns1",
+		},
+		Data: map[string][]byte{
+			"ca.crt":  ca,
+			"tls.crt": certificate,
+			"tls.key": key,
+		},
+	}
+	controller = newTestController(hubCore).withCRDObject().withKubeObject(secret).withAPIServiceObject()
+	actualCA, actualCert, actualKey, err := controller.controller.ensureServingCertAndCA(context.TODO(), "ns1", "kubeconfig", "webhook")
+	if err != nil {
+		t.Errorf("Expect no error when generating serving cert: %v", err)
+	}
+
+	if !reflect.DeepEqual(ca, actualCA) || !reflect.DeepEqual(certificate, actualCert) || !reflect.DeepEqual(key, actualKey) {
+		t.Errorf("Expect the cert/key/ca is obtained from secret")
 	}
 }
