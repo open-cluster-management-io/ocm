@@ -25,6 +25,13 @@ Check the [Development Doc](docs/development.md) for how to contribute to the re
 
 ## How to Deploy
 
+### Prerequisites
+
+These instructions assume:
+
+- You have a running kubernetes cluster
+- You have `KUBECONFIG` environment variable set to a kubeconfig file giving you cluster-admin role on that cluster
+
 ### Deploy Hub
 
 1. Run `make deploy-hub`
