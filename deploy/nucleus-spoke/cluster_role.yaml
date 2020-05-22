@@ -15,7 +15,7 @@ rules:
   verbs: ["get", "list", "watch"]
 - apiGroups: ["", "events.k8s.io"]
   resources: ["events"]
-  verbs: [create", "patch", "update"]
+  verbs: ["create", "patch", "update"]
 - apiGroups: ["apps"]
   resources: ["deployments"]
   verbs: ["create", "get", "list", "update", "watch", "patch", "delete"]

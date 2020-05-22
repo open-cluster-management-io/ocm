@@ -9,4 +9,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: nucleus-spoke
-  namespace: open-cluster-management-core
+  namespace: open-cluster-management

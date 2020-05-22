@@ -59,7 +59,7 @@ spec:
           resources:
           - events
           verbs:
-          - create"
+          - create
           - patch
           - update
         - apiGroups:
