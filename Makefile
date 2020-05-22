@@ -48,7 +48,7 @@ deploy: install-olm deploy-hub deploy-spoke
 clean-deploy: clean-spoke clean-hub
 
 install-olm: ensure-operator-sdk
-	$(OPERATOR_SDK) olm status --olm-namespace $(OLM_NAMESPACE) ; if [ $$? -ne 0 ] ; then $(OPERATOR_SDK) olm install --version 0.14.1 ; fi
+	$(KUBECTL) get crds | grep clusterserviceversion ; if [ $$? -ne 0 ] ; then $(OPERATOR_SDK) olm install --version 0.14.1 --olm-namespace $(OLM_NAMESPACE); fi
 	$(KUBECTL) get ns open-cluster-management ; if [ $$? -ne 0 ] ; then $(KUBECTL) create ns open-cluster-management ; fi
 
 deploy-hub: install-olm
