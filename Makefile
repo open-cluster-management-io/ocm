@@ -48,7 +48,7 @@ deploy: install-olm deploy-hub deploy-spoke
 clean-deploy: clean-spoke clean-hub
 
 install-olm: ensure-operator-sdk
-	$(KUBECTL) get crds | grep clusterserviceversion ; if [ $$? -ne 0 ] ; then $(OPERATOR_SDK) olm install --version 0.14.1 --olm-namespace $(OLM_NAMESPACE); fi
+	$(KUBECTL) get crds | grep clusterserviceversion ; if [ $$? -ne 0 ] ; then $(OPERATOR_SDK) olm install --version 0.14.1; fi
 	$(KUBECTL) get ns open-cluster-management ; if [ $$? -ne 0 ] ; then $(KUBECTL) create ns open-cluster-management ; fi
 
 deploy-hub: install-olm
@@ -68,6 +68,14 @@ bootstrap-secret: cluster-ip
 	$(KUBECTL) config set clusters.kind-kind.server https://$(CLUSTER_IP) --kubeconfig dev-kubeconfig
 	$(KUBECTL) delete secret bootstrap-hub-kubeconfig -n open-cluster-management-spoke --ignore-not-found
 	$(KUBECTL) create secret generic bootstrap-hub-kubeconfig --from-file=kubeconfig=dev-kubeconfig -n open-cluster-management-spoke
+
+# Registration e2e expects to read bootstrap secret from open-cluster-management/e2e-bootstrap-secret
+# TODO: think about how to factor this
+e2e-bootstrap-secret: cluster-ip
+	cp $(KUBECONFIG) e2e-kubeconfig
+	$(KUBECTL) config set clusters.kind-kind.server https://$(CLUSTER_IP) --kubeconfig e2e-kubeconfig
+	$(KUBECTL) delete secret e2e-bootstrap-secret -n open-cluster-management --ignore-not-found
+	$(KUBECTL) create secret generic e2e-bootstrap-secret --from-file=kubeconfig=e2e-kubeconfig -n open-cluster-management
 
 deploy-spoke: install-olm bootstrap-secret
 	$(OPERATOR_SDK) run --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/nucleus-spoke/olm-catalog/nucleus-spoke --olm-namespace $(OLM_NAMESPACE)
