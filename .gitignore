@@ -7,6 +7,8 @@ nucleus
 nucleus
 !deploy/**
 !vendor/**
+dev-kubeconfig
+e2e-kubeconfig
 
 # Test binary, build with `go test -c`
 *.test
