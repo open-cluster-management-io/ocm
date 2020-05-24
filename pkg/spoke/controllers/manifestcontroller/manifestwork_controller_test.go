@@ -1,12 +1,15 @@
-package controllers
+package manifestcontroller
 
 import (
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	fakeworkclient "github.com/open-cluster-management/api/client/work/clientset/versioned/fake"
+	workinformers "github.com/open-cluster-management/api/client/work/informers/externalversions"
+	workapiv1 "github.com/open-cluster-management/api/work/v1"
+	"github.com/open-cluster-management/work/pkg/spoke/resource"
+	"github.com/open-cluster-management/work/pkg/spoke/spoketesting"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,14 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	fakekube "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/restmapper"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/util/workqueue"
-
-	fakeworkclient "github.com/open-cluster-management/api/client/work/clientset/versioned/fake"
-	workinformers "github.com/open-cluster-management/api/client/work/informers/externalversions"
-	workapiv1 "github.com/open-cluster-management/api/work/v1"
-	"github.com/open-cluster-management/work/pkg/spoke/resource"
 )
 
 type testController struct {
@@ -30,124 +26,6 @@ type testController struct {
 	dynamicClient *fakedynamic.FakeDynamicClient
 	workClient    *fakeworkclient.Clientset
 	kubeClient    *fakekube.Clientset
-}
-
-type fakeSyncContext struct {
-	workKey  string
-	queue    workqueue.RateLimitingInterface
-	recorder events.Recorder
-}
-
-func newFakeSyncContext(t *testing.T, workKey string) *fakeSyncContext {
-	return &fakeSyncContext{
-		workKey:  workKey,
-		queue:    workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-		recorder: eventstesting.NewTestingEventRecorder(t),
-	}
-}
-
-func (f fakeSyncContext) Queue() workqueue.RateLimitingInterface { return f.queue }
-func (f fakeSyncContext) QueueKey() string                       { return f.workKey }
-func (f fakeSyncContext) Recorder() events.Recorder              { return f.recorder }
-
-func newSecret(name, namespace string, content string) *corev1.Secret {
-	return &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Data: map[string][]byte{
-			"test": []byte(content),
-		},
-	}
-}
-
-func newUnstructured(apiVersion, kind, namespace, name string) *unstructured.Unstructured {
-	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": apiVersion,
-			"kind":       kind,
-			"metadata": map[string]interface{}{
-				"namespace": namespace,
-				"name":      name,
-			},
-		},
-	}
-}
-
-func newUnstructuredWithContent(
-	apiVersion, kind, namespace, name string, content map[string]interface{}) *unstructured.Unstructured {
-	object := newUnstructured(apiVersion, kind, namespace, name)
-	for key, val := range content {
-		object.Object[key] = val
-	}
-
-	return object
-}
-
-func newManifestWork(index int, objects ...*unstructured.Unstructured) (*workapiv1.ManifestWork, string) {
-	work := &workapiv1.ManifestWork{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("work-%d", index),
-			Namespace: "cluster1",
-		},
-		Spec: workapiv1.ManifestWorkSpec{
-			Workload: workapiv1.ManifestsTemplate{
-				Manifests: []workapiv1.Manifest{},
-			},
-		},
-	}
-
-	for _, object := range objects {
-		objectStr, _ := object.MarshalJSON()
-		manifest := workapiv1.Manifest{}
-		manifest.Raw = objectStr
-		work.Spec.Workload.Manifests = append(work.Spec.Workload.Manifests, manifest)
-	}
-
-	return work, fmt.Sprintf("%s", work.Name)
-}
-
-func newFakeMapper() *resource.Mapper {
-	resources := []*restmapper.APIGroupResources{
-		{
-			Group: metav1.APIGroup{
-				Name: "",
-				Versions: []metav1.GroupVersionForDiscovery{
-					{Version: "v1"},
-				},
-				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1"},
-			},
-			VersionedResources: map[string][]metav1.APIResource{
-				"v1": {
-					{Name: "secrets", Namespaced: true, Kind: "Secret"},
-					{Name: "pods", Namespaced: true, Kind: "Pod"},
-					{Name: "newobjects", Namespaced: true, Kind: "NewObject"},
-				},
-			},
-		},
-		{
-			Group: metav1.APIGroup{
-				Name: "apps",
-				Versions: []metav1.GroupVersionForDiscovery{
-					{Version: "v1", GroupVersion: "apps/v1"},
-				},
-				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1", GroupVersion: "apps/v1"},
-			},
-			VersionedResources: map[string][]metav1.APIResource{
-				"v1": {
-					{Name: "deployments", Group: "apps", Namespaced: true, Kind: "Deployment"},
-				},
-			},
-		},
-	}
-	return &resource.Mapper{
-		Mapper: restmapper.NewDiscoveryRESTMapper(resources),
-	}
 }
 
 func newController(work *workapiv1.ManifestWork, mapper *resource.Mapper) *testController {
@@ -182,12 +60,6 @@ func (t *testController) withUnstructuredObject(objects ...runtime.Object) *test
 	t.controller.spokeDynamicClient = dynamicClient
 	t.dynamicClient = dynamicClient
 	return t
-}
-
-func assertAction(t *testing.T, actual clienttesting.Action, expected string) {
-	if actual.GetVerb() != expected {
-		t.Errorf("expected %s action but got: %#v", expected, actual)
-	}
 }
 
 func assertCondition(t *testing.T, conditions []workapiv1.StatusCondition, expectedCondition string, expectedStatus metav1.ConditionStatus) {
@@ -299,7 +171,7 @@ func (t *testCase) validate(
 		ts.Errorf("Expected %d action but got %#v", len(t.expectedWorkAction), workActions)
 	}
 	for index := range workActions {
-		assertAction(ts, workActions[index], t.expectedWorkAction[index])
+		spoketesting.AssertAction(ts, workActions[index], t.expectedWorkAction[index])
 	}
 
 	spokeDynamicActions := dynamicClient.Actions()
@@ -307,14 +179,14 @@ func (t *testCase) validate(
 		ts.Errorf("Expected %d action but got %#v", len(t.expectedDynamicAction), spokeDynamicActions)
 	}
 	for index := range spokeDynamicActions {
-		assertAction(ts, spokeDynamicActions[index], t.expectedDynamicAction[index])
+		spoketesting.AssertAction(ts, spokeDynamicActions[index], t.expectedDynamicAction[index])
 	}
 	spokeKubeActions := kubeClient.Actions()
 	if len(spokeKubeActions) != len(t.expectedKubeAction) {
 		ts.Errorf("Expected %d action but got %#v", len(t.expectedKubeAction), spokeKubeActions)
 	}
 	for index := range spokeKubeActions {
-		assertAction(ts, spokeKubeActions[index], t.expectedKubeAction[index])
+		spoketesting.AssertAction(ts, spokeKubeActions[index], t.expectedKubeAction[index])
 	}
 
 	actual, ok := workActions[len(workActions)-1].(clienttesting.UpdateActionImpl)
@@ -368,40 +240,40 @@ func findManifestConditionByIndex(index int32, conds []workapiv1.ManifestConditi
 func TestSync(t *testing.T) {
 	cases := []*testCase{
 		newTestCase("create single resource").
-			withWorkManifest(newUnstructured("v1", "Secret", "ns1", "test")).
+			withWorkManifest(spoketesting.NewUnstructured("v1", "Secret", "ns1", "test")).
 			withExpectedWorkAction("get", "update").
 			withExpectedKubeAction("get", "create").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
 			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
 		newTestCase("create single deployment resource").
-			withWorkManifest(newUnstructured("apps/v1", "Deployment", "ns1", "test")).
+			withWorkManifest(spoketesting.NewUnstructured("apps/v1", "Deployment", "ns1", "test")).
 			withExpectedWorkAction("get", "update").
 			withExpectedDynamicAction("get", "create").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
 			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
 		newTestCase("update single resource").
-			withWorkManifest(newUnstructured("v1", "Secret", "ns1", "test")).
-			withSpokeObject(newSecret("test", "ns1", "value2")).
+			withWorkManifest(spoketesting.NewUnstructured("v1", "Secret", "ns1", "test")).
+			withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
 			withExpectedWorkAction("get", "update").
 			withExpectedKubeAction("get", "delete", "create").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
 			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
 		newTestCase("create single unstructured resource").
-			withWorkManifest(newUnstructured("v1", "NewObject", "ns1", "test")).
+			withWorkManifest(spoketesting.NewUnstructured("v1", "NewObject", "ns1", "test")).
 			withExpectedWorkAction("get", "update").
 			withExpectedDynamicAction("get", "create").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
 			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
 		newTestCase("update single unstructured resource").
-			withWorkManifest(newUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}})).
-			withSpokeDynamicObject(newUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val2"}})).
+			withWorkManifest(spoketesting.NewUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}})).
+			withSpokeDynamicObject(spoketesting.NewUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val2"}})).
 			withExpectedWorkAction("get", "update").
 			withExpectedDynamicAction("get", "update").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
 			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
 		newTestCase("multiple create&update resource").
-			withWorkManifest(newUnstructured("v1", "Secret", "ns1", "test"), newUnstructured("v1", "Secret", "ns2", "test")).
-			withSpokeObject(newSecret("test", "ns1", "value2")).
+			withWorkManifest(spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"), spoketesting.NewUnstructured("v1", "Secret", "ns2", "test")).
+			withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
 			withExpectedWorkAction("get", "update").
 			withExpectedKubeAction("get", "delete", "create", "get", "create").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}, expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
@@ -410,12 +282,12 @@ func TestSync(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			work, workKey := newManifestWork(0, c.workManifest...)
+			work, workKey := spoketesting.NewManifestWork(0, c.workManifest...)
 			work.Finalizers = []string{manifestWorkFinalizer}
-			controller := newController(work, newFakeMapper()).
+			controller := newController(work, spoketesting.NewFakeRestMapper()).
 				withKubeObject(c.spokeObject...).
 				withUnstructuredObject(c.spokeDynamicObject...)
-			syncContext := newFakeSyncContext(t, workKey)
+			syncContext := spoketesting.NewFakeSyncContext(t, workKey)
 			err := controller.controller.sync(nil, syncContext)
 			if err != nil {
 				t.Errorf("Should be success with no err: %v", err)
@@ -426,52 +298,19 @@ func TestSync(t *testing.T) {
 	}
 }
 
-// TestDeleteWork tests the action when work is deleted
-func TestDeleteWork(t *testing.T) {
-	tc := newTestCase("delete multiple resources").
-		withWorkManifest(newUnstructured("v1", "Secret", "ns1", "test"), newUnstructured("v1", "Secret", "ns2", "test")).
-		withSpokeObject(newSecret("test", "ns1", "value2")).
-		withExpectedWorkAction("update").
-		withExpectedDynamicAction("delete", "delete")
-
-	work, workKey := newManifestWork(0, tc.workManifest...)
-	work.Finalizers = []string{manifestWorkFinalizer}
-	now := metav1.Now()
-	work.ObjectMeta.SetDeletionTimestamp(&now)
-	controller := newController(work, newFakeMapper()).withKubeObject(tc.spokeObject...).withUnstructuredObject()
-	syncContext := newFakeSyncContext(t, workKey)
-	err := controller.controller.sync(nil, syncContext)
-	if err != nil {
-		t.Errorf("Should be success with no err: %v", err)
-	}
-
-	tc.validate(t, controller.dynamicClient, controller.workClient, controller.kubeClient)
-
-	// Verify that finalizer is removed
-	workActions := controller.workClient.Actions()
-	actual, ok := workActions[len(workActions)-1].(clienttesting.UpdateActionImpl)
-	if !ok {
-		t.Errorf("Expected to get update action")
-	}
-	actualWork := actual.Object.(*workapiv1.ManifestWork)
-	if len(actualWork.Finalizers) != 0 {
-		t.Errorf("Expected 0 finailizer but got %#v", actualWork.Finalizers)
-	}
-}
-
 // Test applying resource failed
 func TestFailedToApplyResource(t *testing.T) {
 	tc := newTestCase("multiple create&update resource").
-		withWorkManifest(newUnstructured("v1", "Secret", "ns1", "test"), newUnstructured("v1", "Secret", "ns2", "test")).
-		withSpokeObject(newSecret("test", "ns1", "value2")).
+		withWorkManifest(spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"), spoketesting.NewUnstructured("v1", "Secret", "ns2", "test")).
+		withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
 		withExpectedWorkAction("get", "update").
 		withExpectedKubeAction("get", "delete", "create", "get", "create").
 		withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}, expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionFalse}).
 		withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionFalse})
 
-	work, workKey := newManifestWork(0, tc.workManifest...)
+	work, workKey := spoketesting.NewManifestWork(0, tc.workManifest...)
 	work.Finalizers = []string{manifestWorkFinalizer}
-	controller := newController(work, newFakeMapper()).withKubeObject(tc.spokeObject...).withUnstructuredObject()
+	controller := newController(work, spoketesting.NewFakeRestMapper()).withKubeObject(tc.spokeObject...).withUnstructuredObject()
 
 	// Add a reactor on fake client to throw error when creating secret on namespace ns2
 	controller.kubeClient.PrependReactor("create", "secrets", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -488,7 +327,7 @@ func TestFailedToApplyResource(t *testing.T) {
 
 		return true, &corev1.Secret{}, fmt.Errorf("Fake error")
 	})
-	syncContext := newFakeSyncContext(t, workKey)
+	syncContext := spoketesting.NewFakeSyncContext(t, workKey)
 	err := controller.controller.sync(nil, syncContext)
 	if err == nil {
 		t.Errorf("Should return an err")
@@ -507,32 +346,32 @@ func TestIsSameUnstructured(t *testing.T) {
 	}{
 		{
 			name:     "different kind",
-			obj1:     newUnstructured("v1", "Kind1", "ns1", "n1"),
-			obj2:     newUnstructured("v1", "Kind2", "ns1", "n1"),
+			obj1:     spoketesting.NewUnstructured("v1", "Kind1", "ns1", "n1"),
+			obj2:     spoketesting.NewUnstructured("v1", "Kind2", "ns1", "n1"),
 			expected: false,
 		},
 		{
 			name:     "different namespace",
-			obj1:     newUnstructured("v1", "Kind1", "ns1", "n1"),
-			obj2:     newUnstructured("v1", "Kind1", "ns2", "n1"),
+			obj1:     spoketesting.NewUnstructured("v1", "Kind1", "ns1", "n1"),
+			obj2:     spoketesting.NewUnstructured("v1", "Kind1", "ns2", "n1"),
 			expected: false,
 		},
 		{
 			name:     "different name",
-			obj1:     newUnstructured("v1", "Kind1", "ns1", "n1"),
-			obj2:     newUnstructured("v1", "Kind1", "ns1", "n2"),
+			obj1:     spoketesting.NewUnstructured("v1", "Kind1", "ns1", "n1"),
+			obj2:     spoketesting.NewUnstructured("v1", "Kind1", "ns1", "n2"),
 			expected: false,
 		},
 		{
 			name:     "different spec",
-			obj1:     newUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}}),
-			obj2:     newUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val2"}}),
+			obj1:     spoketesting.NewUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}}),
+			obj2:     spoketesting.NewUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val2"}}),
 			expected: false,
 		},
 		{
 			name:     "same spec, different status",
-			obj1:     newUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}, "status": "status1"}),
-			obj2:     newUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}, "status": "status2"}),
+			obj1:     spoketesting.NewUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}, "status": "status1"}),
+			obj2:     spoketesting.NewUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}, "status": "status2"}),
 			expected: true,
 		},
 	}
@@ -701,13 +540,13 @@ func TestBuildManifestResourceMeta(t *testing.T) {
 	}{
 		{
 			name:     "build meta for non-unstructured object",
-			object:   newSecret("test", "ns1", "value2"),
+			object:   spoketesting.NewSecret("test", "ns1", "value2"),
 			expected: workapiv1.ManifestResourceMeta{Version: "v1", Kind: "Secret", Namespace: "ns1", Name: "test"},
 		},
 		{
 			name:       "build meta for non-unstructured object with rest mapper",
-			object:     newSecret("test", "ns1", "value2"),
-			restMapper: newFakeMapper(),
+			object:     spoketesting.NewSecret("test", "ns1", "value2"),
+			restMapper: spoketesting.NewFakeRestMapper(),
 			expected:   workapiv1.ManifestResourceMeta{Version: "v1", Kind: "Secret", Resource: "secrets", Namespace: "ns1", Name: "test"},
 		},
 		{
@@ -717,13 +556,13 @@ func TestBuildManifestResourceMeta(t *testing.T) {
 		},
 		{
 			name:     "build meta for unstructured object",
-			object:   newUnstructured("v1", "Kind1", "ns1", "n1"),
+			object:   spoketesting.NewUnstructured("v1", "Kind1", "ns1", "n1"),
 			expected: workapiv1.ManifestResourceMeta{Version: "v1", Kind: "Kind1", Namespace: "ns1", Name: "n1"},
 		},
 		{
 			name:       "build meta for unstructured object with rest mapper",
-			object:     newUnstructured("v1", "NewObject", "ns1", "n1"),
-			restMapper: newFakeMapper(),
+			object:     spoketesting.NewUnstructured("v1", "NewObject", "ns1", "n1"),
+			restMapper: spoketesting.NewFakeRestMapper(),
 			expected:   workapiv1.ManifestResourceMeta{Version: "v1", Kind: "NewObject", Resource: "newobjects", Namespace: "ns1", Name: "n1"},
 		},
 		{
