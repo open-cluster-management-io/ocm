@@ -2,7 +2,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: nucleus-hub
-  namespace: open-cluster-management-core
+  namespace: open-cluster-management
   labels:
     app: nucleus-hub
 spec:
