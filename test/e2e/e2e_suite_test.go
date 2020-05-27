@@ -10,7 +10,9 @@ import (
 
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -24,10 +26,12 @@ func TestE2E(t *testing.T) {
 }
 
 var (
-	hubClient         kubernetes.Interface
-	hubDynamicClient  dynamic.Interface
-	clusterClient     clusterv1client.Interface
-	registrationImage string
+	hubClient           kubernetes.Interface
+	hubDynamicClient    dynamic.Interface
+	hubAPIServiceClient *apiregistrationclient.ApiregistrationV1Client
+	clusterClient       clusterv1client.Interface
+	registrationImage   string
+	clusterCfg          *rest.Config
 )
 
 // This suite is sensitive to the following environment variables:
@@ -49,22 +53,28 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	kubeconfig := os.Getenv("KUBECONFIG")
 	err := func() error {
-		config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+		var err error
+		clusterCfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
 			return err
 		}
 
-		hubClient, err = kubernetes.NewForConfig(config)
+		hubClient, err = kubernetes.NewForConfig(clusterCfg)
 		if err != nil {
 			return err
 		}
 
-		hubDynamicClient, err = dynamic.NewForConfig(config)
+		hubDynamicClient, err = dynamic.NewForConfig(clusterCfg)
 		if err != nil {
 			return err
 		}
 
-		clusterClient, err = clusterv1client.NewForConfig(config)
+		hubAPIServiceClient, err = apiregistrationclient.NewForConfig(clusterCfg)
+		if err != nil {
+			return err
+		}
+
+		clusterClient, err = clusterv1client.NewForConfig(clusterCfg)
 
 		return err
 	}()
