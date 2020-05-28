@@ -12,6 +12,9 @@ import (
 	"k8s.io/client-go/restmapper"
 )
 
+// MapperRefreshInterval is the refresh interval of mapper. It could be modified during testing
+var MapperRefreshInterval = 30 * time.Second
+
 // Mapper is a struct to define resource mapping
 type Mapper struct {
 	Mapper   meta.RESTMapper
@@ -34,7 +37,7 @@ func (p *Mapper) Run(stopCh <-chan struct{}) {
 		defer p.syncLock.Unlock()
 		deferredMappd := p.Mapper.(*restmapper.DeferredDiscoveryRESTMapper)
 		deferredMappd.Reset()
-	}, 30*time.Second, stopCh)
+	}, MapperRefreshInterval, stopCh)
 }
 
 // MappingForGVK returns the RESTMapping for a gvk
