@@ -108,7 +108,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 			}
 		)
 		clusterName := fmt.Sprintf("loopback-e2e-%v", suffix)
-		deployment, err = spokeDeployment(nsName, clusterName, imageRegistry)
+		deployment, err = spokeDeployment(nsName, clusterName, registrationImage)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
 			var err error
@@ -303,7 +303,7 @@ func spokeCRB(nsName, suffix string) (*unstructured.Unstructured, error) {
 	return crb, nil
 }
 
-func spokeDeployment(nsName, clusterName, imageRegistry string) (*unstructured.Unstructured, error) {
+func spokeDeployment(nsName, clusterName, image string) (*unstructured.Unstructured, error) {
 	deployment, err := assetToUnstructured("deploy/spoke/deployment.yaml")
 	if err != nil {
 		return nil, err
@@ -318,7 +318,6 @@ func spokeDeployment(nsName, clusterName, imageRegistry string) (*unstructured.U
 		return nil, fmt.Errorf("deployment containers not found or error in spec: %v", err)
 	}
 
-	image := fmt.Sprintf("%v/registration:latest", imageRegistry)
 	if err := unstructured.SetNestedField(containers[0].(map[string]interface{}), image, "image"); err != nil {
 		return nil, err
 	}
