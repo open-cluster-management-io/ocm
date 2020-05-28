@@ -157,7 +157,23 @@ func (n *nucleusSpokeController) sync(ctx context.Context, controllerContext fac
 	// Start deploy spoke core components
 	// Check if namespace exists
 	_, err = n.kubeClient.CoreV1().Namespaces().Get(ctx, config.SpokeCoreNamespace, metav1.GetOptions{})
-	if err != nil {
+	switch {
+	case errors.IsNotFound(err):
+		_, createErr := n.kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: config.SpokeCoreNamespace},
+		}, metav1.CreateOptions{})
+		if createErr != nil {
+			helpers.SetNucleusCondition(&spokeCore.Status.Conditions, nucleusapiv1.StatusCondition{
+				Type:    spokeCoreApplied,
+				Status:  metav1.ConditionFalse,
+				Reason:  "SpokeCoreApplyFailed",
+				Message: fmt.Sprintf("Failed to create namespace %q", config.SpokeCoreNamespace),
+			})
+			helpers.UpdateNucleusSpokeStatus(
+				ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(spokeCore.Status.Conditions...))
+			return createErr
+		}
+	case err != nil:
 		helpers.SetNucleusCondition(&spokeCore.Status.Conditions, nucleusapiv1.StatusCondition{
 			Type:    spokeCoreApplied,
 			Status:  metav1.ConditionFalse,
