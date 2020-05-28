@@ -12,7 +12,7 @@ rules:
   verbs: ["create"]
 - apiGroups: [""]
   resources: ["namespaces"]
-  verbs: ["get", "list", "watch"]
+  verbs: ["create", "get", "list", "watch"]
 - apiGroups: ["", "events.k8s.io"]
   resources: ["events"]
   verbs: ["create", "patch", "update"]
@@ -25,7 +25,7 @@ rules:
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterroles", "roles"]
   verbs: ["create", "get", "list", "update", "watch", "patch", "delete", "escalate", "bind"]
-# Allow nuclues to manage nucleus apis.
+# Allow nucleus to manage nucleus apis.
 - apiGroups: ["nucleus.open-cluster-management.io"]
   resources: ["spokecores"]
   verbs: ["get", "list", "watch", "update", "patch", "delete"]

@@ -39,6 +39,7 @@ const (
 	hubKubeConfigSecret          = "hub-kubeconfig-secret"
 	nucleusSpokeCoreNamespace    = "open-cluster-management-spoke"
 	spokeCoreApplied             = "Applied"
+	spokeRegistrationDegraded    = "SpokeRegistrationDegraded"
 )
 
 var (
@@ -163,25 +164,17 @@ func (n *nucleusSpokeController) sync(ctx context.Context, controllerContext fac
 			ObjectMeta: metav1.ObjectMeta{Name: config.SpokeCoreNamespace},
 		}, metav1.CreateOptions{})
 		if createErr != nil {
-			helpers.SetNucleusCondition(&spokeCore.Status.Conditions, nucleusapiv1.StatusCondition{
-				Type:    spokeCoreApplied,
-				Status:  metav1.ConditionFalse,
-				Reason:  "SpokeCoreApplyFailed",
-				Message: fmt.Sprintf("Failed to create namespace %q", config.SpokeCoreNamespace),
-			})
-			helpers.UpdateNucleusSpokeStatus(
-				ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(spokeCore.Status.Conditions...))
+			helpers.UpdateNucleusSpokeStatus(ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(nucleusapiv1.StatusCondition{
+				Type: spokeCoreApplied, Status: metav1.ConditionFalse, Reason: "SpokeCoreApplyFailed",
+				Message: fmt.Sprintf("Failed to create namespace %q: %v", config.SpokeCoreNamespace, createErr),
+			}))
 			return createErr
 		}
 	case err != nil:
-		helpers.SetNucleusCondition(&spokeCore.Status.Conditions, nucleusapiv1.StatusCondition{
-			Type:    spokeCoreApplied,
-			Status:  metav1.ConditionFalse,
-			Reason:  "SpokeCoreApplyFailed",
-			Message: fmt.Sprintf("Failed to get namespace %q", config.SpokeCoreNamespace),
-		})
-		helpers.UpdateNucleusSpokeStatus(
-			ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(spokeCore.Status.Conditions...))
+		helpers.UpdateNucleusSpokeStatus(ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(nucleusapiv1.StatusCondition{
+			Type: spokeCoreApplied, Status: metav1.ConditionFalse, Reason: "SpokeCoreApplyFailed",
+			Message: fmt.Sprintf("Failed to get namespace %q: %v", config.SpokeCoreNamespace, err),
+		}))
 		return err
 	}
 
@@ -189,14 +182,10 @@ func (n *nucleusSpokeController) sync(ctx context.Context, controllerContext fac
 	_, err = n.kubeClient.CoreV1().Secrets(config.SpokeCoreNamespace).Get(
 		ctx, config.BootStrapKubeConfigSecret, metav1.GetOptions{})
 	if err != nil {
-		helpers.SetNucleusCondition(&spokeCore.Status.Conditions, nucleusapiv1.StatusCondition{
-			Type:    spokeCoreApplied,
-			Status:  metav1.ConditionFalse,
-			Reason:  "SpokeCoreApplyFailed",
-			Message: fmt.Sprintf("Failed to get bootstrap secret %s/%s", config.SpokeCoreNamespace, config.BootStrapKubeConfigSecret),
-		})
-		helpers.UpdateNucleusSpokeStatus(
-			ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(spokeCore.Status.Conditions...))
+		helpers.UpdateNucleusSpokeStatus(ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(nucleusapiv1.StatusCondition{
+			Type: spokeCoreApplied, Status: metav1.ConditionFalse, Reason: "SpokeCoreApplyFailed",
+			Message: fmt.Sprintf("Failed to get bootstrap secret -n %q %q: %v", config.SpokeCoreNamespace, config.BootStrapKubeConfigSecret, err),
+		}))
 		return err
 	}
 
@@ -219,22 +208,18 @@ func (n *nucleusSpokeController) sync(ctx context.Context, controllerContext fac
 
 	if len(errs) > 0 {
 		applyErrors := operatorhelpers.NewMultiLineAggregate(errs)
-		helpers.SetNucleusCondition(&spokeCore.Status.Conditions, nucleusapiv1.StatusCondition{
-			Type:    spokeCoreApplied,
-			Status:  metav1.ConditionFalse,
-			Reason:  "SpokeCoreApplyFailed",
+		helpers.UpdateNucleusSpokeStatus(ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(nucleusapiv1.StatusCondition{
+			Type: spokeCoreApplied, Status: metav1.ConditionFalse, Reason: "SpokeCoreApplyFailed",
 			Message: applyErrors.Error(),
-		})
-		helpers.UpdateNucleusSpokeStatus(
-			ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(spokeCore.Status.Conditions...))
+		}))
 		return applyErrors
 	}
 
 	// Create hub config secret
-	hubSecret, err := n.kubeClient.CoreV1().Secrets(config.SpokeCoreNamespace).Get(
-		ctx, hubKubeConfigSecret, metav1.GetOptions{})
-	if errors.IsNotFound(err) {
-		// Craete an empty secret with placeholder
+	hubSecret, err := n.kubeClient.CoreV1().Secrets(config.SpokeCoreNamespace).Get(ctx, hubKubeConfigSecret, metav1.GetOptions{})
+	switch {
+	case errors.IsNotFound(err):
+		// Create an empty secret with placeholder
 		hubSecret = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      hubKubeConfigSecret,
@@ -244,50 +229,64 @@ func (n *nucleusSpokeController) sync(ctx context.Context, controllerContext fac
 		}
 		hubSecret, err = n.kubeClient.CoreV1().Secrets(config.SpokeCoreNamespace).Create(ctx, hubSecret, metav1.CreateOptions{})
 		if err != nil {
+			helpers.UpdateNucleusSpokeStatus(ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(nucleusapiv1.StatusCondition{
+				Type: spokeCoreApplied, Status: metav1.ConditionFalse, Reason: "SpokeCoreApplyFailed",
+				Message: fmt.Sprintf("Failed to create hub kubeconfig secret -n %q %q: %v", hubSecret.Namespace, hubSecret.Name, err),
+			}))
 			return err
 		}
-	}
-
-	if err != nil {
-		helpers.SetNucleusCondition(&spokeCore.Status.Conditions, nucleusapiv1.StatusCondition{
-			Type:    spokeCoreApplied,
-			Status:  metav1.ConditionFalse,
-			Reason:  "SpokeCoreApplyFailed",
+	case err != nil:
+		helpers.UpdateNucleusSpokeStatus(ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(nucleusapiv1.StatusCondition{
+			Type: spokeCoreApplied, Status: metav1.ConditionFalse, Reason: "SpokeCoreApplyFailed",
 			Message: fmt.Sprintf("Failed to get hub kubeconfig secret with error %v", err),
-		})
-		helpers.UpdateNucleusSpokeStatus(
-			ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(spokeCore.Status.Conditions...))
+		}))
 		return err
 	}
 
 	// Deploy registration agent
-	generation, err := n.applyDeployment(
-		config, "manifests/spoke/spoke-registration-deployment.yaml", n.registrationGeneration, controllerContext)
+	generation, err := n.applyDeployment(config, "manifests/spoke/spoke-registration-deployment.yaml", n.registrationGeneration, controllerContext)
 	if err != nil {
-		helpers.SetNucleusCondition(&spokeCore.Status.Conditions, nucleusapiv1.StatusCondition{
-			Type:    spokeCoreApplied,
-			Status:  metav1.ConditionFalse,
-			Reason:  "SpokeCoreApplyFailed",
+		helpers.UpdateNucleusSpokeStatus(ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(nucleusapiv1.StatusCondition{
+			Type: spokeCoreApplied, Status: metav1.ConditionFalse, Reason: "SpokeCoreApplyFailed",
 			Message: fmt.Sprintf("Failed to deploy registration deployment with error %v", err),
-		})
-		helpers.UpdateNucleusSpokeStatus(
-			ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(spokeCore.Status.Conditions...))
+		}))
 		return err
 	}
+	// TODO store this in the status of the spokecore itself
 	n.registrationGeneration = generation
+
+	// Deploy work agent
+	generation, err = n.applyDeployment(
+		config, "manifests/spoke/spoke-work-deployment.yaml", n.workGeneration, controllerContext)
+	if err != nil {
+		helpers.UpdateNucleusSpokeStatus(ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(nucleusapiv1.StatusCondition{
+			Type: spokeCoreApplied, Status: metav1.ConditionFalse, Reason: "SpokeCoreApplyFailed",
+			Message: fmt.Sprintf("Failed to deploy work deployment with error %v", err),
+		}))
+		return err
+	}
+	// TODO store this in the status of the spokecore itself
+	n.workGeneration = generation
+
+	// if we get here, we have successfully applied everything and should indicate that
+	helpers.UpdateNucleusSpokeStatus(ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(nucleusapiv1.StatusCondition{
+		Type: spokeCoreApplied, Status: metav1.ConditionTrue, Reason: "SpokeCoreApplied",
+		Message: "Spoke Core Component Applied",
+	}))
+
+	// now that we have applied all of our logic, we can check to see if the data we expect to have present as indications of
+	// proper functioning of registration controller is working
+	// TODO this should be moved into a separate loop since it is independent of the application of the eventually consistent
+	//  resources above
 
 	// If cluster name is empty, read cluster name from hub config secret
 	if config.ClusterName == "" {
 		clusterName := hubSecret.Data["cluster-name"]
 		if clusterName == nil {
-			helpers.SetNucleusCondition(&spokeCore.Status.Conditions, nucleusapiv1.StatusCondition{
-				Type:    spokeCoreApplied,
-				Status:  metav1.ConditionFalse,
-				Reason:  "SpokeCoreApplyFailed",
-				Message: fmt.Sprintf("Failed to get cluster name"),
-			})
-			helpers.UpdateNucleusSpokeStatus(
-				ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(spokeCore.Status.Conditions...))
+			helpers.UpdateNucleusSpokeStatus(ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(nucleusapiv1.StatusCondition{
+				Type: spokeRegistrationDegraded, Status: metav1.ConditionTrue, Reason: "ClusterNameMissing",
+				Message: fmt.Sprintf("Failed to get cluster name from `kubectl get secret -n %q %q -ojsonpath='{.data.cluster-name}`.  This is set by the spoke registration deployment.", hubSecret.Namespace, hubSecret.Name),
+			}))
 			return fmt.Errorf("Failed to get cluster name")
 		}
 		config.ClusterName = string(clusterName)
@@ -295,35 +294,19 @@ func (n *nucleusSpokeController) sync(ctx context.Context, controllerContext fac
 
 	// If hub kubeconfig does not exist, return err.
 	if hubSecret.Data["kubeconfig"] == nil {
+		helpers.UpdateNucleusSpokeStatus(ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(nucleusapiv1.StatusCondition{
+			Type: spokeRegistrationDegraded, Status: metav1.ConditionTrue, Reason: "HubKubeconfigMissing",
+			Message: fmt.Sprintf("Failed to get cluster name from `kubectl get secret -n %q %q -ojsonpath='{.data.kubeconfig}`.  This is set by the spoke registration deployment, but the CSR must be approved by the cluster-admin on the hub.", hubSecret.Namespace, hubSecret.Name),
+		}))
 		return fmt.Errorf("Failed to get kubeconfig from hub kubeconfig secret")
 	}
+	// TODO it is possible to verify the kubeconfig actually works.
 
-	// Deploy work agent
-	generation, err = n.applyDeployment(
-		config, "manifests/spoke/spoke-work-deployment.yaml", n.workGeneration, controllerContext)
-	if err != nil {
-		helpers.SetNucleusCondition(&spokeCore.Status.Conditions, nucleusapiv1.StatusCondition{
-			Type:    spokeCoreApplied,
-			Status:  metav1.ConditionFalse,
-			Reason:  "SpokeCoreApplyFailed",
-			Message: fmt.Sprintf("Failed to deploy work deployment with error %v", err),
-		})
-		helpers.UpdateNucleusSpokeStatus(
-			ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(spokeCore.Status.Conditions...))
-		return err
-	}
-	n.workGeneration = generation
-
-	// Update status
-	helpers.SetNucleusCondition(&spokeCore.Status.Conditions, nucleusapiv1.StatusCondition{
-		Type:    spokeCoreApplied,
-		Status:  metav1.ConditionTrue,
-		Reason:  "SpokeCoreApplied",
-		Message: "Spoke Core Component Applied",
-	})
-	helpers.UpdateNucleusSpokeStatus(
-		ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(spokeCore.Status.Conditions...))
-	return err
+	helpers.UpdateNucleusSpokeStatus(ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(nucleusapiv1.StatusCondition{
+		Type: spokeRegistrationDegraded, Status: metav1.ConditionFalse, Reason: "RegistrationFunctional",
+		Message: "Registration is managing credentials",
+	}))
+	return nil
 }
 
 func (n *nucleusSpokeController) applyDeployment(

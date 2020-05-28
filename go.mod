@@ -3,6 +3,7 @@ module github.com/open-cluster-management/nucleus
 go 1.13
 
 require (
+	github.com/davecgh/go-spew v1.1.1
 	github.com/jteeuwen/go-bindata v3.0.8-0.20151023091102-a0ff2567cfb7+incompatible
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
