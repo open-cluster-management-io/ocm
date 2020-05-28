@@ -193,7 +193,7 @@ func (n *nucleusSpokeController) sync(ctx context.Context, controllerContext fac
 			Type:    spokeCoreApplied,
 			Status:  metav1.ConditionFalse,
 			Reason:  "SpokeCoreApplyFailed",
-			Message: fmt.Sprintf("Failed to get bootstracp secret %s/%s", config.SpokeCoreNamespace, config.BootStrapKubeConfigSecret),
+			Message: fmt.Sprintf("Failed to get bootstrap secret %s/%s", config.SpokeCoreNamespace, config.BootStrapKubeConfigSecret),
 		})
 		helpers.UpdateNucleusSpokeStatus(
 			ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(spokeCore.Status.Conditions...))
