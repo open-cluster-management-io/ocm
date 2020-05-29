@@ -11,13 +11,27 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	lib/tmp.mk\
 )
 
+# IMAGE_NAME can be set in the env to override calculate value for nucleus image
 IMAGE_REGISTRY?=quay.io/open-cluster-management
+IMAGE_TAG?=latest
+IMAGE_NAME?=$(IMAGE_REGISTRY)/nucleus:$(IMAGE_TAG)
+
+# WORK_IMAGE can be set in the env to override calculated value
+WORK_TAG?=latest
+WORK_IMAGE?=$(IMAGE_REGISTRY)/work:$(WORK_TAG)
+
+# REGISTRATION_IMAGE can be set in the env to override calculated value
+REGISTRATION_TAG?=latest
+REGISTRATION_IMAGE?=$(IMAGE_REGISTRY)/registration:$(REGISTRATION_TAG)
+
 OPERATOR_SDK?=$(PERMANENT_TMP_GOPATH)/bin/operator-sdk
 OPERATOR_SDK_VERSION?=v0.17.0
 operatorsdk_gen_dir:=$(dir $(OPERATOR_SDK))
+# On openshift, OLM is installed into openshift-operator-lifecycle-manager
+OLM_NAMESPACE?=olm
+
 KUBECTL?=kubectl
 KUBECONFIG ?= ./.kubeconfig
-OLM_NAMESPACE?=olm
 
 OPERATOR_SDK_ARCHOS:=x86_64-linux-gnu
 ifeq ($(GOHOSTOS),darwin)
@@ -43,6 +57,18 @@ update-csv: ensure-operator-sdk
 	$(OPERATOR_SDK) generate csv --crd-dir=deploy/nucleus-hub/crds --deploy-dir=deploy/nucleus-hub --output-dir=deploy/nucleus-hub/olm-catalog/nucleus-hub --operator-name=nucleus-hub --csv-version=0.1.0
 	$(OPERATOR_SDK) generate csv --crd-dir=deploy/nucleus-spoke/crds --deploy-dir=deploy/nucleus-spoke --output-dir=deploy/nucleus-spoke/olm-catalog/nucleus-spoke --operator-name=nucleus-spoke --csv-version=0.1.0
 
+.PHONY: munge-csv
+munge-csv:
+	mkdir -p munge-csv
+	cp deploy/nucleus-hub/olm-catalog/nucleus-hub/manifests/nucleus-hub.clusterserviceversion.yaml munge-csv/nucleus-hub.clusterserviceversion.yaml.unmunged
+	sed -e "s,quay.io/open-cluster-management/nucleus:latest,$(IMAGE_NAME)," -i deploy/nucleus-hub/olm-catalog/nucleus-hub/manifests/nucleus-hub.clusterserviceversion.yaml
+	cp deploy/nucleus-spoke/olm-catalog/nucleus-spoke/manifests/nucleus-spoke.clusterserviceversion.yaml munge-csv/nucleus-spoke.clusterserviceversion.yaml.unmunged
+	sed -e "s,quay.io/open-cluster-management/nucleus:latest,$(IMAGE_NAME)," -i deploy/nucleus-spoke/olm-catalog/nucleus-spoke/manifests/nucleus-spoke.clusterserviceversion.yaml
+
+unmunge-csv:
+	mv munge-csv/nucleus-hub.clusterserviceversion.yaml.unmunged deploy/nucleus-hub/olm-catalog/nucleus-hub/manifests/nucleus-hub.clusterserviceversion.yaml
+	mv munge-csv/nucleus-spoke.clusterserviceversion.yaml.unmunged deploy/nucleus-spoke/olm-catalog/nucleus-spoke/manifests/nucleus-spoke.clusterserviceversion.yaml
+
 deploy: install-olm deploy-hub deploy-spoke
 
 clean-deploy: clean-spoke clean-hub
@@ -53,10 +79,10 @@ install-olm: ensure-operator-sdk
 
 deploy-hub: install-olm
 	$(OPERATOR_SDK) run --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/nucleus-hub/olm-catalog/nucleus-hub --olm-namespace $(OLM_NAMESPACE)
-	$(KUBECTL) apply -f deploy/nucleus-hub/crds/nucleus_open-clustere-management_hubcores.cr.yaml
+	sed -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," deploy/nucleus-hub/crds/nucleus_open-cluster-management_hubcores.cr.yaml | $(KUBECTL) apply -f -
 
 clean-hub: ensure-operator-sdk
-	$(KUBECTL) delete -f deploy/nucleus-hub/crds/nucleus_open-clustere-management_hubcores.cr.yaml
+	$(KUBECTL) delete -f deploy/nucleus-hub/crds/nucleus_open-cluster-management_hubcores.cr.yaml
 	$(OPERATOR_SDK) cleanup --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/nucleus-hub/olm-catalog/nucleus-hub --olm-namespace $(OLM_NAMESPACE)
 
 cluster-ip: 
@@ -79,10 +105,10 @@ e2e-bootstrap-secret: cluster-ip
 
 deploy-spoke: install-olm bootstrap-secret
 	$(OPERATOR_SDK) run --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/nucleus-spoke/olm-catalog/nucleus-spoke --olm-namespace $(OLM_NAMESPACE)
-	$(KUBECTL) apply -f deploy/nucleus-spoke/crds/nucleus_open-clustere-management_spokecores.cr.yaml
+	sed -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," deploy/nucleus-spoke/crds/nucleus_open-cluster-management_spokecores.cr.yaml | $(KUBECTL) apply -f -
 
 clean-spoke: ensure-operator-sdk
-	$(KUBECTL) delete -f deploy/nucleus-spoke/crds/nucleus_open-clustere-management_spokecores.cr.yaml
+	$(KUBECTL) delete -f deploy/nucleus-spoke/crds/nucleus_open-cluster-management_spokecores.cr.yaml
 	$(OPERATOR_SDK) cleanup --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/nucleus-spoke/olm-catalog/nucleus-spoke --olm-namespace $(OLM_NAMESPACE)
 
 ensure-operator-sdk:
