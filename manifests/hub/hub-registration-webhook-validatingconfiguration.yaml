@@ -1,0 +1,26 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: spokeclustervalidators.admission.cluster.open-cluster-management.io
+webhooks:
+- name: spokeclustervalidators.admission.cluster.open-cluster-management.io
+  failurePolicy: Fail
+  clientConfig:
+    service:
+      # reach the webhook via the registered aggregated API
+      namespace: default
+      name: kubernetes
+      path: /apis/admission.cluster.open-cluster-management.io/v1/spokeclustervalidators
+  rules:
+  - operations:
+    - CREATE
+    - UPDATE
+    apiGroups:
+    - cluster.open-cluster-management.io
+    apiVersions:
+    - "*"
+    resources:
+    - spokeclusters
+  admissionReviewVersions: ["v1beta1"]
+  sideEffects: None
+  timeoutSeconds: 3

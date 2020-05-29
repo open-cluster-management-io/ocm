@@ -6,20 +6,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 
-	"github.com/openshift/api"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -43,9 +39,6 @@ const (
 )
 
 var (
-	genericScheme       = runtime.NewScheme()
-	genericCodecs       = serializer.NewCodecFactory(genericScheme)
-	genericCodec        = genericCodecs.UniversalDeserializer()
 	staticResourceFiles = []string{
 		"manifests/spoke/spoke-registration-serviceaccount.yaml",
 		"manifests/spoke/spoke-registration-clusterrole.yaml",
@@ -65,10 +58,6 @@ type nucleusSpokeController struct {
 	kubeClient             kubernetes.Interface
 	registrationGeneration int64
 	workGeneration         int64
-}
-
-func init() {
-	utilruntime.Must(api.InstallKube(genericScheme))
 }
 
 // NewNucleusSpokeController construct nucleus spoke controller
@@ -244,7 +233,14 @@ func (n *nucleusSpokeController) sync(ctx context.Context, controllerContext fac
 	}
 
 	// Deploy registration agent
-	generation, err := n.applyDeployment(config, "manifests/spoke/spoke-registration-deployment.yaml", n.registrationGeneration, controllerContext)
+	generation, err := helpers.ApplyDeployment(
+		n.kubeClient,
+		n.registrationGeneration,
+		func(name string) ([]byte, error) {
+			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
+		},
+		controllerContext.Recorder(),
+		"manifests/spoke/spoke-registration-deployment.yaml")
 	if err != nil {
 		helpers.UpdateNucleusSpokeStatus(ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(nucleusapiv1.StatusCondition{
 			Type: spokeCoreApplied, Status: metav1.ConditionFalse, Reason: "SpokeCoreApplyFailed",
@@ -256,8 +252,14 @@ func (n *nucleusSpokeController) sync(ctx context.Context, controllerContext fac
 	n.registrationGeneration = generation
 
 	// Deploy work agent
-	generation, err = n.applyDeployment(
-		config, "manifests/spoke/spoke-work-deployment.yaml", n.workGeneration, controllerContext)
+	generation, err = helpers.ApplyDeployment(
+		n.kubeClient,
+		n.workGeneration,
+		func(name string) ([]byte, error) {
+			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
+		},
+		controllerContext.Recorder(),
+		"manifests/spoke/spoke-work-deployment.yaml")
 	if err != nil {
 		helpers.UpdateNucleusSpokeStatus(ctx, n.nucleusClient, spokeCoreName, helpers.UpdateNucleusSpokeConditionFn(nucleusapiv1.StatusCondition{
 			Type: spokeCoreApplied, Status: metav1.ConditionFalse, Reason: "SpokeCoreApplyFailed",
@@ -309,32 +311,6 @@ func (n *nucleusSpokeController) sync(ctx context.Context, controllerContext fac
 	return nil
 }
 
-func (n *nucleusSpokeController) applyDeployment(
-	config spokeConfig, file string, generation int64, controllerContext factory.SyncContext) (int64, error) {
-	deploymentRaw := assets.MustCreateAssetFromTemplate(
-		file,
-		bindata.MustAsset(filepath.Join("", file)), config).Data
-	deployment, _, err := genericCodec.Decode(deploymentRaw, nil, nil)
-	if err != nil {
-		return 0, fmt.Errorf("%q: %v", file, err)
-	}
-	updatedDeployment, updated, err := resourceapply.ApplyDeployment(
-		n.kubeClient.AppsV1(),
-		controllerContext.Recorder(),
-		deployment.(*appsv1.Deployment), generation, false)
-	if err != nil {
-		klog.Errorf("Failed to apply hub deployment manifest: %v", err)
-		return 0, fmt.Errorf("%q (%T): %v", file, deployment, err)
-	}
-
-	// Record the generation, so the deployment is only updated when generation is changed.
-	if updated {
-		generation = updatedDeployment.ObjectMeta.Generation
-	}
-
-	return generation, nil
-}
-
 func (n *nucleusSpokeController) cleanUp(ctx context.Context, controllerContext factory.SyncContext, config spokeConfig) error {
 	// Remove deployment
 	registrationDeployment := fmt.Sprintf("%s-registration-agent", config.SpokeCoreName)
@@ -358,14 +334,16 @@ func (n *nucleusSpokeController) cleanUp(ctx context.Context, controllerContext 
 
 	// Remove Static files
 	for _, file := range staticResourceFiles {
-		objectRaw := assets.MustCreateAssetFromTemplate(
+		err := helpers.CleanUpStaticObject(
+			ctx,
+			n.kubeClient,
+			nil,
+			nil,
+			func(name string) ([]byte, error) {
+				return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
+			},
 			file,
-			bindata.MustAsset(filepath.Join("", file)), config).Data
-		object, _, err := genericCodec.Decode(objectRaw, nil, nil)
-		if err != nil {
-			return err
-		}
-		err = helpers.CleanUpStaticObject(ctx, n.kubeClient, nil, object)
+		)
 		if err != nil {
 			return err
 		}

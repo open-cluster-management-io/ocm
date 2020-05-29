@@ -84,7 +84,7 @@ deploy-hub: install-olm munge-hub-csv
 	sed -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," deploy/nucleus-hub/crds/nucleus_open-cluster-management_hubcores.cr.yaml | $(KUBECTL) apply -f -
 
 clean-hub: ensure-operator-sdk
-	$(KUBECTL) delete -f deploy/nucleus-hub/crds/nucleus_open-cluster-management_hubcores.cr.yaml
+	$(KUBECTL) delete -f deploy/nucleus-hub/crds/nucleus_open-cluster-management_hubcores.cr.yaml --ignore-not-found
 	$(OPERATOR_SDK) cleanup --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/nucleus-hub/olm-catalog/nucleus-hub --olm-namespace $(OLM_NAMESPACE)
 
 cluster-ip: 
@@ -110,7 +110,7 @@ deploy-spoke: install-olm munge-spoke-csv bootstrap-secret
 	sed -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," deploy/nucleus-spoke/crds/nucleus_open-cluster-management_spokecores.cr.yaml | $(KUBECTL) apply -f -
 
 clean-spoke: ensure-operator-sdk
-	$(KUBECTL) delete -f deploy/nucleus-spoke/crds/nucleus_open-cluster-management_spokecores.cr.yaml
+	$(KUBECTL) delete -f deploy/nucleus-spoke/crds/nucleus_open-cluster-management_spokecores.cr.yaml --ignore-not-found
 	$(OPERATOR_SDK) cleanup --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/nucleus-spoke/olm-catalog/nucleus-spoke --olm-namespace $(OLM_NAMESPACE)
 
 ensure-operator-sdk:

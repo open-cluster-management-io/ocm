@@ -6,6 +6,7 @@ import (
 
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/kubernetes"
+	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
@@ -26,6 +27,10 @@ func RunNucleusHubOperator(ctx context.Context, controllerContext *controllercmd
 	if err != nil {
 		return err
 	}
+	apiRegistrationClient, err := apiregistrationclient.NewForConfig(controllerContext.KubeConfig)
+	if err != nil {
+		return err
+	}
 
 	// Build nucleus client and informer
 	nucleusClient, err := nucleusclient.NewForConfig(controllerContext.KubeConfig)
@@ -37,6 +42,7 @@ func RunNucleusHubOperator(ctx context.Context, controllerContext *controllercmd
 	hubcontroller := hub.NewNucleusHubController(
 		kubeClient,
 		apiExtensionClient,
+		apiRegistrationClient.ApiregistrationV1(),
 		nucleusClient.NucleusV1().HubCores(),
 		nucleusInformer.Nucleus().V1().HubCores(),
 		controllerContext.EventRecorder)

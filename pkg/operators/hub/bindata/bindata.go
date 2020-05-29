@@ -2,11 +2,19 @@
 // sources:
 // manifests/hub/0000_00_clusters.open-cluster-management.io_spokeclusters.crd.yaml
 // manifests/hub/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml
-// manifests/hub/hub-clusterrole.yaml
-// manifests/hub/hub-clusterrolebinding.yaml
-// manifests/hub/hub-deployment.yaml
 // manifests/hub/hub-namespace.yaml
-// manifests/hub/hub-serviceaccount.yaml
+// manifests/hub/hub-registration-clusterrole.yaml
+// manifests/hub/hub-registration-clusterrolebinding.yaml
+// manifests/hub/hub-registration-deployment.yaml
+// manifests/hub/hub-registration-serviceaccount.yaml
+// manifests/hub/hub-registration-webhook-apiservice.yaml
+// manifests/hub/hub-registration-webhook-clusterrole.yaml
+// manifests/hub/hub-registration-webhook-clusterrolebinding.yaml
+// manifests/hub/hub-registration-webhook-deployment.yaml
+// manifests/hub/hub-registration-webhook-secret.yaml
+// manifests/hub/hub-registration-webhook-service.yaml
+// manifests/hub/hub-registration-webhook-serviceaccount.yaml
+// manifests/hub/hub-registration-webhook-validatingconfiguration.yaml
 // DO NOT EDIT!
 
 package bindata
@@ -411,10 +419,31 @@ func manifestsHub0000_00_workOpenClusterManagementIo_manifestworksCrdYaml() (*as
 	return a, nil
 }
 
-var _manifestsHubHubClusterroleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+var _manifestsHubHubNamespaceYaml = []byte(`apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .HubCoreNamespace }}
+`)
+
+func manifestsHubHubNamespaceYamlBytes() ([]byte, error) {
+	return _manifestsHubHubNamespaceYaml, nil
+}
+
+func manifestsHubHubNamespaceYaml() (*asset, error) {
+	bytes, err := manifestsHubHubNamespaceYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "manifests/hub/hub-namespace.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _manifestsHubHubRegistrationClusterroleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: system:open-cluster-management:{{ .HubCoreName }}
+  name: system:open-cluster-management:{{ .HubCoreName }}-registration-controller
 rules:
 # Allow hub to monitor and update status of csr
 - apiGroups: ["certificates.k8s.io"]
@@ -449,70 +478,70 @@ rules:
   verbs: ["update", "patch"]
 `)
 
-func manifestsHubHubClusterroleYamlBytes() ([]byte, error) {
-	return _manifestsHubHubClusterroleYaml, nil
+func manifestsHubHubRegistrationClusterroleYamlBytes() ([]byte, error) {
+	return _manifestsHubHubRegistrationClusterroleYaml, nil
 }
 
-func manifestsHubHubClusterroleYaml() (*asset, error) {
-	bytes, err := manifestsHubHubClusterroleYamlBytes()
+func manifestsHubHubRegistrationClusterroleYaml() (*asset, error) {
+	bytes, err := manifestsHubHubRegistrationClusterroleYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "manifests/hub/hub-clusterrole.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "manifests/hub/hub-registration-clusterrole.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _manifestsHubHubClusterrolebindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+var _manifestsHubHubRegistrationClusterrolebindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: system:open-cluster-management:{{ .HubCoreName }}
+  name: system:open-cluster-management:{{ .HubCoreName }}-registration-controller
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: system:open-cluster-management:{{ .HubCoreName }}
+  name: system:open-cluster-management:{{ .HubCoreName }}-registration-controller
 subjects:
 - kind: ServiceAccount
   namespace: {{ .HubCoreNamespace }}
-  name: {{ .HubCoreName }}-sa
+  name: {{ .HubCoreName }}-registration-controller-sa
 `)
 
-func manifestsHubHubClusterrolebindingYamlBytes() ([]byte, error) {
-	return _manifestsHubHubClusterrolebindingYaml, nil
+func manifestsHubHubRegistrationClusterrolebindingYamlBytes() ([]byte, error) {
+	return _manifestsHubHubRegistrationClusterrolebindingYaml, nil
 }
 
-func manifestsHubHubClusterrolebindingYaml() (*asset, error) {
-	bytes, err := manifestsHubHubClusterrolebindingYamlBytes()
+func manifestsHubHubRegistrationClusterrolebindingYaml() (*asset, error) {
+	bytes, err := manifestsHubHubRegistrationClusterrolebindingYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "manifests/hub/hub-clusterrolebinding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "manifests/hub/hub-registration-clusterrolebinding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _manifestsHubHubDeploymentYaml = []byte(`kind: Deployment
+var _manifestsHubHubRegistrationDeploymentYaml = []byte(`kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: {{ .HubCoreName }}-controller
+  name: {{ .HubCoreName }}-registration-controller
   namespace: {{ .HubCoreNamespace }}
   labels:
-    app: nucleushub-controller
+    app: nucleushub-registration-controller
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: nucleushub-controller
+      app: nucleushub-registration-controller
   template:
     metadata:
       labels:
-        app: nucleushub-controller
+        app: nucleushub-registration-controller
     spec:
-      serviceAccountName: {{ .HubCoreName }}-sa
+      serviceAccountName: {{ .HubCoreName }}-registration-controller-sa
       containers:
-      - name: hub-controller
+      - name: hub-registration-controller
         image: {{ .RegistrationImage }}
         imagePullPolicy: IfNotPresent
         args:
@@ -533,60 +562,315 @@ spec:
           initialDelaySeconds: 2
 `)
 
-func manifestsHubHubDeploymentYamlBytes() ([]byte, error) {
-	return _manifestsHubHubDeploymentYaml, nil
+func manifestsHubHubRegistrationDeploymentYamlBytes() ([]byte, error) {
+	return _manifestsHubHubRegistrationDeploymentYaml, nil
 }
 
-func manifestsHubHubDeploymentYaml() (*asset, error) {
-	bytes, err := manifestsHubHubDeploymentYamlBytes()
+func manifestsHubHubRegistrationDeploymentYaml() (*asset, error) {
+	bytes, err := manifestsHubHubRegistrationDeploymentYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "manifests/hub/hub-deployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "manifests/hub/hub-registration-deployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _manifestsHubHubNamespaceYaml = []byte(`apiVersion: v1
-kind: Namespace
-metadata:
-  name: {{ .HubCoreNamespace }}
-`)
-
-func manifestsHubHubNamespaceYamlBytes() ([]byte, error) {
-	return _manifestsHubHubNamespaceYaml, nil
-}
-
-func manifestsHubHubNamespaceYaml() (*asset, error) {
-	bytes, err := manifestsHubHubNamespaceYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "manifests/hub/hub-namespace.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _manifestsHubHubServiceaccountYaml = []byte(`apiVersion: v1
+var _manifestsHubHubRegistrationServiceaccountYaml = []byte(`apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ .HubCoreName }}-sa
+  name: {{ .HubCoreName }}-registration-controller-sa
   namespace: {{ .HubCoreNamespace }}
 `)
 
-func manifestsHubHubServiceaccountYamlBytes() ([]byte, error) {
-	return _manifestsHubHubServiceaccountYaml, nil
+func manifestsHubHubRegistrationServiceaccountYamlBytes() ([]byte, error) {
+	return _manifestsHubHubRegistrationServiceaccountYaml, nil
 }
 
-func manifestsHubHubServiceaccountYaml() (*asset, error) {
-	bytes, err := manifestsHubHubServiceaccountYamlBytes()
+func manifestsHubHubRegistrationServiceaccountYaml() (*asset, error) {
+	bytes, err := manifestsHubHubRegistrationServiceaccountYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "manifests/hub/hub-serviceaccount.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "manifests/hub/hub-registration-serviceaccount.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _manifestsHubHubRegistrationWebhookApiserviceYaml = []byte(`apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1.admission.cluster.open-cluster-management.io
+spec:
+  group: admission.cluster.open-cluster-management.io
+  version: v1
+  service:
+    name: {{ .HubCoreWebhookRegistrationService }}
+    namespace: {{ .HubCoreNamespace }}
+  caBundle: {{ .RegistrationAPIServiceCABundle }}
+  groupPriorityMinimum: 10000
+  versionPriority: 20
+`)
+
+func manifestsHubHubRegistrationWebhookApiserviceYamlBytes() ([]byte, error) {
+	return _manifestsHubHubRegistrationWebhookApiserviceYaml, nil
+}
+
+func manifestsHubHubRegistrationWebhookApiserviceYaml() (*asset, error) {
+	bytes, err := manifestsHubHubRegistrationWebhookApiserviceYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "manifests/hub/hub-registration-webhook-apiservice.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _manifestsHubHubRegistrationWebhookClusterroleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:open-cluster-management:{{ .HubCoreName }}-registration-webhook
+rules:
+# Allow spokecluster admission to get/list/watch configmaps
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+# Allow spokecluster admission to create subjectaccessreviews
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["create"]
+`)
+
+func manifestsHubHubRegistrationWebhookClusterroleYamlBytes() ([]byte, error) {
+	return _manifestsHubHubRegistrationWebhookClusterroleYaml, nil
+}
+
+func manifestsHubHubRegistrationWebhookClusterroleYaml() (*asset, error) {
+	bytes, err := manifestsHubHubRegistrationWebhookClusterroleYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "manifests/hub/hub-registration-webhook-clusterrole.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _manifestsHubHubRegistrationWebhookClusterrolebindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:open-cluster-management:{{ .HubCoreName }}-registration-webhook
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .HubCoreName }}-registration-webhook
+subjects:
+  - kind: ServiceAccount
+    name: {{ .HubCoreName }}-registration-webhook-sa
+    namespace: {{ .HubCoreNamespace }}
+`)
+
+func manifestsHubHubRegistrationWebhookClusterrolebindingYamlBytes() ([]byte, error) {
+	return _manifestsHubHubRegistrationWebhookClusterrolebindingYaml, nil
+}
+
+func manifestsHubHubRegistrationWebhookClusterrolebindingYaml() (*asset, error) {
+	bytes, err := manifestsHubHubRegistrationWebhookClusterrolebindingYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "manifests/hub/hub-registration-webhook-clusterrolebinding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _manifestsHubHubRegistrationWebhookDeploymentYaml = []byte(`apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .HubCoreName }}-registration-webhook
+  namespace: {{ .HubCoreNamespace }}
+  labels:
+    app: {{ .HubCoreName }}-registration-webhook
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: {{ .HubCoreName }}-registration-webhook
+  template:
+    metadata:
+      labels:
+        app: {{ .HubCoreName }}-registration-webhook
+    spec:
+      serviceAccountName: {{ .HubCoreName }}-registration-webhook-sa
+      containers:
+      - name: {{ .HubCoreName }}-registration-webhook-sa
+        image: {{ .RegistrationImage }}
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/registration"
+          - "webhook"
+          - "--secure-port=6443"
+          - "--tls-cert-file=/serving-cert/tls.crt"
+          - "--tls-private-key-file=/serving-cert/tls.key"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 6443
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 6443
+          initialDelaySeconds: 2
+        volumeMounts:
+        - name: webhook-secret
+          mountPath: "/serving-cert"
+          readOnly: true
+      volumes:
+      - name: webhook-secret
+        secret:
+          secretName: {{ .HubCoreWebhookSecret }}
+
+`)
+
+func manifestsHubHubRegistrationWebhookDeploymentYamlBytes() ([]byte, error) {
+	return _manifestsHubHubRegistrationWebhookDeploymentYaml, nil
+}
+
+func manifestsHubHubRegistrationWebhookDeploymentYaml() (*asset, error) {
+	bytes, err := manifestsHubHubRegistrationWebhookDeploymentYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "manifests/hub/hub-registration-webhook-deployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _manifestsHubHubRegistrationWebhookSecretYaml = []byte(`apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .HubCoreWebhookSecret }}
+  namespace: {{ .HubCoreNamespace }}
+data:
+  tls.crt: {{ .RegistrationServingCert }}
+  tls.key: {{ .RegistrationServingKey }}
+  ca.crt: {{ .RegistrationAPIServiceCABundle }}
+type: Opaque
+`)
+
+func manifestsHubHubRegistrationWebhookSecretYamlBytes() ([]byte, error) {
+	return _manifestsHubHubRegistrationWebhookSecretYaml, nil
+}
+
+func manifestsHubHubRegistrationWebhookSecretYaml() (*asset, error) {
+	bytes, err := manifestsHubHubRegistrationWebhookSecretYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "manifests/hub/hub-registration-webhook-secret.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _manifestsHubHubRegistrationWebhookServiceYaml = []byte(`apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .HubCoreWebhookRegistrationService }}
+  namespace: {{ .HubCoreNamespace }}
+spec:
+  selector:
+    app: {{ .HubCoreName }}-registration-webhook
+  ports:
+  - port: 443
+    targetPort: 6443
+`)
+
+func manifestsHubHubRegistrationWebhookServiceYamlBytes() ([]byte, error) {
+	return _manifestsHubHubRegistrationWebhookServiceYaml, nil
+}
+
+func manifestsHubHubRegistrationWebhookServiceYaml() (*asset, error) {
+	bytes, err := manifestsHubHubRegistrationWebhookServiceYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "manifests/hub/hub-registration-webhook-service.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _manifestsHubHubRegistrationWebhookServiceaccountYaml = []byte(`apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .HubCoreName }}-registration-webhook-sa
+  namespace: {{ .HubCoreNamespace }}
+`)
+
+func manifestsHubHubRegistrationWebhookServiceaccountYamlBytes() ([]byte, error) {
+	return _manifestsHubHubRegistrationWebhookServiceaccountYaml, nil
+}
+
+func manifestsHubHubRegistrationWebhookServiceaccountYaml() (*asset, error) {
+	bytes, err := manifestsHubHubRegistrationWebhookServiceaccountYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "manifests/hub/hub-registration-webhook-serviceaccount.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _manifestsHubHubRegistrationWebhookValidatingconfigurationYaml = []byte(`apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: spokeclustervalidators.admission.cluster.open-cluster-management.io
+webhooks:
+- name: spokeclustervalidators.admission.cluster.open-cluster-management.io
+  failurePolicy: Fail
+  clientConfig:
+    service:
+      # reach the webhook via the registered aggregated API
+      namespace: default
+      name: kubernetes
+      path: /apis/admission.cluster.open-cluster-management.io/v1/spokeclustervalidators
+  rules:
+  - operations:
+    - CREATE
+    - UPDATE
+    apiGroups:
+    - cluster.open-cluster-management.io
+    apiVersions:
+    - "*"
+    resources:
+    - spokeclusters
+  admissionReviewVersions: ["v1beta1"]
+  sideEffects: None
+  timeoutSeconds: 3
+`)
+
+func manifestsHubHubRegistrationWebhookValidatingconfigurationYamlBytes() ([]byte, error) {
+	return _manifestsHubHubRegistrationWebhookValidatingconfigurationYaml, nil
+}
+
+func manifestsHubHubRegistrationWebhookValidatingconfigurationYaml() (*asset, error) {
+	bytes, err := manifestsHubHubRegistrationWebhookValidatingconfigurationYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "manifests/hub/hub-registration-webhook-validatingconfiguration.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -645,11 +929,19 @@ func AssetNames() []string {
 var _bindata = map[string]func() (*asset, error){
 	"manifests/hub/0000_00_clusters.open-cluster-management.io_spokeclusters.crd.yaml": manifestsHub0000_00_clustersOpenClusterManagementIo_spokeclustersCrdYaml,
 	"manifests/hub/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml":     manifestsHub0000_00_workOpenClusterManagementIo_manifestworksCrdYaml,
-	"manifests/hub/hub-clusterrole.yaml":                                               manifestsHubHubClusterroleYaml,
-	"manifests/hub/hub-clusterrolebinding.yaml":                                        manifestsHubHubClusterrolebindingYaml,
-	"manifests/hub/hub-deployment.yaml":                                                manifestsHubHubDeploymentYaml,
 	"manifests/hub/hub-namespace.yaml":                                                 manifestsHubHubNamespaceYaml,
-	"manifests/hub/hub-serviceaccount.yaml":                                            manifestsHubHubServiceaccountYaml,
+	"manifests/hub/hub-registration-clusterrole.yaml":                                  manifestsHubHubRegistrationClusterroleYaml,
+	"manifests/hub/hub-registration-clusterrolebinding.yaml":                           manifestsHubHubRegistrationClusterrolebindingYaml,
+	"manifests/hub/hub-registration-deployment.yaml":                                   manifestsHubHubRegistrationDeploymentYaml,
+	"manifests/hub/hub-registration-serviceaccount.yaml":                               manifestsHubHubRegistrationServiceaccountYaml,
+	"manifests/hub/hub-registration-webhook-apiservice.yaml":                           manifestsHubHubRegistrationWebhookApiserviceYaml,
+	"manifests/hub/hub-registration-webhook-clusterrole.yaml":                          manifestsHubHubRegistrationWebhookClusterroleYaml,
+	"manifests/hub/hub-registration-webhook-clusterrolebinding.yaml":                   manifestsHubHubRegistrationWebhookClusterrolebindingYaml,
+	"manifests/hub/hub-registration-webhook-deployment.yaml":                           manifestsHubHubRegistrationWebhookDeploymentYaml,
+	"manifests/hub/hub-registration-webhook-secret.yaml":                               manifestsHubHubRegistrationWebhookSecretYaml,
+	"manifests/hub/hub-registration-webhook-service.yaml":                              manifestsHubHubRegistrationWebhookServiceYaml,
+	"manifests/hub/hub-registration-webhook-serviceaccount.yaml":                       manifestsHubHubRegistrationWebhookServiceaccountYaml,
+	"manifests/hub/hub-registration-webhook-validatingconfiguration.yaml":              manifestsHubHubRegistrationWebhookValidatingconfigurationYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -697,11 +989,19 @@ var _bintree = &bintree{nil, map[string]*bintree{
 		"hub": {nil, map[string]*bintree{
 			"0000_00_clusters.open-cluster-management.io_spokeclusters.crd.yaml": {manifestsHub0000_00_clustersOpenClusterManagementIo_spokeclustersCrdYaml, map[string]*bintree{}},
 			"0000_00_work.open-cluster-management.io_manifestworks.crd.yaml":     {manifestsHub0000_00_workOpenClusterManagementIo_manifestworksCrdYaml, map[string]*bintree{}},
-			"hub-clusterrole.yaml":        {manifestsHubHubClusterroleYaml, map[string]*bintree{}},
-			"hub-clusterrolebinding.yaml": {manifestsHubHubClusterrolebindingYaml, map[string]*bintree{}},
-			"hub-deployment.yaml":         {manifestsHubHubDeploymentYaml, map[string]*bintree{}},
-			"hub-namespace.yaml":          {manifestsHubHubNamespaceYaml, map[string]*bintree{}},
-			"hub-serviceaccount.yaml":     {manifestsHubHubServiceaccountYaml, map[string]*bintree{}},
+			"hub-namespace.yaml":                                    {manifestsHubHubNamespaceYaml, map[string]*bintree{}},
+			"hub-registration-clusterrole.yaml":                     {manifestsHubHubRegistrationClusterroleYaml, map[string]*bintree{}},
+			"hub-registration-clusterrolebinding.yaml":              {manifestsHubHubRegistrationClusterrolebindingYaml, map[string]*bintree{}},
+			"hub-registration-deployment.yaml":                      {manifestsHubHubRegistrationDeploymentYaml, map[string]*bintree{}},
+			"hub-registration-serviceaccount.yaml":                  {manifestsHubHubRegistrationServiceaccountYaml, map[string]*bintree{}},
+			"hub-registration-webhook-apiservice.yaml":              {manifestsHubHubRegistrationWebhookApiserviceYaml, map[string]*bintree{}},
+			"hub-registration-webhook-clusterrole.yaml":             {manifestsHubHubRegistrationWebhookClusterroleYaml, map[string]*bintree{}},
+			"hub-registration-webhook-clusterrolebinding.yaml":      {manifestsHubHubRegistrationWebhookClusterrolebindingYaml, map[string]*bintree{}},
+			"hub-registration-webhook-deployment.yaml":              {manifestsHubHubRegistrationWebhookDeploymentYaml, map[string]*bintree{}},
+			"hub-registration-webhook-secret.yaml":                  {manifestsHubHubRegistrationWebhookSecretYaml, map[string]*bintree{}},
+			"hub-registration-webhook-service.yaml":                 {manifestsHubHubRegistrationWebhookServiceYaml, map[string]*bintree{}},
+			"hub-registration-webhook-serviceaccount.yaml":          {manifestsHubHubRegistrationWebhookServiceaccountYaml, map[string]*bintree{}},
+			"hub-registration-webhook-validatingconfiguration.yaml": {manifestsHubHubRegistrationWebhookValidatingconfigurationYaml, map[string]*bintree{}},
 		}},
 	}},
 }}

@@ -19,5 +19,6 @@ require (
 	k8s.io/client-go v0.18.2
 	k8s.io/component-base v0.18.2
 	k8s.io/klog v1.0.0
+	k8s.io/kube-aggregator v0.18.0
 	sigs.k8s.io/controller-runtime v0.6.0
 )

@@ -7,6 +7,8 @@ import (
 
 	nucleusv1client "github.com/open-cluster-management/api/client/nucleus/clientset/versioned/typed/nucleus/v1"
 	nucleusapiv1 "github.com/open-cluster-management/api/nucleus/v1"
+	admissionv1 "k8s.io/api/admissionregistration/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -16,9 +18,32 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
+	admissionclient "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	"k8s.io/client-go/util/retry"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
+
+	"github.com/openshift/api"
+	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 )
+
+var (
+	genericScheme = runtime.NewScheme()
+	genericCodecs = serializer.NewCodecFactory(genericScheme)
+	genericCodec  = genericCodecs.UniversalDeserializer()
+)
+
+func init() {
+	utilruntime.Must(api.InstallKube(genericScheme))
+	utilruntime.Must(apiextensionsv1beta1.AddToScheme(genericScheme))
+	utilruntime.Must(apiregistrationv1.AddToScheme(genericScheme))
+	utilruntime.Must(admissionv1.AddToScheme(genericScheme))
+}
 
 func IsConditionTrue(condition *nucleusapiv1.StatusCondition) bool {
 	if condition == nil {
@@ -159,9 +184,18 @@ func UpdateNucleusSpokeConditionFn(conds ...nucleusapiv1.StatusCondition) Update
 func CleanUpStaticObject(
 	ctx context.Context,
 	client kubernetes.Interface,
-	apiextensionclient apiextensionsclient.Interface,
-	object runtime.Object) error {
-	var err error
+	apiExtensionClient apiextensionsclient.Interface,
+	apiRegistrationClient apiregistrationclient.APIServicesGetter,
+	manifests resourceapply.AssetFunc,
+	file string) error {
+	objectRaw, err := manifests(file)
+	if err != nil {
+		return err
+	}
+	object, _, err := genericCodec.Decode(objectRaw, nil, nil)
+	if err != nil {
+		return err
+	}
 	switch t := object.(type) {
 	case *corev1.Namespace:
 		err = client.CoreV1().Namespaces().Delete(ctx, t.Name, metav1.DeleteOptions{})
@@ -182,9 +216,13 @@ func CleanUpStaticObject(
 	case *rbacv1.RoleBinding:
 		err = client.RbacV1().RoleBindings(t.Namespace).Delete(ctx, t.Name, metav1.DeleteOptions{})
 	case *apiextensionsv1.CustomResourceDefinition:
-		err = apiextensionclient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, t.Name, metav1.DeleteOptions{})
+		err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, t.Name, metav1.DeleteOptions{})
 	case *apiextensionsv1beta1.CustomResourceDefinition:
-		err = apiextensionclient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(ctx, t.Name, metav1.DeleteOptions{})
+		err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(ctx, t.Name, metav1.DeleteOptions{})
+	case *apiregistrationv1.APIService:
+		err = apiRegistrationClient.APIServices().Delete(ctx, t.Name, metav1.DeleteOptions{})
+	case *admissionv1.ValidatingWebhookConfiguration:
+		err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(ctx, t.Name, metav1.DeleteOptions{})
 	default:
 		err = fmt.Errorf("unhandled type %T", object)
 	}
@@ -192,4 +230,103 @@ func CleanUpStaticObject(
 		return nil
 	}
 	return err
+}
+
+func ApplyValidatingWebhookConfiguration(
+	client admissionclient.ValidatingWebhookConfigurationsGetter,
+	required *admissionv1.ValidatingWebhookConfiguration) (*admissionv1.ValidatingWebhookConfiguration, bool, error) {
+	existing, err := client.ValidatingWebhookConfigurations().Get(context.TODO(), required.Name, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		actual, err := client.ValidatingWebhookConfigurations().Create(context.TODO(), required, metav1.CreateOptions{})
+		return actual, true, err
+	}
+	if err != nil {
+		return nil, false, err
+	}
+
+	modified := resourcemerge.BoolPtr(false)
+	existingCopy := existing.DeepCopy()
+	resourcemerge.EnsureObjectMeta(modified, &existingCopy.ObjectMeta, required.ObjectMeta)
+	if !equality.Semantic.DeepEqual(existingCopy.Webhooks, required.Webhooks) {
+		*modified = true
+		existing.Webhooks = required.Webhooks
+	}
+	if !*modified {
+		return existing, false, nil
+	}
+
+	actual, err := client.ValidatingWebhookConfigurations().Update(context.TODO(), existingCopy, metav1.UpdateOptions{})
+	return actual, true, err
+}
+
+func ApplyDeployment(
+	client kubernetes.Interface, generation int64, manifests resourceapply.AssetFunc, recorder events.Recorder, file string) (int64, error) {
+	deploymentBytes, err := manifests(file)
+	if err != nil {
+
+	}
+	deployment, _, err := genericCodec.Decode(deploymentBytes, nil, nil)
+	if err != nil {
+		return generation, fmt.Errorf("%q: %v", file, err)
+	}
+	updatedDeployment, updated, err := resourceapply.ApplyDeployment(
+		client.AppsV1(),
+		recorder,
+		deployment.(*appsv1.Deployment), generation, false)
+	if err != nil {
+		return generation, fmt.Errorf("%q (%T): %v", file, deployment, err)
+	}
+
+	if updated {
+		generation = updatedDeployment.ObjectMeta.Generation
+	}
+
+	return generation, nil
+}
+
+func ApplyDirectly(
+	client kubernetes.Interface,
+	apiExtensionClient apiextensionsclient.Interface,
+	apiRegistrationClient apiregistrationclient.APIServicesGetter,
+	recorder events.Recorder,
+	manifests resourceapply.AssetFunc,
+	files ...string) []resourceapply.ApplyResult {
+	ret := []resourceapply.ApplyResult{}
+	genericApplyFiles := []string{}
+	for _, file := range files {
+		result := resourceapply.ApplyResult{File: file}
+		objBytes, err := manifests(file)
+		if err != nil {
+			result.Error = fmt.Errorf("missing %q: %v", file, err)
+			ret = append(ret, result)
+			continue
+		}
+		requiredObj, _, err := genericCodec.Decode(objBytes, nil, nil)
+		if err != nil {
+			result.Error = fmt.Errorf("cannot decode %q: %v", file, err)
+			ret = append(ret, result)
+			continue
+		}
+		result.Type = fmt.Sprintf("%T", requiredObj)
+		switch t := requiredObj.(type) {
+		case *admissionv1.ValidatingWebhookConfiguration:
+			result.Result, result.Changed, result.Error = ApplyValidatingWebhookConfiguration(
+				client.AdmissionregistrationV1(), t)
+		case *apiregistrationv1.APIService:
+			result.Result, result.Changed, result.Error = resourceapply.ApplyAPIService(apiRegistrationClient, recorder, t)
+		default:
+			genericApplyFiles = append(genericApplyFiles, file)
+		}
+	}
+
+	clientHolder := resourceapply.NewKubeClientHolder(client).WithAPIExtensionsClient(apiExtensionClient)
+	applyResults := resourceapply.ApplyDirectly(
+		clientHolder,
+		recorder,
+		manifests,
+		genericApplyFiles...,
+	)
+
+	ret = append(ret, applyResults...)
+	return ret
 }
