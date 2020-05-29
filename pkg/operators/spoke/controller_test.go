@@ -6,9 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	fakenucleusclient "github.com/open-cluster-management/api/client/nucleus/clientset/versioned/fake"
 	nucleusinformers "github.com/open-cluster-management/api/client/nucleus/informers/externalversions"
 	nucleusapiv1 "github.com/open-cluster-management/api/nucleus/v1"
+	"github.com/open-cluster-management/nucleus/pkg/helpers"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	appsv1 "k8s.io/api/apps/v1"
@@ -17,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
@@ -46,6 +49,16 @@ func newFakeSyncContext(t *testing.T, key string) *fakeSyncContext {
 	}
 }
 
+func newSecret(name, namespace string) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{},
+	}
+}
+
 func newSpokeCore(name, namespace, clustername string) *nucleusapiv1.SpokeCore {
 	return &nucleusapiv1.SpokeCore{
 		ObjectMeta: metav1.ObjectMeta{
@@ -59,16 +72,6 @@ func newSpokeCore(name, namespace, clustername string) *nucleusapiv1.SpokeCore {
 			Namespace:                 namespace,
 			ExternalServerURLs:        []nucleusapiv1.ServerURL{},
 		},
-	}
-}
-
-func newSecret(name, namespace string) *corev1.Secret {
-	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Data: map[string][]byte{},
 	}
 }
 
@@ -107,18 +110,37 @@ func assertAction(t *testing.T, actual clienttesting.Action, expected string) {
 	}
 }
 
-func assertCondition(t *testing.T, actual runtime.Object, expectedCondition string, expectedStatus metav1.ConditionStatus) {
+func assertGet(t *testing.T, actual clienttesting.Action, group, version, resource string) {
+	t.Helper()
+	if actual.GetVerb() != "get" {
+		t.Error(spew.Sdump(actual))
+	}
+	if actual.GetResource() != (schema.GroupVersionResource{Group: group, Version: version, Resource: resource}) {
+		t.Error(spew.Sdump(actual))
+	}
+}
+
+func namedCondition(name string, status metav1.ConditionStatus) nucleusapiv1.StatusCondition {
+	return nucleusapiv1.StatusCondition{Type: name, Status: status}
+}
+
+func assertOnlyConditions(t *testing.T, actual runtime.Object, expectedConditions ...nucleusapiv1.StatusCondition) {
+	t.Helper()
+
 	spokeCore := actual.(*nucleusapiv1.SpokeCore)
-	conditions := spokeCore.Status.Conditions
-	if len(conditions) != 1 {
-		t.Errorf("expected 1 condition but got: %#v", conditions)
+	actualConditions := spokeCore.Status.Conditions
+	if len(actualConditions) != len(expectedConditions) {
+		t.Errorf("expected %v condition but got: %v", len(expectedConditions), spew.Sdump(actualConditions))
 	}
-	condition := conditions[0]
-	if condition.Type != expectedCondition {
-		t.Errorf("expected %s but got: %s", expectedCondition, condition.Type)
-	}
-	if condition.Status != expectedStatus {
-		t.Errorf("expected %s but got: %s", expectedStatus, condition.Status)
+
+	for _, expectedCondition := range expectedConditions {
+		actual := helpers.FindNucleusCondition(actualConditions, expectedCondition.Type)
+		if actual == nil {
+			t.Errorf("missing %v in %v", spew.Sdump(expectedCondition), spew.Sdump(actual))
+		}
+		if actual.Status != expectedCondition.Status {
+			t.Errorf("wrong result for %v in %v", spew.Sdump(expectedCondition), spew.Sdump(actual))
+		}
 	}
 }
 
@@ -193,12 +215,18 @@ func TestSyncDeploy(t *testing.T) {
 	}
 
 	nucleusAction := controller.nucleusClient.Actions()
-	if len(nucleusAction) != 2 {
-		t.Errorf("Expect 2 actions in the sync loop, actual %#v", nucleusAction)
+	if len(nucleusAction) != 4 {
+		t.Errorf("Expect 4 actions in the sync loop, actual %#v", nucleusAction)
 	}
 
+	assertGet(t, nucleusAction[0], "nucleus.open-cluster-management.io", "v1", "spokecores")
 	assertAction(t, nucleusAction[1], "update")
-	assertCondition(t, nucleusAction[1].(clienttesting.UpdateActionImpl).Object, spokeCoreApplied, metav1.ConditionTrue)
+	assertOnlyConditions(t, nucleusAction[1].(clienttesting.UpdateActionImpl).Object,
+		namedCondition(spokeCoreApplied, metav1.ConditionTrue))
+	assertGet(t, nucleusAction[2], "nucleus.open-cluster-management.io", "v1", "spokecores")
+	assertAction(t, nucleusAction[3], "update")
+	assertOnlyConditions(t, nucleusAction[3].(clienttesting.UpdateActionImpl).Object,
+		namedCondition(spokeCoreApplied, metav1.ConditionTrue), namedCondition(spokeRegistrationDegraded, metav1.ConditionFalse))
 }
 
 // TestSyncWithNoSecret test the scenario that bootstrap secret and hub config secret does not exist
@@ -220,9 +248,12 @@ func TestSyncWithNoSecret(t *testing.T) {
 		t.Errorf("Expect 2 actions in the sync loop, actual %#v", nucleusAction)
 	}
 
+	assertGet(t, nucleusAction[0], "nucleus.open-cluster-management.io", "v1", "spokecores")
 	assertAction(t, nucleusAction[1], "update")
-	assertCondition(t, nucleusAction[1].(clienttesting.UpdateActionImpl).Object, spokeCoreApplied, metav1.ConditionFalse)
+	assertOnlyConditions(t, nucleusAction[1].(clienttesting.UpdateActionImpl).Object, namedCondition(spokeCoreApplied, metav1.ConditionFalse))
 
+	// reset for round 2
+	controller.nucleusClient.ClearActions()
 	// Add bootstrap secret and sync again
 	controller.kubeClient.PrependReactor("get", "secrets", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 		if action.GetVerb() != "get" {
@@ -246,9 +277,17 @@ func TestSyncWithNoSecret(t *testing.T) {
 		t.Errorf("Expect 4 actions in the sync loop, actual %#v", nucleusAction)
 	}
 
+	assertGet(t, nucleusAction[0], "nucleus.open-cluster-management.io", "v1", "spokecores")
+	assertAction(t, nucleusAction[1], "update")
+	assertOnlyConditions(t, nucleusAction[1].(clienttesting.UpdateActionImpl).Object,
+		namedCondition(spokeCoreApplied, metav1.ConditionTrue))
+	assertGet(t, nucleusAction[2], "nucleus.open-cluster-management.io", "v1", "spokecores")
 	assertAction(t, nucleusAction[3], "update")
-	assertCondition(t, nucleusAction[3].(clienttesting.UpdateActionImpl).Object, spokeCoreApplied, metav1.ConditionFalse)
+	assertOnlyConditions(t, nucleusAction[3].(clienttesting.UpdateActionImpl).Object,
+		namedCondition(spokeCoreApplied, metav1.ConditionTrue), namedCondition(spokeRegistrationDegraded, metav1.ConditionTrue))
 
+	// reset for round 3
+	controller.nucleusClient.ClearActions()
 	// Add hub config secret and sync again
 	hubSecret.Data["kubeconfig"] = []byte("dummykubeconfig")
 	hubSecret.Data["cluster-name"] = []byte("cluster1")
@@ -269,12 +308,15 @@ func TestSyncWithNoSecret(t *testing.T) {
 		t.Errorf("Expected no error when sync: %v", err)
 	}
 	nucleusAction = controller.nucleusClient.Actions()
-	if len(nucleusAction) != 6 {
-		t.Errorf("Expect 6 actions in the sync loop, actual %#v", nucleusAction)
+	if len(nucleusAction) != 3 {
+		t.Errorf("Expect 3 actions in the sync loop, actual %#v", nucleusAction)
 	}
 
-	assertAction(t, nucleusAction[5], "update")
-	assertCondition(t, nucleusAction[5].(clienttesting.UpdateActionImpl).Object, spokeCoreApplied, metav1.ConditionTrue)
+	assertGet(t, nucleusAction[0], "nucleus.open-cluster-management.io", "v1", "spokecores")
+	assertGet(t, nucleusAction[1], "nucleus.open-cluster-management.io", "v1", "spokecores")
+	assertAction(t, nucleusAction[2], "update")
+	assertOnlyConditions(t, nucleusAction[2].(clienttesting.UpdateActionImpl).Object,
+		namedCondition(spokeCoreApplied, metav1.ConditionTrue), namedCondition(spokeRegistrationDegraded, metav1.ConditionFalse))
 }
 
 // TestSyncDelete test cleanup hub deploy
