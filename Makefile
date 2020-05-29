@@ -57,11 +57,13 @@ update-csv: ensure-operator-sdk
 	$(OPERATOR_SDK) generate csv --crd-dir=deploy/nucleus-hub/crds --deploy-dir=deploy/nucleus-hub --output-dir=deploy/nucleus-hub/olm-catalog/nucleus-hub --operator-name=nucleus-hub --csv-version=0.1.0
 	$(OPERATOR_SDK) generate csv --crd-dir=deploy/nucleus-spoke/crds --deploy-dir=deploy/nucleus-spoke --output-dir=deploy/nucleus-spoke/olm-catalog/nucleus-spoke --operator-name=nucleus-spoke --csv-version=0.1.0
 
-.PHONY: munge-csv
-munge-csv:
+munge-hub-csv:
 	mkdir -p munge-csv
 	cp deploy/nucleus-hub/olm-catalog/nucleus-hub/manifests/nucleus-hub.clusterserviceversion.yaml munge-csv/nucleus-hub.clusterserviceversion.yaml.unmunged
 	sed -e "s,quay.io/open-cluster-management/nucleus:latest,$(IMAGE_NAME)," -i deploy/nucleus-hub/olm-catalog/nucleus-hub/manifests/nucleus-hub.clusterserviceversion.yaml
+
+munge-spoke-csv:
+	mkdir -p munge-csv
 	cp deploy/nucleus-spoke/olm-catalog/nucleus-spoke/manifests/nucleus-spoke.clusterserviceversion.yaml munge-csv/nucleus-spoke.clusterserviceversion.yaml.unmunged
 	sed -e "s,quay.io/open-cluster-management/nucleus:latest,$(IMAGE_NAME)," -i deploy/nucleus-spoke/olm-catalog/nucleus-spoke/manifests/nucleus-spoke.clusterserviceversion.yaml
 
@@ -69,7 +71,7 @@ unmunge-csv:
 	mv munge-csv/nucleus-hub.clusterserviceversion.yaml.unmunged deploy/nucleus-hub/olm-catalog/nucleus-hub/manifests/nucleus-hub.clusterserviceversion.yaml
 	mv munge-csv/nucleus-spoke.clusterserviceversion.yaml.unmunged deploy/nucleus-spoke/olm-catalog/nucleus-spoke/manifests/nucleus-spoke.clusterserviceversion.yaml
 
-deploy: install-olm deploy-hub deploy-spoke
+deploy: install-olm deploy-hub deploy-spoke unmunge-csv
 
 clean-deploy: clean-spoke clean-hub
 
@@ -77,7 +79,7 @@ install-olm: ensure-operator-sdk
 	$(KUBECTL) get crds | grep clusterserviceversion ; if [ $$? -ne 0 ] ; then $(OPERATOR_SDK) olm install --version 0.14.1; fi
 	$(KUBECTL) get ns open-cluster-management ; if [ $$? -ne 0 ] ; then $(KUBECTL) create ns open-cluster-management ; fi
 
-deploy-hub: install-olm
+deploy-hub: install-olm munge-hub-csv
 	$(OPERATOR_SDK) run --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/nucleus-hub/olm-catalog/nucleus-hub --olm-namespace $(OLM_NAMESPACE)
 	sed -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," deploy/nucleus-hub/crds/nucleus_open-cluster-management_hubcores.cr.yaml | $(KUBECTL) apply -f -
 
@@ -103,7 +105,7 @@ e2e-bootstrap-secret: cluster-ip
 	$(KUBECTL) delete secret e2e-bootstrap-secret -n open-cluster-management --ignore-not-found
 	$(KUBECTL) create secret generic e2e-bootstrap-secret --from-file=kubeconfig=e2e-kubeconfig -n open-cluster-management
 
-deploy-spoke: install-olm bootstrap-secret
+deploy-spoke: install-olm munge-spoke-csv bootstrap-secret
 	$(OPERATOR_SDK) run --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/nucleus-spoke/olm-catalog/nucleus-spoke --olm-namespace $(OLM_NAMESPACE)
 	sed -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," deploy/nucleus-spoke/crds/nucleus_open-cluster-management_spokecores.cr.yaml | $(KUBECTL) apply -f -
 
