@@ -86,8 +86,21 @@ func (m *FinalizeController) syncManifestWork(ctx context.Context, originalManif
 		return nil
 	}
 
+	var err error
+
 	// Work is deleting, we remove its related resources on spoke cluster
-	if errs := m.cleanupResourceOfWork(manifestWork); len(errs) != 0 {
+	remaining, errs := m.cleanupResourceOfWork(manifestWork)
+	if len(manifestWork.Status.AppliedResources) != len(remaining) {
+		// update the status of the manifest work accordingly
+		manifestWork.Status.AppliedResources = remaining
+
+		manifestWork, err = m.manifestWorkClient.UpdateStatus(ctx, manifestWork, metav1.UpdateOptions{})
+		if err != nil {
+			errs = append(errs, fmt.Errorf(
+				"Failed to update status of ManifestWork %s/%s: %w", manifestWork.Namespace, manifestWork.Name, err))
+		}
+	}
+	if len(errs) != 0 {
 		return utilerrors.NewAggregate(errs)
 	}
 
@@ -97,42 +110,38 @@ func (m *FinalizeController) syncManifestWork(ctx context.Context, originalManif
 	// compared with a case where this controller deletes it and another controller (or manifestwork) creates it.
 
 	removeFinalizer(manifestWork, manifestWorkFinalizer)
-	_, err := m.manifestWorkClient.Update(ctx, manifestWork, metav1.UpdateOptions{})
+	_, err = m.manifestWorkClient.Update(ctx, manifestWork, metav1.UpdateOptions{})
 	return err
 }
 
-func (m *FinalizeController) cleanupResourceOfWork(work *workapiv1.ManifestWork) []error {
+func (m *FinalizeController) cleanupResourceOfWork(work *workapiv1.ManifestWork) ([]workapiv1.AppliedManifestResourceMeta, []error) {
 	klog.V(4).Infof("cleaning up %q", work.Name)
 
+	var remaining []workapiv1.AppliedManifestResourceMeta
 	errs := []error{}
 
-	// TODO this can later be based on a list of all resources created by this manifest work
-	//  not just the resources currently managed.  This overlaps with the need to remove resources we have created
-	//  separate from the application of current resources.
-	for _, resourceStatus := range work.Status.ResourceStatus.Manifests {
-		gvr := schema.GroupVersionResource{Group: resourceStatus.ResourceMeta.Group, Version: resourceStatus.ResourceMeta.Version, Resource: resourceStatus.ResourceMeta.Resource}
-		if len(gvr.Resource) == 0 || len(gvr.Version) == 0 || len(resourceStatus.ResourceMeta.Name) == 0 {
-			// without a resource or version, the request cannot be constructed, so we must not have created this either
-			continue
-		}
+	// delete all applied resources which are still tracked by the manifest work
+	for _, appliedResource := range work.Status.AppliedResources {
+		gvr := schema.GroupVersionResource{Group: appliedResource.Group, Version: appliedResource.Version, Resource: appliedResource.Resource}
 
 		err := m.spokeDynamicClient.
 			Resource(gvr).
-			Namespace(resourceStatus.ResourceMeta.Namespace).
-			Delete(context.TODO(), resourceStatus.ResourceMeta.Name, metav1.DeleteOptions{})
+			Namespace(appliedResource.Namespace).
+			Delete(context.TODO(), appliedResource.Name, metav1.DeleteOptions{})
 		switch {
 		case errors.IsNotFound(err):
 			// no-oop
 		case err != nil:
+			remaining = append(remaining, appliedResource)
 			errs = append(errs, fmt.Errorf(
 				"Failed to delete resource %v with key %s/%s: %w",
-				gvr, resourceStatus.ResourceMeta.Namespace, resourceStatus.ResourceMeta.Name, err))
+				gvr, appliedResource.Namespace, appliedResource.Name, err))
 			continue
 		}
-		klog.Infof("Successfully delete resource %v with key %s/%s", gvr, resourceStatus.ResourceMeta.Namespace, resourceStatus.ResourceMeta.Name)
+		klog.Infof("Successfully delete resource %v with key %s/%s", gvr, appliedResource.Namespace, appliedResource.Name)
 	}
 
-	return errs
+	return remaining, errs
 }
 
 // removeFinalizer removes a finalizer from the list.  It mutates its input.
