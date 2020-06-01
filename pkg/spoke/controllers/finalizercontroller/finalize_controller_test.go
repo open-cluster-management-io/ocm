@@ -20,7 +20,7 @@ func TestFinalize(t *testing.T) {
 	cases := []struct {
 		name               string
 		existingFinalizers []string
-		resourcesToRemove  []workapiv1.ManifestResourceMeta
+		resourcesToRemove  []workapiv1.AppliedManifestResourceMeta
 		terminated         bool
 
 		validateManifestWorkActions func(t *testing.T, actions []clienttesting.Action)
@@ -59,19 +59,24 @@ func TestFinalize(t *testing.T) {
 			name:               "delete resources",
 			terminated:         true,
 			existingFinalizers: []string{"a", manifestWorkFinalizer, "b"},
-			resourcesToRemove: []workapiv1.ManifestResourceMeta{
+			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
 				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "", Name: "n1"},
 				{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
 				{Group: "g3", Version: "v3", Resource: "r3", Namespace: "ns3", Name: "n3"},
 				{Group: "g4", Version: "v4", Resource: "r4", Namespace: "", Name: "n4"},
 			},
 			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
+				if len(actions) != 2 {
 					t.Fatal(spew.Sdump(actions))
 				}
+
 				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
+				if len(work.Status.AppliedResources) != 0 {
+					t.Fatal(spew.Sdump(actions[0]))
+				}
+				work = actions[1].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
 				if !reflect.DeepEqual(work.Finalizers, []string{"a", "b"}) {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(spew.Sdump(actions[1]))
 				}
 			},
 			validateDynamicActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -112,7 +117,7 @@ func TestFinalize(t *testing.T) {
 				testingWork.DeletionTimestamp = &now
 			}
 			for _, curr := range c.resourcesToRemove {
-				testingWork.Status.ResourceStatus.Manifests = append(testingWork.Status.ResourceStatus.Manifests, workapiv1.ManifestCondition{ResourceMeta: curr})
+				testingWork.Status.AppliedResources = append(testingWork.Status.AppliedResources, curr)
 			}
 
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme())
