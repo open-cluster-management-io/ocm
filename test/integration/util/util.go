@@ -17,9 +17,12 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
+
 	clusterclientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
+
 	"github.com/openshift/library-go/pkg/operator/events"
+
 	certificates "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -32,7 +35,10 @@ import (
 	"k8s.io/client-go/util/keyutil"
 )
 
-const TestDir = "/tmp/registration-integration-test"
+const (
+	TestLeaseDurationSeconds = 1
+	TestDir                  = "/tmp/registration-integration-test"
+)
 
 var (
 	CertDir        = path.Join(TestDir, "server-certs")
@@ -500,6 +506,7 @@ func AcceptManagedCluster(clusterClient clusterclientset.Interface, spokeCluster
 		return err
 	}
 	spokeCluster.Spec.HubAcceptsClient = true
+	spokeCluster.Spec.LeaseDurationSeconds = TestLeaseDurationSeconds
 	_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), spokeCluster, metav1.UpdateOptions{})
 	return err
 }

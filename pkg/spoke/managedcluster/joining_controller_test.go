@@ -9,8 +9,11 @@ import (
 	clusterfake "github.com/open-cluster-management/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
+	"github.com/open-cluster-management/registration/pkg/helpers"
+
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,7 +48,7 @@ func TestSyncManagedCluster(t *testing.T) {
 		},
 		{
 			name:            "sync an unaccepted managed cluster",
-			startingObjects: []runtime.Object{newSpokeCluster([]clusterv1.StatusCondition{})},
+			startingObjects: []runtime.Object{newManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 0 {
 					t.Errorf("expected 0 call but got: %#v", actions)
@@ -59,13 +62,19 @@ func TestSyncManagedCluster(t *testing.T) {
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				assertActions(t, actions, "get", "update")
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				assertCondition(t, actual, clusterv1.ManagedClusterConditionJoined, metav1.ConditionTrue)
+				expectedCondition := clusterv1.StatusCondition{
+					Type:    clusterv1.ManagedClusterConditionJoined,
+					Status:  metav1.ConditionTrue,
+					Reason:  "ManagedClusterJoined",
+					Message: "Managed cluster joined",
+				}
+				assertCondition(t, actual, expectedCondition)
 				assertStatusVersion(t, actual, kubeversion.Get())
 				assertStatusResource(t, actual, newResourceList(32, 64), newResourceList(16, 32))
 			},
 		},
 		{
-			name:            "sync a joined spoke cluster without status change",
+			name:            "sync a joined managed cluster without status change",
 			startingObjects: []runtime.Object{newJoinedManagedCluster(newResourceList(32, 64), newResourceList(16, 32))},
 			nodes:           []runtime.Object{newNode("testnode1", newResourceList(32, 64), newResourceList(16, 32))},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -73,7 +82,7 @@ func TestSyncManagedCluster(t *testing.T) {
 			},
 		},
 		{
-			name:            "sync a joined spoke cluster with status change",
+			name:            "sync a joined managed cluster with status change",
 			startingObjects: []runtime.Object{newJoinedManagedCluster(newResourceList(32, 64), newResourceList(16, 32))},
 			nodes: []runtime.Object{
 				newNode("testnode1", newResourceList(32, 64), newResourceList(16, 32)),
@@ -82,7 +91,13 @@ func TestSyncManagedCluster(t *testing.T) {
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				assertActions(t, actions, "get", "update")
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				assertCondition(t, actual, clusterv1.ManagedClusterConditionJoined, metav1.ConditionTrue)
+				expectedCondition := clusterv1.StatusCondition{
+					Type:    clusterv1.ManagedClusterConditionJoined,
+					Status:  metav1.ConditionTrue,
+					Reason:  "ManagedClusterJoined",
+					Message: "Managed cluster joined",
+				}
+				assertCondition(t, actual, expectedCondition)
 				assertStatusVersion(t, actual, kubeversion.Get())
 				assertStatusResource(t, actual, newResourceList(64, 128), newResourceList(32, 64))
 			},
@@ -105,12 +120,12 @@ func TestSyncManagedCluster(t *testing.T) {
 				nodeStore.Add(node)
 			}
 
-			ctrl := managedClusterController{
-				clusterName:          testManagedClusterName,
-				hubClusterClient:     clusterClient,
-				hubClusterLister:     clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				spokeDiscoveryClient: kubeClient.Discovery(),
-				spokeNodeLister:      kubeInformerFactory.Core().V1().Nodes().Lister(),
+			ctrl := managedClusterJoiningController{
+				clusterName:      testManagedClusterName,
+				hubClusterClient: clusterClient,
+				hubClusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
+				discoveryClient:  kubeClient.Discovery(),
+				nodeLister:       kubeInformerFactory.Core().V1().Nodes().Lister(),
 			}
 
 			syncErr := ctrl.sync(context.TODO(), newFakeSyncContext(t))
@@ -145,25 +160,27 @@ func assertActions(t *testing.T, actualActions []clienttesting.Action, expectedA
 func assertManagedCluster(t *testing.T, actual runtime.Object, expectedName string) {
 	managedCluster, ok := actual.(*clusterv1.ManagedCluster)
 	if !ok {
-		t.Errorf("expected spoke cluster but got: %#v", actual)
+		t.Errorf("expected managed cluster but got: %#v", actual)
 	}
 	if managedCluster.Name != expectedName {
 		t.Errorf("expected %s but got: %#v", expectedName, managedCluster.Name)
 	}
 }
 
-func assertCondition(t *testing.T, actual runtime.Object, expectedCondition string, expectedStatus metav1.ConditionStatus) {
+func assertCondition(t *testing.T, actual runtime.Object, expectedCondition clusterv1.StatusCondition) {
 	managedCluster := actual.(*clusterv1.ManagedCluster)
-	conditions := managedCluster.Status.Conditions
-	if len(conditions) != 2 {
-		t.Errorf("expected 2 condition but got: %#v", conditions)
+	cond := helpers.FindManagedClusterCondition(managedCluster.Status.Conditions, expectedCondition.Type)
+	if cond == nil {
+		t.Errorf("expected condition %s but got: %s", expectedCondition.Type, cond.Type)
 	}
-	condition := conditions[1]
-	if condition.Type != expectedCondition {
-		t.Errorf("expected %s but got: %s", expectedCondition, condition.Type)
+	if cond.Status != expectedCondition.Status {
+		t.Errorf("expected status %s but got: %s", expectedCondition.Status, cond.Status)
 	}
-	if condition.Status != expectedStatus {
-		t.Errorf("expected %s but got: %s", expectedStatus, condition.Status)
+	if cond.Reason != expectedCondition.Reason {
+		t.Errorf("expected reason %s but got: %s", expectedCondition.Reason, cond.Reason)
+	}
+	if cond.Message != expectedCondition.Message {
+		t.Errorf("expected message %s but got: %s", expectedCondition.Message, cond.Message)
 	}
 }
 
@@ -192,7 +209,7 @@ func assertStatusResource(t *testing.T, actual runtime.Object, expectedCapacity,
 	}
 }
 
-func newSpokeCluster(conditions []clusterv1.StatusCondition) *clusterv1.ManagedCluster {
+func newManagedCluster(conditions ...clusterv1.StatusCondition) *clusterv1.ManagedCluster {
 	return &clusterv1.ManagedCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: testManagedClusterName,
@@ -204,31 +221,29 @@ func newSpokeCluster(conditions []clusterv1.StatusCondition) *clusterv1.ManagedC
 }
 
 func newAcceptedManagedCluster() *clusterv1.ManagedCluster {
-	return newSpokeCluster([]clusterv1.StatusCondition{
-		{
-			Type:    clusterv1.ManagedClusterConditionHubAccepted,
-			Status:  metav1.ConditionTrue,
-			Reason:  "HubClusterAdminAccepted",
-			Message: "Accepted by hub cluster admin",
-		},
+	return newManagedCluster(clusterv1.StatusCondition{
+		Type:    clusterv1.ManagedClusterConditionHubAccepted,
+		Status:  metav1.ConditionTrue,
+		Reason:  "HubClusterAdminAccepted",
+		Message: "Accepted by hub cluster admin",
 	})
 }
 
 func newJoinedManagedCluster(capacity, allocatable corev1.ResourceList) *clusterv1.ManagedCluster {
-	managedCluster := newSpokeCluster([]clusterv1.StatusCondition{
-		{
+	managedCluster := newManagedCluster(
+		clusterv1.StatusCondition{
 			Type:    clusterv1.ManagedClusterConditionHubAccepted,
 			Status:  metav1.ConditionTrue,
 			Reason:  "HubClusterAdminAccepted",
 			Message: "Accepted by hub cluster admin",
 		},
-		{
+		clusterv1.StatusCondition{
 			Type:    clusterv1.ManagedClusterConditionJoined,
 			Status:  metav1.ConditionTrue,
-			Reason:  "SpokeClusterJoined",
-			Message: "Spoke cluster joined",
+			Reason:  "ManagedClusterJoined",
+			Message: "Managed cluster joined",
 		},
-	})
+	)
 	managedCluster.Status.Capacity = clusterv1.ResourceList{
 		"cpu":    capacity.Cpu().DeepCopy(),
 		"memory": capacity.Memory().DeepCopy(),

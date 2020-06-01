@@ -10,7 +10,9 @@ import (
 	clusterv1client "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	clusterv1informers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
 	"github.com/open-cluster-management/registration/pkg/hub/csr"
+	"github.com/open-cluster-management/registration/pkg/hub/lease"
 	"github.com/open-cluster-management/registration/pkg/hub/managedcluster"
+
 	kubeinformers "k8s.io/client-go/informers"
 )
 
@@ -42,11 +44,21 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		controllerContext.EventRecorder,
 	)
 
+	leaseController := lease.NewClusterLeaseController(
+		kubeClient,
+		clusterClient,
+		clusterInformers.Cluster().V1().ManagedClusters(),
+		kubeInfomers.Coordination().V1().Leases(),
+		5*time.Minute, //TODO: this interval time should be allowed to change from outside
+		controllerContext.EventRecorder,
+	)
+
 	go clusterInformers.Start(ctx.Done())
 	go kubeInfomers.Start(ctx.Done())
 
 	go managedClusterController.Run(ctx, 1)
 	go csrController.Run(ctx, 1)
+	go leaseController.Run(ctx, 1)
 
 	<-ctx.Done()
 	return nil

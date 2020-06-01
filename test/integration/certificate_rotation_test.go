@@ -25,10 +25,11 @@ var _ = ginkgo.Describe("Certificate Rotation", func() {
 		// run registration agent
 		go func() {
 			agentOptions := spoke.SpokeAgentOptions{
-				ClusterName:         managedClusterName,
-				BootstrapKubeconfig: bootstrapKubeConfigFile,
-				HubKubeconfigSecret: hubKubeconfigSecret,
-				HubKubeconfigDir:    hubKubeconfigDir,
+				ClusterName:              managedClusterName,
+				BootstrapKubeconfig:      bootstrapKubeConfigFile,
+				HubKubeconfigSecret:      hubKubeconfigSecret,
+				HubKubeconfigDir:         hubKubeconfigDir,
+				ClusterHealthCheckPeriod: 1 * time.Minute,
 			}
 			err := agentOptions.RunSpokeAgent(context.Background(), &controllercmd.ControllerContext{
 				KubeConfig:    spokeCfg,

@@ -19,6 +19,7 @@ import (
 )
 
 var _ = ginkgo.Describe("Agent Recovery", func() {
+
 	ginkgo.It("agent recovery from invalid bootstrap kubeconfig", func() {
 		var err error
 
@@ -35,10 +36,11 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 		// run registration agent with an invalid bootstrap kubeconfig
 		go func() {
 			agentOptions := spoke.SpokeAgentOptions{
-				ClusterName:         managedClusterName,
-				BootstrapKubeconfig: bootstrapFile,
-				HubKubeconfigSecret: hubKubeconfigSecret,
-				HubKubeconfigDir:    hubKubeconfigDir,
+				ClusterName:              managedClusterName,
+				BootstrapKubeconfig:      bootstrapFile,
+				HubKubeconfigSecret:      hubKubeconfigSecret,
+				HubKubeconfigDir:         hubKubeconfigDir,
+				ClusterHealthCheckPeriod: 1 * time.Minute,
 			}
 			err := agentOptions.RunSpokeAgent(context.Background(), &controllercmd.ControllerContext{
 				KubeConfig:    spokeCfg,
@@ -130,10 +132,11 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 		// run registration agent
 		go func() {
 			agentOptions := spoke.SpokeAgentOptions{
-				ClusterName:         spokeClusterName,
-				BootstrapKubeconfig: bootstrapKubeConfigFile,
-				HubKubeconfigSecret: hubKubeconfigSecret,
-				HubKubeconfigDir:    hubKubeconfigDir,
+				ClusterName:              spokeClusterName,
+				BootstrapKubeconfig:      bootstrapKubeConfigFile,
+				HubKubeconfigSecret:      hubKubeconfigSecret,
+				HubKubeconfigDir:         hubKubeconfigDir,
+				ClusterHealthCheckPeriod: 1 * time.Minute,
 			}
 			err := agentOptions.RunSpokeAgent(context.Background(), &controllercmd.ControllerContext{
 				KubeConfig:    spokeCfg,

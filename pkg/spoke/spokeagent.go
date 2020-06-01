@@ -14,8 +14,11 @@ import (
 	"github.com/open-cluster-management/registration/pkg/helpers"
 	"github.com/open-cluster-management/registration/pkg/spoke/hubclientcert"
 	"github.com/open-cluster-management/registration/pkg/spoke/managedcluster"
+
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
+
 	"github.com/spf13/pflag"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -38,20 +41,22 @@ const (
 
 // SpokeAgentOptions holds configuration for spoke cluster agent
 type SpokeAgentOptions struct {
-	ComponentNamespace      string
-	ClusterName             string
-	AgentName               string
-	BootstrapKubeconfig     string
-	HubKubeconfigSecret     string
-	HubKubeconfigDir        string
-	SpokeExternalServerURLs []string
+	ComponentNamespace       string
+	ClusterName              string
+	AgentName                string
+	BootstrapKubeconfig      string
+	HubKubeconfigSecret      string
+	HubKubeconfigDir         string
+	SpokeExternalServerURLs  []string
+	ClusterHealthCheckPeriod time.Duration
 }
 
 // NewSpokeAgentOptions returns a SpokeAgentOptions
 func NewSpokeAgentOptions() *SpokeAgentOptions {
 	return &SpokeAgentOptions{
-		HubKubeconfigSecret: "hub-kubeconfig-secret",
-		HubKubeconfigDir:    "/spoke/hub-kubeconfig",
+		HubKubeconfigSecret:      "hub-kubeconfig-secret",
+		HubKubeconfigDir:         "/spoke/hub-kubeconfig",
+		ClusterHealthCheckPeriod: 1 * time.Minute,
 	}
 }
 
@@ -208,8 +213,8 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		"ClientCertForHubController",
 	)
 
-	// create SpokeClusterController to reconcile instances of SpokeCluster on the spoke cluster
-	spokeClusterController := managedcluster.NewManagedClusterController(
+	// create ManagedClusterJoiningController to reconcile instances of ManagedCluster on the managed cluster
+	managedClusterJoiningController := managedcluster.NewManagedClusterJoiningController(
 		o.ClusterName,
 		hubClusterClient,
 		hubClusterInformerFactory.Cluster().V1().ManagedClusters(),
@@ -218,12 +223,32 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		controllerContext.EventRecorder,
 	)
 
+	// create ManagedClusterLeaseController to keep the spoke cluster heartbeat
+	managedClusterLeaseController := managedcluster.NewManagedClusterLeaseController(
+		o.ClusterName,
+		hubKubeClient,
+		hubClusterInformerFactory.Cluster().V1().ManagedClusters(),
+		controllerContext.EventRecorder,
+	)
+
+	// create ManagedClusterHealthCheckController to check the spoke cluster health
+	managedClusterHealthCheckController := managedcluster.NewManagedClusterHealthCheckController(
+		o.ClusterName,
+		hubClusterClient,
+		hubClusterInformerFactory.Cluster().V1().ManagedClusters(),
+		spokeKubeClient.Discovery(),
+		o.ClusterHealthCheckPeriod,
+		controllerContext.EventRecorder,
+	)
+
 	go hubKubeInformerFactory.Start(ctx.Done())
 	go hubClusterInformerFactory.Start(ctx.Done())
 	go spokeKubeInformerFactory.Start(ctx.Done())
 
 	go clientCertForHubController.Run(ctx, 1)
-	go spokeClusterController.Run(ctx, 1)
+	go managedClusterJoiningController.Run(ctx, 1)
+	go managedClusterLeaseController.Run(ctx, 1)
+	go managedClusterHealthCheckController.Run(ctx, 1)
 
 	<-ctx.Done()
 	return nil
@@ -241,6 +266,8 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 		"The mount path of hub-kubeconfig-secret in the container.")
 	fs.StringArrayVar(&o.SpokeExternalServerURLs, "spoke-external-server-urls", o.SpokeExternalServerURLs,
 		"A list of reachable spoke cluster api server URLs for hub cluster.")
+	fs.DurationVar(&o.ClusterHealthCheckPeriod, "cluster-healthcheck-period", o.ClusterHealthCheckPeriod,
+		"The period to check managed cluster kube-apiserver health")
 }
 
 // Validate verifies the inputs.
@@ -264,6 +291,10 @@ func (o *SpokeAgentOptions) Validate() error {
 				return errors.New(fmt.Sprintf("%q is invalid", serverURL))
 			}
 		}
+	}
+
+	if o.ClusterHealthCheckPeriod <= 0 {
+		return errors.New("cluster healthcheck period must greater than zero")
 	}
 
 	return nil

@@ -5,68 +5,68 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/open-cluster-management/registration/pkg/helpers"
-
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	corev1informers "k8s.io/client-go/informers/core/v1"
-	corev1lister "k8s.io/client-go/listers/core/v1"
-	"k8s.io/klog"
-
 	clientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	clusterv1informer "github.com/open-cluster-management/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "github.com/open-cluster-management/api/client/cluster/listers/cluster/v1"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
+	"github.com/open-cluster-management/registration/pkg/helpers"
+
+	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/events"
+
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	discovery "k8s.io/client-go/discovery"
+	corev1informers "k8s.io/client-go/informers/core/v1"
+	corev1lister "k8s.io/client-go/listers/core/v1"
+	"k8s.io/klog"
 )
 
-// managedClusterController reconciles instances of ManagedCluster on the managed cluster.
-type managedClusterController struct {
-	clusterName          string
-	hubClusterClient     clientset.Interface
-	hubClusterLister     clusterv1listers.ManagedClusterLister
-	spokeDiscoveryClient discovery.DiscoveryInterface
-	spokeNodeLister      corev1lister.NodeLister
+// managedClusterJoiningController add the joined condition to a ManagedCluster on the managed cluster after it is accepted by hub cluster admin.
+type managedClusterJoiningController struct {
+	clusterName      string
+	hubClusterClient clientset.Interface
+	hubClusterLister clusterv1listers.ManagedClusterLister
+	discoveryClient  discovery.DiscoveryInterface
+	nodeLister       corev1lister.NodeLister
 }
 
-// NewManagedClusterController creates a new ManagedCluster controller on the managed cluster.
-func NewManagedClusterController(
+// NewManagedClusterJoiningController creates a new managed cluster joining controller on the managed cluster.
+func NewManagedClusterJoiningController(
 	clusterName string,
 	hubClusterClient clientset.Interface,
 	hubManagedClusterInformer clusterv1informer.ManagedClusterInformer,
-	spokeDiscoveryClient discovery.DiscoveryInterface,
-	spokeNodeInformer corev1informers.NodeInformer,
+	discoveryClient discovery.DiscoveryInterface,
+	nodeInformer corev1informers.NodeInformer,
 	recorder events.Recorder) factory.Controller {
-	c := &managedClusterController{
-		clusterName:          clusterName,
-		hubClusterClient:     hubClusterClient,
-		hubClusterLister:     hubManagedClusterInformer.Lister(),
-		spokeDiscoveryClient: spokeDiscoveryClient,
-		spokeNodeLister:      spokeNodeInformer.Lister(),
+	c := &managedClusterJoiningController{
+		clusterName:      clusterName,
+		hubClusterClient: hubClusterClient,
+		hubClusterLister: hubManagedClusterInformer.Lister(),
+		discoveryClient:  discoveryClient,
+		nodeLister:       nodeInformer.Lister(),
 	}
 
 	return factory.New().
 		// TODO need to have conditional node capacity recalculation based on number of nodes here and decoupling
 		// the node capacity calculation to another controller.
-		WithInformers(hubManagedClusterInformer.Informer(), spokeNodeInformer.Informer()).
+		WithInformers(hubManagedClusterInformer.Informer(), nodeInformer.Informer()).
 		WithSync(c.sync).
 		ResyncEvery(5*time.Minute).
 		ToController("ManagedClusterController", recorder)
 }
 
-// sync maintains the spoke-side status of a ManagedCluster, it maintains the ManagedClusterJoined condition according to
+// sync maintains the managed cluster side status of a ManagedCluster, it maintains the ManagedClusterJoined condition according to
 // the value of the ManagedClusterHubAccepted condition and ensures resource and version are up to date.
-func (c managedClusterController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	spokeCluster, err := c.hubClusterLister.Get(c.clusterName)
+func (c managedClusterJoiningController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	managedCluster, err := c.hubClusterLister.Get(c.clusterName)
 	if err != nil {
 		return fmt.Errorf("unable to get managed cluster with name %q from hub: %w", c.clusterName, err)
 	}
 
 	// current managed cluster is not accepted, do nothing.
-	acceptedCondition := helpers.FindManagedClusterCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
+	acceptedCondition := helpers.FindManagedClusterCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
 	if !helpers.IsConditionTrue(acceptedCondition) {
 		syncCtx.Recorder().Eventf("ManagedClusterIsNotAccepted", "Managed cluster %q is not accepted by hub yet", c.clusterName)
 		return nil
@@ -78,13 +78,13 @@ func (c managedClusterController) sync(ctx context.Context, syncCtx factory.Sync
 		return fmt.Errorf("unable to get capacity and allocatable of managed cluster %q: %w", c.clusterName, err)
 	}
 
-	spokeVersion, err := c.getSpokeVersion()
+	clusterVersion, err := c.getClusterVersion()
 	if err != nil {
 		return fmt.Errorf("unable to get server version of managed cluster %q: %w", c.clusterName, err)
 	}
 
 	updateStatusFuncs := []helpers.UpdateManagedClusterStatusFunc{}
-	joinedCondition := helpers.FindManagedClusterCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
+	joinedCondition := helpers.FindManagedClusterCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
 	joined := helpers.IsConditionTrue(joinedCondition)
 	// current managed cluster did not join the hub cluster, join it.
 	if !joined {
@@ -99,7 +99,7 @@ func (c managedClusterController) sync(ctx context.Context, syncCtx factory.Sync
 	updateStatusFuncs = append(updateStatusFuncs, updateClusterResourcesFn(clusterv1.ManagedClusterStatus{
 		Capacity:    capacity,
 		Allocatable: allocatable,
-		Version:     *spokeVersion,
+		Version:     *clusterVersion,
 	}))
 
 	_, updated, err := helpers.UpdateManagedClusterStatus(ctx, c.hubClusterClient, c.clusterName, updateStatusFuncs...)
@@ -115,16 +115,16 @@ func (c managedClusterController) sync(ctx context.Context, syncCtx factory.Sync
 	return nil
 }
 
-func (c *managedClusterController) getSpokeVersion() (*clusterv1.ManagedClusterVersion, error) {
-	serverVersion, err := c.spokeDiscoveryClient.ServerVersion()
+func (c *managedClusterJoiningController) getClusterVersion() (*clusterv1.ManagedClusterVersion, error) {
+	serverVersion, err := c.discoveryClient.ServerVersion()
 	if err != nil {
 		return nil, err
 	}
 	return &clusterv1.ManagedClusterVersion{Kubernetes: serverVersion.String()}, nil
 }
 
-func (c *managedClusterController) getClusterResources() (capacity, allocatable clusterv1.ResourceList, err error) {
-	nodes, err := c.spokeNodeLister.List(labels.Everything())
+func (c *managedClusterJoiningController) getClusterResources() (capacity, allocatable clusterv1.ResourceList, err error) {
+	nodes, err := c.nodeLister.List(labels.Everything())
 	if err != nil {
 		return nil, nil, err
 	}

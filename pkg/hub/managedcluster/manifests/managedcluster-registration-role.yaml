@@ -1,0 +1,11 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .ManagedClusterName }}:managed-cluster-registration
+  namespace: {{ .ManagedClusterName }}
+rules:
+# Allow spoke registration agent to get/update coordination.k8s.io/lease
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  resourceNames: ["cluster-{{ .ManagedClusterName }}-lease"]
+  verbs: ["get", "update"]

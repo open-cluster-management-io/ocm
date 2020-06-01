@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"testing"
+	"time"
 
 	"github.com/open-cluster-management/registration/pkg/spoke/hubclientcert"
 	"k8s.io/client-go/rest"
@@ -112,9 +113,10 @@ func TestValidate(t *testing.T) {
 	}
 
 	withoutSpokeExternalServerURLs := &SpokeAgentOptions{
-		BootstrapKubeconfig: "/spoke/bootstrap/kubeconfig",
-		ClusterName:         "testcluster",
-		AgentName:           "testagent",
+		BootstrapKubeconfig:      "/spoke/bootstrap/kubeconfig",
+		ClusterName:              "testcluster",
+		AgentName:                "testagent",
+		ClusterHealthCheckPeriod: 1 * time.Minute,
 	}
 	err = withoutSpokeExternalServerURLs.Validate()
 	if err != nil {
@@ -130,6 +132,17 @@ func TestValidate(t *testing.T) {
 	err = withInvalidSpokeExternalServerURL.Validate()
 	if err == nil || err.Error() != "\"http://127.0.0.1:8080\" is invalid" {
 		t.Errorf("expect \"http://127.0.0.1:8080 is invalid\" error but got %v", err)
+	}
+
+	withInvalidClusterHealthCheckPeriod := &SpokeAgentOptions{
+		BootstrapKubeconfig:      "/spoke/bootstrap/kubeconfig",
+		ClusterName:              "testcluster",
+		AgentName:                "testagent",
+		ClusterHealthCheckPeriod: 0,
+	}
+	err = withInvalidClusterHealthCheckPeriod.Validate()
+	if err == nil || err.Error() != "cluster healthcheck period must greater than zero" {
+		t.Errorf("expect no error but got %v", err)
 	}
 }
 
