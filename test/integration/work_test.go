@@ -198,6 +198,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			}
 
 			util.AssertExistenceOfResources(gvrs, namespaces, names, spokeDynamicClient, eventuallyTimeout, eventuallyInterval)
+			util.AssertAppliedResources(work.Namespace, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
 		})
 	})
 
@@ -245,39 +246,53 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			}
 
 			util.AssertExistenceOfResources(gvrs, namespaces, names, spokeDynamicClient, eventuallyTimeout, eventuallyInterval)
+			util.AssertAppliedResources(work.Namespace, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
 		})
 
 		ginkgo.It("should update Service Account and Deployment successfully", func() {
+			ginkgo.By("check condition status in work status")
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue},
 				eventuallyTimeout, eventuallyInterval)
-			// ensure resources are created
+
+			ginkgo.By("check existence of all maintained resources")
 			var namespaces, names []string
 			for _, obj := range objects {
 				namespaces = append(namespaces, obj.GetNamespace())
 				names = append(names, obj.GetName())
 			}
-
 			util.AssertExistenceOfResources(gvrs, namespaces, names, spokeDynamicClient, eventuallyTimeout, eventuallyInterval)
 
-			// update manifests in work
+			ginkgo.By("check if applied resources in status are updated")
+			util.AssertAppliedResources(work.Namespace, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
+
+			// update manifests in work: 1) swap service account and deployment; 2) rename service account; 3) update deployment
+			ginkgo.By("update manifests in work")
+			oldServiceAccount := objects[0]
+			gvrs[0], gvrs[3] = gvrs[3], gvrs[0]
 			u, _ := util.NewServiceAccount(o.SpokeClusterName, "admin")
-			objects[0] = u
+			objects[3] = u
 			u, _, err = util.NewDeployment(o.SpokeClusterName, "deploy1", "admin")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			objects[3] = u
+			objects[0] = u
 
 			newManifests := []workapiv1.Manifest{}
 			for _, obj := range objects {
 				newManifests = append(newManifests, util.ToManifest(obj))
 			}
+
+			// slow down to make the difference between LastTransitionTime and updateTime large enough for measurement
+			time.Sleep(1 * time.Second)
+			updateTime := metav1.Now()
+			time.Sleep(1 * time.Second)
+
 			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			work.Spec.Workload.Manifests = newManifests
 			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			// ensure resources are created
+			ginkgo.By("check existence of all maintained resources")
 			namespaces = nil
 			names = nil
 			for _, obj := range objects {
@@ -286,9 +301,9 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			}
 			util.AssertExistenceOfResources(gvrs, namespaces, names, spokeDynamicClient, eventuallyTimeout, eventuallyInterval)
 
-			// check if deployment is updated
+			ginkgo.By("check if deployment is updated")
 			gomega.Eventually(func() bool {
-				u, err := util.GetResource(o.SpokeClusterName, "deploy1", gvrs[3], spokeDynamicClient)
+				u, err := util.GetResource(o.SpokeClusterName, objects[0].GetName(), gvrs[0], spokeDynamicClient)
 				if err != nil {
 					return false
 				}
@@ -300,6 +315,41 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			ginkgo.By("check if LastTransitionTime is updated")
+			gomega.Eventually(func() bool {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				if len(work.Status.ResourceStatus.Manifests) != len(objects) {
+					return false
+				}
+
+				for i := range work.Status.ResourceStatus.Manifests {
+					if len(work.Status.ResourceStatus.Manifests[i].Conditions) != 1 {
+						return false
+					}
+				}
+
+				// the LastTransitionTime of deployment should not change because of resouce update
+				if updateTime.Before(&work.Status.ResourceStatus.Manifests[0].Conditions[0].LastTransitionTime) {
+					return false
+				}
+
+				// the LastTransitionTime of service account changes because of resource re-creation
+				if work.Status.ResourceStatus.Manifests[3].Conditions[0].LastTransitionTime.Before(&updateTime) {
+					return false
+				}
+
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			ginkgo.By("check if applied resources in status are updated")
+			util.AssertAppliedResources(work.Namespace, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
+
+			ginkgo.By("check if resources which are no longer maintained have been deleted")
+			util.AssertNonexistenceOfResources([]schema.GroupVersionResource{gvrs[3]}, []string{oldServiceAccount.GetNamespace()}, []string{oldServiceAccount.GetName()}, spokeDynamicClient, eventuallyTimeout, eventuallyInterval)
 		})
 	})
 })
