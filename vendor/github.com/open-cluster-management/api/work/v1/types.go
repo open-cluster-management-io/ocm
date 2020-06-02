@@ -100,6 +100,31 @@ type ManifestResourceMeta struct {
 	Namespace string `json:"namespace" protobuf:"bytes,7,opt,name=namespace"`
 }
 
+// AppliedManifestResourceMeta represents the gvr, name and namespace of a resource.
+// Since these resources have been created, they must have valid group, version, resource, namespace, and name.
+type AppliedManifestResourceMeta struct {
+	// Group is the API Group of the kubernetes resource
+	// +required
+	Group string `json:"group" protobuf:"bytes,1,opt,name=group"`
+
+	// Version is the version of the kubernetes resource
+	// +required
+	Version string `json:"version" protobuf:"bytes,2,opt,name=version"`
+
+	// Resource is the resource name of the kubernetes resource
+	// +required
+	Resource string `json:"resource" protobuf:"bytes,3,opt,name=resource"`
+
+	// Name is the name of the kubernetes resource
+	// +required
+	Name string `json:"name" protobuf:"bytes,4,opt,name=name"`
+
+	// Name is the namespace of the kubernetes resource, empty string indicates
+	// it is a cluster scoped resource.
+	// +required
+	Namespace string `json:"namespace" protobuf:"bytes,5,opt,name=namespace"`
+}
+
 // ManifestWorkStatus represents the current status of spoke manifest workload
 type ManifestWorkStatus struct {
 	// Conditions contains the different condition statuses for this work.
@@ -115,6 +140,15 @@ type ManifestWorkStatus struct {
 	// spoke cluster. The agent on spoke cluster syncs the condition from spoke to the hub.
 	// +optional
 	ResourceStatus ManifestResourceStatus `json:"resourceStatus,omitempty" protobuf:"bytes,2,rep,name=resourceStatus"`
+
+	// AppliedResources represents a list of resources defined within the manifestwork that are applied.
+	// Only resources with valid GroupVersionResource, namespace, and name are suitable.
+	// An item in this slice is deleted when there is no mapped manifest in manifestwork.Spec or by finalizer.
+	// The resource relating to the item will also be removed from spoke cluster.
+	// The deleted resource may still be present until the finalizers for that resource are finished.
+	// However, the resource will not be undeleted, so it can be removed from this list and eventual consistency is preserved.
+	// +optional
+	AppliedResources []AppliedManifestResourceMeta `json:"appliedResources,omitempty" protobuf:"bytes,3,rep,name=appliedResources"`
 }
 
 // ManifestResourceStatus represents the status of each resource in manifest work deployed on

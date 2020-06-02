@@ -53,6 +53,11 @@ type SpokeClusterSpec struct {
 	// deleted.
 	// +required
 	HubAcceptsClient bool `json:"hubAcceptsClient" protobuf:"bytes,2,opt,name=hubAcceptsClient"`
+
+	// LeaseDurationSeconds is used to coordinate the lease update time of spoke agents.
+	// If its value is zero, the spoke agent will update its lease per 60s by default
+	// +optional
+	LeaseDurationSeconds int32 `json:"leaseDurationSeconds,omitempty" protobuf:"varint,3,opt,name=leaseDurationSeconds"`
 }
 
 // ClientConfig represents the apiserver address of the spoke cluster.
@@ -101,6 +106,10 @@ const (
 	// SpokeClusterConditionHubDenied means the request to join the cluster is denied by
 	// cluster-admin on hub
 	SpokeClusterConditionHubDenied string = "HubDeniedSpoke"
+	// SpokeClusterConditionAvailable means the spoke cluster is available, if a spoke
+	// cluster is available, the kube-apiserver is health and the registration agent is
+	// running with the minimum deployment on this spoke cluster
+	SpokeClusterConditionAvailable string = "SpokeClusterConditionAvailable"
 )
 
 // ResourceName is the name identifying various resources in a ResourceList.

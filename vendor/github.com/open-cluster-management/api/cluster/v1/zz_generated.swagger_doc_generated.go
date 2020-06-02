@@ -42,9 +42,10 @@ func (SpokeClusterList) SwaggerDoc() map[string]string {
 }
 
 var map_SpokeClusterSpec = map[string]string{
-	"":                   "SpokeClusterSpec provides the information to securely connect to a remote server and verify its identity.",
-	"spokeClientConfigs": "SpokeClientConfigs represents a list of the apiserver address of the spoke cluster. If it is empty, spoke cluster has no accessible address to be visited from hub.",
-	"hubAcceptsClient":   "AcceptSpokeCluster reprsents that hub accepts the join of spoke agent. Its default value is false, and can only be set true when the user on hub has an RBAC rule to UPDATE on the virtual subresource of spokeclusters/accept. When the vaule is set true, a namespace whose name is same as the name of SpokeCluster is created on hub representing the spoke cluster, also role/rolebinding is created on the namespace to grant the permision of access from agent on spoke. When the value is set false, the namespace representing the spoke cluster is deleted.",
+	"":                     "SpokeClusterSpec provides the information to securely connect to a remote server and verify its identity.",
+	"spokeClientConfigs":   "SpokeClientConfigs represents a list of the apiserver address of the spoke cluster. If it is empty, spoke cluster has no accessible address to be visited from hub.",
+	"hubAcceptsClient":     "AcceptSpokeCluster reprsents that hub accepts the join of spoke agent. Its default value is false, and can only be set true when the user on hub has an RBAC rule to UPDATE on the virtual subresource of spokeclusters/accept. When the vaule is set true, a namespace whose name is same as the name of SpokeCluster is created on hub representing the spoke cluster, also role/rolebinding is created on the namespace to grant the permision of access from agent on spoke. When the value is set false, the namespace representing the spoke cluster is deleted.",
+	"leaseDurationSeconds": "LeaseDurationSeconds is used to coordinate the lease update time of spoke agents. If its value is zero, the spoke agent will update its lease per 60s by default",
 }
 
 func (SpokeClusterSpec) SwaggerDoc() map[string]string {

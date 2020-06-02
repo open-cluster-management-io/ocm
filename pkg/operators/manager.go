@@ -10,14 +10,14 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
-	nucleusclient "github.com/open-cluster-management/api/client/nucleus/clientset/versioned"
-	nucleusinformer "github.com/open-cluster-management/api/client/nucleus/informers/externalversions"
-	"github.com/open-cluster-management/nucleus/pkg/operators/hub"
-	"github.com/open-cluster-management/nucleus/pkg/operators/spoke"
+	operatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned"
+	operatorinformer "github.com/open-cluster-management/api/client/operator/informers/externalversions"
+	"github.com/open-cluster-management/nucleus/pkg/operators/clustermanager"
+	"github.com/open-cluster-management/nucleus/pkg/operators/klusterlet"
 )
 
-// RunNucleusHubOperator starts a new nucleus hub operator
-func RunNucleusHubOperator(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+// RunClusterManagerOperator starts a new cluster manager operator
+func RunClusterManagerOperator(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	// Build kubclient client and informer for spoke cluster
 	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
@@ -32,50 +32,50 @@ func RunNucleusHubOperator(ctx context.Context, controllerContext *controllercmd
 		return err
 	}
 
-	// Build nucleus client and informer
-	nucleusClient, err := nucleusclient.NewForConfig(controllerContext.KubeConfig)
+	// Build operator client and informer
+	operatorClient, err := operatorclient.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
-	nucleusInformer := nucleusinformer.NewSharedInformerFactory(nucleusClient, 5*time.Minute)
+	operatorInformer := operatorinformer.NewSharedInformerFactory(operatorClient, 5*time.Minute)
 
-	hubcontroller := hub.NewNucleusHubController(
+	clusterManagerController := clustermanager.NewClusterManagerController(
 		kubeClient,
 		apiExtensionClient,
 		apiRegistrationClient.ApiregistrationV1(),
-		nucleusClient.NucleusV1().HubCores(),
-		nucleusInformer.Nucleus().V1().HubCores(),
+		operatorClient.OperatorV1().ClusterManagers(),
+		operatorInformer.Operator().V1().ClusterManagers(),
 		controllerContext.EventRecorder)
 
-	go nucleusInformer.Start(ctx.Done())
-	go hubcontroller.Run(ctx, 1)
+	go operatorInformer.Start(ctx.Done())
+	go clusterManagerController.Run(ctx, 1)
 	<-ctx.Done()
 	return nil
 }
 
-// RunNucleusSpokeOperator starts a new nucleus spoke operator
-func RunNucleusSpokeOperator(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+// RunKlusterletOperator starts a new klusterlet operator
+func RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	// Build kubclient client and informer for spoke cluster
 	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
 
-	// Build nucleus client and informer
-	nucleusClient, err := nucleusclient.NewForConfig(controllerContext.KubeConfig)
+	// Build operator client and informer
+	operatorClient, err := operatorclient.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
-	nucleusInformer := nucleusinformer.NewSharedInformerFactory(nucleusClient, 5*time.Minute)
+	operatorInformer := operatorinformer.NewSharedInformerFactory(operatorClient, 5*time.Minute)
 
-	spokeController := spoke.NewNucleusSpokeController(
+	klusterletController := klusterlet.NewKlusterletController(
 		kubeClient,
-		nucleusClient.NucleusV1().SpokeCores(),
-		nucleusInformer.Nucleus().V1().SpokeCores(),
+		operatorClient.OperatorV1().Klusterlets(),
+		operatorInformer.Operator().V1().Klusterlets(),
 		controllerContext.EventRecorder)
 
-	go nucleusInformer.Start(ctx.Done())
-	go spokeController.Run(ctx, 1)
+	go operatorInformer.Start(ctx.Done())
+	go klusterletController.Run(ctx, 1)
 	<-ctx.Done()
 	return nil
 }

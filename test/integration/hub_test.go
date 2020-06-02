@@ -15,11 +15,11 @@ import (
 	"github.com/open-cluster-management/nucleus/pkg/operators"
 	"github.com/open-cluster-management/nucleus/test/integration/util"
 
-	nucleusapiv1 "github.com/open-cluster-management/api/nucleus/v1"
+	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
 )
 
 func startHubOperator(ctx context.Context) {
-	err := operators.RunNucleusHubOperator(ctx, &controllercmd.ControllerContext{
+	err := operators.RunClusterManagerOperator(ctx, &controllercmd.ControllerContext{
 		KubeConfig:    restConfig,
 		EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
 	})
@@ -29,7 +29,7 @@ func startHubOperator(ctx context.Context) {
 var _ = ginkgo.Describe("HubCore", func() {
 	var cancel context.CancelFunc
 	var err error
-	var hubCoreName string
+	var clusterManagerName string
 	var hubRegistrationClusterRole string
 	var hubWebhookClusterRole string
 	var hubRegistrationSA string
@@ -46,15 +46,15 @@ var _ = ginkgo.Describe("HubCore", func() {
 	})
 
 	ginkgo.JustBeforeEach(func() {
-		hubcore := &nucleusapiv1.HubCore{
+		clusterManager := &operatorapiv1.ClusterManager{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: hubCoreName,
+				Name: clusterManagerName,
 			},
-			Spec: nucleusapiv1.HubCoreSpec{
+			Spec: operatorapiv1.ClusterManagerSpec{
 				RegistrationImagePullSpec: "quay.io/open-cluster-management/registration",
 			},
 		}
-		hubcore, err = nucleusClient.NucleusV1().HubCores().Create(context.Background(), hubcore, metav1.CreateOptions{})
+		_, err = operatorClient.OperatorV1().ClusterManagers().Create(context.Background(), clusterManager, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
@@ -66,13 +66,13 @@ var _ = ginkgo.Describe("HubCore", func() {
 
 	ginkgo.Context("Deploy and clean hub component", func() {
 		ginkgo.BeforeEach(func() {
-			hubCoreName = "hub"
-			hubRegistrationClusterRole = fmt.Sprintf("system:open-cluster-management:%s-registration-controller", hubCoreName)
-			hubWebhookClusterRole = fmt.Sprintf("system:open-cluster-management:%s-registration-webhook", hubCoreName)
-			hubRegistrationSA = fmt.Sprintf("%s-registration-controller-sa", hubCoreName)
-			hubWebhookSA = fmt.Sprintf("%s-registration-webhook-sa", hubCoreName)
-			hubRegistrationDeployment = fmt.Sprintf("%s-registration-controller", hubCoreName)
-			hubWebhookDeployment = fmt.Sprintf("%s-registration-webhook", hubCoreName)
+			clusterManagerName = "hub"
+			hubRegistrationClusterRole = fmt.Sprintf("system:open-cluster-management:%s-registration-controller", clusterManagerName)
+			hubWebhookClusterRole = fmt.Sprintf("system:open-cluster-management:%s-registration-webhook", clusterManagerName)
+			hubRegistrationSA = fmt.Sprintf("%s-registration-controller-sa", clusterManagerName)
+			hubWebhookSA = fmt.Sprintf("%s-registration-webhook-sa", clusterManagerName)
+			hubRegistrationDeployment = fmt.Sprintf("%s-registration-controller", clusterManagerName)
+			hubWebhookDeployment = fmt.Sprintf("%s-registration-webhook", clusterManagerName)
 			webhookSecret = "webhook-serving-cert"
 			validtingWebhook = "spokeclustervalidators.admission.cluster.open-cluster-management.io"
 		})
@@ -168,7 +168,7 @@ var _ = ginkgo.Describe("HubCore", func() {
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
-			err := nucleusClient.NucleusV1().HubCores().Delete(context.Background(), hubCoreName, metav1.DeleteOptions{})
+			err := operatorClient.OperatorV1().ClusterManagers().Delete(context.Background(), clusterManagerName, metav1.DeleteOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			// Check namespace deletion

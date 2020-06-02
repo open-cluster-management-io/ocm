@@ -1,6 +1,0 @@
-apiVersion: nucleus.open-cluster-management.io/v1
-kind: HubCore
-metadata:
-  name: hub
-spec:
-  registrationImagePullSpec: quay.io/open-cluster-management/registration
