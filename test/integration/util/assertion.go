@@ -3,6 +3,7 @@ package util
 import (
 	"context"
 	"reflect"
+	"sort"
 
 	"github.com/onsi/gomega"
 
@@ -105,5 +106,63 @@ func AssertExistenceOfResources(gvrs []schema.GroupVersionResource, namespaces, 
 		}
 
 		return true
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+}
+
+// check if resource with GVR, namespace and name does not exists
+func AssertNonexistenceOfResources(gvrs []schema.GroupVersionResource, namespaces, names []string, dynamicClient dynamic.Interface, eventuallyTimeout, eventuallyInterval int) {
+	gomega.Expect(gvrs).To(gomega.HaveLen(len(namespaces)))
+	gomega.Expect(gvrs).To(gomega.HaveLen(len(names)))
+
+	gomega.Eventually(func() bool {
+		for i := range gvrs {
+			_, err := GetResource(namespaces[i], names[i], gvrs[i], dynamicClient)
+			if !apierrors.IsNotFound(err) {
+				return false
+			}
+		}
+
+		return true
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+}
+
+// check if applied resources in work status are updated correctly
+func AssertAppliedResources(workNamespace, workName string, gvrs []schema.GroupVersionResource, namespaces, names []string, workClient workclientset.Interface, eventuallyTimeout, eventuallyInterval int) {
+	gomega.Expect(gvrs).To(gomega.HaveLen(len(namespaces)))
+	gomega.Expect(gvrs).To(gomega.HaveLen(len(names)))
+
+	var appliedResources []workapiv1.AppliedManifestResourceMeta
+	for i := range gvrs {
+		appliedResources = append(appliedResources, workapiv1.AppliedManifestResourceMeta{
+			Group:     gvrs[i].Group,
+			Version:   gvrs[i].Version,
+			Resource:  gvrs[i].Resource,
+			Namespace: namespaces[i],
+			Name:      names[i],
+		})
+	}
+
+	sort.SliceStable(appliedResources, func(i, j int) bool {
+		switch {
+		case appliedResources[i].Group != appliedResources[j].Group:
+			return appliedResources[i].Group < appliedResources[j].Group
+		case appliedResources[i].Version != appliedResources[j].Version:
+			return appliedResources[i].Version < appliedResources[j].Version
+		case appliedResources[i].Resource != appliedResources[j].Resource:
+			return appliedResources[i].Resource < appliedResources[j].Resource
+		case appliedResources[i].Namespace != appliedResources[j].Namespace:
+			return appliedResources[i].Namespace < appliedResources[j].Namespace
+		default:
+			return appliedResources[i].Name < appliedResources[j].Name
+		}
+	})
+
+	gomega.Eventually(func() bool {
+		work, err := workClient.WorkV1().ManifestWorks(workNamespace).Get(context.Background(), workName, metav1.GetOptions{})
+		if err != nil {
+			return false
+		}
+
+		return reflect.DeepEqual(work.Status.AppliedResources, appliedResources)
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }
