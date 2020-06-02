@@ -232,7 +232,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By("Waiting for SpokeCluster to have HubAccepted=true")
-		err = wait.Poll(1*time.Second, 10*time.Second, func() (bool, error) {
+		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
 			var err error
 			spoke, err := spokeClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
 			if err != nil {

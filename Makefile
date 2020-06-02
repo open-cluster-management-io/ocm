@@ -42,6 +42,12 @@ deploy-hub: ensure-kustomize
 	$(KUSTOMIZE) build deploy/hub | $(KUBECTL) apply -f -
 	mv deploy/hub/kustomization.yaml.tmp deploy/hub/kustomization.yaml
 
+deploy-webhook: ensure-kustomize
+	cp deploy/webhook/kustomization.yaml deploy/webhook/kustomization.yaml.tmp
+	cd deploy/webhook && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/registration:latest=$(IMAGE_NAME)
+	$(KUSTOMIZE) build deploy/webhook | $(KUBECTL) apply -f -
+	mv deploy/webhook/kustomization.yaml.tmp deploy/webhook/kustomization.yaml
+
 cluster-ip: 
   CLUSTER_IP?=$(shell $(KUBECTL) get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}")
 
@@ -62,14 +68,14 @@ deploy-spoke: ensure-kustomize
 	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) apply -f -
 	mv deploy/spoke/kustomization.yaml.tmp deploy/spoke/kustomization.yaml
 
-deploy-all: deploy-hub bootstrap-secret deploy-spoke
+deploy-all: deploy-hub deploy-webhook bootstrap-secret deploy-spoke
 
 build: build-e2e
 
 build-e2e:
 	go test -c ./test/e2e
 
-test-e2e: build-e2e ensure-kustomize deploy-hub e2e-bootstrap-secret
+test-e2e: build-e2e ensure-kustomize deploy-hub deploy-webhook e2e-bootstrap-secret
 	./e2e.test -test.v -ginkgo.v
 
 clean-e2e:
