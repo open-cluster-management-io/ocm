@@ -182,15 +182,15 @@ func ensureObject(t *testing.T, object runtime.Object, klusterlet *opratorapiv1.
 	}
 }
 
-// TestSyncDeploy test deployment of spoke components
+// TestSyncDeploy test deployment of klusterlet components
 func TestSyncDeploy(t *testing.T) {
-	spokeCore := newKlusterlet("testspoke", "testns", "cluster1")
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	bootStrapSecret := newSecret(bootstrapHubKubeConfigSecret, "testns")
 	hubKubeConfigSecret := newSecret(hubKubeConfigSecret, "testns")
 	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	namespace := newNamespace("testns")
-	controller := newTestController(spokeCore, bootStrapSecret, hubKubeConfigSecret, namespace)
-	syncContext := newFakeSyncContext(t, "testspoke")
+	controller := newTestController(klusterlet, bootStrapSecret, hubKubeConfigSecret, namespace)
+	syncContext := newFakeSyncContext(t, "klusterlet")
 
 	err := controller.controller.sync(nil, syncContext)
 	if err != nil {
@@ -211,7 +211,7 @@ func TestSyncDeploy(t *testing.T) {
 		t.Errorf("Expect 11 objects created in the sync loop, actual %d", len(createObjects))
 	}
 	for _, object := range createObjects {
-		ensureObject(t, object, spokeCore)
+		ensureObject(t, object, klusterlet)
 	}
 
 	operatorAction := controller.operatorClient.Actions()
@@ -226,17 +226,17 @@ func TestSyncDeploy(t *testing.T) {
 	assertGet(t, operatorAction[2], "operator.open-cluster-management.io", "v1", "klusterlets")
 	assertAction(t, operatorAction[3], "update")
 	assertOnlyConditions(t, operatorAction[3].(clienttesting.UpdateActionImpl).Object,
-		namedCondition(klusterletApplied, metav1.ConditionTrue), namedCondition(spokeRegistrationDegraded, metav1.ConditionFalse))
+		namedCondition(klusterletApplied, metav1.ConditionTrue), namedCondition(klusterletRegistrationDegraded, metav1.ConditionFalse))
 }
 
 // TestSyncWithNoSecret test the scenario that bootstrap secret and hub config secret does not exist
 func TestSyncWithNoSecret(t *testing.T) {
-	klusterlet := newKlusterlet("testspoke", "testns", "")
+	klusterlet := newKlusterlet("klusterlet", "testns", "")
 	bootStrapSecret := newSecret(bootstrapHubKubeConfigSecret, "testns")
 	hubSecret := newSecret(hubKubeConfigSecret, "testns")
 	namespace := newNamespace("testns")
 	controller := newTestController(klusterlet, namespace)
-	syncContext := newFakeSyncContext(t, "testspoke")
+	syncContext := newFakeSyncContext(t, "klusterlet")
 
 	// Return err since bootstrap secret does not exist
 	err := controller.controller.sync(nil, syncContext)
@@ -284,7 +284,7 @@ func TestSyncWithNoSecret(t *testing.T) {
 	assertGet(t, operatorAction[2], "operator.open-cluster-management.io", "v1", "klusterlets")
 	assertAction(t, operatorAction[3], "update")
 	assertOnlyConditions(t, operatorAction[3].(clienttesting.UpdateActionImpl).Object,
-		namedCondition(klusterletApplied, metav1.ConditionTrue), namedCondition(spokeRegistrationDegraded, metav1.ConditionTrue))
+		namedCondition(klusterletApplied, metav1.ConditionTrue), namedCondition(klusterletRegistrationDegraded, metav1.ConditionTrue))
 
 	// reset for round 3
 	controller.operatorClient.ClearActions()
@@ -316,17 +316,17 @@ func TestSyncWithNoSecret(t *testing.T) {
 	assertGet(t, operatorAction[1], "operator.open-cluster-management.io", "v1", "klusterlets")
 	assertAction(t, operatorAction[2], "update")
 	assertOnlyConditions(t, operatorAction[2].(clienttesting.UpdateActionImpl).Object,
-		namedCondition(klusterletApplied, metav1.ConditionTrue), namedCondition(spokeRegistrationDegraded, metav1.ConditionFalse))
+		namedCondition(klusterletApplied, metav1.ConditionTrue), namedCondition(klusterletRegistrationDegraded, metav1.ConditionFalse))
 }
 
 // TestSyncDelete test cleanup hub deploy
 func TestSyncDelete(t *testing.T) {
-	spokeCore := newKlusterlet("testspoke", "testns", "")
+	klusterlet := newKlusterlet("klusterlet", "testns", "")
 	now := metav1.Now()
-	spokeCore.ObjectMeta.SetDeletionTimestamp(&now)
+	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
 	namespace := newNamespace("testns")
-	controller := newTestController(spokeCore, namespace)
-	syncContext := newFakeSyncContext(t, "testspoke")
+	controller := newTestController(klusterlet, namespace)
+	syncContext := newFakeSyncContext(t, "klusterlet")
 
 	err := controller.controller.sync(nil, syncContext)
 	if err != nil {
@@ -378,12 +378,12 @@ func TestGetServersFromKlusterlet(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			spokeCore := newKlusterlet("testspoke", "testns", "")
+			klusterlet := newKlusterlet("klusterlet", "testns", "")
 			for _, server := range c.servers {
-				spokeCore.Spec.ExternalServerURLs = append(spokeCore.Spec.ExternalServerURLs,
+				klusterlet.Spec.ExternalServerURLs = append(klusterlet.Spec.ExternalServerURLs,
 					opratorapiv1.ServerURL{URL: server})
 			}
-			actual := getServersFromKlusterlet(spokeCore)
+			actual := getServersFromKlusterlet(klusterlet)
 			if actual != c.expected {
 				t.Errorf("Expected to be same, actual %q, expected %q", actual, c.expected)
 			}

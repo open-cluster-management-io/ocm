@@ -12,69 +12,69 @@ package v1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_ClientConfig = map[string]string{
-	"":         "ClientConfig represents the apiserver address of the spoke cluster.",
-	"url":      "URL is the url of apiserver endpoint of the spoke cluster.",
-	"caBundle": "CABundle is the ca bundle to connect to apiserver of the spoke cluster. System certs are used if it is not set.",
+	"":         "ClientConfig represents the apiserver address of the managed cluster.",
+	"url":      "URL is the url of apiserver endpoint of the managed cluster.",
+	"caBundle": "CABundle is the ca bundle to connect to apiserver of the managed cluster. System certs are used if it is not set.",
 }
 
 func (ClientConfig) SwaggerDoc() map[string]string {
 	return map_ClientConfig
 }
 
-var map_SpokeCluster = map[string]string{
-	"":       "SpokeCluster represents the desired state and current status of spoke cluster. SpokeCluster is a cluster scoped resource. The name is the cluster UID.\n\nThe cluster join process follows a double opt-in process:\n\n1. agent on spoke cluster creates CSR on hub with cluster UID and agent name. 2. agent on spoke cluster creates spokecluster on hub. 3. cluster admin on hub approves the CSR for the spoke's cluster UID and agent name. 4. cluster admin set spec.acceptSpokeCluster of spokecluster to true. 5. cluster admin on spoke creates credential of kubeconfig to spoke.\n\nOnce the hub creates the cluster namespace, the spoke agent pushes the credential to the hub to use against the spoke's kube-apiserver.",
-	"spec":   "Spec represents a desired configuration for the agent on the spoke cluster.",
-	"status": "Status represents the current status of joined spoke cluster",
+var map_ManagedCluster = map[string]string{
+	"":       "ManagedCluster represents the desired state and current status of managed cluster. ManagedCluster is a cluster scoped resource. The name is the cluster UID.\n\nThe cluster join process follows a double opt-in process:\n\n1. agent on managed cluster creates CSR on hub with cluster UID and agent name. 2. agent on managed cluster creates ManagedCluster on hub. 3. cluster admin on hub approves the CSR for the ManagedCluster's UID and agent name. 4. cluster admin sets spec.acceptClient of ManagedCluster to true. 5. cluster admin on managed cluster creates credential of kubeconfig to hub.\n\nOnce the hub creates the cluster namespace, the Klusterlet agent on the Managed Cluster pushes the credential to the hub to use against the managed cluster's kube-apiserver.",
+	"spec":   "Spec represents a desired configuration for the agent on the managed cluster.",
+	"status": "Status represents the current status of joined managed cluster",
 }
 
-func (SpokeCluster) SwaggerDoc() map[string]string {
-	return map_SpokeCluster
+func (ManagedCluster) SwaggerDoc() map[string]string {
+	return map_ManagedCluster
 }
 
-var map_SpokeClusterList = map[string]string{
-	"":         "SpokeClusterList is a collection of spoke cluster.",
+var map_ManagedClusterList = map[string]string{
+	"":         "ManagedClusterList is a collection of managed cluster.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
-	"items":    "Items is a list of spoke cluster.",
+	"items":    "Items is a list of managed cluster.",
 }
 
-func (SpokeClusterList) SwaggerDoc() map[string]string {
-	return map_SpokeClusterList
+func (ManagedClusterList) SwaggerDoc() map[string]string {
+	return map_ManagedClusterList
 }
 
-var map_SpokeClusterSpec = map[string]string{
-	"":                     "SpokeClusterSpec provides the information to securely connect to a remote server and verify its identity.",
-	"spokeClientConfigs":   "SpokeClientConfigs represents a list of the apiserver address of the spoke cluster. If it is empty, spoke cluster has no accessible address to be visited from hub.",
-	"hubAcceptsClient":     "AcceptSpokeCluster reprsents that hub accepts the join of spoke agent. Its default value is false, and can only be set true when the user on hub has an RBAC rule to UPDATE on the virtual subresource of spokeclusters/accept. When the vaule is set true, a namespace whose name is same as the name of SpokeCluster is created on hub representing the spoke cluster, also role/rolebinding is created on the namespace to grant the permision of access from agent on spoke. When the value is set false, the namespace representing the spoke cluster is deleted.",
-	"leaseDurationSeconds": "LeaseDurationSeconds is used to coordinate the lease update time of spoke agents. If its value is zero, the spoke agent will update its lease per 60s by default",
+var map_ManagedClusterSpec = map[string]string{
+	"":                            "ManagedClusterSpec provides the information to securely connect to a remote server and verify its identity.",
+	"managedClusterClientConfigs": "ManagedClusterClientConfigs represents a list of the apiserver address of the managed cluster. If it is empty, managed cluster has no accessible address to be visited from hub.",
+	"hubAcceptsClient":            "hubAcceptsClient represents that hub accepts the join of Klusterlet agent on the managed cluster to the hub. The default value is false, and can only be set true when the user on hub has an RBAC rule to UPDATE on the virtual subresource of managedclusters/accept. When the value is set true, a namespace whose name is same as the name of ManagedCluster is created on hub representing the managed cluster, also role/rolebinding is created on the namespace to grant the permision of access from agent on managed cluster. When the value is set false, the namespace representing the managed cluster is deleted.",
+	"leaseDurationSeconds":        "LeaseDurationSeconds is used to coordinate the lease update time of Klusterlet agents on the managed cluster. If its value is zero, the Klusterlet agent will update its lease every 60s by default",
 }
 
-func (SpokeClusterSpec) SwaggerDoc() map[string]string {
-	return map_SpokeClusterSpec
+func (ManagedClusterSpec) SwaggerDoc() map[string]string {
+	return map_ManagedClusterSpec
 }
 
-var map_SpokeClusterStatus = map[string]string{
-	"":            "SpokeClusterStatus represents the current status of joined spoke cluster.",
-	"conditions":  "Conditions contains the different condition statuses for this spoke cluster.",
-	"capacity":    "Capacity represents the total resource capacity from all nodeStatuses on the spoke cluster.",
-	"allocatable": "Allocatable represents the total allocatable resources on the spoke cluster.",
-	"version":     "Version represents the kubernetes version of the spoke cluster.",
+var map_ManagedClusterStatus = map[string]string{
+	"":            "ManagedClusterStatus represents the current status of joined managed cluster.",
+	"conditions":  "Conditions contains the different condition statuses for this managed cluster.",
+	"capacity":    "Capacity represents the total resource capacity from all nodeStatuses on the managed cluster.",
+	"allocatable": "Allocatable represents the total allocatable resources on the managed cluster.",
+	"version":     "Version represents the kubernetes version of the managed cluster.",
 }
 
-func (SpokeClusterStatus) SwaggerDoc() map[string]string {
-	return map_SpokeClusterStatus
+func (ManagedClusterStatus) SwaggerDoc() map[string]string {
+	return map_ManagedClusterStatus
 }
 
-var map_SpokeVersion = map[string]string{
-	"":           "SpokeVersion represents version information about the spoke cluster.",
-	"kubernetes": "Kubernetes is the kubernetes version of spoke cluster",
+var map_ManagedClusterVersion = map[string]string{
+	"":           "ManagedClusterVersion represents version information about the managed cluster.",
+	"kubernetes": "Kubernetes is the kubernetes version of managed cluster.",
 }
 
-func (SpokeVersion) SwaggerDoc() map[string]string {
-	return map_SpokeVersion
+func (ManagedClusterVersion) SwaggerDoc() map[string]string {
+	return map_ManagedClusterVersion
 }
 
 var map_StatusCondition = map[string]string{
-	"":                   "StatusCondition contains condition information for a spoke cluster.",
+	"":                   "StatusCondition contains condition information for a managed cluster.",
 	"type":               "Type is the type of the cluster condition.",
 	"status":             "Status is the status of the condition. One of True, False, Unknown.",
 	"lastTransitionTime": "LastTransitionTime is the last time the condition changed from one status to another.",

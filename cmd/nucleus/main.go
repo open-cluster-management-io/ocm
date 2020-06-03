@@ -50,7 +50,7 @@ func newNucleusCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(operator.NewHubOperatorCmd())
-	cmd.AddCommand(operator.NewSpokeOperatorCmd())
+	cmd.AddCommand(operator.NewKlusterletOperatorCmd())
 
 	return cmd
 }

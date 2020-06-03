@@ -27,10 +27,10 @@ rules:
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterroles", "roles"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "escalate", "bind"]
-# Allow hub to manage spokeclusters
+# Allow hub to manage managedclusters
 - apiGroups: ["cluster.open-cluster-management.io"]
-  resources: ["spokeclusters"]
+  resources: ["managedclusters"]
   verbs: ["get", "list", "watch", "update", "patch"]
 - apiGroups: ["cluster.open-cluster-management.io"]
-  resources: ["spokeclusters/status"]
+  resources: ["managedclusters/status"]
   verbs: ["update", "patch"]

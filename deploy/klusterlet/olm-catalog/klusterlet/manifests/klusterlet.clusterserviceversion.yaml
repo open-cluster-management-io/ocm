@@ -33,6 +33,9 @@ spec:
     - kind: Klusterlet
       name: klusterlets.operator.open-cluster-management.io
       version: v1
+    - kind: Klusterlet
+      name: klusterlets.operator.open-cluster-management.io
+      version: v1
   displayName: Klusterlet
   icon:
   - base64data: ""

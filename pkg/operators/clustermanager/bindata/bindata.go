@@ -1,6 +1,6 @@
 // Code generated for package bindata by go-bindata DO NOT EDIT. (@generated)
 // sources:
-// manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_spokeclusters.crd.yaml
+// manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml
 // manifests/cluster-manager/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml
 // manifests/cluster-manager/cluster-manager-clusterrolebinding.yaml
 // manifests/cluster-manager/cluster-manager-namespace.yaml
@@ -69,33 +69,34 @@ func (fi bindataFileInfo) Sys() interface{} {
 	return nil
 }
 
-var _manifestsClusterManager0000_00_clustersOpenClusterManagementIo_spokeclustersCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: spokeclusters.cluster.open-cluster-management.io
+  name: managedclusters.cluster.open-cluster-management.io
 spec:
   group: cluster.open-cluster-management.io
   names:
-    kind: SpokeCluster
-    listKind: SpokeClusterList
-    plural: spokeclusters
-    singular: spokecluster
+    kind: ManagedCluster
+    listKind: ManagedClusterList
+    plural: managedclusters
+    singular: managedcluster
   scope: "Cluster"
   subresources:
     status: {}
   preserveUnknownFields: false
   validation:
     openAPIV3Schema:
-      description: "SpokeCluster represents the desired state and current status of
-        spoke cluster. SpokeCluster is a cluster scoped resource. The name is the
-        cluster UID. \n The cluster join process follows a double opt-in process:
-        \n 1. agent on spoke cluster creates CSR on hub with cluster UID and agent
-        name. 2. agent on spoke cluster creates spokecluster on hub. 3. cluster admin
-        on hub approves the CSR for the spoke's cluster UID and agent name. 4. cluster
-        admin set spec.acceptSpokeCluster of spokecluster to true. 5. cluster admin
-        on spoke creates credential of kubeconfig to spoke. \n Once the hub creates
-        the cluster namespace, the spoke agent pushes the credential to the hub to
-        use against the spoke's kube-apiserver."
+      description: "ManagedCluster represents the desired state and current status
+        of managed cluster. ManagedCluster is a cluster scoped resource. The name
+        is the cluster UID. \n The cluster join process follows a double opt-in process:
+        \n 1. agent on managed cluster creates CSR on hub with cluster UID and agent
+        name. 2. agent on managed cluster creates ManagedCluster on hub. 3. cluster
+        admin on hub approves the CSR for the ManagedCluster's UID and agent name.
+        4. cluster admin sets spec.acceptClient of ManagedCluster to true. 5. cluster
+        admin on managed cluster creates credential of kubeconfig to hub. \n Once
+        the hub creates the cluster namespace, the Klusterlet agent on the Managed
+        Cluster pushes the credential to the hub to use against the managed cluster's
+        kube-apiserver."
       type: object
       properties:
         apiVersion:
@@ -112,68 +113,69 @@ spec:
           type: object
         spec:
           description: Spec represents a desired configuration for the agent on the
-            spoke cluster.
+            managed cluster.
           type: object
           properties:
             hubAcceptsClient:
-              description: AcceptSpokeCluster reprsents that hub accepts the join
-                of spoke agent. Its default value is false, and can only be set true
-                when the user on hub has an RBAC rule to UPDATE on the virtual subresource
-                of spokeclusters/accept. When the vaule is set true, a namespace whose
-                name is same as the name of SpokeCluster is created on hub representing
-                the spoke cluster, also role/rolebinding is created on the namespace
-                to grant the permision of access from agent on spoke. When the value
-                is set false, the namespace representing the spoke cluster is deleted.
+              description: hubAcceptsClient represents that hub accepts the join of
+                Klusterlet agent on the managed cluster to the hub. The default value
+                is false, and can only be set true when the user on hub has an RBAC
+                rule to UPDATE on the virtual subresource of managedclusters/accept.
+                When the value is set true, a namespace whose name is same as the
+                name of ManagedCluster is created on hub representing the managed
+                cluster, also role/rolebinding is created on the namespace to grant
+                the permision of access from agent on managed cluster. When the value
+                is set false, the namespace representing the managed cluster is deleted.
               type: boolean
             leaseDurationSeconds:
               description: LeaseDurationSeconds is used to coordinate the lease update
-                time of spoke agents. If its value is zero, the spoke agent will update
-                its lease per 60s by default
+                time of Klusterlet agents on the managed cluster. If its value is
+                zero, the Klusterlet agent will update its lease every 60s by default
               type: integer
               format: int32
-            spokeClientConfigs:
-              description: SpokeClientConfigs represents a list of the apiserver address
-                of the spoke cluster. If it is empty, spoke cluster has no accessible
-                address to be visited from hub.
+            managedClusterClientConfigs:
+              description: ManagedClusterClientConfigs represents a list of the apiserver
+                address of the managed cluster. If it is empty, managed cluster has
+                no accessible address to be visited from hub.
               type: array
               items:
                 description: ClientConfig represents the apiserver address of the
-                  spoke cluster. TODO include credential to connect to spoke cluster
+                  managed cluster. TODO include credential to connect to managed cluster
                   kube-apiserver
                 type: object
                 properties:
                   caBundle:
                     description: CABundle is the ca bundle to connect to apiserver
-                      of the spoke cluster. System certs are used if it is not set.
+                      of the managed cluster. System certs are used if it is not set.
                     type: string
                     format: byte
                   url:
-                    description: URL is the url of apiserver endpoint of the spoke
+                    description: URL is the url of apiserver endpoint of the managed
                       cluster.
                     type: string
         status:
-          description: Status represents the current status of joined spoke cluster
+          description: Status represents the current status of joined managed cluster
           type: object
           properties:
             allocatable:
               description: Allocatable represents the total allocatable resources
-                on the spoke cluster.
+                on the managed cluster.
               type: object
               additionalProperties:
                 type: string
             capacity:
               description: Capacity represents the total resource capacity from all
-                nodeStatuses on the spoke cluster.
+                nodeStatuses on the managed cluster.
               type: object
               additionalProperties:
                 type: string
             conditions:
               description: Conditions contains the different condition statuses for
-                this spoke cluster.
+                this managed cluster.
               type: array
               items:
                 description: StatusCondition contains condition information for a
-                  spoke cluster.
+                  managed cluster.
                 type: object
                 properties:
                   lastTransitionTime:
@@ -197,12 +199,12 @@ spec:
                     description: Type is the type of the cluster condition.
                     type: string
             version:
-              description: Version represents the kubernetes version of the spoke
+              description: Version represents the kubernetes version of the managed
                 cluster.
               type: object
               properties:
                 kubernetes:
-                  description: Kubernetes is the kubernetes version of spoke cluster
+                  description: Kubernetes is the kubernetes version of managed cluster.
                   type: string
   version: v1
   versions:
@@ -217,17 +219,17 @@ status:
   storedVersions: []
 `)
 
-func manifestsClusterManager0000_00_clustersOpenClusterManagementIo_spokeclustersCrdYamlBytes() ([]byte, error) {
-	return _manifestsClusterManager0000_00_clustersOpenClusterManagementIo_spokeclustersCrdYaml, nil
+func manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersCrdYamlBytes() ([]byte, error) {
+	return _manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersCrdYaml, nil
 }
 
-func manifestsClusterManager0000_00_clustersOpenClusterManagementIo_spokeclustersCrdYaml() (*asset, error) {
-	bytes, err := manifestsClusterManager0000_00_clustersOpenClusterManagementIo_spokeclustersCrdYamlBytes()
+func manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersCrdYaml() (*asset, error) {
+	bytes, err := manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersCrdYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_spokeclusters.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -251,10 +253,10 @@ spec:
   validation:
     openAPIV3Schema:
       description: ManifestWork represents a manifests workload that hub wants to
-        deploy on the spoke cluster. A manifest workload is defined as a set of kubernetes
-        resources. ManifestWork must be created in the cluster namespace on the hub,
-        so that agent on the corresponding spoke cluster can access this resource
-        and deploy on the spoke cluster.
+        deploy on the managed cluster. A manifest workload is defined as a set of
+        kubernetes resources. ManifestWork must be created in the cluster namespace
+        on the hub, so that agent on the corresponding managed cluster can access
+        this resource and deploy on the managed cluster.
       type: object
       properties:
         apiVersion:
@@ -271,21 +273,21 @@ spec:
           type: object
         spec:
           description: Spec represents a desired configuration of work to be deployed
-            on the spoke cluster.
+            on the managed cluster.
           type: object
           properties:
             workload:
               description: Workload represents the manifest workload to be deployed
-                on spoke cluster
+                on managed cluster
               type: object
               properties:
                 manifests:
                   description: Manifests represents a list of kuberenetes resources
-                    to be deployed on the spoke cluster.
+                    to be deployed on the managed cluster.
                   type: array
                   items:
                     description: Manifest represents a resource to be deployed on
-                      spoke cluster
+                      managed cluster
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                     x-kubernetes-embedded-resource: true
@@ -299,7 +301,7 @@ spec:
                 GroupVersionResource, namespace, and name are suitable. An item in
                 this slice is deleted when there is no mapped manifest in manifestwork.Spec
                 or by finalizer. The resource relating to the item will also be removed
-                from spoke cluster. The deleted resource may still be present until
+                from managed cluster. The deleted resource may still be present until
                 the finalizers for that resource are finished. However, the resource
                 will not be undeleted, so it can be removed from this list and eventual
                 consistency is preserved.
@@ -329,15 +331,15 @@ spec:
             conditions:
               description: 'Conditions contains the different condition statuses for
                 this work. Valid condition types are: 1. Applied represents workload
-                in ManifestWork is applied successfully on spoke cluster. 2. Progressing
-                represents workload in ManifestWork is being applied on spoke cluster.
-                3. Available represents workload in ManifestWork exists on the spoke
+                in ManifestWork is applied successfully on managed cluster. 2. Progressing
+                represents workload in ManifestWork is being applied on managed cluster.
+                3. Available represents workload in ManifestWork exists on the managed
                 cluster. 4. Degraded represents the current state of workload does
                 not match the desired state for a certain period.'
               type: array
               items:
                 description: StatusCondition contains condition information for a
-                  spoke work.
+                  ManifestWork applied to a managed cluster.
                 type: object
                 properties:
                   lastTransitionTime:
@@ -358,35 +360,35 @@ spec:
                       False, Unknown.
                     type: string
                   type:
-                    description: Type is the type of the spoke work condition.
+                    description: Type is the type of the ManifestWork condition.
                     type: string
             resourceStatus:
               description: ResourceStatus represents the status of each resource in
-                manifestwork deployed on spoke cluster. The agent on spoke cluster
-                syncs the condition from spoke to the hub.
+                manifestwork deployed on managed cluster. The Klusterlet agent on
+                managed cluster syncs the condition from managed to the hub.
               type: object
               properties:
                 manifests:
                   description: 'Manifests represents the condition of manifests deployed
-                    on spoke cluster. Valid condition types are: 1. Progressing represents
-                    the resource is being applied on spoke cluster. 2. Applied represents
-                    the resource is applied successfully on spoke cluster. 3. Available
-                    represents the resource exists on the spoke cluster. 4. Degraded
-                    represents the current state of resource does not match the desired
-                    state for a certain period.'
+                    on managed cluster. Valid condition types are: 1. Progressing
+                    represents the resource is being applied on managed cluster. 2.
+                    Applied represents the resource is applied successfully on managed
+                    cluster. 3. Available represents the resource exists on the managed
+                    cluster. 4. Degraded represents the current state of resource
+                    does not match the desired state for a certain period.'
                   type: array
                   items:
                     description: ManifestCondition represents the conditions of the
-                      resources deployed on spoke cluster
+                      resources deployed on managed cluster
                     type: object
                     properties:
                       conditions:
                         description: Conditions represents the conditions of this
-                          resource on spoke cluster
+                          resource on managed cluster
                         type: array
                         items:
                           description: StatusCondition contains condition information
-                            for a spoke work.
+                            for a ManifestWork applied to a managed cluster.
                           type: object
                           properties:
                             lastTransitionTime:
@@ -407,7 +409,7 @@ spec:
                                 One of True, False, Unknown.
                               type: string
                             type:
-                              description: Type is the type of the spoke work condition.
+                              description: Type is the type of the ManifestWork condition.
                               type: string
                       resourceMeta:
                         description: ResourceMeta represents the gvk, name and namespace
@@ -547,12 +549,12 @@ rules:
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterroles", "roles"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "escalate", "bind"]
-# Allow hub to manage spokeclusters
+# Allow hub to manage managedclusters
 - apiGroups: ["cluster.open-cluster-management.io"]
-  resources: ["spokeclusters"]
+  resources: ["managedclusters"]
   verbs: ["get", "list", "watch", "update", "patch"]
 - apiGroups: ["cluster.open-cluster-management.io"]
-  resources: ["spokeclusters/status"]
+  resources: ["managedclusters/status"]
   verbs: ["update", "patch"]
 `)
 
@@ -712,11 +714,11 @@ kind: ClusterRole
 metadata:
   name: system:open-cluster-management:{{ .ClusterManagerName }}-registration-webhook
 rules:
-# Allow spokecluster admission to get/list/watch configmaps
+# Allow managedcluster admission to get/list/watch configmaps
 - apiGroups: [""]
   resources: ["configmaps"]
   verbs: ["get", "list", "watch"]
-# Allow spokecluster admission to create subjectaccessreviews
+# Allow managedcluster admission to create subjectaccessreviews
 - apiGroups: ["authorization.k8s.io"]
   resources: ["subjectaccessreviews"]
   verbs: ["create"]
@@ -913,16 +915,16 @@ func manifestsClusterManagerClusterManagerRegistrationWebhookServiceaccountYaml(
 var _manifestsClusterManagerClusterManagerRegistrationWebhookValidatingconfigurationYaml = []byte(`apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: spokeclustervalidators.admission.cluster.open-cluster-management.io
+  name: managedclustervalidators.admission.cluster.open-cluster-management.io
 webhooks:
-- name: spokeclustervalidators.admission.cluster.open-cluster-management.io
+- name: managedclustervalidators.admission.cluster.open-cluster-management.io
   failurePolicy: Fail
   clientConfig:
     service:
       # reach the webhook via the registered aggregated API
       namespace: default
       name: kubernetes
-      path: /apis/admission.cluster.open-cluster-management.io/v1/spokeclustervalidators
+      path: /apis/admission.cluster.open-cluster-management.io/v1/managedclustervalidators
   rules:
   - operations:
     - CREATE
@@ -932,7 +934,7 @@ webhooks:
     apiVersions:
     - "*"
     resources:
-    - spokeclusters
+    - managedclusters
   admissionReviewVersions: ["v1beta1"]
   sideEffects: None
   timeoutSeconds: 3
@@ -1005,22 +1007,22 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_spokeclusters.crd.yaml": manifestsClusterManager0000_00_clustersOpenClusterManagementIo_spokeclustersCrdYaml,
-	"manifests/cluster-manager/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml":     manifestsClusterManager0000_00_workOpenClusterManagementIo_manifestworksCrdYaml,
-	"manifests/cluster-manager/cluster-manager-clusterrolebinding.yaml":                            manifestsClusterManagerClusterManagerClusterrolebindingYaml,
-	"manifests/cluster-manager/cluster-manager-namespace.yaml":                                     manifestsClusterManagerClusterManagerNamespaceYaml,
-	"manifests/cluster-manager/cluster-manager-registration-clusterrole.yaml":                      manifestsClusterManagerClusterManagerRegistrationClusterroleYaml,
-	"manifests/cluster-manager/cluster-manager-registration-clusterrolebinding.yaml":               manifestsClusterManagerClusterManagerRegistrationClusterrolebindingYaml,
-	"manifests/cluster-manager/cluster-manager-registration-deployment.yaml":                       manifestsClusterManagerClusterManagerRegistrationDeploymentYaml,
-	"manifests/cluster-manager/cluster-manager-registration-serviceaccount.yaml":                   manifestsClusterManagerClusterManagerRegistrationServiceaccountYaml,
-	"manifests/cluster-manager/cluster-manager-registration-webhook-apiservice.yaml":               manifestsClusterManagerClusterManagerRegistrationWebhookApiserviceYaml,
-	"manifests/cluster-manager/cluster-manager-registration-webhook-clusterrole.yaml":              manifestsClusterManagerClusterManagerRegistrationWebhookClusterroleYaml,
-	"manifests/cluster-manager/cluster-manager-registration-webhook-clusterrolebinding.yaml":       manifestsClusterManagerClusterManagerRegistrationWebhookClusterrolebindingYaml,
-	"manifests/cluster-manager/cluster-manager-registration-webhook-deployment.yaml":               manifestsClusterManagerClusterManagerRegistrationWebhookDeploymentYaml,
-	"manifests/cluster-manager/cluster-manager-registration-webhook-secret.yaml":                   manifestsClusterManagerClusterManagerRegistrationWebhookSecretYaml,
-	"manifests/cluster-manager/cluster-manager-registration-webhook-service.yaml":                  manifestsClusterManagerClusterManagerRegistrationWebhookServiceYaml,
-	"manifests/cluster-manager/cluster-manager-registration-webhook-serviceaccount.yaml":           manifestsClusterManagerClusterManagerRegistrationWebhookServiceaccountYaml,
-	"manifests/cluster-manager/cluster-manager-registration-webhook-validatingconfiguration.yaml":  manifestsClusterManagerClusterManagerRegistrationWebhookValidatingconfigurationYaml,
+	"manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml": manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersCrdYaml,
+	"manifests/cluster-manager/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml":       manifestsClusterManager0000_00_workOpenClusterManagementIo_manifestworksCrdYaml,
+	"manifests/cluster-manager/cluster-manager-clusterrolebinding.yaml":                              manifestsClusterManagerClusterManagerClusterrolebindingYaml,
+	"manifests/cluster-manager/cluster-manager-namespace.yaml":                                       manifestsClusterManagerClusterManagerNamespaceYaml,
+	"manifests/cluster-manager/cluster-manager-registration-clusterrole.yaml":                        manifestsClusterManagerClusterManagerRegistrationClusterroleYaml,
+	"manifests/cluster-manager/cluster-manager-registration-clusterrolebinding.yaml":                 manifestsClusterManagerClusterManagerRegistrationClusterrolebindingYaml,
+	"manifests/cluster-manager/cluster-manager-registration-deployment.yaml":                         manifestsClusterManagerClusterManagerRegistrationDeploymentYaml,
+	"manifests/cluster-manager/cluster-manager-registration-serviceaccount.yaml":                     manifestsClusterManagerClusterManagerRegistrationServiceaccountYaml,
+	"manifests/cluster-manager/cluster-manager-registration-webhook-apiservice.yaml":                 manifestsClusterManagerClusterManagerRegistrationWebhookApiserviceYaml,
+	"manifests/cluster-manager/cluster-manager-registration-webhook-clusterrole.yaml":                manifestsClusterManagerClusterManagerRegistrationWebhookClusterroleYaml,
+	"manifests/cluster-manager/cluster-manager-registration-webhook-clusterrolebinding.yaml":         manifestsClusterManagerClusterManagerRegistrationWebhookClusterrolebindingYaml,
+	"manifests/cluster-manager/cluster-manager-registration-webhook-deployment.yaml":                 manifestsClusterManagerClusterManagerRegistrationWebhookDeploymentYaml,
+	"manifests/cluster-manager/cluster-manager-registration-webhook-secret.yaml":                     manifestsClusterManagerClusterManagerRegistrationWebhookSecretYaml,
+	"manifests/cluster-manager/cluster-manager-registration-webhook-service.yaml":                    manifestsClusterManagerClusterManagerRegistrationWebhookServiceYaml,
+	"manifests/cluster-manager/cluster-manager-registration-webhook-serviceaccount.yaml":             manifestsClusterManagerClusterManagerRegistrationWebhookServiceaccountYaml,
+	"manifests/cluster-manager/cluster-manager-registration-webhook-validatingconfiguration.yaml":    manifestsClusterManagerClusterManagerRegistrationWebhookValidatingconfigurationYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -1066,22 +1068,22 @@ type bintree struct {
 var _bintree = &bintree{nil, map[string]*bintree{
 	"manifests": {nil, map[string]*bintree{
 		"cluster-manager": {nil, map[string]*bintree{
-			"0000_00_clusters.open-cluster-management.io_spokeclusters.crd.yaml": {manifestsClusterManager0000_00_clustersOpenClusterManagementIo_spokeclustersCrdYaml, map[string]*bintree{}},
-			"0000_00_work.open-cluster-management.io_manifestworks.crd.yaml":     {manifestsClusterManager0000_00_workOpenClusterManagementIo_manifestworksCrdYaml, map[string]*bintree{}},
-			"cluster-manager-clusterrolebinding.yaml":                            {manifestsClusterManagerClusterManagerClusterrolebindingYaml, map[string]*bintree{}},
-			"cluster-manager-namespace.yaml":                                     {manifestsClusterManagerClusterManagerNamespaceYaml, map[string]*bintree{}},
-			"cluster-manager-registration-clusterrole.yaml":                      {manifestsClusterManagerClusterManagerRegistrationClusterroleYaml, map[string]*bintree{}},
-			"cluster-manager-registration-clusterrolebinding.yaml":               {manifestsClusterManagerClusterManagerRegistrationClusterrolebindingYaml, map[string]*bintree{}},
-			"cluster-manager-registration-deployment.yaml":                       {manifestsClusterManagerClusterManagerRegistrationDeploymentYaml, map[string]*bintree{}},
-			"cluster-manager-registration-serviceaccount.yaml":                   {manifestsClusterManagerClusterManagerRegistrationServiceaccountYaml, map[string]*bintree{}},
-			"cluster-manager-registration-webhook-apiservice.yaml":               {manifestsClusterManagerClusterManagerRegistrationWebhookApiserviceYaml, map[string]*bintree{}},
-			"cluster-manager-registration-webhook-clusterrole.yaml":              {manifestsClusterManagerClusterManagerRegistrationWebhookClusterroleYaml, map[string]*bintree{}},
-			"cluster-manager-registration-webhook-clusterrolebinding.yaml":       {manifestsClusterManagerClusterManagerRegistrationWebhookClusterrolebindingYaml, map[string]*bintree{}},
-			"cluster-manager-registration-webhook-deployment.yaml":               {manifestsClusterManagerClusterManagerRegistrationWebhookDeploymentYaml, map[string]*bintree{}},
-			"cluster-manager-registration-webhook-secret.yaml":                   {manifestsClusterManagerClusterManagerRegistrationWebhookSecretYaml, map[string]*bintree{}},
-			"cluster-manager-registration-webhook-service.yaml":                  {manifestsClusterManagerClusterManagerRegistrationWebhookServiceYaml, map[string]*bintree{}},
-			"cluster-manager-registration-webhook-serviceaccount.yaml":           {manifestsClusterManagerClusterManagerRegistrationWebhookServiceaccountYaml, map[string]*bintree{}},
-			"cluster-manager-registration-webhook-validatingconfiguration.yaml":  {manifestsClusterManagerClusterManagerRegistrationWebhookValidatingconfigurationYaml, map[string]*bintree{}},
+			"0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml": {manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersCrdYaml, map[string]*bintree{}},
+			"0000_00_work.open-cluster-management.io_manifestworks.crd.yaml":       {manifestsClusterManager0000_00_workOpenClusterManagementIo_manifestworksCrdYaml, map[string]*bintree{}},
+			"cluster-manager-clusterrolebinding.yaml":                              {manifestsClusterManagerClusterManagerClusterrolebindingYaml, map[string]*bintree{}},
+			"cluster-manager-namespace.yaml":                                       {manifestsClusterManagerClusterManagerNamespaceYaml, map[string]*bintree{}},
+			"cluster-manager-registration-clusterrole.yaml":                        {manifestsClusterManagerClusterManagerRegistrationClusterroleYaml, map[string]*bintree{}},
+			"cluster-manager-registration-clusterrolebinding.yaml":                 {manifestsClusterManagerClusterManagerRegistrationClusterrolebindingYaml, map[string]*bintree{}},
+			"cluster-manager-registration-deployment.yaml":                         {manifestsClusterManagerClusterManagerRegistrationDeploymentYaml, map[string]*bintree{}},
+			"cluster-manager-registration-serviceaccount.yaml":                     {manifestsClusterManagerClusterManagerRegistrationServiceaccountYaml, map[string]*bintree{}},
+			"cluster-manager-registration-webhook-apiservice.yaml":                 {manifestsClusterManagerClusterManagerRegistrationWebhookApiserviceYaml, map[string]*bintree{}},
+			"cluster-manager-registration-webhook-clusterrole.yaml":                {manifestsClusterManagerClusterManagerRegistrationWebhookClusterroleYaml, map[string]*bintree{}},
+			"cluster-manager-registration-webhook-clusterrolebinding.yaml":         {manifestsClusterManagerClusterManagerRegistrationWebhookClusterrolebindingYaml, map[string]*bintree{}},
+			"cluster-manager-registration-webhook-deployment.yaml":                 {manifestsClusterManagerClusterManagerRegistrationWebhookDeploymentYaml, map[string]*bintree{}},
+			"cluster-manager-registration-webhook-secret.yaml":                     {manifestsClusterManagerClusterManagerRegistrationWebhookSecretYaml, map[string]*bintree{}},
+			"cluster-manager-registration-webhook-service.yaml":                    {manifestsClusterManagerClusterManagerRegistrationWebhookServiceYaml, map[string]*bintree{}},
+			"cluster-manager-registration-webhook-serviceaccount.yaml":             {manifestsClusterManagerClusterManagerRegistrationWebhookServiceaccountYaml, map[string]*bintree{}},
+			"cluster-manager-registration-webhook-validatingconfiguration.yaml":    {manifestsClusterManagerClusterManagerRegistrationWebhookValidatingconfigurationYaml, map[string]*bintree{}},
 		}},
 	}},
 }}

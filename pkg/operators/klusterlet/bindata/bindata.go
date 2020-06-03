@@ -142,7 +142,7 @@ spec:
     spec:
       serviceAccountName: {{ .KlusterletName }}-registration-sa
       containers:
-      - name: spoke-agent
+      - name: registration-controller
         image: {{ .RegistrationImage }}
         imagePullPolicy: IfNotPresent
         args:
@@ -402,7 +402,7 @@ spec:
     spec:
       serviceAccountName: {{ .KlusterletName }}-work-sa
       containers:
-      - name: spoke-agent
+      - name: ç
         image: {{ .WorkImage }}
         imagePullPolicy: IfNotPresent
         args:

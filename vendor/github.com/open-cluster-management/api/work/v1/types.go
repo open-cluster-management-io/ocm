@@ -5,9 +5,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// StatusCondition contains condition information for a spoke work.
+// StatusCondition contains condition information for a ManifestWork applied to a managed cluster.
 type StatusCondition struct {
-	// Type is the type of the spoke work condition.
+	// Type is the type of the ManifestWork condition.
 	// +required
 	Type string `json:"type" protobuf:"bytes,1,opt,name=type"`
 
@@ -32,16 +32,16 @@ type StatusCondition struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:subresource:status
 
-// ManifestWork represents a manifests workload that hub wants to deploy on the spoke cluster.
+// ManifestWork represents a manifests workload that hub wants to deploy on the managed cluster.
 // A manifest workload is defined as a set of kubernetes resources.
 // ManifestWork must be created in the cluster namespace on the hub, so that agent on the
-// corresponding spoke cluster can access this resource and deploy on the spoke
+// corresponding managed cluster can access this resource and deploy on the managed
 // cluster.
 type ManifestWork struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Spec represents a desired configuration of work to be deployed on the spoke cluster.
+	// Spec represents a desired configuration of work to be deployed on the managed cluster.
 	Spec ManifestWorkSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// Status represents the current status of work
@@ -49,22 +49,22 @@ type ManifestWork struct {
 	Status ManifestWorkStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
-// ManifestWorkSpec represents a desired configuration of manifests to be deployed on the spoke cluster.
+// ManifestWorkSpec represents a desired configuration of manifests to be deployed on the managed cluster.
 type ManifestWorkSpec struct {
-	// Workload represents the manifest workload to be deployed on spoke cluster
+	// Workload represents the manifest workload to be deployed on managed cluster
 	Workload ManifestsTemplate `json:"workload,omitempty" protobuf:"bytes,1,opt,name=workload"`
 }
 
-// Manifest represents a resource to be deployed on spoke cluster
+// Manifest represents a resource to be deployed on managed cluster
 type Manifest struct {
 	// +kubebuilder:validation:EmbeddedResource
 	// +kubebuilder:pruning:PreserveUnknownFields
 	runtime.RawExtension `json:",inline" protobuf:"bytes,1,opt,name=rawExtension"`
 }
 
-// ManifestsTemplate represents the manifest workload to be deployed on spoke cluster
+// ManifestsTemplate represents the manifest workload to be deployed on managed cluster
 type ManifestsTemplate struct {
-	// Manifests represents a list of kuberenetes resources to be deployed on the spoke cluster.
+	// Manifests represents a list of kuberenetes resources to be deployed on the managed cluster.
 	// +optional
 	Manifests []Manifest `json:"manifests,omitempty" protobuf:"bytes,1,rep,name=manifests"`
 }
@@ -125,26 +125,26 @@ type AppliedManifestResourceMeta struct {
 	Namespace string `json:"namespace" protobuf:"bytes,5,opt,name=namespace"`
 }
 
-// ManifestWorkStatus represents the current status of spoke manifest workload
+// ManifestWorkStatus represents the current status of managed cluster ManifestWork
 type ManifestWorkStatus struct {
 	// Conditions contains the different condition statuses for this work.
 	// Valid condition types are:
-	// 1. Applied represents workload in ManifestWork is applied successfully on spoke cluster.
-	// 2. Progressing represents workload in ManifestWork is being applied on spoke cluster.
-	// 3. Available represents workload in ManifestWork exists on the spoke cluster.
+	// 1. Applied represents workload in ManifestWork is applied successfully on managed cluster.
+	// 2. Progressing represents workload in ManifestWork is being applied on managed cluster.
+	// 3. Available represents workload in ManifestWork exists on the managed cluster.
 	// 4. Degraded represents the current state of workload does not match the desired
 	// state for a certain period.
 	Conditions []StatusCondition `json:"conditions" protobuf:"bytes,1,rep,name=conditions"`
 
 	// ResourceStatus represents the status of each resource in manifestwork deployed on
-	// spoke cluster. The agent on spoke cluster syncs the condition from spoke to the hub.
+	// managed cluster. The Klusterlet agent on managed cluster syncs the condition from managed to the hub.
 	// +optional
 	ResourceStatus ManifestResourceStatus `json:"resourceStatus,omitempty" protobuf:"bytes,2,rep,name=resourceStatus"`
 
 	// AppliedResources represents a list of resources defined within the manifestwork that are applied.
 	// Only resources with valid GroupVersionResource, namespace, and name are suitable.
 	// An item in this slice is deleted when there is no mapped manifest in manifestwork.Spec or by finalizer.
-	// The resource relating to the item will also be removed from spoke cluster.
+	// The resource relating to the item will also be removed from managed cluster.
 	// The deleted resource may still be present until the finalizers for that resource are finished.
 	// However, the resource will not be undeleted, so it can be removed from this list and eventual consistency is preserved.
 	// +optional
@@ -152,13 +152,13 @@ type ManifestWorkStatus struct {
 }
 
 // ManifestResourceStatus represents the status of each resource in manifest work deployed on
-// spoke cluster
+// managed cluster
 type ManifestResourceStatus struct {
-	// Manifests represents the condition of manifests deployed on spoke cluster.
+	// Manifests represents the condition of manifests deployed on managed cluster.
 	// Valid condition types are:
-	// 1. Progressing represents the resource is being applied on spoke cluster.
-	// 2. Applied represents the resource is applied successfully on spoke cluster.
-	// 3. Available represents the resource exists on the spoke cluster.
+	// 1. Progressing represents the resource is being applied on managed cluster.
+	// 2. Applied represents the resource is applied successfully on managed cluster.
+	// 3. Available represents the resource exists on the managed cluster.
 	// 4. Degraded represents the current state of resource does not match the desired
 	// state for a certain period.
 	Manifests []ManifestCondition `json:"manifests,omitempty" protobuf:"bytes,2,opt,name=manifests"`
@@ -169,13 +169,13 @@ type WorkStatusConditionType string
 
 const (
 	// WorkProgressing represents that the work is in the progress to be
-	// applied on the spoke cluster.
+	// applied on the managed cluster.
 	WorkProgressing WorkStatusConditionType = "Progressing"
 	// WorkApplied represents that the workload defined in work is
-	// succesfully applied on the spoke cluster.
+	// succesfully applied on the managed cluster.
 	WorkApplied WorkStatusConditionType = "Applied"
 	// WorkAvailable represents that all resources of the work exists on
-	// the spoke cluster.
+	// the managed cluster.
 	WorkAvailable WorkStatusConditionType = "Available"
 	// WorkDegraded represents that the current state of work does not match
 	// the desired state for a certain period.
@@ -183,29 +183,29 @@ const (
 )
 
 // ManifestCondition represents the conditions of the resources deployed on
-// spoke cluster
+// managed cluster
 type ManifestCondition struct {
 	// ResourceMeta represents the gvk, name and namespace of a resoure
 	// +required
 	ResourceMeta ManifestResourceMeta `json:"resourceMeta" protobuf:"bytes,1,opt,name=resourceMeta"`
 
-	// Conditions represents the conditions of this resource on spoke cluster
+	// Conditions represents the conditions of this resource on managed cluster
 	// +required
 	Conditions []StatusCondition `json:"conditions" protobuf:"bytes,2,rep,name=conditions"`
 }
 
 // ManifestConditionType represents the condition type of a single
-// resource manifest deployed on the spoke cluster.
+// resource manifest deployed on the managed cluster.
 type ManifestConditionType string
 
 const (
-	// ManifestProgressing represents the resource is being applied on the spoke cluster
+	// ManifestProgressing represents the resource is being applied on the managed cluster
 	ManifestProgressing ManifestConditionType = "Progressing"
 	// ManifestApplied represents that the resource object is applied
-	// on the spoke cluster.
+	// on the managed cluster.
 	ManifestApplied ManifestConditionType = "Applied"
 	// ManifestAvailable represents that the resource object exists
-	// on the spoke cluster.
+	// on the managed cluster.
 	ManifestAvailable ManifestConditionType = "Available"
 	// ManifestDegraded represents that the current state of resource object does not
 	// match the desired state for a certain period.

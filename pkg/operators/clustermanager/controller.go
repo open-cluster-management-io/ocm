@@ -34,10 +34,10 @@ import (
 var (
 	crdNames = []string{
 		"manifestworks.work.open-cluster-management.io",
-		"spokeclusters.cluster.open-cluster-management.io",
+		"managedclusters.cluster.open-cluster-management.io",
 	}
 	staticResourceFiles = []string{
-		"manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_spokeclusters.crd.yaml",
+		"manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml",
 		"manifests/cluster-manager/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml",
 		"manifests/cluster-manager/cluster-manager-registration-clusterrole.yaml",
 		"manifests/cluster-manager/cluster-manager-registration-clusterrolebinding.yaml",

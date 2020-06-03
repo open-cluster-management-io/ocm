@@ -86,13 +86,13 @@ func TestUpdateStatusCondition(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			fakeOperatorClient := opereatorfake.NewSimpleClientset(
 				&operatorapiv1.ClusterManager{
-					ObjectMeta: metav1.ObjectMeta{Name: "testspokecluster"},
+					ObjectMeta: metav1.ObjectMeta{Name: "testmanagedcluster"},
 					Status: operatorapiv1.ClusterManagerStatus{
 						Conditions: c.startingConditions,
 					},
 				},
 				&operatorapiv1.Klusterlet{
-					ObjectMeta: metav1.ObjectMeta{Name: "testspokecluster"},
+					ObjectMeta: metav1.ObjectMeta{Name: "testmanagedcluster"},
 					Status: operatorapiv1.KlusterletStatus{
 						Conditions: c.startingConditions,
 					},
@@ -102,7 +102,7 @@ func TestUpdateStatusCondition(t *testing.T) {
 			hubstatus, updated, err := UpdateClusterManagerStatus(
 				context.TODO(),
 				fakeOperatorClient.OperatorV1().ClusterManagers(),
-				"testspokecluster",
+				"testmanagedcluster",
 				UpdateClusterManagerConditionFn(c.newCondition),
 			)
 			if err != nil {
@@ -112,10 +112,10 @@ func TestUpdateStatusCondition(t *testing.T) {
 				t.Errorf("expected %t, but %t", c.expectedUpdated, updated)
 			}
 
-			spokestatus, updated, err := UpdateKlusterletStatus(
+			klusterletstatus, updated, err := UpdateKlusterletStatus(
 				context.TODO(),
 				fakeOperatorClient.OperatorV1().Klusterlets(),
-				"testspokecluster",
+				"testmanagedcluster",
 				UpdateKlusterletConditionFn(c.newCondition),
 			)
 			if err != nil {
@@ -135,12 +135,12 @@ func TestUpdateStatusCondition(t *testing.T) {
 					t.Errorf(diff.ObjectDiff(expected, hubactual))
 				}
 
-				spokeactual := spokestatus.Conditions[i]
+				klusterletactual := klusterletstatus.Conditions[i]
 				if expected.LastTransitionTime == (metav1.Time{}) {
-					spokeactual.LastTransitionTime = metav1.Time{}
+					klusterletactual.LastTransitionTime = metav1.Time{}
 				}
-				if !equality.Semantic.DeepEqual(expected, spokeactual) {
-					t.Errorf(diff.ObjectDiff(expected, spokeactual))
+				if !equality.Semantic.DeepEqual(expected, klusterletactual) {
+					t.Errorf(diff.ObjectDiff(expected, klusterletactual))
 				}
 			}
 		})

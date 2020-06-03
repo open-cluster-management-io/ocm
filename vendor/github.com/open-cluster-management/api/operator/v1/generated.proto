@@ -11,12 +11,12 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1";
 
-// ClusterManager configures the controllers on the hub that govern registration and work distribution for attached klusterlets.
+// ClusterManager configures the controllers on the hub that govern registration and work distribution for attached Klusterlets.
 // ClusterManager will be only deployed in open-cluster-management-hub namespace.
 message ClusterManager {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec represents a desired deployment configuration of controllers that govern registration and work distribution for attached klusterlets.
+  // Spec represents a desired deployment configuration of controllers that govern registration and work distribution for attached Klusterlets.
   optional ClusterManagerSpec spec = 2;
 
   // Status represents the current status of controllers that govern the lifecycle of managed clusters.
@@ -35,7 +35,7 @@ message ClusterManagerList {
   repeated ClusterManager items = 2;
 }
 
-// ClusterManagerSpec represents a desired deployment configuration of controllers that govern registration and work distribution for attached klusterlets.
+// ClusterManagerSpec represents a desired deployment configuration of controllers that govern registration and work distribution for attached Klusterlets.
 message ClusterManagerSpec {
   // RegistrationImagePullSpec represents the desired image of registration controller installed on hub.
   // +required
@@ -60,29 +60,29 @@ message ClusterManagerStatus {
 message Klusterlet {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec represents the desired deployment configuration of klusterlet agent.
+  // Spec represents the desired deployment configuration of Klusterlet agent.
   optional KlusterletSpec spec = 2;
 
-  // Status represents the current status of klusterlet agent.
+  // Status represents the current status of Klusterlet agent.
   optional KlusterletStatus status = 3;
 }
 
-// KlusterletList is a collection of klusterlet agent.
+// KlusterletList is a collection of Klusterlet agents.
 message KlusterletList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is a list of klusterlet agent.
+  // Items is a list of Klusterlet agent.
   repeated Klusterlet items = 2;
 }
 
-// KlusterletSpec represents the desired deployment configuration of klusterlet agent.
+// KlusterletSpec represents the desired deployment configuration of Klusterlet agent.
 message KlusterletSpec {
   // Namespace is the namespace to deploy the agent.
   // The namespace must have a prefix of "open-cluster-management-", and if it is not set,
-  // the namespace of "open-cluster-management-spoke" is used to deploy agent.
+  // the namespace of "open-cluster-management-agent" is used to deploy agent.
   // +optional
   optional string namespace = 1;
 
@@ -94,36 +94,36 @@ message KlusterletSpec {
   // +required
   optional string workImagePullSpec = 3;
 
-  // ClusterName is the name of the spoke cluster to be created on hub.
-  // The spoke agent generates a random name if it is not set, or discovers the appropriate cluster name on openshift.
+  // ClusterName is the name of the managed cluster to be created on hub.
+  // The Klusterlet agent generates a random name if it is not set, or discovers the appropriate cluster name on openshift.
   // +optional
   optional string clusterName = 4;
 
   // ExternalServerURLs represents the a list of apiserver urls and ca bundles that is accessible externally
-  // If it is set empty, spoke cluster has no externally accessible url that hub cluster can visit.
+  // If it is set empty, managed cluster has no externally accessible url that hub cluster can visit.
   // +optional
   repeated ServerURL externalServerURLs = 5;
 }
 
-// KlusterletStatus represents the current status of klusterlet agent.
+// KlusterletStatus represents the current status of Klusterlet agent.
 message KlusterletStatus {
-  // Conditions contain the different condition statuses for this spokecore.
+  // Conditions contain the different condition statuses for this Klusterlet.
   // Valid condition types are:
-  // Applied: components in spoke is applied.
-  // Available: components in spoke are available and ready to serve.
-  // Progressing: components in spoke are in a transitioning state.
-  // Degraded: components in spoke do not match the desired configuration and only provide
+  // Applied: components have been applied in the managed cluster.
+  // Available: components in the managed cluster are available and ready to serve.
+  // Progressing: components in the managed cluster are in a transitioning state.
+  // Degraded: components in the managed cluster do not match the desired configuration and only provide
   // degraded service.
   repeated StatusCondition conditions = 1;
 }
 
 // ServerURL represents the apiserver url and ca bundle that is accessible externally
 message ServerURL {
-  // URL is the url of apiserver endpoint of the spoke cluster.
+  // URL is the url of apiserver endpoint of the managed cluster.
   // +required
   optional string url = 1;
 
-  // CABundle is the ca bundle to connect to apiserver of the spoke cluster.
+  // CABundle is the ca bundle to connect to apiserver of the managed cluster.
   // System certs are used if it is not set.
   // +optional
   optional bytes caBundle = 2;

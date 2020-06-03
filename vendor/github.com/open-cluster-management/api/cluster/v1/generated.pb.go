@@ -59,15 +59,15 @@ func (m *ClientConfig) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_ClientConfig proto.InternalMessageInfo
 
-func (m *SpokeCluster) Reset()      { *m = SpokeCluster{} }
-func (*SpokeCluster) ProtoMessage() {}
-func (*SpokeCluster) Descriptor() ([]byte, []int) {
+func (m *ManagedCluster) Reset()      { *m = ManagedCluster{} }
+func (*ManagedCluster) ProtoMessage() {}
+func (*ManagedCluster) Descriptor() ([]byte, []int) {
 	return fileDescriptor_65aa4961edf1a5e7, []int{1}
 }
-func (m *SpokeCluster) XXX_Unmarshal(b []byte) error {
+func (m *ManagedCluster) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *SpokeCluster) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *ManagedCluster) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
 	if err != nil {
@@ -75,27 +75,27 @@ func (m *SpokeCluster) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
 	}
 	return b[:n], nil
 }
-func (m *SpokeCluster) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SpokeCluster.Merge(m, src)
+func (m *ManagedCluster) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ManagedCluster.Merge(m, src)
 }
-func (m *SpokeCluster) XXX_Size() int {
+func (m *ManagedCluster) XXX_Size() int {
 	return m.Size()
 }
-func (m *SpokeCluster) XXX_DiscardUnknown() {
-	xxx_messageInfo_SpokeCluster.DiscardUnknown(m)
+func (m *ManagedCluster) XXX_DiscardUnknown() {
+	xxx_messageInfo_ManagedCluster.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_SpokeCluster proto.InternalMessageInfo
+var xxx_messageInfo_ManagedCluster proto.InternalMessageInfo
 
-func (m *SpokeClusterList) Reset()      { *m = SpokeClusterList{} }
-func (*SpokeClusterList) ProtoMessage() {}
-func (*SpokeClusterList) Descriptor() ([]byte, []int) {
+func (m *ManagedClusterList) Reset()      { *m = ManagedClusterList{} }
+func (*ManagedClusterList) ProtoMessage() {}
+func (*ManagedClusterList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_65aa4961edf1a5e7, []int{2}
 }
-func (m *SpokeClusterList) XXX_Unmarshal(b []byte) error {
+func (m *ManagedClusterList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *SpokeClusterList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *ManagedClusterList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
 	if err != nil {
@@ -103,27 +103,27 @@ func (m *SpokeClusterList) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 	}
 	return b[:n], nil
 }
-func (m *SpokeClusterList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SpokeClusterList.Merge(m, src)
+func (m *ManagedClusterList) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ManagedClusterList.Merge(m, src)
 }
-func (m *SpokeClusterList) XXX_Size() int {
+func (m *ManagedClusterList) XXX_Size() int {
 	return m.Size()
 }
-func (m *SpokeClusterList) XXX_DiscardUnknown() {
-	xxx_messageInfo_SpokeClusterList.DiscardUnknown(m)
+func (m *ManagedClusterList) XXX_DiscardUnknown() {
+	xxx_messageInfo_ManagedClusterList.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_SpokeClusterList proto.InternalMessageInfo
+var xxx_messageInfo_ManagedClusterList proto.InternalMessageInfo
 
-func (m *SpokeClusterSpec) Reset()      { *m = SpokeClusterSpec{} }
-func (*SpokeClusterSpec) ProtoMessage() {}
-func (*SpokeClusterSpec) Descriptor() ([]byte, []int) {
+func (m *ManagedClusterSpec) Reset()      { *m = ManagedClusterSpec{} }
+func (*ManagedClusterSpec) ProtoMessage() {}
+func (*ManagedClusterSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_65aa4961edf1a5e7, []int{3}
 }
-func (m *SpokeClusterSpec) XXX_Unmarshal(b []byte) error {
+func (m *ManagedClusterSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *SpokeClusterSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *ManagedClusterSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
 	if err != nil {
@@ -131,27 +131,27 @@ func (m *SpokeClusterSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 	}
 	return b[:n], nil
 }
-func (m *SpokeClusterSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SpokeClusterSpec.Merge(m, src)
+func (m *ManagedClusterSpec) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ManagedClusterSpec.Merge(m, src)
 }
-func (m *SpokeClusterSpec) XXX_Size() int {
+func (m *ManagedClusterSpec) XXX_Size() int {
 	return m.Size()
 }
-func (m *SpokeClusterSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_SpokeClusterSpec.DiscardUnknown(m)
+func (m *ManagedClusterSpec) XXX_DiscardUnknown() {
+	xxx_messageInfo_ManagedClusterSpec.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_SpokeClusterSpec proto.InternalMessageInfo
+var xxx_messageInfo_ManagedClusterSpec proto.InternalMessageInfo
 
-func (m *SpokeClusterStatus) Reset()      { *m = SpokeClusterStatus{} }
-func (*SpokeClusterStatus) ProtoMessage() {}
-func (*SpokeClusterStatus) Descriptor() ([]byte, []int) {
+func (m *ManagedClusterStatus) Reset()      { *m = ManagedClusterStatus{} }
+func (*ManagedClusterStatus) ProtoMessage() {}
+func (*ManagedClusterStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_65aa4961edf1a5e7, []int{4}
 }
-func (m *SpokeClusterStatus) XXX_Unmarshal(b []byte) error {
+func (m *ManagedClusterStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *SpokeClusterStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *ManagedClusterStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
 	if err != nil {
@@ -159,27 +159,27 @@ func (m *SpokeClusterStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, 
 	}
 	return b[:n], nil
 }
-func (m *SpokeClusterStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SpokeClusterStatus.Merge(m, src)
+func (m *ManagedClusterStatus) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ManagedClusterStatus.Merge(m, src)
 }
-func (m *SpokeClusterStatus) XXX_Size() int {
+func (m *ManagedClusterStatus) XXX_Size() int {
 	return m.Size()
 }
-func (m *SpokeClusterStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_SpokeClusterStatus.DiscardUnknown(m)
+func (m *ManagedClusterStatus) XXX_DiscardUnknown() {
+	xxx_messageInfo_ManagedClusterStatus.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_SpokeClusterStatus proto.InternalMessageInfo
+var xxx_messageInfo_ManagedClusterStatus proto.InternalMessageInfo
 
-func (m *SpokeVersion) Reset()      { *m = SpokeVersion{} }
-func (*SpokeVersion) ProtoMessage() {}
-func (*SpokeVersion) Descriptor() ([]byte, []int) {
+func (m *ManagedClusterVersion) Reset()      { *m = ManagedClusterVersion{} }
+func (*ManagedClusterVersion) ProtoMessage() {}
+func (*ManagedClusterVersion) Descriptor() ([]byte, []int) {
 	return fileDescriptor_65aa4961edf1a5e7, []int{5}
 }
-func (m *SpokeVersion) XXX_Unmarshal(b []byte) error {
+func (m *ManagedClusterVersion) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *SpokeVersion) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *ManagedClusterVersion) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
 	if err != nil {
@@ -187,17 +187,17 @@ func (m *SpokeVersion) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
 	}
 	return b[:n], nil
 }
-func (m *SpokeVersion) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SpokeVersion.Merge(m, src)
+func (m *ManagedClusterVersion) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ManagedClusterVersion.Merge(m, src)
 }
-func (m *SpokeVersion) XXX_Size() int {
+func (m *ManagedClusterVersion) XXX_Size() int {
 	return m.Size()
 }
-func (m *SpokeVersion) XXX_DiscardUnknown() {
-	xxx_messageInfo_SpokeVersion.DiscardUnknown(m)
+func (m *ManagedClusterVersion) XXX_DiscardUnknown() {
+	xxx_messageInfo_ManagedClusterVersion.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_SpokeVersion proto.InternalMessageInfo
+var xxx_messageInfo_ManagedClusterVersion proto.InternalMessageInfo
 
 func (m *StatusCondition) Reset()      { *m = StatusCondition{} }
 func (*StatusCondition) ProtoMessage() {}
@@ -229,13 +229,13 @@ var xxx_messageInfo_StatusCondition proto.InternalMessageInfo
 
 func init() {
 	proto.RegisterType((*ClientConfig)(nil), "github.com.open_cluster_management.api.cluster.v1.ClientConfig")
-	proto.RegisterType((*SpokeCluster)(nil), "github.com.open_cluster_management.api.cluster.v1.SpokeCluster")
-	proto.RegisterType((*SpokeClusterList)(nil), "github.com.open_cluster_management.api.cluster.v1.SpokeClusterList")
-	proto.RegisterType((*SpokeClusterSpec)(nil), "github.com.open_cluster_management.api.cluster.v1.SpokeClusterSpec")
-	proto.RegisterType((*SpokeClusterStatus)(nil), "github.com.open_cluster_management.api.cluster.v1.SpokeClusterStatus")
-	proto.RegisterMapType((ResourceList)(nil), "github.com.open_cluster_management.api.cluster.v1.SpokeClusterStatus.AllocatableEntry")
-	proto.RegisterMapType((ResourceList)(nil), "github.com.open_cluster_management.api.cluster.v1.SpokeClusterStatus.CapacityEntry")
-	proto.RegisterType((*SpokeVersion)(nil), "github.com.open_cluster_management.api.cluster.v1.SpokeVersion")
+	proto.RegisterType((*ManagedCluster)(nil), "github.com.open_cluster_management.api.cluster.v1.ManagedCluster")
+	proto.RegisterType((*ManagedClusterList)(nil), "github.com.open_cluster_management.api.cluster.v1.ManagedClusterList")
+	proto.RegisterType((*ManagedClusterSpec)(nil), "github.com.open_cluster_management.api.cluster.v1.ManagedClusterSpec")
+	proto.RegisterType((*ManagedClusterStatus)(nil), "github.com.open_cluster_management.api.cluster.v1.ManagedClusterStatus")
+	proto.RegisterMapType((ResourceList)(nil), "github.com.open_cluster_management.api.cluster.v1.ManagedClusterStatus.AllocatableEntry")
+	proto.RegisterMapType((ResourceList)(nil), "github.com.open_cluster_management.api.cluster.v1.ManagedClusterStatus.CapacityEntry")
+	proto.RegisterType((*ManagedClusterVersion)(nil), "github.com.open_cluster_management.api.cluster.v1.ManagedClusterVersion")
 	proto.RegisterType((*StatusCondition)(nil), "github.com.open_cluster_management.api.cluster.v1.StatusCondition")
 }
 
@@ -244,65 +244,66 @@ func init() {
 }
 
 var fileDescriptor_65aa4961edf1a5e7 = []byte{
-	// 925 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x55, 0x4f, 0x8f, 0xdb, 0x44,
-	0x14, 0x8f, 0x93, 0xcd, 0x6e, 0x3a, 0x49, 0x69, 0x34, 0xea, 0xc1, 0x8a, 0xc0, 0x59, 0xe5, 0x80,
-	0x02, 0xd2, 0x8e, 0x9b, 0x05, 0xa1, 0x8a, 0x0b, 0x5a, 0x67, 0x8b, 0x40, 0x6c, 0xf9, 0x33, 0x59,
-	0x8a, 0x84, 0x10, 0x65, 0xe2, 0xbc, 0x7a, 0xdd, 0xf8, 0x9f, 0x3c, 0xe3, 0x48, 0xb9, 0x21, 0xae,
-	0x5c, 0xf8, 0x0a, 0x1c, 0x39, 0x70, 0xe7, 0x13, 0xa0, 0x3d, 0xf6, 0x84, 0x7a, 0x0a, 0x6c, 0xf8,
-	0x16, 0x3d, 0x21, 0x8f, 0x27, 0xb6, 0x37, 0x09, 0x65, 0xd9, 0xb6, 0x37, 0xcf, 0xfb, 0xf3, 0xfb,
-	0xfd, 0xe6, 0xf9, 0xcd, 0x7b, 0xe8, 0xc8, 0x71, 0xc5, 0x59, 0x32, 0x26, 0x76, 0xe8, 0x9b, 0x61,
-	0x04, 0xc1, 0x81, 0xed, 0x25, 0x5c, 0x40, 0x7c, 0xe0, 0xb3, 0x80, 0x39, 0xe0, 0x43, 0x20, 0x4c,
-	0x16, 0xb9, 0xa6, 0x32, 0x9b, 0xb3, 0x81, 0xe9, 0x40, 0x00, 0x31, 0x13, 0x30, 0x21, 0x51, 0x1c,
-	0x8a, 0x10, 0x0f, 0x0a, 0x08, 0x92, 0x42, 0x3c, 0x54, 0xb1, 0x0f, 0x0b, 0x08, 0xc2, 0x22, 0x97,
-	0x28, 0x33, 0x99, 0x0d, 0x3a, 0x07, 0x25, 0x56, 0x27, 0x74, 0x42, 0x53, 0x22, 0x8d, 0x93, 0x47,
-	0xf2, 0x24, 0x0f, 0xf2, 0x2b, 0x63, 0xe8, 0xbc, 0x3b, 0xbd, 0xcb, 0x89, 0x1b, 0xa6, 0x42, 0x7c,
-	0x66, 0x9f, 0xb9, 0x01, 0xc4, 0x73, 0x33, 0x9a, 0x3a, 0x52, 0x59, 0x0c, 0x3c, 0x4c, 0x62, 0x1b,
-	0xd6, 0x75, 0x3d, 0x37, 0x8b, 0x9b, 0x3e, 0x08, 0xb6, 0xe5, 0x36, 0x9d, 0xf7, 0xfe, 0x2d, 0x2b,
-	0x4e, 0x02, 0xe1, 0xfa, 0x60, 0x72, 0xfb, 0x0c, 0x7c, 0xb6, 0x9e, 0xd7, 0xfb, 0x0a, 0xb5, 0x86,
-	0x9e, 0x0b, 0x81, 0x18, 0x86, 0xc1, 0x23, 0xd7, 0xc1, 0x6f, 0xa0, 0x5a, 0x12, 0x7b, 0xba, 0xb6,
-	0xaf, 0xf5, 0x6f, 0x58, 0xcd, 0xf3, 0x45, 0xb7, 0xb2, 0x5c, 0x74, 0x6b, 0x5f, 0xd2, 0x13, 0x9a,
-	0xda, 0x71, 0x1f, 0x35, 0x6c, 0x66, 0x25, 0xc1, 0xc4, 0x03, 0xbd, 0xba, 0xaf, 0xf5, 0x5b, 0x56,
-	0x6b, 0xb9, 0xe8, 0x36, 0x86, 0x47, 0x99, 0x8d, 0xe6, 0xde, 0xde, 0xef, 0x55, 0xd4, 0x1a, 0x45,
-	0xe1, 0x14, 0x86, 0x59, 0xfd, 0xf0, 0x77, 0xa8, 0x91, 0x8a, 0x9f, 0x30, 0xc1, 0x24, 0x7c, 0xf3,
-	0xf0, 0x0e, 0xc9, 0x44, 0x93, 0xb2, 0x68, 0x12, 0x4d, 0x9d, 0xd4, 0xc0, 0x49, 0x1a, 0x4d, 0x66,
-	0x03, 0xf2, 0xd9, 0xf8, 0x31, 0xd8, 0xe2, 0x3e, 0x08, 0x66, 0x61, 0x25, 0x08, 0x15, 0x36, 0x9a,
-	0xa3, 0x62, 0x40, 0x3b, 0x3c, 0x02, 0x5b, 0x0a, 0x6b, 0x1e, 0x0e, 0xc9, 0xff, 0xfe, 0xc1, 0xa4,
-	0x2c, 0x78, 0x14, 0x81, 0x6d, 0xb5, 0x14, 0xe1, 0x4e, 0x7a, 0xa2, 0x12, 0x1e, 0xfb, 0x68, 0x97,
-	0x0b, 0x26, 0x12, 0xae, 0xd7, 0x24, 0xd1, 0xbd, 0x17, 0x25, 0x92, 0x60, 0xd6, 0x6b, 0x8a, 0x6a,
-	0x37, 0x3b, 0x53, 0x45, 0xd2, 0xfb, 0x43, 0x43, 0xed, 0x72, 0xf8, 0x89, 0xcb, 0x05, 0xfe, 0x66,
-	0xa3, 0x98, 0xe4, 0x6a, 0xc5, 0x4c, 0xb3, 0x65, 0x29, 0xdb, 0x8a, 0xae, 0xb1, 0xb2, 0x94, 0x0a,
-	0x39, 0x41, 0x75, 0x57, 0x80, 0xcf, 0xf5, 0xea, 0x7e, 0xad, 0xdf, 0x3c, 0xfc, 0xe0, 0x05, 0x2f,
-	0x68, 0xdd, 0x54, 0x5c, 0xf5, 0x8f, 0x53, 0x54, 0x9a, 0x81, 0xf7, 0x7e, 0xab, 0x5e, 0xbe, 0x58,
-	0x5a, 0x62, 0xfc, 0xa3, 0x86, 0x30, 0xcf, 0x8c, 0x45, 0x57, 0x72, 0x5d, 0xbb, 0xb6, 0x90, 0x32,
-	0x8e, 0xd5, 0x51, 0x42, 0xf0, 0x68, 0x83, 0x82, 0x6e, 0xa1, 0xc5, 0xc7, 0xa8, 0x7d, 0x96, 0x8c,
-	0x8f, 0x6c, 0x1b, 0x22, 0xc1, 0x33, 0x97, 0xec, 0xae, 0x86, 0xa5, 0x2b, 0xa4, 0xf6, 0x47, 0x6b,
-	0x7e, 0xba, 0x91, 0x81, 0x3f, 0x47, 0xb7, 0x3d, 0x60, 0x1c, 0x8e, 0x93, 0x98, 0x09, 0x37, 0x0c,
-	0x46, 0x60, 0x87, 0xc1, 0x24, 0x6b, 0x9f, 0xba, 0xf5, 0xba, 0x42, 0xba, 0x7d, 0xb2, 0x25, 0x86,
-	0x6e, 0xcd, 0xec, 0xfd, 0xb2, 0x8b, 0xf0, 0x66, 0x0b, 0xe1, 0x19, 0x42, 0xa9, 0xdf, 0x4d, 0x43,
-	0x57, 0x35, 0xb3, 0xae, 0xf3, 0xf3, 0x24, 0xdc, 0x70, 0x05, 0x55, 0x3c, 0xbb, 0xdc, 0xc4, 0x69,
-	0x89, 0x09, 0xff, 0xac, 0xa5, 0x63, 0x21, 0x62, 0xb6, 0x2b, 0xe6, 0xaa, 0x67, 0x46, 0x2f, 0xe5,
-	0x51, 0x90, 0xa1, 0x42, 0xbd, 0x17, 0x88, 0x78, 0x6e, 0xdd, 0x59, 0xf5, 0xec, 0xca, 0xfc, 0x6c,
-	0xd1, 0x6d, 0x51, 0x35, 0x48, 0xd3, 0x3e, 0xfe, 0xe1, 0xcf, 0xe2, 0xfc, 0x29, 0xf3, 0xe5, 0x3c,
-	0xca, 0x22, 0xf1, 0xaf, 0x1a, 0x6a, 0x32, 0xcf, 0x0b, 0x6d, 0x26, 0xd8, 0xd8, 0x03, 0xbd, 0x26,
-	0x65, 0x3e, 0x78, 0x39, 0x32, 0x8f, 0x0a, 0xe0, 0x4c, 0xe9, 0x3b, 0x4a, 0x69, 0xb3, 0xe4, 0xf9,
-	0x4f, 0xb1, 0x65, 0x7d, 0xf8, 0x31, 0xda, 0x9b, 0x41, 0xcc, 0xdd, 0x30, 0xd0, 0x77, 0xe4, 0x03,
-	0xbf, 0xf6, 0x2b, 0x7c, 0x90, 0xc1, 0x58, 0xb7, 0x94, 0xa6, 0x3d, 0x65, 0xa0, 0x2b, 0x82, 0xce,
-	0x14, 0xdd, 0xbc, 0x54, 0x68, 0xdc, 0x46, 0xb5, 0x29, 0xcc, 0xb3, 0x2d, 0x40, 0xd3, 0x4f, 0x7c,
-	0x8c, 0xea, 0x33, 0xe6, 0x25, 0xa0, 0x86, 0xeb, 0x73, 0xa7, 0x0d, 0x59, 0xed, 0x36, 0xf2, 0x45,
-	0xc2, 0x02, 0xe1, 0x8a, 0x39, 0xcd, 0x92, 0xdf, 0xaf, 0xde, 0xd5, 0x3a, 0x01, 0x6a, 0xaf, 0x97,
-	0xeb, 0x55, 0xf2, 0xf5, 0x2c, 0xb5, 0x87, 0xd4, 0xad, 0xf1, 0x21, 0x42, 0xd3, 0x64, 0x0c, 0x71,
-	0x00, 0x02, 0xb8, 0x5a, 0x74, 0x79, 0x83, 0x7f, 0x92, 0x7b, 0x68, 0x29, 0xaa, 0xb7, 0xa8, 0xa2,
-	0x5b, 0x6b, 0x8f, 0x02, 0xef, 0xa3, 0x1d, 0x31, 0x8f, 0x40, 0x21, 0xe4, 0x8b, 0xe2, 0x74, 0x1e,
-	0x01, 0x95, 0x1e, 0xfc, 0x6d, 0xbe, 0x28, 0xaa, 0x32, 0xe6, 0xc3, 0xcb, 0x13, 0xfe, 0xd9, 0xa2,
-	0x7b, 0xa5, 0x5d, 0x4f, 0x72, 0xce, 0xcb, 0x9b, 0x01, 0xcf, 0x10, 0xf6, 0x18, 0x17, 0xa7, 0x31,
-	0x0b, 0xb8, 0xf4, 0x9f, 0xba, 0x3e, 0xa8, 0xa5, 0xf4, 0xf6, 0xd5, 0xd6, 0x41, 0x9a, 0x51, 0x4c,
-	0xc5, 0x93, 0x0d, 0x34, 0xba, 0x85, 0x01, 0xbf, 0x89, 0x76, 0x63, 0x60, 0x5c, 0x75, 0xe6, 0x8d,
-	0x62, 0x73, 0x51, 0x69, 0xa5, 0xca, 0x8b, 0xdf, 0x42, 0x7b, 0x3e, 0x70, 0xce, 0x1c, 0xd0, 0xeb,
-	0x32, 0x30, 0xef, 0xc0, 0xfb, 0x99, 0x99, 0xae, 0xfc, 0x56, 0xff, 0xfc, 0xc2, 0xa8, 0x3c, 0xb9,
-	0x30, 0x2a, 0x4f, 0x2f, 0x8c, 0xca, 0xf7, 0x4b, 0x43, 0x3b, 0x5f, 0x1a, 0xda, 0x93, 0xa5, 0xa1,
-	0x3d, 0x5d, 0x1a, 0xda, 0x5f, 0x4b, 0x43, 0xfb, 0xe9, 0x6f, 0xa3, 0xf2, 0x75, 0x75, 0x36, 0xf8,
-	0x27, 0x00, 0x00, 0xff, 0xff, 0xd8, 0x45, 0x45, 0xa3, 0xfa, 0x09, 0x00, 0x00,
+	// 938 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x56, 0x4f, 0x6f, 0x1b, 0x45,
+	0x14, 0xf7, 0xda, 0x71, 0xe2, 0x8e, 0xdd, 0xd6, 0x1a, 0x05, 0xc9, 0x72, 0x61, 0x1d, 0x19, 0x09,
+	0x19, 0xa4, 0xcc, 0xd6, 0x01, 0xa1, 0x8a, 0x0b, 0xf2, 0x3a, 0x85, 0xa2, 0x26, 0xfc, 0x99, 0xa6,
+	0x80, 0x10, 0xa2, 0x8c, 0xd7, 0x2f, 0x9b, 0xc5, 0xfb, 0x4f, 0x3b, 0xb3, 0x96, 0x7c, 0x43, 0x7c,
+	0x02, 0xbe, 0x03, 0x12, 0x57, 0xae, 0x7c, 0x84, 0x1c, 0x38, 0xf4, 0x82, 0x54, 0x71, 0x30, 0xc4,
+	0x7c, 0x8b, 0x9e, 0xd0, 0xce, 0x8e, 0xd7, 0x6b, 0xc7, 0x0d, 0xa1, 0x09, 0xb7, 0x9d, 0xdf, 0x7b,
+	0xef, 0xf7, 0xfb, 0xed, 0xf3, 0xdb, 0x79, 0x46, 0x3d, 0xdb, 0x11, 0x27, 0xf1, 0x80, 0x58, 0x81,
+	0x67, 0x04, 0x21, 0xf8, 0xbb, 0x96, 0x1b, 0x73, 0x01, 0xd1, 0xae, 0xc7, 0x7c, 0x66, 0x83, 0x07,
+	0xbe, 0x30, 0x58, 0xe8, 0x18, 0x0a, 0x36, 0xc6, 0x5d, 0xc3, 0x06, 0x1f, 0x22, 0x26, 0x60, 0x48,
+	0xc2, 0x28, 0x10, 0x01, 0xee, 0x2e, 0x28, 0x48, 0x42, 0xf1, 0x44, 0xe5, 0x3e, 0x59, 0x50, 0x10,
+	0x16, 0x3a, 0x44, 0xc1, 0x64, 0xdc, 0x6d, 0xee, 0xe6, 0x54, 0xed, 0xc0, 0x0e, 0x0c, 0xc9, 0x34,
+	0x88, 0x8f, 0xe5, 0x49, 0x1e, 0xe4, 0x53, 0xaa, 0xd0, 0x7c, 0x67, 0x74, 0x8f, 0x13, 0x27, 0x48,
+	0x8c, 0x78, 0xcc, 0x3a, 0x71, 0x7c, 0x88, 0x26, 0x46, 0x38, 0xb2, 0xa5, 0xb3, 0x08, 0x78, 0x10,
+	0x47, 0x16, 0xac, 0xfa, 0xba, 0xb0, 0x8a, 0x1b, 0x1e, 0x08, 0xb6, 0xe6, 0x6d, 0x9a, 0xef, 0xbe,
+	0xa8, 0x2a, 0x8a, 0x7d, 0xe1, 0x78, 0x60, 0x70, 0xeb, 0x04, 0x3c, 0xb6, 0x5a, 0xd7, 0xfe, 0x02,
+	0xd5, 0xfa, 0xae, 0x03, 0xbe, 0xe8, 0x07, 0xfe, 0xb1, 0x63, 0xe3, 0xd7, 0x50, 0x29, 0x8e, 0xdc,
+	0x86, 0xb6, 0xa3, 0x75, 0x6e, 0x98, 0xd5, 0xd3, 0x69, 0xab, 0x30, 0x9b, 0xb6, 0x4a, 0x8f, 0xe9,
+	0x01, 0x4d, 0x70, 0xdc, 0x41, 0x15, 0x8b, 0x99, 0xb1, 0x3f, 0x74, 0xa1, 0x51, 0xdc, 0xd1, 0x3a,
+	0x35, 0xb3, 0x36, 0x9b, 0xb6, 0x2a, 0xfd, 0x5e, 0x8a, 0xd1, 0x2c, 0xda, 0xfe, 0xad, 0x88, 0x6e,
+	0x1d, 0xca, 0x4e, 0x0e, 0xfb, 0x69, 0x07, 0xf1, 0xb7, 0xa8, 0x92, 0xd8, 0x1f, 0x32, 0xc1, 0xa4,
+	0x40, 0x75, 0xef, 0x2e, 0x49, 0x6d, 0x93, 0xbc, 0x6d, 0x12, 0x8e, 0xec, 0x04, 0xe0, 0x24, 0xc9,
+	0x26, 0xe3, 0x2e, 0xf9, 0x64, 0xf0, 0x1d, 0x58, 0xe2, 0x10, 0x04, 0x33, 0xb1, 0xb2, 0x84, 0x16,
+	0x18, 0xcd, 0x58, 0xb1, 0x8d, 0x36, 0x78, 0x08, 0x96, 0xb4, 0x56, 0xdd, 0xbb, 0x4f, 0xfe, 0xf3,
+	0x4f, 0x4c, 0x96, 0x2d, 0x3f, 0x0a, 0xc1, 0x32, 0x6b, 0x4a, 0x72, 0x23, 0x39, 0x51, 0x29, 0x80,
+	0x03, 0xb4, 0xc9, 0x05, 0x13, 0x31, 0x6f, 0x94, 0xa4, 0xd4, 0x87, 0x57, 0x97, 0x92, 0x74, 0xe6,
+	0x2d, 0x25, 0xb6, 0x99, 0x9e, 0xa9, 0x92, 0x69, 0xff, 0xa1, 0x21, 0xbc, 0x5c, 0x70, 0xe0, 0x70,
+	0x81, 0xbf, 0x3e, 0xd7, 0x52, 0x72, 0xb9, 0x96, 0x26, 0xd5, 0xb2, 0xa1, 0x75, 0x25, 0x58, 0x99,
+	0x23, 0xb9, 0x76, 0x1e, 0xa3, 0xb2, 0x23, 0xc0, 0xe3, 0x8d, 0xe2, 0x4e, 0xa9, 0x53, 0xdd, 0xeb,
+	0x5d, 0xf9, 0x25, 0xcd, 0x9b, 0x4a, 0xad, 0xfc, 0x51, 0xc2, 0x4b, 0x53, 0xfa, 0xf6, 0xef, 0xc5,
+	0xd5, 0x97, 0x4b, 0x5a, 0x8d, 0x7f, 0xd6, 0xd0, 0x1d, 0x6f, 0x09, 0xce, 0x8f, 0x2a, 0x6f, 0x68,
+	0xd2, 0xd5, 0xfb, 0x2f, 0xe1, 0x2a, 0xcf, 0x63, 0xbe, 0xae, 0x3c, 0xdd, 0x39, 0x7c, 0xb1, 0x16,
+	0xbd, 0xc8, 0x08, 0xde, 0x47, 0xf5, 0x93, 0x78, 0xd0, 0xb3, 0x2c, 0x08, 0x05, 0x4f, 0x43, 0x72,
+	0x04, 0x2b, 0x66, 0x43, 0x71, 0xd7, 0x1f, 0xac, 0xc4, 0xe9, 0xb9, 0x0a, 0xfc, 0x29, 0xda, 0x76,
+	0x81, 0x71, 0xd8, 0x8f, 0x23, 0x26, 0x9c, 0xc0, 0x7f, 0x04, 0x56, 0xe0, 0x0f, 0xd3, 0x09, 0x2b,
+	0x9b, 0xaf, 0x2a, 0xa6, 0xed, 0x83, 0x35, 0x39, 0x74, 0x6d, 0x65, 0xfb, 0xd7, 0x4d, 0xb4, 0xbd,
+	0x6e, 0xca, 0xf0, 0x18, 0xa1, 0x24, 0xc3, 0x49, 0x92, 0xe7, 0x7d, 0x34, 0x5f, 0xa2, 0x8f, 0x29,
+	0x5d, 0x7f, 0x4e, 0xb5, 0xf8, 0x3a, 0x33, 0x88, 0xd3, 0x9c, 0x12, 0xfe, 0x49, 0x4b, 0xee, 0x8f,
+	0x90, 0x59, 0x8e, 0x98, 0xa8, 0xa1, 0x7a, 0x7c, 0x4d, 0x5f, 0x0e, 0xe9, 0x2b, 0xde, 0xfb, 0xbe,
+	0x88, 0x26, 0xe6, 0xdd, 0xf9, 0x58, 0xcf, 0xe1, 0xe7, 0xd3, 0x56, 0x8d, 0xaa, 0x3b, 0x37, 0x19,
+	0xf5, 0x1f, 0xfe, 0x5c, 0x9c, 0x3f, 0x66, 0x9e, 0xbc, 0xba, 0xd2, 0x4c, 0xfc, 0x8b, 0x86, 0xaa,
+	0xcc, 0x75, 0x03, 0x8b, 0x09, 0x36, 0x70, 0xa1, 0x51, 0x92, 0x46, 0xbf, 0xbc, 0x2e, 0xa3, 0xbd,
+	0x05, 0x75, 0xea, 0xf5, 0x6d, 0xe5, 0xb5, 0x9a, 0x8b, 0xfc, 0xab, 0xdd, 0xbc, 0x43, 0xcc, 0xd1,
+	0xd6, 0x18, 0x22, 0xee, 0x04, 0x7e, 0x63, 0x43, 0xde, 0x02, 0x0f, 0xae, 0x6c, 0xf6, 0xf3, 0x94,
+	0xcf, 0xbc, 0xad, 0xcc, 0x6d, 0x29, 0x80, 0xce, 0x95, 0x9a, 0x23, 0x74, 0x73, 0xa9, 0xe7, 0xb8,
+	0x8e, 0x4a, 0x23, 0x98, 0xa4, 0xbb, 0x83, 0x26, 0x8f, 0x78, 0x1f, 0x95, 0xc7, 0xcc, 0x8d, 0x41,
+	0x5d, 0xc8, 0x17, 0xde, 0x4d, 0x64, 0xbe, 0x11, 0xc9, 0x67, 0x31, 0xf3, 0x85, 0x23, 0x26, 0x34,
+	0x2d, 0x7e, 0xaf, 0x78, 0x4f, 0x6b, 0xfa, 0xa8, 0xbe, 0xda, 0xb7, 0xff, 0x53, 0xaf, 0xfd, 0x10,
+	0xbd, 0xb2, 0xb6, 0x1f, 0x78, 0x0f, 0xa1, 0x51, 0x3c, 0x80, 0xc8, 0x07, 0x01, 0x5c, 0xed, 0xc9,
+	0x6c, 0xec, 0x1f, 0x66, 0x11, 0x9a, 0xcb, 0x6a, 0x4f, 0x8b, 0xe8, 0xf6, 0xca, 0xa7, 0x82, 0x77,
+	0xd0, 0x86, 0x98, 0x84, 0xa0, 0x18, 0xb2, 0x1d, 0x73, 0x34, 0x09, 0x81, 0xca, 0x08, 0xfe, 0x26,
+	0xdb, 0x31, 0x45, 0x99, 0xf3, 0xc1, 0xf2, 0x6a, 0x78, 0x3e, 0x6d, 0x5d, 0xea, 0xaf, 0x02, 0xc9,
+	0x34, 0x97, 0x57, 0x0a, 0x1e, 0x23, 0xec, 0x32, 0x2e, 0x8e, 0x22, 0xe6, 0x73, 0x19, 0x3f, 0x72,
+	0x3c, 0x50, 0xfb, 0xec, 0xad, 0xcb, 0x6d, 0x91, 0xa4, 0xc2, 0x6c, 0x2a, 0x5f, 0xf8, 0xe0, 0x1c,
+	0x1b, 0x5d, 0xa3, 0x80, 0xdf, 0x40, 0x9b, 0x11, 0x30, 0xae, 0x66, 0xf5, 0xc6, 0x62, 0xe5, 0x51,
+	0x89, 0x52, 0x15, 0xc5, 0x6f, 0xa2, 0x2d, 0x0f, 0x38, 0x67, 0x36, 0x34, 0xca, 0x32, 0x31, 0x1b,
+	0xc5, 0xc3, 0x14, 0xa6, 0xf3, 0xb8, 0xd9, 0x39, 0x3d, 0xd3, 0x0b, 0x4f, 0xcf, 0xf4, 0xc2, 0xb3,
+	0x33, 0xbd, 0xf0, 0xfd, 0x4c, 0xd7, 0x4e, 0x67, 0xba, 0xf6, 0x74, 0xa6, 0x6b, 0xcf, 0x66, 0xba,
+	0xf6, 0xd7, 0x4c, 0xd7, 0x7e, 0xfc, 0x5b, 0x2f, 0x7c, 0x55, 0x1c, 0x77, 0xff, 0x09, 0x00, 0x00,
+	0xff, 0xff, 0xbd, 0x12, 0x9e, 0xec, 0x39, 0x0a, 0x00, 0x00,
 }
 
 func (m *ClientConfig) Marshal() (dAtA []byte, err error) {
@@ -340,7 +341,7 @@ func (m *ClientConfig) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *SpokeCluster) Marshal() (dAtA []byte, err error) {
+func (m *ManagedCluster) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -350,12 +351,12 @@ func (m *SpokeCluster) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *SpokeCluster) MarshalTo(dAtA []byte) (int, error) {
+func (m *ManagedCluster) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *SpokeCluster) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *ManagedCluster) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -393,7 +394,7 @@ func (m *SpokeCluster) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *SpokeClusterList) Marshal() (dAtA []byte, err error) {
+func (m *ManagedClusterList) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -403,12 +404,12 @@ func (m *SpokeClusterList) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *SpokeClusterList) MarshalTo(dAtA []byte) (int, error) {
+func (m *ManagedClusterList) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *SpokeClusterList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *ManagedClusterList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -440,7 +441,7 @@ func (m *SpokeClusterList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *SpokeClusterSpec) Marshal() (dAtA []byte, err error) {
+func (m *ManagedClusterSpec) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -450,12 +451,12 @@ func (m *SpokeClusterSpec) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *SpokeClusterSpec) MarshalTo(dAtA []byte) (int, error) {
+func (m *ManagedClusterSpec) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *SpokeClusterSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *ManagedClusterSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -471,10 +472,10 @@ func (m *SpokeClusterSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	}
 	i--
 	dAtA[i] = 0x10
-	if len(m.SpokeClientConfigs) > 0 {
-		for iNdEx := len(m.SpokeClientConfigs) - 1; iNdEx >= 0; iNdEx-- {
+	if len(m.ManagedClusterClientConfigs) > 0 {
+		for iNdEx := len(m.ManagedClusterClientConfigs) - 1; iNdEx >= 0; iNdEx-- {
 			{
-				size, err := m.SpokeClientConfigs[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				size, err := m.ManagedClusterClientConfigs[iNdEx].MarshalToSizedBuffer(dAtA[:i])
 				if err != nil {
 					return 0, err
 				}
@@ -488,7 +489,7 @@ func (m *SpokeClusterSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *SpokeClusterStatus) Marshal() (dAtA []byte, err error) {
+func (m *ManagedClusterStatus) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -498,12 +499,12 @@ func (m *SpokeClusterStatus) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *SpokeClusterStatus) MarshalTo(dAtA []byte) (int, error) {
+func (m *ManagedClusterStatus) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *SpokeClusterStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *ManagedClusterStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -593,7 +594,7 @@ func (m *SpokeClusterStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *SpokeVersion) Marshal() (dAtA []byte, err error) {
+func (m *ManagedClusterVersion) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -603,12 +604,12 @@ func (m *SpokeVersion) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *SpokeVersion) MarshalTo(dAtA []byte) (int, error) {
+func (m *ManagedClusterVersion) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *SpokeVersion) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *ManagedClusterVersion) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -700,7 +701,7 @@ func (m *ClientConfig) Size() (n int) {
 	return n
 }
 
-func (m *SpokeCluster) Size() (n int) {
+func (m *ManagedCluster) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -715,7 +716,7 @@ func (m *SpokeCluster) Size() (n int) {
 	return n
 }
 
-func (m *SpokeClusterList) Size() (n int) {
+func (m *ManagedClusterList) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -732,14 +733,14 @@ func (m *SpokeClusterList) Size() (n int) {
 	return n
 }
 
-func (m *SpokeClusterSpec) Size() (n int) {
+func (m *ManagedClusterSpec) Size() (n int) {
 	if m == nil {
 		return 0
 	}
 	var l int
 	_ = l
-	if len(m.SpokeClientConfigs) > 0 {
-		for _, e := range m.SpokeClientConfigs {
+	if len(m.ManagedClusterClientConfigs) > 0 {
+		for _, e := range m.ManagedClusterClientConfigs {
 			l = e.Size()
 			n += 1 + l + sovGenerated(uint64(l))
 		}
@@ -749,7 +750,7 @@ func (m *SpokeClusterSpec) Size() (n int) {
 	return n
 }
 
-func (m *SpokeClusterStatus) Size() (n int) {
+func (m *ManagedClusterStatus) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -784,7 +785,7 @@ func (m *SpokeClusterStatus) Size() (n int) {
 	return n
 }
 
-func (m *SpokeVersion) Size() (n int) {
+func (m *ManagedClusterVersion) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -831,52 +832,52 @@ func (this *ClientConfig) String() string {
 	}, "")
 	return s
 }
-func (this *SpokeCluster) String() string {
+func (this *ManagedCluster) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&SpokeCluster{`,
+	s := strings.Join([]string{`&ManagedCluster{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
-		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "SpokeClusterSpec", "SpokeClusterSpec", 1), `&`, ``, 1) + `,`,
-		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "SpokeClusterStatus", "SpokeClusterStatus", 1), `&`, ``, 1) + `,`,
+		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "ManagedClusterSpec", "ManagedClusterSpec", 1), `&`, ``, 1) + `,`,
+		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "ManagedClusterStatus", "ManagedClusterStatus", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *SpokeClusterList) String() string {
+func (this *ManagedClusterList) String() string {
 	if this == nil {
 		return "nil"
 	}
-	repeatedStringForItems := "[]SpokeCluster{"
+	repeatedStringForItems := "[]ManagedCluster{"
 	for _, f := range this.Items {
-		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "SpokeCluster", "SpokeCluster", 1), `&`, ``, 1) + ","
+		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "ManagedCluster", "ManagedCluster", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&SpokeClusterList{`,
+	s := strings.Join([]string{`&ManagedClusterList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *SpokeClusterSpec) String() string {
+func (this *ManagedClusterSpec) String() string {
 	if this == nil {
 		return "nil"
 	}
-	repeatedStringForSpokeClientConfigs := "[]ClientConfig{"
-	for _, f := range this.SpokeClientConfigs {
-		repeatedStringForSpokeClientConfigs += strings.Replace(strings.Replace(f.String(), "ClientConfig", "ClientConfig", 1), `&`, ``, 1) + ","
+	repeatedStringForManagedClusterClientConfigs := "[]ClientConfig{"
+	for _, f := range this.ManagedClusterClientConfigs {
+		repeatedStringForManagedClusterClientConfigs += strings.Replace(strings.Replace(f.String(), "ClientConfig", "ClientConfig", 1), `&`, ``, 1) + ","
 	}
-	repeatedStringForSpokeClientConfigs += "}"
-	s := strings.Join([]string{`&SpokeClusterSpec{`,
-		`SpokeClientConfigs:` + repeatedStringForSpokeClientConfigs + `,`,
+	repeatedStringForManagedClusterClientConfigs += "}"
+	s := strings.Join([]string{`&ManagedClusterSpec{`,
+		`ManagedClusterClientConfigs:` + repeatedStringForManagedClusterClientConfigs + `,`,
 		`HubAcceptsClient:` + fmt.Sprintf("%v", this.HubAcceptsClient) + `,`,
 		`LeaseDurationSeconds:` + fmt.Sprintf("%v", this.LeaseDurationSeconds) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *SpokeClusterStatus) String() string {
+func (this *ManagedClusterStatus) String() string {
 	if this == nil {
 		return "nil"
 	}
@@ -905,20 +906,20 @@ func (this *SpokeClusterStatus) String() string {
 		mapStringForAllocatable += fmt.Sprintf("%v: %v,", k, this.Allocatable[ResourceName(k)])
 	}
 	mapStringForAllocatable += "}"
-	s := strings.Join([]string{`&SpokeClusterStatus{`,
+	s := strings.Join([]string{`&ManagedClusterStatus{`,
 		`Conditions:` + repeatedStringForConditions + `,`,
 		`Capacity:` + mapStringForCapacity + `,`,
 		`Allocatable:` + mapStringForAllocatable + `,`,
-		`Version:` + strings.Replace(strings.Replace(this.Version.String(), "SpokeVersion", "SpokeVersion", 1), `&`, ``, 1) + `,`,
+		`Version:` + strings.Replace(strings.Replace(this.Version.String(), "ManagedClusterVersion", "ManagedClusterVersion", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *SpokeVersion) String() string {
+func (this *ManagedClusterVersion) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&SpokeVersion{`,
+	s := strings.Join([]string{`&ManagedClusterVersion{`,
 		`Kubernetes:` + fmt.Sprintf("%v", this.Kubernetes) + `,`,
 		`}`,
 	}, "")
@@ -1065,7 +1066,7 @@ func (m *ClientConfig) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *SpokeCluster) Unmarshal(dAtA []byte) error {
+func (m *ManagedCluster) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1088,10 +1089,10 @@ func (m *SpokeCluster) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: SpokeCluster: wiretype end group for non-group")
+			return fmt.Errorf("proto: ManagedCluster: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: SpokeCluster: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ManagedCluster: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -1217,7 +1218,7 @@ func (m *SpokeCluster) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *SpokeClusterList) Unmarshal(dAtA []byte) error {
+func (m *ManagedClusterList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1240,10 +1241,10 @@ func (m *SpokeClusterList) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: SpokeClusterList: wiretype end group for non-group")
+			return fmt.Errorf("proto: ManagedClusterList: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: SpokeClusterList: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ManagedClusterList: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -1308,7 +1309,7 @@ func (m *SpokeClusterList) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Items = append(m.Items, SpokeCluster{})
+			m.Items = append(m.Items, ManagedCluster{})
 			if err := m.Items[len(m.Items)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -1337,7 +1338,7 @@ func (m *SpokeClusterList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *SpokeClusterSpec) Unmarshal(dAtA []byte) error {
+func (m *ManagedClusterSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1360,15 +1361,15 @@ func (m *SpokeClusterSpec) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: SpokeClusterSpec: wiretype end group for non-group")
+			return fmt.Errorf("proto: ManagedClusterSpec: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: SpokeClusterSpec: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ManagedClusterSpec: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field SpokeClientConfigs", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ManagedClusterClientConfigs", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -1395,8 +1396,8 @@ func (m *SpokeClusterSpec) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.SpokeClientConfigs = append(m.SpokeClientConfigs, ClientConfig{})
-			if err := m.SpokeClientConfigs[len(m.SpokeClientConfigs)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			m.ManagedClusterClientConfigs = append(m.ManagedClusterClientConfigs, ClientConfig{})
+			if err := m.ManagedClusterClientConfigs[len(m.ManagedClusterClientConfigs)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1463,7 +1464,7 @@ func (m *SpokeClusterSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *SpokeClusterStatus) Unmarshal(dAtA []byte) error {
+func (m *ManagedClusterStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1486,10 +1487,10 @@ func (m *SpokeClusterStatus) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: SpokeClusterStatus: wiretype end group for non-group")
+			return fmt.Errorf("proto: ManagedClusterStatus: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: SpokeClusterStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ManagedClusterStatus: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -1841,7 +1842,7 @@ func (m *SpokeClusterStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *SpokeVersion) Unmarshal(dAtA []byte) error {
+func (m *ManagedClusterVersion) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1864,10 +1865,10 @@ func (m *SpokeVersion) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: SpokeVersion: wiretype end group for non-group")
+			return fmt.Errorf("proto: ManagedClusterVersion: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: SpokeVersion: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ManagedClusterVersion: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:

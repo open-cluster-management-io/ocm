@@ -9,12 +9,12 @@ import (
 	"github.com/open-cluster-management/nucleus/pkg/version"
 )
 
-// NewSpokeOperatorCmd generatee a command to start spoke operator
-func NewSpokeOperatorCmd() *cobra.Command {
+// NewKlusterletOperatorCmd generatee a command to start klusterlet operator
+func NewKlusterletOperatorCmd() *cobra.Command {
 	cmd := controllercmd.
 		NewControllerCommandConfig("klusterlet", version.Get(), operators.RunKlusterletOperator).
 		NewCommand()
-	cmd.Use = "spoke"
+	cmd.Use = "klusterlet"
 	cmd.Short = "Start the klusterlet operator"
 
 	return cmd

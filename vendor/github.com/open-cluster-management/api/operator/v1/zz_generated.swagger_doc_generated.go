@@ -12,8 +12,8 @@ package v1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_ClusterManager = map[string]string{
-	"":       "ClusterManager configures the controllers on the hub that govern registration and work distribution for attached klusterlets. ClusterManager will be only deployed in open-cluster-management-hub namespace.",
-	"spec":   "Spec represents a desired deployment configuration of controllers that govern registration and work distribution for attached klusterlets.",
+	"":       "ClusterManager configures the controllers on the hub that govern registration and work distribution for attached Klusterlets. ClusterManager will be only deployed in open-cluster-management-hub namespace.",
+	"spec":   "Spec represents a desired deployment configuration of controllers that govern registration and work distribution for attached Klusterlets.",
 	"status": "Status represents the current status of controllers that govern the lifecycle of managed clusters.",
 }
 
@@ -32,7 +32,7 @@ func (ClusterManagerList) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterManagerSpec = map[string]string{
-	"":                          "ClusterManagerSpec represents a desired deployment configuration of controllers that govern registration and work distribution for attached klusterlets.",
+	"":                          "ClusterManagerSpec represents a desired deployment configuration of controllers that govern registration and work distribution for attached Klusterlets.",
 	"registrationImagePullSpec": "RegistrationImagePullSpec represents the desired image of registration controller installed on hub.",
 }
 
@@ -51,8 +51,8 @@ func (ClusterManagerStatus) SwaggerDoc() map[string]string {
 
 var map_Klusterlet = map[string]string{
 	"":       "Klusterlet represents controllers on the managed cluster. When configured, the Klusterlet requires a secret named of bootstrap-hub-kubeconfig in the same namespace to allow API requests to the hub for the registration protocol.",
-	"spec":   "Spec represents the desired deployment configuration of klusterlet agent.",
-	"status": "Status represents the current status of klusterlet agent.",
+	"spec":   "Spec represents the desired deployment configuration of Klusterlet agent.",
+	"status": "Status represents the current status of Klusterlet agent.",
 }
 
 func (Klusterlet) SwaggerDoc() map[string]string {
@@ -60,9 +60,9 @@ func (Klusterlet) SwaggerDoc() map[string]string {
 }
 
 var map_KlusterletList = map[string]string{
-	"":         "KlusterletList is a collection of klusterlet agent.",
+	"":         "KlusterletList is a collection of Klusterlet agents.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
-	"items":    "Items is a list of klusterlet agent.",
+	"items":    "Items is a list of Klusterlet agent.",
 }
 
 func (KlusterletList) SwaggerDoc() map[string]string {
@@ -70,12 +70,12 @@ func (KlusterletList) SwaggerDoc() map[string]string {
 }
 
 var map_KlusterletSpec = map[string]string{
-	"":                          "KlusterletSpec represents the desired deployment configuration of klusterlet agent.",
-	"namespace":                 "Namespace is the namespace to deploy the agent. The namespace must have a prefix of \"open-cluster-management-\", and if it is not set, the namespace of \"open-cluster-management-spoke\" is used to deploy agent.",
+	"":                          "KlusterletSpec represents the desired deployment configuration of Klusterlet agent.",
+	"namespace":                 "Namespace is the namespace to deploy the agent. The namespace must have a prefix of \"open-cluster-management-\", and if it is not set, the namespace of \"open-cluster-management-agent\" is used to deploy agent.",
 	"registrationImagePullSpec": "RegistrationImagePullSpec represents the desired image configuration of registration agent.",
 	"workImagePullSpec":         "WorkImagePullSpec represents the desired image configuration of work agent.",
-	"clusterName":               "ClusterName is the name of the spoke cluster to be created on hub. The spoke agent generates a random name if it is not set, or discovers the appropriate cluster name on openshift.",
-	"externalServerURLs":        "ExternalServerURLs represents the a list of apiserver urls and ca bundles that is accessible externally If it is set empty, spoke cluster has no externally accessible url that hub cluster can visit.",
+	"clusterName":               "ClusterName is the name of the managed cluster to be created on hub. The Klusterlet agent generates a random name if it is not set, or discovers the appropriate cluster name on openshift.",
+	"externalServerURLs":        "ExternalServerURLs represents the a list of apiserver urls and ca bundles that is accessible externally If it is set empty, managed cluster has no externally accessible url that hub cluster can visit.",
 }
 
 func (KlusterletSpec) SwaggerDoc() map[string]string {
@@ -83,8 +83,8 @@ func (KlusterletSpec) SwaggerDoc() map[string]string {
 }
 
 var map_KlusterletStatus = map[string]string{
-	"":           "KlusterletStatus represents the current status of klusterlet agent.",
-	"conditions": "Conditions contain the different condition statuses for this spokecore. Valid condition types are: Applied: components in spoke is applied. Available: components in spoke are available and ready to serve. Progressing: components in spoke are in a transitioning state. Degraded: components in spoke do not match the desired configuration and only provide degraded service.",
+	"":           "KlusterletStatus represents the current status of Klusterlet agent.",
+	"conditions": "Conditions contain the different condition statuses for this Klusterlet. Valid condition types are: Applied: components have been applied in the managed cluster. Available: components in the managed cluster are available and ready to serve. Progressing: components in the managed cluster are in a transitioning state. Degraded: components in the managed cluster do not match the desired configuration and only provide degraded service.",
 }
 
 func (KlusterletStatus) SwaggerDoc() map[string]string {
@@ -93,8 +93,8 @@ func (KlusterletStatus) SwaggerDoc() map[string]string {
 
 var map_ServerURL = map[string]string{
 	"":         "ServerURL represents the apiserver url and ca bundle that is accessible externally",
-	"url":      "URL is the url of apiserver endpoint of the spoke cluster.",
-	"caBundle": "CABundle is the ca bundle to connect to apiserver of the spoke cluster. System certs are used if it is not set.",
+	"url":      "URL is the url of apiserver endpoint of the managed cluster.",
+	"caBundle": "CABundle is the ca bundle to connect to apiserver of the managed cluster. System certs are used if it is not set.",
 }
 
 func (ServerURL) SwaggerDoc() map[string]string {

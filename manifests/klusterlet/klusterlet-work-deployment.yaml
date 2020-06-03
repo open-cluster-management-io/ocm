@@ -17,7 +17,7 @@ spec:
     spec:
       serviceAccountName: {{ .KlusterletName }}-work-sa
       containers:
-      - name: spoke-agent
+      - name: ç
         image: {{ .WorkImage }}
         imagePullPolicy: IfNotPresent
         args:

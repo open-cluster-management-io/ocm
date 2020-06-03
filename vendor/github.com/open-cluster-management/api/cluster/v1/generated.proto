@@ -12,105 +12,106 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1";
 
-// ClientConfig represents the apiserver address of the spoke cluster.
-// TODO include credential to connect to spoke cluster kube-apiserver
+// ClientConfig represents the apiserver address of the managed cluster.
+// TODO include credential to connect to managed cluster kube-apiserver
 message ClientConfig {
-  // URL is the url of apiserver endpoint of the spoke cluster.
+  // URL is the url of apiserver endpoint of the managed cluster.
   // +required
   optional string url = 1;
 
-  // CABundle is the ca bundle to connect to apiserver of the spoke cluster.
+  // CABundle is the ca bundle to connect to apiserver of the managed cluster.
   // System certs are used if it is not set.
   // +optional
   optional bytes caBundle = 2;
 }
 
-// SpokeCluster represents the desired state and current status of spoke
-// cluster. SpokeCluster is a cluster scoped resource. The name is the cluster
+// ManagedCluster represents the desired state and current status of managed
+// cluster. ManagedCluster is a cluster scoped resource. The name is the cluster
 // UID.
 //
 // The cluster join process follows a double opt-in process:
 //
-// 1. agent on spoke cluster creates CSR on hub with cluster UID and agent name.
-// 2. agent on spoke cluster creates spokecluster on hub.
-// 3. cluster admin on hub approves the CSR for the spoke's cluster UID and agent name.
-// 4. cluster admin set spec.acceptSpokeCluster of spokecluster to true.
-// 5. cluster admin on spoke creates credential of kubeconfig to spoke.
+// 1. agent on managed cluster creates CSR on hub with cluster UID and agent name.
+// 2. agent on managed cluster creates ManagedCluster on hub.
+// 3. cluster admin on hub approves the CSR for the ManagedCluster's UID and agent name.
+// 4. cluster admin sets spec.acceptClient of ManagedCluster to true.
+// 5. cluster admin on managed cluster creates credential of kubeconfig to hub.
 //
-// Once the hub creates the cluster namespace, the spoke agent pushes the
-// credential to the hub to use against the spoke's kube-apiserver.
-message SpokeCluster {
+// Once the hub creates the cluster namespace, the Klusterlet agent on the Managed Cluster
+// pushes the credential to the hub to use against the managed cluster's kube-apiserver.
+message ManagedCluster {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec represents a desired configuration for the agent on the spoke cluster.
-  optional SpokeClusterSpec spec = 2;
+  // Spec represents a desired configuration for the agent on the managed cluster.
+  optional ManagedClusterSpec spec = 2;
 
-  // Status represents the current status of joined spoke cluster
+  // Status represents the current status of joined managed cluster
   // +optional
-  optional SpokeClusterStatus status = 3;
+  optional ManagedClusterStatus status = 3;
 }
 
-// SpokeClusterList is a collection of spoke cluster.
-message SpokeClusterList {
+// ManagedClusterList is a collection of managed cluster.
+message ManagedClusterList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is a list of spoke cluster.
-  repeated SpokeCluster items = 2;
+  // Items is a list of managed cluster.
+  repeated ManagedCluster items = 2;
 }
 
-// SpokeClusterSpec provides the information to securely connect to a remote server
+// ManagedClusterSpec provides the information to securely connect to a remote server
 // and verify its identity.
-message SpokeClusterSpec {
-  // SpokeClientConfigs represents a list of the apiserver address of the spoke cluster.
-  // If it is empty, spoke cluster has no accessible address to be visited from hub.
+message ManagedClusterSpec {
+  // ManagedClusterClientConfigs represents a list of the apiserver address of the managed cluster.
+  // If it is empty, managed cluster has no accessible address to be visited from hub.
   // +optional
-  repeated ClientConfig spokeClientConfigs = 1;
+  repeated ClientConfig managedClusterClientConfigs = 1;
 
-  // AcceptSpokeCluster reprsents that hub accepts the join of spoke agent.
-  // Its default value is false, and can only be set true when the user on hub
-  // has an RBAC rule to UPDATE on the virtual subresource of spokeclusters/accept.
-  // When the vaule is set true, a namespace whose name is same as the name of SpokeCluster
-  // is created on hub representing the spoke cluster, also role/rolebinding is created on
-  // the namespace to grant the permision of access from agent on spoke.
-  // When the value is set false, the namespace representing the spoke cluster is
+  // hubAcceptsClient represents that hub accepts the join of Klusterlet agent on
+  // the managed cluster to the hub. The default value is false, and can only be set
+  // true when the user on hub has an RBAC rule to UPDATE on the virtual subresource
+  // of managedclusters/accept.
+  // When the value is set true, a namespace whose name is same as the name of ManagedCluster
+  // is created on hub representing the managed cluster, also role/rolebinding is created on
+  // the namespace to grant the permision of access from agent on managed cluster.
+  // When the value is set false, the namespace representing the managed cluster is
   // deleted.
   // +required
   optional bool hubAcceptsClient = 2;
 
-  // LeaseDurationSeconds is used to coordinate the lease update time of spoke agents.
-  // If its value is zero, the spoke agent will update its lease per 60s by default
+  // LeaseDurationSeconds is used to coordinate the lease update time of Klusterlet agents on the managed cluster.
+  // If its value is zero, the Klusterlet agent will update its lease every 60s by default
   // +optional
   optional int32 leaseDurationSeconds = 3;
 }
 
-// SpokeClusterStatus represents the current status of joined spoke cluster.
-message SpokeClusterStatus {
-  // Conditions contains the different condition statuses for this spoke cluster.
+// ManagedClusterStatus represents the current status of joined managed cluster.
+message ManagedClusterStatus {
+  // Conditions contains the different condition statuses for this managed cluster.
   repeated StatusCondition conditions = 1;
 
   // Capacity represents the total resource capacity from all nodeStatuses
-  // on the spoke cluster.
+  // on the managed cluster.
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 2;
 
-  // Allocatable represents the total allocatable resources on the spoke cluster.
+  // Allocatable represents the total allocatable resources on the managed cluster.
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> allocatable = 3;
 
-  // Version represents the kubernetes version of the spoke cluster.
-  optional SpokeVersion version = 4;
+  // Version represents the kubernetes version of the managed cluster.
+  optional ManagedClusterVersion version = 4;
 }
 
-// SpokeVersion represents version information about the spoke cluster.
-// TODO add spoke agent versions
-message SpokeVersion {
-  // Kubernetes is the kubernetes version of spoke cluster
+// ManagedClusterVersion represents version information about the managed cluster.
+// TODO add managed agent versions
+message ManagedClusterVersion {
+  // Kubernetes is the kubernetes version of managed cluster.
   // +optional
   optional string kubernetes = 1;
 }
 
-// StatusCondition contains condition information for a spoke cluster.
+// StatusCondition contains condition information for a managed cluster.
 message StatusCondition {
   // Type is the type of the cluster condition.
   // +required
