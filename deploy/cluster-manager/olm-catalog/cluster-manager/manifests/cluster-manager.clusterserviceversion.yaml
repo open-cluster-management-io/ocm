@@ -1,0 +1,213 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "operator.open-cluster-management.io/v1",
+          "kind": "ClusterManager",
+          "metadata": {
+            "name": "cluster-manager"
+          },
+          "spec": {
+            "registrationImagePullSpec": "quay.io/open-cluster-management/registration"
+          }
+        }
+      ]
+    capabilities: Basic Install
+  name: cluster-manager.v0.1.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - kind: ClusterManager
+      name: clustermanagers.operator.open-cluster-management.io
+      version: v1
+  displayName: Cluster Manager
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          - namespaces
+          - serviceaccounts
+          - services
+          - secrets
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+          - patch
+          - delete
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
+        - apiGroups:
+          - ""
+          - events.k8s.io
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+          - update
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+          - patch
+          - delete
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterrolebindings
+          - rolebindings
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+          - patch
+          - delete
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterroles
+          - roles
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+          - patch
+          - delete
+          - escalate
+          - bind
+        - apiGroups:
+          - apiextensions.k8s.io
+          resources:
+          - customresourcedefinitions
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+          - patch
+          - delete
+        - apiGroups:
+          - apiregistration.k8s.io
+          resources:
+          - apiservices
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+          - patch
+          - delete
+        - apiGroups:
+          - admissionregistration.k8s.io
+          resources:
+          - validatingwebhookconfigurations
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+          - patch
+          - delete
+        - apiGroups:
+          - operator.open-cluster-management.io
+          resources:
+          - clustermanagers
+          verbs:
+          - get
+          - list
+          - watch
+          - update
+          - delete
+        - apiGroups:
+          - operator.open-cluster-management.io
+          resources:
+          - clustermanagers/status
+          verbs:
+          - update
+          - patch
+        serviceAccountName: cluster-manager
+      deployments:
+      - name: cluster-manager
+        spec:
+          replicas: 3
+          selector:
+            matchLabels:
+              app: cluster-manager
+          strategy: {}
+          template:
+            metadata:
+              labels:
+                app: cluster-manager
+            spec:
+              containers:
+              - args:
+                - /nucleus
+                - hub
+                image: quay.io/open-cluster-management/nucleus:latest
+                imagePullPolicy: IfNotPresent
+                livenessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 8443
+                    scheme: HTTPS
+                  initialDelaySeconds: 2
+                  periodSeconds: 10
+                name: nucleus-operator
+                readinessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 8443
+                    scheme: HTTPS
+                  initialDelaySeconds: 2
+                resources: {}
+              serviceAccountName: cluster-manager
+    strategy: deployment
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: true
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - open-cluster-management
+  maintainers:
+  - {}
+  maturity: alpha
+  provider:
+    name: open-cluster-management
+  version: 0.1.0

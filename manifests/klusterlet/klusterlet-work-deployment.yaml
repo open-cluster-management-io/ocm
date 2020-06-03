@@ -1,0 +1,48 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ .KlusterletName }}-work-agent
+  namespace: {{ .KlusterletNamespace }}
+  labels:
+    app: klusterlet-manifestwork-agent
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: klusterlet-manifestwork-agent
+  template:
+    metadata:
+      labels:
+        app: klusterlet-manifestwork-agent
+    spec:
+      serviceAccountName: {{ .KlusterletName }}-work-sa
+      containers:
+      - name: spoke-agent
+        image: {{ .WorkImage }}
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/work"
+          - "agent"
+          - "--spoke-cluster-name={{ .ClusterName }}"
+          - "--hub-kubeconfig=/spoke/hub-kubeconfig/kubeconfig"
+        volumeMounts:
+        - name: hub-kubeconfig-secret
+          mountPath: "/spoke/hub-kubeconfig"
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+      volumes:
+      - name: hub-kubeconfig-secret
+        secret:
+          secretName: {{ .HubKubeConfigSecret }}

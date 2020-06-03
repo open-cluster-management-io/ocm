@@ -7,12 +7,13 @@ import (
 	"testing"
 	"time"
 
-	nucleusfake "github.com/open-cluster-management/api/client/nucleus/clientset/versioned/fake"
-	nucleusapiv1 "github.com/open-cluster-management/api/nucleus/v1"
+	opereatorfake "github.com/open-cluster-management/api/client/operator/clientset/versioned/fake"
+	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	fakeapiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
+
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -29,52 +30,52 @@ func TestUpdateStatusCondition(t *testing.T) {
 
 	cases := []struct {
 		name               string
-		startingConditions []nucleusapiv1.StatusCondition
-		newCondition       nucleusapiv1.StatusCondition
+		startingConditions []operatorapiv1.StatusCondition
+		newCondition       operatorapiv1.StatusCondition
 		expectedUpdated    bool
-		expectedConditions []nucleusapiv1.StatusCondition
+		expectedConditions []operatorapiv1.StatusCondition
 	}{
 		{
 			name:               "add to empty",
-			startingConditions: []nucleusapiv1.StatusCondition{},
+			startingConditions: []operatorapiv1.StatusCondition{},
 			newCondition:       newCondition("test", "True", "my-reason", "my-message", nil),
 			expectedUpdated:    true,
-			expectedConditions: []nucleusapiv1.StatusCondition{newCondition("test", "True", "my-reason", "my-message", nil)},
+			expectedConditions: []operatorapiv1.StatusCondition{newCondition("test", "True", "my-reason", "my-message", nil)},
 		},
 		{
 			name: "add to non-conflicting",
-			startingConditions: []nucleusapiv1.StatusCondition{
+			startingConditions: []operatorapiv1.StatusCondition{
 				newCondition("two", "True", "my-reason", "my-message", nil),
 			},
 			newCondition:    newCondition("one", "True", "my-reason", "my-message", nil),
 			expectedUpdated: true,
-			expectedConditions: []nucleusapiv1.StatusCondition{
+			expectedConditions: []operatorapiv1.StatusCondition{
 				newCondition("two", "True", "my-reason", "my-message", nil),
 				newCondition("one", "True", "my-reason", "my-message", nil),
 			},
 		},
 		{
 			name: "change existing status",
-			startingConditions: []nucleusapiv1.StatusCondition{
+			startingConditions: []operatorapiv1.StatusCondition{
 				newCondition("two", "True", "my-reason", "my-message", nil),
 				newCondition("one", "True", "my-reason", "my-message", nil),
 			},
 			newCondition:    newCondition("one", "False", "my-different-reason", "my-othermessage", nil),
 			expectedUpdated: true,
-			expectedConditions: []nucleusapiv1.StatusCondition{
+			expectedConditions: []operatorapiv1.StatusCondition{
 				newCondition("two", "True", "my-reason", "my-message", nil),
 				newCondition("one", "False", "my-different-reason", "my-othermessage", nil),
 			},
 		},
 		{
 			name: "leave existing transition time",
-			startingConditions: []nucleusapiv1.StatusCondition{
+			startingConditions: []operatorapiv1.StatusCondition{
 				newCondition("two", "True", "my-reason", "my-message", nil),
 				newCondition("one", "True", "my-reason", "my-message", &beforeish),
 			},
 			newCondition:    newCondition("one", "True", "my-reason", "my-message", &afterish),
 			expectedUpdated: false,
-			expectedConditions: []nucleusapiv1.StatusCondition{
+			expectedConditions: []operatorapiv1.StatusCondition{
 				newCondition("two", "True", "my-reason", "my-message", nil),
 				newCondition("one", "True", "my-reason", "my-message", &beforeish),
 			},
@@ -83,26 +84,26 @@ func TestUpdateStatusCondition(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			fakeClusterClient := nucleusfake.NewSimpleClientset(
-				&nucleusapiv1.HubCore{
+			fakeOperatorClient := opereatorfake.NewSimpleClientset(
+				&operatorapiv1.ClusterManager{
 					ObjectMeta: metav1.ObjectMeta{Name: "testspokecluster"},
-					Status: nucleusapiv1.HubCoreStatus{
+					Status: operatorapiv1.ClusterManagerStatus{
 						Conditions: c.startingConditions,
 					},
 				},
-				&nucleusapiv1.SpokeCore{
+				&operatorapiv1.Klusterlet{
 					ObjectMeta: metav1.ObjectMeta{Name: "testspokecluster"},
-					Status: nucleusapiv1.SpokeCoreStatus{
+					Status: operatorapiv1.KlusterletStatus{
 						Conditions: c.startingConditions,
 					},
 				},
 			)
 
-			hubstatus, updated, err := UpdateNucleusHubStatus(
+			hubstatus, updated, err := UpdateClusterManagerStatus(
 				context.TODO(),
-				fakeClusterClient.NucleusV1().HubCores(),
+				fakeOperatorClient.OperatorV1().ClusterManagers(),
 				"testspokecluster",
-				UpdateNucleusHubConditionFn(c.newCondition),
+				UpdateClusterManagerConditionFn(c.newCondition),
 			)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
@@ -111,11 +112,11 @@ func TestUpdateStatusCondition(t *testing.T) {
 				t.Errorf("expected %t, but %t", c.expectedUpdated, updated)
 			}
 
-			spokestatus, updated, err := UpdateNucleusSpokeStatus(
+			spokestatus, updated, err := UpdateKlusterletStatus(
 				context.TODO(),
-				fakeClusterClient.NucleusV1().SpokeCores(),
+				fakeOperatorClient.OperatorV1().Klusterlets(),
 				"testspokecluster",
-				UpdateNucleusSpokeConditionFn(c.newCondition),
+				UpdateKlusterletConditionFn(c.newCondition),
 			)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
@@ -146,8 +147,8 @@ func TestUpdateStatusCondition(t *testing.T) {
 	}
 }
 
-func newCondition(name, status, reason, message string, lastTransition *metav1.Time) nucleusapiv1.StatusCondition {
-	ret := nucleusapiv1.StatusCondition{
+func newCondition(name, status, reason, message string, lastTransition *metav1.Time) operatorapiv1.StatusCondition {
+	ret := operatorapiv1.StatusCondition{
 		Type:    name,
 		Status:  metav1.ConditionStatus(status),
 		Reason:  reason,

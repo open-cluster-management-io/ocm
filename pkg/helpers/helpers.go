@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	nucleusv1client "github.com/open-cluster-management/api/client/nucleus/clientset/versioned/typed/nucleus/v1"
-	nucleusapiv1 "github.com/open-cluster-management/api/nucleus/v1"
+	operatorv1client "github.com/open-cluster-management/api/client/operator/clientset/versioned/typed/operator/v1"
+	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -45,14 +45,14 @@ func init() {
 	utilruntime.Must(admissionv1.AddToScheme(genericScheme))
 }
 
-func IsConditionTrue(condition *nucleusapiv1.StatusCondition) bool {
+func IsConditionTrue(condition *operatorapiv1.StatusCondition) bool {
 	if condition == nil {
 		return false
 	}
 	return condition.Status == metav1.ConditionTrue
 }
 
-func FindNucleusCondition(conditions []nucleusapiv1.StatusCondition, conditionType string) *nucleusapiv1.StatusCondition {
+func FindOperatorCondition(conditions []operatorapiv1.StatusCondition, conditionType string) *operatorapiv1.StatusCondition {
 	for i := range conditions {
 		if conditions[i].Type == conditionType {
 			return &conditions[i]
@@ -61,11 +61,11 @@ func FindNucleusCondition(conditions []nucleusapiv1.StatusCondition, conditionTy
 	return nil
 }
 
-func SetNucleusCondition(conditions *[]nucleusapiv1.StatusCondition, newCondition nucleusapiv1.StatusCondition) {
+func SetOperatorCondition(conditions *[]operatorapiv1.StatusCondition, newCondition operatorapiv1.StatusCondition) {
 	if conditions == nil {
-		conditions = &[]nucleusapiv1.StatusCondition{}
+		conditions = &[]operatorapiv1.StatusCondition{}
 	}
-	existingCondition := FindNucleusCondition(*conditions, newCondition.Type)
+	existingCondition := FindOperatorCondition(*conditions, newCondition.Type)
 	if existingCondition == nil {
 		newCondition.LastTransitionTime = metav1.NewTime(time.Now())
 		*conditions = append(*conditions, newCondition)
@@ -81,21 +81,21 @@ func SetNucleusCondition(conditions *[]nucleusapiv1.StatusCondition, newConditio
 	existingCondition.Message = newCondition.Message
 }
 
-type UpdateNucleusHubStatusFunc func(status *nucleusapiv1.HubCoreStatus) error
+type UpdateClusterManagerStatusFunc func(status *operatorapiv1.ClusterManagerStatus) error
 
-func UpdateNucleusHubStatus(
+func UpdateClusterManagerStatus(
 	ctx context.Context,
-	client nucleusv1client.HubCoreInterface,
-	nucleusHubCoreName string,
-	updateFuncs ...UpdateNucleusHubStatusFunc) (*nucleusapiv1.HubCoreStatus, bool, error) {
+	client operatorv1client.ClusterManagerInterface,
+	clusterManagerName string,
+	updateFuncs ...UpdateClusterManagerStatusFunc) (*operatorapiv1.ClusterManagerStatus, bool, error) {
 	updated := false
-	var updatedSpokeClusterStatus *nucleusapiv1.HubCoreStatus
+	var updatedClusterManagerStatus *operatorapiv1.ClusterManagerStatus
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		hubCore, err := client.Get(ctx, nucleusHubCoreName, metav1.GetOptions{})
+		clusterManager, err := client.Get(ctx, clusterManagerName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		oldStatus := &hubCore.Status
+		oldStatus := &clusterManager.Status
 
 		newStatus := oldStatus.DeepCopy()
 		for _, update := range updateFuncs {
@@ -105,47 +105,47 @@ func UpdateNucleusHubStatus(
 		}
 		if equality.Semantic.DeepEqual(oldStatus, newStatus) {
 			// We return the newStatus which is a deep copy of oldStatus but with all update funcs applied.
-			updatedSpokeClusterStatus = newStatus
+			updatedClusterManagerStatus = newStatus
 			return nil
 		}
 
-		hubCore.Status = *newStatus
-		updatedSpokeCluster, err := client.UpdateStatus(ctx, hubCore, metav1.UpdateOptions{})
+		clusterManager.Status = *newStatus
+		updatedClusterManager, err := client.UpdateStatus(ctx, clusterManager, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
-		updatedSpokeClusterStatus = &updatedSpokeCluster.Status
+		updatedClusterManagerStatus = &updatedClusterManager.Status
 		updated = err == nil
 		return err
 	})
 
-	return updatedSpokeClusterStatus, updated, err
+	return updatedClusterManagerStatus, updated, err
 }
 
-func UpdateNucleusHubConditionFn(conds ...nucleusapiv1.StatusCondition) UpdateNucleusHubStatusFunc {
-	return func(oldStatus *nucleusapiv1.HubCoreStatus) error {
+func UpdateClusterManagerConditionFn(conds ...operatorapiv1.StatusCondition) UpdateClusterManagerStatusFunc {
+	return func(oldStatus *operatorapiv1.ClusterManagerStatus) error {
 		for _, cond := range conds {
-			SetNucleusCondition(&oldStatus.Conditions, cond)
+			SetOperatorCondition(&oldStatus.Conditions, cond)
 		}
 		return nil
 	}
 }
 
-type UpdateNucleusSpokeStatusFunc func(status *nucleusapiv1.SpokeCoreStatus) error
+type UpdateKlusterletStatusFunc func(status *operatorapiv1.KlusterletStatus) error
 
-func UpdateNucleusSpokeStatus(
+func UpdateKlusterletStatus(
 	ctx context.Context,
-	client nucleusv1client.SpokeCoreInterface,
-	nucleusSpokeCoreName string,
-	updateFuncs ...UpdateNucleusSpokeStatusFunc) (*nucleusapiv1.SpokeCoreStatus, bool, error) {
+	client operatorv1client.KlusterletInterface,
+	klusterletName string,
+	updateFuncs ...UpdateKlusterletStatusFunc) (*operatorapiv1.KlusterletStatus, bool, error) {
 	updated := false
-	var updatedSpokeClusterStatus *nucleusapiv1.SpokeCoreStatus
+	var updatedKlusterletStatus *operatorapiv1.KlusterletStatus
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		spokeCore, err := client.Get(ctx, nucleusSpokeCoreName, metav1.GetOptions{})
+		klusterlet, err := client.Get(ctx, klusterletName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		oldStatus := &spokeCore.Status
+		oldStatus := &klusterlet.Status
 
 		newStatus := oldStatus.DeepCopy()
 		for _, update := range updateFuncs {
@@ -155,27 +155,27 @@ func UpdateNucleusSpokeStatus(
 		}
 		if equality.Semantic.DeepEqual(oldStatus, newStatus) {
 			// We return the newStatus which is a deep copy of oldStatus but with all update funcs applied.
-			updatedSpokeClusterStatus = newStatus
+			updatedKlusterletStatus = newStatus
 			return nil
 		}
 
-		spokeCore.Status = *newStatus
-		updatedSpokeCluster, err := client.UpdateStatus(ctx, spokeCore, metav1.UpdateOptions{})
+		klusterlet.Status = *newStatus
+		updatedKlusterlet, err := client.UpdateStatus(ctx, klusterlet, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
-		updatedSpokeClusterStatus = &updatedSpokeCluster.Status
+		updatedKlusterletStatus = &updatedKlusterlet.Status
 		updated = err == nil
 		return err
 	})
 
-	return updatedSpokeClusterStatus, updated, err
+	return updatedKlusterletStatus, updated, err
 }
 
-func UpdateNucleusSpokeConditionFn(conds ...nucleusapiv1.StatusCondition) UpdateNucleusSpokeStatusFunc {
-	return func(oldStatus *nucleusapiv1.SpokeCoreStatus) error {
+func UpdateKlusterletConditionFn(conds ...operatorapiv1.StatusCondition) UpdateKlusterletStatusFunc {
+	return func(oldStatus *operatorapiv1.KlusterletStatus) error {
 		for _, cond := range conds {
-			SetNucleusCondition(&oldStatus.Conditions, cond)
+			SetOperatorCondition(&oldStatus.Conditions, cond)
 		}
 		return nil
 	}

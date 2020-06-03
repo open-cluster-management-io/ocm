@@ -15,7 +15,7 @@ import (
 
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
-	nucleusclient "github.com/open-cluster-management/api/client/nucleus/clientset/versioned"
+	operatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned"
 )
 
 func TestIntegration(t *testing.T) {
@@ -36,7 +36,7 @@ var kubeClient kubernetes.Interface
 
 var restConfig *rest.Config
 
-var nucleusClient nucleusclient.Interface
+var operatorClient operatorclient.Interface
 
 var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	logf.SetLogger(zap.LoggerTo(ginkgo.GinkgoWriter, true))
@@ -49,7 +49,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	testEnv = &envtest.Environment{
 		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths: []string{
-			filepath.Join(".", "vendor", "github.com", "open-cluster-management", "api", "nucleus", "v1"),
+			filepath.Join(".", "vendor", "github.com", "open-cluster-management", "api", "operator", "v1"),
 		},
 	}
 	cfg, err := testEnv.Start()
@@ -60,7 +60,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	kubeClient, err = kubernetes.NewForConfig(cfg)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(kubeClient).ToNot(gomega.BeNil())
-	nucleusClient, err = nucleusclient.NewForConfig(cfg)
+	operatorClient, err = operatorclient.NewForConfig(cfg)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(kubeClient).ToNot(gomega.BeNil())
 

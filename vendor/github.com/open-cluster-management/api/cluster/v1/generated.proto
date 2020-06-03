@@ -79,6 +79,11 @@ message SpokeClusterSpec {
   // deleted.
   // +required
   optional bool hubAcceptsClient = 2;
+
+  // LeaseDurationSeconds is used to coordinate the lease update time of spoke agents.
+  // If its value is zero, the spoke agent will update its lease per 60s by default
+  // +optional
+  optional int32 leaseDurationSeconds = 3;
 }
 
 // SpokeClusterStatus represents the current status of joined spoke cluster.

@@ -1,0 +1,38 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: klusterlet
+  namespace: open-cluster-management
+  labels:
+    app: klusterlet
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: klusterlet
+  template:
+    metadata:
+      labels:
+        app: klusterlet
+    spec:
+      serviceAccountName: klusterlet
+      containers:
+      - name: klusterlet
+        image: quay.io/open-cluster-management/nucleus:latest
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/nucleus"
+          - "spoke"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2

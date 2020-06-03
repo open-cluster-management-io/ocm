@@ -1,0 +1,38 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ .ClusterManagerName }}-registration-controller
+  namespace: {{ .ClusterManagerNamespace }}
+  labels:
+    app: clustermanager-controller
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: clustermanager-registration-controller
+  template:
+    metadata:
+      labels:
+        app: clustermanager-registration-controller
+    spec:
+      serviceAccountName: {{ .ClusterManagerName }}-registration-controller-sa
+      containers:
+      - name: hub-registration-controller
+        image: {{ .RegistrationImage }}
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/registration"
+          - "controller"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
