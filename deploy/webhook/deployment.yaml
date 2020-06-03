@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: spokecluster-admission
+  name: managedcluster-admission
   labels:
-    app: spokecluster-admission
+    app: managedcluster-admission
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: spokecluster-admission
+      app: managedcluster-admission
   template:
     metadata:
       labels:
-        app: spokecluster-admission
+        app: managedcluster-admission
     spec:
-      serviceAccountName: spokecluster-admission-sa
+      serviceAccountName: managedcluster-admission-sa
       containers:
-      - name: spokecluster-admission
+      - name: managedcluster-admission
         image: quay.io/open-cluster-management/registration:latest
         imagePullPolicy: IfNotPresent
         args:

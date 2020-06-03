@@ -25,7 +25,7 @@ import (
 const testCSRName = "test_csr"
 
 var (
-	labels     = map[string]string{"open-cluster-management.io/cluster-name": "spokecluster1"}
+	labels     = map[string]string{"open-cluster-management.io/cluster-name": "managedcluster1"}
 	signerName = certificatesv1beta1.KubeAPIServerClientSignerName
 )
 
@@ -153,7 +153,7 @@ func TestIsSpokeClusterClientCertRenewal(t *testing.T) {
 		},
 		{
 			name:      "an invalid common name",
-			csr:       newCSR(labels, &signerName, "", []string{"system:open-cluster-management:spokecluster1"}, "", "CERTIFICATE REQUEST"),
+			csr:       newCSR(labels, &signerName, "", []string{"system:open-cluster-management:managedcluster1"}, "", "CERTIFICATE REQUEST"),
 			isRenewal: false,
 		},
 		{
@@ -218,9 +218,9 @@ func newCSRWithSignerName(signer *string) *certificatesv1beta1.CertificateSignin
 	csr := newCSR(
 		labels,
 		signer,
-		"system:open-cluster-management:spokecluster1:spokeagent1",
-		[]string{"system:open-cluster-management:spokecluster1"},
-		"system:open-cluster-management:spokecluster1:spokeagent1",
+		"system:open-cluster-management:managedcluster1:spokeagent1",
+		[]string{"system:open-cluster-management:managedcluster1"},
+		"system:open-cluster-management:managedcluster1:spokeagent1",
 		"CERTIFICATE REQUEST",
 	)
 	csr.Name = testCSRName
@@ -235,9 +235,9 @@ func newInvalidCSR() *certificatesv1beta1.CertificateSigningRequest {
 	csr := newCSR(
 		labels,
 		&signerName,
-		"system:open-cluster-management:spokecluster1:spokeagent2",
-		[]string{"system:open-cluster-management:spokecluster1"},
-		"system:open-cluster-management:spokecluster1:spokeagent1",
+		"system:open-cluster-management:managedcluster1:spokeagent2",
+		[]string{"system:open-cluster-management:managedcluster1"},
+		"system:open-cluster-management:managedcluster1:spokeagent1",
 		"CERTIFICATE REQUEST",
 	)
 	csr.Name = testCSRName

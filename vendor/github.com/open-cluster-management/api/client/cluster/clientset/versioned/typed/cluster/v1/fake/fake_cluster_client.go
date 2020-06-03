@@ -12,8 +12,8 @@ type FakeClusterV1 struct {
 	*testing.Fake
 }
 
-func (c *FakeClusterV1) SpokeClusters() v1.SpokeClusterInterface {
-	return &FakeSpokeClusters{c}
+func (c *FakeClusterV1) ManagedClusters() v1.ManagedClusterInterface {
+	return &FakeManagedClusters{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

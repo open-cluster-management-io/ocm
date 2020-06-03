@@ -21,7 +21,7 @@ KUSTOMIZE_VERSION?=v3.5.4
 KUSTOMIZE_ARCHIVE_NAME?=kustomize_$(KUSTOMIZE_VERSION)_$(GOHOSTOS)_$(GOHOSTARCH).tar.gz
 kustomize_dir:=$(dir $(KUSTOMIZE))
 
-$(call add-bindata,spokecluster,./pkg/hub/spokecluster/manifests/...,bindata,bindata,./pkg/hub/spokecluster/bindata/bindata.go)
+$(call add-bindata,managedcluster,./pkg/hub/managedcluster/manifests/...,bindata,bindata,./pkg/hub/managedcluster/bindata/bindata.go)
 $(call add-bindata,spokecluster-e2e,./deploy/spoke/...,bindata,bindata,./test/e2e/bindata/bindata.go)
 
 # This will call a macro called "build-image" which will generate image specific targets based on the parameters:

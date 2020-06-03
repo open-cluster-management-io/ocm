@@ -486,21 +486,21 @@ func ApproveCSR(kubeClient kubernetes.Interface, csr *certificates.CertificateSi
 	return err
 }
 
-func GetSpokeCluster(clusterClient clusterclientset.Interface, spokeClusterName string) (*clusterv1.SpokeCluster, error) {
-	spokeCluster, err := clusterClient.ClusterV1().SpokeClusters().Get(context.TODO(), spokeClusterName, metav1.GetOptions{})
+func GetManagedCluster(clusterClient clusterclientset.Interface, spokeClusterName string) (*clusterv1.ManagedCluster, error) {
+	spokeCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), spokeClusterName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 	return spokeCluster, nil
 }
 
-func AcceptSpokeCluster(clusterClient clusterclientset.Interface, spokeClusterName string) error {
-	spokeCluster, err := GetSpokeCluster(clusterClient, spokeClusterName)
+func AcceptManagedCluster(clusterClient clusterclientset.Interface, spokeClusterName string) error {
+	spokeCluster, err := GetManagedCluster(clusterClient, spokeClusterName)
 	if err != nil {
 		return err
 	}
 	spokeCluster.Spec.HubAcceptsClient = true
-	_, err = clusterClient.ClusterV1().SpokeClusters().Update(context.TODO(), spokeCluster, metav1.UpdateOptions{})
+	_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), spokeCluster, metav1.UpdateOptions{})
 	return err
 }
 

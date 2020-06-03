@@ -10,7 +10,7 @@ import (
 
 type ClusterV1Interface interface {
 	RESTClient() rest.Interface
-	SpokeClustersGetter
+	ManagedClustersGetter
 }
 
 // ClusterV1Client is used to interact with features provided by the cluster.open-cluster-management.io group.
@@ -18,8 +18,8 @@ type ClusterV1Client struct {
 	restClient rest.Interface
 }
 
-func (c *ClusterV1Client) SpokeClusters() SpokeClusterInterface {
-	return newSpokeClusters(c)
+func (c *ClusterV1Client) ManagedClusters() ManagedClusterInterface {
+	return newManagedClusters(c)
 }
 
 // NewForConfig creates a new ClusterV1Client for the given config.

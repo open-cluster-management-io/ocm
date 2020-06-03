@@ -10,11 +10,11 @@ import (
 )
 
 func NewAdmissionHook() *cobra.Command {
-	o := admissionserver.NewAdmissionServerOptions(os.Stdout, os.Stderr, &webhook.SpokeClusterAdmissionHook{})
+	o := admissionserver.NewAdmissionServerOptions(os.Stdout, os.Stderr, &webhook.ManagedClusterAdmissionHook{})
 
 	cmd := &cobra.Command{
 		Use:   "webhook",
-		Short: "Start Spoke Cluster Admission Server",
+		Short: "Start Managed Cluster Admission Server",
 		RunE: func(c *cobra.Command, args []string) error {
 			stopCh := genericapiserver.SetupSignalHandler()
 
