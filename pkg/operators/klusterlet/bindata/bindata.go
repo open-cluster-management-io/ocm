@@ -402,7 +402,7 @@ spec:
     spec:
       serviceAccountName: {{ .KlusterletName }}-work-sa
       containers:
-      - name: ç
+      - name: klusterlet-manifestwork-agent
         image: {{ .WorkImage }}
         imagePullPolicy: IfNotPresent
         args:

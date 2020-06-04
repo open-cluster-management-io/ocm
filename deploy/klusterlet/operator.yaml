@@ -22,7 +22,7 @@ spec:
         imagePullPolicy: IfNotPresent
         args:
           - "/nucleus"
-          - "spoke"
+          - "klusterlet"
         livenessProbe:
           httpGet:
             path: /healthz
