@@ -6,7 +6,7 @@ spec:
   group: admission.cluster.open-cluster-management.io
   version: v1
   service:
-    name: spokecluster-admission
+    name: managedcluster-admission
     namespace: open-cluster-management
   insecureSkipTLSVerify: true
   groupPriorityMinimum: 10000

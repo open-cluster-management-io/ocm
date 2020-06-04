@@ -77,7 +77,7 @@ func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncC
 	}
 	if !allowed {
 		//TODO find a way to avoid looking at this CSR again.
-		klog.V(4).Infof("Spoke cluster csr %q cannont be auto approved due to subject access review was not approved", csr.Name)
+		klog.V(4).Infof("Managed cluster csr %q cannont be auto approved due to subject access review was not approved", csr.Name)
 		return nil
 	}
 
@@ -85,13 +85,13 @@ func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncC
 	csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
 		Type:    certificatesv1beta1.CertificateApproved,
 		Reason:  "AutoApprovedByHubCSRApprovingController",
-		Message: "Auto approving spoke cluster agent certificate after SubjectAccessReview.",
+		Message: "Auto approving Managed cluster agent certificate after SubjectAccessReview.",
 	})
 	_, err = c.kubeClient.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(ctx, csr, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
-	c.eventRecorder.Eventf("SpokeClusterCSRAutoApproved", "spoke cluster csr %q is auto approved by hub csr controller", csr.Name)
+	c.eventRecorder.Eventf("ManagedClusterCSRAutoApproved", "spoke cluster csr %q is auto approved by hub csr controller", csr.Name)
 	return nil
 }
 
@@ -111,7 +111,7 @@ func (c *csrApprovingController) authorize(ctx context.Context, csr *certificate
 			Extra:  extra,
 			ResourceAttributes: &authorizationv1.ResourceAttributes{
 				Group:       "register.open-cluster-management.io",
-				Resource:    "spokeclusters",
+				Resource:    "managedclusters",
 				Verb:        "renew",
 				Subresource: "clientcertificates",
 			},
@@ -124,7 +124,7 @@ func (c *csrApprovingController) authorize(ctx context.Context, csr *certificate
 	return sar.Status.Allowed, nil
 }
 
-// To check a renewal spoke cluster csr, we check
+// To check a renewal managed cluster csr, we check
 // 1. if the signer name in csr request is valid.
 // 2. if organization field and commonName field in csr request is valid.
 // 3. if user name in csr is the same as commonName field in csr request.

@@ -10,7 +10,7 @@ import (
 	clusterv1client "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	clusterv1informers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
 	"github.com/open-cluster-management/registration/pkg/hub/csr"
-	"github.com/open-cluster-management/registration/pkg/hub/spokecluster"
+	"github.com/open-cluster-management/registration/pkg/hub/managedcluster"
 	kubeinformers "k8s.io/client-go/informers"
 )
 
@@ -29,10 +29,10 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
 	kubeInfomers := kubeinformers.NewSharedInformerFactory(kubeClient, 10*time.Minute)
 
-	spokeClusterController := spokecluster.NewSpokeClusterController(
+	managedClusterController := managedcluster.NewManagedClusterController(
 		kubeClient,
 		clusterClient,
-		clusterInformers.Cluster().V1().SpokeClusters().Informer(),
+		clusterInformers.Cluster().V1().ManagedClusters().Informer(),
 		controllerContext.EventRecorder,
 	)
 
@@ -45,7 +45,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	go clusterInformers.Start(ctx.Done())
 	go kubeInfomers.Start(ctx.Done())
 
-	go spokeClusterController.Run(ctx, 1)
+	go managedClusterController.Run(ctx, 1)
 	go csrController.Run(ctx, 1)
 
 	<-ctx.Done()

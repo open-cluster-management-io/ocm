@@ -13,7 +13,7 @@ import (
 	clusterv1informers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
 	"github.com/open-cluster-management/registration/pkg/helpers"
 	"github.com/open-cluster-management/registration/pkg/spoke/hubclientcert"
-	"github.com/open-cluster-management/registration/pkg/spoke/spokecluster"
+	"github.com/open-cluster-management/registration/pkg/spoke/managedcluster"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -115,7 +115,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	}
 
 	// start a SpokeClusterCreatingController to make sure there is a spoke cluster on hub cluster
-	spokeClusterCreatingController := spokecluster.NewSpokeClusterCreatingController(
+	spokeClusterCreatingController := managedcluster.NewManagedClusterCreatingController(
 		o.ClusterName, o.SpokeExternalServerURLs,
 		spokeClusterCABundle,
 		bootstrapClusterClient,
@@ -157,7 +157,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		go clientCertForHubController.Run(bootstrapCtx, 1)
 
 		// wait for the hub client config is ready.
-		klog.Info("Waiting for hub client config and spoke cluster to be ready")
+		klog.Info("Waiting for hub client config and managed cluster to be ready")
 		if err := wait.PollImmediateInfinite(1*time.Second, o.hasValidHubClientConfig); err != nil {
 			// TODO need run the bootstrap CSR forever to re-establish the client-cert if it is ever lost.
 			stopBootstrap()
@@ -209,10 +209,10 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	)
 
 	// create SpokeClusterController to reconcile instances of SpokeCluster on the spoke cluster
-	spokeClusterController := spokecluster.NewSpokeClusterController(
+	spokeClusterController := managedcluster.NewManagedClusterController(
 		o.ClusterName,
 		hubClusterClient,
-		hubClusterInformerFactory.Cluster().V1().SpokeClusters(),
+		hubClusterInformerFactory.Cluster().V1().ManagedClusters(),
 		spokeKubeClient.Discovery(),
 		spokeKubeInformerFactory.Core().V1().Nodes(),
 		controllerContext.EventRecorder,
@@ -234,7 +234,7 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.ClusterName, "cluster-name", o.ClusterName,
 		"If non-empty, will use as cluster name instead of generated random name.")
 	fs.StringVar(&o.BootstrapKubeconfig, "bootstrap-kubeconfig", o.BootstrapKubeconfig,
-		"The path of the kubeconfig file for spoke agent bootstrap.")
+		"The path of the kubeconfig file for agent bootstrap.")
 	fs.StringVar(&o.HubKubeconfigSecret, "hub-kubeconfig-secret", o.HubKubeconfigSecret,
 		"The name of secret in component namespace storing kubeconfig for hub.")
 	fs.StringVar(&o.HubKubeconfigDir, "hub-kubeconfig-dir", o.HubKubeconfigDir,

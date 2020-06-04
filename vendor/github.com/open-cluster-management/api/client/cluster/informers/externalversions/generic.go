@@ -37,8 +37,8 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=cluster.open-cluster-management.io, Version=v1
-	case v1.SchemeGroupVersion.WithResource("spokeclusters"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1().SpokeClusters().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("managedclusters"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1().ManagedClusters().Informer()}, nil
 
 	}
 

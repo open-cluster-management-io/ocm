@@ -21,31 +21,31 @@ import (
 	"k8s.io/klog"
 )
 
-// SpokeClusterAdmissionHook will validate the creating/updating spokeclusters request.
-type SpokeClusterAdmissionHook struct {
+// ManagedClusterAdmissionHook will validate the creating/updating managedcluster request.
+type ManagedClusterAdmissionHook struct {
 	kubeClient kubernetes.Interface
 }
 
 // ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the
 // webhook is accessed by the kube apiserver.
-func (a *SpokeClusterAdmissionHook) ValidatingResource() (plural schema.GroupVersionResource, singular string) {
+func (a *ManagedClusterAdmissionHook) ValidatingResource() (plural schema.GroupVersionResource, singular string) {
 	return schema.GroupVersionResource{
 			Group:    "admission.cluster.open-cluster-management.io",
 			Version:  "v1",
-			Resource: "spokeclustervalidators",
+			Resource: "managedclustervalidators",
 		},
-		"spokeclustervalidator"
+		"managedclustervalidators"
 }
 
 // Validate is called by generic-admission-server when the registered REST resource above is called with an admission request.
-func (a *SpokeClusterAdmissionHook) Validate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+func (a *ManagedClusterAdmissionHook) Validate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
 	klog.V(4).Infof("validate %q operation for object %q", admissionSpec.Operation, admissionSpec.Object)
 
 	status := &admissionv1beta1.AdmissionResponse{}
 
-	// only validate the request for spokeclusters
+	// only validate the request for managedcluster
 	if admissionSpec.Resource.Group != "cluster.open-cluster-management.io" ||
-		admissionSpec.Resource.Resource != "spokeclusters" {
+		admissionSpec.Resource.Resource != "managedclusters" {
 		status.Allowed = true
 		return status
 	}
@@ -61,19 +61,19 @@ func (a *SpokeClusterAdmissionHook) Validate(admissionSpec *admissionv1beta1.Adm
 	}
 }
 
-// Initialize is called by generic-admission-server on startup to setup initialization that spokeclusters webhook needs.
-func (a *SpokeClusterAdmissionHook) Initialize(kubeClientConfig *rest.Config, stopCh <-chan struct{}) error {
+// Initialize is called by generic-admission-server on startup to setup initialization that managedclusters webhook needs.
+func (a *ManagedClusterAdmissionHook) Initialize(kubeClientConfig *rest.Config, stopCh <-chan struct{}) error {
 	var err error
 	a.kubeClient, err = kubernetes.NewForConfig(kubeClientConfig)
 	return err
 }
 
-// validateCreateRequest validates create spoke cluster operation
-func (a *SpokeClusterAdmissionHook) validateCreateRequest(request *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+// validateCreateRequest validates create managed cluster operation
+func (a *ManagedClusterAdmissionHook) validateCreateRequest(request *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
 	status := &admissionv1beta1.AdmissionResponse{}
 
-	// validate SpokeCluster object firstly
-	spokeCluster, err := a.validateSpokeClusterObj(request.Object)
+	// validate ManagedCluster object firstly
+	managedCluster, err := a.validateManagedClusterObj(request.Object)
 	if err != nil {
 		status.Allowed = false
 		status.Result = &metav1.Status{
@@ -84,7 +84,7 @@ func (a *SpokeClusterAdmissionHook) validateCreateRequest(request *admissionv1be
 	}
 
 	// the HubAcceptsClient field is not changed, finish the validation process
-	if !spokeCluster.Spec.HubAcceptsClient {
+	if !managedCluster.Spec.HubAcceptsClient {
 		status.Allowed = true
 		return status
 	}
@@ -94,12 +94,12 @@ func (a *SpokeClusterAdmissionHook) validateCreateRequest(request *admissionv1be
 	return a.allowUpdateAcceptField(request.UserInfo)
 }
 
-// validateUpdateRequest validates update spoke cluster operation.
-func (a *SpokeClusterAdmissionHook) validateUpdateRequest(request *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+// validateUpdateRequest validates update managed cluster operation.
+func (a *ManagedClusterAdmissionHook) validateUpdateRequest(request *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
 	status := &admissionv1beta1.AdmissionResponse{}
 
-	oldSpokeCluster := &clusterv1.SpokeCluster{}
-	if err := json.Unmarshal(request.OldObject.Raw, oldSpokeCluster); err != nil {
+	oldManagedCluster := &clusterv1.ManagedCluster{}
+	if err := json.Unmarshal(request.OldObject.Raw, oldManagedCluster); err != nil {
 		status.Allowed = false
 		status.Result = &metav1.Status{
 			Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -108,8 +108,8 @@ func (a *SpokeClusterAdmissionHook) validateUpdateRequest(request *admissionv1be
 		return status
 	}
 
-	// validate the updating SpokeCluster object firstly
-	newSpokeCluster, err := a.validateSpokeClusterObj(request.Object)
+	// validate the updating ManagedCluster object firstly
+	newManagedCluster, err := a.validateManagedClusterObj(request.Object)
 	if err != nil {
 		status.Allowed = false
 		status.Result = &metav1.Status{
@@ -120,7 +120,7 @@ func (a *SpokeClusterAdmissionHook) validateUpdateRequest(request *admissionv1be
 	}
 
 	// the HubAcceptsClient field is not changed, finish the validation process
-	if newSpokeCluster.Spec.HubAcceptsClient == oldSpokeCluster.Spec.HubAcceptsClient {
+	if newManagedCluster.Spec.HubAcceptsClient == oldManagedCluster.Spec.HubAcceptsClient {
 		status.Allowed = true
 		return status
 	}
@@ -130,33 +130,33 @@ func (a *SpokeClusterAdmissionHook) validateUpdateRequest(request *admissionv1be
 	return a.allowUpdateAcceptField(request.UserInfo)
 }
 
-// validateSpokeClusterObj validates the fileds of SpokeCluster object
-func (a *SpokeClusterAdmissionHook) validateSpokeClusterObj(requestObj runtime.RawExtension) (*clusterv1.SpokeCluster, error) {
+// validateManagedClusterObj validates the fileds of ManagedCluster object
+func (a *ManagedClusterAdmissionHook) validateManagedClusterObj(requestObj runtime.RawExtension) (*clusterv1.ManagedCluster, error) {
 	errs := []error{}
 
-	spokeCluster := &clusterv1.SpokeCluster{}
-	if err := json.Unmarshal(requestObj.Raw, spokeCluster); err != nil {
+	managedCluster := &clusterv1.ManagedCluster{}
+	if err := json.Unmarshal(requestObj.Raw, managedCluster); err != nil {
 		errs = append(errs, err)
 	}
 
 	// there are no spoke client configs, finish the validation process
-	if len(spokeCluster.Spec.SpokeClientConfigs) == 0 {
-		return spokeCluster, operatorhelpers.NewMultiLineAggregate(errs)
+	if len(managedCluster.Spec.ManagedClusterClientConfigs) == 0 {
+		return managedCluster, operatorhelpers.NewMultiLineAggregate(errs)
 	}
 
 	// validate the url in spoke client configs
-	for _, clientConfig := range spokeCluster.Spec.SpokeClientConfigs {
+	for _, clientConfig := range managedCluster.Spec.ManagedClusterClientConfigs {
 		if !helpers.IsValidHTTPSURL(clientConfig.URL) {
-			errs = append(errs, fmt.Errorf("url %q is invalid in spoke client configs", clientConfig.URL))
+			errs = append(errs, fmt.Errorf("url %q is invalid in client configs", clientConfig.URL))
 		}
 	}
 
-	return spokeCluster, operatorhelpers.NewMultiLineAggregate(errs)
+	return managedCluster, operatorhelpers.NewMultiLineAggregate(errs)
 }
 
 // allowUpdateHubAcceptsClientField using SubjectAccessReview API to check whether a request user has been authorized to update
 // HubAcceptsClient field
-func (a *SpokeClusterAdmissionHook) allowUpdateAcceptField(userInfo authenticationv1.UserInfo) *admissionv1beta1.AdmissionResponse {
+func (a *ManagedClusterAdmissionHook) allowUpdateAcceptField(userInfo authenticationv1.UserInfo) *admissionv1beta1.AdmissionResponse {
 	status := &admissionv1beta1.AdmissionResponse{}
 
 	extra := make(map[string]authorizationv1.ExtraValue)
@@ -172,7 +172,7 @@ func (a *SpokeClusterAdmissionHook) allowUpdateAcceptField(userInfo authenticati
 			Extra:  extra,
 			ResourceAttributes: &authorizationv1.ResourceAttributes{
 				Group:       "register.open-cluster-management.io",
-				Resource:    "spokeclusters",
+				Resource:    "managedclusters",
 				Verb:        "update",
 				Subresource: "accept",
 			},

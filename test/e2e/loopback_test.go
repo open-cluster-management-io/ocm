@@ -12,7 +12,6 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -34,7 +33,7 @@ import (
 var spokeNamespace string = ""
 
 var _ = ginkgo.Describe("Loopback registration [development]", func() {
-	ginkgo.It("Should register the hub as a spoke", func() {
+	ginkgo.It("Should register the hub as a managed cluster", func() {
 		var (
 			err    error
 			suffix = rand.String(6)
@@ -45,7 +44,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 				},
 			}
 		)
-		ginkgo.By(fmt.Sprintf("Deploying the spoke agent using suffix=%q ns=%q", suffix, nsName))
+		ginkgo.By(fmt.Sprintf("Deploying the agent using suffix=%q ns=%q", suffix, nsName))
 		err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
 			var err error
 			ns, err = hubClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
@@ -206,40 +205,43 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		}
 
 		var (
-			spoke         *clusterv1.SpokeCluster
-			spokeClusters = clusterClient.ClusterV1().SpokeClusters()
+			managedCluster  *clusterv1.ManagedCluster
+			managedClusters = clusterClient.ClusterV1().ManagedClusters()
 		)
 
-		ginkgo.By(fmt.Sprintf("Waiting for SpokeCluster %q to exist", clusterName))
-		err = retry.OnError(retry.DefaultRetry, errors.IsNotFound, func() error {
+		ginkgo.By(fmt.Sprintf("Waiting for ManagedCluster %q to exist", clusterName))
+		err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
 			var err error
-			spoke, err = spokeClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
-			return err
+			managedCluster, err = managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			return true, nil
 		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		gomega.Expect(spoke.Spec.HubAcceptsClient).To(gomega.Equal(false))
+		gomega.Expect(managedCluster.Spec.HubAcceptsClient).To(gomega.Equal(false))
 
-		ginkgo.By(fmt.Sprintf("Accepting SpokeCluster %q", clusterName))
+		ginkgo.By(fmt.Sprintf("Accepting ManagedCluster %q", clusterName))
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			var err error
-			spoke, err = spokeClusters.Get(context.TODO(), spoke.Name, metav1.GetOptions{})
+			managedCluster, err = managedClusters.Get(context.TODO(), managedCluster.Name, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			spoke.Spec.HubAcceptsClient = true
-			spoke, err = spokeClusters.Update(context.TODO(), spoke, metav1.UpdateOptions{})
+			managedCluster.Spec.HubAcceptsClient = true
+			managedCluster, err = managedClusters.Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
 			return err
 		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		ginkgo.By("Waiting for SpokeCluster to have HubAccepted=true")
+		ginkgo.By("Waiting for ManagedCluster to have HubAccepted=true")
 		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
 			var err error
-			spoke, err := spokeClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
+			managedCluster, err := managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
 
-			condition := helpers.FindSpokeClusterCondition(spoke.Status.Conditions, "HubAcceptedSpoke")
+			condition := helpers.FindManagedClusterCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
 			if condition == nil {
 				return false, nil
 			}

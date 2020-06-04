@@ -16,10 +16,10 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 )
 
-var spokeclustersSchema = metav1.GroupVersionResource{
+var managedclustersSchema = metav1.GroupVersionResource{
 	Group:    "cluster.open-cluster-management.io",
 	Version:  "v1",
-	Resource: "spokeclusters",
+	Resource: "managedclusters",
 }
 
 func TestSpokeClusterValidate(t *testing.T) {
@@ -30,7 +30,7 @@ func TestSpokeClusterValidate(t *testing.T) {
 		allowUpdateAcceptField bool
 	}{
 		{
-			name: "validate non-spokeclusters request",
+			name: "validate non-managedclusters request",
 			request: &admissionv1beta1.AdmissionRequest{
 				Resource: metav1.GroupVersionResource{
 					Group:    "test.open-cluster-management.io",
@@ -45,7 +45,7 @@ func TestSpokeClusterValidate(t *testing.T) {
 		{
 			name: "validate deleting operation",
 			request: &admissionv1beta1.AdmissionRequest{
-				Resource:  spokeclustersSchema,
+				Resource:  managedclustersSchema,
 				Operation: admissionv1beta1.Delete,
 			},
 			expectedResponse: &admissionv1beta1.AdmissionResponse{
@@ -53,37 +53,37 @@ func TestSpokeClusterValidate(t *testing.T) {
 			},
 		},
 		{
-			name: "validate creating SpokeCluster",
+			name: "validate creating ManagedCluster",
 			request: &admissionv1beta1.AdmissionRequest{
-				Resource:  spokeclustersSchema,
+				Resource:  managedclustersSchema,
 				Operation: admissionv1beta1.Create,
-				Object:    newSpokeClusterObj(),
+				Object:    newManagedClusterObj(),
 			},
 			expectedResponse: &admissionv1beta1.AdmissionResponse{
 				Allowed: true,
 			},
 		},
 		{
-			name: "validate creating SpokeCluster with invalid fields",
+			name: "validate creating ManagedCluster with invalid fields",
 			request: &admissionv1beta1.AdmissionRequest{
-				Resource:  spokeclustersSchema,
+				Resource:  managedclustersSchema,
 				Operation: admissionv1beta1.Create,
-				Object:    newSpokeClusterObjWithClientConfigs(clusterv1.ClientConfig{URL: "http://127.0.0.1:8001"}),
+				Object:    newManagedClusterObjWithClientConfigs(clusterv1.ClientConfig{URL: "http://127.0.0.1:8001"}),
 			},
 			expectedResponse: &admissionv1beta1.AdmissionResponse{
 				Allowed: false,
 				Result: &metav1.Status{
 					Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
-					Message: "url \"http://127.0.0.1:8001\" is invalid in spoke client configs",
+					Message: "url \"http://127.0.0.1:8001\" is invalid in client configs",
 				},
 			},
 		},
 		{
-			name: "validate creating an accepted SpokeCluster without update acceptance permission",
+			name: "validate creating an accepted ManagedCluster without update acceptance permission",
 			request: &admissionv1beta1.AdmissionRequest{
-				Resource:  spokeclustersSchema,
+				Resource:  managedclustersSchema,
 				Operation: admissionv1beta1.Create,
-				Object:    newSpokeClusterObjWithHubAcceptsClient(true),
+				Object:    newManagedClusterObjWithHubAcceptsClient(true),
 				UserInfo:  authenticationv1.UserInfo{Username: "tester"},
 			},
 			expectedResponse: &admissionv1beta1.AdmissionResponse{
@@ -95,11 +95,11 @@ func TestSpokeClusterValidate(t *testing.T) {
 			},
 		},
 		{
-			name: "validate creating an accepted SpokeCluster",
+			name: "validate creating an accepted ManagedCluster",
 			request: &admissionv1beta1.AdmissionRequest{
-				Resource:  spokeclustersSchema,
+				Resource:  managedclustersSchema,
 				Operation: admissionv1beta1.Create,
-				Object:    newSpokeClusterObjWithHubAcceptsClient(true),
+				Object:    newManagedClusterObjWithHubAcceptsClient(true),
 			},
 			expectedResponse: &admissionv1beta1.AdmissionResponse{
 				Allowed: true,
@@ -107,12 +107,12 @@ func TestSpokeClusterValidate(t *testing.T) {
 			allowUpdateAcceptField: true,
 		},
 		{
-			name: "validate update SpokeCluster without HubAcceptsClient field changed",
+			name: "validate update ManagedCluster without HubAcceptsClient field changed",
 			request: &admissionv1beta1.AdmissionRequest{
-				Resource:  spokeclustersSchema,
+				Resource:  managedclustersSchema,
 				Operation: admissionv1beta1.Update,
-				OldObject: newSpokeClusterObjWithClientConfigs(clusterv1.ClientConfig{URL: "https://127.0.0.1:6443"}),
-				Object:    newSpokeClusterObjWithClientConfigs(clusterv1.ClientConfig{URL: "https://127.0.0.1:8443"}),
+				OldObject: newManagedClusterObjWithClientConfigs(clusterv1.ClientConfig{URL: "https://127.0.0.1:6443"}),
+				Object:    newManagedClusterObjWithClientConfigs(clusterv1.ClientConfig{URL: "https://127.0.0.1:8443"}),
 			},
 			expectedResponse: &admissionv1beta1.AdmissionResponse{
 				Allowed: true,
@@ -121,10 +121,10 @@ func TestSpokeClusterValidate(t *testing.T) {
 		{
 			name: "validate updating HubAcceptsClient field without update acceptance permission",
 			request: &admissionv1beta1.AdmissionRequest{
-				Resource:  spokeclustersSchema,
+				Resource:  managedclustersSchema,
 				Operation: admissionv1beta1.Update,
-				OldObject: newSpokeClusterObjWithHubAcceptsClient(false),
-				Object:    newSpokeClusterObjWithHubAcceptsClient(true),
+				OldObject: newManagedClusterObjWithHubAcceptsClient(false),
+				Object:    newManagedClusterObjWithHubAcceptsClient(true),
 				UserInfo:  authenticationv1.UserInfo{Username: "tester"},
 			},
 			expectedResponse: &admissionv1beta1.AdmissionResponse{
@@ -138,10 +138,10 @@ func TestSpokeClusterValidate(t *testing.T) {
 		{
 			name: "validate updating HubAcceptsClient field",
 			request: &admissionv1beta1.AdmissionRequest{
-				Resource:  spokeclustersSchema,
+				Resource:  managedclustersSchema,
 				Operation: admissionv1beta1.Update,
-				OldObject: newSpokeClusterObjWithHubAcceptsClient(false),
-				Object:    newSpokeClusterObjWithHubAcceptsClient(true),
+				OldObject: newManagedClusterObjWithHubAcceptsClient(false),
+				Object:    newManagedClusterObjWithHubAcceptsClient(true),
 			},
 			expectedResponse: &admissionv1beta1.AdmissionResponse{
 				Allowed: true,
@@ -165,7 +165,7 @@ func TestSpokeClusterValidate(t *testing.T) {
 				},
 			)
 
-			admissionHook := &SpokeClusterAdmissionHook{kubeClient: kubeClient}
+			admissionHook := &ManagedClusterAdmissionHook{kubeClient: kubeClient}
 
 			actualResponse := admissionHook.Validate(c.request)
 
@@ -176,8 +176,8 @@ func TestSpokeClusterValidate(t *testing.T) {
 	}
 }
 
-func newSpokeClusterObj() runtime.RawExtension {
-	spokeCluster := &clusterv1.SpokeCluster{
+func newManagedClusterObj() runtime.RawExtension {
+	spokeCluster := &clusterv1.ManagedCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "testspokecluster",
 		},
@@ -188,12 +188,12 @@ func newSpokeClusterObj() runtime.RawExtension {
 	}
 }
 
-func newSpokeClusterObjWithHubAcceptsClient(hubAcceptsClient bool) runtime.RawExtension {
-	spokeCluster := &clusterv1.SpokeCluster{
+func newManagedClusterObjWithHubAcceptsClient(hubAcceptsClient bool) runtime.RawExtension {
+	spokeCluster := &clusterv1.ManagedCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "testspokecluster",
 		},
-		Spec: clusterv1.SpokeClusterSpec{
+		Spec: clusterv1.ManagedClusterSpec{
 			HubAcceptsClient: hubAcceptsClient,
 		},
 	}
@@ -203,13 +203,13 @@ func newSpokeClusterObjWithHubAcceptsClient(hubAcceptsClient bool) runtime.RawEx
 	}
 }
 
-func newSpokeClusterObjWithClientConfigs(clientConfig clusterv1.ClientConfig) runtime.RawExtension {
-	spokeCluster := &clusterv1.SpokeCluster{
+func newManagedClusterObjWithClientConfigs(clientConfig clusterv1.ClientConfig) runtime.RawExtension {
+	spokeCluster := &clusterv1.ManagedCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "testspokecluster",
 		},
-		Spec: clusterv1.SpokeClusterSpec{
-			SpokeClientConfigs: []clusterv1.ClientConfig{clientConfig},
+		Spec: clusterv1.ManagedClusterSpec{
+			ManagedClusterClientConfigs: []clusterv1.ClientConfig{clientConfig},
 		},
 	}
 	clusterObj, _ := json.Marshal(spokeCluster)

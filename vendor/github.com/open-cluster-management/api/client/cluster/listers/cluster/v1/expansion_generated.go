@@ -2,6 +2,6 @@
 
 package v1
 
-// SpokeClusterListerExpansion allows custom methods to be added to
-// SpokeClusterLister.
-type SpokeClusterListerExpansion interface{}
+// ManagedClusterListerExpansion allows custom methods to be added to
+// ManagedClusterLister.
+type ManagedClusterListerExpansion interface{}

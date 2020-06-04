@@ -17,17 +17,17 @@ import (
 )
 
 var _ = ginkgo.Describe("Joining Process", func() {
-	ginkgo.It("spokecluster should join successfully", func() {
+	ginkgo.It("managedcluster should join successfully", func() {
 		var err error
 
-		spokeClusterName := "joiningtest-spokecluster"
+		managedClusterName := "joiningtest-managedcluster"
 		hubKubeconfigSecret := "joiningtest-hub-kubeconfig-secret"
 		hubKubeconfigDir := path.Join(util.TestDir, "joiningtest", "hub-kubeconfig")
 
 		// run registration agent
 		go func() {
 			agentOptions := spoke.SpokeAgentOptions{
-				ClusterName:         spokeClusterName,
+				ClusterName:         managedClusterName,
 				BootstrapKubeconfig: bootstrapKubeConfigFile,
 				HubKubeconfigSecret: hubKubeconfigSecret,
 				HubKubeconfigDir:    hubKubeconfigDir,
@@ -41,14 +41,14 @@ var _ = ginkgo.Describe("Joining Process", func() {
 
 		// the spoke cluster and csr should be created after bootstrap
 		gomega.Eventually(func() bool {
-			if _, err := util.GetSpokeCluster(clusterClient, spokeClusterName); err != nil {
+			if _, err := util.GetManagedCluster(clusterClient, managedClusterName); err != nil {
 				return false
 			}
 			return true
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 		gomega.Eventually(func() bool {
-			if _, err := util.FindUnapprovedSpokeCSR(kubeClient, spokeClusterName); err != nil {
+			if _, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName); err != nil {
 				return false
 			}
 			return true
@@ -56,7 +56,7 @@ var _ = ginkgo.Describe("Joining Process", func() {
 
 		// the spoke cluster should has finalizer that is added by hub controller
 		gomega.Eventually(func() bool {
-			spokeCluster, err := util.GetSpokeCluster(clusterClient, spokeClusterName)
+			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return false
 			}
@@ -67,20 +67,20 @@ var _ = ginkgo.Describe("Joining Process", func() {
 			return true
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
-		// simulate hub cluster admin to accept the spokecluster and approve the csr
-		err = util.AcceptSpokeCluster(clusterClient, spokeClusterName)
+		// simulate hub cluster admin to accept the managedcluster and approve the csr
+		err = util.AcceptManagedCluster(clusterClient, managedClusterName)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		err = util.ApproveSpokeClusterCSR(kubeClient, spokeClusterName, time.Hour*24)
+		err = util.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		// the spoke cluster should have accepted condition after it is accepted
+		// the managed cluster should have accepted condition after it is accepted
 		gomega.Eventually(func() bool {
-			spokeCluster, err := util.GetSpokeCluster(clusterClient, spokeClusterName)
+			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return false
 			}
-			accpeted := helpers.FindSpokeClusterCondition(spokeCluster.Status.Conditions, clusterv1.SpokeClusterConditionHubAccepted)
+			accpeted := helpers.FindManagedClusterCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
 			if accpeted == nil {
 				return false
 			}
@@ -101,11 +101,11 @@ var _ = ginkgo.Describe("Joining Process", func() {
 
 		// the spoke cluster should have joined condition finally
 		gomega.Eventually(func() bool {
-			spokeCluster, err := util.GetSpokeCluster(clusterClient, spokeClusterName)
+			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
 				return false
 			}
-			joined := helpers.FindSpokeClusterCondition(spokeCluster.Status.Conditions, clusterv1.SpokeClusterConditionJoined)
+			joined := helpers.FindManagedClusterCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
 			if joined == nil {
 				return false
 			}

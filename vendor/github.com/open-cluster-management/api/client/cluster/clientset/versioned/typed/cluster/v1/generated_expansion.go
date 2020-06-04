@@ -2,4 +2,4 @@
 
 package v1
 
-type SpokeClusterExpansion interface{}
+type ManagedClusterExpansion interface{}

@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: spokecluster-admission
+  name: managedcluster-admission
 spec:
   selector:
-    app: spokecluster-admission
+    app: managedcluster-admission
   ports:
   - port: 443
     targetPort: 6443

@@ -5,22 +5,22 @@ import (
 	"net/url"
 	"time"
 
-	spokeclusterclientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
-	spokeclusterv1 "github.com/open-cluster-management/api/cluster/v1"
+	clusterclientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
+	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 )
 
-func IsConditionTrue(condition *spokeclusterv1.StatusCondition) bool {
+func IsConditionTrue(condition *clusterv1.StatusCondition) bool {
 	if condition == nil {
 		return false
 	}
 	return condition.Status == metav1.ConditionTrue
 }
 
-func FindSpokeClusterCondition(conditions []spokeclusterv1.StatusCondition, conditionType string) *spokeclusterv1.StatusCondition {
+func FindManagedClusterCondition(conditions []clusterv1.StatusCondition, conditionType string) *clusterv1.StatusCondition {
 	for i := range conditions {
 		if conditions[i].Type == conditionType {
 			return &conditions[i]
@@ -29,11 +29,11 @@ func FindSpokeClusterCondition(conditions []spokeclusterv1.StatusCondition, cond
 	return nil
 }
 
-func SetSpokeClusterCondition(conditions *[]spokeclusterv1.StatusCondition, newCondition spokeclusterv1.StatusCondition) {
+func SetManagedClusterCondition(conditions *[]clusterv1.StatusCondition, newCondition clusterv1.StatusCondition) {
 	if conditions == nil {
-		conditions = &[]spokeclusterv1.StatusCondition{}
+		conditions = &[]clusterv1.StatusCondition{}
 	}
-	existingCondition := FindSpokeClusterCondition(*conditions, newCondition.Type)
+	existingCondition := FindManagedClusterCondition(*conditions, newCondition.Type)
 	if existingCondition == nil {
 		newCondition.LastTransitionTime = metav1.NewTime(time.Now())
 		*conditions = append(*conditions, newCondition)
@@ -49,21 +49,22 @@ func SetSpokeClusterCondition(conditions *[]spokeclusterv1.StatusCondition, newC
 	existingCondition.Message = newCondition.Message
 }
 
-type UpdateSpokeClusterStatusFunc func(status *spokeclusterv1.SpokeClusterStatus) error
+type UpdateManagedClusterStatusFunc func(status *clusterv1.ManagedClusterStatus) error
 
-func UpdateSpokeClusterStatus(
+func UpdateManagedClusterStatus(
 	ctx context.Context,
-	client spokeclusterclientset.Interface,
+	client clusterclientset.Interface,
 	spokeClusterName string,
-	updateFuncs ...UpdateSpokeClusterStatusFunc) (*spokeclusterv1.SpokeClusterStatus, bool, error) {
+	updateFuncs ...UpdateManagedClusterStatusFunc) (*clusterv1.ManagedClusterStatus, bool, error) {
 	updated := false
-	var updatedSpokeClusterStatus *spokeclusterv1.SpokeClusterStatus
+	var updatedManagedClusterStatus *clusterv1.ManagedClusterStatus
+
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		spokeCluster, err := client.ClusterV1().SpokeClusters().Get(ctx, spokeClusterName, metav1.GetOptions{})
+		managedCluster, err := client.ClusterV1().ManagedClusters().Get(ctx, spokeClusterName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		oldStatus := &spokeCluster.Status
+		oldStatus := &managedCluster.Status
 
 		newStatus := oldStatus.DeepCopy()
 		for _, update := range updateFuncs {
@@ -73,26 +74,26 @@ func UpdateSpokeClusterStatus(
 		}
 		if equality.Semantic.DeepEqual(oldStatus, newStatus) {
 			// We return the newStatus which is a deep copy of oldStatus but with all update funcs applied.
-			updatedSpokeClusterStatus = newStatus
+			updatedManagedClusterStatus = newStatus
 			return nil
 		}
 
-		spokeCluster.Status = *newStatus
-		updatedSpokeCluster, err := client.ClusterV1().SpokeClusters().UpdateStatus(ctx, spokeCluster, metav1.UpdateOptions{})
+		managedCluster.Status = *newStatus
+		updatedManagedCluster, err := client.ClusterV1().ManagedClusters().UpdateStatus(ctx, managedCluster, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
-		updatedSpokeClusterStatus = &updatedSpokeCluster.Status
+		updatedManagedClusterStatus = &updatedManagedCluster.Status
 		updated = err == nil
 		return err
 	})
 
-	return updatedSpokeClusterStatus, updated, err
+	return updatedManagedClusterStatus, updated, err
 }
 
-func UpdateSpokeClusterConditionFn(cond spokeclusterv1.StatusCondition) UpdateSpokeClusterStatusFunc {
-	return func(oldStatus *spokeclusterv1.SpokeClusterStatus) error {
-		SetSpokeClusterCondition(&oldStatus.Conditions, cond)
+func UpdateManagedClusterConditionFn(cond clusterv1.StatusCondition) UpdateManagedClusterStatusFunc {
+	return func(oldStatus *clusterv1.ManagedClusterStatus) error {
+		SetManagedClusterCondition(&oldStatus.Conditions, cond)
 		return nil
 	}
 }
