@@ -74,7 +74,7 @@ var _ = ginkgo.Describe("HubCore", func() {
 			hubRegistrationDeployment = fmt.Sprintf("%s-registration-controller", clusterManagerName)
 			hubWebhookDeployment = fmt.Sprintf("%s-registration-webhook", clusterManagerName)
 			webhookSecret = "webhook-serving-cert"
-			validtingWebhook = "spokeclustervalidators.admission.cluster.open-cluster-management.io"
+			validtingWebhook = "managedclustervalidators.admission.cluster.open-cluster-management.io"
 		})
 
 		ginkgo.It("should have expected resource created successfully", func() {

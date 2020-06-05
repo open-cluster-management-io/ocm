@@ -30,12 +30,12 @@ import (
 )
 
 const (
-	klusterletFinalizer          = "operator.open-cluster-management.io/klusterlet-cleanup"
-	bootstrapHubKubeConfigSecret = "bootstrap-hub-kubeconfig"
-	hubKubeConfigSecret          = "hub-kubeconfig-secret"
-	klusterletNamespace          = "open-cluster-management-agent"
-	klusterletApplied            = "Applied"
-	spokeRegistrationDegraded    = "SpokeRegistrationDegraded"
+	klusterletFinalizer            = "operator.open-cluster-management.io/klusterlet-cleanup"
+	bootstrapHubKubeConfigSecret   = "bootstrap-hub-kubeconfig"
+	hubKubeConfigSecret            = "hub-kubeconfig-secret"
+	klusterletNamespace            = "open-cluster-management-agent"
+	klusterletApplied              = "Applied"
+	klusterletRegistrationDegraded = "KlusterletRegistrationDegraded"
 )
 
 var (
@@ -80,8 +80,8 @@ func NewKlusterletController(
 		ToController("KlusterletController", recorder)
 }
 
-// spokeConfig is used to render the template of hub manifests
-type spokeConfig struct {
+// klusterletConfig is used to render the template of hub manifests
+type klusterletConfig struct {
 	KlusterletName            string
 	KlusterletNamespace       string
 	RegistrationImage         string
@@ -105,7 +105,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 	klusterlet = klusterlet.DeepCopy()
 
-	config := spokeConfig{
+	config := klusterletConfig{
 		KlusterletName:            klusterlet.Name,
 		KlusterletNamespace:       klusterlet.Spec.Namespace,
 		RegistrationImage:         klusterlet.Spec.RegistrationImagePullSpec,
@@ -136,7 +136,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		}
 	}
 
-	// Klusterlet is deleting, we remove its related resources on spoke
+	// Klusterlet is deleting, we remove its related resources on managed cluster
 	if !klusterlet.DeletionTimestamp.IsZero() {
 		if err := n.cleanUp(ctx, controllerContext, config); err != nil {
 			return err
@@ -144,7 +144,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		return n.removeKlusterletFinalizer(ctx, klusterlet)
 	}
 
-	// Start deploy spoke core components
+	// Start deploy klusterlet components
 	// Check if namespace exists
 	_, err = n.kubeClient.CoreV1().Namespaces().Get(ctx, config.KlusterletNamespace, metav1.GetOptions{})
 	switch {
@@ -248,7 +248,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		}))
 		return err
 	}
-	// TODO store this in the status of the spokecore itself
+	// TODO store this in the status of the klusterlet itself
 	n.registrationGeneration = generation
 
 	// Deploy work agent
@@ -267,13 +267,13 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		}))
 		return err
 	}
-	// TODO store this in the status of the spokecore itself
+	// TODO store this in the status of the klusterlet itself
 	n.workGeneration = generation
 
 	// if we get here, we have successfully applied everything and should indicate that
 	helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
 		Type: klusterletApplied, Status: metav1.ConditionTrue, Reason: "KlusterletApplied",
-		Message: "Spoke Core Component Applied",
+		Message: "Klusterlet Component Applied",
 	}))
 
 	// now that we have applied all of our logic, we can check to see if the data we expect to have present as indications of
@@ -286,8 +286,8 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		clusterName := hubSecret.Data["cluster-name"]
 		if clusterName == nil {
 			helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
-				Type: spokeRegistrationDegraded, Status: metav1.ConditionTrue, Reason: "ClusterNameMissing",
-				Message: fmt.Sprintf("Failed to get cluster name from `kubectl get secret -n %q %q -ojsonpath='{.data.cluster-name}`.  This is set by the spoke registration deployment.", hubSecret.Namespace, hubSecret.Name),
+				Type: klusterletRegistrationDegraded, Status: metav1.ConditionTrue, Reason: "ClusterNameMissing",
+				Message: fmt.Sprintf("Failed to get cluster name from `kubectl get secret -n %q %q -ojsonpath='{.data.cluster-name}`.  This is set by the klusterlet registration deployment.", hubSecret.Namespace, hubSecret.Name),
 			}))
 			return fmt.Errorf("Failed to get cluster name")
 		}
@@ -297,21 +297,21 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	// If hub kubeconfig does not exist, return err.
 	if hubSecret.Data["kubeconfig"] == nil {
 		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
-			Type: spokeRegistrationDegraded, Status: metav1.ConditionTrue, Reason: "HubKubeconfigMissing",
-			Message: fmt.Sprintf("Failed to get cluster name from `kubectl get secret -n %q %q -ojsonpath='{.data.kubeconfig}`.  This is set by the spoke registration deployment, but the CSR must be approved by the cluster-admin on the hub.", hubSecret.Namespace, hubSecret.Name),
+			Type: klusterletRegistrationDegraded, Status: metav1.ConditionTrue, Reason: "HubKubeconfigMissing",
+			Message: fmt.Sprintf("Failed to get cluster name from `kubectl get secret -n %q %q -ojsonpath='{.data.kubeconfig}`.  This is set by the klusterlet registration deployment, but the CSR must be approved by the cluster-admin on the hub.", hubSecret.Namespace, hubSecret.Name),
 		}))
 		return fmt.Errorf("Failed to get kubeconfig from hub kubeconfig secret")
 	}
 	// TODO it is possible to verify the kubeconfig actually works.
 
 	helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
-		Type: spokeRegistrationDegraded, Status: metav1.ConditionFalse, Reason: "RegistrationFunctional",
+		Type: klusterletRegistrationDegraded, Status: metav1.ConditionFalse, Reason: "RegistrationFunctional",
 		Message: "Registration is managing credentials",
 	}))
 	return nil
 }
 
-func (n *klusterletController) cleanUp(ctx context.Context, controllerContext factory.SyncContext, config spokeConfig) error {
+func (n *klusterletController) cleanUp(ctx context.Context, controllerContext factory.SyncContext, config klusterletConfig) error {
 	// Remove deployment
 	registrationDeployment := fmt.Sprintf("%s-registration-agent", config.KlusterletName)
 	err := n.kubeClient.AppsV1().Deployments(config.KlusterletNamespace).Delete(ctx, registrationDeployment, metav1.DeleteOptions{})
@@ -377,7 +377,7 @@ func readClusterNameFromSecret(secret *corev1.Secret) (string, error) {
 	return string(secret.Data["cluster-name"]), nil
 }
 
-func readKubuConfigFromSecret(secret *corev1.Secret, config spokeConfig) (string, error) {
+func readKubuConfigFromSecret(secret *corev1.Secret, config klusterletConfig) (string, error) {
 	if secret.Data["kubeconfig"] == nil {
 		return "", fmt.Errorf("Unable to find kubeconfig in secret")
 	}
@@ -386,12 +386,12 @@ func readKubuConfigFromSecret(secret *corev1.Secret, config spokeConfig) (string
 }
 
 // TODO also read CABundle from ExternalServerURLs and set into registration deployment
-func getServersFromKlusterlet(spokeCore *operatorapiv1.Klusterlet) string {
-	if spokeCore.Spec.ExternalServerURLs == nil {
+func getServersFromKlusterlet(klusterlet *operatorapiv1.Klusterlet) string {
+	if klusterlet.Spec.ExternalServerURLs == nil {
 		return ""
 	}
-	serverString := make([]string, 0, len(spokeCore.Spec.ExternalServerURLs))
-	for _, server := range spokeCore.Spec.ExternalServerURLs {
+	serverString := make([]string, 0, len(klusterlet.Spec.ExternalServerURLs))
+	for _, server := range klusterlet.Spec.ExternalServerURLs {
 		serverString = append(serverString, server.URL)
 	}
 	return strings.Join(serverString, ",")

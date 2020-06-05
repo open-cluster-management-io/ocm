@@ -1,4 +1,4 @@
 // Package integration provides integration tests for open-cluster-management nucleus, the test cases include
-// - TODO deploy/update/remvoe the cluster manager
-// - TODO deploy/update/remvoe the spoke agents
+// - TODO deploy/update/remove the cluster manager
+// - TODO deploy/update/remove the klusterlet
 package integration

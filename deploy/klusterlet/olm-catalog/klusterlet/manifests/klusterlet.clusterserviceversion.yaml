@@ -154,7 +154,7 @@ spec:
               containers:
               - args:
                 - /nucleus
-                - spoke
+                - klusterlet
                 image: quay.io/open-cluster-management/nucleus:latest
                 imagePullPolicy: IfNotPresent
                 livenessProbe:

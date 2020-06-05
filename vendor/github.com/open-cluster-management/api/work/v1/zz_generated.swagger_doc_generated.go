@@ -25,7 +25,7 @@ func (AppliedManifestResourceMeta) SwaggerDoc() map[string]string {
 }
 
 var map_Manifest = map[string]string{
-	"": "Manifest represents a resource to be deployed on spoke cluster",
+	"": "Manifest represents a resource to be deployed on managed cluster",
 }
 
 func (Manifest) SwaggerDoc() map[string]string {
@@ -33,9 +33,9 @@ func (Manifest) SwaggerDoc() map[string]string {
 }
 
 var map_ManifestCondition = map[string]string{
-	"":             "ManifestCondition represents the conditions of the resources deployed on spoke cluster",
+	"":             "ManifestCondition represents the conditions of the resources deployed on managed cluster",
 	"resourceMeta": "ResourceMeta represents the gvk, name and namespace of a resoure",
-	"conditions":   "Conditions represents the conditions of this resource on spoke cluster",
+	"conditions":   "Conditions represents the conditions of this resource on managed cluster",
 }
 
 func (ManifestCondition) SwaggerDoc() map[string]string {
@@ -58,8 +58,8 @@ func (ManifestResourceMeta) SwaggerDoc() map[string]string {
 }
 
 var map_ManifestResourceStatus = map[string]string{
-	"":          "ManifestResourceStatus represents the status of each resource in manifest work deployed on spoke cluster",
-	"manifests": "Manifests represents the condition of manifests deployed on spoke cluster. Valid condition types are: 1. Progressing represents the resource is being applied on spoke cluster. 2. Applied represents the resource is applied successfully on spoke cluster. 3. Available represents the resource exists on the spoke cluster. 4. Degraded represents the current state of resource does not match the desired state for a certain period.",
+	"":          "ManifestResourceStatus represents the status of each resource in manifest work deployed on managed cluster",
+	"manifests": "Manifests represents the condition of manifests deployed on managed cluster. Valid condition types are: 1. Progressing represents the resource is being applied on managed cluster. 2. Applied represents the resource is applied successfully on managed cluster. 3. Available represents the resource exists on the managed cluster. 4. Degraded represents the current state of resource does not match the desired state for a certain period.",
 }
 
 func (ManifestResourceStatus) SwaggerDoc() map[string]string {
@@ -67,8 +67,8 @@ func (ManifestResourceStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ManifestWork = map[string]string{
-	"":       "ManifestWork represents a manifests workload that hub wants to deploy on the spoke cluster. A manifest workload is defined as a set of kubernetes resources. ManifestWork must be created in the cluster namespace on the hub, so that agent on the corresponding spoke cluster can access this resource and deploy on the spoke cluster.",
-	"spec":   "Spec represents a desired configuration of work to be deployed on the spoke cluster.",
+	"":       "ManifestWork represents a manifests workload that hub wants to deploy on the managed cluster. A manifest workload is defined as a set of kubernetes resources. ManifestWork must be created in the cluster namespace on the hub, so that agent on the corresponding managed cluster can access this resource and deploy on the managed cluster.",
+	"spec":   "Spec represents a desired configuration of work to be deployed on the managed cluster.",
 	"status": "Status represents the current status of work",
 }
 
@@ -87,8 +87,8 @@ func (ManifestWorkList) SwaggerDoc() map[string]string {
 }
 
 var map_ManifestWorkSpec = map[string]string{
-	"":         "ManifestWorkSpec represents a desired configuration of manifests to be deployed on the spoke cluster.",
-	"workload": "Workload represents the manifest workload to be deployed on spoke cluster",
+	"":         "ManifestWorkSpec represents a desired configuration of manifests to be deployed on the managed cluster.",
+	"workload": "Workload represents the manifest workload to be deployed on managed cluster",
 }
 
 func (ManifestWorkSpec) SwaggerDoc() map[string]string {
@@ -96,10 +96,10 @@ func (ManifestWorkSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ManifestWorkStatus = map[string]string{
-	"":                 "ManifestWorkStatus represents the current status of spoke manifest workload",
-	"conditions":       "Conditions contains the different condition statuses for this work. Valid condition types are: 1. Applied represents workload in ManifestWork is applied successfully on spoke cluster. 2. Progressing represents workload in ManifestWork is being applied on spoke cluster. 3. Available represents workload in ManifestWork exists on the spoke cluster. 4. Degraded represents the current state of workload does not match the desired state for a certain period.",
-	"resourceStatus":   "ResourceStatus represents the status of each resource in manifestwork deployed on spoke cluster. The agent on spoke cluster syncs the condition from spoke to the hub.",
-	"appliedResources": "AppliedResources represents a list of resources defined within the manifestwork that are applied. Only resources with valid GroupVersionResource, namespace, and name are suitable. An item in this slice is deleted when there is no mapped manifest in manifestwork.Spec or by finalizer. The resource relating to the item will also be removed from spoke cluster. The deleted resource may still be present until the finalizers for that resource are finished. However, the resource will not be undeleted, so it can be removed from this list and eventual consistency is preserved.",
+	"":                 "ManifestWorkStatus represents the current status of managed cluster ManifestWork",
+	"conditions":       "Conditions contains the different condition statuses for this work. Valid condition types are: 1. Applied represents workload in ManifestWork is applied successfully on managed cluster. 2. Progressing represents workload in ManifestWork is being applied on managed cluster. 3. Available represents workload in ManifestWork exists on the managed cluster. 4. Degraded represents the current state of workload does not match the desired state for a certain period.",
+	"resourceStatus":   "ResourceStatus represents the status of each resource in manifestwork deployed on managed cluster. The Klusterlet agent on managed cluster syncs the condition from managed to the hub.",
+	"appliedResources": "AppliedResources represents a list of resources defined within the manifestwork that are applied. Only resources with valid GroupVersionResource, namespace, and name are suitable. An item in this slice is deleted when there is no mapped manifest in manifestwork.Spec or by finalizer. The resource relating to the item will also be removed from managed cluster. The deleted resource may still be present until the finalizers for that resource are finished. However, the resource will not be undeleted, so it can be removed from this list and eventual consistency is preserved.",
 }
 
 func (ManifestWorkStatus) SwaggerDoc() map[string]string {
@@ -107,8 +107,8 @@ func (ManifestWorkStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ManifestsTemplate = map[string]string{
-	"":          "ManifestsTemplate represents the manifest workload to be deployed on spoke cluster",
-	"manifests": "Manifests represents a list of kuberenetes resources to be deployed on the spoke cluster.",
+	"":          "ManifestsTemplate represents the manifest workload to be deployed on managed cluster",
+	"manifests": "Manifests represents a list of kuberenetes resources to be deployed on the managed cluster.",
 }
 
 func (ManifestsTemplate) SwaggerDoc() map[string]string {
@@ -116,8 +116,8 @@ func (ManifestsTemplate) SwaggerDoc() map[string]string {
 }
 
 var map_StatusCondition = map[string]string{
-	"":                   "StatusCondition contains condition information for a spoke work.",
-	"type":               "Type is the type of the spoke work condition.",
+	"":                   "StatusCondition contains condition information for a ManifestWork applied to a managed cluster.",
+	"type":               "Type is the type of the ManifestWork condition.",
 	"status":             "Status is the status of the condition. One of True, False, Unknown.",
 	"lastTransitionTime": "LastTransitionTime is the last time the condition changed from one status to another.",
 	"reason":             "Reason is a (brief) reason for the condition's last status change.",

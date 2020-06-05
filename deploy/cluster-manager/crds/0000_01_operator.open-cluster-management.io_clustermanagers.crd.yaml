@@ -16,7 +16,7 @@ spec:
   validation:
     openAPIV3Schema:
       description: ClusterManager configures the controllers on the hub that govern
-        registration and work distribution for attached klusterlets. ClusterManager
+        registration and work distribution for attached Klusterlets. ClusterManager
         will be only deployed in open-cluster-management-hub namespace.
       type: object
       properties:
@@ -34,7 +34,7 @@ spec:
           type: object
         spec:
           description: Spec represents a desired deployment configuration of controllers
-            that govern registration and work distribution for attached klusterlets.
+            that govern registration and work distribution for attached Klusterlets.
           type: object
           properties:
             registrationImagePullSpec:

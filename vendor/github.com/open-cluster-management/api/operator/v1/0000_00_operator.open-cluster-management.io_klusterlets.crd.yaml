@@ -34,18 +34,18 @@ spec:
         metadata:
           type: object
         spec:
-          description: Spec represents the desired deployment configuration of klusterlet
+          description: Spec represents the desired deployment configuration of Klusterlet
             agent.
           type: object
           properties:
             clusterName:
-              description: ClusterName is the name of the spoke cluster to be created
-                on hub. The spoke agent generates a random name if it is not set,
-                or discovers the appropriate cluster name on openshift.
+              description: ClusterName is the name of the managed cluster to be created
+                on hub. The Klusterlet agent generates a random name if it is not
+                set, or discovers the appropriate cluster name on openshift.
               type: string
             externalServerURLs:
               description: ExternalServerURLs represents the a list of apiserver urls
-                and ca bundles that is accessible externally If it is set empty, spoke
+                and ca bundles that is accessible externally If it is set empty, managed
                 cluster has no externally accessible url that hub cluster can visit.
               type: array
               items:
@@ -55,17 +55,17 @@ spec:
                 properties:
                   caBundle:
                     description: CABundle is the ca bundle to connect to apiserver
-                      of the spoke cluster. System certs are used if it is not set.
+                      of the managed cluster. System certs are used if it is not set.
                     type: string
                     format: byte
                   url:
-                    description: URL is the url of apiserver endpoint of the spoke
+                    description: URL is the url of apiserver endpoint of the managed
                       cluster.
                     type: string
             namespace:
               description: Namespace is the namespace to deploy the agent. The namespace
                 must have a prefix of "open-cluster-management-", and if it is not
-                set, the namespace of "open-cluster-management-spoke" is used to deploy
+                set, the namespace of "open-cluster-management-agent" is used to deploy
                 agent.
               type: string
             registrationImagePullSpec:
@@ -77,16 +77,17 @@ spec:
                 of work agent.
               type: string
         status:
-          description: Status represents the current status of klusterlet agent.
+          description: Status represents the current status of Klusterlet agent.
           type: object
           properties:
             conditions:
               description: 'Conditions contain the different condition statuses for
-                this spokecore. Valid condition types are: Applied: components in
-                spoke is applied. Available: components in spoke are available and
-                ready to serve. Progressing: components in spoke are in a transitioning
-                state. Degraded: components in spoke do not match the desired configuration
-                and only provide degraded service.'
+                this Klusterlet. Valid condition types are: Applied: components have
+                been applied in the managed cluster. Available: components in the
+                managed cluster are available and ready to serve. Progressing: components
+                in the managed cluster are in a transitioning state. Degraded: components
+                in the managed cluster do not match the desired configuration and
+                only provide degraded service.'
               type: array
               items:
                 description: StatusCondition contains condition information.
