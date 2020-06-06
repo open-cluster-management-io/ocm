@@ -18,10 +18,10 @@ spec:
       serviceAccountName: klusterlet
       containers:
       - name: klusterlet
-        image: quay.io/open-cluster-management/nucleus:latest
+        image: quay.io/open-cluster-management/registration-operator:latest
         imagePullPolicy: IfNotPresent
         args:
-          - "/nucleus"
+          - "/registration-operator"
           - "klusterlet"
         livenessProbe:
           httpGet:

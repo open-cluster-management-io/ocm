@@ -11,10 +11,10 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	lib/tmp.mk\
 )
 
-# IMAGE_NAME can be set in the env to override calculate value for nucleus image
+# IMAGE_NAME can be set in the env to override calculated value for registration-operator image
 IMAGE_REGISTRY?=quay.io/open-cluster-management
 IMAGE_TAG?=latest
-IMAGE_NAME?=$(IMAGE_REGISTRY)/nucleus:$(IMAGE_TAG)
+IMAGE_NAME?=$(IMAGE_REGISTRY)/registration-operator:$(IMAGE_TAG)
 
 # WORK_IMAGE can be set in the env to override calculated value
 WORK_TAG?=latest
@@ -62,12 +62,12 @@ update-csv: ensure-operator-sdk
 munge-hub-csv:
 	mkdir -p munge-csv
 	cp deploy/cluster-manager/olm-catalog/cluster-manager/manifests/cluster-manager.clusterserviceversion.yaml munge-csv/cluster-manager.clusterserviceversion.yaml.unmunged
-	sed -e "s,quay.io/open-cluster-management/nucleus:latest,$(IMAGE_NAME)," -i deploy/cluster-manager/olm-catalog/cluster-manager/manifests/cluster-manager.clusterserviceversion.yaml
+	sed -e "s,quay.io/open-cluster-management/registration-operator:latest,$(IMAGE_NAME)," -i deploy/cluster-manager/olm-catalog/cluster-manager/manifests/cluster-manager.clusterserviceversion.yaml
 
 munge-spoke-csv:
 	mkdir -p munge-csv
 	cp deploy/klusterlet/olm-catalog/klusterlet/manifests/klusterlet.clusterserviceversion.yaml munge-csv/klusterlet.clusterserviceversion.yaml.unmunged
-	sed -e "s,quay.io/open-cluster-management/nucleus:latest,$(IMAGE_NAME)," -i deploy/klusterlet/olm-catalog/klusterlet/manifests/klusterlet.clusterserviceversion.yaml
+	sed -e "s,quay.io/open-cluster-management/registration-operator:latest,$(IMAGE_NAME)," -i deploy/klusterlet/olm-catalog/klusterlet/manifests/klusterlet.clusterserviceversion.yaml
 
 unmunge-csv:
 	mv munge-csv/cluster-manager.clusterserviceversion.yaml.unmunged deploy/cluster-manager/olm-catalog/cluster-manager/manifests/cluster-manager.clusterserviceversion.yaml
@@ -132,10 +132,10 @@ endif
 # $2 - Dockerfile path
 # $3 - context directory for image build
 # It will generate target "image-$(1)" for builing the image an binding it as a prerequisite to target "images".
-$(call build-image,nucleus,$(IMAGE_REGISTRY)/nucleus,./Dockerfile,.)
+$(call build-image,registration-operator,$(IMAGE_REGISTRY)/nucleus,./Dockerfile,.)
 
 clean:
-	$(RM) ./nucleus
+	$(RM) ./registration-operator
 .PHONY: clean
 
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...

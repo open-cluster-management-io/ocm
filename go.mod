@@ -1,4 +1,4 @@
-module github.com/open-cluster-management/nucleus
+module github.com/open-cluster-management/registration-operator
 
 go 1.13
 
