@@ -251,6 +251,14 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	// TODO store this in the status of the klusterlet itself
 	n.registrationGeneration = generation
 
+	// If cluster name is empty, read cluster name from hub config secret
+	if config.ClusterName == "" {
+		clusterName := hubSecret.Data["cluster-name"]
+		if clusterName != nil {
+			config.ClusterName = string(clusterName)
+		}
+	}
+
 	// Deploy work agent
 	generation, err = helpers.ApplyDeployment(
 		n.kubeClient,
@@ -281,24 +289,20 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	// TODO this should be moved into a separate loop since it is independent of the application of the eventually consistent
 	//  resources above
 
-	// If cluster name is empty, read cluster name from hub config secret
+	// If cluster name is empty, return err
 	if config.ClusterName == "" {
-		clusterName := hubSecret.Data["cluster-name"]
-		if clusterName == nil {
-			helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
-				Type: klusterletRegistrationDegraded, Status: metav1.ConditionTrue, Reason: "ClusterNameMissing",
-				Message: fmt.Sprintf("Failed to get cluster name from `kubectl get secret -n %q %q -ojsonpath='{.data.cluster-name}`.  This is set by the klusterlet registration deployment.", hubSecret.Namespace, hubSecret.Name),
-			}))
-			return fmt.Errorf("Failed to get cluster name")
-		}
-		config.ClusterName = string(clusterName)
+		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
+			Type: klusterletRegistrationDegraded, Status: metav1.ConditionTrue, Reason: "ClusterNameMissing",
+			Message: fmt.Sprintf("Failed to get cluster name from `kubectl get secret -n %q %q -ojsonpath='{.data.cluster-name}`.  This is set by the klusterlet registration deployment.", hubSecret.Namespace, hubSecret.Name),
+		}))
+		return fmt.Errorf("Failed to get cluster name")
 	}
 
 	// If hub kubeconfig does not exist, return err.
 	if hubSecret.Data["kubeconfig"] == nil {
 		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
 			Type: klusterletRegistrationDegraded, Status: metav1.ConditionTrue, Reason: "HubKubeconfigMissing",
-			Message: fmt.Sprintf("Failed to get cluster name from `kubectl get secret -n %q %q -ojsonpath='{.data.kubeconfig}`.  This is set by the klusterlet registration deployment, but the CSR must be approved by the cluster-admin on the hub.", hubSecret.Namespace, hubSecret.Name),
+			Message: fmt.Sprintf("Failed to get kubeconfig from `kubectl get secret -n %q %q -ojsonpath='{.data.kubeconfig}`.  This is set by the klusterlet registration deployment, but the CSR must be approved by the cluster-admin on the hub.", hubSecret.Namespace, hubSecret.Name),
 		}))
 		return fmt.Errorf("Failed to get kubeconfig from hub kubeconfig secret")
 	}
