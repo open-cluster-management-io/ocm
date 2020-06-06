@@ -45,7 +45,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 
 	var err error
 
-	// install nucleus CRDs and start a local kube-apiserver
+	// install registration-operator CRDs and start a local kube-apiserver
 	testEnv = &envtest.Environment{
 		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths: []string{

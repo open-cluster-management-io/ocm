@@ -5,8 +5,8 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
-	"github.com/open-cluster-management/nucleus/pkg/operators"
-	"github.com/open-cluster-management/nucleus/pkg/version"
+	"github.com/open-cluster-management/registration-operator/pkg/operators"
+	"github.com/open-cluster-management/registration-operator/pkg/version"
 )
 
 // NewHubOperatorCmd generatee a command to start hub operator

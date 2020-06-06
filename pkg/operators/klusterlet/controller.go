@@ -25,8 +25,8 @@ import (
 	operatorinformer "github.com/open-cluster-management/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "github.com/open-cluster-management/api/client/operator/listers/operator/v1"
 	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
-	"github.com/open-cluster-management/nucleus/pkg/helpers"
-	"github.com/open-cluster-management/nucleus/pkg/operators/klusterlet/bindata"
+	"github.com/open-cluster-management/registration-operator/pkg/helpers"
+	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/bindata"
 )
 
 const (

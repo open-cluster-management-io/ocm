@@ -12,8 +12,8 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
-	"github.com/open-cluster-management/nucleus/pkg/operators"
-	"github.com/open-cluster-management/nucleus/test/integration/util"
+	"github.com/open-cluster-management/registration-operator/pkg/operators"
+	"github.com/open-cluster-management/registration-operator/test/integration/util"
 
 	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
 )
