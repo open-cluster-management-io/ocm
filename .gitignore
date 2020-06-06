@@ -1,10 +1,9 @@
 # Binaries for programs and plugins
-nucleus
+registration-operator
 *.exe
 *.dll
 *.so
 *.dylib
-nucleus
 !deploy/**
 !vendor/**
 dev-kubeconfig
