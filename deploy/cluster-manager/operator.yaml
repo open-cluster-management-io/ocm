@@ -17,7 +17,7 @@ spec:
     spec:
       serviceAccountName: cluster-manager
       containers:
-      - name: registration-operator-operator
+      - name: registration-operator
         image: quay.io/open-cluster-management/registration-operator:latest
         imagePullPolicy: IfNotPresent
         args:

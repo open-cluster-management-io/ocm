@@ -184,7 +184,7 @@ spec:
                     scheme: HTTPS
                   initialDelaySeconds: 2
                   periodSeconds: 10
-                name: registration-operator-operator
+                name: registration-operator
                 readinessProbe:
                   httpGet:
                     path: /healthz
