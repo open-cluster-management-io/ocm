@@ -17,11 +17,11 @@ spec:
     spec:
       serviceAccountName: cluster-manager
       containers:
-      - name: nucleus-operator
-        image: quay.io/open-cluster-management/nucleus:latest
+      - name: registration-operator-operator
+        image: quay.io/open-cluster-management/registration-operator:latest
         imagePullPolicy: IfNotPresent
         args:
-          - "/nucleus"
+          - "/registration-operator"
           - "hub"
         livenessProbe:
           httpGet:

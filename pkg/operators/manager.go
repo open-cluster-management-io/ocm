@@ -12,8 +12,8 @@ import (
 
 	operatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned"
 	operatorinformer "github.com/open-cluster-management/api/client/operator/informers/externalversions"
-	"github.com/open-cluster-management/nucleus/pkg/operators/clustermanager"
-	"github.com/open-cluster-management/nucleus/pkg/operators/klusterlet"
+	"github.com/open-cluster-management/registration-operator/pkg/operators/clustermanager"
+	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet"
 )
 
 // RunClusterManagerOperator starts a new cluster manager operator

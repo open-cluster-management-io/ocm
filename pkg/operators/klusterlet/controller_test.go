@@ -10,7 +10,7 @@ import (
 	fakeoperatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned/fake"
 	operatorinformers "github.com/open-cluster-management/api/client/operator/informers/externalversions"
 	opratorapiv1 "github.com/open-cluster-management/api/operator/v1"
-	"github.com/open-cluster-management/nucleus/pkg/helpers"
+	"github.com/open-cluster-management/registration-operator/pkg/helpers"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	appsv1 "k8s.io/api/apps/v1"

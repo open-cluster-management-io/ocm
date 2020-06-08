@@ -173,9 +173,9 @@ spec:
             spec:
               containers:
               - args:
-                - /nucleus
+                - /registration-operator
                 - hub
-                image: quay.io/open-cluster-management/nucleus:latest
+                image: quay.io/open-cluster-management/registration-operator:latest
                 imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:
@@ -184,7 +184,7 @@ spec:
                     scheme: HTTPS
                   initialDelaySeconds: 2
                   periodSeconds: 10
-                name: nucleus-operator
+                name: registration-operator-operator
                 readinessProbe:
                   httpGet:
                     path: /healthz

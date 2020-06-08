@@ -13,8 +13,8 @@ import (
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 
-	"github.com/open-cluster-management/nucleus/pkg/cmd/operator"
-	"github.com/open-cluster-management/nucleus/pkg/version"
+	"github.com/open-cluster-management/registration-operator/pkg/cmd/operator"
+	"github.com/open-cluster-management/registration-operator/pkg/version"
 )
 
 func main() {
@@ -35,7 +35,7 @@ func main() {
 
 func newNucleusCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "nucleus",
+		Use:   "registration-operator",
 		Short: "Nucleus Operator",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
