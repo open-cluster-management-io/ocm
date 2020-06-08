@@ -10,8 +10,13 @@ import (
 	operatorclientset "github.com/open-cluster-management/api/client/operator/clientset/versioned"
 )
 
+const (
+	eventuallyTimeout  = 30 // seconds
+	eventuallyInterval = 1  // seconds
+)
+
 func AssertKlusterletCondition(
-	name string, operatorClient operatorclientset.Interface, expectedType string, expectedWorkStatus metav1.ConditionStatus, eventuallyTimeout, eventuallyInterval int) {
+	name string, operatorClient operatorclientset.Interface, expectedType, expectedReason string, expectedWorkStatus metav1.ConditionStatus) {
 	gomega.Eventually(func() bool {
 		klusterlet, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
@@ -19,12 +24,12 @@ func AssertKlusterletCondition(
 		}
 
 		// check work status condition
-		return HasCondition(klusterlet.Status.Conditions, expectedType, expectedWorkStatus)
+		return HasCondition(klusterlet.Status.Conditions, expectedType, expectedReason, expectedWorkStatus)
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }
 
 func AssertClusterManagerCondition(
-	name string, operatorClient operatorclientset.Interface, expectedType string, expectedWorkStatus metav1.ConditionStatus, eventuallyTimeout, eventuallyInterval int) {
+	name string, operatorClient operatorclientset.Interface, expectedType, expectedReason string, expectedWorkStatus metav1.ConditionStatus) {
 	gomega.Eventually(func() bool {
 		klusterlet, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
@@ -32,6 +37,6 @@ func AssertClusterManagerCondition(
 		}
 
 		// check work status condition
-		return HasCondition(klusterlet.Status.Conditions, expectedType, expectedWorkStatus)
+		return HasCondition(klusterlet.Status.Conditions, expectedType, expectedReason, expectedWorkStatus)
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }

@@ -1,4 +1,4 @@
-package klusterlet
+package klusterletcontroller
 
 import (
 	"context"
@@ -167,17 +167,6 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		return err
 	}
 
-	// Check if bootstrap secret exists
-	_, err = n.kubeClient.CoreV1().Secrets(config.KlusterletNamespace).Get(
-		ctx, config.BootStrapKubeConfigSecret, metav1.GetOptions{})
-	if err != nil {
-		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
-			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
-			Message: fmt.Sprintf("Failed to get bootstrap secret -n %q %q: %v", config.KlusterletNamespace, config.BootStrapKubeConfigSecret, err),
-		}))
-		return err
-	}
-
 	// Deploy the static resources
 	// Apply static files
 	resourceResults := resourceapply.ApplyDirectly(
@@ -282,35 +271,6 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
 		Type: klusterletApplied, Status: metav1.ConditionTrue, Reason: "KlusterletApplied",
 		Message: "Klusterlet Component Applied",
-	}))
-
-	// now that we have applied all of our logic, we can check to see if the data we expect to have present as indications of
-	// proper functioning of registration controller is working
-	// TODO this should be moved into a separate loop since it is independent of the application of the eventually consistent
-	//  resources above
-
-	// If cluster name is empty, return err
-	if config.ClusterName == "" {
-		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
-			Type: klusterletRegistrationDegraded, Status: metav1.ConditionTrue, Reason: "ClusterNameMissing",
-			Message: fmt.Sprintf("Failed to get cluster name from `kubectl get secret -n %q %q -ojsonpath='{.data.cluster-name}`.  This is set by the klusterlet registration deployment.", hubSecret.Namespace, hubSecret.Name),
-		}))
-		return fmt.Errorf("Failed to get cluster name")
-	}
-
-	// If hub kubeconfig does not exist, return err.
-	if hubSecret.Data["kubeconfig"] == nil {
-		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
-			Type: klusterletRegistrationDegraded, Status: metav1.ConditionTrue, Reason: "HubKubeconfigMissing",
-			Message: fmt.Sprintf("Failed to get kubeconfig from `kubectl get secret -n %q %q -ojsonpath='{.data.kubeconfig}`.  This is set by the klusterlet registration deployment, but the CSR must be approved by the cluster-admin on the hub.", hubSecret.Namespace, hubSecret.Name),
-		}))
-		return fmt.Errorf("Failed to get kubeconfig from hub kubeconfig secret")
-	}
-	// TODO it is possible to verify the kubeconfig actually works.
-
-	helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
-		Type: klusterletRegistrationDegraded, Status: metav1.ConditionFalse, Reason: "RegistrationFunctional",
-		Message: "Registration is managing credentials",
 	}))
 	return nil
 }

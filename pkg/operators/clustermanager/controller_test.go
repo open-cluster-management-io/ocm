@@ -20,11 +20,9 @@ import (
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/cert"
-	"k8s.io/client-go/util/workqueue"
 	fakeapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
 
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	testinghelper "github.com/open-cluster-management/registration-operator/pkg/helpers/testing"
 )
 
 type testController struct {
@@ -33,24 +31,6 @@ type testController struct {
 	apiExtensionClient    *fakeapiextensions.Clientset
 	apiRegistrationClient *fakeapiregistration.Clientset
 	operatorClient        *fakeoperatorlient.Clientset
-}
-
-type fakeSyncContext struct {
-	key      string
-	queue    workqueue.RateLimitingInterface
-	recorder events.Recorder
-}
-
-func (f fakeSyncContext) Queue() workqueue.RateLimitingInterface { return f.queue }
-func (f fakeSyncContext) QueueKey() string                       { return f.key }
-func (f fakeSyncContext) Recorder() events.Recorder              { return f.recorder }
-
-func newFakeSyncContext(t *testing.T, key string) *fakeSyncContext {
-	return &fakeSyncContext{
-		key:      key,
-		queue:    workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-		recorder: eventstesting.NewTestingEventRecorder(t),
-	}
 }
 
 func newClusterManager(name string) *operatorapiv1.ClusterManager {
@@ -105,43 +85,6 @@ func (t *testController) withAPIServiceObject(objects ...runtime.Object) *testCo
 	return t
 }
 
-func assertAction(t *testing.T, actual clienttesting.Action, expected string) {
-	if actual.GetVerb() != expected {
-		t.Errorf("expected %s action but got: %#v", expected, actual)
-	}
-}
-
-func assertEqualNumber(t *testing.T, actual, expected int) {
-	if actual != expected {
-		t.Errorf("expected %d number of actions but got: %d", expected, actual)
-	}
-}
-
-func assertCondition(t *testing.T, actual runtime.Object, expectedCondition string, expectedStatus metav1.ConditionStatus) {
-	hubCore := actual.(*operatorapiv1.ClusterManager)
-	conditions := hubCore.Status.Conditions
-	if len(conditions) != 1 {
-		t.Errorf("expected 1 condition but got: %#v", conditions)
-	}
-	condition := conditions[0]
-	if condition.Type != expectedCondition {
-		t.Errorf("expected %s but got: %s", expectedCondition, condition.Type)
-	}
-	if condition.Status != expectedStatus {
-		t.Errorf("expected %s but got: %s", expectedStatus, condition.Status)
-	}
-}
-
-func ensureNameNamespace(t *testing.T, actualName, actualNamespace, name, namespace string) {
-	if actualName != name {
-		t.Errorf("Name of the object does not match, expected %s, actual %s", name, actualName)
-	}
-
-	if actualNamespace != namespace {
-		t.Errorf("Namespace of the object does not match, expected %s, actual %s", namespace, actualNamespace)
-	}
-}
-
 func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.ClusterManager) {
 	access, err := meta.Accessor(object)
 	if err != nil {
@@ -150,7 +93,7 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.Cl
 
 	switch o := object.(type) {
 	case *corev1.Namespace:
-		ensureNameNamespace(t, access.GetName(), "", clusterManagerNamespace, "")
+		testinghelper.AssertEqualNameNamespace(t, access.GetName(), "", clusterManagerNamespace, "")
 	case *appsv1.Deployment:
 		if hubCore.Spec.RegistrationImagePullSpec != o.Spec.Template.Spec.Containers[0].Image {
 			t.Errorf("Image does not match to the expected.")
@@ -162,7 +105,7 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.Cl
 func TestSyncDeploy(t *testing.T) {
 	clusterManager := newClusterManager("testhub")
 	controller := newTestController(clusterManager).withCRDObject().withKubeObject().withAPIServiceObject()
-	syncContext := newFakeSyncContext(t, "testhub")
+	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
 
 	err := controller.controller.sync(nil, syncContext)
 	if err != nil {
@@ -179,7 +122,7 @@ func TestSyncDeploy(t *testing.T) {
 	}
 
 	// Check if resources are created as expected
-	assertEqualNumber(t, len(createKubeObjects), 12)
+	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 12)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager)
 	}
@@ -193,7 +136,7 @@ func TestSyncDeploy(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	assertEqualNumber(t, len(createCRDObjects), 2)
+	testinghelper.AssertEqualNumber(t, len(createCRDObjects), 2)
 
 	createAPIServiceObjects := []runtime.Object{}
 	apiServiceActions := controller.apiRegistrationClient.Actions()
@@ -204,12 +147,14 @@ func TestSyncDeploy(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	assertEqualNumber(t, len(createAPIServiceObjects), 1)
+	testinghelper.AssertEqualNumber(t, len(createAPIServiceObjects), 1)
 
 	clusterManagerAction := controller.operatorClient.Actions()
-	assertEqualNumber(t, len(clusterManagerAction), 2)
-	assertAction(t, clusterManagerAction[1], "update")
-	assertCondition(t, clusterManagerAction[1].(clienttesting.UpdateActionImpl).Object, clusterManagerApplied, metav1.ConditionTrue)
+	testinghelper.AssertEqualNumber(t, len(clusterManagerAction), 2)
+	testinghelper.AssertAction(t, clusterManagerAction[1], "update")
+	testinghelper.AssertOnlyConditions(
+		t, clusterManagerAction[1].(clienttesting.UpdateActionImpl).Object,
+		testinghelper.NamedCondition(clusterManagerApplied, "ClusterManagerApplied", metav1.ConditionTrue))
 }
 
 // TestSyncDelete test cleanup hub deploy
@@ -218,7 +163,7 @@ func TestSyncDelete(t *testing.T) {
 	now := metav1.Now()
 	clusterManager.ObjectMeta.SetDeletionTimestamp(&now)
 	controller := newTestController(clusterManager).withCRDObject().withKubeObject().withAPIServiceObject()
-	syncContext := newFakeSyncContext(t, "testhub")
+	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
 
 	err := controller.controller.sync(nil, syncContext)
 	if err != nil {
@@ -233,7 +178,7 @@ func TestSyncDelete(t *testing.T) {
 			deleteKubeActions = append(deleteKubeActions, deleteKubeAction)
 		}
 	}
-	assertEqualNumber(t, len(deleteKubeActions), 10)
+	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 10)
 
 	deleteCRDActions := []clienttesting.DeleteActionImpl{}
 	crdActions := controller.apiExtensionClient.Actions()
@@ -244,7 +189,7 @@ func TestSyncDelete(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	assertEqualNumber(t, len(deleteCRDActions), 4)
+	testinghelper.AssertEqualNumber(t, len(deleteCRDActions), 4)
 
 	deleteAPIServiceActions := []clienttesting.DeleteActionImpl{}
 	apiServiceActions := controller.apiRegistrationClient.Actions()
@@ -255,12 +200,12 @@ func TestSyncDelete(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	assertEqualNumber(t, len(deleteAPIServiceActions), 1)
+	testinghelper.AssertEqualNumber(t, len(deleteAPIServiceActions), 1)
 
 	for _, action := range deleteKubeActions {
 		switch action.Resource.Resource {
 		case "namespaces":
-			ensureNameNamespace(t, action.Name, "", clusterManagerNamespace, "")
+			testinghelper.AssertEqualNameNamespace(t, action.Name, "", clusterManagerNamespace, "")
 		}
 	}
 }
@@ -288,7 +233,7 @@ func TestDeleteCRD(t *testing.T) {
 			apiextensionsv1.Resource("customresourcedefinitions"), crdNames[0])
 
 	})
-	syncContext := newFakeSyncContext(t, "testhub")
+	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
 	err := controller.controller.sync(nil, syncContext)
 	if err == nil {
 		t.Errorf("Expected error when sync")

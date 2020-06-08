@@ -330,3 +330,17 @@ func ApplyDirectly(
 	ret = append(ret, applyResults...)
 	return ret
 }
+
+// NumOfUnavailablePod is to check if a deployment is in degraded state.
+func NumOfUnavailablePod(deployment *appsv1.Deployment) int32 {
+	desiredReplicas := int32(1)
+	if deployment.Spec.Replicas != nil {
+		desiredReplicas = *(deployment.Spec.Replicas)
+	}
+
+	if desiredReplicas <= deployment.Status.AvailableReplicas {
+		return 0
+	}
+
+	return desiredReplicas - deployment.Status.AvailableReplicas
+}
