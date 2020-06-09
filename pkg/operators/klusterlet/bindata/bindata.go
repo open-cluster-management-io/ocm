@@ -150,7 +150,9 @@ spec:
           - "agent"
           - "--cluster-name={{ .ClusterName }}"
           - "--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig"
+          {{if .ExternalServerURL}}
           - "--spoke-external-server-urls={{ .ExternalServerURL }}"
+          {{end}}
         volumeMounts:
         - name: bootstrap-secret
           mountPath: "/spoke/bootstrap"

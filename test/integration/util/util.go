@@ -6,6 +6,9 @@ import (
 	"github.com/onsi/ginkgo"
 
 	"github.com/openshift/library-go/pkg/operator/events"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
 )
 
 func NewIntegrationTestEventRecorder(componet string) events.Recorder {
@@ -42,4 +45,21 @@ func (r *IntegrationTestEventRecorder) Warning(reason, message string) {
 
 func (r *IntegrationTestEventRecorder) Warningf(reason, messageFmt string, args ...interface{}) {
 	r.Warning(reason, fmt.Sprintf(messageFmt, args...))
+}
+
+func HasCondition(conditions []operatorapiv1.StatusCondition, expectedType string, expectedStatus metav1.ConditionStatus) bool {
+	found := false
+	for _, condition := range conditions {
+		if condition.Type != expectedType {
+			continue
+		}
+		found = true
+
+		if condition.Status != expectedStatus {
+			return false
+		}
+		return true
+	}
+
+	return found
 }

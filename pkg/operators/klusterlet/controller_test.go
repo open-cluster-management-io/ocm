@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 )
 
@@ -29,6 +30,7 @@ type testController struct {
 	controller     *klusterletController
 	kubeClient     *fakekube.Clientset
 	operatorClient *fakeoperatorclient.Clientset
+	operatorStore  cache.Store
 }
 
 type fakeSyncContext struct {
@@ -101,6 +103,7 @@ func newTestController(klusterlet *opratorapiv1.Klusterlet, objects ...runtime.O
 		controller:     hubController,
 		kubeClient:     fakeKubeClient,
 		operatorClient: fakeOperatorClient,
+		operatorStore:  store,
 	}
 }
 
@@ -151,6 +154,95 @@ func ensureNameNamespace(t *testing.T, actualName, actualNamespace, name, namesp
 
 	if actualNamespace != namespace {
 		t.Errorf("Namespace of the object does not match, expected %s, actual %s", namespace, actualNamespace)
+	}
+}
+
+func ensureDeployments(t *testing.T, actions []clienttesting.Action, verb, serverURL, registrationClusterName, workClusterName string) {
+	deployments := []*appsv1.Deployment{}
+	for _, action := range actions {
+		if action.GetVerb() != verb || action.GetResource().Resource != "deployments" {
+			continue
+		}
+
+		if verb == "create" {
+			object := action.(clienttesting.CreateActionImpl).Object
+			deployments = append(deployments, object.(*appsv1.Deployment))
+		}
+
+		if verb == "update" {
+			object := action.(clienttesting.UpdateActionImpl).Object
+			deployments = append(deployments, object.(*appsv1.Deployment))
+		}
+	}
+
+	if len(deployments) != 2 {
+		t.Errorf("Expect %s 2 deployment, actual  %d", verb, len(deployments))
+	}
+
+	for _, deployment := range deployments {
+		if strings.HasSuffix(deployment.Name, "registration-agent") {
+			ensureRegistrationDeployment(t, deployment, serverURL, registrationClusterName)
+		} else if strings.HasSuffix(deployment.Name, "work-agent") {
+			ensureWorkDeployment(t, deployment, workClusterName)
+		} else {
+			t.Errorf("Unexpected deployment name %s", deployment.Name)
+		}
+	}
+}
+
+func ensureRegistrationDeployment(t *testing.T, deployment *appsv1.Deployment, serverURL, clusterName string) {
+	if len(deployment.Spec.Template.Spec.Containers) != 1 {
+		t.Errorf("Expect 1 containers in deployment spec, actual %d", len(deployment.Spec.Template.Spec.Containers))
+	}
+	args := deployment.Spec.Template.Spec.Containers[0].Args
+	if serverURL == "" && len(args) != 4 {
+		t.Errorf("Expect 4 args in container spec, actual %d", len(args))
+	}
+	if serverURL != "" && len(deployment.Spec.Template.Spec.Containers[0].Args) != 5 {
+		t.Errorf("Expect 5 args in container spec, actual %d", len(args))
+	}
+	clusterNameArg := ""
+	serverURLArg := ""
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--cluster-name=") {
+			clusterNameArg = arg
+		}
+		if strings.HasPrefix(arg, "--spoke-external-server-urls=") {
+			serverURLArg = arg
+		}
+	}
+
+	desiredServerURLArg := ""
+	if serverURL != "" {
+		desiredServerURLArg = fmt.Sprintf("--spoke-external-server-urls=%s", serverURL)
+	}
+	if serverURLArg != desiredServerURLArg {
+		t.Errorf("Server url args not correct, expect %q, actual %q", desiredServerURLArg, serverURLArg)
+	}
+
+	desiredClusterNameArg := fmt.Sprintf("--cluster-name=%s", clusterName)
+	if clusterNameArg != desiredClusterNameArg {
+		t.Errorf("Cluster name arg not correct, expect %q, actual %q", desiredClusterNameArg, clusterNameArg)
+	}
+}
+
+func ensureWorkDeployment(t *testing.T, deployment *appsv1.Deployment, clusterName string) {
+	if len(deployment.Spec.Template.Spec.Containers) != 1 {
+		t.Errorf("Expect 1 containers in deployment spec, actual %d", len(deployment.Spec.Template.Spec.Containers))
+	}
+	args := deployment.Spec.Template.Spec.Containers[0].Args
+	if len(args) != 4 {
+		t.Errorf("Expect 4 args in container spec, actual %d", len(args))
+	}
+	clusterNameArg := ""
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--spoke-cluster-name") {
+			clusterNameArg = arg
+		}
+	}
+	desiredClusterNameArg := fmt.Sprintf("--spoke-cluster-name=%s", clusterName)
+	if desiredClusterNameArg != clusterNameArg {
+		t.Errorf("Expect cluster namee arg is %q, actual %q", desiredClusterNameArg, clusterNameArg)
 	}
 }
 
@@ -389,4 +481,76 @@ func TestGetServersFromKlusterlet(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClusterNameChange(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	namespace := newNamespace("testns")
+	bootStrapSecret := newSecret(bootstrapHubKubeConfigSecret, "testns")
+	hubSecret := newSecret(hubKubeConfigSecret, "testns")
+	hubSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubSecret.Data["cluster-name"] = []byte("cluster1")
+	controller := newTestController(klusterlet, bootStrapSecret, hubSecret, namespace)
+	syncContext := newFakeSyncContext(t, "klusterlet")
+	err := controller.controller.sync(nil, syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	// Check if deployment has the right cluster name set
+	ensureDeployments(t, controller.kubeClient.Actions(), "create", "", "cluster1", "cluster1")
+
+	// Update klusterlet with unset cluster name and rerun sync
+	controller.kubeClient.ClearActions()
+	klusterlet = newKlusterlet("klusterlet", "testns", "")
+	controller.operatorStore.Update(klusterlet)
+	// Set generation to another number so we can force the update, we will read generatioin from status in the future
+	controller.controller.registrationGeneration = 100
+	controller.controller.workGeneration = 100
+
+	err = controller.controller.sync(nil, syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+	ensureDeployments(t, controller.kubeClient.Actions(), "update", "", "", "cluster1")
+
+	// Update hubconfigsecret and sync again
+	hubSecret.Data["cluster-name"] = []byte("cluster2")
+	controller.kubeClient.PrependReactor("get", "secrets", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		if action.GetVerb() != "get" {
+			return false, nil, nil
+		}
+
+		getAction := action.(clienttesting.GetActionImpl)
+		if getAction.Name != hubKubeConfigSecret {
+			return false, nil, errors.NewNotFound(
+				corev1.Resource("secrets"), hubKubeConfigSecret)
+		}
+		return true, hubSecret, nil
+	})
+	controller.kubeClient.ClearActions()
+	// Set generation to another number so we can force the update, we will read generatioin from status in the future
+	controller.controller.registrationGeneration = 100
+	controller.controller.workGeneration = 100
+
+	err = controller.controller.sync(nil, syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+	ensureDeployments(t, controller.kubeClient.Actions(), "update", "", "", "cluster2")
+
+	// Update klusterlet with different cluster name and rerun sync
+	klusterlet = newKlusterlet("klusterlet", "testns", "cluster3")
+	klusterlet.Spec.ExternalServerURLs = []opratorapiv1.ServerURL{{URL: "https://localhost"}}
+	controller.kubeClient.ClearActions()
+	controller.operatorStore.Update(klusterlet)
+	// Set generation to another number so we can force the update, we will read generatioin from status in the future
+	controller.controller.registrationGeneration = 100
+	controller.controller.workGeneration = 100
+
+	err = controller.controller.sync(nil, syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+	ensureDeployments(t, controller.kubeClient.Actions(), "update", "https://localhost", "cluster3", "cluster3")
 }

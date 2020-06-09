@@ -26,7 +26,7 @@ func startHubOperator(ctx context.Context) {
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 }
 
-var _ = ginkgo.Describe("HubCore", func() {
+var _ = ginkgo.Describe("ClusterManager", func() {
 	var cancel context.CancelFunc
 	var err error
 	var clusterManagerName string
@@ -167,6 +167,8 @@ var _ = ginkgo.Describe("HubCore", func() {
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			util.AssertClusterManagerCondition(clusterManagerName, operatorClient, "Applied", metav1.ConditionTrue, eventuallyTimeout, eventuallyInterval)
 
 			err := operatorClient.OperatorV1().ClusterManagers().Delete(context.Background(), clusterManagerName, metav1.DeleteOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
