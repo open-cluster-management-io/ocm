@@ -168,7 +168,7 @@ var _ = ginkgo.Describe("ClusterManager", func() {
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
-			util.AssertClusterManagerCondition(clusterManagerName, operatorClient, "Applied", metav1.ConditionTrue, eventuallyTimeout, eventuallyInterval)
+			util.AssertClusterManagerCondition(clusterManagerName, operatorClient, "Applied", "ClusterManagerApplied", metav1.ConditionTrue)
 
 			err := operatorClient.OperatorV1().ClusterManagers().Delete(context.Background(), clusterManagerName, metav1.DeleteOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())

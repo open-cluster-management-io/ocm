@@ -5,6 +5,7 @@ import (
 	"time"
 
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 
@@ -13,7 +14,8 @@ import (
 	operatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned"
 	operatorinformer "github.com/open-cluster-management/api/client/operator/informers/externalversions"
 	"github.com/open-cluster-management/registration-operator/pkg/operators/clustermanager"
-	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet"
+	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/controllers/klusterletcontroller"
+	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/controllers/statuscontroller"
 )
 
 // RunClusterManagerOperator starts a new cluster manager operator
@@ -61,6 +63,8 @@ func RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd
 		return err
 	}
 
+	kubeInformer := informers.NewSharedInformerFactory(kubeClient, 5*time.Minute)
+
 	// Build operator client and informer
 	operatorClient, err := operatorclient.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
@@ -68,14 +72,24 @@ func RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd
 	}
 	operatorInformer := operatorinformer.NewSharedInformerFactory(operatorClient, 5*time.Minute)
 
-	klusterletController := klusterlet.NewKlusterletController(
+	klusterletController := klusterletcontroller.NewKlusterletController(
 		kubeClient,
 		operatorClient.OperatorV1().Klusterlets(),
 		operatorInformer.Operator().V1().Klusterlets(),
 		controllerContext.EventRecorder)
+	statusController := statuscontroller.NewKlusterletStatusController(
+		kubeClient,
+		operatorClient.OperatorV1().Klusterlets(),
+		operatorInformer.Operator().V1().Klusterlets(),
+		kubeInformer.Core().V1().Secrets(),
+		kubeInformer.Apps().V1().Deployments(),
+		controllerContext.EventRecorder,
+	)
 
 	go operatorInformer.Start(ctx.Done())
+	go kubeInformer.Start(ctx.Done())
 	go klusterletController.Run(ctx, 1)
+	go statusController.Run(ctx, 1)
 	<-ctx.Done()
 	return nil
 }
