@@ -32,7 +32,7 @@ func TestCreateSpokeCluster(t *testing.T) {
 		},
 		{
 			name:            "create an existed cluster",
-			startingObjects: []runtime.Object{newSpokeCluster([]clusterv1.StatusCondition{})},
+			startingObjects: []runtime.Object{newManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				assertActions(t, actions, "get")
 			},

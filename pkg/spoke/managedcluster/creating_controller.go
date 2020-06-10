@@ -8,8 +8,10 @@ import (
 
 	clientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
+
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"

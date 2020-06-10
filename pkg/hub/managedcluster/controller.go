@@ -136,6 +136,8 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		"manifests/managedcluster-clusterrole.yaml",
 		"manifests/managedcluster-clusterrolebinding.yaml",
 		"manifests/managedcluster-namespace.yaml",
+		"manifests/managedcluster-registration-role.yaml",
+		"manifests/managedcluster-registration-rolebinding.yaml",
 		"manifests/managedcluster-work-role.yaml",
 		"manifests/managedcluster-work-rolebinding.yaml",
 	)

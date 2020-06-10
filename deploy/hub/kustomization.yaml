@@ -28,8 +28,8 @@ resources:
 - ./crd.yaml
 - ./namespace.yaml
 - ./service_account.yaml
-- ./clusterrole_binding.yaml
-- ./clusterrole.yaml
+- ./hub_controller_clusterrole_binding.yaml
+- ./hub_controller_clusterrole.yaml
 - ./deployment.yaml
 
 images:
