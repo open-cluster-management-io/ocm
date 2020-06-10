@@ -1,9 +1,11 @@
-# nucleus
+# registration-operator
+
 Minimum cluster registration and work
 
 # How to Deploy
 
 ## Deploy all-in-one deployment on kind
+
 1. Create a kind cluster
 2. Deploy all compoenent on the kind cluster
     ```
@@ -13,6 +15,7 @@ Minimum cluster registration and work
 3. To clean the environment, run `make clean-deploy`
 
 ## Deploy on OCP
+
 1. Deploy hub component
     ```
     export OLM_NAMESPACE=openshift-operator-lifecycle-manager
