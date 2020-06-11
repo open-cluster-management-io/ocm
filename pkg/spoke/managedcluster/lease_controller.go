@@ -43,7 +43,7 @@ func NewManagedClusterLeaseController(
 		leaseUpdater: &leaseUpdater{
 			hubClient:   hubClient,
 			clusterName: clusterName,
-			leaseName:   fmt.Sprintf("cluster-%s-lease", clusterName),
+			leaseName:   fmt.Sprintf("cluster-lease-%s", clusterName),
 			recorder:    recorder,
 		},
 	}

@@ -69,7 +69,7 @@ func TestLeaseUpdate(t *testing.T) {
 
 			hubClient := kubefake.NewSimpleClientset(&coordinationv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "cluster-testmanagedcluster-lease",
+					Name:      "cluster-lease-testmanagedcluster",
 					Namespace: "testmanagedcluster",
 				},
 			})
@@ -77,7 +77,7 @@ func TestLeaseUpdate(t *testing.T) {
 			leaseUpdater := &leaseUpdater{
 				hubClient:   hubClient,
 				clusterName: testManagedClusterName,
-				leaseName:   fmt.Sprintf("cluster-%s-lease", testManagedClusterName),
+				leaseName:   fmt.Sprintf("cluster-lease-%s", testManagedClusterName),
 				recorder:    eventstesting.NewTestingEventRecorder(t),
 			}
 

@@ -100,10 +100,10 @@ func TestHealthCheck(t *testing.T) {
 			serverResponse.responseMsg = c.responseMsg
 
 			ctrl := &managedClusterHealthCheckController{
-				clusterName:      testManagedClusterName,
-				hubClusterClient: clusterClient,
-				hubClusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				discoveryClient:  discoveryClient,
+				clusterName:                   testManagedClusterName,
+				hubClusterClient:              clusterClient,
+				hubClusterLister:              clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
+				managedClusterDiscoveryClient: discoveryClient,
 			}
 			syncErr := ctrl.sync(context.TODO(), newFakeSyncContext(t))
 			if len(c.expectedErr) > 0 && syncErr == nil {

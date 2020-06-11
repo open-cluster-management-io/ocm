@@ -25,12 +25,11 @@ var now = time.Now()
 
 func TestSync(t *testing.T) {
 	cases := []struct {
-		name             string
-		clusters         []runtime.Object
-		lastClusterLease *clusterLease
-		clusterLeases    []runtime.Object
-		validateActions  func(t *testing.T, leaseActions, clusterActions []clienttesting.Action)
-		expectedErr      string
+		name            string
+		clusters        []runtime.Object
+		clusterLeases   []runtime.Object
+		validateActions func(t *testing.T, leaseActions, clusterActions []clienttesting.Action)
+		expectedErr     string
 	}{
 		{
 			name:          "sync unaccepted managed cluster",
@@ -51,12 +50,8 @@ func TestSync(t *testing.T) {
 			},
 		},
 		{
-			name:     "managed cluster stop update lease",
-			clusters: []runtime.Object{newManagedCluster(newAcceptedCondtion(), newAvailableCondtion())},
-			lastClusterLease: &clusterLease{
-				probeTimestamp: metav1.Time{Time: now.Add(-5 * time.Minute)},
-				lease:          newClusterLease(now.Add(-5 * time.Minute)),
-			},
+			name:          "managed cluster stop update lease",
+			clusters:      []runtime.Object{newManagedCluster(newAcceptedCondtion(), newAvailableCondtion())},
 			clusterLeases: []runtime.Object{newClusterLease(now.Add(-5 * time.Minute))},
 			validateActions: func(t *testing.T, leaseActions, clusterActions []clienttesting.Action) {
 				assertActions(t, clusterActions, "get", "update")
@@ -71,12 +66,8 @@ func TestSync(t *testing.T) {
 			},
 		},
 		{
-			name:     "managed cluster is available",
-			clusters: []runtime.Object{newManagedCluster(newAcceptedCondtion(), newAvailableCondtion())},
-			lastClusterLease: &clusterLease{
-				probeTimestamp: metav1.Time{Time: now.Add(-1 * time.Minute)},
-				lease:          newClusterLease(now.Add(-1 * time.Minute)),
-			},
+			name:          "managed cluster is available",
+			clusters:      []runtime.Object{newManagedCluster(newAcceptedCondtion(), newAvailableCondtion())},
 			clusterLeases: []runtime.Object{newClusterLease(now)},
 			validateActions: func(t *testing.T, leaseActions, clusterActions []clienttesting.Action) {
 				assertActions(t, clusterActions)
@@ -100,15 +91,11 @@ func TestSync(t *testing.T) {
 				leaseStore.Add(lease)
 			}
 
-			clusterLeaseMap := newClusterLeaseMap()
-			clusterLeaseMap.set("cluster-testmanagedcluster-lease", c.lastClusterLease)
-
 			ctrl := &leaseController{
-				kubeClient:      leaseClient,
-				clusterClient:   clusterClient,
-				clusterLister:   clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				leaseLister:     leaseInformerFactory.Coordination().V1().Leases().Lister(),
-				clusterLeaseMap: clusterLeaseMap,
+				kubeClient:    leaseClient,
+				clusterClient: clusterClient,
+				clusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
+				leaseLister:   leaseInformerFactory.Coordination().V1().Leases().Lister(),
 			}
 			syncErr := ctrl.sync(context.TODO(), newFakeSyncContext(t))
 			if len(c.expectedErr) > 0 && syncErr == nil {
@@ -187,7 +174,7 @@ func newAvailableCondtion() clusterv1.StatusCondition {
 func newClusterLease(renewTime time.Time) *coordv1.Lease {
 	return &coordv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cluster-testmanagedcluster-lease",
+			Name:      "cluster-lease-testmanagedcluster",
 			Namespace: "testmanagedcluster",
 		},
 		Spec: coordv1.LeaseSpec{

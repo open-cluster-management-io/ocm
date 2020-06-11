@@ -21,10 +21,10 @@ import (
 
 // managedClusterHealthCheckController checks the kube-apiserver health on managed cluster to determine it whether is available.
 type managedClusterHealthCheckController struct {
-	clusterName      string
-	hubClusterClient clientset.Interface
-	hubClusterLister clusterv1listers.ManagedClusterLister
-	discoveryClient  discovery.DiscoveryInterface
+	clusterName                   string
+	hubClusterClient              clientset.Interface
+	hubClusterLister              clusterv1listers.ManagedClusterLister
+	managedClusterDiscoveryClient discovery.DiscoveryInterface
 }
 
 // NewManagedClusterHealthCheckController creates a managed cluster health check controller on managed cluster.
@@ -32,14 +32,14 @@ func NewManagedClusterHealthCheckController(
 	clusterName string,
 	hubClusterClient clientset.Interface,
 	hubClusterInformer clusterv1informer.ManagedClusterInformer,
-	discoveryClient discovery.DiscoveryInterface,
+	managedClusterDiscoveryClient discovery.DiscoveryInterface,
 	resyncInterval time.Duration,
 	recorder events.Recorder) factory.Controller {
 	c := &managedClusterHealthCheckController{
-		clusterName:      clusterName,
-		hubClusterClient: hubClusterClient,
-		hubClusterLister: hubClusterInformer.Lister(),
-		discoveryClient:  discoveryClient,
+		clusterName:                   clusterName,
+		hubClusterClient:              hubClusterClient,
+		hubClusterLister:              hubClusterInformer.Lister(),
+		managedClusterDiscoveryClient: managedClusterDiscoveryClient,
 	}
 
 	return factory.New().
@@ -73,7 +73,7 @@ func (c *managedClusterHealthCheckController) sync(ctx context.Context, syncCtx 
 func (c *managedClusterHealthCheckController) checkKubeAPIServerStatus(ctx context.Context) clusterv1.StatusCondition {
 	statusCode := 0
 	condition := clusterv1.StatusCondition{Type: clusterv1.ManagedClusterConditionAvailable}
-	result := c.discoveryClient.RESTClient().Get().AbsPath("/readyz").Do(ctx).StatusCode(&statusCode)
+	result := c.managedClusterDiscoveryClient.RESTClient().Get().AbsPath("/readyz").Do(ctx).StatusCode(&statusCode)
 	if statusCode == http.StatusOK {
 		condition.Status = metav1.ConditionTrue
 		condition.Reason = "ManagedClusterAvailable"
