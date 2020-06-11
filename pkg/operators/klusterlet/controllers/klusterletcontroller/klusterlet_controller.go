@@ -10,6 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	appsinformer "k8s.io/client-go/informers/apps/v1"
+	coreinformer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 
@@ -30,12 +32,8 @@ import (
 )
 
 const (
-	klusterletFinalizer            = "operator.open-cluster-management.io/klusterlet-cleanup"
-	bootstrapHubKubeConfigSecret   = "bootstrap-hub-kubeconfig"
-	hubKubeConfigSecret            = "hub-kubeconfig-secret"
-	klusterletNamespace            = "open-cluster-management-agent"
-	klusterletApplied              = "Applied"
-	klusterletRegistrationDegraded = "KlusterletRegistrationDegraded"
+	klusterletFinalizer = "operator.open-cluster-management.io/klusterlet-cleanup"
+	klusterletApplied   = "Applied"
 )
 
 var (
@@ -53,11 +51,9 @@ var (
 )
 
 type klusterletController struct {
-	klusterletClient       operatorv1client.KlusterletInterface
-	klusterletLister       operatorlister.KlusterletLister
-	kubeClient             kubernetes.Interface
-	registrationGeneration int64
-	workGeneration         int64
+	klusterletClient operatorv1client.KlusterletInterface
+	klusterletLister operatorlister.KlusterletLister
+	kubeClient       kubernetes.Interface
 }
 
 // NewKlusterletController construct klusterlet controller
@@ -65,6 +61,8 @@ func NewKlusterletController(
 	kubeClient kubernetes.Interface,
 	klusterletClient operatorv1client.KlusterletInterface,
 	klusterletInformer operatorinformer.KlusterletInformer,
+	secretInformer coreinformer.SecretInformer,
+	deploymentInformer appsinformer.DeploymentInformer,
 	recorder events.Recorder) factory.Controller {
 	controller := &klusterletController{
 		kubeClient:       kubeClient,
@@ -73,6 +71,8 @@ func NewKlusterletController(
 	}
 
 	return factory.New().WithSync(controller.sync).
+		WithInformersQueueKeyFunc(helpers.KlusterletSecretQueueKeyFunc(controller.klusterletLister), secretInformer.Informer()).
+		WithInformersQueueKeyFunc(helpers.KlusterletDeploymentQueueKeyFunc(controller.klusterletLister), deploymentInformer.Informer()).
 		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
 			accessor, _ := meta.Accessor(obj)
 			return accessor.GetName()
@@ -111,13 +111,13 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		RegistrationImage:         klusterlet.Spec.RegistrationImagePullSpec,
 		WorkImage:                 klusterlet.Spec.WorkImagePullSpec,
 		ClusterName:               klusterlet.Spec.ClusterName,
-		BootStrapKubeConfigSecret: bootstrapHubKubeConfigSecret,
-		HubKubeConfigSecret:       hubKubeConfigSecret,
+		BootStrapKubeConfigSecret: helpers.BootstrapHubKubeConfigSecret,
+		HubKubeConfigSecret:       helpers.HubKubeConfigSecret,
 		ExternalServerURL:         getServersFromKlusterlet(klusterlet),
 	}
 	// If namespace is not set, use the default namespace
 	if config.KlusterletNamespace == "" {
-		config.KlusterletNamespace = klusterletNamespace
+		config.KlusterletNamespace = helpers.KlusterletDefaultNamespace
 	}
 
 	// Update finalizer at first
@@ -194,13 +194,13 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 
 	// Create hub config secret
-	hubSecret, err := n.kubeClient.CoreV1().Secrets(config.KlusterletNamespace).Get(ctx, hubKubeConfigSecret, metav1.GetOptions{})
+	hubSecret, err := n.kubeClient.CoreV1().Secrets(config.KlusterletNamespace).Get(ctx, helpers.HubKubeConfigSecret, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		// Create an empty secret with placeholder
 		hubSecret = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      hubKubeConfigSecret,
+				Name:      helpers.HubKubeConfigSecret,
 				Namespace: config.KlusterletNamespace,
 			},
 			Data: map[string][]byte{"placeholder": []byte("placeholder")},
@@ -221,13 +221,19 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		return err
 	}
 
+	forceRollOut := false
+	if klusterlet.Generation != klusterlet.Status.ObservedGeneration {
+		forceRollOut = true
+	}
+
 	// Deploy registration agent
-	generation, err := helpers.ApplyDeployment(
+	registrationGeneration, err := helpers.ApplyDeployment(
 		n.kubeClient,
-		n.registrationGeneration,
+		klusterlet.Status.Generations,
 		func(name string) ([]byte, error) {
 			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
 		},
+		forceRollOut,
 		controllerContext.Recorder(),
 		"manifests/klusterlet/klusterlet-registration-deployment.yaml")
 	if err != nil {
@@ -237,8 +243,6 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		}))
 		return err
 	}
-	// TODO store this in the status of the klusterlet itself
-	n.registrationGeneration = generation
 
 	// If cluster name is empty, read cluster name from hub config secret
 	if config.ClusterName == "" {
@@ -249,12 +253,14 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 
 	// Deploy work agent
-	generation, err = helpers.ApplyDeployment(
+	n.forceRollOutWorkAgent(ctx, config, &forceRollOut)
+	workGeneration, err := helpers.ApplyDeployment(
 		n.kubeClient,
-		n.workGeneration,
+		klusterlet.Status.Generations,
 		func(name string) ([]byte, error) {
 			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
 		},
+		forceRollOut,
 		controllerContext.Recorder(),
 		"manifests/klusterlet/klusterlet-work-deployment.yaml")
 	if err != nil {
@@ -264,15 +270,49 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		}))
 		return err
 	}
-	// TODO store this in the status of the klusterlet itself
-	n.workGeneration = generation
+	observedKlusterletGeneration := klusterlet.Generation
 
 	// if we get here, we have successfully applied everything and should indicate that
-	helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
-		Type: klusterletApplied, Status: metav1.ConditionTrue, Reason: "KlusterletApplied",
-		Message: "Klusterlet Component Applied",
-	}))
+	helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName,
+		helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
+			Type: klusterletApplied, Status: metav1.ConditionTrue, Reason: "KlusterletApplied",
+			Message: "Klusterlet Component Applied"}),
+		helpers.UpdateKlusterletGenerationsFn(registrationGeneration, workGeneration),
+		func(oldStatus *operatorapiv1.KlusterletStatus) error {
+			oldStatus.ObservedGeneration = observedKlusterletGeneration
+			return nil
+		},
+	)
 	return nil
+}
+
+// Check if cluster name is changed in hub kubeconfig secret by comparing with deployment args. Force update the deployment
+// if the secret is changed.
+func (n *klusterletController) forceRollOutWorkAgent(ctx context.Context, config klusterletConfig, forceRollOut *bool) {
+	if *forceRollOut {
+		return
+	}
+
+	workDeploymentName := fmt.Sprintf("%s-work-agent", config.KlusterletName)
+	workDeployment, err := n.kubeClient.AppsV1().Deployments(config.KlusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{})
+	if err != nil {
+		return
+	}
+
+	if len(workDeployment.Spec.Template.Spec.Containers) != 1 {
+		return
+	}
+
+	clusterArgFound := false
+	for _, arg := range workDeployment.Spec.Template.Spec.Containers[0].Args {
+		if arg == fmt.Sprintf("--spoke-cluster-name=%s", config.ClusterName) {
+			clusterArgFound = true
+		}
+	}
+
+	if !clusterArgFound {
+		*forceRollOut = true
+	}
 }
 
 func (n *klusterletController) cleanUp(ctx context.Context, controllerContext factory.SyncContext, config klusterletConfig) error {

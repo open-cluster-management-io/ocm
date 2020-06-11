@@ -3,12 +3,10 @@ package statuscontroller
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
 	coreinformer "k8s.io/client-go/informers/core/v1"
@@ -19,7 +17,6 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 
 	operatorv1client "github.com/open-cluster-management/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "github.com/open-cluster-management/api/client/operator/informers/externalversions/operator/v1"
@@ -38,8 +35,6 @@ type klusterletStatusController struct {
 
 const (
 	klusterletNamespace            = "open-cluster-management-agent"
-	bootstrapHubKubeConfigSecret   = "bootstrap-hub-kubeconfig"
-	hubKubeConfigSecret            = "hub-kubeconfig-secret"
 	klusterletRegistrationDegraded = "KlusterletRegistrationDegraded"
 	klusterletWorKDegraded         = "KlusterletWorkDegraded"
 )
@@ -60,7 +55,8 @@ func NewKlusterletStatusController(
 		klusterletLister: klusterletInformer.Lister(),
 	}
 	return factory.New().WithSync(controller.sync).
-		WithInformersQueueKeyFunc(controller.queueKeyFunc, secretInformer.Informer(), deploymentInformer.Informer()).
+		WithInformersQueueKeyFunc(helpers.KlusterletSecretQueueKeyFunc(controller.klusterletLister), secretInformer.Informer()).
+		WithInformersQueueKeyFunc(helpers.KlusterletDeploymentQueueKeyFunc(controller.klusterletLister), deploymentInformer.Informer()).
 		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
 			accessor, _ := meta.Accessor(obj)
 			return accessor.GetName()
@@ -103,9 +99,9 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 	}
 
 	// Check if bootstrap secret exists
-	_, err = k.kubeClient.CoreV1().Secrets(klusterletNS).Get(ctx, bootstrapHubKubeConfigSecret, metav1.GetOptions{})
+	_, err = k.kubeClient.CoreV1().Secrets(klusterletNS).Get(ctx, helpers.BootstrapHubKubeConfigSecret, metav1.GetOptions{})
 	if err != nil {
-		registrationDegradedCondition.Message = fmt.Sprintf("Failed to get bootstrap secret %q %q: %v", klusterletNS, bootstrapHubKubeConfigSecret, err)
+		registrationDegradedCondition.Message = fmt.Sprintf("Failed to get bootstrap secret %q %q: %v", klusterletNS, helpers.BootstrapHubKubeConfigSecret, err)
 		registrationDegradedCondition.Status = metav1.ConditionTrue
 		registrationDegradedCondition.Reason = "BootStrapSecretMissing"
 		_, _, err := helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
@@ -116,9 +112,9 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 	// TODO verify if bootstrap secret works
 
 	// Check if hub kubeconfig secret exists
-	hubConfigSecret, err := k.kubeClient.CoreV1().Secrets(klusterletNS).Get(ctx, hubKubeConfigSecret, metav1.GetOptions{})
+	hubConfigSecret, err := k.kubeClient.CoreV1().Secrets(klusterletNS).Get(ctx, helpers.HubKubeConfigSecret, metav1.GetOptions{})
 	if err != nil {
-		registrationDegradedCondition.Message = fmt.Sprintf("Failed to get hub kubeconfig secret %q %q: %v", klusterletNS, hubKubeConfigSecret, err)
+		registrationDegradedCondition.Message = fmt.Sprintf("Failed to get hub kubeconfig secret %q %q: %v", klusterletNS, helpers.HubKubeConfigSecret, err)
 		registrationDegradedCondition.Status = metav1.ConditionTrue
 		registrationDegradedCondition.Reason = "HubKubeConfigSecretMissing"
 		// Work condition will be the same as registration
@@ -203,47 +199,4 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 		helpers.UpdateKlusterletConditionFn(workDegradedCondition),
 	)
 	return nil
-}
-
-func (k *klusterletStatusController) queueKeyFunc(obj runtime.Object) string {
-	accessor, _ := meta.Accessor(obj)
-	namespace := accessor.GetNamespace()
-	name := accessor.GetName()
-
-	// return empty key if secret ot deployment is not interesting
-	gvk := resourcehelper.GuessObjectGroupVersionKind(obj)
-	interestedObjectFound := false
-	switch gvk.Kind {
-	case "Secret":
-		if name == hubKubeConfigSecret || name == bootstrapHubKubeConfigSecret {
-			interestedObjectFound = true
-		}
-	case "Deployment":
-		if strings.HasSuffix(name, "registration-agent") || strings.HasSuffix(name, "work-agent") {
-			interestedObjectFound = true
-		}
-	}
-
-	if !interestedObjectFound {
-		return ""
-	}
-
-	klusterlets, err := k.klusterletLister.List(labels.Everything())
-	if err != nil {
-		return ""
-	}
-
-	for _, klusterlet := range klusterlets {
-		klusterletNS := klusterlet.Spec.Namespace
-		if klusterletNS == "" {
-			klusterletNS = klusterletNamespace
-		}
-		if namespace == klusterletNS {
-			return klusterlet.Name
-		}
-
-		return ""
-	}
-
-	return ""
 }

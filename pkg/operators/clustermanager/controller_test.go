@@ -22,6 +22,7 @@ import (
 	"k8s.io/client-go/util/cert"
 	fakeapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
 
+	"github.com/open-cluster-management/registration-operator/pkg/helpers"
 	testinghelper "github.com/open-cluster-management/registration-operator/pkg/helpers/testing"
 )
 
@@ -93,7 +94,7 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.Cl
 
 	switch o := object.(type) {
 	case *corev1.Namespace:
-		testinghelper.AssertEqualNameNamespace(t, access.GetName(), "", clusterManagerNamespace, "")
+		testinghelper.AssertEqualNameNamespace(t, access.GetName(), "", helpers.ClusterManagerNamespace, "")
 	case *appsv1.Deployment:
 		if hubCore.Spec.RegistrationImagePullSpec != o.Spec.Template.Spec.Containers[0].Image {
 			t.Errorf("Image does not match to the expected.")
@@ -205,7 +206,7 @@ func TestSyncDelete(t *testing.T) {
 	for _, action := range deleteKubeActions {
 		switch action.Resource.Resource {
 		case "namespaces":
-			testinghelper.AssertEqualNameNamespace(t, action.Name, "", clusterManagerNamespace, "")
+			testinghelper.AssertEqualNameNamespace(t, action.Name, "", helpers.ClusterManagerNamespace, "")
 		}
 	}
 }

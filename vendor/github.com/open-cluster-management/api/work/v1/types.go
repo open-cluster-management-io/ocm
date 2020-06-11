@@ -9,23 +9,23 @@ import (
 type StatusCondition struct {
 	// Type is the type of the ManifestWork condition.
 	// +required
-	Type string `json:"type" protobuf:"bytes,1,opt,name=type"`
+	Type string `json:"type"`
 
 	// Status is the status of the condition. One of True, False, Unknown.
 	// +required
-	Status metav1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/apimachinery/pkg/apis/meta/v1.ConditionStatus"`
+	Status metav1.ConditionStatus `json:"status"`
 
 	// LastTransitionTime is the last time the condition changed from one status to another.
 	// +required
-	LastTransitionTime metav1.Time `json:"lastTransitionTime" protobuf:"bytes,3,opt,name=lastTransitionTime"`
+	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
 
 	// Reason is a (brief) reason for the condition's last status change.
 	// +required
-	Reason string `json:"reason" protobuf:"bytes,4,opt,name=reason"`
+	Reason string `json:"reason"`
 
 	// Message is a human-readable message indicating details about the last status change.
 	// +required
-	Message string `json:"message" protobuf:"bytes,5,opt,name=message"`
+	Message string `json:"message"`
 }
 
 // +genclient
@@ -39,65 +39,65 @@ type StatusCondition struct {
 // cluster.
 type ManifestWork struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec represents a desired configuration of work to be deployed on the managed cluster.
-	Spec ManifestWorkSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
+	Spec ManifestWorkSpec `json:"spec"`
 
 	// Status represents the current status of work
 	// +optional
-	Status ManifestWorkStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+	Status ManifestWorkStatus `json:"status,omitempty"`
 }
 
 // ManifestWorkSpec represents a desired configuration of manifests to be deployed on the managed cluster.
 type ManifestWorkSpec struct {
 	// Workload represents the manifest workload to be deployed on managed cluster
-	Workload ManifestsTemplate `json:"workload,omitempty" protobuf:"bytes,1,opt,name=workload"`
+	Workload ManifestsTemplate `json:"workload,omitempty"`
 }
 
 // Manifest represents a resource to be deployed on managed cluster
 type Manifest struct {
 	// +kubebuilder:validation:EmbeddedResource
 	// +kubebuilder:pruning:PreserveUnknownFields
-	runtime.RawExtension `json:",inline" protobuf:"bytes,1,opt,name=rawExtension"`
+	runtime.RawExtension `json:",inline"`
 }
 
 // ManifestsTemplate represents the manifest workload to be deployed on managed cluster
 type ManifestsTemplate struct {
 	// Manifests represents a list of kuberenetes resources to be deployed on the managed cluster.
 	// +optional
-	Manifests []Manifest `json:"manifests,omitempty" protobuf:"bytes,1,rep,name=manifests"`
+	Manifests []Manifest `json:"manifests,omitempty"`
 }
 
 // ManifestResourceMeta represents the gvk, gvr, name and namespace of a resoure
 type ManifestResourceMeta struct {
 	// Ordinal represents the index of the manifest on spec
 	// +required
-	Ordinal int32 `json:"ordinal" protobuf:"varint,1,opt,name=ordinal"`
+	Ordinal int32 `json:"ordinal"`
 
 	// Group is the API Group of the kubernetes resource
 	// +optional
-	Group string `json:"group" protobuf:"bytes,2,opt,name=group"`
+	Group string `json:"group"`
 
 	// Version is the version of the kubernetes resource
 	// +optional
-	Version string `json:"version" protobuf:"bytes,3,opt,name=version"`
+	Version string `json:"version"`
 
 	// Kind is the kind of the kubernetes resource
 	// +optional
-	Kind string `json:"kind" protobuf:"bytes,4,opt,name=kind"`
+	Kind string `json:"kind"`
 
 	// Resource is the resource name of the kubernetes resource
 	// +optional
-	Resource string `json:"resource" protobuf:"bytes,5,opt,name=resource"`
+	Resource string `json:"resource"`
 
 	// Name is the name of the kubernetes resource
 	// +optional
-	Name string `json:"name" protobuf:"bytes,6,opt,name=name"`
+	Name string `json:"name"`
 
 	// Name is the namespace of the kubernetes resource
 	// +optional
-	Namespace string `json:"namespace" protobuf:"bytes,7,opt,name=namespace"`
+	Namespace string `json:"namespace"`
 }
 
 // AppliedManifestResourceMeta represents the gvr, name and namespace of a resource.
@@ -105,24 +105,24 @@ type ManifestResourceMeta struct {
 type AppliedManifestResourceMeta struct {
 	// Group is the API Group of the kubernetes resource
 	// +required
-	Group string `json:"group" protobuf:"bytes,1,opt,name=group"`
+	Group string `json:"group"`
 
 	// Version is the version of the kubernetes resource
 	// +required
-	Version string `json:"version" protobuf:"bytes,2,opt,name=version"`
+	Version string `json:"version"`
 
 	// Resource is the resource name of the kubernetes resource
 	// +required
-	Resource string `json:"resource" protobuf:"bytes,3,opt,name=resource"`
+	Resource string `json:"resource"`
 
 	// Name is the name of the kubernetes resource
 	// +required
-	Name string `json:"name" protobuf:"bytes,4,opt,name=name"`
+	Name string `json:"name"`
 
 	// Name is the namespace of the kubernetes resource, empty string indicates
 	// it is a cluster scoped resource.
 	// +required
-	Namespace string `json:"namespace" protobuf:"bytes,5,opt,name=namespace"`
+	Namespace string `json:"namespace"`
 }
 
 // ManifestWorkStatus represents the current status of managed cluster ManifestWork
@@ -134,12 +134,12 @@ type ManifestWorkStatus struct {
 	// 3. Available represents workload in ManifestWork exists on the managed cluster.
 	// 4. Degraded represents the current state of workload does not match the desired
 	// state for a certain period.
-	Conditions []StatusCondition `json:"conditions" protobuf:"bytes,1,rep,name=conditions"`
+	Conditions []StatusCondition `json:"conditions"`
 
 	// ResourceStatus represents the status of each resource in manifestwork deployed on
 	// managed cluster. The Klusterlet agent on managed cluster syncs the condition from managed to the hub.
 	// +optional
-	ResourceStatus ManifestResourceStatus `json:"resourceStatus,omitempty" protobuf:"bytes,2,rep,name=resourceStatus"`
+	ResourceStatus ManifestResourceStatus `json:"resourceStatus,omitempty"`
 
 	// AppliedResources represents a list of resources defined within the manifestwork that are applied.
 	// Only resources with valid GroupVersionResource, namespace, and name are suitable.
@@ -148,7 +148,7 @@ type ManifestWorkStatus struct {
 	// The deleted resource may still be present until the finalizers for that resource are finished.
 	// However, the resource will not be undeleted, so it can be removed from this list and eventual consistency is preserved.
 	// +optional
-	AppliedResources []AppliedManifestResourceMeta `json:"appliedResources,omitempty" protobuf:"bytes,3,rep,name=appliedResources"`
+	AppliedResources []AppliedManifestResourceMeta `json:"appliedResources,omitempty"`
 }
 
 // ManifestResourceStatus represents the status of each resource in manifest work deployed on
@@ -161,7 +161,7 @@ type ManifestResourceStatus struct {
 	// 3. Available represents the resource exists on the managed cluster.
 	// 4. Degraded represents the current state of resource does not match the desired
 	// state for a certain period.
-	Manifests []ManifestCondition `json:"manifests,omitempty" protobuf:"bytes,2,opt,name=manifests"`
+	Manifests []ManifestCondition `json:"manifests,omitempty"`
 }
 
 // WorkStatusConditionType represents the condition type of the work
@@ -187,11 +187,11 @@ const (
 type ManifestCondition struct {
 	// ResourceMeta represents the gvk, name and namespace of a resoure
 	// +required
-	ResourceMeta ManifestResourceMeta `json:"resourceMeta" protobuf:"bytes,1,opt,name=resourceMeta"`
+	ResourceMeta ManifestResourceMeta `json:"resourceMeta"`
 
 	// Conditions represents the conditions of this resource on managed cluster
 	// +required
-	Conditions []StatusCondition `json:"conditions" protobuf:"bytes,2,rep,name=conditions"`
+	Conditions []StatusCondition `json:"conditions"`
 }
 
 // ManifestConditionType represents the condition type of a single
@@ -220,8 +220,8 @@ type ManifestWorkList struct {
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
 	// +optional
-	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of manifestworks.
-	Items []ManifestWork `json:"items" protobuf:"bytes,2,rep,name=items"`
+	Items []ManifestWork `json:"items"`
 }

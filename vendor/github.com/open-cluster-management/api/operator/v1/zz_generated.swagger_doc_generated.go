@@ -41,12 +41,29 @@ func (ClusterManagerSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterManagerStatus = map[string]string{
-	"":           "ClusterManagerStatus represents the current status of the registration and work distribution controllers running on the hub.",
-	"conditions": "Conditions contain the different condition statuses for this ClusterManager. Valid condition types are: Applied: components in hub are applied. Available: components in hub are available and ready to serve. Progressing: components in hub are in a transitioning state. Degraded: components in hub do not match the desired configuration and only provide degraded service.",
+	"":                   "ClusterManagerStatus represents the current status of the registration and work distribution controllers running on the hub.",
+	"observedGeneration": "ObservedGeneration is the last generation change you've dealt with",
+	"conditions":         "Conditions contain the different condition statuses for this ClusterManager. Valid condition types are: Applied: components in hub are applied. Available: components in hub are available and ready to serve. Progressing: components in hub are in a transitioning state. Degraded: components in hub do not match the desired configuration and only provide degraded service.",
+	"generations":        "Generations are used to determine when an item needs to be reconciled or has changed in a way that needs a reaction.",
+	"relatedResources":   "RelatedResources are used to track the resources that are related to this ClusterManager",
 }
 
 func (ClusterManagerStatus) SwaggerDoc() map[string]string {
 	return map_ClusterManagerStatus
+}
+
+var map_GenerationStatus = map[string]string{
+	"":               "GenerationStatus keeps track of the generation for a given resource so that decisions about forced updates can be made. the definition matches the GenerationStatus defined in github.com/openshift/api/v1",
+	"group":          "group is the group of the thing you're tracking",
+	"version":        "version is the version of the thing you're tracking",
+	"resource":       "resource is the resource type of the thing you're tracking",
+	"namespace":      "namespace is where the thing you're tracking is",
+	"name":           "name is the name of the thing you're tracking",
+	"lastGeneration": "lastGeneration is the last generation of the thing that controller applies",
+}
+
+func (GenerationStatus) SwaggerDoc() map[string]string {
+	return map_GenerationStatus
 }
 
 var map_Klusterlet = map[string]string{
@@ -83,12 +100,28 @@ func (KlusterletSpec) SwaggerDoc() map[string]string {
 }
 
 var map_KlusterletStatus = map[string]string{
-	"":           "KlusterletStatus represents the current status of Klusterlet agent.",
-	"conditions": "Conditions contain the different condition statuses for this Klusterlet. Valid condition types are: Applied: components have been applied in the managed cluster. Available: components in the managed cluster are available and ready to serve. Progressing: components in the managed cluster are in a transitioning state. Degraded: components in the managed cluster do not match the desired configuration and only provide degraded service.",
+	"":                   "KlusterletStatus represents the current status of Klusterlet agent.",
+	"observedGeneration": "ObservedGeneration is the last generation change you've dealt with",
+	"conditions":         "Conditions contain the different condition statuses for this Klusterlet. Valid condition types are: Applied: components have been applied in the managed cluster. Available: components in the managed cluster are available and ready to serve. Progressing: components in the managed cluster are in a transitioning state. Degraded: components in the managed cluster do not match the desired configuration and only provide degraded service.",
+	"generations":        "Generations are used to determine when an item needs to be reconciled or has changed in a way that needs a reaction.",
+	"relatedResources":   "RelatedResources are used to track the resources that are related to this Klusterlet",
 }
 
 func (KlusterletStatus) SwaggerDoc() map[string]string {
 	return map_KlusterletStatus
+}
+
+var map_RelatedResourceMeta = map[string]string{
+	"":          "RelatedResourceMeta represents the resource that is managed by an operator",
+	"group":     "group is the group of the thing you're tracking",
+	"version":   "version is the version of the thing you're tracking",
+	"resource":  "resource is the resource type of the thing you're tracking",
+	"namespace": "namespace is where the thing you're tracking is",
+	"name":      "name is the name of the thing you're tracking",
+}
+
+func (RelatedResourceMeta) SwaggerDoc() map[string]string {
+	return map_RelatedResourceMeta
 }
 
 var map_ServerURL = map[string]string{
