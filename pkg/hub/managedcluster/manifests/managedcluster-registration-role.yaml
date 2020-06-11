@@ -7,5 +7,5 @@ rules:
 # Allow spoke registration agent to get/update coordination.k8s.io/lease
 - apiGroups: ["coordination.k8s.io"]
   resources: ["leases"]
-  resourceNames: ["cluster-{{ .ManagedClusterName }}-lease"]
+  resourceNames: ["cluster-lease-{{ .ManagedClusterName }}"]
   verbs: ["get", "update"]
