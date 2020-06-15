@@ -15,6 +15,27 @@ spec:
       labels:
         app: {{ .ClusterManagerName }}-registration-webhook
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 70
+            podAffinityTerm:
+              topologyKey: failure-domain.beta.kubernetes.io/zone
+              labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                    - {{ .ClusterManagerName }}-registration-webhook
+          - weight: 30
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                    - {{ .ClusterManagerName }}-registration-webhook
       serviceAccountName: {{ .ClusterManagerName }}-registration-webhook-sa
       containers:
       - name: {{ .ClusterManagerName }}-registration-webhook-sa
