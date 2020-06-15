@@ -228,13 +228,14 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			managedCluster.Spec.HubAcceptsClient = true
+			managedCluster.Spec.LeaseDurationSeconds = 5
 			managedCluster, err = managedClusters.Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
 			return err
 		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By("Waiting for ManagedCluster to have HubAccepted=true")
-		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+		err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
 			var err error
 			managedCluster, err := managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
 			if err != nil {
@@ -251,6 +252,81 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 			}
 
 			return false, nil
+		})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ginkgo.By("Waiting for ManagedCluster to join the hub cluser")
+		err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
+			var err error
+			managedCluster, err := managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+
+			condition := helpers.FindManagedClusterCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
+
+			return helpers.IsConditionTrue(condition), nil
+		})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ginkgo.By("Waiting for ManagedCluster available")
+		err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
+			managedCluster, err := managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+
+			condition := helpers.FindManagedClusterCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
+			return helpers.IsConditionTrue(condition), nil
+		})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		leaseName := fmt.Sprintf("cluster-lease-%s", clusterName)
+		ginkgo.By(fmt.Sprintf("Make sure ManagedCluster lease %q exists", leaseName))
+		var lastRenewTime *metav1.MicroTime
+		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+			lease, err := hubClient.CoordinationV1().Leases(clusterName).Get(context.TODO(), leaseName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			lastRenewTime = lease.Spec.RenewTime
+			return true, nil
+		})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ginkgo.By(fmt.Sprintf("Make sure ManagedCluster lease %q is updated", leaseName))
+		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+			lease, err := hubClient.CoordinationV1().Leases(clusterName).Get(context.TODO(), leaseName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			leaseUpdated := lastRenewTime.Before(lease.Spec.RenewTime)
+			if leaseUpdated {
+				lastRenewTime = lease.Spec.RenewTime
+			}
+			return leaseUpdated, nil
+		})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ginkgo.By(fmt.Sprintf("Make sure ManagedCluster lease %q is updated again", leaseName))
+		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+			lease, err := hubClient.CoordinationV1().Leases(clusterName).Get(context.TODO(), leaseName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			return lastRenewTime.Before(lease.Spec.RenewTime), nil
+		})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ginkgo.By("Make sure ManagedCluster is still available")
+		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+			managedCluster, err := managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+
+			condition := helpers.FindManagedClusterCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
+			return helpers.IsConditionTrue(condition), nil
 		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
