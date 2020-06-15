@@ -22,6 +22,7 @@ import (
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	appsinformer "k8s.io/client-go/informers/apps/v1"
 
 	operatorv1client "github.com/open-cluster-management/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "github.com/open-cluster-management/api/client/operator/informers/externalversions/operator/v1"
@@ -60,7 +61,6 @@ var (
 
 const (
 	clusterManagerFinalizer     = "operator.open-cluster-management.io/cluster-manager-cleanup"
-	clusterManagerNamespace     = "open-cluster-management-hub"
 	clusterManagerWebhookSecret = "webhook-serving-cert"
 	clusterManagerApplied       = "Applied"
 	clusterManagerAvailable     = "Available"
@@ -82,6 +82,7 @@ func NewClusterManagerController(
 	apiRegistrationClient apiregistrationclient.APIServicesGetter,
 	clusterManagerClient operatorv1client.ClusterManagerInterface,
 	clusterManagerInformer operatorinformer.ClusterManagerInformer,
+	deploymentInformer appsinformer.DeploymentInformer,
 	recorder events.Recorder) factory.Controller {
 	controller := &clusterManagerController{
 		kubeClient:            kubeClient,
@@ -94,6 +95,7 @@ func NewClusterManagerController(
 
 	return factory.New().WithSync(controller.sync).
 		ResyncEvery(3*time.Minute).
+		WithInformersQueueKeyFunc(helpers.ClusterManagerDeploymentQueueKeyFunc(controller.clusterManagerLister), deploymentInformer.Informer()).
 		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
 			accessor, _ := meta.Accessor(obj)
 			return accessor.GetName()
@@ -129,7 +131,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 
 	config := hubConfig{
 		ClusterManagerName:                       clusterManager.Name,
-		ClusterManagerNamespace:                  clusterManagerNamespace,
+		ClusterManagerNamespace:                  helpers.ClusterManagerNamespace,
 		RegistrationImage:                        clusterManager.Spec.RegistrationImagePullSpec,
 		ClusterManagerWebhookSecret:              clusterManagerWebhookSecret,
 		ClusterManagerWebhookRegistrationService: fmt.Sprintf("%s-registration-webhook", clusterManager.Name),
@@ -186,23 +188,31 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		}
 	}
 
+	forceRollOut := false
+	if clusterManager.Generation != clusterManager.Status.ObservedGeneration {
+		forceRollOut = true
+	}
+
+	currentGenerations := []operatorapiv1.GenerationStatus{}
 	// Render deployment manifest and apply
-	for index, file := range deploymentFiles {
+	for _, file := range deploymentFiles {
 		currentGeneration, err := helpers.ApplyDeployment(
 			n.kubeClient,
-			n.currentGeneration[index],
+			clusterManager.Status.Generations,
 			func(name string) ([]byte, error) {
 				return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
 			},
+			forceRollOut,
 			controllerContext.Recorder(),
 			file)
 		if err != nil {
 			errs = append(errs, err)
 		}
-		n.currentGeneration[index] = currentGeneration
+		currentGenerations = append(currentGenerations, currentGeneration)
 	}
 
 	conditions := &clusterManager.Status.Conditions
+	observedKlusterletGeneration := clusterManager.Status.ObservedGeneration
 	if len(errs) == 0 {
 		helpers.SetOperatorCondition(conditions, operatorapiv1.StatusCondition{
 			Type:    clusterManagerApplied,
@@ -210,6 +220,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 			Reason:  "ClusterManagerApplied",
 			Message: "Components of cluster manager is applied",
 		})
+		observedKlusterletGeneration = clusterManager.Generation
 	} else {
 		helpers.SetOperatorCondition(conditions, operatorapiv1.StatusCondition{
 			Type:    clusterManagerApplied,
@@ -222,7 +233,14 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	//TODO Check if all the pods are running.
 	// Update status
 	_, _, updatedErr := helpers.UpdateClusterManagerStatus(
-		ctx, n.clusterManagerClient, clusterManager.Name, helpers.UpdateClusterManagerConditionFn(*conditions...))
+		ctx, n.clusterManagerClient, clusterManager.Name,
+		helpers.UpdateClusterManagerConditionFn(*conditions...),
+		helpers.UpdateClusterManagerGenerationsFn(currentGenerations...),
+		func(oldStatus *operatorapiv1.ClusterManagerStatus) error {
+			oldStatus.ObservedGeneration = observedKlusterletGeneration
+			return nil
+		},
+	)
 	if updatedErr != nil {
 		errs = append(errs, updatedErr)
 	}

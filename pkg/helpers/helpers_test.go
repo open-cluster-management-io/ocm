@@ -14,6 +14,7 @@ import (
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	fakeapiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -197,6 +198,16 @@ func newUnstructured(
 	return object
 }
 
+func newDeployment(name, namespace string, generation int64) *appsv1.Deployment {
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       name,
+			Namespace:  namespace,
+			Generation: generation,
+		},
+	}
+}
+
 func TestApplyValidatingWebhookConfiguration(t *testing.T) {
 	testcase := []struct {
 		name          string
@@ -363,6 +374,108 @@ func TestDeleteStaticObject(t *testing.T) {
 			}
 			if err != nil && !c.expectErr {
 				t.Errorf("Expect no apply error, %v", err)
+			}
+		})
+	}
+}
+
+func TestUpdateGeneration(t *testing.T) {
+	gvr := appsv1.SchemeGroupVersion.WithResource("deployments")
+	cases := []struct {
+		name               string
+		startingGeneration []operatorapiv1.GenerationStatus
+		newGeneration      operatorapiv1.GenerationStatus
+		expectedUpdated    bool
+		expectedGeneration []operatorapiv1.GenerationStatus
+	}{
+		{
+			name:               "add to empty",
+			startingGeneration: []operatorapiv1.GenerationStatus{},
+			newGeneration:      NewGenerationStatus(gvr, newDeployment("test", "test", 0)),
+			expectedUpdated:    true,
+			expectedGeneration: []operatorapiv1.GenerationStatus{NewGenerationStatus(gvr, newDeployment("test", "test", 0))},
+		},
+		{
+			name: "add to non-conflicting",
+			startingGeneration: []operatorapiv1.GenerationStatus{
+				NewGenerationStatus(gvr, newDeployment("test", "test", 0)),
+			},
+			newGeneration:   NewGenerationStatus(gvr, newDeployment("test2", "test", 0)),
+			expectedUpdated: true,
+			expectedGeneration: []operatorapiv1.GenerationStatus{
+				NewGenerationStatus(gvr, newDeployment("test", "test", 0)),
+				NewGenerationStatus(gvr, newDeployment("test2", "test", 0)),
+			},
+		},
+		{
+			name: "change existing status",
+			startingGeneration: []operatorapiv1.GenerationStatus{
+				NewGenerationStatus(gvr, newDeployment("test", "test", 0)),
+				NewGenerationStatus(gvr, newDeployment("test2", "test", 0)),
+			},
+			newGeneration:   NewGenerationStatus(gvr, newDeployment("test", "test", 1)),
+			expectedUpdated: true,
+			expectedGeneration: []operatorapiv1.GenerationStatus{
+				NewGenerationStatus(gvr, newDeployment("test", "test", 1)),
+				NewGenerationStatus(gvr, newDeployment("test2", "test", 0)),
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fakeOperatorClient := opereatorfake.NewSimpleClientset(
+				&operatorapiv1.ClusterManager{
+					ObjectMeta: metav1.ObjectMeta{Name: "testmanagedcluster"},
+					Status: operatorapiv1.ClusterManagerStatus{
+						Generations: c.startingGeneration,
+					},
+				},
+				&operatorapiv1.Klusterlet{
+					ObjectMeta: metav1.ObjectMeta{Name: "testmanagedcluster"},
+					Status: operatorapiv1.KlusterletStatus{
+						Generations: c.startingGeneration,
+					},
+				},
+			)
+
+			hubstatus, updated, err := UpdateClusterManagerStatus(
+				context.TODO(),
+				fakeOperatorClient.OperatorV1().ClusterManagers(),
+				"testmanagedcluster",
+				UpdateClusterManagerGenerationsFn(c.newGeneration),
+			)
+			if err != nil {
+				t.Errorf("unexpected err: %v", err)
+			}
+			if updated != c.expectedUpdated {
+				t.Errorf("expected %t, but %t", c.expectedUpdated, updated)
+			}
+
+			klusterletstatus, updated, err := UpdateKlusterletStatus(
+				context.TODO(),
+				fakeOperatorClient.OperatorV1().Klusterlets(),
+				"testmanagedcluster",
+				UpdateKlusterletGenerationsFn(c.newGeneration),
+			)
+			if err != nil {
+				t.Errorf("unexpected err: %v", err)
+			}
+			if updated != c.expectedUpdated {
+				t.Errorf("expected %t, but %t", c.expectedUpdated, updated)
+			}
+
+			for i := range c.expectedGeneration {
+				expected := c.expectedGeneration[i]
+				hubactual := hubstatus.Generations[i]
+				if !equality.Semantic.DeepEqual(expected, hubactual) {
+					t.Errorf(diff.ObjectDiff(expected, hubactual))
+				}
+
+				klusterletactual := klusterletstatus.Generations[i]
+				if !equality.Semantic.DeepEqual(expected, klusterletactual) {
+					t.Errorf(diff.ObjectDiff(expected, klusterletactual))
+				}
 			}
 		})
 	}

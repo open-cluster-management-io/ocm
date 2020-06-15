@@ -15,6 +15,7 @@ import (
 	fakeoperatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned/fake"
 	operatorinformers "github.com/open-cluster-management/api/client/operator/informers/externalversions"
 	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
+	"github.com/open-cluster-management/registration-operator/pkg/helpers"
 	testinghelper "github.com/open-cluster-management/registration-operator/pkg/helpers/testing"
 )
 
@@ -92,63 +93,6 @@ func newTestController(klusterlet *operatorapiv1.Klusterlet, objects ...runtime.
 	}
 }
 
-// TestQueueKeyFunc test queueKeyFunc
-func TestQueueKeyFunc(t *testing.T) {
-	cases := []struct {
-		name        string
-		object      runtime.Object
-		klusterlet  *operatorapiv1.Klusterlet
-		expectedKey string
-	}{
-		{
-			name:        "key by secret",
-			object:      newSecret(hubKubeConfigSecret, "test"),
-			klusterlet:  newKlusterlet("testklusterlet", "test", ""),
-			expectedKey: "testklusterlet",
-		},
-		{
-			name:        "key by deployment",
-			object:      newDeployment("test-work-agent", "test", 0, 0),
-			klusterlet:  newKlusterlet("testklusterlet", "test", ""),
-			expectedKey: "testklusterlet",
-		},
-		{
-			name:        "key by wrong secret",
-			object:      newSecret("dummy", "test"),
-			klusterlet:  newKlusterlet("testklusterlet", "test", ""),
-			expectedKey: "",
-		},
-		{
-			name:        "key by wrong deployment",
-			object:      newDeployment("dummy", "test", 0, 0),
-			klusterlet:  newKlusterlet("testklusterlet", "test", ""),
-			expectedKey: "",
-		},
-		{
-			name:        "key by wrong klusterlet",
-			object:      newDeployment("test-work-agent", "test", 0, 0),
-			klusterlet:  newKlusterlet("testklusterlet", "test1", ""),
-			expectedKey: "",
-		},
-		{
-			name:        "key by klusterlet with empty namespace",
-			object:      newSecret(bootstrapHubKubeConfigSecret, klusterletNamespace),
-			klusterlet:  newKlusterlet("testklusterlet", "", ""),
-			expectedKey: "testklusterlet",
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			controller := newTestController(c.klusterlet, c.object)
-			actualKey := controller.controller.queueKeyFunc(c.object)
-			if actualKey != c.expectedKey {
-				t.Errorf("Queued key is not correct: actual %s, expected %s", actualKey, c.expectedKey)
-			}
-		})
-	}
-}
-
 func TestSync(t *testing.T) {
 	cases := []struct {
 		name               string
@@ -166,7 +110,7 @@ func TestSync(t *testing.T) {
 		},
 		{
 			name:       "No hubconfig secret",
-			object:     []runtime.Object{newSecret(bootstrapHubKubeConfigSecret, "test")},
+			object:     []runtime.Object{newSecret(helpers.BootstrapHubKubeConfigSecret, "test")},
 			klusterlet: newKlusterlet("testklusterlet", "test", ""),
 			expectedConditions: []operatorapiv1.StatusCondition{
 				testinghelper.NamedCondition(klusterletRegistrationDegraded, "HubKubeConfigSecretMissing", metav1.ConditionTrue),
@@ -175,7 +119,7 @@ func TestSync(t *testing.T) {
 		},
 		{
 			name:       "No cluster name secret",
-			object:     []runtime.Object{newSecret(bootstrapHubKubeConfigSecret, "test"), newSecret(hubKubeConfigSecret, "test")},
+			object:     []runtime.Object{newSecret(helpers.BootstrapHubKubeConfigSecret, "test"), newSecret(helpers.HubKubeConfigSecret, "test")},
 			klusterlet: newKlusterlet("testklusterlet", "test", ""),
 			expectedConditions: []operatorapiv1.StatusCondition{
 				testinghelper.NamedCondition(klusterletRegistrationDegraded, "ClusterNameMissing", metav1.ConditionTrue),
@@ -184,7 +128,7 @@ func TestSync(t *testing.T) {
 		},
 		{
 			name:       "No kubeconfig secret",
-			object:     []runtime.Object{newSecret(bootstrapHubKubeConfigSecret, "test"), newSecret(hubKubeConfigSecret, "test")},
+			object:     []runtime.Object{newSecret(helpers.BootstrapHubKubeConfigSecret, "test"), newSecret(helpers.HubKubeConfigSecret, "test")},
 			klusterlet: newKlusterlet("testklusterlet", "test", "cluster1"),
 			expectedConditions: []operatorapiv1.StatusCondition{
 				testinghelper.NamedCondition(klusterletRegistrationDegraded, "KubeConfigMissing", metav1.ConditionTrue),
@@ -194,8 +138,8 @@ func TestSync(t *testing.T) {
 		{
 			name: "Unavailable pod in deployments",
 			object: []runtime.Object{
-				newSecret(bootstrapHubKubeConfigSecret, "test"),
-				newSecretWithKubeConfig(hubKubeConfigSecret, "test"),
+				newSecret(helpers.BootstrapHubKubeConfigSecret, "test"),
+				newSecretWithKubeConfig(helpers.HubKubeConfigSecret, "test"),
 				newDeployment("testklusterlet-registration-agent", "test", 3, 0),
 				newDeployment("testklusterlet-work-agent", "test", 3, 0),
 			},
@@ -208,8 +152,8 @@ func TestSync(t *testing.T) {
 		{
 			name: "Operator functional",
 			object: []runtime.Object{
-				newSecret(bootstrapHubKubeConfigSecret, "test"),
-				newSecretWithKubeConfig(hubKubeConfigSecret, "test"),
+				newSecret(helpers.BootstrapHubKubeConfigSecret, "test"),
+				newSecretWithKubeConfig(helpers.HubKubeConfigSecret, "test"),
 				newDeployment("testklusterlet-registration-agent", "test", 3, 3),
 				newDeployment("testklusterlet-work-agent", "test", 3, 3),
 			},

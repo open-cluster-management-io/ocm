@@ -9,7 +9,9 @@ import (
 	fakeoperatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned/fake"
 	operatorinformers "github.com/open-cluster-management/api/client/operator/informers/externalversions"
 	opratorapiv1 "github.com/open-cluster-management/api/operator/v1"
+	"github.com/open-cluster-management/registration-operator/pkg/helpers"
 	testinghelper "github.com/open-cluster-management/registration-operator/pkg/helpers/testing"
+	"golang.org/x/net/context"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -35,6 +37,26 @@ func newSecret(name, namespace string) *corev1.Secret {
 			Namespace: namespace,
 		},
 		Data: map[string][]byte{},
+	}
+}
+
+func newWorkAgentDeployment(klusterletName, clusterName string) *appsv1.Deployment {
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-work-agent", klusterletName),
+			Namespace: helpers.KlusterletDefaultNamespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Args: []string{"/work", "agent", fmt.Sprintf("--spoke-cluster-name=%s", clusterName)},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -204,8 +226,8 @@ func ensureObject(t *testing.T, object runtime.Object, klusterlet *opratorapiv1.
 // TestSyncDeploy test deployment of klusterlet components
 func TestSyncDeploy(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
-	bootStrapSecret := newSecret(bootstrapHubKubeConfigSecret, "testns")
-	hubKubeConfigSecret := newSecret(hubKubeConfigSecret, "testns")
+	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfigSecret, "testns")
+	hubKubeConfigSecret := newSecret(helpers.HubKubeConfigSecret, "testns")
 	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	namespace := newNamespace("testns")
 	controller := newTestController(klusterlet, bootStrapSecret, hubKubeConfigSecret, namespace)
@@ -320,8 +342,8 @@ func TestGetServersFromKlusterlet(t *testing.T) {
 func TestClusterNameChange(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	namespace := newNamespace("testns")
-	bootStrapSecret := newSecret(bootstrapHubKubeConfigSecret, "testns")
-	hubSecret := newSecret(hubKubeConfigSecret, "testns")
+	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfigSecret, "testns")
+	hubSecret := newSecret(helpers.HubKubeConfigSecret, "testns")
 	hubSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	hubSecret.Data["cluster-name"] = []byte("cluster1")
 	controller := newTestController(klusterlet, bootStrapSecret, hubSecret, namespace)
@@ -334,13 +356,26 @@ func TestClusterNameChange(t *testing.T) {
 	// Check if deployment has the right cluster name set
 	ensureDeployments(t, controller.kubeClient.Actions(), "create", "", "cluster1", "cluster1")
 
+	operatorAction := controller.operatorClient.Actions()
+	if len(operatorAction) != 2 {
+		t.Errorf("Expect 2 actions in the sync loop, actual %#v", operatorAction)
+	}
+
+	testinghelper.AssertGet(t, operatorAction[0], "operator.open-cluster-management.io", "v1", "klusterlets")
+	testinghelper.AssertAction(t, operatorAction[1], "update")
+	updatedKlusterlet := operatorAction[1].(clienttesting.UpdateActionImpl).Object.(*opratorapiv1.Klusterlet)
+	testinghelper.AssertOnlyGenerationStatuses(
+		t, updatedKlusterlet,
+		testinghelper.NamedDeploymentGenerationStatus("klusterlet-registration-agent", "testns", 0),
+		testinghelper.NamedDeploymentGenerationStatus("klusterlet-work-agent", "testns", 0),
+	)
+
 	// Update klusterlet with unset cluster name and rerun sync
 	controller.kubeClient.ClearActions()
+	controller.operatorClient.ClearActions()
 	klusterlet = newKlusterlet("klusterlet", "testns", "")
+	klusterlet.Generation = 1
 	controller.operatorStore.Update(klusterlet)
-	// Set generation to another number so we can force the update, we will read generatioin from status in the future
-	controller.controller.registrationGeneration = 100
-	controller.controller.workGeneration = 100
 
 	err = controller.controller.sync(nil, syncContext)
 	if err != nil {
@@ -356,16 +391,13 @@ func TestClusterNameChange(t *testing.T) {
 		}
 
 		getAction := action.(clienttesting.GetActionImpl)
-		if getAction.Name != hubKubeConfigSecret {
+		if getAction.Name != helpers.HubKubeConfigSecret {
 			return false, nil, errors.NewNotFound(
-				corev1.Resource("secrets"), hubKubeConfigSecret)
+				corev1.Resource("secrets"), helpers.HubKubeConfigSecret)
 		}
 		return true, hubSecret, nil
 	})
 	controller.kubeClient.ClearActions()
-	// Set generation to another number so we can force the update, we will read generatioin from status in the future
-	controller.controller.registrationGeneration = 100
-	controller.controller.workGeneration = 100
 
 	err = controller.controller.sync(nil, syncContext)
 	if err != nil {
@@ -375,16 +407,63 @@ func TestClusterNameChange(t *testing.T) {
 
 	// Update klusterlet with different cluster name and rerun sync
 	klusterlet = newKlusterlet("klusterlet", "testns", "cluster3")
+	klusterlet.Generation = 2
 	klusterlet.Spec.ExternalServerURLs = []opratorapiv1.ServerURL{{URL: "https://localhost"}}
 	controller.kubeClient.ClearActions()
+	controller.operatorClient.ClearActions()
 	controller.operatorStore.Update(klusterlet)
-	// Set generation to another number so we can force the update, we will read generatioin from status in the future
-	controller.controller.registrationGeneration = 100
-	controller.controller.workGeneration = 100
 
 	err = controller.controller.sync(nil, syncContext)
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 	ensureDeployments(t, controller.kubeClient.Actions(), "update", "https://localhost", "cluster3", "cluster3")
+}
+
+func TestForceRollOutWorkAgent(t *testing.T) {
+	cases := []struct {
+		name            string
+		forceRollout    bool
+		deployment      *appsv1.Deployment
+		clusterName     string
+		expectedRollout bool
+	}{
+		{
+			name:            "cluster name changes",
+			forceRollout:    false,
+			deployment:      newWorkAgentDeployment("klusterlet", "cluster1"),
+			clusterName:     "cluster2",
+			expectedRollout: true,
+		},
+		{
+			name:            "cluster name does not change",
+			forceRollout:    false,
+			deployment:      newWorkAgentDeployment("klusterlet", "cluster1"),
+			clusterName:     "cluster1",
+			expectedRollout: false,
+		},
+		{
+			name:            "force rollout already true",
+			forceRollout:    true,
+			deployment:      newWorkAgentDeployment("klusterlet", "cluster1"),
+			clusterName:     "cluster1",
+			expectedRollout: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			klusterlet := newKlusterlet("klusterlet", helpers.KlusterletDefaultNamespace, "cluster1")
+			controller := newTestController(klusterlet, c.deployment)
+			config := klusterletConfig{
+				KlusterletNamespace: helpers.KlusterletDefaultNamespace,
+				ClusterName:         c.clusterName,
+				KlusterletName:      klusterlet.Name,
+			}
+			controller.controller.forceRollOutWorkAgent(context.TODO(), config, &c.forceRollout)
+			if c.forceRollout != c.expectedRollout {
+				t.Errorf("Expected force rollout to be %v, but got %v", c.expectedRollout, c.forceRollout)
+			}
+		})
+	}
 }

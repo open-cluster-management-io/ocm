@@ -16,8 +16,10 @@ import (
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -260,28 +262,38 @@ func ApplyValidatingWebhookConfiguration(
 }
 
 func ApplyDeployment(
-	client kubernetes.Interface, generation int64, manifests resourceapply.AssetFunc, recorder events.Recorder, file string) (int64, error) {
+	client kubernetes.Interface,
+	generationStatuses []operatorapiv1.GenerationStatus,
+	manifests resourceapply.AssetFunc,
+	forceRollout bool,
+	recorder events.Recorder, file string) (operatorapiv1.GenerationStatus, error) {
 	deploymentBytes, err := manifests(file)
 	if err != nil {
-
+		return operatorapiv1.GenerationStatus{}, err
 	}
 	deployment, _, err := genericCodec.Decode(deploymentBytes, nil, nil)
 	if err != nil {
-		return generation, fmt.Errorf("%q: %v", file, err)
+		return operatorapiv1.GenerationStatus{}, fmt.Errorf("%q: %v", file, err)
+	}
+	generationStatus := NewGenerationStatus(appsv1.SchemeGroupVersion.WithResource("deployments"), deployment)
+	currentGenerationStatus := FindGenerationStatus(generationStatuses, generationStatus)
+
+	if currentGenerationStatus != nil {
+		generationStatus.LastGeneration = currentGenerationStatus.LastGeneration
 	}
 	updatedDeployment, updated, err := resourceapply.ApplyDeployment(
 		client.AppsV1(),
 		recorder,
-		deployment.(*appsv1.Deployment), generation, false)
+		deployment.(*appsv1.Deployment), generationStatus.LastGeneration, forceRollout)
 	if err != nil {
-		return generation, fmt.Errorf("%q (%T): %v", file, deployment, err)
+		return generationStatus, fmt.Errorf("%q (%T): %v", file, deployment, err)
 	}
 
 	if updated {
-		generation = updatedDeployment.ObjectMeta.Generation
+		generationStatus.LastGeneration = updatedDeployment.ObjectMeta.Generation
 	}
 
-	return generation, nil
+	return generationStatus, nil
 }
 
 func ApplyDirectly(
@@ -343,4 +355,70 @@ func NumOfUnavailablePod(deployment *appsv1.Deployment) int32 {
 	}
 
 	return desiredReplicas - deployment.Status.AvailableReplicas
+}
+
+func NewGenerationStatus(gvr schema.GroupVersionResource, object runtime.Object) operatorapiv1.GenerationStatus {
+	accessor, _ := meta.Accessor(object)
+	return operatorapiv1.GenerationStatus{
+		Group:          gvr.Group,
+		Version:        gvr.Version,
+		Resource:       gvr.Resource,
+		Namespace:      accessor.GetNamespace(),
+		Name:           accessor.GetName(),
+		LastGeneration: accessor.GetGeneration(),
+	}
+}
+
+func FindGenerationStatus(generationStatuses []operatorapiv1.GenerationStatus, generation operatorapiv1.GenerationStatus) *operatorapiv1.GenerationStatus {
+	for i := range generationStatuses {
+		if generationStatuses[i].Group != generation.Group {
+			continue
+		}
+		if generationStatuses[i].Resource != generation.Resource {
+			continue
+		}
+		if generationStatuses[i].Version != generation.Version {
+			continue
+		}
+		if generationStatuses[i].Name != generation.Name {
+			continue
+		}
+		if generationStatuses[i].Namespace != generation.Namespace {
+			continue
+		}
+		return &generationStatuses[i]
+	}
+	return nil
+}
+
+func SetGenerationStatuses(generationStatuses *[]operatorapiv1.GenerationStatus, newGenerationStatus operatorapiv1.GenerationStatus) {
+	if generationStatuses == nil {
+		generationStatuses = &[]operatorapiv1.GenerationStatus{}
+	}
+
+	existingGeneration := FindGenerationStatus(*generationStatuses, newGenerationStatus)
+	if existingGeneration == nil {
+		*generationStatuses = append(*generationStatuses, newGenerationStatus)
+		return
+	}
+
+	existingGeneration.LastGeneration = newGenerationStatus.LastGeneration
+}
+
+func UpdateClusterManagerGenerationsFn(generations ...operatorapiv1.GenerationStatus) UpdateClusterManagerStatusFunc {
+	return func(oldStatus *operatorapiv1.ClusterManagerStatus) error {
+		for _, generation := range generations {
+			SetGenerationStatuses(&oldStatus.Generations, generation)
+		}
+		return nil
+	}
+}
+
+func UpdateKlusterletGenerationsFn(generations ...operatorapiv1.GenerationStatus) UpdateKlusterletStatusFunc {
+	return func(oldStatus *operatorapiv1.KlusterletStatus) error {
+		for _, generation := range generations {
+			SetGenerationStatuses(&oldStatus.Generations, generation)
+		}
+		return nil
+	}
 }

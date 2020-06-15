@@ -78,6 +78,67 @@ spec:
                   type:
                     description: Type is the type of the cluster condition.
                     type: string
+            generations:
+              description: Generations are used to determine when an item needs to
+                be reconciled or has changed in a way that needs a reaction.
+              type: array
+              items:
+                description: GenerationStatus keeps track of the generation for a
+                  given resource so that decisions about forced updates can be made.
+                  the definition matches the GenerationStatus defined in github.com/openshift/api/v1
+                type: object
+                properties:
+                  group:
+                    description: group is the group of the thing you're tracking
+                    type: string
+                  lastGeneration:
+                    description: lastGeneration is the last generation of the thing
+                      that controller applies
+                    type: integer
+                    format: int64
+                  name:
+                    description: name is the name of the thing you're tracking
+                    type: string
+                  namespace:
+                    description: namespace is where the thing you're tracking is
+                    type: string
+                  resource:
+                    description: resource is the resource type of the thing you're
+                      tracking
+                    type: string
+                  version:
+                    description: version is the version of the thing you're tracking
+                    type: string
+            observedGeneration:
+              description: ObservedGeneration is the last generation change you've
+                dealt with
+              type: integer
+              format: int64
+            relatedResources:
+              description: RelatedResources are used to track the resources that are
+                related to this ClusterManager
+              type: array
+              items:
+                description: RelatedResourceMeta represents the resource that is managed
+                  by an operator
+                type: object
+                properties:
+                  group:
+                    description: group is the group of the thing you're tracking
+                    type: string
+                  name:
+                    description: name is the name of the thing you're tracking
+                    type: string
+                  namespace:
+                    description: namespace is where the thing you're tracking is
+                    type: string
+                  resource:
+                    description: resource is the resource type of the thing you're
+                      tracking
+                    type: string
+                  version:
+                    description: version is the version of the thing you're tracking
+                    type: string
   version: v1
   versions:
   - name: v1
