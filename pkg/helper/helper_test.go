@@ -7,9 +7,13 @@ import (
 
 	fakeworkclient "github.com/open-cluster-management/api/client/work/clientset/versioned/fake"
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	fakedynamic "k8s.io/client-go/dynamic/fake"
 )
 
 func newCondition(name, status, reason, message string, lastTransition *metav1.Time) workapiv1.StatusCondition {
@@ -37,6 +41,29 @@ func newManifestCondition(ordinal int32, resource string, conds ...workapiv1.Sta
 		ResourceMeta: workapiv1.ManifestResourceMeta{Ordinal: ordinal, Resource: resource},
 		Conditions:   conds,
 	}
+}
+
+func newSecret(namespace, name string, terminated bool, uid string) *corev1.Secret {
+	secret := &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+
+	if terminated {
+		now := metav1.Now()
+		secret.DeletionTimestamp = &now
+	}
+	if uid != "" {
+		secret.UID = types.UID(uid)
+	}
+
+	return secret
 }
 
 // TestUpdateStatusCondition tests UpdateManifestWorkStatus function
@@ -280,6 +307,65 @@ func TestMergeStatusConditions(t *testing.T) {
 				if !equality.Semantic.DeepEqual(actual, expect) {
 					t.Errorf(diff.ObjectDiff(actual, expect))
 				}
+			}
+		})
+	}
+}
+
+func TestDeleteAppliedResourcess(t *testing.T) {
+	cases := []struct {
+		name                                 string
+		existingResources                    []runtime.Object
+		resourcesToRemove                    []workapiv1.AppliedManifestResourceMeta
+		expectedResourcesPendingFinalization []workapiv1.AppliedManifestResourceMeta
+	}{
+		{
+			name: "skip if resource does not exist",
+			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1"},
+			},
+		},
+		{
+			name: "skip if resource have different uid",
+			existingResources: []runtime.Object{
+				newSecret("ns1", "n1", false, "ns1-n1-xxx"),
+				newSecret("ns2", "n2", true, "ns2-n2-xxx"),
+			},
+			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
+				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
+			},
+		},
+		{
+			name: "delete resources",
+			existingResources: []runtime.Object{
+				newSecret("ns1", "n1", false, "ns1-n1"),
+				newSecret("ns2", "n2", true, "ns2-n2"),
+			},
+			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1"},
+				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
+			},
+			expectedResourcesPendingFinalization: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
+				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
+			},
+		},
+	}
+
+	scheme := runtime.NewScheme()
+	corev1.AddToScheme(scheme)
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(scheme, c.existingResources...)
+			actual, err := DeleteAppliedResources(c.resourcesToRemove, fakeDynamicClient)
+			if err != nil {
+				t.Errorf("unexpected err: %v", err)
+			}
+
+			if !equality.Semantic.DeepEqual(actual, c.expectedResourcesPendingFinalization) {
+				t.Errorf(diff.ObjectDiff(actual, c.expectedResourcesPendingFinalization))
 			}
 		})
 	}

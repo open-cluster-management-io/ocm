@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	fakeworkclient "github.com/open-cluster-management/api/client/work/clientset/versioned/fake"
@@ -13,18 +14,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/diff"
 )
-
-func newAppliedResource(group, version, resource, namespace, name string) workapiv1.AppliedManifestResourceMeta {
-	return workapiv1.AppliedManifestResourceMeta{
-		Group:     group,
-		Version:   version,
-		Resource:  resource,
-		Namespace: namespace,
-		Name:      name,
-	}
-}
 
 func newManifest(group, version, resource, namespace, name string) workapiv1.ManifestCondition {
 	return workapiv1.ManifestCondition{
@@ -38,18 +30,22 @@ func newManifest(group, version, resource, namespace, name string) workapiv1.Man
 	}
 }
 
-func TestGarbageCollection(t *testing.T) {
+func TestSyncManifestWork(t *testing.T) {
 	cases := []struct {
 		name                        string
+		existingResources           []runtime.Object
 		appliedResources            []workapiv1.AppliedManifestResourceMeta
 		manifests                   []workapiv1.ManifestCondition
 		validateManifestWorkActions func(t *testing.T, actions []clienttesting.Action)
 		validateDynamicActions      func(t *testing.T, actions []clienttesting.Action)
+		expectedQueueLen            int
 	}{
 		{
-			name:             "skip when no applied resource changed",
-			appliedResources: []workapiv1.AppliedManifestResourceMeta{newAppliedResource("g1", "v1", "r1", "ns1", "n1")},
-			manifests:        []workapiv1.ManifestCondition{newManifest("g1", "v1", "r1", "ns1", "n1")},
+			name: "skip when no applied resource changed",
+			appliedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
+			},
+			manifests: []workapiv1.ManifestCondition{newManifest("g1", "v1", "r1", "ns1", "n1")},
 			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) > 0 {
 					t.Fatal(spew.Sdump(actions))
@@ -64,10 +60,10 @@ func TestGarbageCollection(t *testing.T) {
 		{
 			name: "delete untracked resources",
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
-				newAppliedResource("g1", "v1", "r1", "ns1", "n1"),
-				newAppliedResource("g2", "v2", "r2", "ns2", "n2"),
-				newAppliedResource("g3", "v3", "r3", "ns3", "n3"),
-				newAppliedResource("g4", "v4", "r4", "ns4", "n4"),
+				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
+				{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
+				{Group: "g3", Version: "v3", Resource: "r3", Namespace: "ns3", Name: "n3"},
+				{Group: "g4", Version: "v4", Resource: "r4", Namespace: "ns4", Name: "n4"},
 			},
 			manifests: []workapiv1.ManifestCondition{
 				newManifest("g1", "v1", "r1", "ns1", "n1"),
@@ -81,10 +77,10 @@ func TestGarbageCollection(t *testing.T) {
 				}
 				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
 				if !reflect.DeepEqual(work.Status.AppliedResources, []workapiv1.AppliedManifestResourceMeta{
-					newAppliedResource("g1", "v1", "r1", "ns1", "n1"),
-					newAppliedResource("g2", "v2", "r2", "ns2", "n2"),
-					newAppliedResource("g5", "v5", "r5", "ns5", "n5"),
-					newAppliedResource("g6", "v6", "r6", "ns6", "n6"),
+					{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
+					{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
+					{Group: "g5", Version: "v5", Resource: "r5", Namespace: "ns5", Name: "n5"},
+					{Group: "g6", Version: "v6", Resource: "r6", Namespace: "ns6", Name: "n6"},
 				}) {
 					t.Fatal(spew.Sdump(actions))
 				}
@@ -94,14 +90,88 @@ func TestGarbageCollection(t *testing.T) {
 					t.Fatal(spew.Sdump(actions))
 				}
 
-				action := actions[0].(clienttesting.DeleteAction)
+				action := actions[0].(clienttesting.GetAction)
 				resource, namespace, name := action.GetResource(), action.GetNamespace(), action.GetName()
 				if !reflect.DeepEqual(resource, schema.GroupVersionResource{Group: "g3", Version: "v3", Resource: "r3"}) || namespace != "ns3" || name != "n3" {
 					t.Fatal(spew.Sdump(actions))
 				}
-				action = actions[1].(clienttesting.DeleteAction)
+				action = actions[1].(clienttesting.GetAction)
 				resource, namespace, name = action.GetResource(), action.GetNamespace(), action.GetName()
 				if !reflect.DeepEqual(resource, schema.GroupVersionResource{Group: "g4", Version: "v4", Resource: "r4"}) || namespace != "ns4" || name != "n4" {
+					t.Fatal(spew.Sdump(actions))
+				}
+			},
+		},
+		{
+			name: "requeue work when applied resource for stale manifest is deleting",
+			existingResources: []runtime.Object{
+				spoketesting.NewUnstructuredSecret("ns3", "n3", true, "ns3-n3"),
+			},
+			appliedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1"},
+				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2"},
+				{Version: "v1", Resource: "secrets", Namespace: "ns3", Name: "n3", UID: "ns3-n3"},
+			},
+			manifests: []workapiv1.ManifestCondition{
+				newManifest("", "v1", "secrets", "ns1", "n1"),
+				newManifest("", "v1", "secrets", "ns2", "n2"),
+			},
+			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) > 0 {
+					t.Fatal(spew.Sdump(actions))
+				}
+			},
+			validateDynamicActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 1 {
+					t.Fatal(spew.Sdump(actions))
+				}
+
+				action := actions[0].(clienttesting.GetAction)
+				resource, namespace, name := action.GetResource(), action.GetNamespace(), action.GetName()
+				if !reflect.DeepEqual(resource, schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}) || namespace != "ns3" || name != "n3" {
+					t.Fatal(spew.Sdump(actions))
+				}
+			},
+			expectedQueueLen: 1,
+		},
+		{
+			name: "ignore re-created resource",
+			existingResources: []runtime.Object{
+				spoketesting.NewUnstructuredSecret("ns3", "n3", false, "ns3-n3-recreated"),
+			},
+			appliedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", Resource: "secrets", Namespace: "ns3", Name: "n3", UID: "ns3-n3"},
+				{Version: "v1", Resource: "secrets", Namespace: "ns4", Name: "n4", UID: "ns4-n4"},
+			},
+			manifests: []workapiv1.ManifestCondition{
+				newManifest("", "v1", "secrets", "ns1", "n1"),
+				newManifest("", "v1", "secrets", "ns5", "n5"),
+			},
+			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 1 {
+					t.Fatal(spew.Sdump(actions))
+				}
+				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
+				if !reflect.DeepEqual(work.Status.AppliedResources, []workapiv1.AppliedManifestResourceMeta{
+					{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1"},
+					{Version: "v1", Resource: "secrets", Namespace: "ns5", Name: "n5"},
+				}) {
+					t.Fatal(spew.Sdump(actions))
+				}
+			},
+			validateDynamicActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 2 {
+					t.Fatal(spew.Sdump(actions))
+				}
+
+				action := actions[0].(clienttesting.GetAction)
+				resource, namespace, name := action.GetResource(), action.GetNamespace(), action.GetName()
+				if !reflect.DeepEqual(resource, schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}) || namespace != "ns3" || name != "n3" {
+					t.Fatal(spew.Sdump(actions))
+				}
+				action = actions[1].(clienttesting.GetAction)
+				resource, namespace, name = action.GetResource(), action.GetNamespace(), action.GetName()
+				if !reflect.DeepEqual(resource, schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}) || namespace != "ns4" || name != "n4" {
 					t.Fatal(spew.Sdump(actions))
 				}
 			},
@@ -114,19 +184,26 @@ func TestGarbageCollection(t *testing.T) {
 			testingWork.Status.AppliedResources = c.appliedResources
 			testingWork.Status.ResourceStatus.Manifests = c.manifests
 
-			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme())
+			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), c.existingResources...)
 			fakeClient := fakeworkclient.NewSimpleClientset(testingWork)
 			controller := StaleManifestDeletionController{
 				manifestWorkClient: fakeClient.WorkV1().ManifestWorks(testingWork.Namespace),
 				spokeDynamicClient: fakeDynamicClient,
+				rateLimiter:        workqueue.NewItemExponentialFailureRateLimiter(0, 1*time.Second),
 			}
 
-			err := controller.syncManifestWork(context.TODO(), testingWork)
+			controllerContext := spoketesting.NewFakeSyncContext(t, testingWork.Name)
+			err := controller.syncManifestWork(context.TODO(), controllerContext, testingWork)
 			if err != nil {
 				t.Fatal(err)
 			}
 			c.validateManifestWorkActions(t, fakeClient.Actions())
 			c.validateDynamicActions(t, fakeDynamicClient.Actions())
+
+			queueLen := controllerContext.Queue().Len()
+			if queueLen != c.expectedQueueLen {
+				t.Errorf("expected %d, but %d", c.expectedQueueLen, queueLen)
+			}
 		})
 	}
 
@@ -143,37 +220,37 @@ func TestFindUntrackedResources(t *testing.T) {
 			name:             "no resource untracked",
 			appliedResources: nil,
 			newAppliedResources: []workapiv1.AppliedManifestResourceMeta{
-				newAppliedResource("g1", "v1", "r1", "ns1", "n1"),
+				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
 			},
 			expectedUntrackedResources: nil,
 		},
 		{
 			name: "some of original resources untracked",
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
-				newAppliedResource("g1", "v1", "r1", "ns1", "n1"),
-				newAppliedResource("g2", "v2", "r2", "ns2", "n2"),
+				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
+				{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
 			},
 			newAppliedResources: []workapiv1.AppliedManifestResourceMeta{
-				newAppliedResource("g2", "v2", "r2", "ns2", "n2"),
-				newAppliedResource("g3", "v3", "r3", "ns3", "n3"),
+				{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
+				{Group: "g3", Version: "v3", Resource: "r3", Namespace: "ns3", Name: "n3"},
 			},
 			expectedUntrackedResources: []workapiv1.AppliedManifestResourceMeta{
-				newAppliedResource("g1", "v1", "r1", "ns1", "n1"),
+				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
 			},
 		},
 		{
 			name: "all original resources untracked",
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
-				newAppliedResource("g1", "v1", "r1", "ns1", "n1"),
-				newAppliedResource("g2", "v2", "r2", "ns2", "n2"),
+				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
+				{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
 			},
 			newAppliedResources: []workapiv1.AppliedManifestResourceMeta{
-				newAppliedResource("g3", "v3", "r3", "ns3", "n3"),
-				newAppliedResource("g4", "v4", "r4", "ns4", "n4"),
+				{Group: "g3", Version: "v3", Resource: "r3", Namespace: "ns3", Name: "n3"},
+				{Group: "g4", Version: "v4", Resource: "r4", Namespace: "ns4", Name: "n4"},
 			},
 			expectedUntrackedResources: []workapiv1.AppliedManifestResourceMeta{
-				newAppliedResource("g1", "v1", "r1", "ns1", "n1"),
-				newAppliedResource("g2", "v2", "r2", "ns2", "n2"),
+				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
+				{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
 			},
 		},
 	}

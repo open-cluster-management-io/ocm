@@ -8,6 +8,7 @@ import (
 	"github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -38,22 +39,22 @@ func AssertWorkCondition(namespace, name string, workClient workclientset.Interf
 
 // check if work is deleted
 func AssertWorkDeleted(namespace, name string, manifests []workapiv1.Manifest, workClient workclientset.Interface, kubeClient kubernetes.Interface, eventuallyTimeout, eventuallyInterval int) {
+	// wait for deletion of manifest work
 	gomega.Eventually(func() bool {
 		_, err := workClient.WorkV1().ManifestWorks(namespace).Get(context.Background(), name, metav1.GetOptions{})
 		if !apierrors.IsNotFound(err) {
 			return false
 		}
 
-		for _, manifest := range manifests {
-			expected := manifest.Object.(*corev1.ConfigMap)
-			_, err = kubeClient.CoreV1().ConfigMaps(expected.Namespace).Get(context.Background(), expected.Name, metav1.GetOptions{})
-			if !apierrors.IsNotFound(err) {
-				return false
-			}
-		}
-
 		return true
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+	// Once manifest work is deleted, all applied resources should have already been deleted too
+	for _, manifest := range manifests {
+		expected := manifest.Object.(*corev1.ConfigMap)
+		_, err := kubeClient.CoreV1().ConfigMaps(expected.Namespace).Get(context.Background(), expected.Name, metav1.GetOptions{})
+		gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+	}
 }
 
 // check if finalizer is added
