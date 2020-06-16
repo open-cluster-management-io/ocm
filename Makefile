@@ -42,6 +42,13 @@ ifeq ($(GOHOSTOS),darwin)
 	endif
 endif
 
+SED_CMD:=sed
+ifeq ($(GOHOSTOS),darwin)
+	ifeq ($(GOHOSTARCH),amd64)
+		SED_CMD:=gsed
+	endif
+endif
+
 $(call add-bindata,cluster-manager,./manifests/cluster-manager/...,bindata,bindata,./pkg/operators/clustermanager/bindata/bindata.go)
 $(call add-bindata,klusterlet,./manifests/klusterlet/...,bindata,bindata,./pkg/operators/klusterlet/bindata/bindata.go)
 
@@ -62,12 +69,12 @@ update-csv: ensure-operator-sdk
 munge-hub-csv:
 	mkdir -p munge-csv
 	cp deploy/cluster-manager/olm-catalog/cluster-manager/manifests/cluster-manager.clusterserviceversion.yaml munge-csv/cluster-manager.clusterserviceversion.yaml.unmunged
-	sed -e "s,quay.io/open-cluster-management/registration-operator:latest,$(IMAGE_NAME)," -i deploy/cluster-manager/olm-catalog/cluster-manager/manifests/cluster-manager.clusterserviceversion.yaml
+	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration-operator:latest,$(IMAGE_NAME)," -i deploy/cluster-manager/olm-catalog/cluster-manager/manifests/cluster-manager.clusterserviceversion.yaml
 
 munge-spoke-csv:
 	mkdir -p munge-csv
 	cp deploy/klusterlet/olm-catalog/klusterlet/manifests/klusterlet.clusterserviceversion.yaml munge-csv/klusterlet.clusterserviceversion.yaml.unmunged
-	sed -e "s,quay.io/open-cluster-management/registration-operator:latest,$(IMAGE_NAME)," -i deploy/klusterlet/olm-catalog/klusterlet/manifests/klusterlet.clusterserviceversion.yaml
+	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration-operator:latest,$(IMAGE_NAME)," -i deploy/klusterlet/olm-catalog/klusterlet/manifests/klusterlet.clusterserviceversion.yaml
 
 unmunge-csv:
 	mv munge-csv/cluster-manager.clusterserviceversion.yaml.unmunged deploy/cluster-manager/olm-catalog/cluster-manager/manifests/cluster-manager.clusterserviceversion.yaml
@@ -81,9 +88,13 @@ install-olm: ensure-operator-sdk
 	$(KUBECTL) get crds | grep clusterserviceversion ; if [ $$? -ne 0 ] ; then $(OPERATOR_SDK) olm install --version 0.14.1; fi
 	$(KUBECTL) get ns open-cluster-management ; if [ $$? -ne 0 ] ; then $(KUBECTL) create ns open-cluster-management ; fi
 
-deploy-hub: install-olm munge-hub-csv
+deploy-hub: deploy-hub-operator apply-hub-cr
+
+deploy-hub-operator: install-olm munge-hub-csv
 	$(OPERATOR_SDK) run --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/cluster-manager/olm-catalog/cluster-manager --olm-namespace $(OLM_NAMESPACE) --timeout 10m
-	sed -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," deploy/cluster-manager/crds/operator_open-cluster-management_clustermanagers.cr.yaml | $(KUBECTL) apply -f -
+	
+apply-hub-cr:
+	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," deploy/cluster-manager/crds/operator_open-cluster-management_clustermanagers.cr.yaml | $(KUBECTL) apply -f -
 
 clean-hub: ensure-operator-sdk
 	$(KUBECTL) delete -f deploy/cluster-manager/crds/operator_open-cluster-management_clustermanagers.cr.yaml --ignore-not-found
@@ -108,9 +119,13 @@ e2e-bootstrap-secret: cluster-ip
 	$(KUBECTL) delete secret e2e-bootstrap-secret -n open-cluster-management --ignore-not-found
 	$(KUBECTL) create secret generic e2e-bootstrap-secret --from-file=kubeconfig=e2e-kubeconfig -n open-cluster-management
 
-deploy-spoke: install-olm munge-spoke-csv bootstrap-secret
+deploy-spoke: deploy-spoke-operator apply-spoke-cr
+
+deploy-spoke-operator: install-olm munge-spoke-csv bootstrap-secret
 	$(OPERATOR_SDK) run --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/klusterlet/olm-catalog/klusterlet --olm-namespace $(OLM_NAMESPACE) --timeout 10m
-	sed -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," deploy/klusterlet/crds/operator_open-cluster-management_klusterlets.cr.yaml | $(KUBECTL) apply -f -
+
+apply-spoke-cr:
+	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," deploy/klusterlet/crds/operator_open-cluster-management_klusterlets.cr.yaml | $(KUBECTL) apply -f -
 
 clean-spoke: ensure-operator-sdk
 	$(KUBECTL) delete -f deploy/klusterlet/crds/operator_open-cluster-management_klusterlets.cr.yaml --ignore-not-found
