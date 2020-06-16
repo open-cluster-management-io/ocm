@@ -14,7 +14,8 @@ import (
 	operatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned"
 	operatorinformer "github.com/open-cluster-management/api/client/operator/informers/externalversions"
 	"github.com/open-cluster-management/registration-operator/pkg/helpers"
-	"github.com/open-cluster-management/registration-operator/pkg/operators/clustermanager"
+	"github.com/open-cluster-management/registration-operator/pkg/operators/clustermanager/controllers/clustermanagercontroller"
+	clustermanagerstatuscontroller "github.com/open-cluster-management/registration-operator/pkg/operators/clustermanager/controllers/statuscontroller"
 	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/controllers/klusterletcontroller"
 	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/controllers/statuscontroller"
 )
@@ -44,7 +45,7 @@ func RunClusterManagerOperator(ctx context.Context, controllerContext *controlle
 	}
 	operatorInformer := operatorinformer.NewSharedInformerFactory(operatorClient, 5*time.Minute)
 
-	clusterManagerController := clustermanager.NewClusterManagerController(
+	clusterManagerController := clustermanagercontroller.NewClusterManagerController(
 		kubeClient,
 		apiExtensionClient,
 		apiRegistrationClient.ApiregistrationV1(),
@@ -53,9 +54,16 @@ func RunClusterManagerOperator(ctx context.Context, controllerContext *controlle
 		kubeInformer.Apps().V1().Deployments(),
 		controllerContext.EventRecorder)
 
+	statusController := clustermanagerstatuscontroller.NewClusterManagerStatusController(
+		operatorClient.OperatorV1().ClusterManagers(),
+		operatorInformer.Operator().V1().ClusterManagers(),
+		kubeInformer.Apps().V1().Deployments(),
+		controllerContext.EventRecorder)
+
 	go operatorInformer.Start(ctx.Done())
 	go kubeInformer.Start(ctx.Done())
 	go clusterManagerController.Run(ctx, 1)
+	go statusController.Run(ctx, 1)
 	<-ctx.Done()
 	return nil
 }

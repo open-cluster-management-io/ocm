@@ -1,4 +1,4 @@
-package clustermanager
+package clustermanagercontroller
 
 import (
 	"context"
