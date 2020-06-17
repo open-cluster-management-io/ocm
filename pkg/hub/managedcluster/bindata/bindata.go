@@ -214,6 +214,8 @@ kind: Role
 metadata:
   name: {{ .ManagedClusterName }}:managed-cluster-work
   namespace: {{ .ManagedClusterName }}
+  finalizers:
+  - cluster.open-cluster-management.io/manifest-work-cleanup
 rules:
 # Allow work agent to send event to hub
 - apiGroups: ["", "events.k8s.io"]
@@ -249,6 +251,8 @@ kind: RoleBinding
 metadata:
   name: {{ .ManagedClusterName }}:managed-cluster-work
   namespace: {{ .ManagedClusterName }}
+  finalizers:
+  - cluster.open-cluster-management.io/manifest-work-cleanup
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
