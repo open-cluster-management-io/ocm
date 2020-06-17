@@ -549,6 +549,10 @@ rules:
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterroles", "roles"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "escalate", "bind"]
+# Allow hub to manage coordination.k8s.io/lease
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "delete", "update"]
 # Allow hub to manage managedclusters
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["managedclusters"]
