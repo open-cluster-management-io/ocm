@@ -423,31 +423,27 @@ func TestClusterNameChange(t *testing.T) {
 func TestForceRollOutWorkAgent(t *testing.T) {
 	cases := []struct {
 		name            string
-		forceRollout    bool
 		deployment      *appsv1.Deployment
 		clusterName     string
 		expectedRollout bool
 	}{
 		{
 			name:            "cluster name changes",
-			forceRollout:    false,
 			deployment:      newWorkAgentDeployment("klusterlet", "cluster1"),
 			clusterName:     "cluster2",
 			expectedRollout: true,
 		},
 		{
 			name:            "cluster name does not change",
-			forceRollout:    false,
 			deployment:      newWorkAgentDeployment("klusterlet", "cluster1"),
 			clusterName:     "cluster1",
 			expectedRollout: false,
 		},
 		{
-			name:            "force rollout already true",
-			forceRollout:    true,
-			deployment:      newWorkAgentDeployment("klusterlet", "cluster1"),
+			name:            "deployment not found",
+			deployment:      newWorkAgentDeployment("test", "cluster1"),
 			clusterName:     "cluster1",
-			expectedRollout: true,
+			expectedRollout: false,
 		},
 	}
 
@@ -460,9 +456,9 @@ func TestForceRollOutWorkAgent(t *testing.T) {
 				ClusterName:         c.clusterName,
 				KlusterletName:      klusterlet.Name,
 			}
-			controller.controller.forceRollOutWorkAgent(context.TODO(), config, &c.forceRollout)
-			if c.forceRollout != c.expectedRollout {
-				t.Errorf("Expected force rollout to be %v, but got %v", c.expectedRollout, c.forceRollout)
+			forceRollout := controller.controller.forceRollOutWorkAgent(context.TODO(), config)
+			if forceRollout != c.expectedRollout {
+				t.Errorf("Expected force rollout to be %v, but got %v", c.expectedRollout, forceRollout)
 			}
 		})
 	}

@@ -253,7 +253,9 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 
 	// Deploy work agent
-	n.forceRollOutWorkAgent(ctx, config, &forceRollOut)
+	if !forceRollOut {
+		forceRollOut = n.forceRollOutWorkAgent(ctx, config)
+	}
 	workGeneration, err := helpers.ApplyDeployment(
 		n.kubeClient,
 		klusterlet.Status.Generations,
@@ -288,31 +290,26 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 // Check if cluster name is changed in hub kubeconfig secret by comparing with deployment args. Force update the deployment
 // if the secret is changed.
-func (n *klusterletController) forceRollOutWorkAgent(ctx context.Context, config klusterletConfig, forceRollOut *bool) {
-	if *forceRollOut {
-		return
-	}
-
+func (n *klusterletController) forceRollOutWorkAgent(ctx context.Context, config klusterletConfig) bool {
 	workDeploymentName := fmt.Sprintf("%s-work-agent", config.KlusterletName)
 	workDeployment, err := n.kubeClient.AppsV1().Deployments(config.KlusterletNamespace).Get(ctx, workDeploymentName, metav1.GetOptions{})
 	if err != nil {
-		return
+		// Do not force roll out if fails to get deployment, applyDeployment will handle this anyway
+		return false
 	}
 
 	if len(workDeployment.Spec.Template.Spec.Containers) != 1 {
-		return
+		// Deployment is manipulated, do not force rollout but leverage generation.
+		return false
 	}
 
-	clusterArgFound := false
 	for _, arg := range workDeployment.Spec.Template.Spec.Containers[0].Args {
 		if arg == fmt.Sprintf("--spoke-cluster-name=%s", config.ClusterName) {
-			clusterArgFound = true
+			return false
 		}
 	}
 
-	if !clusterArgFound {
-		*forceRollOut = true
-	}
+	return true
 }
 
 func (n *klusterletController) cleanUp(ctx context.Context, controllerContext factory.SyncContext, config klusterletConfig) error {

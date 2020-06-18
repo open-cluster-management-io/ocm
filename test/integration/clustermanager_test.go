@@ -254,12 +254,12 @@ var _ = ginkgo.Describe("ClusterManager", func() {
 				return false
 			}
 
-			registrationoDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
+			registrationDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
 
-			deploymentGeneration := helpers.NewGenerationStatus(appsv1.SchemeGroupVersion.WithResource("deployments"), registrationoDeployment)
+			deploymentGeneration := helpers.NewGenerationStatus(appsv1.SchemeGroupVersion.WithResource("deployments"), registrationDeployment)
 			actualGeneration := helpers.FindGenerationStatus(actual.Status.Generations, deploymentGeneration)
 			if deploymentGeneration.LastGeneration != actualGeneration.LastGeneration {
 				return false
