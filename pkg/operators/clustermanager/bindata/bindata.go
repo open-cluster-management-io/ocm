@@ -549,6 +549,10 @@ rules:
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterroles", "roles"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "escalate", "bind"]
+# Allow hub to manage coordination.k8s.io/lease
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "delete", "update"]
 # Allow hub to manage managedclusters
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["managedclusters"]
@@ -619,6 +623,27 @@ spec:
       labels:
         app: clustermanager-registration-controller
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 70
+            podAffinityTerm:
+              topologyKey: failure-domain.beta.kubernetes.io/zone
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - clustermanager-registration-controller
+          - weight: 30
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - clustermanager-registration-controller
       serviceAccountName: {{ .ClusterManagerName }}-registration-controller-sa
       containers:
       - name: hub-registration-controller
@@ -785,6 +810,27 @@ spec:
       labels:
         app: {{ .ClusterManagerName }}-registration-webhook
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 70
+            podAffinityTerm:
+              topologyKey: failure-domain.beta.kubernetes.io/zone
+              labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                    - {{ .ClusterManagerName }}-registration-webhook
+          - weight: 30
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                    - {{ .ClusterManagerName }}-registration-webhook
       serviceAccountName: {{ .ClusterManagerName }}-registration-webhook-sa
       containers:
       - name: {{ .ClusterManagerName }}-registration-webhook-sa
