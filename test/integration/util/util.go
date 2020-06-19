@@ -47,6 +47,10 @@ func (r *IntegrationTestEventRecorder) Warningf(reason, messageFmt string, args 
 	r.Warning(reason, fmt.Sprintf(messageFmt, args...))
 }
 
+func (r *IntegrationTestEventRecorder) Shutdown() {
+	return
+}
+
 func HasCondition(conditions []operatorapiv1.StatusCondition, expectedType, expectedReason string, expectedStatus metav1.ConditionStatus) bool {
 	found := false
 	for _, condition := range conditions {

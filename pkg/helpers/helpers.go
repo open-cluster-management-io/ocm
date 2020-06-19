@@ -265,7 +265,6 @@ func ApplyDeployment(
 	client kubernetes.Interface,
 	generationStatuses []operatorapiv1.GenerationStatus,
 	manifests resourceapply.AssetFunc,
-	forceRollout bool,
 	recorder events.Recorder, file string) (operatorapiv1.GenerationStatus, error) {
 	deploymentBytes, err := manifests(file)
 	if err != nil {
@@ -284,7 +283,7 @@ func ApplyDeployment(
 	updatedDeployment, updated, err := resourceapply.ApplyDeployment(
 		client.AppsV1(),
 		recorder,
-		deployment.(*appsv1.Deployment), generationStatus.LastGeneration, forceRollout)
+		deployment.(*appsv1.Deployment), generationStatus.LastGeneration)
 	if err != nil {
 		return generationStatus, fmt.Errorf("%q (%T): %v", file, deployment, err)
 	}
