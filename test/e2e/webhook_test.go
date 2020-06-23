@@ -113,12 +113,11 @@ var _ = ginkgo.Describe("Managed cluster admission hook", func() {
 		ginkgo.It("Should respond bad request when updating a managed cluster with invalid external server URLs", func() {
 			ginkgo.By(fmt.Sprintf("update managed cluster %q with an invalid external server URL %q", clusterName, invalidURL))
 
-			managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			managedCluster.Spec.ManagedClusterClientConfigs[0].URL = invalidURL
-
-			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				managedCluster.Spec.ManagedClusterClientConfigs[0].URL = invalidURL
 				_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
 				return err
 			})
@@ -140,12 +139,11 @@ var _ = ginkgo.Describe("Managed cluster admission hook", func() {
 			unauthorizedClient, err := buildUnauthorizedClusterClient(sa)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			spokeCluster, err := unauthorizedClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			spokeCluster.Spec.HubAcceptsClient = true
-
 			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				spokeCluster, err := unauthorizedClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				spokeCluster.Spec.HubAcceptsClient = true
 				_, err = unauthorizedClient.ClusterV1().ManagedClusters().Update(context.TODO(), spokeCluster, metav1.UpdateOptions{})
 				return err
 			})
