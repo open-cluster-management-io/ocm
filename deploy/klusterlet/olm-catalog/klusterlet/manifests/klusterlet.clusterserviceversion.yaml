@@ -151,6 +151,27 @@ spec:
               labels:
                 app: klusterlet
             spec:
+              affinity:
+                podAntiAffinity:
+                  preferredDuringSchedulingIgnoredDuringExecution:
+                  - podAffinityTerm:
+                      labelSelector:
+                        matchExpressions:
+                        - key: app
+                          operator: In
+                          values:
+                          - klusterlet
+                      topologyKey: failure-domain.beta.kubernetes.io/zone
+                    weight: 70
+                  - podAffinityTerm:
+                      labelSelector:
+                        matchExpressions:
+                        - key: app
+                          operator: In
+                          values:
+                          - klusterlet
+                      topologyKey: kubernetes.io/hostname
+                    weight: 30
               containers:
               - args:
                 - /registration-operator
