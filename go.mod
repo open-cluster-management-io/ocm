@@ -7,6 +7,7 @@ require (
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
 	github.com/open-cluster-management/api v0.0.0-20200602195039-a516cac2e038
+	github.com/openshift/api v0.0.0-20200326160804-ecb9283fe820
 	github.com/openshift/build-machinery-go v0.0.0-20200424080330-082bf86082cc
 	github.com/openshift/generic-admission-server v1.14.1-0.20200514123932-ccc9079d8bdb
 	github.com/openshift/library-go v0.0.0-20200401114229-ffab8c6e83a9
