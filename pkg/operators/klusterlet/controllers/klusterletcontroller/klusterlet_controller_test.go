@@ -11,7 +11,6 @@ import (
 	opratorapiv1 "github.com/open-cluster-management/api/operator/v1"
 	"github.com/open-cluster-management/registration-operator/pkg/helpers"
 	testinghelper "github.com/open-cluster-management/registration-operator/pkg/helpers/testing"
-	"golang.org/x/net/context"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -106,7 +105,7 @@ func newTestController(klusterlet *opratorapiv1.Klusterlet, objects ...runtime.O
 	}
 }
 
-func ensureDeployments(t *testing.T, actions []clienttesting.Action, verb, serverURL, registrationClusterName, workClusterName string) {
+func ensureDeployments(t *testing.T, actions []clienttesting.Action, verb, serverURL, registrationClusterName, workClusterName string, count int) {
 	deployments := []*appsv1.Deployment{}
 	for _, action := range actions {
 		if action.GetVerb() != verb || action.GetResource().Resource != "deployments" {
@@ -124,8 +123,8 @@ func ensureDeployments(t *testing.T, actions []clienttesting.Action, verb, serve
 		}
 	}
 
-	if len(deployments) != 2 {
-		t.Errorf("Expect %s 2 deployment, actual  %d", verb, len(deployments))
+	if len(deployments) != count {
+		t.Errorf("Expect %s %d deployment, actual  %d", verb, count, len(deployments))
 	}
 
 	for _, deployment := range deployments {
@@ -354,7 +353,7 @@ func TestClusterNameChange(t *testing.T) {
 	}
 
 	// Check if deployment has the right cluster name set
-	ensureDeployments(t, controller.kubeClient.Actions(), "create", "", "cluster1", "cluster1")
+	ensureDeployments(t, controller.kubeClient.Actions(), "create", "", "cluster1", "cluster1", 2)
 
 	operatorAction := controller.operatorClient.Actions()
 	if len(operatorAction) != 2 {
@@ -381,7 +380,7 @@ func TestClusterNameChange(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
-	ensureDeployments(t, controller.kubeClient.Actions(), "update", "", "", "cluster1")
+	ensureDeployments(t, controller.kubeClient.Actions(), "update", "", "", "cluster1", 1)
 
 	// Update hubconfigsecret and sync again
 	hubSecret.Data["cluster-name"] = []byte("cluster2")
@@ -403,7 +402,7 @@ func TestClusterNameChange(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
-	ensureDeployments(t, controller.kubeClient.Actions(), "update", "", "", "cluster2")
+	ensureDeployments(t, controller.kubeClient.Actions(), "update", "", "", "cluster2", 1)
 
 	// Update klusterlet with different cluster name and rerun sync
 	klusterlet = newKlusterlet("klusterlet", "testns", "cluster3")
@@ -417,49 +416,5 @@ func TestClusterNameChange(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
-	ensureDeployments(t, controller.kubeClient.Actions(), "update", "https://localhost", "cluster3", "cluster3")
-}
-
-func TestForceRollOutWorkAgent(t *testing.T) {
-	cases := []struct {
-		name            string
-		deployment      *appsv1.Deployment
-		clusterName     string
-		expectedRollout bool
-	}{
-		{
-			name:            "cluster name changes",
-			deployment:      newWorkAgentDeployment("klusterlet", "cluster1"),
-			clusterName:     "cluster2",
-			expectedRollout: true,
-		},
-		{
-			name:            "cluster name does not change",
-			deployment:      newWorkAgentDeployment("klusterlet", "cluster1"),
-			clusterName:     "cluster1",
-			expectedRollout: false,
-		},
-		{
-			name:            "deployment not found",
-			deployment:      newWorkAgentDeployment("test", "cluster1"),
-			clusterName:     "cluster1",
-			expectedRollout: false,
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			klusterlet := newKlusterlet("klusterlet", helpers.KlusterletDefaultNamespace, "cluster1")
-			controller := newTestController(klusterlet, c.deployment)
-			config := klusterletConfig{
-				KlusterletNamespace: helpers.KlusterletDefaultNamespace,
-				ClusterName:         c.clusterName,
-				KlusterletName:      klusterlet.Name,
-			}
-			forceRollout := controller.controller.forceRollOutWorkAgent(context.TODO(), config)
-			if forceRollout != c.expectedRollout {
-				t.Errorf("Expected force rollout to be %v, but got %v", c.expectedRollout, forceRollout)
-			}
-		})
-	}
+	ensureDeployments(t, controller.kubeClient.Actions(), "update", "https://localhost", "cluster3", "cluster3", 2)
 }

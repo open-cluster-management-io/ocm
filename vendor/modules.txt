@@ -147,7 +147,7 @@ github.com/open-cluster-management/api/client/operator/listers/operator/v1
 github.com/open-cluster-management/api/cluster/v1
 github.com/open-cluster-management/api/operator/v1
 github.com/open-cluster-management/api/work/v1
-# github.com/openshift/api v0.0.0-20200326160804-ecb9283fe820
+# github.com/openshift/api v0.0.0-20200521101457-60c476765272
 github.com/openshift/api
 github.com/openshift/api/apps
 github.com/openshift/api/apps/v1
@@ -203,7 +203,7 @@ github.com/openshift/build-machinery-go/make/targets/golang
 github.com/openshift/build-machinery-go/make/targets/openshift
 github.com/openshift/build-machinery-go/make/targets/openshift/operator
 github.com/openshift/build-machinery-go/scripts
-# github.com/openshift/library-go v0.0.0-20200414135834-ccc4bb27d032
+# github.com/openshift/library-go v0.0.0-20200617154932-eaf8c138def4
 github.com/openshift/library-go/pkg/assets
 github.com/openshift/library-go/pkg/config/client
 github.com/openshift/library-go/pkg/config/configdefaults
@@ -239,6 +239,8 @@ github.com/prometheus/common/model
 # github.com/prometheus/procfs v0.0.3
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
+# github.com/robfig/cron/v3 v3.0.1
+github.com/robfig/cron/v3
 # github.com/sirupsen/logrus v1.4.2
 github.com/sirupsen/logrus
 # github.com/spf13/cobra v1.0.0
@@ -468,7 +470,7 @@ k8s.io/api/settings/v1alpha1
 k8s.io/api/storage/v1
 k8s.io/api/storage/v1alpha1
 k8s.io/api/storage/v1beta1
-# k8s.io/apiextensions-apiserver v0.18.2
+# k8s.io/apiextensions-apiserver v0.18.3
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
@@ -531,7 +533,7 @@ k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/json
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/apiserver v0.18.2
+# k8s.io/apiserver v0.18.3
 k8s.io/apiserver/pkg/admission
 k8s.io/apiserver/pkg/admission/configuration
 k8s.io/apiserver/pkg/admission/initializer
@@ -863,7 +865,7 @@ k8s.io/client-go/util/homedir
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/retry
 k8s.io/client-go/util/workqueue
-# k8s.io/component-base v0.18.2
+# k8s.io/component-base v0.18.3
 k8s.io/component-base/cli/flag
 k8s.io/component-base/featuregate
 k8s.io/component-base/logs
@@ -873,7 +875,7 @@ k8s.io/component-base/metrics/testutil
 k8s.io/component-base/version
 # k8s.io/klog v1.0.0
 k8s.io/klog
-# k8s.io/kube-aggregator v0.18.0
+# k8s.io/kube-aggregator v0.18.3
 k8s.io/kube-aggregator/pkg/apis/apiregistration
 k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
 k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1

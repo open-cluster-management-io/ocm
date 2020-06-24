@@ -188,11 +188,6 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		}
 	}
 
-	forceRollOut := false
-	if clusterManager.Generation != clusterManager.Status.ObservedGeneration {
-		forceRollOut = true
-	}
-
 	currentGenerations := []operatorapiv1.GenerationStatus{}
 	// Render deployment manifest and apply
 	for _, file := range deploymentFiles {
@@ -202,7 +197,6 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 			func(name string) ([]byte, error) {
 				return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
 			},
-			forceRollOut,
 			controllerContext.Recorder(),
 			file)
 		if err != nil {
