@@ -11,8 +11,7 @@ import (
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
 	"github.com/open-cluster-management/registration/pkg/helpers"
 
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -23,7 +22,6 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	kubeversion "k8s.io/client-go/pkg/version"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/util/workqueue"
 )
 
 const testManagedClusterName = "testmanagedcluster"
@@ -128,7 +126,7 @@ func TestSyncManagedCluster(t *testing.T) {
 				nodeLister:       kubeInformerFactory.Core().V1().Nodes().Lister(),
 			}
 
-			syncErr := ctrl.sync(context.TODO(), newFakeSyncContext(t))
+			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, ""))
 			if len(c.expectedErr) > 0 && syncErr == nil {
 				t.Errorf("expected %q error", c.expectedErr)
 				return
@@ -276,17 +274,3 @@ func newNode(name string, capacity, allocatable corev1.ResourceList) *corev1.Nod
 		},
 	}
 }
-
-type fakeSyncContext struct {
-	recorder events.Recorder
-}
-
-func newFakeSyncContext(t *testing.T) *fakeSyncContext {
-	return &fakeSyncContext{
-		recorder: eventstesting.NewTestingEventRecorder(t),
-	}
-}
-
-func (f fakeSyncContext) Queue() workqueue.RateLimitingInterface { return nil }
-func (f fakeSyncContext) QueueKey() string                       { return "" }
-func (f fakeSyncContext) Recorder() events.Recorder              { return f.recorder }

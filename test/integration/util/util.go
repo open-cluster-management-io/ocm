@@ -546,3 +546,7 @@ func (r *IntegrationTestEventRecorder) Warning(reason, message string) {
 func (r *IntegrationTestEventRecorder) Warningf(reason, messageFmt string, args ...interface{}) {
 	r.Warning(reason, fmt.Sprintf(messageFmt, args...))
 }
+
+func (r *IntegrationTestEventRecorder) Shutdown() {
+	return
+}

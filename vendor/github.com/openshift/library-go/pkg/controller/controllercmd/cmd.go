@@ -1,7 +1,6 @@
 package controllercmd
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -25,6 +24,7 @@ import (
 	"github.com/openshift/library-go/pkg/config/configdefaults"
 	"github.com/openshift/library-go/pkg/controller/fileobserver"
 	"github.com/openshift/library-go/pkg/crypto"
+	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/serviceability"
 
 	// for metrics
@@ -41,6 +41,9 @@ type ControllerCommandConfig struct {
 
 	// DisableServing disables serving metrics, debug and health checks and so on.
 	DisableServing bool
+
+	// DisableLeaderElection allows leader election to be suspended
+	DisableLeaderElection bool
 }
 
 // NewControllerConfig returns a new ControllerCommandConfig which can be used to wire up all the boiler plate of a controller
@@ -53,7 +56,8 @@ func NewControllerCommandConfig(componentName string, version version.Info, star
 
 		basicFlags: NewControllerFlags(),
 
-		DisableServing: false,
+		DisableServing:        false,
+		DisableLeaderElection: false,
 	}
 }
 
@@ -198,6 +202,11 @@ func (c *ControllerCommandConfig) AddDefaultRotationToConfig(config *operatorv1a
 			config.ServingInfo.KeyFile = filepath.Join(certDir, "tls.key")
 		} else {
 			klog.Warningf("Using insecure, self-signed certificates")
+			// If we generate our own certificates, then we want to specify empty content to avoid a starting race.  This way,
+			// if any change comes in, we will properly restart
+			startingFileContent[filepath.Join(certDir, "tls.crt")] = []byte{}
+			startingFileContent[filepath.Join(certDir, "tls.key")] = []byte{}
+
 			temporaryCertDir, err := ioutil.TempDir("", "serving-cert-")
 			if err != nil {
 				return nil, nil, err
@@ -213,11 +222,10 @@ func (c *ControllerCommandConfig) AddDefaultRotationToConfig(config *operatorv1a
 			if err != nil {
 				return nil, nil, err
 			}
-			certDir = temporaryCertDir
 
 			// force the values to be set to where we are writing the certs
-			config.ServingInfo.CertFile = filepath.Join(certDir, "tls.crt")
-			config.ServingInfo.KeyFile = filepath.Join(certDir, "tls.key")
+			config.ServingInfo.CertFile = filepath.Join(temporaryCertDir, "tls.crt")
+			config.ServingInfo.KeyFile = filepath.Join(temporaryCertDir, "tls.key")
 			// nothing can trust this, so we don't really care about hostnames
 			servingCert, err := ca.MakeServerCert(sets.NewString("localhost"), 30)
 			if err != nil {
@@ -226,16 +234,6 @@ func (c *ControllerCommandConfig) AddDefaultRotationToConfig(config *operatorv1a
 			if err := servingCert.WriteCertConfigFile(config.ServingInfo.CertFile, config.ServingInfo.KeyFile); err != nil {
 				return nil, nil, err
 			}
-			crtContent := &bytes.Buffer{}
-			keyContent := &bytes.Buffer{}
-			if err := servingCert.WriteCertConfig(crtContent, keyContent); err != nil {
-				return nil, nil, err
-			}
-
-			// If we generate our own certificates, then we want to specify empty content to avoid a starting race.  This way,
-			// if any change comes in, we will properly restart
-			startingFileContent[filepath.Join(certDir, "tls.crt")] = crtContent.Bytes()
-			startingFileContent[filepath.Join(certDir, "tls.key")] = keyContent.Bytes()
 		}
 	}
 	return startingFileContent, observedFiles, nil
@@ -269,10 +267,14 @@ func (c *ControllerCommandConfig) StartController(ctx context.Context) error {
 		}
 	}()
 
+	config.LeaderElection.Disable = c.DisableLeaderElection
+
 	builder := NewController(c.componentName, c.startFunc).
 		WithKubeConfigFile(c.basicFlags.KubeConfigFile, nil).
 		WithComponentNamespace(c.basicFlags.Namespace).
 		WithLeaderElection(config.LeaderElection, c.basicFlags.Namespace, c.componentName+"-lock").
+		WithVersion(c.version).
+		WithEventRecorderOptions(events.RecommendedClusterSingletonCorrelatorOptions()).
 		WithRestartOnChange(exitOnChangeReactorCh, startingFileContent, observedFiles...)
 
 	if !c.DisableServing {
