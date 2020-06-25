@@ -7,6 +7,9 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 
 	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
 )
@@ -54,6 +57,7 @@ func (r *IntegrationTestEventRecorder) Shutdown() {
 func HasCondition(conditions []operatorapiv1.StatusCondition, expectedType, expectedReason string, expectedStatus metav1.ConditionStatus) bool {
 	found := false
 	for _, condition := range conditions {
+		fmt.Printf(">>> %v \n", condition)
 		if condition.Type != expectedType {
 			continue
 		}
@@ -71,4 +75,18 @@ func HasCondition(conditions []operatorapiv1.StatusCondition, expectedType, expe
 	}
 
 	return found
+}
+
+func NewKubeConfig(host string) []byte {
+	configData, _ := runtime.Encode(clientcmdlatest.Codec, &clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{"test-cluster": {
+			Server:                host,
+			InsecureSkipTLSVerify: true,
+		}},
+		Contexts: map[string]*clientcmdapi.Context{"test-context": {
+			Cluster: "test-cluster",
+		}},
+		CurrentContext: "test-context",
+	})
+	return configData
 }

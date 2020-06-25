@@ -53,6 +53,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		},
 	}
 	cfg, err := testEnv.Start()
+
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(cfg).ToNot(gomega.BeNil())
 

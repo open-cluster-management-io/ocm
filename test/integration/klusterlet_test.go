@@ -371,14 +371,14 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "KlusterletRegistrationDegraded", "BootStrapSecretMissing", metav1.ConditionTrue)
 
-			// Create a dummy bootstrap secret
+			// Create a bootstrap secret and make sure the kubeconfig can work
 			bootStrapSecret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      helpers.BootstrapHubKubeConfigSecret,
 					Namespace: klusterletNamespace,
 				},
 				Data: map[string][]byte{
-					"kubeconfig": []byte("dummy"),
+					"kubeconfig": util.NewKubeConfig(restConfig.Host),
 				},
 			}
 			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(), bootStrapSecret, metav1.CreateOptions{})
@@ -390,9 +390,9 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.HubKubeConfigSecret, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			// Update hub secret
+			// Update hub secret and make sure the kubeconfig can work
 			hubSecret.Data["cluster-name"] = []byte("testcluster")
-			hubSecret.Data["kubeconfig"] = []byte("dummy")
+			hubSecret.Data["kubeconfig"] = util.NewKubeConfig(restConfig.Host)
 			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(), hubSecret, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
