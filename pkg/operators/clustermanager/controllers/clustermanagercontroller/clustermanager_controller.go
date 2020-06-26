@@ -1,4 +1,4 @@
-package clustermanager
+package clustermanagercontroller
 
 import (
 	"context"
@@ -224,7 +224,6 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		})
 	}
 
-	//TODO Check if all the pods are running.
 	// Update status
 	_, _, updatedErr := helpers.UpdateClusterManagerStatus(
 		ctx, n.clusterManagerClient, clusterManager.Name,

@@ -31,12 +31,12 @@ func AssertKlusterletCondition(
 func AssertClusterManagerCondition(
 	name string, operatorClient operatorclientset.Interface, expectedType, expectedReason string, expectedWorkStatus metav1.ConditionStatus) {
 	gomega.Eventually(func() bool {
-		klusterlet, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), name, metav1.GetOptions{})
+		clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
 			return false
 		}
 
 		// check work status condition
-		return HasCondition(klusterlet.Status.Conditions, expectedType, expectedReason, expectedWorkStatus)
+		return HasCondition(clusterManager.Status.Conditions, expectedType, expectedReason, expectedWorkStatus)
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }

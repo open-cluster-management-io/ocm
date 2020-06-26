@@ -1,11 +1,13 @@
 package integration
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
@@ -16,6 +18,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	operatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned"
+	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
 )
 
 func TestIntegration(t *testing.T) {
@@ -28,6 +31,7 @@ const (
 	eventuallyInterval = 1  // seconds
 	hubNamespace       = "open-cluster-management-hub"
 	spokeNamespace     = "open-cluster-management-agent"
+	clusterManagerName = "hub"
 )
 
 var testEnv *envtest.Environment
@@ -64,6 +68,18 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	operatorClient, err = operatorclient.NewForConfig(cfg)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(kubeClient).ToNot(gomega.BeNil())
+
+	// prepare a ClusterManager
+	clusterManager := &operatorapiv1.ClusterManager{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: clusterManagerName,
+		},
+		Spec: operatorapiv1.ClusterManagerSpec{
+			RegistrationImagePullSpec: "quay.io/open-cluster-management/registration",
+		},
+	}
+	_, err = operatorClient.OperatorV1().ClusterManagers().Create(context.Background(), clusterManager, metav1.CreateOptions{})
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	restConfig = cfg
 
