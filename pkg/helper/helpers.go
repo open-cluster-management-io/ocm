@@ -2,13 +2,18 @@ package helper
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned/typed/work/v1"
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/klog"
 )
 
 // MergeManifestConditions return a new ManifestCondition array which merges the existing manifest
@@ -234,4 +239,92 @@ func UpdateManifestWorkStatus(
 	})
 
 	return updatedWorkStatus, updated, err
+}
+
+// DeleteAppliedResources deletes all given applied resources and returns those pending for finalization
+func DeleteAppliedResources(resources []workapiv1.AppliedManifestResourceMeta, dynamicClient dynamic.Interface) ([]workapiv1.AppliedManifestResourceMeta, []error) {
+	var resourcesPendingFinalization []workapiv1.AppliedManifestResourceMeta
+	var errs []error
+
+	for _, resource := range resources {
+		gvr := schema.GroupVersionResource{Group: resource.Group, Version: resource.Version, Resource: resource.Resource}
+		u, err := dynamicClient.
+			Resource(gvr).
+			Namespace(resource.Namespace).
+			Get(context.TODO(), resource.Name, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			klog.V(2).Infof("Resource %v with key %s/%s is removed Successfully", gvr, resource.Namespace, resource.Name)
+			continue
+		}
+
+		if err != nil {
+			errs = append(errs, fmt.Errorf(
+				"Failed to get resource %v with key %s/%s: %w",
+				gvr, resource.Namespace, resource.Name, err))
+			continue
+		}
+
+		pendingFinalization := u.GetDeletionTimestamp() != nil && !u.GetDeletionTimestamp().IsZero()
+		if pendingFinalization {
+			waitingForFinalization := len(resource.UID) > 0
+			if waitingForFinalization && resource.UID != string(u.GetUID()) {
+				// the instance is deleted, so do not add to the resourcesPendingDeletion list
+				continue
+			}
+
+			// if we aren't waiting for finalization or the UID does match, then we want to ensure we add it to the pending list
+			newResource := copyAppliedResource(resource)
+			newResource.UID = string(u.GetUID())
+			resourcesPendingFinalization = append(resourcesPendingFinalization, newResource)
+			continue
+		}
+
+		// forget this item if the UID does not match the resource UID we previously deleted
+		if len(resource.UID) > 0 && resource.UID != string(u.GetUID()) {
+			continue
+		}
+
+		// delete the resource which is not deleted yet
+		uid := u.GetUID()
+		err = dynamicClient.
+			Resource(gvr).
+			Namespace(resource.Namespace).
+			Delete(context.TODO(), resource.Name, metav1.DeleteOptions{
+				Preconditions: &metav1.Preconditions{
+					UID: &uid,
+				},
+			})
+		if errors.IsNotFound(err) {
+			continue
+		}
+		// forget this item if the UID precondition check fails
+		if errors.IsConflict(err) {
+			continue
+		}
+		if err != nil {
+			errs = append(errs, fmt.Errorf(
+				"Failed to delete resource %v with key %s/%s: %w",
+				gvr, resource.Namespace, resource.Name, err))
+			continue
+		}
+
+		// set UID of applied resource once deletion is successful
+		newResource := copyAppliedResource(resource)
+		newResource.UID = string(u.GetUID())
+		resourcesPendingFinalization = append(resourcesPendingFinalization, newResource)
+		klog.V(2).Infof("Delete resource %v with key %s/%s", gvr, resource.Namespace, resource.Name)
+	}
+
+	return resourcesPendingFinalization, errs
+}
+
+func copyAppliedResource(resource workapiv1.AppliedManifestResourceMeta) workapiv1.AppliedManifestResourceMeta {
+	return workapiv1.AppliedManifestResourceMeta{
+		Group:     resource.Group,
+		Version:   resource.Version,
+		Resource:  resource.Resource,
+		Name:      resource.Name,
+		Namespace: resource.Namespace,
+		UID:       resource.UID,
+	}
 }

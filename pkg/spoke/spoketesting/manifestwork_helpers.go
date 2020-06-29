@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/restmapper"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
@@ -48,6 +49,18 @@ func NewSecret(name, namespace string, content string) *corev1.Secret {
 			"test": []byte(content),
 		},
 	}
+}
+
+func NewUnstructuredSecret(namespace, name string, terminated bool, uid string) *unstructured.Unstructured {
+	u := NewUnstructured("v1", "Secret", namespace, name)
+	if terminated {
+		now := metav1.Now()
+		u.SetDeletionTimestamp(&now)
+	}
+	if uid != "" {
+		u.SetUID(types.UID(uid))
+	}
+	return u
 }
 
 func NewUnstructured(apiVersion, kind, namespace, name string) *unstructured.Unstructured {

@@ -73,15 +73,16 @@ func NewManifestWork(namespace, name string, manifests []workapiv1.Manifest) *wo
 	return work
 }
 
-func NewConfigmap(namespace, name string, data map[string]string) *corev1.ConfigMap {
+func NewConfigmap(namespace, name string, data map[string]string, finalizers []string) *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
+			Namespace:  namespace,
+			Name:       name,
+			Finalizers: finalizers,
 		},
 		Data: data,
 	}

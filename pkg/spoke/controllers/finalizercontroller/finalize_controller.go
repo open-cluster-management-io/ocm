@@ -3,20 +3,22 @@ package finalizercontroller
 import (
 	"context"
 	"fmt"
+	"time"
 
 	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned/typed/work/v1"
 	workinformer "github.com/open-cluster-management/api/client/work/informers/externalversions/work/v1"
 	worklister "github.com/open-cluster-management/api/client/work/listers/work/v1"
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
+	"github.com/open-cluster-management/work/pkg/helper"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 )
 
@@ -25,6 +27,7 @@ type FinalizeController struct {
 	manifestWorkClient workv1client.ManifestWorkInterface
 	manifestWorkLister worklister.ManifestWorkNamespaceLister
 	spokeDynamicClient dynamic.Interface
+	rateLimiter        workqueue.RateLimiter
 }
 
 func NewFinalizeController(
@@ -39,6 +42,7 @@ func NewFinalizeController(
 		manifestWorkClient: manifestWorkClient,
 		manifestWorkLister: manifestWorkLister,
 		spokeDynamicClient: spokeDynamicClient,
+		rateLimiter:        workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
 	}
 
 	return factory.New().
@@ -61,16 +65,17 @@ func (m *FinalizeController) sync(ctx context.Context, controllerContext factory
 	if err != nil {
 		return err
 	}
-	return m.syncManifestWork(ctx, manifestWork)
+	return m.syncManifestWork(ctx, controllerContext, manifestWork)
 }
 
-// syncManifestWork ensures that when a manifestwork has been deleted, everything it created is also deleted before removing
-// the finalizer
-func (m *FinalizeController) syncManifestWork(ctx context.Context, originalManifestWork *workapiv1.ManifestWork) error {
+// syncManifestWork ensures that when a manifestwork has been deleted, everything it created is also deleted.
+// Foreground deletion is implemented, which means all resources created will be deleted and finalized
+// before removing finalizer from manifestwork
+func (m *FinalizeController) syncManifestWork(ctx context.Context, controllerContext factory.SyncContext, originalManifestWork *workapiv1.ManifestWork) error {
 	manifestWork := originalManifestWork.DeepCopy()
 
 	// no work to do until we're deleted
-	if manifestWork.DeletionTimestamp.IsZero() {
+	if manifestWork.DeletionTimestamp == nil || manifestWork.DeletionTimestamp.IsZero() {
 		return nil
 	}
 
@@ -89,59 +94,40 @@ func (m *FinalizeController) syncManifestWork(ctx context.Context, originalManif
 	var err error
 
 	// Work is deleting, we remove its related resources on spoke cluster
-	remaining, errs := m.cleanupResourceOfWork(manifestWork)
-	if len(manifestWork.Status.AppliedResources) != len(remaining) {
+	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(manifestWork.Status.AppliedResources, m.spokeDynamicClient)
+	updatedManifestWork := false
+	if len(manifestWork.Status.AppliedResources) != len(resourcesPendingFinalization) {
 		// update the status of the manifest work accordingly
-		manifestWork.Status.AppliedResources = remaining
-
+		manifestWork.Status.AppliedResources = resourcesPendingFinalization
 		manifestWork, err = m.manifestWorkClient.UpdateStatus(ctx, manifestWork, metav1.UpdateOptions{})
 		if err != nil {
 			errs = append(errs, fmt.Errorf(
 				"Failed to update status of ManifestWork %s/%s: %w", manifestWork.Namespace, manifestWork.Name, err))
+		} else {
+			updatedManifestWork = true
 		}
 	}
 	if len(errs) != 0 {
 		return utilerrors.NewAggregate(errs)
 	}
 
-	// We consider the case of deletion of created resources, with finalization still to come, as sufficient to remove the finalizer
-	// We do this because resources cannot be un-deleted.  This means that deletion is inevitable.
-	// Also, since we don't track UIDs, we have no reliable way of know when "this" particular resource has been removed as
-	// compared with a case where this controller deletes it and another controller (or manifestwork) creates it.
+	// requeue the work until all applied resources are deleted and finalized if the work itself is not updated
+	if len(resourcesPendingFinalization) != 0 {
+		if !updatedManifestWork {
+			controllerContext.Queue().AddAfter(manifestWork.Name, m.rateLimiter.When(manifestWork.Name))
+		}
+		return nil
+	}
+
+	// reset the rate limiter for the manifest work
+	m.rateLimiter.Forget(manifestWork.Name)
 
 	removeFinalizer(manifestWork, manifestWorkFinalizer)
 	_, err = m.manifestWorkClient.Update(ctx, manifestWork, metav1.UpdateOptions{})
-	return err
-}
-
-func (m *FinalizeController) cleanupResourceOfWork(work *workapiv1.ManifestWork) ([]workapiv1.AppliedManifestResourceMeta, []error) {
-	klog.V(4).Infof("cleaning up %q", work.Name)
-
-	var remaining []workapiv1.AppliedManifestResourceMeta
-	errs := []error{}
-
-	// delete all applied resources which are still tracked by the manifest work
-	for _, appliedResource := range work.Status.AppliedResources {
-		gvr := schema.GroupVersionResource{Group: appliedResource.Group, Version: appliedResource.Version, Resource: appliedResource.Resource}
-
-		err := m.spokeDynamicClient.
-			Resource(gvr).
-			Namespace(appliedResource.Namespace).
-			Delete(context.TODO(), appliedResource.Name, metav1.DeleteOptions{})
-		switch {
-		case errors.IsNotFound(err):
-			// no-oop
-		case err != nil:
-			remaining = append(remaining, appliedResource)
-			errs = append(errs, fmt.Errorf(
-				"Failed to delete resource %v with key %s/%s: %w",
-				gvr, appliedResource.Namespace, appliedResource.Name, err))
-			continue
-		}
-		klog.Infof("Successfully delete resource %v with key %s/%s", gvr, appliedResource.Namespace, appliedResource.Name)
+	if err != nil {
+		return fmt.Errorf("Failed to remove finalizer from ManifestWork %s/%s: %w", manifestWork.Namespace, manifestWork.Name, err)
 	}
-
-	return remaining, errs
+	return nil
 }
 
 // removeFinalizer removes a finalizer from the list.  It mutates its input.
