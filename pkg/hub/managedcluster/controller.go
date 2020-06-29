@@ -3,17 +3,16 @@ package managedcluster
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 
 	clientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	v1 "github.com/open-cluster-management/api/cluster/v1"
 	"github.com/open-cluster-management/registration/pkg/helpers"
-	"github.com/open-cluster-management/registration/pkg/hub/managedcluster/bindata"
-	"github.com/openshift/library-go/pkg/assets"
+
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +26,16 @@ const (
 	clusterRolePrefix       = "system:open-cluster-management:managedcluster"
 	managedClusterFinalizer = "cluster.open-cluster-management.io/api-resource-cleanup"
 )
+
+var staticFiles = []string{
+	"manifests/managedcluster-clusterrole.yaml",
+	"manifests/managedcluster-clusterrolebinding.yaml",
+	"manifests/managedcluster-namespace.yaml",
+	"manifests/managedcluster-registration-role.yaml",
+	"manifests/managedcluster-registration-rolebinding.yaml",
+	"manifests/managedcluster-work-role.yaml",
+	"manifests/managedcluster-work-rolebinding.yaml",
+}
 
 // managedClusterController reconciles instances of ManagedCluster on the hub.
 type managedClusterController struct {
@@ -125,21 +134,8 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	resourceResults := resourceapply.ApplyDirectly(
 		resourceapply.NewKubeClientHolder(c.kubeClient),
 		syncCtx.Recorder(),
-		func(name string) ([]byte, error) {
-			config := struct {
-				ManagedClusterName string
-			}{
-				ManagedClusterName: managedClusterName,
-			}
-			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join(manifestDir, name)), config).Data, nil
-		},
-		"manifests/managedcluster-clusterrole.yaml",
-		"manifests/managedcluster-clusterrolebinding.yaml",
-		"manifests/managedcluster-namespace.yaml",
-		"manifests/managedcluster-registration-role.yaml",
-		"manifests/managedcluster-registration-rolebinding.yaml",
-		"manifests/managedcluster-work-role.yaml",
-		"manifests/managedcluster-work-rolebinding.yaml",
+		helpers.ManagedClusterAssetFn(manifestDir, managedClusterName),
+		staticFiles...,
 	)
 	errs := []error{}
 	for _, result := range resourceResults {
@@ -178,28 +174,21 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 }
 
 func (c *managedClusterController) removeManagedClusterResources(ctx context.Context, managedClusterName string) error {
-	err := c.kubeClient.CoreV1().Namespaces().Delete(ctx, managedClusterName, metav1.DeleteOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return err
+	errs := []error{}
+	// Cleap up managed cluster manifests
+	assetFn := helpers.ManagedClusterAssetFn(manifestDir, managedClusterName)
+	if err := helpers.CleanUpManagedClusterManifests(ctx, c.kubeClient, c.eventRecorder, assetFn, staticFiles...); err != nil {
+		errs = append(errs, err)
 	}
-	c.eventRecorder.Eventf("ManagedClusterNamespaceDeleted", "namespace %s is deleted", managedClusterName)
-
-	clusterRoleName := fmt.Sprintf("%s:%s", clusterRolePrefix, managedClusterName)
-	err = c.kubeClient.RbacV1().ClusterRoles().Delete(ctx, clusterRoleName, metav1.DeleteOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return err
+	// Clean up managed cluster group from clusterrolebindings and rolebindings.
+	managedClusterGroup := fmt.Sprintf("system:open-cluster-management:%s", managedClusterName)
+	if err := helpers.CleanUpGroupFromClusterRoleBindings(ctx, c.kubeClient, c.eventRecorder, managedClusterGroup); err != nil {
+		errs = append(errs, err)
 	}
-	c.eventRecorder.Eventf("ManagedClusterClusterRoleDeleted", "clusterrole %s is deleted", clusterRoleName)
-
-	//TODO search all clusterroles and roles for this group and remove the entry or delete the clusterrolebinding if it's the only subject.
-	clusterRoleBindingName := fmt.Sprintf("%s:%s", clusterRolePrefix, managedClusterName)
-	err = c.kubeClient.RbacV1().ClusterRoleBindings().Delete(ctx, clusterRoleBindingName, metav1.DeleteOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return err
+	if err := helpers.CleanUpGroupFromRoleBindings(ctx, c.kubeClient, c.eventRecorder, managedClusterGroup); err != nil {
+		errs = append(errs, err)
 	}
-	c.eventRecorder.Eventf("ManagedClusterClusterRoleBindingDeleted", "clusterrolebinding %s is deleted", clusterRoleBindingName)
-
-	return nil
+	return operatorhelpers.NewMultiLineAggregate(errs)
 }
 
 func (c *managedClusterController) removeManagedClusterFinalizer(ctx context.Context, managedCluster *v1.ManagedCluster) error {
