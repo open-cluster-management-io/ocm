@@ -123,6 +123,12 @@ type AppliedManifestResourceMeta struct {
 	// it is a cluster scoped resource.
 	// +required
 	Namespace string `json:"namespace"`
+
+	// UID is set on successful deletion of the kubernetes resource by controller. The
+	// resource might be still visible on the managed cluster after this field is set.
+	// It is not directly settable by a client.
+	// +optional
+	UID string `json:"uid,omitempty"`
 }
 
 // ManifestWorkStatus represents the current status of managed cluster ManifestWork
