@@ -30,7 +30,6 @@ const (
 var staticFiles = []string{
 	"manifests/managedcluster-clusterrole.yaml",
 	"manifests/managedcluster-clusterrolebinding.yaml",
-	"manifests/managedcluster-namespace.yaml",
 	"manifests/managedcluster-registration-role.yaml",
 	"manifests/managedcluster-registration-rolebinding.yaml",
 	"manifests/managedcluster-work-role.yaml",
@@ -127,6 +126,13 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		return err
 	}
 
+	// TODO: we will add the managedcluster-namespace.yaml back to staticFiles
+	// in next release, currently, we need keep the namespace after the managed
+	// cluster is deleted, see the issue
+	// https://github.com/open-cluster-management/backlog/issues/2648
+	applyFiles := []string{"manifests/managedcluster-namespace.yaml"}
+	applyFiles = append(applyFiles, staticFiles...)
+
 	// Hub cluster-admin accepts the spoke cluster, we apply
 	// 1. clusterrole and clusterrolebinding for this spoke cluster.
 	// 2. namespace for this spoke cluster.
@@ -135,7 +141,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		resourceapply.NewKubeClientHolder(c.kubeClient),
 		syncCtx.Recorder(),
 		helpers.ManagedClusterAssetFn(manifestDir, managedClusterName),
-		staticFiles...,
+		applyFiles...,
 	)
 	errs := []error{}
 	for _, result := range resourceResults {
