@@ -9,8 +9,7 @@ import (
 	clusterinformers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
 	"github.com/open-cluster-management/registration/pkg/helpers"
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
 
 	coordv1 "k8s.io/api/coordination/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,7 +17,6 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/util/workqueue"
 )
 
 var now = time.Now()
@@ -97,7 +95,7 @@ func TestSync(t *testing.T) {
 				clusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				leaseLister:   leaseInformerFactory.Coordination().V1().Leases().Lister(),
 			}
-			syncErr := ctrl.sync(context.TODO(), newFakeSyncContext(t))
+			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, ""))
 			if len(c.expectedErr) > 0 && syncErr == nil {
 				t.Errorf("expected %q error", c.expectedErr)
 				return
@@ -182,17 +180,3 @@ func newClusterLease(renewTime time.Time) *coordv1.Lease {
 		},
 	}
 }
-
-type fakeSyncContext struct {
-	recorder events.Recorder
-}
-
-func newFakeSyncContext(t *testing.T) *fakeSyncContext {
-	return &fakeSyncContext{
-		recorder: eventstesting.NewTestingEventRecorder(t),
-	}
-}
-
-func (f fakeSyncContext) Queue() workqueue.RateLimitingInterface { return nil }
-func (f fakeSyncContext) QueueKey() string                       { return "" }
-func (f fakeSyncContext) Recorder() events.Recorder              { return f.recorder }

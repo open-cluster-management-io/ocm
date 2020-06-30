@@ -21,6 +21,7 @@ import (
 	"k8s.io/client-go/transport"
 
 	clusterclientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
+	workclientset "github.com/open-cluster-management/api/client/work/clientset/versioned"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
 	"github.com/open-cluster-management/registration/pkg/hub"
 	"github.com/open-cluster-management/registration/pkg/spoke/hubclientcert"
@@ -46,6 +47,7 @@ var securePort int
 
 var kubeClient kubernetes.Interface
 var clusterClient clusterclientset.Interface
+var workClient workclientset.Interface
 
 var testNamespace string
 
@@ -82,6 +84,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths: []string{
 			filepath.Join(".", "vendor", "github.com", "open-cluster-management", "api", "cluster", "v1"),
+			filepath.Join(".", "vendor", "github.com", "open-cluster-management", "api", "work", "v1"),
 		},
 		KubeAPIServerFlags: apiServerFlags,
 	}
@@ -111,6 +114,10 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	gomega.Expect(kubeClient).ToNot(gomega.BeNil())
 
 	clusterClient, err = clusterclientset.NewForConfig(cfg)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	gomega.Expect(clusterClient).ToNot(gomega.BeNil())
+
+	workClient, err = workclientset.NewForConfig(cfg)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(clusterClient).ToNot(gomega.BeNil())
 

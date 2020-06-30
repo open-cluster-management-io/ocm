@@ -11,10 +11,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/util/workqueue"
 
 	v1 "github.com/open-cluster-management/api/cluster/v1"
-	"github.com/openshift/library-go/pkg/operator/events"
+	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 )
 
@@ -99,7 +98,7 @@ func TestSyncManagedCluster(t *testing.T) {
 			kubeClient := kubefake.NewSimpleClientset()
 
 			ctrl := managedClusterController{kubeClient, clusterClient, eventstesting.NewTestingEventRecorder(t)}
-			syncErr := ctrl.sync(context.TODO(), newFakeSyncContext(t))
+			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, testManagedClusterName))
 			if len(c.expectedErr) > 0 && syncErr == nil {
 				t.Errorf("expected %q error", c.expectedErr)
 				return
@@ -189,19 +188,3 @@ func newDeletingManagedCluster() *v1.ManagedCluster {
 		Spec: v1.ManagedClusterSpec{HubAcceptsClient: true},
 	}
 }
-
-type fakeSyncContext struct {
-	spokeName string
-	recorder  events.Recorder
-}
-
-func newFakeSyncContext(t *testing.T) *fakeSyncContext {
-	return &fakeSyncContext{
-		spokeName: testManagedClusterName,
-		recorder:  eventstesting.NewTestingEventRecorder(t),
-	}
-}
-
-func (f fakeSyncContext) Queue() workqueue.RateLimitingInterface { return nil }
-func (f fakeSyncContext) QueueKey() string                       { return f.spokeName }
-func (f fakeSyncContext) Recorder() events.Recorder              { return f.recorder }

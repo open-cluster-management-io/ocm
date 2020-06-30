@@ -10,6 +10,7 @@ import (
 	clusterfake "github.com/open-cluster-management/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
+	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -105,7 +106,7 @@ func TestHealthCheck(t *testing.T) {
 				hubClusterLister:              clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				managedClusterDiscoveryClient: discoveryClient,
 			}
-			syncErr := ctrl.sync(context.TODO(), newFakeSyncContext(t))
+			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, ""))
 			if len(c.expectedErr) > 0 && syncErr == nil {
 				t.Errorf("expected %q error", c.expectedErr)
 				return

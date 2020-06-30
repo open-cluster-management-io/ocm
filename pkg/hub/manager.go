@@ -9,9 +9,12 @@ import (
 
 	clusterv1client "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	clusterv1informers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
+	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned"
+	workv1informers "github.com/open-cluster-management/api/client/work/informers/externalversions"
 	"github.com/open-cluster-management/registration/pkg/hub/csr"
 	"github.com/open-cluster-management/registration/pkg/hub/lease"
 	"github.com/open-cluster-management/registration/pkg/hub/managedcluster"
+	"github.com/open-cluster-management/registration/pkg/hub/rbacfinalizerdeletion"
 
 	kubeinformers "k8s.io/client-go/informers"
 )
@@ -28,7 +31,13 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		return err
 	}
 
+	workClient, err := workv1client.NewForConfig(controllerContext.KubeConfig)
+	if err != nil {
+		return err
+	}
+
 	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
+	workInformers := workv1informers.NewSharedInformerFactory(workClient, 10*time.Minute)
 	kubeInfomers := kubeinformers.NewSharedInformerFactory(kubeClient, 10*time.Minute)
 
 	managedClusterController := managedcluster.NewManagedClusterController(
@@ -53,12 +62,24 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		controllerContext.EventRecorder,
 	)
 
+	rbacFinalizerController := rbacfinalizerdeletion.NewFinalizeController(
+		kubeInfomers.Rbac().V1().Roles(),
+		kubeInfomers.Rbac().V1().RoleBindings(),
+		kubeInfomers.Core().V1().Namespaces().Lister(),
+		clusterInformers.Cluster().V1().ManagedClusters().Lister(),
+		workInformers.Work().V1().ManifestWorks().Lister(),
+		kubeClient.RbacV1(),
+		controllerContext.EventRecorder,
+	)
+
 	go clusterInformers.Start(ctx.Done())
+	go workInformers.Start(ctx.Done())
 	go kubeInfomers.Start(ctx.Done())
 
 	go managedClusterController.Run(ctx, 1)
 	go csrController.Run(ctx, 1)
 	go leaseController.Run(ctx, 1)
+	go rbacFinalizerController.Run(ctx, 1)
 
 	<-ctx.Done()
 	return nil

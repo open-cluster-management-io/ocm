@@ -61,10 +61,14 @@ var _ = ginkgo.Describe("Joining Process", func() {
 			if err != nil {
 				return false
 			}
-			if len(spokeCluster.Finalizers) != 1 ||
-				spokeCluster.Finalizers[0] != "cluster.open-cluster-management.io/api-resource-cleanup" {
+			if len(spokeCluster.Finalizers) != 1 {
 				return false
 			}
+
+			if spokeCluster.Finalizers[0] != "cluster.open-cluster-management.io/api-resource-cleanup" {
+				return false
+			}
+
 			return true
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 

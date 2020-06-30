@@ -9,6 +9,7 @@ import (
 	clusterfake "github.com/open-cluster-management/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
+	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 
@@ -92,7 +93,7 @@ func TestLeaseUpdate(t *testing.T) {
 				hubClusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				leaseUpdater:     leaseUpdater,
 			}
-			syncErr := ctrl.sync(context.TODO(), newFakeSyncContext(t))
+			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, ""))
 			if len(c.expectedErr) > 0 && syncErr == nil {
 				t.Errorf("expected %q error", c.expectedErr)
 				return

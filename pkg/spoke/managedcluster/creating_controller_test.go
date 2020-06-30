@@ -7,6 +7,7 @@ import (
 
 	clusterfake "github.com/open-cluster-management/api/client/cluster/clientset/versioned/fake"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
+	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
 )
@@ -49,7 +50,7 @@ func TestCreateSpokeCluster(t *testing.T) {
 				hubClusterClient:        clusterClient,
 			}
 
-			syncErr := ctrl.sync(context.TODO(), newFakeSyncContext(t))
+			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, ""))
 			if len(c.expectedErr) > 0 && syncErr == nil {
 				t.Errorf("expected %q error", c.expectedErr)
 				return
