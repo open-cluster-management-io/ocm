@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
 	coreinformer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -29,6 +30,7 @@ import (
 	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
 	"github.com/open-cluster-management/registration-operator/pkg/helpers"
 	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/bindata"
+	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/kube111bindata"
 )
 
 const (
@@ -48,12 +50,19 @@ var (
 		"manifests/klusterlet/klusterlet-work-clusterrolebinding.yaml",
 		"manifests/klusterlet/klusterlet-work-clusterrolebinding-addition.yaml",
 	}
+
+	kube111StaticResourceFiles = []string{
+		"manifests/klusterletkube111/klusterlet-registration-operator-clusterrolebinding.yaml",
+		"manifests/klusterletkube111/klusterlet-work-clusterrolebinding.yaml",
+	}
 )
 
 type klusterletController struct {
-	klusterletClient operatorv1client.KlusterletInterface
-	klusterletLister operatorlister.KlusterletLister
-	kubeClient       kubernetes.Interface
+	klusterletClient  operatorv1client.KlusterletInterface
+	klusterletLister  operatorlister.KlusterletLister
+	kubeClient        kubernetes.Interface
+	kubeVersion       *version.Version
+	operatorNamespace string
 }
 
 // NewKlusterletController construct klusterlet controller
@@ -63,11 +72,15 @@ func NewKlusterletController(
 	klusterletInformer operatorinformer.KlusterletInformer,
 	secretInformer coreinformer.SecretInformer,
 	deploymentInformer appsinformer.DeploymentInformer,
+	kubeVersion *version.Version,
+	operatorNamespace string,
 	recorder events.Recorder) factory.Controller {
 	controller := &klusterletController{
-		kubeClient:       kubeClient,
-		klusterletClient: klusterletClient,
-		klusterletLister: klusterletInformer.Lister(),
+		kubeClient:        kubeClient,
+		klusterletClient:  klusterletClient,
+		klusterletLister:  klusterletInformer.Lister(),
+		kubeVersion:       kubeVersion,
+		operatorNamespace: operatorNamespace,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -90,6 +103,7 @@ type klusterletConfig struct {
 	ExternalServerURL         string
 	HubKubeConfigSecret       string
 	BootStrapKubeConfigSecret string
+	OperatorNamespace         string
 }
 
 func (n *klusterletController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
@@ -114,6 +128,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		BootStrapKubeConfigSecret: helpers.BootstrapHubKubeConfigSecret,
 		HubKubeConfigSecret:       helpers.HubKubeConfigSecret,
 		ExternalServerURL:         getServersFromKlusterlet(klusterlet),
+		OperatorNamespace:         n.operatorNamespace,
 	}
 	// If namespace is not set, use the default namespace
 	if config.KlusterletNamespace == "" {
@@ -167,7 +182,25 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		return err
 	}
 
-	// Deploy the static resources
+	errs := []error{}
+	// If kube version is less than 1.12, deploy static resource for kube 1.11 at first
+	// TODO remove this when we do not support kube 1.11 any longer
+	if cnt, err := n.kubeVersion.Compare("v1.12.0"); err == nil && cnt < 0 {
+		resourceResult := resourceapply.ApplyDirectly(
+			resourceapply.NewKubeClientHolder(n.kubeClient),
+			controllerContext.Recorder(),
+			func(name string) ([]byte, error) {
+				return assets.MustCreateAssetFromTemplate(name, kube111bindata.MustAsset(filepath.Join("", name)), config).Data, nil
+			},
+			kube111StaticResourceFiles...,
+		)
+		for _, result := range resourceResult {
+			if result.Error != nil {
+				errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
+			}
+		}
+	}
+
 	// Apply static files
 	resourceResults := resourceapply.ApplyDirectly(
 		resourceapply.NewKubeClientHolder(n.kubeClient),
@@ -177,7 +210,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		},
 		staticResourceFiles...,
 	)
-	errs := []error{}
+
 	for _, result := range resourceResults {
 		if result.Error != nil {
 			errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
@@ -313,6 +346,27 @@ func (n *klusterletController) cleanUp(ctx context.Context, controllerContext fa
 		)
 		if err != nil {
 			return err
+		}
+	}
+
+	// TODO remove this when we do not support kube 1.11 any longer
+	cnt, err := n.kubeVersion.Compare("v1.12.0")
+	klog.Errorf("comapare version %d, %v", cnt, err)
+	if cnt, err := n.kubeVersion.Compare("v1.12.0"); err == nil && cnt < 0 {
+		for _, file := range kube111StaticResourceFiles {
+			err := helpers.CleanUpStaticObject(
+				ctx,
+				n.kubeClient,
+				nil,
+				nil,
+				func(name string) ([]byte, error) {
+					return assets.MustCreateAssetFromTemplate(name, kube111bindata.MustAsset(filepath.Join("", name)), config).Data, nil
+				},
+				file,
+			)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
