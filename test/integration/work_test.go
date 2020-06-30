@@ -391,7 +391,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 	})
 
 	ginkgo.Context("Foreground deletion", func() {
-		var finalizer = "a.b.c/d"
+		var finalizer = "cluster.open-cluster-management.io/testing"
 		ginkgo.BeforeEach(func() {
 			manifests = []workapiv1.Manifest{
 				util.ToManifest(util.NewConfigmap(o.SpokeClusterName, "cm1", map[string]string{"a": "b"}, []string{finalizer})),

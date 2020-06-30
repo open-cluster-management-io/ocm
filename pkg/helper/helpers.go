@@ -265,8 +265,8 @@ func DeleteAppliedResources(resources []workapiv1.AppliedManifestResourceMeta, d
 		}
 
 		pendingFinalization := u.GetDeletionTimestamp() != nil && !u.GetDeletionTimestamp().IsZero()
+		waitingForFinalization := len(resource.UID) > 0
 		if pendingFinalization {
-			waitingForFinalization := len(resource.UID) > 0
 			if waitingForFinalization && resource.UID != string(u.GetUID()) {
 				// the instance is deleted, so do not add to the resourcesPendingDeletion list
 				continue
@@ -280,7 +280,7 @@ func DeleteAppliedResources(resources []workapiv1.AppliedManifestResourceMeta, d
 		}
 
 		// forget this item if the UID does not match the resource UID we previously deleted
-		if len(resource.UID) > 0 && resource.UID != string(u.GetUID()) {
+		if waitingForFinalization && resource.UID != string(u.GetUID()) {
 			continue
 		}
 
