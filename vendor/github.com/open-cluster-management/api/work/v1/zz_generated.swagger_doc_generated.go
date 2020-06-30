@@ -18,6 +18,7 @@ var map_AppliedManifestResourceMeta = map[string]string{
 	"resource":  "Resource is the resource name of the kubernetes resource",
 	"name":      "Name is the name of the kubernetes resource",
 	"namespace": "Name is the namespace of the kubernetes resource, empty string indicates it is a cluster scoped resource.",
+	"uid":       "UID is set on successful deletion of the kubernetes resource by controller. The resource might be still visible on the managed cluster after this field is set. It is not directly settable by a client.",
 }
 
 func (AppliedManifestResourceMeta) SwaggerDoc() map[string]string {

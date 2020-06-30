@@ -74,13 +74,29 @@ kind: CustomResourceDefinition
 metadata:
   name: managedclusters.cluster.open-cluster-management.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.hubAcceptsClient
+    name: Hub Accepted
+    type: boolean
+  - JSONPath: .spec.managedClusterClientConfigs[*].url
+    name: Managed Cluster URLs
+    type: string
+  - JSONPath: .status.conditions[?(@.type=="ManagedClusterJoined")].status
+    name: Joined
+    type: string
+  - JSONPath: .status.conditions[?(@.type=="ManagedClusterConditionAvailable")].status
+    name: Available
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: cluster.open-cluster-management.io
   names:
     kind: ManagedCluster
     listKind: ManagedClusterList
     plural: managedclusters
     singular: managedcluster
-  scope: "Cluster"
+  scope: Cluster
   subresources:
     status: {}
   preserveUnknownFields: false
@@ -324,6 +340,12 @@ spec:
                     type: string
                   resource:
                     description: Resource is the resource name of the kubernetes resource
+                    type: string
+                  uid:
+                    description: UID is set on successful deletion of the kubernetes
+                      resource by controller. The resource might be still visible
+                      on the managed cluster after this field is set. It is not directly
+                      settable by a client.
                     type: string
                   version:
                     description: Version is the version of the kubernetes resource
