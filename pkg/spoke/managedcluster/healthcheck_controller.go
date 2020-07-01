@@ -81,6 +81,18 @@ func (c *managedClusterHealthCheckController) checkKubeAPIServerStatus(ctx conte
 		return condition
 	}
 
+	// for backward compatible, the readyz endpoint is supported from Kubernetes 1.16, so if the readyz is not found,
+	// the healthz endpoint will be used.
+	if statusCode == http.StatusNotFound {
+		result = c.managedClusterDiscoveryClient.RESTClient().Get().AbsPath("/healthz").Do(ctx).StatusCode(&statusCode)
+		if statusCode == http.StatusOK {
+			condition.Status = metav1.ConditionTrue
+			condition.Reason = "ManagedClusterAvailable"
+			condition.Message = "Managed cluster is available"
+			return condition
+		}
+	}
+
 	condition.Status = metav1.ConditionFalse
 	condition.Reason = "ManagedClusterKubeAPIServerUnavailable"
 	body, err := result.Raw()
