@@ -86,8 +86,8 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 		ginkgo.BeforeEach(func() {
 			registrationDeploymentName = fmt.Sprintf("%s-registration-agent", klusterlet.Name)
 			workDeploymentName = fmt.Sprintf("%s-work-agent", klusterlet.Name)
-			registrationRoleName = fmt.Sprintf("system:open-cluster-management:%s", registrationDeploymentName)
-			workRoleName = fmt.Sprintf("system:open-cluster-management:%s", workDeploymentName)
+			registrationRoleName = fmt.Sprintf("open-cluster-management:%s-registration:agent", klusterlet.Name)
+			workRoleName = fmt.Sprintf("open-cluster-management:%s-work:agent", klusterlet.Name)
 			registrationSAName = fmt.Sprintf("%s-registration-sa", klusterlet.Name)
 			workSAName = fmt.Sprintf("%s-work-sa", klusterlet.Name)
 		})
