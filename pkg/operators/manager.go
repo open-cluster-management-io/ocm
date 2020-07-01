@@ -2,9 +2,11 @@ package operators
 
 import (
 	"context"
+	"io/ioutil"
 	"time"
 
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
@@ -19,6 +21,9 @@ import (
 	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/controllers/klusterletcontroller"
 	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/controllers/statuscontroller"
 )
+
+// defaultSpokeComponentNamespace is the default namespace in which the operator is deployed
+const defaultComponentNamespace = "open-cluster-management"
 
 // RunClusterManagerOperator starts a new cluster manager operator
 func RunClusterManagerOperator(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
@@ -75,6 +80,14 @@ func RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd
 	if err != nil {
 		return err
 	}
+	version, err := kubeClient.ServerVersion()
+	if err != nil {
+		return err
+	}
+	kubeVersion, err := versionutil.ParseGeneric(version.String())
+	if err != nil {
+		return err
+	}
 
 	kubeInformer := informers.NewSharedInformerFactory(kubeClient, 5*time.Minute)
 
@@ -85,12 +98,21 @@ func RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd
 	}
 	operatorInformer := operatorinformer.NewSharedInformerFactory(operatorClient, 5*time.Minute)
 
+	// Read component namespace
+	operatorNamespace := defaultComponentNamespace
+	nsBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err == nil {
+		operatorNamespace = string(nsBytes)
+	}
+
 	klusterletController := klusterletcontroller.NewKlusterletController(
 		kubeClient,
 		operatorClient.OperatorV1().Klusterlets(),
 		operatorInformer.Operator().V1().Klusterlets(),
 		kubeInformer.Core().V1().Secrets(),
 		kubeInformer.Apps().V1().Deployments(),
+		kubeVersion,
+		operatorNamespace,
 		controllerContext.EventRecorder)
 	statusController := statuscontroller.NewKlusterletStatusController(
 		kubeClient,

@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
@@ -87,11 +88,14 @@ func newTestController(klusterlet *opratorapiv1.Klusterlet, objects ...runtime.O
 	fakeKubeClient := fakekube.NewSimpleClientset(objects...)
 	fakeOperatorClient := fakeoperatorclient.NewSimpleClientset(klusterlet)
 	operatorInformers := operatorinformers.NewSharedInformerFactory(fakeOperatorClient, 5*time.Minute)
+	kubeVersion, _ := version.ParseGeneric("v1.18.0")
 
 	hubController := &klusterletController{
-		klusterletClient: fakeOperatorClient.OperatorV1().Klusterlets(),
-		kubeClient:       fakeKubeClient,
-		klusterletLister: operatorInformers.Operator().V1().Klusterlets().Lister(),
+		klusterletClient:  fakeOperatorClient.OperatorV1().Klusterlets(),
+		kubeClient:        fakeKubeClient,
+		klusterletLister:  operatorInformers.Operator().V1().Klusterlets().Lister(),
+		kubeVersion:       kubeVersion,
+		operatorNamespace: "open-cluster-management",
 	}
 
 	store := operatorInformers.Operator().V1().Klusterlets().Informer().GetStore()
@@ -290,7 +294,7 @@ func TestSyncDelete(t *testing.T) {
 	}
 
 	if len(kubeActions) != 12 {
-		t.Errorf("Expected 7 delete actions, but got %d", len(kubeActions))
+		t.Errorf("Expected 12 delete actions, but got %d", len(kubeActions))
 	}
 }
 
@@ -417,4 +421,72 @@ func TestClusterNameChange(t *testing.T) {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 	ensureDeployments(t, controller.kubeClient.Actions(), "update", "https://localhost", "cluster3", "cluster3", 2)
+}
+
+func TestDeployOnKube111(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfigSecret, "testns")
+	hubKubeConfigSecret := newSecret(helpers.HubKubeConfigSecret, "testns")
+	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	namespace := newNamespace("testns")
+	controller := newTestController(klusterlet, bootStrapSecret, hubKubeConfigSecret, namespace)
+	kubeVersion, _ := version.ParseGeneric("v1.11.0")
+	controller.controller.kubeVersion = kubeVersion
+	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
+
+	err := controller.controller.sync(nil, syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	createObjects := []runtime.Object{}
+	kubeActions := controller.kubeClient.Actions()
+	for _, action := range kubeActions {
+		if action.GetVerb() == "create" {
+			object := action.(clienttesting.CreateActionImpl).Object
+			createObjects = append(createObjects, object)
+		}
+	}
+
+	// Check if resources are created as expected
+	if len(createObjects) != 13 {
+		t.Errorf("Expect 13 objects created in the sync loop, actual %d", len(createObjects))
+	}
+	for _, object := range createObjects {
+		ensureObject(t, object, klusterlet)
+	}
+
+	operatorAction := controller.operatorClient.Actions()
+	if len(operatorAction) != 2 {
+		t.Errorf("Expect 2 actions in the sync loop, actual %#v", operatorAction)
+	}
+
+	testinghelper.AssertGet(t, operatorAction[0], "operator.open-cluster-management.io", "v1", "klusterlets")
+	testinghelper.AssertAction(t, operatorAction[1], "update")
+	testinghelper.AssertOnlyConditions(
+		t, operatorAction[1].(clienttesting.UpdateActionImpl).Object,
+		testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue))
+
+	// Delete the klusterlet
+	now := metav1.Now()
+	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
+	controller.operatorStore.Update(klusterlet)
+	controller.kubeClient.ClearActions()
+	err = controller.controller.sync(nil, syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	deleteActions := []clienttesting.DeleteActionImpl{}
+	kubeActions = controller.kubeClient.Actions()
+	for _, action := range kubeActions {
+		if action.GetVerb() == "delete" {
+			deleteAction := action.(clienttesting.DeleteActionImpl)
+			deleteActions = append(deleteActions, deleteAction)
+		}
+	}
+
+	if len(kubeActions) != 14 {
+		t.Errorf("Expected 14 delete actions, but got %d", len(kubeActions))
+	}
 }
