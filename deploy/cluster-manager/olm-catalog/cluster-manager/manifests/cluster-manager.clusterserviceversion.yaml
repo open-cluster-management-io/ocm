@@ -212,7 +212,10 @@ spec:
                     port: 8443
                     scheme: HTTPS
                   initialDelaySeconds: 2
-                resources: {}
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 128Mi
               serviceAccountName: cluster-manager
     strategy: deployment
   installModes:
