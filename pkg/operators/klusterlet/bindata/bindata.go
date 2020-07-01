@@ -194,6 +194,10 @@ spec:
             scheme: HTTPS
             port: 8443
           initialDelaySeconds: 2
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
       volumes:
       - name: bootstrap-secret
         secret:
@@ -471,6 +475,10 @@ spec:
             scheme: HTTPS
             port: 8443
           initialDelaySeconds: 2
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
       volumes:
       - name: hub-kubeconfig-secret
         secret:

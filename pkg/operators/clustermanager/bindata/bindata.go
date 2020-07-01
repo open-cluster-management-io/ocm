@@ -687,6 +687,10 @@ spec:
             scheme: HTTPS
             port: 8443
           initialDelaySeconds: 2
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
 `)
 
 func manifestsClusterManagerClusterManagerRegistrationDeploymentYamlBytes() ([]byte, error) {
@@ -877,6 +881,10 @@ spec:
             scheme: HTTPS
             port: 6443
           initialDelaySeconds: 2
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
         volumeMounts:
         - name: webhook-secret
           mountPath: "/serving-cert"
