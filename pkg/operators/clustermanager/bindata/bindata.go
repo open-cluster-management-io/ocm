@@ -582,6 +582,10 @@ rules:
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["managedclusters/status"]
   verbs: ["update", "patch"]
+# Allow hub to monitor manifestworks
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["manifestworks"]
+  verbs: ["get", "list", "watch"]
 `)
 
 func manifestsClusterManagerClusterManagerRegistrationClusterroleYamlBytes() ([]byte, error) {
