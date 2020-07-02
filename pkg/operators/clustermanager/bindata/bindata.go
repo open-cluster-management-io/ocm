@@ -2,7 +2,6 @@
 // sources:
 // manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml
 // manifests/cluster-manager/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml
-// manifests/cluster-manager/cluster-manager-clusterrolebinding.yaml
 // manifests/cluster-manager/cluster-manager-namespace.yaml
 // manifests/cluster-manager/cluster-manager-registration-clusterrole.yaml
 // manifests/cluster-manager/cluster-manager-registration-clusterrolebinding.yaml
@@ -492,35 +491,6 @@ func manifestsClusterManager0000_00_workOpenClusterManagementIo_manifestworksCrd
 	return a, nil
 }
 
-var _manifestsClusterManagerClusterManagerClusterrolebindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: system:open-cluster-management:{{ .ClusterManagerName }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: system:open-cluster-management:{{ .ClusterManagerName }}
-subjects:
-- kind: ServiceAccount
-  namespace: {{ .ClusterManagerNamespace }}
-  name: {{ .ClusterManagerName }}-sa
-`)
-
-func manifestsClusterManagerClusterManagerClusterrolebindingYamlBytes() ([]byte, error) {
-	return _manifestsClusterManagerClusterManagerClusterrolebindingYaml, nil
-}
-
-func manifestsClusterManagerClusterManagerClusterrolebindingYaml() (*asset, error) {
-	bytes, err := manifestsClusterManagerClusterManagerClusterrolebindingYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "manifests/cluster-manager/cluster-manager-clusterrolebinding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
 var _manifestsClusterManagerClusterManagerNamespaceYaml = []byte(`apiVersion: v1
 kind: Namespace
 metadata:
@@ -545,7 +515,7 @@ func manifestsClusterManagerClusterManagerNamespaceYaml() (*asset, error) {
 var _manifestsClusterManagerClusterManagerRegistrationClusterroleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: system:open-cluster-management:{{ .ClusterManagerName }}-registration-controller
+  name: open-cluster-management:{{ .ClusterManagerName }}-registration:controller
 rules:
 # Allow hub to monitor and update status of csr
 - apiGroups: ["certificates.k8s.io"]
@@ -606,11 +576,11 @@ func manifestsClusterManagerClusterManagerRegistrationClusterroleYaml() (*asset,
 var _manifestsClusterManagerClusterManagerRegistrationClusterrolebindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: system:open-cluster-management:{{ .ClusterManagerName }}-registration-controller
+  name: open-cluster-management:{{ .ClusterManagerName }}-registration:controller
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: system:open-cluster-management:{{ .ClusterManagerName }}-registration-controller
+  name: open-cluster-management:{{ .ClusterManagerName }}-registration:controller
 subjects:
 - kind: ServiceAccount
   namespace: {{ .ClusterManagerNamespace }}
@@ -767,7 +737,7 @@ func manifestsClusterManagerClusterManagerRegistrationWebhookApiserviceYaml() (*
 var _manifestsClusterManagerClusterManagerRegistrationWebhookClusterroleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: system:open-cluster-management:{{ .ClusterManagerName }}-registration-webhook
+  name: open-cluster-management:{{ .ClusterManagerName }}-registration:webhook
 rules:
 # Allow managedcluster admission to get/list/watch configmaps
 - apiGroups: [""]
@@ -797,11 +767,11 @@ func manifestsClusterManagerClusterManagerRegistrationWebhookClusterroleYaml() (
 var _manifestsClusterManagerClusterManagerRegistrationWebhookClusterrolebindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: system:open-cluster-management:{{ .ClusterManagerName }}-registration-webhook
+  name: open-cluster-management:{{ .ClusterManagerName }}-registration:webhook
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: system:open-cluster-management:{{ .ClusterManagerName }}-registration-webhook
+  name: open-cluster-management:{{ .ClusterManagerName }}-registration:webhook
 subjects:
   - kind: ServiceAccount
     name: {{ .ClusterManagerName }}-registration-webhook-sa
@@ -1089,7 +1059,6 @@ func AssetNames() []string {
 var _bindata = map[string]func() (*asset, error){
 	"manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml": manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersCrdYaml,
 	"manifests/cluster-manager/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml":       manifestsClusterManager0000_00_workOpenClusterManagementIo_manifestworksCrdYaml,
-	"manifests/cluster-manager/cluster-manager-clusterrolebinding.yaml":                              manifestsClusterManagerClusterManagerClusterrolebindingYaml,
 	"manifests/cluster-manager/cluster-manager-namespace.yaml":                                       manifestsClusterManagerClusterManagerNamespaceYaml,
 	"manifests/cluster-manager/cluster-manager-registration-clusterrole.yaml":                        manifestsClusterManagerClusterManagerRegistrationClusterroleYaml,
 	"manifests/cluster-manager/cluster-manager-registration-clusterrolebinding.yaml":                 manifestsClusterManagerClusterManagerRegistrationClusterrolebindingYaml,
@@ -1150,7 +1119,6 @@ var _bintree = &bintree{nil, map[string]*bintree{
 		"cluster-manager": {nil, map[string]*bintree{
 			"0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml": {manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersCrdYaml, map[string]*bintree{}},
 			"0000_00_work.open-cluster-management.io_manifestworks.crd.yaml":       {manifestsClusterManager0000_00_workOpenClusterManagementIo_manifestworksCrdYaml, map[string]*bintree{}},
-			"cluster-manager-clusterrolebinding.yaml":                              {manifestsClusterManagerClusterManagerClusterrolebindingYaml, map[string]*bintree{}},
 			"cluster-manager-namespace.yaml":                                       {manifestsClusterManagerClusterManagerNamespaceYaml, map[string]*bintree{}},
 			"cluster-manager-registration-clusterrole.yaml":                        {manifestsClusterManagerClusterManagerRegistrationClusterroleYaml, map[string]*bintree{}},
 			"cluster-manager-registration-clusterrolebinding.yaml":                 {manifestsClusterManagerClusterManagerRegistrationClusterrolebindingYaml, map[string]*bintree{}},

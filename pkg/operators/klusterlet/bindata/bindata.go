@@ -68,7 +68,7 @@ var _manifestsKlusterletKlusterletRegistrationClusterroleYaml = []byte(`# Cluste
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: system:open-cluster-management:{{ .KlusterletName }}-registration-agent
+  name: open-cluster-management:{{ .KlusterletName }}-registration:agent
 rules:
 # Allow agent to get/list/watch nodes.
 - apiGroups: [""]
@@ -97,11 +97,11 @@ func manifestsKlusterletKlusterletRegistrationClusterroleYaml() (*asset, error) 
 var _manifestsKlusterletKlusterletRegistrationClusterrolebindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: system:open-cluster-management:{{ .KlusterletName }}-registration-agent
+  name: open-cluster-management:{{ .KlusterletName }}-registration:agent
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: system:open-cluster-management:{{ .KlusterletName }}-registration-agent
+  name: open-cluster-management:{{ .KlusterletName }}-registration:agent
 subjects:
   - kind: ServiceAccount
     name: {{ .KlusterletName }}-registration-sa
@@ -226,7 +226,7 @@ var _manifestsKlusterletKlusterletRegistrationRoleYaml = []byte(`# Role for regi
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: system:open-cluster-management:{{ .KlusterletName }}-registration-agent
+  name: open-cluster-management:{{ .KlusterletName }}-registration:agent
   namespace: {{ .KlusterletNamespace }}
 rules:
 - apiGroups: [""]
@@ -255,12 +255,12 @@ func manifestsKlusterletKlusterletRegistrationRoleYaml() (*asset, error) {
 var _manifestsKlusterletKlusterletRegistrationRolebindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: system:open-cluster-management:{{ .KlusterletName }}-registration-agent
+  name: open-cluster-management:{{ .KlusterletName }}-registration:agent
   namespace: {{ .KlusterletNamespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: system:open-cluster-management:{{ .KlusterletName }}-registration-agent
+  name: open-cluster-management:{{ .KlusterletName }}-registration:agent
 subjects:
   - kind: ServiceAccount
     name: {{ .KlusterletName }}-registration-sa
@@ -308,7 +308,7 @@ var _manifestsKlusterletKlusterletWorkClusterroleYaml = []byte(`# Clusterrole fo
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: system:open-cluster-management:{{ .KlusterletName }}-work-agent
+  name: open-cluster-management:{{ .KlusterletName }}-work:agent
 rules:
 # Allow agent to get/list/watch/create/delete crds.
 - apiGroups: ["apiextensions.k8s.io"]
@@ -353,11 +353,11 @@ func manifestsKlusterletKlusterletWorkClusterroleYaml() (*asset, error) {
 var _manifestsKlusterletKlusterletWorkClusterrolebindingAdditionYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: system:open-cluster-management:{{ .KlusterletName }}-work-agent-addition
+  name: open-cluster-management:{{ .KlusterletName }}-work:agent-addition
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: system:open-cluster-management:{{ .KlusterletName }}-work-agent
+  name: open-cluster-management:{{ .KlusterletName }}-work:agent
 subjects:
   - kind: ServiceAccount
     name: {{ .KlusterletName }}-work-sa
@@ -382,7 +382,7 @@ func manifestsKlusterletKlusterletWorkClusterrolebindingAdditionYaml() (*asset, 
 var _manifestsKlusterletKlusterletWorkClusterrolebindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: system:open-cluster-management:{{ .KlusterletName }}-work-agent
+  name: open-cluster-management:{{ .KlusterletName }}-work:agent
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole

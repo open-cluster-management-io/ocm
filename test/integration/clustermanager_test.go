@@ -52,8 +52,8 @@ var _ = ginkgo.Describe("ClusterManager", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Check clusterrole/clusterrolebinding
-			hubRegistrationClusterRole := fmt.Sprintf("system:open-cluster-management:%s-registration-controller", clusterManagerName)
-			hubWebhookClusterRole := fmt.Sprintf("system:open-cluster-management:%s-registration-webhook", clusterManagerName)
+			hubRegistrationClusterRole := fmt.Sprintf("open-cluster-management:%s-registration:controller", clusterManagerName)
+			hubWebhookClusterRole := fmt.Sprintf("open-cluster-management:%s-registration:webhook", clusterManagerName)
 			gomega.Eventually(func() bool {
 				if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubRegistrationClusterRole, metav1.GetOptions{}); err != nil {
 					return false
