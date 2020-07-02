@@ -22,7 +22,10 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - kind: ClusterManager
+    - description: ClusterManager defines the configurations of controllers running
+        hub that govern registration and work distribution for attached Klusterlets
+      displayName: ClusterManager
+      kind: ClusterManager
       name: clustermanagers.operator.open-cluster-management.io
       version: v1
   displayName: Cluster Manager
