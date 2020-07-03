@@ -63,7 +63,7 @@ func (fi bindataFileInfo) Sys() interface{} {
 var _pkgHubManagedclusterManifestsManagedclusterClusterroleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: system:open-cluster-management:managedcluster:{{ .ManagedClusterName }}
+  name: open-cluster-management:managedcluster:{{ .ManagedClusterName }}
 rules:
 # Allow agent to rotate its certificate
 - apiGroups: ["certificates.k8s.io"]
@@ -102,11 +102,11 @@ func pkgHubManagedclusterManifestsManagedclusterClusterroleYaml() (*asset, error
 var _pkgHubManagedclusterManifestsManagedclusterClusterrolebindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: system:open-cluster-management:managedcluster:{{ .ManagedClusterName }}
+  name: open-cluster-management:managedcluster:{{ .ManagedClusterName }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: system:open-cluster-management:managedcluster:{{ .ManagedClusterName }}
+  name: open-cluster-management:managedcluster:{{ .ManagedClusterName }}
 subjects:
 - kind: Group
   apiGroup: rbac.authorization.k8s.io

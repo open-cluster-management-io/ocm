@@ -23,7 +23,6 @@ import (
 
 const (
 	manifestDir             = "pkg/hub/managedcluster"
-	clusterRolePrefix       = "system:open-cluster-management:managedcluster"
 	managedClusterFinalizer = "cluster.open-cluster-management.io/api-resource-cleanup"
 )
 
