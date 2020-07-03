@@ -7,14 +7,32 @@ import (
 
 	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned/typed/work/v1"
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
+	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 )
+
+const (
+	// unknownKind is returned by resourcehelper.GuessObjectGroupVersionKind() when it
+	// cannot tell the kind of the given object
+	unknownKind = "<unknown>"
+)
+
+var (
+	genericScheme = runtime.NewScheme()
+)
+
+func init() {
+	// add apiextensions v1beta1 to scheme to support CustomResourceDefinition v1beta1
+	_ = apiextensionsv1beta1.AddToScheme(genericScheme)
+}
 
 // MergeManifestConditions return a new ManifestCondition array which merges the existing manifest
 // conditions and the new manifest conditions. Rules to match ManifestCondition between two arrays:
@@ -327,4 +345,20 @@ func copyAppliedResource(resource workapiv1.AppliedManifestResourceMeta) workapi
 		Namespace: resource.Namespace,
 		UID:       resource.UID,
 	}
+}
+
+// GuessObjectGroupVersionKind returns GVK for the passed runtime object.
+func GuessObjectGroupVersionKind(object runtime.Object) (*schema.GroupVersionKind, error) {
+	gvk := resourcehelper.GuessObjectGroupVersionKind(object)
+	// return gvk if found
+	if gvk.Kind != unknownKind {
+		return &gvk, nil
+	}
+
+	// otherwise fall back to genericScheme
+	if kinds, _, _ := genericScheme.ObjectKinds(object); len(kinds) > 0 {
+		return &kinds[0], nil
+	}
+
+	return nil, fmt.Errorf("cannot get gvk of %v", object)
 }

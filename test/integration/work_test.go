@@ -237,6 +237,40 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			util.AssertExistenceOfResources(gvrs, namespaces, names, spokeDynamicClient, eventuallyTimeout, eventuallyInterval)
 			util.AssertAppliedResources(work.Namespace, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
 		})
+
+		ginkgo.It("should delete CRD and CR successfully", func() {
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			var namespaces, names []string
+			for _, obj := range objects {
+				namespaces = append(namespaces, obj.GetNamespace())
+				names = append(names, obj.GetName())
+			}
+
+			util.AssertExistenceOfResources(gvrs, namespaces, names, spokeDynamicClient, eventuallyTimeout, eventuallyInterval)
+			util.AssertAppliedResources(work.Namespace, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
+
+			// delete manifest work
+			err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// wait for deletion of manifest work
+			gomega.Eventually(func() bool {
+				_, err := hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if !errors.IsNotFound(err) {
+					return false
+				}
+
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Once manifest work is deleted, all CRs/CRD should have already been deleted too
+			for i := range gvrs {
+				_, err := util.GetResource(namespaces[i], names[i], gvrs[i], spokeDynamicClient)
+				gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+			}
+		})
 	})
 
 	ginkgo.Context("With Service Account, Role, RoleBinding and Deployment in manifests", func() {
