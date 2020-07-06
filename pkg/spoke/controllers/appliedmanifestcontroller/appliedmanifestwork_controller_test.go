@@ -1,4 +1,4 @@
-package deletioncontroller
+package appliedmanifestcontroller
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	fakeworkclient "github.com/open-cluster-management/api/client/work/clientset/versioned/fake"
+	workinformers "github.com/open-cluster-management/api/client/work/informers/externalversions"
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
 	"github.com/open-cluster-management/work/pkg/spoke/spoketesting"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,13 +33,13 @@ func newManifest(group, version, resource, namespace, name string) workapiv1.Man
 
 func TestSyncManifestWork(t *testing.T) {
 	cases := []struct {
-		name                        string
-		existingResources           []runtime.Object
-		appliedResources            []workapiv1.AppliedManifestResourceMeta
-		manifests                   []workapiv1.ManifestCondition
-		validateManifestWorkActions func(t *testing.T, actions []clienttesting.Action)
-		validateDynamicActions      func(t *testing.T, actions []clienttesting.Action)
-		expectedQueueLen            int
+		name                               string
+		existingResources                  []runtime.Object
+		appliedResources                   []workapiv1.AppliedManifestResourceMeta
+		manifests                          []workapiv1.ManifestCondition
+		validateAppliedManifestWorkActions func(t *testing.T, actions []clienttesting.Action)
+		validateDynamicActions             func(t *testing.T, actions []clienttesting.Action)
+		expectedQueueLen                   int
 	}{
 		{
 			name: "skip when no applied resource changed",
@@ -46,7 +47,7 @@ func TestSyncManifestWork(t *testing.T) {
 				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
 			},
 			manifests: []workapiv1.ManifestCondition{newManifest("g1", "v1", "r1", "ns1", "n1")},
-			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) > 0 {
 					t.Fatal(spew.Sdump(actions))
 				}
@@ -71,11 +72,11 @@ func TestSyncManifestWork(t *testing.T) {
 				newManifest("g5", "v5", "r5", "ns5", "n5"),
 				newManifest("g6", "v6", "r6", "ns6", "n6"),
 			},
-			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 1 {
 					t.Fatal(spew.Sdump(actions))
 				}
-				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
+				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
 				if !reflect.DeepEqual(work.Status.AppliedResources, []workapiv1.AppliedManifestResourceMeta{
 					{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
 					{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
@@ -116,7 +117,7 @@ func TestSyncManifestWork(t *testing.T) {
 				newManifest("", "v1", "secrets", "ns1", "n1"),
 				newManifest("", "v1", "secrets", "ns2", "n2"),
 			},
-			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) > 0 {
 					t.Fatal(spew.Sdump(actions))
 				}
@@ -147,11 +148,11 @@ func TestSyncManifestWork(t *testing.T) {
 				newManifest("", "v1", "secrets", "ns1", "n1"),
 				newManifest("", "v1", "secrets", "ns5", "n5"),
 			},
-			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 1 {
 					t.Fatal(spew.Sdump(actions))
 				}
-				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
+				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
 				if !reflect.DeepEqual(work.Status.AppliedResources, []workapiv1.AppliedManifestResourceMeta{
 					{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1"},
 					{Version: "v1", Resource: "secrets", Namespace: "ns5", Name: "n5"},
@@ -181,23 +182,31 @@ func TestSyncManifestWork(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			testingWork, _ := spoketesting.NewManifestWork(0)
-			testingWork.Status.AppliedResources = c.appliedResources
+			testingAppliedWork := spoketesting.NewAppliedManifestWork("test", 0)
+			testingAppliedWork.Status.AppliedResources = c.appliedResources
 			testingWork.Status.ResourceStatus.Manifests = c.manifests
 
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), c.existingResources...)
-			fakeClient := fakeworkclient.NewSimpleClientset(testingWork)
-			controller := StaleManifestDeletionController{
-				manifestWorkClient: fakeClient.WorkV1().ManifestWorks(testingWork.Namespace),
-				spokeDynamicClient: fakeDynamicClient,
-				rateLimiter:        workqueue.NewItemExponentialFailureRateLimiter(0, 1*time.Second),
+			fakeClient := fakeworkclient.NewSimpleClientset(testingWork, testingAppliedWork)
+			informerFactory := workinformers.NewSharedInformerFactory(fakeClient, 5*time.Minute)
+			informerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(testingWork)
+			informerFactory.Work().V1().AppliedManifestWorks().Informer().GetStore().Add(testingAppliedWork)
+			controller := AppliedManifestWorkController{
+				manifestWorkClient:        fakeClient.WorkV1().ManifestWorks(testingWork.Namespace),
+				manifestWorkLister:        informerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks("cluster1"),
+				appliedManifestWorkClient: fakeClient.WorkV1().AppliedManifestWorks(),
+				appliedManifestWorkLister: informerFactory.Work().V1().AppliedManifestWorks().Lister(),
+				spokeDynamicClient:        fakeDynamicClient,
+				hubHash:                   "test",
+				rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(0, 1*time.Second),
 			}
 
 			controllerContext := spoketesting.NewFakeSyncContext(t, testingWork.Name)
-			err := controller.syncManifestWork(context.TODO(), controllerContext, testingWork)
+			err := controller.sync(context.TODO(), controllerContext)
 			if err != nil {
 				t.Fatal(err)
 			}
-			c.validateManifestWorkActions(t, fakeClient.Actions())
+			c.validateAppliedManifestWorkActions(t, fakeClient.Actions())
 			c.validateDynamicActions(t, fakeDynamicClient.Actions())
 
 			queueLen := controllerContext.Queue().Len()

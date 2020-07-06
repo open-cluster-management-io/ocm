@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -36,6 +37,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 
 	var work *workapiv1.ManifestWork
 	var manifests []workapiv1.Manifest
+	var appliedManifestWorkName string
 
 	var err error
 
@@ -62,6 +64,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 	ginkgo.JustBeforeEach(func() {
 		work = util.NewManifestWork(o.SpokeClusterName, "", manifests)
 		work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+		appliedManifestWorkName = fmt.Sprintf("%s-%s", hubHash, work.Name)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
@@ -105,12 +108,12 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 
 			// check if resource created by stale manifest is deleted once it is removed from applied resource list
 			gomega.Eventually(func() bool {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				appliedManifestWork, err := hubWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
 
-				for _, appliedResource := range work.Status.AppliedResources {
+				for _, appliedResource := range appliedManifestWork.Status.AppliedResources {
 					if appliedResource.Name == "cm1" {
 						return false
 					}
@@ -129,7 +132,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			util.AssertWorkDeleted(work.Namespace, work.Name, manifests, hubWorkClient, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkDeleted(work.Namespace, work.Name, hubHash, manifests, hubWorkClient, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 	})
 
@@ -169,12 +172,12 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 
 			// check if resource created by stale manifest is deleted once it is removed from applied resource list
 			gomega.Eventually(func() bool {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
 
-				for _, appliedResource := range work.Status.AppliedResources {
+				for _, appliedResource := range appliedManifestWork.Status.AppliedResources {
 					if appliedResource.Name == "cm3" {
 						return false
 					}
@@ -193,7 +196,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			util.AssertWorkDeleted(work.Namespace, work.Name, manifests, hubWorkClient, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkDeleted(work.Namespace, work.Name, hubHash, manifests, hubWorkClient, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 	})
 
@@ -235,7 +238,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			}
 
 			util.AssertExistenceOfResources(gvrs, namespaces, names, spokeDynamicClient, eventuallyTimeout, eventuallyInterval)
-			util.AssertAppliedResources(work.Namespace, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
+			util.AssertAppliedResources(hubHash, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
 		})
 
 		ginkgo.It("should delete CRD and CR successfully", func() {
@@ -249,7 +252,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			}
 
 			util.AssertExistenceOfResources(gvrs, namespaces, names, spokeDynamicClient, eventuallyTimeout, eventuallyInterval)
-			util.AssertAppliedResources(work.Namespace, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
+			util.AssertAppliedResources(hubHash, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
 
 			// delete manifest work
 			err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
@@ -317,7 +320,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			}
 
 			util.AssertExistenceOfResources(gvrs, namespaces, names, spokeDynamicClient, eventuallyTimeout, eventuallyInterval)
-			util.AssertAppliedResources(work.Namespace, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
+			util.AssertAppliedResources(hubHash, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
 		})
 
 		ginkgo.It("should update Service Account and Deployment successfully", func() {
@@ -335,7 +338,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			util.AssertExistenceOfResources(gvrs, namespaces, names, spokeDynamicClient, eventuallyTimeout, eventuallyInterval)
 
 			ginkgo.By("check if applied resources in status are updated")
-			util.AssertAppliedResources(work.Namespace, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
+			util.AssertAppliedResources(hubHash, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
 
 			// update manifests in work: 1) swap service account and deployment; 2) rename service account; 3) update deployment
 			ginkgo.By("update manifests in work")
@@ -417,7 +420,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			ginkgo.By("check if applied resources in status are updated")
-			util.AssertAppliedResources(work.Namespace, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
+			util.AssertAppliedResources(hubHash, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
 
 			ginkgo.By("check if resources which are no longer maintained have been deleted")
 			util.AssertNonexistenceOfResources([]schema.GroupVersionResource{gvrs[3]}, []string{oldServiceAccount.GetNamespace()}, []string{oldServiceAccount.GetName()}, spokeDynamicClient, eventuallyTimeout, eventuallyInterval)
@@ -464,12 +467,12 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 
 			// check if resource created by stale manifest is deleted once it is removed from applied resource list
 			gomega.Eventually(func() bool {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
 
-				for _, appliedResource := range work.Status.AppliedResources {
+				for _, appliedResource := range appliedManifestWork.Status.AppliedResources {
 					if appliedResource.Name == "cm1" {
 						return false
 					}
@@ -504,7 +507,23 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 				}
 			}()
 
-			util.AssertWorkDeleted(work.Namespace, work.Name, manifests, hubWorkClient, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkDeleted(work.Namespace, work.Name, hubHash, manifests, hubWorkClient, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
+		})
+
+		ginkgo.It("should delete applied manifest work if it is orphan", func() {
+			appliedManifestWork := &workapiv1.AppliedManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-fakeworrk", hubHash),
+				},
+				Spec: workapiv1.AppliedManifestWorkSpec{
+					HubHash:          hubHash,
+					ManifestWorkName: "fakework",
+				},
+			}
+			_, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Create(context.Background(), appliedManifestWork, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			util.AssertAppliedManifestWorkDeleted(appliedManifestWork.Name, spokeWorkClient, eventuallyTimeout, eventuallyInterval)
 		})
 	})
 })

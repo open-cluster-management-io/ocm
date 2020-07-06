@@ -21,48 +21,48 @@ import (
 
 func TestFinalize(t *testing.T) {
 	cases := []struct {
-		name                        string
-		existingFinalizers          []string
-		existingResources           []runtime.Object
-		resourcesToRemove           []workapiv1.AppliedManifestResourceMeta
-		terminated                  bool
-		validateManifestWorkActions func(t *testing.T, actions []clienttesting.Action)
-		validateDynamicActions      func(t *testing.T, actions []clienttesting.Action)
-		expectedQueueLen            int
+		name                               string
+		existingFinalizers                 []string
+		existingResources                  []runtime.Object
+		resourcesToRemove                  []workapiv1.AppliedManifestResourceMeta
+		terminated                         bool
+		validateAppliedManifestWorkActions func(t *testing.T, actions []clienttesting.Action)
+		validateDynamicActions             func(t *testing.T, actions []clienttesting.Action)
+		expectedQueueLen                   int
 	}{
 		{
-			name:                        "skip when not delete",
-			existingFinalizers:          []string{controllers.ManifestWorkFinalizer},
-			validateManifestWorkActions: noAction,
-			validateDynamicActions:      noAction,
+			name:                               "skip when not delete",
+			existingFinalizers:                 []string{controllers.ManifestWorkFinalizer},
+			validateAppliedManifestWorkActions: noAction,
+			validateDynamicActions:             noAction,
 		},
 		{
-			name:                        "skip when finalizer gone",
-			terminated:                  true,
-			existingFinalizers:          []string{"other-finalizer"},
-			validateManifestWorkActions: noAction,
-			validateDynamicActions:      noAction,
+			name:                               "skip when finalizer gone",
+			terminated:                         true,
+			existingFinalizers:                 []string{"other-finalizer"},
+			validateAppliedManifestWorkActions: noAction,
+			validateDynamicActions:             noAction,
 		},
 		{
 			name:               "delete resources and remove finalizer",
 			terminated:         true,
-			existingFinalizers: []string{"a", controllers.ManifestWorkFinalizer, "b"},
+			existingFinalizers: []string{"a", controllers.AppliedManifestWorkFinalizer, "b"},
 			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
 				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "", Name: "n1"},
 				{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
 				{Group: "g3", Version: "v3", Resource: "r3", Namespace: "ns3", Name: "n3"},
 				{Group: "g4", Version: "v4", Resource: "r4", Namespace: "", Name: "n4"},
 			},
-			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
 					t.Fatal(spew.Sdump(actions))
 				}
 
-				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
+				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
 				if len(work.Status.AppliedResources) != 0 {
 					t.Fatal(spew.Sdump(actions[0]))
 				}
-				work = actions[1].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
+				work = actions[1].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
 				if !reflect.DeepEqual(work.Finalizers, []string{"a", "b"}) {
 					t.Fatal(spew.Sdump(actions[1]))
 				}
@@ -97,7 +97,7 @@ func TestFinalize(t *testing.T) {
 		{
 			name:               "requeue work when deleting resources are still visiable",
 			terminated:         true,
-			existingFinalizers: []string{controllers.ManifestWorkFinalizer},
+			existingFinalizers: []string{controllers.AppliedManifestWorkFinalizer},
 			existingResources: []runtime.Object{
 				spoketesting.NewUnstructuredSecret("ns1", "n1", true, "ns1-n1"),
 				spoketesting.NewUnstructuredSecret("ns2", "n2", true, "ns2-n2"),
@@ -106,7 +106,7 @@ func TestFinalize(t *testing.T) {
 				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
 				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
 			},
-			validateManifestWorkActions: noAction,
+			validateAppliedManifestWorkActions: noAction,
 			validateDynamicActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
 					t.Fatal(spew.Sdump(actions))
@@ -128,7 +128,7 @@ func TestFinalize(t *testing.T) {
 		{
 			name:               "ignore re-created resource and remove finalizer",
 			terminated:         true,
-			existingFinalizers: []string{controllers.ManifestWorkFinalizer},
+			existingFinalizers: []string{controllers.AppliedManifestWorkFinalizer},
 			existingResources: []runtime.Object{
 				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
 			},
@@ -136,17 +136,17 @@ func TestFinalize(t *testing.T) {
 				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "n1"},
 				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "n2"},
 			},
-			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
 					t.Fatal(spew.Sdump(actions))
 				}
 
-				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
+				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
 				if len(work.Status.AppliedResources) != 0 {
 					t.Fatal(spew.Sdump(actions[0]))
 				}
 
-				work = actions[1].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
+				work = actions[1].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
 				if !reflect.DeepEqual(work.Finalizers, []string{}) {
 					t.Fatal(spew.Sdump(actions[0]))
 				}
@@ -173,7 +173,7 @@ func TestFinalize(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			testingWork, _ := spoketesting.NewManifestWork(0)
+			testingWork := spoketesting.NewAppliedManifestWork("test", 0)
 			testingWork.Finalizers = c.existingFinalizers
 			if c.terminated {
 				now := metav1.Now()
@@ -185,18 +185,18 @@ func TestFinalize(t *testing.T) {
 
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), c.existingResources...)
 			fakeClient := fakeworkclient.NewSimpleClientset(testingWork)
-			controller := FinalizeController{
-				manifestWorkClient: fakeClient.WorkV1().ManifestWorks(testingWork.Namespace),
-				spokeDynamicClient: fakeDynamicClient,
-				rateLimiter:        workqueue.NewItemExponentialFailureRateLimiter(0, 1*time.Second),
+			controller := AppliedManifestWorkFinalizeController{
+				appliedManifestWorkClient: fakeClient.WorkV1().AppliedManifestWorks(),
+				spokeDynamicClient:        fakeDynamicClient,
+				rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(0, 1*time.Second),
 			}
 
 			controllerContext := spoketesting.NewFakeSyncContext(t, testingWork.Name)
-			err := controller.syncManifestWork(context.TODO(), controllerContext, testingWork)
+			err := controller.syncAppliedManifestWork(context.TODO(), controllerContext, testingWork)
 			if err != nil {
 				t.Fatal(err)
 			}
-			c.validateManifestWorkActions(t, fakeClient.Actions())
+			c.validateAppliedManifestWorkActions(t, fakeClient.Actions())
 			c.validateDynamicActions(t, fakeDynamicClient.Actions())
 
 			queueLen := controllerContext.Queue().Len()

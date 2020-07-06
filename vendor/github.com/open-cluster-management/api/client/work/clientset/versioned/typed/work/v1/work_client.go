@@ -10,12 +10,17 @@ import (
 
 type WorkV1Interface interface {
 	RESTClient() rest.Interface
+	AppliedManifestWorksGetter
 	ManifestWorksGetter
 }
 
 // WorkV1Client is used to interact with features provided by the work.open-cluster-management.io group.
 type WorkV1Client struct {
 	restClient rest.Interface
+}
+
+func (c *WorkV1Client) AppliedManifestWorks() AppliedManifestWorkInterface {
+	return newAppliedManifestWorks(c)
 }
 
 func (c *WorkV1Client) ManifestWorks(namespace string) ManifestWorkInterface {

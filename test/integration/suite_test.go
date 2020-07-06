@@ -19,6 +19,7 @@ import (
 
 	workclientset "github.com/open-cluster-management/api/client/work/clientset/versioned"
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
+	"github.com/open-cluster-management/work/pkg/helper"
 	"github.com/open-cluster-management/work/test/integration/util"
 )
 
@@ -32,7 +33,9 @@ var hubKubeconfigFileName string
 var spokeRestConfig *rest.Config
 var testEnv *envtest.Environment
 var spokeKubeClient kubernetes.Interface
+var spokeWorkClient workclientset.Interface
 var hubWorkClient workclientset.Interface
+var hubHash string
 
 func TestIntegration(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
@@ -67,10 +70,13 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	spokeRestConfig = cfg
+	hubHash = helper.HubHash(spokeRestConfig.Host)
 	spokeKubeClient, err = kubernetes.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	hubWorkClient, err = workclientset.NewForConfig(cfg)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	spokeWorkClient, err = workclientset.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	close(done)

@@ -6,7 +6,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
-	github.com/open-cluster-management/api v0.0.0-20200625151141-2cd72177f031
+	github.com/open-cluster-management/api v0.0.0-20200702210332-e07f4fdaf68b
 	github.com/openshift/build-machinery-go v0.0.0-20200424080330-082bf86082cc
 	github.com/openshift/library-go v0.0.0-20200414135834-ccc4bb27d032
 	github.com/spf13/cobra v1.0.0

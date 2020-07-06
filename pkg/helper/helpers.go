@@ -2,15 +2,19 @@ package helper
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
+	"strings"
 	"time"
 
 	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned/typed/work/v1"
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
+	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -361,4 +365,35 @@ func GuessObjectGroupVersionKind(object runtime.Object) (*schema.GroupVersionKin
 	}
 
 	return nil, fmt.Errorf("cannot get gvk of %v", object)
+}
+
+// RemoveFinalizer removes a finalizer from the list.  It mutates its input.
+func RemoveFinalizer(object runtime.Object, finalizerName string) {
+	accessor, _ := meta.Accessor(object)
+	finalizers := accessor.GetFinalizers()
+	newFinalizers := []string{}
+	for i := range finalizers {
+		if finalizers[i] == finalizerName {
+			continue
+		}
+		newFinalizers = append(newFinalizers, finalizers[i])
+	}
+	accessor.SetFinalizers(newFinalizers)
+}
+
+// AppliedManifestworkQueueKeyFunc return manifestwork key from appliedmanifestwork
+func AppliedManifestworkQueueKeyFunc(hubhash string) factory.ObjectQueueKeyFunc {
+	return func(obj runtime.Object) string {
+		accessor, _ := meta.Accessor(obj)
+		if !strings.HasPrefix(accessor.GetName(), hubhash) {
+			return ""
+		}
+		return strings.TrimPrefix(accessor.GetName(), hubhash+"-")
+	}
+}
+
+// HubHash returns a hash of hubserver
+// NOTE: the length of hash string is 64, meaning the length of manifestwork name should be less than 189
+func HubHash(hubServer string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(hubServer)))
 }

@@ -2,6 +2,10 @@
 
 package v1
 
+// AppliedManifestWorkListerExpansion allows custom methods to be added to
+// AppliedManifestWorkLister.
+type AppliedManifestWorkListerExpansion interface{}
+
 // ManifestWorkListerExpansion allows custom methods to be added to
 // ManifestWorkLister.
 type ManifestWorkListerExpansion interface{}

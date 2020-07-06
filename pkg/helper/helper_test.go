@@ -9,6 +9,7 @@ import (
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -366,6 +367,80 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 
 			if !equality.Semantic.DeepEqual(actual, c.expectedResourcesPendingFinalization) {
 				t.Errorf(diff.ObjectDiff(actual, c.expectedResourcesPendingFinalization))
+			}
+		})
+	}
+}
+
+func TestRemoveFinalizer(t *testing.T) {
+	cases := []struct {
+		name               string
+		obj                runtime.Object
+		finalizerToRemove  string
+		expectedFinalizers []string
+	}{
+		{
+			name:               "No finalizers in object",
+			obj:                &workapiv1.ManifestWork{},
+			finalizerToRemove:  "a",
+			expectedFinalizers: []string{},
+		},
+		{
+			name:               "remove finalizer",
+			obj:                &workapiv1.ManifestWork{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"a"}}},
+			finalizerToRemove:  "a",
+			expectedFinalizers: []string{},
+		},
+		{
+			name:               "multiple finalizers",
+			obj:                &workapiv1.ManifestWork{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"b", "a", "c"}}},
+			finalizerToRemove:  "a",
+			expectedFinalizers: []string{"b", "c"},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			RemoveFinalizer(c.obj, c.finalizerToRemove)
+			accessor, _ := meta.Accessor(c.obj)
+			finalizers := accessor.GetFinalizers()
+			if !equality.Semantic.DeepEqual(finalizers, c.expectedFinalizers) {
+				t.Errorf("Expected finalizers are same, but got %v", finalizers)
+			}
+		})
+	}
+}
+
+func TestHubHash(t *testing.T) {
+	cases := []struct {
+		name  string
+		key1  string
+		key2  string
+		equal bool
+	}{
+		{
+			name:  "same key",
+			key1:  "http://localhost",
+			key2:  "http://localhost",
+			equal: true,
+		},
+		{
+			name:  "same key",
+			key1:  "http://localhost",
+			key2:  "http://remotehost",
+			equal: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			hash1 := HubHash(c.key1)
+			hash2 := HubHash(c.key2)
+
+			if hash1 == hash2 && !c.equal {
+				t.Errorf("Expected not equal hash value, got %s, %s", hash1, hash2)
+			} else if hash1 != hash2 && c.equal {
+				t.Errorf("Expected equal hash value, got %s, %s", hash1, hash2)
 			}
 		})
 	}

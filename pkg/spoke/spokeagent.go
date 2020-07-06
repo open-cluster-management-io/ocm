@@ -4,7 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/open-cluster-management/work/pkg/spoke/controllers/deletioncontroller"
+	"github.com/open-cluster-management/work/pkg/helper"
+	"github.com/open-cluster-management/work/pkg/spoke/controllers/appliedmanifestcontroller"
 	"github.com/open-cluster-management/work/pkg/spoke/controllers/finalizercontroller"
 	"github.com/open-cluster-management/work/pkg/spoke/controllers/manifestcontroller"
 
@@ -48,6 +49,7 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 	if err != nil {
 		return err
 	}
+	hubhash := helper.HubHash(hubRestConfig.Host)
 
 	hubWorkClient, err := workclientset.NewForConfig(hubRestConfig)
 	if err != nil {
@@ -70,6 +72,11 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 	if err != nil {
 		return err
 	}
+	spokeWorkClient, err := workclientset.NewForConfig(spokeRestConfig)
+	if err != nil {
+		return err
+	}
+	spokeWorkInformerFactory := workinformers.NewSharedInformerFactory(spokeWorkClient, 5*time.Minute)
 	// Start restmapper gorountine that refresh cached APIGroupResources in the memory
 	// using discovery client
 	spokeDiscoveryClient, err := discovery.NewDiscoveryClientForConfig(spokeRestConfig)
@@ -89,6 +96,9 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 		hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName),
 		workInformerFactory.Work().V1().ManifestWorks(),
 		workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks(o.SpokeClusterName),
+		spokeWorkClient.WorkV1().AppliedManifestWorks(),
+		spokeWorkInformerFactory.Work().V1().AppliedManifestWorks(),
+		hubhash,
 		restMapper,
 	)
 	addFinalizerController := finalizercontroller.NewAddFinalizerController(
@@ -97,27 +107,39 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 		workInformerFactory.Work().V1().ManifestWorks(),
 		workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks(o.SpokeClusterName),
 	)
-	finalizeController := finalizercontroller.NewFinalizeController(
+	appliedManifestWorkFinalizeController := finalizercontroller.NewAppliedManifestWorkFinalizeController(
 		controllerContext.EventRecorder,
 		spokeDynamicClient,
-		hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName),
-		workInformerFactory.Work().V1().ManifestWorks(),
-		workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks(o.SpokeClusterName),
+		spokeWorkClient.WorkV1().AppliedManifestWorks(),
+		spokeWorkInformerFactory.Work().V1().AppliedManifestWorks(),
 	)
-
-	staleManifestDeletionController := deletioncontroller.NewStaleManifestDeletionController(
+	manifestWorkFinalizeController := finalizercontroller.NewManifestWorkFinalizeController(
+		controllerContext.EventRecorder,
+		hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName),
+		workInformerFactory.Work().V1().ManifestWorks(),
+		workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks(o.SpokeClusterName),
+		spokeWorkClient.WorkV1().AppliedManifestWorks(),
+		spokeWorkInformerFactory.Work().V1().AppliedManifestWorks(),
+		hubhash,
+	)
+	appliedManifestWorkController := appliedmanifestcontroller.NewAppliedManifestWorkController(
 		controllerContext.EventRecorder,
 		spokeDynamicClient,
 		hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName),
 		workInformerFactory.Work().V1().ManifestWorks(),
 		workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks(o.SpokeClusterName),
+		spokeWorkClient.WorkV1().AppliedManifestWorks(),
+		spokeWorkInformerFactory.Work().V1().AppliedManifestWorks(),
+		hubhash,
 	)
 
 	go workInformerFactory.Start(ctx.Done())
+	go spokeWorkInformerFactory.Start(ctx.Done())
 	go addFinalizerController.Run(ctx, 1)
-	go finalizeController.Run(ctx, 1)
-	go staleManifestDeletionController.Run(ctx, 1)
+	go appliedManifestWorkFinalizeController.Run(ctx, 1)
+	go appliedManifestWorkController.Run(ctx, 1)
 	go manifestWorkController.Run(ctx, 1)
+	go manifestWorkFinalizeController.Run(ctx, 1)
 	<-ctx.Done()
 	return nil
 }
