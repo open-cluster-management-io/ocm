@@ -1,9 +1,12 @@
 // Code generated for package bindata by go-bindata DO NOT EDIT. (@generated)
 // sources:
+// deploy/spoke/clusterrole.yaml
 // deploy/spoke/clusterrole_binding.yaml
 // deploy/spoke/deployment.yaml
 // deploy/spoke/kustomization.yaml
 // deploy/spoke/namespace.yaml
+// deploy/spoke/role.yaml
+// deploy/spoke/role_binding.yaml
 // deploy/spoke/secret.yaml
 // deploy/spoke/service_account.yaml
 package bindata
@@ -59,14 +62,42 @@ func (fi bindataFileInfo) Sys() interface{} {
 	return nil
 }
 
+var _deploySpokeClusterroleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: open-cluster-management:spoke
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["create"]
+`)
+
+func deploySpokeClusterroleYamlBytes() ([]byte, error) {
+	return _deploySpokeClusterroleYaml, nil
+}
+
+func deploySpokeClusterroleYaml() (*asset, error) {
+	bytes, err := deploySpokeClusterroleYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "deploy/spoke/clusterrole.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _deploySpokeClusterrole_bindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: system:open-cluster-management:spoke
+  name: open-cluster-management:spoke
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: cluster-admin
+  name: open-cluster-management:spoke
 subjects:
   - kind: ServiceAccount
     name: spoke-agent-sa
@@ -174,7 +205,10 @@ namespace: open-cluster-management
 resources:
 - ./namespace.yaml
 - ./service_account.yaml
+- ./clusterrole.yaml
 - ./clusterrole_binding.yaml
+- ./role.yaml
+- ./role_binding.yaml
 - ./deployment.yaml
 - ./secret.yaml
 
@@ -218,6 +252,65 @@ func deploySpokeNamespaceYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "deploy/spoke/namespace.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _deploySpokeRoleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: open-cluster-management:registration-agent
+  namespace: open-cluster-management
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]
+- apiGroups: ["", "events.k8s.io"]
+  resources: ["events"]
+  verbs: ["create", "patch", "update"]
+`)
+
+func deploySpokeRoleYamlBytes() ([]byte, error) {
+	return _deploySpokeRoleYaml, nil
+}
+
+func deploySpokeRoleYaml() (*asset, error) {
+	bytes, err := deploySpokeRoleYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "deploy/spoke/role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _deploySpokeRole_bindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: open-cluster-management:registration-agent
+  namespace: open-cluster-management
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: open-cluster-management:registration-agent
+subjects:
+  - kind: ServiceAccount
+    name: spoke-agent-sa
+    namespace: open-cluster-management
+`)
+
+func deploySpokeRole_bindingYamlBytes() ([]byte, error) {
+	return _deploySpokeRole_bindingYaml, nil
+}
+
+func deploySpokeRole_bindingYaml() (*asset, error) {
+	bytes, err := deploySpokeRole_bindingYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "deploy/spoke/role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -319,10 +412,13 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
+	"deploy/spoke/clusterrole.yaml":         deploySpokeClusterroleYaml,
 	"deploy/spoke/clusterrole_binding.yaml": deploySpokeClusterrole_bindingYaml,
 	"deploy/spoke/deployment.yaml":          deploySpokeDeploymentYaml,
 	"deploy/spoke/kustomization.yaml":       deploySpokeKustomizationYaml,
 	"deploy/spoke/namespace.yaml":           deploySpokeNamespaceYaml,
+	"deploy/spoke/role.yaml":                deploySpokeRoleYaml,
+	"deploy/spoke/role_binding.yaml":        deploySpokeRole_bindingYaml,
 	"deploy/spoke/secret.yaml":              deploySpokeSecretYaml,
 	"deploy/spoke/service_account.yaml":     deploySpokeService_accountYaml,
 }
@@ -370,10 +466,13 @@ type bintree struct {
 var _bintree = &bintree{nil, map[string]*bintree{
 	"deploy": {nil, map[string]*bintree{
 		"spoke": {nil, map[string]*bintree{
+			"clusterrole.yaml":         {deploySpokeClusterroleYaml, map[string]*bintree{}},
 			"clusterrole_binding.yaml": {deploySpokeClusterrole_bindingYaml, map[string]*bintree{}},
 			"deployment.yaml":          {deploySpokeDeploymentYaml, map[string]*bintree{}},
 			"kustomization.yaml":       {deploySpokeKustomizationYaml, map[string]*bintree{}},
 			"namespace.yaml":           {deploySpokeNamespaceYaml, map[string]*bintree{}},
+			"role.yaml":                {deploySpokeRoleYaml, map[string]*bintree{}},
+			"role_binding.yaml":        {deploySpokeRole_bindingYaml, map[string]*bintree{}},
 			"secret.yaml":              {deploySpokeSecretYaml, map[string]*bintree{}},
 			"service_account.yaml":     {deploySpokeService_accountYaml, map[string]*bintree{}},
 		}},
