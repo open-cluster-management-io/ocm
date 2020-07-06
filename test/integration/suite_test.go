@@ -10,7 +10,6 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -63,9 +62,6 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	hubKubeconfigFileName = path.Join(tempDir, "kubeconfig")
 	err = util.CreateKubeconfigFile(cfg, hubKubeconfigFileName)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-	err = apiextensionsv1beta1.AddToScheme(scheme.Scheme)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	err = workapiv1.AddToScheme(scheme.Scheme)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())

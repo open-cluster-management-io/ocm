@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -29,7 +28,6 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
-	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 
 	"github.com/open-cluster-management/work/pkg/helper"
 	"github.com/open-cluster-management/work/pkg/spoke/resource"
@@ -46,12 +44,6 @@ type ManifestWorkController struct {
 	// restMapper is a cached resource mapping obtained fron discovery client
 	restMapper *resource.Mapper
 }
-
-var (
-	genericScheme = runtime.NewScheme()
-	genericCodecs = serializer.NewCodecFactory(genericScheme)
-	genericCodec  = genericCodecs.UniversalDeserializer()
-)
 
 const (
 	manifestWorkFinalizer = "cluster.open-cluster-management.io/manifest-work-cleanup"
@@ -135,8 +127,6 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	// merge the new manifest conditions with the existing manifest conditions
 	manifestWork.Status.ResourceStatus.Manifests = helper.MergeManifestConditions(manifestWork.Status.ResourceStatus.Manifests, newManifestConditions)
 
-	// TODO find resources to be deleted if it is not owned by manifestwork any longer
-
 	// Update work status
 	_, _, err = helper.UpdateManifestWorkStatus(
 		ctx, m.manifestWorkClient, manifestWork.Name, m.generateUpdateStatusFunc(manifestWork.Status.ResourceStatus))
@@ -184,7 +174,7 @@ func (m *ManifestWorkController) decodeUnstructured(data []byte) (schema.GroupVe
 	}
 	mapping, err := m.restMapper.MappingForGVK(unstructuredObj.GroupVersionKind())
 	if err != nil {
-		return schema.GroupVersionResource{}, nil, fmt.Errorf("Failed to find grv from restmapping: %w", err)
+		return schema.GroupVersionResource{}, nil, fmt.Errorf("Failed to find gvr from restmapping: %w", err)
 	}
 
 	return mapping.Resource, unstructuredObj, nil
@@ -348,7 +338,10 @@ func buildManifestResourceMeta(index int, object runtime.Object, restMapper *res
 	}
 
 	// set gvk
-	gvk := resourcehelper.GuessObjectGroupVersionKind(object)
+	gvk, err := helper.GuessObjectGroupVersionKind(object)
+	if err != nil {
+		return resourceMeta, err
+	}
 	resourceMeta.Group = gvk.Group
 	resourceMeta.Version = gvk.Version
 	resourceMeta.Kind = gvk.Kind
@@ -365,7 +358,7 @@ func buildManifestResourceMeta(index int, object runtime.Object, restMapper *res
 	if restMapper == nil {
 		return resourceMeta, err
 	}
-	if mapping, e := restMapper.MappingForGVK(gvk); e == nil {
+	if mapping, e := restMapper.MappingForGVK(*gvk); e == nil {
 		resourceMeta.Resource = mapping.Resource.Resource
 	}
 
