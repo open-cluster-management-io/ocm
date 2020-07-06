@@ -66,7 +66,7 @@ func TestHealthCheck(t *testing.T) {
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionFalse,
 					Reason:  "ManagedClusterKubeAPIServerUnavailable",
-					Message: "The kube-apiserver is not ok: an error on the server (\"internal server error\") has prevented the request from succeeding",
+					Message: "The kube-apiserver is not ok, status code: 500, an error on the server (\"internal server error\") has prevented the request from succeeding",
 				}
 				assertCondition(t, actual, expectedCondition)
 			},
@@ -91,6 +91,22 @@ func TestHealthCheck(t *testing.T) {
 			name:       "there is no readyz endpoint",
 			clusters:   []runtime.Object{newAcceptedManagedCluster()},
 			httpStatus: http.StatusNotFound,
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				assertActions(t, actions, "get", "update")
+				actual := actions[1].(clienttesting.UpdateActionImpl).Object
+				expectedCondition := clusterv1.StatusCondition{
+					Type:    clusterv1.ManagedClusterConditionAvailable,
+					Status:  metav1.ConditionTrue,
+					Reason:  "ManagedClusterAvailable",
+					Message: "Managed cluster is available",
+				}
+				assertCondition(t, actual, expectedCondition)
+			},
+		},
+		{
+			name:       "readyz is forbidden",
+			clusters:   []runtime.Object{newAcceptedManagedCluster()},
+			httpStatus: http.StatusForbidden,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				assertActions(t, actions, "get", "update")
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
