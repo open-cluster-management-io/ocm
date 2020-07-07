@@ -8,44 +8,78 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 )
 
-var _ = Describe("Test Cases: Create klusterlet", func() {
+var _ = Describe("Create klusterlet CR", func() {
 	var klusterletName = ""
 	BeforeEach(func() {
 		klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
-		checkHubReady()
-		checkKlusterletOperatorReady()
 	})
 
 	AfterEach(func() {
-		By("clean resources after each case")
-		cleanResources()
+		By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
+		t.cleanKlusterletResources(klusterletName)
 	})
 
-	It("Sub Case: Created klusterlet with managed cluster name", func() {
+	It("Create klusterlet CR with managed cluster name", func() {
 		var clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
 		var agentNamespace = fmt.Sprintf("e2e-agent-%s", rand.String(6))
 
-		By("create klusterlet with managed cluster name")
-		realClusterName := createKlusterlet(klusterletName, clusterName, agentNamespace)
-		Expect(realClusterName).Should(Equal(clusterName))
+		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v", klusterletName, clusterName))
+		_, err := t.CreateKlusterlet(klusterletName, clusterName, agentNamespace)
+		Expect(err).ToNot(HaveOccurred())
 
-		By("waiting for the managed cluster to be created and ready")
+		By(fmt.Sprintf("waiting for the managed cluster %v to be created", clusterName))
 		Eventually(func() error {
-			return managedClusterReady(realClusterName)
-		}, eventuallyTimeout*5, eventuallyInterval*5).Should(Succeed())
+			_, err := t.GetCreatedManagedCluster(clusterName)
+			return err
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+
+		By(fmt.Sprintf("approve the created managed cluster %v", clusterName))
+		Eventually(func() error {
+			return t.ApproveCSR(clusterName)
+		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+
+		By(fmt.Sprintf("accept the created managed cluster %v", clusterName))
+		Eventually(func() error {
+			return t.AcceptsClient(clusterName)
+		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+
+		By(fmt.Sprintf("waiting for the managed cluster %v to be ready", clusterName))
+		Eventually(func() error {
+			return t.CheckManagedClusterStatus(clusterName)
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
 	})
 
-	It("Sub Case: Created klusterlet without managed cluster name", func() {
+	It("Created klusterlet without managed cluster name", func() {
 		var clusterName = ""
 		var agentNamespace = ""
+		var err error
+		By(fmt.Sprintf("create klusterlet %v without managed cluster name", klusterletName))
+		_, err = t.CreateKlusterlet(klusterletName, clusterName, agentNamespace)
+		Expect(err).ToNot(HaveOccurred())
 
-		By("create klusterlet without managed cluster name")
-		realClusterName := createKlusterlet(klusterletName, clusterName, agentNamespace)
-		Expect(realClusterName).ShouldNot(BeEmpty())
-
-		By("waiting for the managed cluster to be created and ready")
+		By("waiting for the managed cluster to be created")
 		Eventually(func() error {
-			return managedClusterReady(realClusterName)
-		}, eventuallyTimeout*5, eventuallyInterval*5).Should(Succeed())
+			clusterName, err = t.GetClusterNameFromKlusterlet(klusterletName)
+			if err != nil {
+				return err
+			}
+			_, err = t.GetCreatedManagedCluster(clusterName)
+			return err
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+
+		By(fmt.Sprintf("approve the created managed cluster %v", clusterName))
+		Eventually(func() error {
+			return t.ApproveCSR(clusterName)
+		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+
+		By(fmt.Sprintf("accept the created managed cluster %v", clusterName))
+		Eventually(func() error {
+			return t.AcceptsClient(clusterName)
+		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+
+		By(fmt.Sprintf("waiting for the managed cluster %v to be ready", clusterName))
+		Eventually(func() error {
+			return t.CheckManagedClusterStatus(clusterName)
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
 	})
 })
