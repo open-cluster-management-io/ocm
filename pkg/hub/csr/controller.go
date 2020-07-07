@@ -149,7 +149,7 @@ func isSpokeClusterClientCertRenewal(csr *certificatesv1beta1.CertificateSigning
 
 	x509cr, err := x509.ParseCertificateRequest(block.Bytes)
 	if err != nil {
-		klog.V(4).Infof("csr %q was not recognized: %w", csr.Name, err)
+		klog.V(4).Infof("csr %q was not recognized: %v", csr.Name, err)
 		return false
 	}
 

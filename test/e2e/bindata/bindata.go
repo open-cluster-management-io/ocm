@@ -62,7 +62,7 @@ func (fi bindataFileInfo) Sys() interface{} {
 var _deploySpokeClusterrole_bindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: system:open-cluster-management:spoke
+  name: open-cluster-management:spoke
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole

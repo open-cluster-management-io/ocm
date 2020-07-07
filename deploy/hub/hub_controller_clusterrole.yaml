@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: system:open-cluster-management:hub
+  name: open-cluster-management:hub
 rules:
 # Allow hub to monitor and update status of csr
 - apiGroups: ["certificates.k8s.io"]

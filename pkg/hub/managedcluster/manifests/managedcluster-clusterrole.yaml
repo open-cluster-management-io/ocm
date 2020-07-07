@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: system:open-cluster-management:managedcluster:{{ .ManagedClusterName }}
+  name: open-cluster-management:managedcluster:{{ .ManagedClusterName }}
 rules:
 # Allow agent to rotate its certificate
 - apiGroups: ["certificates.k8s.io"]
