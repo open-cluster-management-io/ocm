@@ -10,6 +10,7 @@ import (
 	worklister "github.com/open-cluster-management/api/client/work/listers/work/v1"
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
 	"github.com/open-cluster-management/work/pkg/helper"
+	"github.com/open-cluster-management/work/pkg/spoke/controllers"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -82,7 +83,7 @@ func (m *FinalizeController) syncManifestWork(ctx context.Context, controllerCon
 	// don't do work if the finalizer is not present
 	found := false
 	for i := range manifestWork.Finalizers {
-		if manifestWork.Finalizers[i] == manifestWorkFinalizer {
+		if manifestWork.Finalizers[i] == controllers.ManifestWorkFinalizer {
 			found = true
 			break
 		}
@@ -122,7 +123,7 @@ func (m *FinalizeController) syncManifestWork(ctx context.Context, controllerCon
 	// reset the rate limiter for the manifest work
 	m.rateLimiter.Forget(manifestWork.Name)
 
-	removeFinalizer(manifestWork, manifestWorkFinalizer)
+	removeFinalizer(manifestWork, controllers.ManifestWorkFinalizer)
 	_, err = m.manifestWorkClient.Update(ctx, manifestWork, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("Failed to remove finalizer from ManifestWork %s/%s: %w", manifestWork.Namespace, manifestWork.Name, err)

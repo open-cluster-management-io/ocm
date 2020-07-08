@@ -9,6 +9,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	fakeworkclient "github.com/open-cluster-management/api/client/work/clientset/versioned/fake"
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
+	"github.com/open-cluster-management/work/pkg/spoke/controllers"
 	"github.com/open-cluster-management/work/pkg/spoke/spoketesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,7 +32,7 @@ func TestFinalize(t *testing.T) {
 	}{
 		{
 			name:                        "skip when not delete",
-			existingFinalizers:          []string{manifestWorkFinalizer},
+			existingFinalizers:          []string{controllers.ManifestWorkFinalizer},
 			validateManifestWorkActions: noAction,
 			validateDynamicActions:      noAction,
 		},
@@ -45,7 +46,7 @@ func TestFinalize(t *testing.T) {
 		{
 			name:               "delete resources and remove finalizer",
 			terminated:         true,
-			existingFinalizers: []string{"a", manifestWorkFinalizer, "b"},
+			existingFinalizers: []string{"a", controllers.ManifestWorkFinalizer, "b"},
 			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
 				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "", Name: "n1"},
 				{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
@@ -96,7 +97,7 @@ func TestFinalize(t *testing.T) {
 		{
 			name:               "requeue work when deleting resources are still visiable",
 			terminated:         true,
-			existingFinalizers: []string{manifestWorkFinalizer},
+			existingFinalizers: []string{controllers.ManifestWorkFinalizer},
 			existingResources: []runtime.Object{
 				spoketesting.NewUnstructuredSecret("ns1", "n1", true, "ns1-n1"),
 				spoketesting.NewUnstructuredSecret("ns2", "n2", true, "ns2-n2"),
@@ -127,7 +128,7 @@ func TestFinalize(t *testing.T) {
 		{
 			name:               "ignore re-created resource and remove finalizer",
 			terminated:         true,
-			existingFinalizers: []string{manifestWorkFinalizer},
+			existingFinalizers: []string{controllers.ManifestWorkFinalizer},
 			existingResources: []runtime.Object{
 				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
 			},
