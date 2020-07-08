@@ -30,6 +30,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 
 	"github.com/open-cluster-management/work/pkg/helper"
+	"github.com/open-cluster-management/work/pkg/spoke/controllers"
 	"github.com/open-cluster-management/work/pkg/spoke/resource"
 )
 
@@ -44,10 +45,6 @@ type ManifestWorkController struct {
 	// restMapper is a cached resource mapping obtained fron discovery client
 	restMapper *resource.Mapper
 }
-
-const (
-	manifestWorkFinalizer = "cluster.open-cluster-management.io/manifest-work-cleanup"
-)
 
 // NewManifestWorkController returns a ManifestWorkController
 func NewManifestWorkController(
@@ -97,6 +94,19 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 
 	// no work to do if we're deleted
 	if !manifestWork.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
+	// don't do work if the finalizer is not present
+	// it ensures all maintained resources will be cleaned once manifestwork is deleted
+	found := false
+	for i := range manifestWork.Finalizers {
+		if manifestWork.Finalizers[i] == controllers.ManifestWorkFinalizer {
+			found = true
+			break
+		}
+	}
+	if !found {
 		return nil
 	}
 

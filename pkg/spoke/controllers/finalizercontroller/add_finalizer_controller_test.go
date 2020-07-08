@@ -8,6 +8,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	fakeworkclient "github.com/open-cluster-management/api/client/work/clientset/versioned/fake"
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
+	"github.com/open-cluster-management/work/pkg/spoke/controllers"
 	"github.com/open-cluster-management/work/pkg/spoke/spoketesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clienttesting "k8s.io/client-go/testing"
@@ -28,7 +29,7 @@ func TestAddFinalizer(t *testing.T) {
 					t.Fatal(spew.Sdump(actions))
 				}
 				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
-				if !reflect.DeepEqual(work.Finalizers, []string{manifestWorkFinalizer}) {
+				if !reflect.DeepEqual(work.Finalizers, []string{controllers.ManifestWorkFinalizer}) {
 					t.Fatal(spew.Sdump(actions))
 				}
 			},
@@ -41,7 +42,7 @@ func TestAddFinalizer(t *testing.T) {
 					t.Fatal(spew.Sdump(actions))
 				}
 				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
-				if !reflect.DeepEqual(work.Finalizers, []string{"other", manifestWorkFinalizer}) {
+				if !reflect.DeepEqual(work.Finalizers, []string{"other", controllers.ManifestWorkFinalizer}) {
 					t.Fatal(spew.Sdump(actions))
 				}
 			},
@@ -57,7 +58,7 @@ func TestAddFinalizer(t *testing.T) {
 		},
 		{
 			name:               "skip when present",
-			existingFinalizers: []string{manifestWorkFinalizer},
+			existingFinalizers: []string{controllers.ManifestWorkFinalizer},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) > 0 {
 					t.Fatal(spew.Sdump(actions))

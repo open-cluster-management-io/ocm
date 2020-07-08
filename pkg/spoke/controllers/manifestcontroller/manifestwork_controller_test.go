@@ -8,6 +8,7 @@ import (
 	fakeworkclient "github.com/open-cluster-management/api/client/work/clientset/versioned/fake"
 	workinformers "github.com/open-cluster-management/api/client/work/informers/externalversions"
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
+	"github.com/open-cluster-management/work/pkg/spoke/controllers"
 	"github.com/open-cluster-management/work/pkg/spoke/resource"
 	"github.com/open-cluster-management/work/pkg/spoke/spoketesting"
 	corev1 "k8s.io/api/core/v1"
@@ -283,7 +284,7 @@ func TestSync(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			work, workKey := spoketesting.NewManifestWork(0, c.workManifest...)
-			work.Finalizers = []string{manifestWorkFinalizer}
+			work.Finalizers = []string{controllers.ManifestWorkFinalizer}
 			controller := newController(work, spoketesting.NewFakeRestMapper()).
 				withKubeObject(c.spokeObject...).
 				withUnstructuredObject(c.spokeDynamicObject...)
@@ -309,7 +310,7 @@ func TestFailedToApplyResource(t *testing.T) {
 		withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionFalse})
 
 	work, workKey := spoketesting.NewManifestWork(0, tc.workManifest...)
-	work.Finalizers = []string{manifestWorkFinalizer}
+	work.Finalizers = []string{controllers.ManifestWorkFinalizer}
 	controller := newController(work, spoketesting.NewFakeRestMapper()).withKubeObject(tc.spokeObject...).withUnstructuredObject()
 
 	// Add a reactor on fake client to throw error when creating secret on namespace ns2

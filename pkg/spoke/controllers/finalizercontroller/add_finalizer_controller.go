@@ -14,6 +14,7 @@ import (
 	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned/typed/work/v1"
 	workinformer "github.com/open-cluster-management/api/client/work/informers/externalversions/work/v1"
 	worklister "github.com/open-cluster-management/api/client/work/listers/work/v1"
+	"github.com/open-cluster-management/work/pkg/spoke/controllers"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 )
@@ -23,10 +24,6 @@ type AddFinalizerController struct {
 	manifestWorkClient workv1client.ManifestWorkInterface
 	manifestWorkLister worklister.ManifestWorkNamespaceLister
 }
-
-const (
-	manifestWorkFinalizer = "cluster.open-cluster-management.io/manifest-work-cleanup"
-)
 
 // NewAddFinalizerController returns a ManifestWorkController
 func NewAddFinalizerController(
@@ -74,12 +71,12 @@ func (m *AddFinalizerController) syncManifestWork(ctx context.Context, originalM
 
 	// don't add finalizer to instances that already have it
 	for i := range manifestWork.Finalizers {
-		if manifestWork.Finalizers[i] == manifestWorkFinalizer {
+		if manifestWork.Finalizers[i] == controllers.ManifestWorkFinalizer {
 			return nil
 		}
 	}
 	// if this conflicts, we'll simply try again later
-	manifestWork.Finalizers = append(manifestWork.Finalizers, manifestWorkFinalizer)
+	manifestWork.Finalizers = append(manifestWork.Finalizers, controllers.ManifestWorkFinalizer)
 	_, err := m.manifestWorkClient.Update(ctx, manifestWork, metav1.UpdateOptions{})
 	return err
 }
