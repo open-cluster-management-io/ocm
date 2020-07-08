@@ -203,7 +203,7 @@ func CleanUpManagedClusterManifests(
 	return errorhelpers.NewMultiLineAggregate(errs)
 }
 
-// CleanUpGroupFromClusterRoleBindings search all clusterrolebings for managed cluster group and remove the subject entry
+// CleanUpGroupFromClusterRoleBindings search all clusterrolebindings for managed cluster group and remove the subject entry
 // or delete the clusterrolebinding if it's the only subject.
 func CleanUpGroupFromClusterRoleBindings(
 	ctx context.Context,
@@ -248,7 +248,7 @@ func CleanUpGroupFromClusterRoleBindings(
 	return nil
 }
 
-// CleanUpGroupFromRoleBindings search all rolebings for managed cluster group and remove the subject entry
+// CleanUpGroupFromRoleBindings search all rolebindings for managed cluster group and remove the subject entry
 // or delete the rolebinding if it's the only subject.
 func CleanUpGroupFromRoleBindings(
 	ctx context.Context,

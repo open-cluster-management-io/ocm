@@ -10,13 +10,14 @@ import (
 
 	clusterfake "github.com/open-cluster-management/api/client/cluster/clientset/versioned/fake"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
+	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
+
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	fakekube "k8s.io/client-go/kubernetes/fake"
@@ -40,46 +41,46 @@ func TestUpdateStatusCondition(t *testing.T) {
 		{
 			name:               "add to empty",
 			startingConditions: []clusterv1.StatusCondition{},
-			newCondition:       newCondition("test", "True", "my-reason", "my-message", nil),
+			newCondition:       testinghelpers.NewManagedClusterCondition("test", "True", "my-reason", "my-message", nil),
 			expextedUpdated:    true,
-			expectedConditions: []clusterv1.StatusCondition{newCondition("test", "True", "my-reason", "my-message", nil)},
+			expectedConditions: []clusterv1.StatusCondition{testinghelpers.NewManagedClusterCondition("test", "True", "my-reason", "my-message", nil)},
 		},
 		{
 			name: "add to non-conflicting",
 			startingConditions: []clusterv1.StatusCondition{
-				newCondition("two", "True", "my-reason", "my-message", nil),
+				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
 			},
-			newCondition:    newCondition("one", "True", "my-reason", "my-message", nil),
+			newCondition:    testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", nil),
 			expextedUpdated: true,
 			expectedConditions: []clusterv1.StatusCondition{
-				newCondition("two", "True", "my-reason", "my-message", nil),
-				newCondition("one", "True", "my-reason", "my-message", nil),
+				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
+				testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", nil),
 			},
 		},
 		{
 			name: "change existing status",
 			startingConditions: []clusterv1.StatusCondition{
-				newCondition("two", "True", "my-reason", "my-message", nil),
-				newCondition("one", "True", "my-reason", "my-message", nil),
+				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
+				testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", nil),
 			},
-			newCondition:    newCondition("one", "False", "my-different-reason", "my-othermessage", nil),
+			newCondition:    testinghelpers.NewManagedClusterCondition("one", "False", "my-different-reason", "my-othermessage", nil),
 			expextedUpdated: true,
 			expectedConditions: []clusterv1.StatusCondition{
-				newCondition("two", "True", "my-reason", "my-message", nil),
-				newCondition("one", "False", "my-different-reason", "my-othermessage", nil),
+				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
+				testinghelpers.NewManagedClusterCondition("one", "False", "my-different-reason", "my-othermessage", nil),
 			},
 		},
 		{
 			name: "leave existing transition time",
 			startingConditions: []clusterv1.StatusCondition{
-				newCondition("two", "True", "my-reason", "my-message", nil),
-				newCondition("one", "True", "my-reason", "my-message", &beforeish),
+				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
+				testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", &beforeish),
 			},
-			newCondition:    newCondition("one", "True", "my-reason", "my-message", &afterish),
+			newCondition:    testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", &afterish),
 			expextedUpdated: false,
 			expectedConditions: []clusterv1.StatusCondition{
-				newCondition("two", "True", "my-reason", "my-message", nil),
-				newCondition("one", "True", "my-reason", "my-message", &beforeish),
+				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
+				testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", &beforeish),
 			},
 		},
 	}
@@ -159,11 +160,15 @@ func TestIsValidHTTPSURL(t *testing.T) {
 
 func TestCleanUpManagedClusterManifests(t *testing.T) {
 	applyFiles := map[string]runtime.Object{
-		"namespace":          newUnstructured("v1", "Namespace", "", "n1"),
-		"clusterrole":        newUnstructured("rbac.authorization.k8s.io/v1", "ClusterRole", "", "cr1"),
-		"clusterrolebinding": newUnstructured("rbac.authorization.k8s.io/v1", "ClusterRoleBinding", "", "crb1"),
-		"role":               newUnstructured("rbac.authorization.k8s.io/v1", "Role", "n1", "r1"),
-		"rolebinding":        newUnstructured("rbac.authorization.k8s.io/v1", "RoleBinding", "n1", "rb1"),
+		"namespace":          testinghelpers.NewUnstructuredObj("v1", "Namespace", "", "n1"),
+		"clusterrole":        testinghelpers.NewUnstructuredObj("rbac.authorization.k8s.io/v1", "ClusterRole", "", "cr1"),
+		"clusterrolebinding": testinghelpers.NewUnstructuredObj("rbac.authorization.k8s.io/v1", "ClusterRoleBinding", "", "crb1"),
+		"role":               testinghelpers.NewUnstructuredObj("rbac.authorization.k8s.io/v1", "Role", "n1", "r1"),
+		"rolebinding":        testinghelpers.NewUnstructuredObj("rbac.authorization.k8s.io/v1", "RoleBinding", "n1", "rb1"),
+	}
+	expectedActions := []string{}
+	for i := 0; i < len(applyFiles); i++ {
+		expectedActions = append(expectedActions, "delete")
 	}
 	cases := []struct {
 		name            string
@@ -183,7 +188,7 @@ func TestCleanUpManagedClusterManifests(t *testing.T) {
 			},
 			applyFiles: applyFiles,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertDeleteActions(t, len(applyFiles), actions)
+				testinghelpers.AssertActions(t, actions, expectedActions...)
 			},
 		},
 		{
@@ -191,19 +196,15 @@ func TestCleanUpManagedClusterManifests(t *testing.T) {
 			applyObject: []runtime.Object{},
 			applyFiles:  applyFiles,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertDeleteActions(t, len(applyFiles), actions)
+				testinghelpers.AssertActions(t, actions, expectedActions...)
 			},
 		},
 		{
-			name:        "unhandled types",
-			applyObject: []runtime.Object{},
-			applyFiles:  map[string]runtime.Object{"secret": newUnstructured("v1", "Secret", "n1", "s1")},
-			expectedErr: "unhandled type *v1.Secret",
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 0 {
-					t.Errorf("expected no actions, but %v", actions)
-				}
-			},
+			name:            "unhandled types",
+			applyObject:     []runtime.Object{},
+			applyFiles:      map[string]runtime.Object{"secret": testinghelpers.NewUnstructuredObj("v1", "Secret", "n1", "s1")},
+			expectedErr:     "unhandled type *v1.Secret",
+			validateActions: testinghelpers.AssertNoActions,
 		},
 	}
 	for _, c := range cases {
@@ -221,19 +222,7 @@ func TestCleanUpManagedClusterManifests(t *testing.T) {
 				},
 				getApplyFileNames(c.applyFiles)...,
 			)
-			if len(c.expectedErr) > 0 && cleanUpErr == nil {
-				t.Errorf("expected %q error", c.expectedErr)
-				return
-			}
-			if len(c.expectedErr) > 0 && cleanUpErr != nil && cleanUpErr.Error() != c.expectedErr {
-				t.Errorf("expected %q error, got %q", c.expectedErr, cleanUpErr.Error())
-				return
-			}
-			if len(c.expectedErr) == 0 && cleanUpErr != nil {
-				t.Errorf("unexpected err: %v", cleanUpErr)
-				return
-			}
-
+			testinghelpers.AssertError(t, cleanUpErr, c.expectedErr)
 			c.validateActions(t, kubeClient.Actions())
 		})
 	}
@@ -364,44 +353,6 @@ func TestCleanUpGroupFromRoleBindings(t *testing.T) {
 			c.validateActions(t, kubeClient.Actions())
 		})
 	}
-}
-
-func assertDeleteActions(t *testing.T, actionCounts int, actions []clienttesting.Action) {
-	if len(actions) != actionCounts {
-		t.Errorf("expected %d actions, but %v", actionCounts, actions)
-	}
-	for _, action := range actions {
-		if action.GetVerb() != "delete" {
-			t.Errorf("expected delete actions, but %v", action)
-		}
-	}
-}
-
-func newCondition(name, status, reason, message string, lastTransition *metav1.Time) clusterv1.StatusCondition {
-	ret := clusterv1.StatusCondition{
-		Type:    name,
-		Status:  metav1.ConditionStatus(status),
-		Reason:  reason,
-		Message: message,
-	}
-	if lastTransition != nil {
-		ret.LastTransitionTime = *lastTransition
-	}
-	return ret
-}
-
-func newUnstructured(apiVersion, kind, namespace, name string) *unstructured.Unstructured {
-	object := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": apiVersion,
-			"kind":       kind,
-			"metadata": map[string]interface{}{
-				"namespace": namespace,
-				"name":      name,
-			},
-		},
-	}
-	return object
 }
 
 func getApplyFileNames(applyFiles map[string]runtime.Object) []string {

@@ -8,8 +8,10 @@ import (
 	clusterv1listers "github.com/open-cluster-management/api/client/cluster/listers/cluster/v1"
 	worklister "github.com/open-cluster-management/api/client/work/listers/work/v1"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
+
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
