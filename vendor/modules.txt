@@ -133,7 +133,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/open-cluster-management/api v0.0.0-20200629211334-8be047b65c52
+# github.com/open-cluster-management/api v0.0.0-20200715201722-3c3c076bf062
 github.com/open-cluster-management/api/client/cluster/clientset/versioned
 github.com/open-cluster-management/api/client/cluster/clientset/versioned/scheme
 github.com/open-cluster-management/api/client/cluster/clientset/versioned/typed/cluster/v1

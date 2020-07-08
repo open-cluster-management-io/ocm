@@ -59,45 +59,6 @@ spec:
           description: Status represents the current status of work
           type: object
           properties:
-            appliedResources:
-              description: AppliedResources represents a list of resources defined
-                within the manifestwork that are applied. Only resources with valid
-                GroupVersionResource, namespace, and name are suitable. An item in
-                this slice is deleted when there is no mapped manifest in manifestwork.Spec
-                or by finalizer. The resource relating to the item will also be removed
-                from managed cluster. The deleted resource may still be present until
-                the finalizers for that resource are finished. However, the resource
-                will not be undeleted, so it can be removed from this list and eventual
-                consistency is preserved.
-              type: array
-              items:
-                description: AppliedManifestResourceMeta represents the gvr, name
-                  and namespace of a resource. Since these resources have been created,
-                  they must have valid group, version, resource, namespace, and name.
-                type: object
-                properties:
-                  group:
-                    description: Group is the API Group of the kubernetes resource
-                    type: string
-                  name:
-                    description: Name is the name of the kubernetes resource
-                    type: string
-                  namespace:
-                    description: Name is the namespace of the kubernetes resource,
-                      empty string indicates it is a cluster scoped resource.
-                    type: string
-                  resource:
-                    description: Resource is the resource name of the kubernetes resource
-                    type: string
-                  uid:
-                    description: UID is set on successful deletion of the kubernetes
-                      resource by controller. The resource might be still visible
-                      on the managed cluster after this field is set. It is not directly
-                      settable by a client.
-                    type: string
-                  version:
-                    description: Version is the version of the kubernetes resource
-                    type: string
             conditions:
               description: 'Conditions contains the different condition statuses for
                 this work. Valid condition types are: 1. Applied represents workload

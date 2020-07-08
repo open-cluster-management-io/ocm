@@ -3,8 +3,10 @@ package e2e
 import (
 	"context"
 	"fmt"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 )
@@ -19,7 +21,7 @@ var _ = Describe("Create klusterlet and then create a configmap by manifestwork"
 
 	AfterEach(func() {
 		By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
-		t.cleanKlusterletResources(klusterletName)
+		t.cleanKlusterletResources(klusterletName, clusterName)
 	})
 
 	It("Create configmap using manifestwork and then delete klusterlet", func() {
@@ -61,36 +63,15 @@ var _ = Describe("Create klusterlet and then create a configmap by manifestwork"
 			return err
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
 
-		// Manifest work and ns should not be deleted after delete klusterlet
-		By(fmt.Sprintf("delete klusterlet %v", klusterletName))
-		err = t.OperatorClient.OperatorV1().Klusterlets().Delete(context.TODO(), klusterletName, metav1.DeleteOptions{})
-		Expect(err).NotTo(HaveOccurred())
-
-		By(fmt.Sprintf("waiting for pods in agent namespace %v to be deleted", agentNamespace))
-		Eventually(func() error {
-			pods, err := t.KubeClient.CoreV1().Pods(agentNamespace).
-				List(context.TODO(), metav1.ListOptions{})
-			if err != nil {
-				return err
+		By(fmt.Sprintf("delete manifestwork %v/%v", clusterName, workName))
+		err = t.WorkClient.WorkV1().ManifestWorks(clusterName).Delete(context.Background(), workName, metav1.DeleteOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		Eventually(func() bool {
+			_, err := t.WorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return true
 			}
-			if len(pods.Items) != 0 {
-				return fmt.Errorf("the pods are not deleted in ns %v", agentNamespace)
-			}
-			return nil
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
-
-		By(fmt.Sprintf("check that managed cluster namespace %v should not be deleted", clusterName))
-		Eventually(func() error {
-			_, err := t.KubeClient.CoreV1().Namespaces().
-				Get(context.TODO(), clusterName, metav1.GetOptions{})
-			return err
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
-
-		By(fmt.Sprintf("check that manifestwork %v/%v should not be deleted", clusterName, workName))
-		Eventually(func() error {
-			_, err := t.WorkClient.WorkV1().ManifestWorks(clusterName).
-				Get(context.TODO(), workName, metav1.GetOptions{})
-			return err
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+			return false
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(BeTrue())
 	})
 })

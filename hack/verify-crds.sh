@@ -2,9 +2,14 @@
 
 source "$(dirname "${BASH_SOURCE}")/init.sh"
 
-for f in $CRD_FILES
+for f in $HUB_CRD_FILES
 do
     diff -N $f ./manifests/cluster-manager/$(basename $f) || ( echo 'crd content is incorrect' && false )
+done
+
+for f in $SPOKE_CRD_FILES
+do
+    diff -N $f ./manifests/klusterlet/$(basename $f) || ( echo 'crd content is incorrect' && false )
 done
 
 diff -N $CLUSTER_MANAGER_CRD_FILE ./deploy/cluster-manager/crds/$(basename $CLUSTER_MANAGER_CRD_FILE) || ( echo 'crd content is incorrect' && false )

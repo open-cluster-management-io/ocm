@@ -9,20 +9,22 @@ import (
 )
 
 var _ = Describe("Create klusterlet CR", func() {
-	var klusterletName = ""
+	var klusterletName string
+	var clusterName string
+	var agentNamespace string
+
 	BeforeEach(func() {
 		klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
+		clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
+		agentNamespace = fmt.Sprintf("e2e-agent-%s", rand.String(6))
 	})
 
 	AfterEach(func() {
 		By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
-		t.cleanKlusterletResources(klusterletName)
+		t.cleanKlusterletResources(klusterletName, clusterName)
 	})
 
 	It("Create klusterlet CR with managed cluster name", func() {
-		var clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
-		var agentNamespace = fmt.Sprintf("e2e-agent-%s", rand.String(6))
-
 		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v", klusterletName, clusterName))
 		_, err := t.CreateKlusterlet(klusterletName, clusterName, agentNamespace)
 		Expect(err).ToNot(HaveOccurred())
@@ -50,8 +52,8 @@ var _ = Describe("Create klusterlet CR", func() {
 	})
 
 	It("Created klusterlet without managed cluster name", func() {
-		var clusterName = ""
-		var agentNamespace = ""
+		clusterName = ""
+		agentNamespace = ""
 		var err error
 		By(fmt.Sprintf("create klusterlet %v without managed cluster name", klusterletName))
 		_, err = t.CreateKlusterlet(klusterletName, clusterName, agentNamespace)
