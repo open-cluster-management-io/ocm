@@ -22,6 +22,19 @@ You can reach the maintainers of this project at:
 
 Check the [Development Doc](docs/development.md) for how to contribute to the repo.
 
+## How to Deploy
+
+### Prerequisites
+
+These instructions assume:
+
+- You have a running kubernetes cluster
+- You have `KUBECONFIG` environment variable set to a kubeconfig file giving you cluster-admin role on that cluster
+
+### Deploy Work Agent
+
+1. Run `make deploy-work-agent`
+
 ## Security Response
 
 If you've found a security issue that you'd like to disclose confidentially please contact Red Hat's Product Security team. Details at https://access.redhat.com/security/team/contact

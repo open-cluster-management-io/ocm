@@ -7,7 +7,18 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
 	targets/openshift/deps.mk \
 	targets/openshift/images.mk \
+	lib/tmp.mk \
 )
+
+IMAGE_REGISTRY?=quay.io/open-cluster-management
+IMAGE_TAG?=latest
+IMAGE_NAME?=$(IMAGE_REGISTRY)/work:$(IMAGE_TAG)
+KUBECONFIG ?= ./.kubeconfig
+KUBECTL?=kubectl
+KUSTOMIZE?=$(PERMANENT_TMP_GOPATH)/bin/kustomize
+KUSTOMIZE_VERSION?=v3.5.4
+KUSTOMIZE_ARCHIVE_NAME?=kustomize_$(KUSTOMIZE_VERSION)_$(GOHOSTOS)_$(GOHOSTARCH).tar.gz
+kustomize_dir:=$(dir $(KUSTOMIZE))
 
 # This will call a macro called "build-image" which will generate image specific targets based on the parameters:
 # $0 - macro name
@@ -20,6 +31,46 @@ $(call build-image,work,$(IMAGE_REGISTRY)/open-cluster-management/work,./Dockerf
 clean:
 	$(RM) ./work
 .PHONY: clean
+
+cluster-ip:
+  CLUSTER_IP?=$(shell $(KUBECTL) get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}")
+
+hub-kubeconfig-secret: cluster-ip
+	cp $(KUBECONFIG) hub-kubeconfig
+	$(KUBECTL) apply -f deploy/spoke/component_namespace.yaml
+	$(KUBECTL) config set clusters.kind-kind.server https://$(CLUSTER_IP) --kubeconfig hub-kubeconfig
+	$(KUBECTL) delete secret hub-kubeconfig-secret -n open-cluster-management --ignore-not-found
+	$(KUBECTL) create secret generic hub-kubeconfig-secret --from-file=kubeconfig=hub-kubeconfig -n open-cluster-management
+
+install-crd:
+	$(KUBECTL) apply -f vendor/github.com/open-cluster-management/api/work/v1/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml
+
+deploy-work-agent: ensure-kustomize hub-kubeconfig-secret install-crd
+	cp deploy/spoke/kustomization.yaml deploy/spoke/kustomization.yaml.tmp
+	cd deploy/spoke && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/work:latest=$(IMAGE_NAME)
+	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) apply -f -
+	mv deploy/spoke/kustomization.yaml.tmp deploy/spoke/kustomization.yaml
+
+ensure-kustomize:
+ifeq "" "$(wildcard $(KUSTOMIZE))"
+	$(info Installing kustomize into '$(KUSTOMIZE)')
+	mkdir -p '$(kustomize_dir)'
+	curl -s -f -L https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F$(KUSTOMIZE_VERSION)/$(KUSTOMIZE_ARCHIVE_NAME) -o '$(kustomize_dir)$(KUSTOMIZE_ARCHIVE_NAME)'
+	tar -C '$(kustomize_dir)' -zvxf '$(kustomize_dir)$(KUSTOMIZE_ARCHIVE_NAME)'
+	chmod +x '$(KUSTOMIZE)';
+else
+	$(info Using existing kustomize from "$(KUSTOMIZE)")
+endif
+
+build-e2e:
+	go test -c ./test/e2e
+
+test-e2e: build-e2e deploy-work-agent
+	./e2e.test -test.v -ginkgo.v
+
+clean-e2e:
+	$(RM) ./e2e.test
+	$(RM) ./hub-kubeconfig
 
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...
 
