@@ -35,6 +35,7 @@ import (
 
 const (
 	klusterletFinalizer = "operator.open-cluster-management.io/klusterlet-cleanup"
+	imagePullSecret     = "open-cluster-management-image-pull-credentials"
 	klusterletApplied   = "Applied"
 )
 
@@ -179,6 +180,26 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
 			Message: fmt.Sprintf("Failed to get namespace %q: %v", config.KlusterletNamespace, err),
 		}))
+		return err
+	}
+
+	// Symc pull secret
+	_, _, err = resourceapply.SyncSecret(
+		n.kubeClient.CoreV1(),
+		controllerContext.Recorder(),
+		n.operatorNamespace,
+		imagePullSecret,
+		config.KlusterletNamespace,
+		imagePullSecret,
+		[]metav1.OwnerReference{},
+	)
+
+	if err != nil {
+		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
+			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
+			Message: fmt.Sprintf("Failed to sync image pull secret to namespace %q: %v", config.KlusterletNamespace, err),
+		}))
+
 		return err
 	}
 
