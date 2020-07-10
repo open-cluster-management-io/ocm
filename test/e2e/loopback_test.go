@@ -78,6 +78,27 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		var (
+			cr         *unstructured.Unstructured
+			crResource = schema.GroupVersionResource{
+				Group:    "rbac.authorization.k8s.io",
+				Version:  "v1",
+				Resource: "clusterroles",
+			}
+		)
+		cr, err = spokeCR(suffix)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
+			var err error
+			_, err = hubDynamicClient.Resource(crResource).Create(context.TODO(), cr, metav1.CreateOptions{})
+			if err != nil {
+				return false, err
+			}
+
+			return true, nil
+		})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		var (
 			crb         *unstructured.Unstructured
 			crbResource = schema.GroupVersionResource{
 				Group:    "rbac.authorization.k8s.io",
@@ -90,6 +111,48 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
 			var err error
 			_, err = hubDynamicClient.Resource(crbResource).Create(context.TODO(), crb, metav1.CreateOptions{})
+			if err != nil {
+				return false, err
+			}
+
+			return true, nil
+		})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		var (
+			role         *unstructured.Unstructured
+			roleResource = schema.GroupVersionResource{
+				Group:    "rbac.authorization.k8s.io",
+				Version:  "v1",
+				Resource: "roles",
+			}
+		)
+		role, err = spokeRole(nsName, suffix)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
+			var err error
+			_, err = hubDynamicClient.Resource(roleResource).Namespace(nsName).Create(context.TODO(), role, metav1.CreateOptions{})
+			if err != nil {
+				return false, err
+			}
+
+			return true, nil
+		})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		var (
+			roleBinding         *unstructured.Unstructured
+			roleBindingResource = schema.GroupVersionResource{
+				Group:    "rbac.authorization.k8s.io",
+				Version:  "v1",
+				Resource: "rolebindings",
+			}
+		)
+		roleBinding, err = spokeRoleBinding(nsName, suffix)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
+			var err error
+			_, err = hubDynamicClient.Resource(roleBindingResource).Namespace(nsName).Create(context.TODO(), roleBinding, metav1.CreateOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -350,6 +413,17 @@ func assetToUnstructured(name string) (*unstructured.Unstructured, error) {
 	}
 }
 
+func spokeCR(suffix string) (*unstructured.Unstructured, error) {
+	cr, err := assetToUnstructured("deploy/spoke/clusterrole.yaml")
+	if err != nil {
+		return nil, err
+	}
+	name := cr.GetName()
+	name = fmt.Sprintf("%v-%v", name, suffix)
+	cr.SetName(name)
+	return cr, nil
+}
+
 func spokeCRB(nsName, suffix string) (*unstructured.Unstructured, error) {
 	crb, err := assetToUnstructured("deploy/spoke/clusterrole_binding.yaml")
 	if err != nil {
@@ -359,6 +433,19 @@ func spokeCRB(nsName, suffix string) (*unstructured.Unstructured, error) {
 	name := crb.GetName()
 	name = fmt.Sprintf("%v-%v", name, suffix)
 	crb.SetName(name)
+
+	roleRef, found, err := unstructured.NestedMap(crb.Object, "roleRef")
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, goerrors.New("couldn't find CRB roleRef")
+	}
+	roleRef["name"] = name
+	err = unstructured.SetNestedMap(crb.Object, roleRef, "roleRef")
+	if err != nil {
+		return nil, err
+	}
 
 	subjects, found, err := unstructured.NestedSlice(crb.Object, "subjects")
 	if err != nil {
@@ -379,6 +466,63 @@ func spokeCRB(nsName, suffix string) (*unstructured.Unstructured, error) {
 	}
 
 	return crb, nil
+}
+
+func spokeRole(nsName, suffix string) (*unstructured.Unstructured, error) {
+	r, err := assetToUnstructured("deploy/spoke/role.yaml")
+	if err != nil {
+		return nil, err
+	}
+	name := r.GetName()
+	name = fmt.Sprintf("%v-%v", name, suffix)
+	r.SetName(name)
+	r.SetNamespace(nsName)
+	return r, nil
+}
+
+func spokeRoleBinding(nsName, suffix string) (*unstructured.Unstructured, error) {
+	rb, err := assetToUnstructured("deploy/spoke/role_binding.yaml")
+	if err != nil {
+		return nil, err
+	}
+
+	name := rb.GetName()
+	name = fmt.Sprintf("%v-%v", name, suffix)
+	rb.SetName(name)
+	rb.SetNamespace(nsName)
+
+	roleRef, found, err := unstructured.NestedMap(rb.Object, "roleRef")
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, goerrors.New("couldn't find RB roleRef")
+	}
+	roleRef["name"] = name
+	err = unstructured.SetNestedMap(rb.Object, roleRef, "roleRef")
+	if err != nil {
+		return nil, err
+	}
+
+	subjects, found, err := unstructured.NestedSlice(rb.Object, "subjects")
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, goerrors.New("couldn't find RB subjects")
+	}
+
+	err = unstructured.SetNestedField(subjects[0].(map[string]interface{}), nsName, "namespace")
+	if err != nil {
+		return nil, err
+	}
+
+	err = unstructured.SetNestedField(rb.Object, subjects, "subjects")
+	if err != nil {
+		return nil, err
+	}
+
+	return rb, nil
 }
 
 func spokeDeployment(nsName, clusterName, image string) (*unstructured.Unstructured, error) {
