@@ -287,6 +287,8 @@ kind: ServiceAccount
 metadata:
   name: {{ .KlusterletName }}-registration-sa
   namespace: {{ .KlusterletNamespace }}
+imagePullSecrets:
+- name: open-cluster-management-image-pull-credentials
 `)
 
 func manifestsKlusterletKlusterletRegistrationServiceaccountYamlBytes() ([]byte, error) {
@@ -505,6 +507,8 @@ kind: ServiceAccount
 metadata:
   name: {{ .KlusterletName }}-work-sa
   namespace: {{ .KlusterletNamespace }}
+imagePullSecrets:
+- name: open-cluster-management-image-pull-credentials
 `)
 
 func manifestsKlusterletKlusterletWorkServiceaccountYamlBytes() ([]byte, error) {

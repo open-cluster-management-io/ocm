@@ -423,6 +423,35 @@ func TestClusterNameChange(t *testing.T) {
 	ensureDeployments(t, controller.kubeClient.Actions(), "update", "https://localhost", "cluster3", "cluster3", 2)
 }
 
+func TestSyncWithPullSecret(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfigSecret, "testns")
+	hubKubeConfigSecret := newSecret(helpers.HubKubeConfigSecret, "testns")
+	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	namespace := newNamespace("testns")
+	pullSecret := newSecret(imagePullSecret, "open-cluster-management")
+	controller := newTestController(klusterlet, bootStrapSecret, hubKubeConfigSecret, namespace, pullSecret)
+	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
+
+	err := controller.controller.sync(nil, syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	var createdSecret *corev1.Secret
+	kubeActions := controller.kubeClient.Actions()
+	for _, action := range kubeActions {
+		if action.GetVerb() == "create" && action.GetResource().Resource == "secrets" {
+			createdSecret = action.(clienttesting.CreateActionImpl).Object.(*corev1.Secret)
+			break
+		}
+	}
+
+	if createdSecret == nil || createdSecret.Name != imagePullSecret {
+		t.Errorf("Failed to sync pull secret")
+	}
+}
+
 func TestDeployOnKube111(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfigSecret, "testns")
