@@ -132,6 +132,15 @@ clean-spoke: ensure-operator-sdk
 	$(KUBECTL) delete -f deploy/klusterlet/crds/operator_open-cluster-management_klusterlets.cr.yaml --ignore-not-found
 	$(OPERATOR_SDK) cleanup --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/klusterlet/olm-catalog/klusterlet --olm-namespace $(OLM_NAMESPACE) --timeout 10m
 
+test-e2e: deploy-hub deploy-spoke-operator run-e2e
+
+run-e2e:
+	go test -c ./test/e2e
+	./e2e.test -test.v -ginkgo.v
+
+clean-e2e:
+	$(RM) ./e2e.test
+
 ensure-operator-sdk:
 ifeq "" "$(wildcard $(OPERATOR_SDK))"
 	$(info Installing operator-sdk into '$(OPERATOR_SDK)')
