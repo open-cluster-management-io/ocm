@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
+	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
+
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -22,7 +24,7 @@ var managedclustersSchema = metav1.GroupVersionResource{
 	Resource: "managedclusters",
 }
 
-func TestSpokeClusterValidate(t *testing.T) {
+func TestManagedClusterValidate(t *testing.T) {
 	cases := []struct {
 		name                   string
 		request                *admissionv1beta1.AdmissionRequest
@@ -177,42 +179,26 @@ func TestSpokeClusterValidate(t *testing.T) {
 }
 
 func newManagedClusterObj() runtime.RawExtension {
-	spokeCluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "testspokecluster",
-		},
-	}
-	clusterObj, _ := json.Marshal(spokeCluster)
+	managedCluster := testinghelpers.NewManagedCluster()
+	clusterObj, _ := json.Marshal(managedCluster)
 	return runtime.RawExtension{
 		Raw: clusterObj,
 	}
 }
 
 func newManagedClusterObjWithHubAcceptsClient(hubAcceptsClient bool) runtime.RawExtension {
-	spokeCluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "testspokecluster",
-		},
-		Spec: clusterv1.ManagedClusterSpec{
-			HubAcceptsClient: hubAcceptsClient,
-		},
-	}
-	clusterObj, _ := json.Marshal(spokeCluster)
+	managedCluster := testinghelpers.NewManagedCluster()
+	managedCluster.Spec.HubAcceptsClient = hubAcceptsClient
+	clusterObj, _ := json.Marshal(managedCluster)
 	return runtime.RawExtension{
 		Raw: clusterObj,
 	}
 }
 
 func newManagedClusterObjWithClientConfigs(clientConfig clusterv1.ClientConfig) runtime.RawExtension {
-	spokeCluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "testspokecluster",
-		},
-		Spec: clusterv1.ManagedClusterSpec{
-			ManagedClusterClientConfigs: []clusterv1.ClientConfig{clientConfig},
-		},
-	}
-	clusterObj, _ := json.Marshal(spokeCluster)
+	managedCluster := testinghelpers.NewManagedCluster()
+	managedCluster.Spec.ManagedClusterClientConfigs = []clusterv1.ClientConfig{clientConfig}
+	clusterObj, _ := json.Marshal(managedCluster)
 	return runtime.RawExtension{
 		Raw: clusterObj,
 	}

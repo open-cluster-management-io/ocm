@@ -47,76 +47,74 @@ func TestHealthCheck(t *testing.T) {
 		expectedErr     string
 	}{
 		{
-			name:     "there are no managed clusters",
-			clusters: []runtime.Object{},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertActions(t, actions)
-			},
-			expectedErr: "unable to get managed cluster \"testmanagedcluster\" from hub: managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
+			name:            "there are no managed clusters",
+			clusters:        []runtime.Object{},
+			validateActions: testinghelpers.AssertNoActions,
+			expectedErr:     "unable to get managed cluster \"testmanagedcluster\" from hub: managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
 		},
 		{
 			name:        "kube-apiserver is not health",
-			clusters:    []runtime.Object{newAcceptedManagedCluster()},
+			clusters:    []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			httpStatus:  http.StatusInternalServerError,
 			responseMsg: "internal server error",
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertActions(t, actions, "get", "update")
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				expectedCondition := clusterv1.StatusCondition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionFalse,
 					Reason:  "ManagedClusterKubeAPIServerUnavailable",
 					Message: "The kube-apiserver is not ok, status code: 500, an error on the server (\"internal server error\") has prevented the request from succeeding",
 				}
-				assertCondition(t, actual, expectedCondition)
+				testinghelpers.AssertActions(t, actions, "get", "update")
+				actual := actions[1].(clienttesting.UpdateActionImpl).Object
+				testinghelpers.AssertManagedClusterCondition(t, actual.(*clusterv1.ManagedCluster).Status.Conditions, expectedCondition)
 			},
 		},
 		{
 			name:       "kube-apiserver is ok",
-			clusters:   []runtime.Object{newAcceptedManagedCluster()},
+			clusters:   []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			httpStatus: http.StatusOK,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertActions(t, actions, "get", "update")
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				expectedCondition := clusterv1.StatusCondition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ManagedClusterAvailable",
 					Message: "Managed cluster is available",
 				}
-				assertCondition(t, actual, expectedCondition)
+				testinghelpers.AssertActions(t, actions, "get", "update")
+				actual := actions[1].(clienttesting.UpdateActionImpl).Object
+				testinghelpers.AssertManagedClusterCondition(t, actual.(*clusterv1.ManagedCluster).Status.Conditions, expectedCondition)
 			},
 		},
 		{
 			name:       "there is no readyz endpoint",
-			clusters:   []runtime.Object{newAcceptedManagedCluster()},
+			clusters:   []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			httpStatus: http.StatusNotFound,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertActions(t, actions, "get", "update")
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				expectedCondition := clusterv1.StatusCondition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ManagedClusterAvailable",
 					Message: "Managed cluster is available",
 				}
-				assertCondition(t, actual, expectedCondition)
+				testinghelpers.AssertActions(t, actions, "get", "update")
+				actual := actions[1].(clienttesting.UpdateActionImpl).Object
+				testinghelpers.AssertManagedClusterCondition(t, actual.(*clusterv1.ManagedCluster).Status.Conditions, expectedCondition)
 			},
 		},
 		{
 			name:       "readyz is forbidden",
-			clusters:   []runtime.Object{newAcceptedManagedCluster()},
+			clusters:   []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			httpStatus: http.StatusForbidden,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertActions(t, actions, "get", "update")
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				expectedCondition := clusterv1.StatusCondition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ManagedClusterAvailable",
 					Message: "Managed cluster is available",
 				}
-				assertCondition(t, actual, expectedCondition)
+				testinghelpers.AssertActions(t, actions, "get", "update")
+				actual := actions[1].(clienttesting.UpdateActionImpl).Object
+				testinghelpers.AssertManagedClusterCondition(t, actual.(*clusterv1.ManagedCluster).Status.Conditions, expectedCondition)
 			},
 		},
 	}
@@ -133,23 +131,13 @@ func TestHealthCheck(t *testing.T) {
 			serverResponse.responseMsg = c.responseMsg
 
 			ctrl := &managedClusterHealthCheckController{
-				clusterName:                   testManagedClusterName,
+				clusterName:                   testinghelpers.TestManagedClusterName,
 				hubClusterClient:              clusterClient,
 				hubClusterLister:              clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				managedClusterDiscoveryClient: discoveryClient,
 			}
 			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, ""))
-			if len(c.expectedErr) > 0 && syncErr == nil {
-				t.Errorf("expected %q error", c.expectedErr)
-				return
-			}
-			if len(c.expectedErr) > 0 && syncErr != nil && syncErr.Error() != c.expectedErr {
-				t.Errorf("expected %q error, got %q", c.expectedErr, syncErr.Error())
-				return
-			}
-			if len(c.expectedErr) == 0 && syncErr != nil {
-				t.Errorf("unexpected err: %v", syncErr)
-			}
+			testinghelpers.AssertError(t, syncErr, c.expectedErr)
 
 			c.validateActions(t, clusterClient.Actions())
 		})

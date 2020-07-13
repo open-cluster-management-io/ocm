@@ -2,87 +2,105 @@ package rbacfinalizerdeletion
 
 import (
 	"context"
-	"reflect"
+	"fmt"
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
+	fakeclusterclient "github.com/open-cluster-management/api/client/cluster/clientset/versioned/fake"
+	clusterinformers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
 	fakeworkclient "github.com/open-cluster-management/api/client/work/clientset/versioned/fake"
 	workinformers "github.com/open-cluster-management/api/client/work/informers/externalversions"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
 	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
+
 	"github.com/openshift/library-go/pkg/operator/events"
+
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	kubeinformers "k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/utils/diff"
 )
 
-func newRole(namespace, name string, finalizers []string, terminated bool) *rbacv1.Role {
-	role := &rbacv1.Role{}
+var roleName = fmt.Sprintf("%s:spoke-work", testinghelpers.TestManagedClusterName)
 
-	role.Namespace = namespace
-	role.Name = name
-	role.Finalizers = finalizers
-	if terminated {
-		now := metav1.Now()
-		role.DeletionTimestamp = &now
-	}
-
-	return role
-}
-
-func newRoleBinding(namespace, name string, finalizers []string, terminated bool) *rbacv1.RoleBinding {
-	rolebinding := &rbacv1.RoleBinding{}
-
-	rolebinding.Namespace = namespace
-	rolebinding.Name = name
-	rolebinding.Finalizers = finalizers
-	if terminated {
-		now := metav1.Now()
-		rolebinding.DeletionTimestamp = &now
-	}
-
-	return rolebinding
-}
-
-func newNamespace(name string, terminated bool) *corev1.Namespace {
-	namespace := &corev1.Namespace{}
-	namespace.Name = name
-	if terminated {
-		now := metav1.Now()
-		namespace.DeletionTimestamp = &now
-	}
-
-	return namespace
-}
-
-func newManifestWork(namespace, name string, finalizers []string, deletionTimestamp *metav1.Time) *workapiv1.ManifestWork {
-	work := &workapiv1.ManifestWork{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:         namespace,
-			Name:              name,
-			Finalizers:        finalizers,
-			DeletionTimestamp: deletionTimestamp,
+func TestSync(t *testing.T) {
+	cases := []struct {
+		name         string
+		key          string
+		clusters     []runtime.Object
+		namespaces   []runtime.Object
+		roles        []runtime.Object
+		roleBindings []runtime.Object
+		works        []runtime.Object
+		expectedErr  string
+	}{
+		{
+			name:        "managed cluster namespace is not found",
+			key:         fmt.Sprintf("%s/%s", testinghelpers.TestManagedClusterName, roleName),
+			expectedErr: "namespace \"testmanagedcluster\" not found",
+		},
+		{
+			name:       "there are no resources in managed cluster namespace",
+			key:        fmt.Sprintf("%s/%s", testinghelpers.TestManagedClusterName, roleName),
+			namespaces: []runtime.Object{testinghelpers.NewNamespace(testinghelpers.TestManagedClusterName, true)},
+		},
+		{
+			name:         "still have works in deleting managed cluster namespace",
+			key:          fmt.Sprintf("%s/%s", testinghelpers.TestManagedClusterName, roleName),
+			namespaces:   []runtime.Object{testinghelpers.NewNamespace(testinghelpers.TestManagedClusterName, true)},
+			roles:        []runtime.Object{testinghelpers.NewRole(testinghelpers.TestManagedClusterName, roleName, []string{manifestWorkFinalizer}, true)},
+			roleBindings: []runtime.Object{testinghelpers.NewRoleBinding(testinghelpers.TestManagedClusterName, roleName, []string{manifestWorkFinalizer}, true)},
+			works:        []runtime.Object{testinghelpers.NewManifestWork(testinghelpers.TestManagedClusterName, "work1", []string{manifestWorkFinalizer}, nil)},
+			expectedErr:  "Still having 1 works in the cluster namespace testmanagedcluster",
 		},
 	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			kubeClient := fakeclient.NewSimpleClientset()
+			kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Minute*10)
+			nsStore := kubeInformerFactory.Core().V1().Namespaces().Informer().GetStore()
+			for _, ns := range c.namespaces {
+				nsStore.Add(ns)
+			}
+			roleStore := kubeInformerFactory.Rbac().V1().Roles().Informer().GetStore()
+			for _, role := range c.roles {
+				roleStore.Add(role)
+			}
+			roleBindingStore := kubeInformerFactory.Rbac().V1().RoleBindings().Informer().GetStore()
+			for _, roleBinding := range c.roleBindings {
+				roleBindingStore.Add(roleBinding)
+			}
 
-	return work
-}
+			clusterClient := fakeclusterclient.NewSimpleClientset()
+			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
 
-func newDeletionTimestamp(offset time.Duration) *metav1.Time {
-	return &metav1.Time{
-		Time: metav1.Now().Add(offset),
+			workClient := fakeworkclient.NewSimpleClientset()
+			workInformerFactory := workinformers.NewSharedInformerFactory(workClient, 5*time.Minute)
+			workStore := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore()
+			for _, work := range c.works {
+				workStore.Add(work)
+			}
+
+			ctrl := &finalizeController{
+				roleLister:         kubeInformerFactory.Rbac().V1().Roles().Lister(),
+				roleBindingLister:  kubeInformerFactory.Rbac().V1().RoleBindings().Lister(),
+				namespaceLister:    kubeInformerFactory.Core().V1().Namespaces().Lister(),
+				clusterLister:      clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
+				manifestWorkLister: workInformerFactory.Work().V1().ManifestWorks().Lister(),
+				rbacClient:         kubeClient.RbacV1(),
+				eventRecorder:      events.NewInMemoryRecorder(""),
+			}
+			err := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, c.key))
+			testinghelpers.AssertError(t, err, c.expectedErr)
+		})
 	}
 }
 
 func TestSyncRoleAndRoleBinding(t *testing.T) {
-	now := metav1.Now()
 	cases := []struct {
 		name                          string
 		role                          *rbacv1.Role
@@ -98,57 +116,51 @@ func TestSyncRoleAndRoleBinding(t *testing.T) {
 	}{
 		{
 			name:                "skip if neither role nor rolebinding exists",
-			cluster:             testinghelpers.NewManagedCluster("cluster1", nil),
-			namespace:           newNamespace("cluster1", false),
-			work:                testinghelpers.NewManifestWork("cluster1", "work1", nil, nil),
-			validateRbacActions: noAction,
+			cluster:             testinghelpers.NewManagedCluster(),
+			namespace:           testinghelpers.NewNamespace(testinghelpers.TestManagedClusterName, false),
+			work:                testinghelpers.NewManifestWork(testinghelpers.TestManagedClusterName, "work1", nil, nil),
+			validateRbacActions: testinghelpers.AssertNoActions,
 		},
 		{
 			name:                   "skip if neither role nor rolebinding has finalizer",
-			role:                   newRole("cluster1", "cluster1:spoke-work", nil, false),
-			roleBinding:            newRoleBinding("cluster1", "cluster1:spoke-work", nil, false),
-			cluster:                testinghelpers.NewManagedCluster("cluster1", nil),
-			namespace:              newNamespace("cluster1", false),
-			work:                   testinghelpers.NewManifestWork("cluster1", "work1", []string{manifestWorkFinalizer}, nil),
+			role:                   testinghelpers.NewRole(testinghelpers.TestManagedClusterName, roleName, nil, false),
+			roleBinding:            testinghelpers.NewRoleBinding(testinghelpers.TestManagedClusterName, roleName, nil, false),
+			cluster:                testinghelpers.NewManagedCluster(),
+			namespace:              testinghelpers.NewNamespace(testinghelpers.TestManagedClusterName, false),
+			work:                   testinghelpers.NewManifestWork(testinghelpers.TestManagedClusterName, "work1", []string{manifestWorkFinalizer}, nil),
 			expectedWorkFinalizers: []string{manifestWorkFinalizer},
-			validateRbacActions:    noAction,
+			validateRbacActions:    testinghelpers.AssertNoActions,
 		},
 		{
 			name:                          "remove finalizer from deleting role within non-terminating namespace",
-			role:                          newRole("cluster1", "cluster1:spoke-work", []string{manifestWorkFinalizer}, true),
-			roleBinding:                   newRoleBinding("cluster1", "cluster1:spoke-work", []string{manifestWorkFinalizer}, false),
-			cluster:                       testinghelpers.NewManagedCluster("cluster1", nil),
-			namespace:                     newNamespace("cluster1", false),
-			work:                          testinghelpers.NewManifestWork("cluster1", "work1", []string{manifestWorkFinalizer}, nil),
+			role:                          testinghelpers.NewRole(testinghelpers.TestManagedClusterName, roleName, []string{manifestWorkFinalizer}, true),
+			roleBinding:                   testinghelpers.NewRoleBinding(testinghelpers.TestManagedClusterName, roleName, []string{manifestWorkFinalizer}, false),
+			cluster:                       testinghelpers.NewManagedCluster(),
+			namespace:                     testinghelpers.NewNamespace(testinghelpers.TestManagedClusterName, false),
+			work:                          testinghelpers.NewManifestWork(testinghelpers.TestManagedClusterName, "work1", []string{manifestWorkFinalizer}, nil),
 			expectedRoleBindingFinalizers: []string{manifestWorkFinalizer},
 			expectedWorkFinalizers:        []string{manifestWorkFinalizer},
 			validateRbacActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatal(spew.Sdump(actions))
-				}
+				testinghelpers.AssertActions(t, actions, "update")
 			},
 		},
 		{
 			name:        "remove finalizer from role/rolebinding within terminating cluster",
-			role:        newRole("cluster1", "cluster1:spoke-work", []string{manifestWorkFinalizer}, true),
-			roleBinding: newRoleBinding("cluster1", "cluster1:spoke-work", []string{manifestWorkFinalizer}, true),
-			cluster:     testinghelpers.NewManagedCluster("cluster1", &now),
-			namespace:   newNamespace("cluster1", false),
+			role:        testinghelpers.NewRole(testinghelpers.TestManagedClusterName, roleName, []string{manifestWorkFinalizer}, true),
+			roleBinding: testinghelpers.NewRoleBinding(testinghelpers.TestManagedClusterName, roleName, []string{manifestWorkFinalizer}, true),
+			cluster:     testinghelpers.NewDeletingManagedCluster(),
+			namespace:   testinghelpers.NewNamespace(testinghelpers.TestManagedClusterName, false),
 			validateRbacActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 2 {
-					t.Fatal(spew.Sdump(actions))
-				}
+				testinghelpers.AssertActions(t, actions, "update", "update")
 			},
 		},
 		{
 			name:        "remove finalizer from role/rolebinding within terminating ns",
-			role:        newRole("cluster1", "cluster1:spoke-work", []string{manifestWorkFinalizer}, true),
-			roleBinding: newRoleBinding("cluster1", "cluster1:spoke-work", []string{manifestWorkFinalizer}, true),
-			namespace:   newNamespace("cluster1", true),
+			role:        testinghelpers.NewRole(testinghelpers.TestManagedClusterName, roleName, []string{manifestWorkFinalizer}, true),
+			roleBinding: testinghelpers.NewRoleBinding(testinghelpers.TestManagedClusterName, roleName, []string{manifestWorkFinalizer}, true),
+			namespace:   testinghelpers.NewNamespace(testinghelpers.TestManagedClusterName, true),
 			validateRbacActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 2 {
-					t.Fatal(spew.Sdump(actions))
-				}
+				testinghelpers.AssertActions(t, actions, "update", "update")
 			},
 		},
 	}
@@ -198,7 +210,7 @@ func TestSyncRoleAndRoleBinding(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					assertFinalizers(t, role, c.expectedRoleFinalizers)
+					testinghelpers.AssertFinalizers(t, role, c.expectedRoleFinalizers)
 				}
 
 				if c.roleBinding != nil {
@@ -206,7 +218,7 @@ func TestSyncRoleAndRoleBinding(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					assertFinalizers(t, rolebinding, c.expectedRoleBindingFinalizers)
+					testinghelpers.AssertFinalizers(t, rolebinding, c.expectedRoleBindingFinalizers)
 				}
 
 				if c.work != nil {
@@ -214,7 +226,7 @@ func TestSyncRoleAndRoleBinding(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					assertFinalizers(t, work, c.expectedWorkFinalizers)
+					testinghelpers.AssertFinalizers(t, work, c.expectedWorkFinalizers)
 				}
 
 				actual := controllerContext.Queue().Len()
@@ -223,23 +235,5 @@ func TestSyncRoleAndRoleBinding(t *testing.T) {
 				}
 			}()
 		})
-	}
-}
-
-func assertFinalizers(t *testing.T, obj runtime.Object, finalizers []string) {
-	accessor, _ := meta.Accessor(obj)
-	actual := accessor.GetFinalizers()
-	if len(actual) == 0 && len(finalizers) == 0 {
-		return
-	}
-
-	if !reflect.DeepEqual(actual, finalizers) {
-		t.Fatal(diff.ObjectDiff(actual, finalizers))
-	}
-}
-
-func noAction(t *testing.T, actions []clienttesting.Action) {
-	if len(actions) > 0 {
-		t.Fatal(spew.Sdump(actions))
 	}
 }
