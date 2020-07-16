@@ -26,7 +26,7 @@ func (AppliedManifestResourceMeta) SwaggerDoc() map[string]string {
 }
 
 var map_AppliedManifestWork = map[string]string{
-	"":       "AppliedManifestWork represents an applied manifestwork on managed cluster. It is placed on managed cluster. An AppliedManifestWork links to a manifestwork on a hub recording resources deployed in the managed cluster. When the agent is removed from managed cluster, cluster-admin on managed cluster can delete appliedmanifestwork to remove resources deployed by the agent.",
+	"":       "AppliedManifestWork represents an applied manifestwork on managed cluster. It is placed on managed cluster. An AppliedManifestWork links to a manifestwork on a hub recording resources deployed in the managed cluster. When the agent is removed from managed cluster, cluster-admin on managed cluster can delete appliedmanifestwork to remove resources deployed by the agent. The name of the appliedmanifestwork must be in the format of {hash of hub's first kube-apiserver url}-{manifestwork name}",
 	"spec":   "Spec represents the desired configuration of AppliedManifestWork",
 	"status": "Status represents the current status of AppliedManifestWork",
 }
@@ -49,7 +49,6 @@ var map_AppliedManifestWorkSpec = map[string]string{
 	"":                 "AppliedManifestWorkSpec represents the desired configuration of AppliedManifestWork",
 	"hubHash":          "HubHash represents the hash of the first hub kube apiserver to identify which hub this AppliedManifestWork links to.",
 	"manifestWorkName": "ManifestWorkName represents the name of the related manifestwork on hub.",
-	"clusterNamee":     "ClusterName represents the name of the cluster on hub where the related manifestwork is placed.",
 }
 
 func (AppliedManifestWorkSpec) SwaggerDoc() map[string]string {

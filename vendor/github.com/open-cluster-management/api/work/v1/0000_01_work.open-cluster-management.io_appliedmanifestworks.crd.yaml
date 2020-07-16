@@ -21,6 +21,8 @@ spec:
         a manifestwork on a hub recording resources deployed in the managed cluster.
         When the agent is removed from managed cluster, cluster-admin on managed cluster
         can delete appliedmanifestwork to remove resources deployed by the agent.
+        The name of the appliedmanifestwork must be in the format of {hash of hub's
+        first kube-apiserver url}-{manifestwork name}
       type: object
       properties:
         apiVersion:
@@ -39,10 +41,6 @@ spec:
           description: Spec represents the desired configuration of AppliedManifestWork
           type: object
           properties:
-            clusterNamee:
-              description: ClusterName represents the name of the cluster on hub where
-                the related manifestwork is placed.
-              type: string
             hubHash:
               description: HubHash represents the hash of the first hub kube apiserver
                 to identify which hub this AppliedManifestWork links to.
