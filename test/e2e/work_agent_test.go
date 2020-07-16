@@ -52,6 +52,7 @@ var _ = ginkgo.Describe("Work agent", func() {
 			newConfigmap(ns2, "cm3", nil, cmFinalizers),
 		}
 		work := newManifestWork(clusterName, "", objects...)
+		appliedManifestWorkName := fmt.Sprintf("%s-%s", hubHash, work.Name)
 		work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -97,6 +98,9 @@ var _ = ginkgo.Describe("Work agent", func() {
 			return haveCondition(work.Status.Conditions, string(workapiv1.WorkApplied), metav1.ConditionTrue)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
+		appliedManifestWork, err := hubWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 		// check applied resources in manifestwork status
 		expectedAppliedResources := []workapiv1.AppliedManifestResourceMeta{
 			{Version: "v1", Resource: "configmaps", Namespace: ns1, Name: "cm1"},
@@ -104,7 +108,7 @@ var _ = ginkgo.Describe("Work agent", func() {
 			{Version: "v1", Resource: "configmaps", Namespace: ns2, Name: "cm3"},
 			{Version: "v1", Resource: "namespaces", Name: ns1},
 		}
-		gomega.Expect(reflect.DeepEqual(work.Status.AppliedResources, expectedAppliedResources)).To(gomega.BeTrue())
+		gomega.Expect(reflect.DeepEqual(appliedManifestWork.Status.AppliedResources, expectedAppliedResources)).To(gomega.BeTrue())
 
 		ginkgo.By("update manifestwork")
 		cmData := map[string]string{"x": "y"}
@@ -120,12 +124,12 @@ var _ = ginkgo.Describe("Work agent", func() {
 
 		// check if cm1 is removed from applied resources list in status
 		gomega.Eventually(func() bool {
-			work, err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Get(context.Background(), work.Name, metav1.GetOptions{})
+			appliedManifestWork, err = hubWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
 
-			for _, resource := range work.Status.AppliedResources {
+			for _, resource := range appliedManifestWork.Status.AppliedResources {
 				if resource.Name == "cm1" {
 					return false
 				}
@@ -142,7 +146,7 @@ var _ = ginkgo.Describe("Work agent", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 		// check if cm1 is deleted
-		_, err := spokeKubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm1", metav1.GetOptions{})
+		_, err = spokeKubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm1", metav1.GetOptions{})
 		gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
 
 		// check if cm3 is updated

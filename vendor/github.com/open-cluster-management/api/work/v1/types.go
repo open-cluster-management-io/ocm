@@ -146,15 +146,6 @@ type ManifestWorkStatus struct {
 	// managed cluster. The Klusterlet agent on managed cluster syncs the condition from managed to the hub.
 	// +optional
 	ResourceStatus ManifestResourceStatus `json:"resourceStatus,omitempty"`
-
-	// AppliedResources represents a list of resources defined within the manifestwork that are applied.
-	// Only resources with valid GroupVersionResource, namespace, and name are suitable.
-	// An item in this slice is deleted when there is no mapped manifest in manifestwork.Spec or by finalizer.
-	// The resource relating to the item will also be removed from managed cluster.
-	// The deleted resource may still be present until the finalizers for that resource are finished.
-	// However, the resource will not be undeleted, so it can be removed from this list and eventual consistency is preserved.
-	// +optional
-	AppliedResources []AppliedManifestResourceMeta `json:"appliedResources,omitempty"`
 }
 
 // ManifestResourceStatus represents the status of each resource in manifest work deployed on
@@ -230,4 +221,69 @@ type ManifestWorkList struct {
 
 	// Items is a list of manifestworks.
 	Items []ManifestWork `json:"items"`
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +kubebuilder:subresource:status
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// AppliedManifestWork represents an applied manifestwork on managed cluster. It is placed
+// on managed cluster. An AppliedManifestWork links to a manifestwork on a hub recording resources
+// deployed in the managed cluster.
+// When the agent is removed from managed cluster, cluster-admin on managed cluster
+// can delete appliedmanifestwork to remove resources deployed by the agent.
+type AppliedManifestWork struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec represents the desired configuration of AppliedManifestWork
+	Spec AppliedManifestWorkSpec `json:"spec,omitempty"`
+
+	// Status represents the current status of AppliedManifestWork
+	// +optional
+	Status AppliedManifestWorkStatus `json:"status,omitempty"`
+}
+
+// AppliedManifestWorkSpec represents the desired configuration of AppliedManifestWork
+type AppliedManifestWorkSpec struct {
+	// HubHash represents the hash of the first hub kube apiserver to identify which hub
+	// this AppliedManifestWork links to.
+	// +required
+	HubHash string `json:"hubHash"`
+
+	// ManifestWorkName represents the name of the related manifestwork on hub.
+	// +required
+	ManifestWorkName string `json:"manifestWorkName"`
+
+	// ClusterName represents the name of the cluster on hub where the related manifestwork
+	// is placed.
+	// +required
+	ClusterName string `json:"clusterNamee"`
+}
+
+// AppliedManifestWorkStatus represents the current status of AppliedManifestWork
+type AppliedManifestWorkStatus struct {
+	// AppliedResources represents a list of resources defined within the manifestwork that are applied.
+	// Only resources with valid GroupVersionResource, namespace, and name are suitable.
+	// An item in this slice is deleted when there is no mapped manifest in manifestwork.Spec or by finalizer.
+	// The resource relating to the item will also be removed from managed cluster.
+	// The deleted resource may still be present until the finalizers for that resource are finished.
+	// However, the resource will not be undeleted, so it can be removed from this list and eventual consistency is preserved.
+	// +optional
+	AppliedResources []AppliedManifestResourceMeta `json:"appliedResources,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// AppliedManifestWorkList is a collection of appliedmanifestworks.
+type AppliedManifestWorkList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	// Items is a list of appliedmanifestworks.
+	Items []AppliedManifestWork `json:"items"`
 }

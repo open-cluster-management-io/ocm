@@ -2,6 +2,7 @@ package util
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sort"
 
@@ -38,7 +39,7 @@ func AssertWorkCondition(namespace, name string, workClient workclientset.Interf
 }
 
 // check if work is deleted
-func AssertWorkDeleted(namespace, name string, manifests []workapiv1.Manifest, workClient workclientset.Interface, kubeClient kubernetes.Interface, eventuallyTimeout, eventuallyInterval int) {
+func AssertWorkDeleted(namespace, name, hubhash string, manifests []workapiv1.Manifest, workClient workclientset.Interface, kubeClient kubernetes.Interface, eventuallyTimeout, eventuallyInterval int) {
 	// wait for deletion of manifest work
 	gomega.Eventually(func() bool {
 		_, err := workClient.WorkV1().ManifestWorks(namespace).Get(context.Background(), name, metav1.GetOptions{})
@@ -49,12 +50,27 @@ func AssertWorkDeleted(namespace, name string, manifests []workapiv1.Manifest, w
 		return true
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
+	// wait for deletion of appliedmanifestwork
+	appliedManifestWorkName := fmt.Sprintf("%s-%s", hubhash, name)
+	AssertAppliedManifestWorkDeleted(appliedManifestWorkName, workClient, eventuallyTimeout, eventuallyInterval)
+
 	// Once manifest work is deleted, all applied resources should have already been deleted too
 	for _, manifest := range manifests {
 		expected := manifest.Object.(*corev1.ConfigMap)
 		_, err := kubeClient.CoreV1().ConfigMaps(expected.Namespace).Get(context.Background(), expected.Name, metav1.GetOptions{})
 		gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
 	}
+}
+
+func AssertAppliedManifestWorkDeleted(name string, workClient workclientset.Interface, eventuallyTimeout, eventuallyInterval int) {
+	gomega.Eventually(func() bool {
+		_, err := workClient.WorkV1().AppliedManifestWorks().Get(context.Background(), name, metav1.GetOptions{})
+		if !apierrors.IsNotFound(err) {
+			return false
+		}
+
+		return true
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }
 
 // check if finalizer is added
@@ -128,7 +144,7 @@ func AssertNonexistenceOfResources(gvrs []schema.GroupVersionResource, namespace
 }
 
 // check if applied resources in work status are updated correctly
-func AssertAppliedResources(workNamespace, workName string, gvrs []schema.GroupVersionResource, namespaces, names []string, workClient workclientset.Interface, eventuallyTimeout, eventuallyInterval int) {
+func AssertAppliedResources(hubHash, workName string, gvrs []schema.GroupVersionResource, namespaces, names []string, workClient workclientset.Interface, eventuallyTimeout, eventuallyInterval int) {
 	gomega.Expect(gvrs).To(gomega.HaveLen(len(namespaces)))
 	gomega.Expect(gvrs).To(gomega.HaveLen(len(names)))
 
@@ -159,11 +175,12 @@ func AssertAppliedResources(workNamespace, workName string, gvrs []schema.GroupV
 	})
 
 	gomega.Eventually(func() bool {
-		work, err := workClient.WorkV1().ManifestWorks(workNamespace).Get(context.Background(), workName, metav1.GetOptions{})
+		appliedManifestWorkName := fmt.Sprintf("%s-%s", hubHash, workName)
+		appliedManifestWork, err := workClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
 		if err != nil {
 			return false
 		}
 
-		return reflect.DeepEqual(work.Status.AppliedResources, appliedResources)
+		return reflect.DeepEqual(appliedManifestWork.Status.AppliedResources, appliedResources)
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }

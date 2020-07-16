@@ -109,6 +109,15 @@ func NewManifestWork(index int, objects ...*unstructured.Unstructured) (*workapi
 	return work, fmt.Sprintf("%s", work.Name)
 }
 
+func NewAppliedManifestWork(hash string, index int) *workapiv1.AppliedManifestWork {
+	return &workapiv1.AppliedManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("%s-work-%d", hash, index),
+		},
+		Status: workapiv1.AppliedManifestWorkStatus{},
+	}
+}
+
 func NewFakeRestMapper() *resource.Mapper {
 	resources := []*restmapper.APIGroupResources{
 		{

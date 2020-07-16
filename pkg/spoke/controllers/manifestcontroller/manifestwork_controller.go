@@ -37,11 +37,14 @@ import (
 // ManifestWorkController is to reconcile the workload resources
 // fetched from hub cluster on spoke cluster.
 type ManifestWorkController struct {
-	manifestWorkClient      workv1client.ManifestWorkInterface
-	manifestWorkLister      worklister.ManifestWorkNamespaceLister
-	spokeDynamicClient      dynamic.Interface
-	spokeKubeclient         kubernetes.Interface
-	spokeAPIExtensionClient apiextensionsclient.Interface
+	manifestWorkClient        workv1client.ManifestWorkInterface
+	manifestWorkLister        worklister.ManifestWorkNamespaceLister
+	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
+	appliedManifestWorkLister worklister.AppliedManifestWorkLister
+	spokeDynamicClient        dynamic.Interface
+	spokeKubeclient           kubernetes.Interface
+	spokeAPIExtensionClient   apiextensionsclient.Interface
+	hubHash                   string
 	// restMapper is a cached resource mapping obtained fron discovery client
 	restMapper *resource.Mapper
 }
@@ -56,15 +59,21 @@ func NewManifestWorkController(
 	manifestWorkClient workv1client.ManifestWorkInterface,
 	manifestWorkInformer workinformer.ManifestWorkInformer,
 	manifestWorkLister worklister.ManifestWorkNamespaceLister,
+	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
+	appliedManifestWorkInformer workinformer.AppliedManifestWorkInformer,
+	hubHash string,
 	restMapper *resource.Mapper) factory.Controller {
 
 	controller := &ManifestWorkController{
-		manifestWorkClient:      manifestWorkClient,
-		manifestWorkLister:      manifestWorkLister,
-		spokeDynamicClient:      spokeDynamicClient,
-		spokeKubeclient:         spokeKubeClient,
-		spokeAPIExtensionClient: spokeAPIExtensionClient,
-		restMapper:              restMapper,
+		manifestWorkClient:        manifestWorkClient,
+		manifestWorkLister:        manifestWorkLister,
+		appliedManifestWorkClient: appliedManifestWorkClient,
+		appliedManifestWorkLister: appliedManifestWorkInformer.Lister(),
+		spokeDynamicClient:        spokeDynamicClient,
+		spokeKubeclient:           spokeKubeClient,
+		spokeAPIExtensionClient:   spokeAPIExtensionClient,
+		hubHash:                   hubHash,
+		restMapper:                restMapper,
 	}
 
 	return factory.New().
@@ -72,6 +81,7 @@ func NewManifestWorkController(
 			accessor, _ := meta.Accessor(obj)
 			return accessor.GetName()
 		}, manifestWorkInformer.Informer()).
+		WithInformersQueueKeyFunc(helper.AppliedManifestworkQueueKeyFunc(hubHash), appliedManifestWorkInformer.Informer()).
 		WithSync(controller.sync).ResyncEvery(5*time.Minute).ToController("ManifestWorkAgent", recorder)
 }
 
@@ -109,10 +119,33 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	if !found {
 		return nil
 	}
+	// Apply appliedManifestWork
+	appliedManifestWorkName := fmt.Sprintf("%s-%s", m.hubHash, manifestWork.Name)
+	appliedManifestWork, err := m.appliedManifestWorkLister.Get(appliedManifestWorkName)
+	switch {
+	case errors.IsNotFound(err):
+		appliedManifestWork = &workapiv1.AppliedManifestWork{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       appliedManifestWorkName,
+				Finalizers: []string{controllers.AppliedManifestWorkFinalizer},
+			},
+			Spec: workapiv1.AppliedManifestWorkSpec{
+				HubHash:          m.hubHash,
+				ManifestWorkName: manifestWorkName,
+			},
+		}
+		appliedManifestWork, err = m.appliedManifestWorkClient.Create(ctx, appliedManifestWork, metav1.CreateOptions{})
+		if err != nil {
+			return err
+		}
+	case err != nil:
+		return err
+	}
+	owner := metav1.NewControllerRef(appliedManifestWork, workapiv1.GroupVersion.WithKind("AppliedManifestWork"))
 
 	errs := []error{}
 	// Apply resources on spoke cluster.
-	resourceResults := m.applyManifest(manifestWork.Spec.Workload.Manifests, controllerContext.Recorder())
+	resourceResults := m.applyManifest(manifestWork.Spec.Workload.Manifests, controllerContext.Recorder(), *owner)
 	newManifestConditions := []workapiv1.ManifestCondition{}
 	for index, result := range resourceResults {
 		if result.Error != nil {
@@ -150,7 +183,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	return err
 }
 
-func (m *ManifestWorkController) applyManifest(manifests []workapiv1.Manifest, recorder events.Recorder) []resourceapply.ApplyResult {
+func (m *ManifestWorkController) applyManifest(manifests []workapiv1.Manifest, recorder events.Recorder, owner metav1.OwnerReference) []resourceapply.ApplyResult {
 	clientHolder := resourceapply.NewClientHolder().
 		WithAPIExtensionsClient(m.spokeAPIExtensionClient).
 		WithKubernetes(m.spokeKubeclient)
@@ -162,7 +195,13 @@ func (m *ManifestWorkController) applyManifest(manifests []workapiv1.Manifest, r
 	}
 	results := resourceapply.ApplyDirectly(clientHolder, recorder, func(name string) ([]byte, error) {
 		index, _ := strconv.ParseInt(name, 10, 32)
-		return manifests[index].Raw, nil
+		unstructuredObj := &unstructured.Unstructured{}
+		err := unstructuredObj.UnmarshalJSON(manifests[index].Raw)
+		if err != nil {
+			return nil, err
+		}
+		unstructuredObj.SetOwnerReferences([]metav1.OwnerReference{owner})
+		return unstructuredObj.MarshalJSON()
 	}, indexstrings...)
 
 	// Try apply with dynamic client if the manifest cannot be decoded by scheme or typed client is not found
@@ -170,7 +209,7 @@ func (m *ManifestWorkController) applyManifest(manifests []workapiv1.Manifest, r
 	for index, result := range results {
 		// Use dynamic client when scheme cannot decode manifest or typed client cannot handle the object
 		if isDecodeError(result.Error) || isUnhandledError(result.Error) {
-			results[index].Result, results[index].Changed, results[index].Error = m.applyUnstructrued(manifests[index].Raw, recorder)
+			results[index].Result, results[index].Changed, results[index].Error = m.applyUnstructrued(manifests[index].Raw, owner, recorder)
 		}
 	}
 	return results
@@ -190,12 +229,13 @@ func (m *ManifestWorkController) decodeUnstructured(data []byte) (schema.GroupVe
 	return mapping.Resource, unstructuredObj, nil
 }
 
-func (m *ManifestWorkController) applyUnstructrued(data []byte, recorder events.Recorder) (*unstructured.Unstructured, bool, error) {
+func (m *ManifestWorkController) applyUnstructrued(data []byte, owner metav1.OwnerReference, recorder events.Recorder) (*unstructured.Unstructured, bool, error) {
 	gvr, required, err := m.decodeUnstructured(data)
 	if err != nil {
 		return nil, false, err
 	}
 
+	required.SetOwnerReferences([]metav1.OwnerReference{owner})
 	existing, err := m.spokeDynamicClient.
 		Resource(gvr).
 		Namespace(required.GetNamespace()).

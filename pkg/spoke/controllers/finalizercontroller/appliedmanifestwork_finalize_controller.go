@@ -1,0 +1,133 @@
+package finalizercontroller
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned/typed/work/v1"
+	workinformer "github.com/open-cluster-management/api/client/work/informers/externalversions/work/v1"
+	worklister "github.com/open-cluster-management/api/client/work/listers/work/v1"
+	workapiv1 "github.com/open-cluster-management/api/work/v1"
+	"github.com/open-cluster-management/work/pkg/helper"
+	"github.com/open-cluster-management/work/pkg/spoke/controllers"
+	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/events"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
+)
+
+// AppliedManifestWorkFinalizeController handles cleanup of appliedmanifestwork resources before deletion is allowed.
+type AppliedManifestWorkFinalizeController struct {
+	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
+	appliedManifestWorkLister worklister.AppliedManifestWorkLister
+	spokeDynamicClient        dynamic.Interface
+	rateLimiter               workqueue.RateLimiter
+}
+
+func NewAppliedManifestWorkFinalizeController(
+	recorder events.Recorder,
+	spokeDynamicClient dynamic.Interface,
+	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
+	appliedManifestWorkInformer workinformer.AppliedManifestWorkInformer,
+) factory.Controller {
+
+	controller := &AppliedManifestWorkFinalizeController{
+		appliedManifestWorkClient: appliedManifestWorkClient,
+		appliedManifestWorkLister: appliedManifestWorkInformer.Lister(),
+		spokeDynamicClient:        spokeDynamicClient,
+		rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
+	}
+
+	return factory.New().
+		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
+			accessor, _ := meta.Accessor(obj)
+			return accessor.GetName()
+		}, appliedManifestWorkInformer.Informer()).
+		WithSync(controller.sync).ToController("AppliedManifestWorkFinalizer", recorder)
+}
+
+func (m *AppliedManifestWorkFinalizeController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
+	appliedManifestWorkName := controllerContext.QueueKey()
+	klog.V(4).Infof("Reconciling ManifestWork %q", appliedManifestWorkName)
+
+	appliedManifestWork, err := m.appliedManifestWorkLister.Get(appliedManifestWorkName)
+	if errors.IsNotFound(err) {
+		// work  not found, could have been deleted, do nothing.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return m.syncAppliedManifestWork(ctx, controllerContext, appliedManifestWork)
+}
+
+// syncAppliedManifestWork ensures that when a appliedmanifestwork has been deleted, everything it created is also deleted.
+// Foreground deletion is implemented, which means all resources created will be deleted and finalized
+// before removing finalizer from appliedmanifestwork
+func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx context.Context, controllerContext factory.SyncContext, originalManifestWork *workapiv1.AppliedManifestWork) error {
+	appliedManifestWork := originalManifestWork.DeepCopy()
+
+	// no work to do until we're deleted
+	if appliedManifestWork.DeletionTimestamp == nil || appliedManifestWork.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
+	// don't do work if the finalizer is not present
+	found := false
+	for i := range appliedManifestWork.Finalizers {
+		if appliedManifestWork.Finalizers[i] == controllers.AppliedManifestWorkFinalizer {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return nil
+	}
+
+	var err error
+
+	// Work is deleting, we remove its related resources on spoke cluster
+	// We still need to run delete for every resource even with ownerref on it, since ownerref does not handle cluster
+	// scoped resource correctly.
+	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(appliedManifestWork.Status.AppliedResources, m.spokeDynamicClient)
+	updatedAppliedManifestWork := false
+	if len(appliedManifestWork.Status.AppliedResources) != len(resourcesPendingFinalization) {
+		// update the status of the manifest work accordingly
+		appliedManifestWork.Status.AppliedResources = resourcesPendingFinalization
+		appliedManifestWork, err = m.appliedManifestWorkClient.UpdateStatus(ctx, appliedManifestWork, metav1.UpdateOptions{})
+		if err != nil {
+			errs = append(errs, fmt.Errorf(
+				"Failed to update status of AppliedManifestWork %s: %w", originalManifestWork.Name, err))
+		} else {
+			updatedAppliedManifestWork = true
+		}
+	}
+	if len(errs) != 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+
+	// requeue the work until all applied resources are deleted and finalized if the appliedmanifestwork itself is not updated
+	if len(resourcesPendingFinalization) != 0 {
+		if !updatedAppliedManifestWork {
+			controllerContext.Queue().AddAfter(appliedManifestWork.Name, m.rateLimiter.When(appliedManifestWork.Name))
+		}
+		return nil
+	}
+
+	// reset the rate limiter for the appliedmanifestwork
+	m.rateLimiter.Forget(appliedManifestWork.Name)
+
+	helper.RemoveFinalizer(appliedManifestWork, controllers.AppliedManifestWorkFinalizer)
+	_, err = m.appliedManifestWorkClient.Update(ctx, appliedManifestWork, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("Failed to remove finalizer from AppliedManifestWork %s: %w", appliedManifestWork.Name, err)
+	}
+	return nil
+}

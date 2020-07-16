@@ -1,7 +1,8 @@
-package deletioncontroller
+package appliedmanifestcontroller
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sort"
 	"time"
@@ -25,28 +26,37 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 )
 
-// StaleManifestDeletionController is to reconcile the applied resources of manifest work and
-// delete any resouce which is no longer maintained by the manifest work
-type StaleManifestDeletionController struct {
-	manifestWorkClient workv1client.ManifestWorkInterface
-	manifestWorkLister worklister.ManifestWorkNamespaceLister
-	spokeDynamicClient dynamic.Interface
-	rateLimiter        workqueue.RateLimiter
+// AppliedManifestWorkController is to sync the applied resources of appliedmanifestwork with related
+// manifestwork and delete any resouce which is no longer maintained by the manifestwork
+type AppliedManifestWorkController struct {
+	manifestWorkClient        workv1client.ManifestWorkInterface
+	manifestWorkLister        worklister.ManifestWorkNamespaceLister
+	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
+	appliedManifestWorkLister worklister.AppliedManifestWorkLister
+	spokeDynamicClient        dynamic.Interface
+	hubHash                   string
+	rateLimiter               workqueue.RateLimiter
 }
 
-// NewStaleManifestDeletionController returns a StaleManifestDeletionController
-func NewStaleManifestDeletionController(
+// NewAppliedManifestWorkController returns a AppliedManifestWorkController
+func NewAppliedManifestWorkController(
 	recorder events.Recorder,
 	spokeDynamicClient dynamic.Interface,
 	manifestWorkClient workv1client.ManifestWorkInterface,
 	manifestWorkInformer workinformer.ManifestWorkInformer,
-	manifestWorkLister worklister.ManifestWorkNamespaceLister) factory.Controller {
+	manifestWorkLister worklister.ManifestWorkNamespaceLister,
+	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
+	appliedManifestWorkInformer workinformer.AppliedManifestWorkInformer,
+	hubHash string) factory.Controller {
 
-	controller := &StaleManifestDeletionController{
-		manifestWorkClient: manifestWorkClient,
-		manifestWorkLister: manifestWorkLister,
-		spokeDynamicClient: spokeDynamicClient,
-		rateLimiter:        workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
+	controller := &AppliedManifestWorkController{
+		manifestWorkClient:        manifestWorkClient,
+		manifestWorkLister:        manifestWorkLister,
+		appliedManifestWorkClient: appliedManifestWorkClient,
+		appliedManifestWorkLister: appliedManifestWorkInformer.Lister(),
+		spokeDynamicClient:        spokeDynamicClient,
+		hubHash:                   hubHash,
+		rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
 	}
 
 	return factory.New().
@@ -54,10 +64,11 @@ func NewStaleManifestDeletionController(
 			accessor, _ := meta.Accessor(obj)
 			return accessor.GetName()
 		}, manifestWorkInformer.Informer()).
+		WithInformersQueueKeyFunc(helper.AppliedManifestworkQueueKeyFunc(hubHash), appliedManifestWorkInformer.Informer()).
 		WithSync(controller.sync).ToController("StaleManifestDeletionController", recorder)
 }
 
-func (m *StaleManifestDeletionController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
+func (m *AppliedManifestWorkController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	manifestWorkName := controllerContext.QueueKey()
 	klog.V(4).Infof("Reconciling ManifestWork %q", manifestWorkName)
 
@@ -69,19 +80,32 @@ func (m *StaleManifestDeletionController) sync(ctx context.Context, controllerCo
 	if err != nil {
 		return err
 	}
-
-	return m.syncManifestWork(ctx, controllerContext, manifestWork)
-}
-
-// syncManifestWork collects latest applied resources from ManifestWork.Status.ResourceStatus and merges them with
-// existing applied resources. It also deletes applied resources for stale manifests
-func (m *StaleManifestDeletionController) syncManifestWork(ctx context.Context, controllerContext factory.SyncContext, originalManifestWork *workapiv1.ManifestWork) error {
-	manifestWork := originalManifestWork.DeepCopy()
-
 	// no work to do if we're deleted
 	if !manifestWork.DeletionTimestamp.IsZero() {
 		return nil
 	}
+
+	appliedManifestWorkName := fmt.Sprintf("%s-%s", m.hubHash, manifestWork.Name)
+	appliedManifestWork, err := m.appliedManifestWorkLister.Get(appliedManifestWorkName)
+	if errors.IsNotFound(err) {
+		// appliedmanifestwork  not found, could have been deleted, do nothing.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	return m.syncManifestWork(ctx, controllerContext, manifestWork, appliedManifestWork)
+}
+
+// syncManifestWork collects latest applied resources from ManifestWork.Status.ResourceStatus and merges them with
+// existing applied resources in appliedmanifestwork. It also deletes applied resources for stale manifests
+func (m *AppliedManifestWorkController) syncManifestWork(
+	ctx context.Context,
+	controllerContext factory.SyncContext,
+	manifestWork *workapiv1.ManifestWork,
+	originalAppliedManifestWork *workapiv1.AppliedManifestWork) error {
+	appliedManifestWork := originalAppliedManifestWork.DeepCopy()
 
 	// get the latest applied resources from the manifests in resource status. We get this from status instead of
 	// spec because manifests in spec are only resource templates, while resource status records the real resources
@@ -103,7 +127,7 @@ func (m *StaleManifestDeletionController) syncManifestWork(ctx context.Context, 
 	}
 
 	// delete applied resources which are no longer maintained by manifest work
-	noLongerMaintainedResources := findUntrackedResources(manifestWork.Status.AppliedResources, appliedResources)
+	noLongerMaintainedResources := findUntrackedResources(appliedManifestWork.Status.AppliedResources, appliedResources)
 	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(noLongerMaintainedResources, m.spokeDynamicClient)
 	if len(errs) != 0 {
 		return utilerrors.NewAggregate(errs)
@@ -127,7 +151,7 @@ func (m *StaleManifestDeletionController) syncManifestWork(ctx context.Context, 
 		}
 	})
 
-	willSkipStatusUpdate := reflect.DeepEqual(manifestWork.Status.AppliedResources, appliedResources)
+	willSkipStatusUpdate := reflect.DeepEqual(appliedManifestWork.Status.AppliedResources, appliedResources)
 	if willSkipStatusUpdate {
 		// requeue the work if there exists any resource pending for finalization
 		if len(resourcesPendingFinalization) != 0 {
@@ -141,10 +165,10 @@ func (m *StaleManifestDeletionController) syncManifestWork(ctx context.Context, 
 		m.rateLimiter.Forget(manifestWork.Name)
 	}
 
-	// update work status with latest applied resources. if this conflicts, we'll try again later
+	// update appliedmanifestwork status with latest applied resources. if this conflicts, we'll try again later
 	// for retrying update without reassessing the status can cause overwriting of valid information.
-	manifestWork.Status.AppliedResources = appliedResources
-	_, err := m.manifestWorkClient.UpdateStatus(ctx, manifestWork, metav1.UpdateOptions{})
+	appliedManifestWork.Status.AppliedResources = appliedResources
+	_, err := m.appliedManifestWorkClient.UpdateStatus(ctx, appliedManifestWork, metav1.UpdateOptions{})
 	return err
 }
 

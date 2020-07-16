@@ -9,6 +9,7 @@ import (
 	"github.com/onsi/gomega"
 
 	workclientset "github.com/open-cluster-management/api/client/work/clientset/versioned"
+	"github.com/open-cluster-management/work/pkg/helper"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -21,6 +22,7 @@ var (
 	restConfig      *rest.Config
 	spokeKubeClient kubernetes.Interface
 	hubWorkClient   workclientset.Interface
+	hubHash         string
 )
 
 func TestE2e(t *testing.T) {
@@ -49,6 +51,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	kubeconfig := os.Getenv("KUBECONFIG")
 	restConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	hubHash = helper.HubHash(restConfig.Host)
 
 	spokeKubeClient, err = kubernetes.NewForConfig(restConfig)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
