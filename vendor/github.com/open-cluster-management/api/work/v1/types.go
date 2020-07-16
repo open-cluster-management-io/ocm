@@ -233,6 +233,8 @@ type ManifestWorkList struct {
 // deployed in the managed cluster.
 // When the agent is removed from managed cluster, cluster-admin on managed cluster
 // can delete appliedmanifestwork to remove resources deployed by the agent.
+// The name of the appliedmanifestwork must be in the format of
+// {hash of hub's first kube-apiserver url}-{manifestwork name}
 type AppliedManifestWork struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -255,11 +257,6 @@ type AppliedManifestWorkSpec struct {
 	// ManifestWorkName represents the name of the related manifestwork on hub.
 	// +required
 	ManifestWorkName string `json:"manifestWorkName"`
-
-	// ClusterName represents the name of the cluster on hub where the related manifestwork
-	// is placed.
-	// +required
-	ClusterName string `json:"clusterNamee"`
 }
 
 // AppliedManifestWorkStatus represents the current status of AppliedManifestWork
