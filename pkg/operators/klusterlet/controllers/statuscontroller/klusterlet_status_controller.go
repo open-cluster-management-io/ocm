@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -41,6 +42,8 @@ type klusterletStatusController struct {
 
 const (
 	klusterletNamespace            = "open-cluster-management-agent"
+	klusterletRegistration         = "Registration"
+	klusterletWork                 = "Work"
 	klusterletRegistrationDegraded = "KlusterletRegistrationDegraded"
 	klusterletWorKDegraded         = "KlusterletWorkDegraded"
 )
@@ -91,210 +94,197 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 		klusterletNS = klusterletNamespace
 	}
 
-	registrationDegradedCondition := operatorapiv1.StatusCondition{
-		Type:    klusterletRegistrationDegraded,
-		Status:  metav1.ConditionFalse,
-		Reason:  "RegistrationFunctional",
-		Message: "Registration is managing credentials",
-	}
-	workDegradedCondition := operatorapiv1.StatusCondition{
-		Type:    klusterletWorKDegraded,
-		Status:  metav1.ConditionFalse,
-		Reason:  "WorkFunctional",
-		Message: "Work is managing manifests",
+	registrationDegradedCondition := checkAgentDegradedCondition(
+		ctx, k.kubeClient,
+		klusterletRegistration, klusterletRegistrationDegraded,
+		klusterletAgent{
+			clusterName:    klusterlet.Spec.ClusterName,
+			deploymentName: fmt.Sprintf("%s-registration-agent", klusterlet.Name),
+			namespace:      klusterletNS,
+			getSSARFunc:    getRegistrationSelfSubjectAccessReviews,
+		},
+		[]degradedCheckFunc{checkBootstrapSecret, checkHubConfigSecret, checkAgentDeployment},
+	)
+	workDegradedCondition := checkAgentDegradedCondition(
+		ctx, k.kubeClient,
+		klusterletWork, klusterletWorKDegraded,
+		klusterletAgent{
+			clusterName:    klusterlet.Spec.ClusterName,
+			deploymentName: fmt.Sprintf("%s-work-agent", klusterlet.Name),
+			namespace:      klusterletNS,
+			getSSARFunc:    getWorkSelfSubjectAccessReviews,
+		},
+		[]degradedCheckFunc{checkHubConfigSecret, checkAgentDeployment},
+	)
+
+	_, _, err = helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
+		helpers.UpdateKlusterletConditionFn(registrationDegradedCondition),
+		helpers.UpdateKlusterletConditionFn(workDegradedCondition),
+	)
+	return err
+}
+
+type klusterletAgent struct {
+	clusterName    string
+	deploymentName string
+	namespace      string
+	getSSARFunc    getSelfSubjectAccessReviewsFunc
+}
+
+func checkAgentDegradedCondition(
+	ctx context.Context, kubeClient kubernetes.Interface,
+	agentName, degradedType string,
+	agent klusterletAgent,
+	degradedCheckFns []degradedCheckFunc) operatorapiv1.StatusCondition {
+	degradedConditionReasons := []string{}
+	degradedConditionMessages := []string{}
+	for _, degradedCheckFn := range degradedCheckFns {
+		currCond := degradedCheckFn(ctx, kubeClient, agent)
+		if currCond == nil {
+			continue
+		}
+		degradedConditionReasons = append(degradedConditionReasons, currCond.Reason)
+		degradedConditionMessages = append(degradedConditionMessages, currCond.Message)
 	}
 
+	if len(degradedConditionReasons) == 0 {
+		return operatorapiv1.StatusCondition{
+			Type:    degradedType,
+			Status:  metav1.ConditionFalse,
+			Reason:  fmt.Sprintf("%sFunctional", agentName),
+			Message: fmt.Sprintf("%s is managing credentials", agentName),
+		}
+	}
+
+	return operatorapiv1.StatusCondition{
+		Type:    degradedType,
+		Status:  metav1.ConditionTrue,
+		Reason:  strings.Join(degradedConditionReasons, ","),
+		Message: strings.Join(degradedConditionMessages, "\n"),
+	}
+}
+
+type degradedCheckFunc func(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) *operatorapiv1.StatusCondition
+
+// Check bootstrap secret, if the secret is invalid, return registration degraded condition
+func checkBootstrapSecret(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) *operatorapiv1.StatusCondition {
 	// Check if bootstrap secret exists
-	bootstrapSecret, err := k.kubeClient.CoreV1().Secrets(klusterletNS).Get(ctx, helpers.BootstrapHubKubeConfigSecret, metav1.GetOptions{})
+	bootstrapSecret, err := kubeClient.CoreV1().Secrets(agent.namespace).Get(ctx, helpers.BootstrapHubKubeConfigSecret, metav1.GetOptions{})
 	if err != nil {
-		registrationDegradedCondition.Message = fmt.Sprintf("Failed to get bootstrap secret %q %q: %v", klusterletNS, helpers.BootstrapHubKubeConfigSecret, err)
-		registrationDegradedCondition.Status = metav1.ConditionTrue
-		registrationDegradedCondition.Reason = "BootStrapSecretMissing"
-		_, _, err := helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
-			helpers.UpdateKlusterletConditionFn(registrationDegradedCondition),
-		)
-		return err
+		return &operatorapiv1.StatusCondition{
+			Reason:  "BootstrapSecretMissing",
+			Message: fmt.Sprintf("Failed to get bootstrap secret %q %q: %v", agent.namespace, helpers.BootstrapHubKubeConfigSecret, err),
+		}
 	}
 
 	// Check if bootstrap secret works by building kube client
 	bootstrapClient, err := buildKubeClientWithSecret(bootstrapSecret)
 	if err != nil {
-		registrationDegradedCondition.Message = fmt.Sprintf("Failed to build kube client with bootstrap secret %q %q: %v", klusterletNS, helpers.BootstrapHubKubeConfigSecret, err)
-		registrationDegradedCondition.Status = metav1.ConditionTrue
-		registrationDegradedCondition.Reason = "BootstrapSecretError"
-		_, _, err := helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
-			helpers.UpdateKlusterletConditionFn(registrationDegradedCondition),
-		)
-		return err
+		return &operatorapiv1.StatusCondition{
+			Reason: "BootstrapSecretError",
+			Message: fmt.Sprintf("Failed to build bootstrap kube client with bootstrap secret %q %q: %v",
+				agent.namespace, helpers.BootstrapHubKubeConfigSecret, err),
+		}
 	}
 
 	// Check the bootstrap client permissions by creating SelfSubjectAccessReviews
 	allowed, failedReview, err := createSelfSubjectAccessReviews(ctx, bootstrapClient, getBootstrapSelfSubjectAccessReviews())
 	if err != nil {
-		registrationDegradedCondition.Message = fmt.Sprintf("Failed to create %+v with bootstrap secret %q %q: %v", failedReview, klusterletNS, helpers.BootstrapHubKubeConfigSecret, err)
-		registrationDegradedCondition.Status = metav1.ConditionTrue
-		registrationDegradedCondition.Reason = "BootstrapSecretError"
-		_, _, err := helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
-			helpers.UpdateKlusterletConditionFn(registrationDegradedCondition),
-		)
-		return err
+		return &operatorapiv1.StatusCondition{
+			Reason: "BootstrapSecretError",
+			Message: fmt.Sprintf("Failed to create %+v with bootstrap secret %q %q: %v",
+				failedReview, agent.namespace, helpers.BootstrapHubKubeConfigSecret, err),
+		}
 	}
 	if !allowed {
-		registrationDegradedCondition.Message = fmt.Sprintf("Operation for resource %+v is not allowed with bootstrap secret %q %q", failedReview.Spec.ResourceAttributes, klusterletNS, helpers.BootstrapHubKubeConfigSecret)
-		registrationDegradedCondition.Status = metav1.ConditionTrue
-		registrationDegradedCondition.Reason = "BootstrapSecretUnauthorized"
-		_, _, err := helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
-			helpers.UpdateKlusterletConditionFn(registrationDegradedCondition),
-		)
-		return err
+		return &operatorapiv1.StatusCondition{
+			Reason: "BootstrapSecretUnauthorized",
+			Message: fmt.Sprintf("Operation for resource %+v is not allowed with bootstrap secret %q %q",
+				failedReview.Spec.ResourceAttributes, agent.namespace, helpers.BootstrapHubKubeConfigSecret),
+		}
 	}
 
-	// Check if hub kubeconfig secret exists
-	hubConfigSecret, err := k.kubeClient.CoreV1().Secrets(klusterletNS).Get(ctx, helpers.HubKubeConfigSecret, metav1.GetOptions{})
+	return nil
+}
+
+// Check hub-kubeconfig-secret, if the secret is invalid, return degraded condition
+func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) *operatorapiv1.StatusCondition {
+	hubConfigSecret, err := kubeClient.CoreV1().Secrets(agent.namespace).Get(ctx, helpers.HubKubeConfigSecret, metav1.GetOptions{})
 	if err != nil {
-		registrationDegradedCondition.Message = fmt.Sprintf("Failed to get hub kubeconfig secret %q %q: %v", klusterletNS, helpers.HubKubeConfigSecret, err)
-		registrationDegradedCondition.Status = metav1.ConditionTrue
-		registrationDegradedCondition.Reason = "HubKubeConfigSecretMissing"
-		// Work condition will be the same as registration
-		workDegradedCondition.Message = registrationDegradedCondition.Message
-		workDegradedCondition.Status = registrationDegradedCondition.Status
-		workDegradedCondition.Reason = registrationDegradedCondition.Reason
-
-		_, _, err := helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
-			helpers.UpdateKlusterletConditionFn(registrationDegradedCondition),
-			helpers.UpdateKlusterletConditionFn(workDegradedCondition),
-		)
-		return err
+		return &operatorapiv1.StatusCondition{
+			Reason:  "HubKubeConfigSecretMissing",
+			Message: fmt.Sprintf("Failed to get hub kubeconfig secret %q %q: %v", agent.namespace, helpers.HubKubeConfigSecret, err),
+		}
 	}
 
+	if hubConfigSecret.Data["kubeconfig"] == nil {
+		return &operatorapiv1.StatusCondition{
+			Reason: "HubKubeConfigMissing",
+			Message: fmt.Sprintf("Failed to get kubeconfig from `kubectl get secret -n %q %q -ojsonpath='{.data.kubeconfig}'`. "+
+				"This is set by the klusterlet registration deployment, but the CSR must be approved by the cluster-admin on the hub.",
+				hubConfigSecret.Namespace, hubConfigSecret.Name),
+		}
+	}
+
+	hubClient, err := buildKubeClientWithSecret(hubConfigSecret)
+	if err != nil {
+		return &operatorapiv1.StatusCondition{
+			Reason: "HubKubeConfigError",
+			Message: fmt.Sprintf("Failed to build hub kube client with hub config secret %q %q: %v",
+				hubConfigSecret.Namespace, hubConfigSecret.Name, err),
+		}
+	}
+
+	clusterName := agent.clusterName
 	// If cluster name is empty, read cluster name from hub config secret
-	clusterName := klusterlet.Spec.ClusterName
 	if clusterName == "" {
 		if hubConfigSecret.Data["cluster-name"] == nil {
-			registrationDegradedCondition.Message = fmt.Sprintf(
-				"Failed to get cluster name from `kubectl get secret -n %q %q -ojsonpath='{.data.cluster-name}`.  This is set by the klusterlet registration deployment.", hubConfigSecret.Namespace, hubConfigSecret.Name)
-			registrationDegradedCondition.Status = metav1.ConditionTrue
-			registrationDegradedCondition.Reason = "ClusterNameMissing"
-			// Work condition will be the same as registration
-			workDegradedCondition.Message = registrationDegradedCondition.Message
-			workDegradedCondition.Status = registrationDegradedCondition.Status
-			workDegradedCondition.Reason = registrationDegradedCondition.Reason
-
-			_, _, err := helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
-				helpers.UpdateKlusterletConditionFn(registrationDegradedCondition),
-				helpers.UpdateKlusterletConditionFn(workDegradedCondition),
-			)
-			return err
+			return &operatorapiv1.StatusCondition{
+				Reason: "ClusterNameMissing",
+				Message: fmt.Sprintf(
+					"Failed to get cluster name from `kubectl get secret -n %q %q -ojsonpath='{.data.cluster-name}`."+
+						" This is set by the klusterlet registration deployment.", hubConfigSecret.Namespace, hubConfigSecret.Name),
+			}
 		}
 		clusterName = string(hubConfigSecret.Data["cluster-name"])
 	}
 
-	// If hub kubeconfig does not exist, return err.
-	if hubConfigSecret.Data["kubeconfig"] == nil {
-		registrationDegradedCondition.Message = fmt.Sprintf(
-			"Failed to get kubeconfig from `kubectl get secret -n %q %q -ojsonpath='{.data.kubeconfig}`.  This is set by the klusterlet registration deployment, but the CSR must be approved by the cluster-admin on the hub.", hubConfigSecret.Namespace, hubConfigSecret.Name)
-		registrationDegradedCondition.Status = metav1.ConditionTrue
-		registrationDegradedCondition.Reason = "KubeConfigMissing"
-		// Work condition will be the same as registration
-		workDegradedCondition.Message = registrationDegradedCondition.Message
-		workDegradedCondition.Status = registrationDegradedCondition.Status
-		workDegradedCondition.Reason = registrationDegradedCondition.Reason
-
-		_, _, err := helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
-			helpers.UpdateKlusterletConditionFn(registrationDegradedCondition),
-			helpers.UpdateKlusterletConditionFn(workDegradedCondition),
-		)
-		return err
-	}
-
-	// Check if hub config secret works by building kube client with its kubeconfig
-	hubClient, err := buildKubeClientWithSecret(hubConfigSecret)
+	// Check the hub kubeconfig permissions by creating SelfSubjectAccessReviews
+	allowed, failedReview, err := createSelfSubjectAccessReviews(ctx, hubClient, agent.getSSARFunc(agent.clusterName))
 	if err != nil {
-		registrationDegradedCondition.Message = fmt.Sprintf("Failed to build kube client with hub config secret %q %q: %v", hubConfigSecret.Namespace, hubConfigSecret.Name, err)
-		registrationDegradedCondition.Status = metav1.ConditionTrue
-		registrationDegradedCondition.Reason = "HubConfigSecretError"
-		// Work condition will be the same as registration
-		workDegradedCondition.Message = registrationDegradedCondition.Message
-		workDegradedCondition.Status = registrationDegradedCondition.Status
-		workDegradedCondition.Reason = registrationDegradedCondition.Reason
-
-		_, _, err := helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
-			helpers.UpdateKlusterletConditionFn(registrationDegradedCondition),
-			helpers.UpdateKlusterletConditionFn(workDegradedCondition),
-		)
-		return err
-	}
-
-	// Check the hub client (registration and work) permissions by creating SelfSubjectAccessReviews
-	allowed, failedReview, err = createSelfSubjectAccessReviews(ctx, hubClient, getRegistrationSelfSubjectAccessReviews(clusterName))
-	if err != nil {
-		registrationDegradedCondition.Message = fmt.Sprintf("Failed to create %+v with hub config secret %q %q: %v", failedReview, klusterletNS, helpers.BootstrapHubKubeConfigSecret, err)
-		registrationDegradedCondition.Status = metav1.ConditionTrue
-		registrationDegradedCondition.Reason = "HubConfigSecretError"
-		_, _, err := helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
-			helpers.UpdateKlusterletConditionFn(registrationDegradedCondition),
-		)
-		return err
+		return &operatorapiv1.StatusCondition{
+			Reason: "HubKubeConfigError",
+			Message: fmt.Sprintf("Failed to create %+v with hub config secret %q %q: %v",
+				failedReview, hubConfigSecret.Namespace, hubConfigSecret.Name, err),
+		}
 	}
 	if !allowed {
-		registrationDegradedCondition.Message = fmt.Sprintf("Operation for resource %+v is not allowed with hub config secret %q %q", failedReview.Spec.ResourceAttributes, klusterletNS, helpers.BootstrapHubKubeConfigSecret)
-		registrationDegradedCondition.Status = metav1.ConditionTrue
-		registrationDegradedCondition.Reason = "HubConfigSecretUnauthorized"
-		_, _, err := helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
-			helpers.UpdateKlusterletConditionFn(registrationDegradedCondition),
-		)
-		return err
+		return &operatorapiv1.StatusCondition{
+			Reason: "HubKubeConfigUnauthorized",
+			Message: fmt.Sprintf("Operation for resource %+v is not allowed with hub config secret %q %q",
+				failedReview.Spec.ResourceAttributes, hubConfigSecret.Namespace, hubConfigSecret.Name),
+		}
 	}
 
-	allowed, failedReview, err = createSelfSubjectAccessReviews(ctx, hubClient, getWorkSelfSubjectAccessReviews(clusterName))
+	return nil
+}
+
+// Check agent deployment, if the desired replicas is not equal to available replicas, return degraded condition
+func checkAgentDeployment(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) *operatorapiv1.StatusCondition {
+	deployment, err := kubeClient.AppsV1().Deployments(agent.namespace).Get(ctx, agent.deploymentName, metav1.GetOptions{})
 	if err != nil {
-		workDegradedCondition.Message = fmt.Sprintf("Failed to create %+v with hub config secret %q %q: %v", failedReview, klusterletNS, helpers.BootstrapHubKubeConfigSecret, err)
-		workDegradedCondition.Status = metav1.ConditionTrue
-		workDegradedCondition.Reason = "HubConfigSecretError"
-		_, _, err := helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
-			helpers.UpdateKlusterletConditionFn(workDegradedCondition),
-		)
-		return err
+		return &operatorapiv1.StatusCondition{
+			Reason:  "GetDeploymentFailed",
+			Message: fmt.Sprintf("Failed to get deployment %q %q: %v", agent.namespace, agent.deploymentName, err),
+		}
 	}
-	if !allowed {
-		workDegradedCondition.Message = fmt.Sprintf("Operation for resource %+v is not allowed with hub config secret %q %q", failedReview.Spec.ResourceAttributes, klusterletNS, helpers.BootstrapHubKubeConfigSecret)
-		workDegradedCondition.Status = metav1.ConditionTrue
-		workDegradedCondition.Reason = "HubConfigSecretUnauthorized"
-		_, _, err := helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
-			helpers.UpdateKlusterletConditionFn(workDegradedCondition),
-		)
-		return err
+	if unavailablePod := helpers.NumOfUnavailablePod(deployment); unavailablePod > 0 {
+		return &operatorapiv1.StatusCondition{
+			Reason: "UnavailablePods",
+			Message: fmt.Sprintf("%v of requested instances are unavailable of deployment %q %q",
+				unavailablePod, agent.namespace, agent.deploymentName),
+		}
 	}
-
-	// Check deployment status
-	registrationDeploymentName := fmt.Sprintf("%s-registration-agent", klusterlet.Name)
-	registrationDeployment, err := k.kubeClient.AppsV1().Deployments(klusterletNS).Get(ctx, registrationDeploymentName, metav1.GetOptions{})
-	if err != nil {
-		registrationDegradedCondition.Message = fmt.Sprintf("Failed to get registration deployment %q %q: %v", klusterletNS, registrationDeploymentName, err)
-		registrationDegradedCondition.Status = metav1.ConditionTrue
-		registrationDegradedCondition.Reason = "GetRegistrationDeploymentFailed"
-	} else if unavailablePod := helpers.NumOfUnavailablePod(registrationDeployment); unavailablePod > 0 {
-		registrationDegradedCondition.Message = fmt.Sprintf("%v of requested instances are unavailable of registration deployment %q %q", unavailablePod, klusterletNS, registrationDeploymentName)
-		registrationDegradedCondition.Status = metav1.ConditionTrue
-		registrationDegradedCondition.Reason = "UnavailableRegistrationPod"
-	}
-
-	workDeploymentName := fmt.Sprintf("%s-work-agent", klusterlet.Name)
-	workDeployment, err := k.kubeClient.AppsV1().Deployments(klusterletNS).Get(ctx, workDeploymentName, metav1.GetOptions{})
-	if err != nil {
-		workDegradedCondition.Message = fmt.Sprintf("Failed to get work deployment %q %q: %v", klusterletNS, workDeploymentName, err)
-		workDegradedCondition.Status = metav1.ConditionTrue
-		workDegradedCondition.Reason = "GetWorkDeploymentFailed"
-	} else if unavailablePod := helpers.NumOfUnavailablePod(workDeployment); unavailablePod > 0 {
-		workDegradedCondition.Message = fmt.Sprintf("%v of requested instances are unavailable of work deployment %q %q", unavailablePod, klusterletNS, workDeploymentName)
-		workDegradedCondition.Status = metav1.ConditionTrue
-		workDegradedCondition.Reason = "UnavailableWorkPod"
-	}
-
-	helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
-		helpers.UpdateKlusterletConditionFn(registrationDegradedCondition),
-		helpers.UpdateKlusterletConditionFn(workDegradedCondition),
-	)
 	return nil
 }
 
@@ -348,6 +338,8 @@ func getBootstrapSelfSubjectAccessReviews() []authorizationv1.SelfSubjectAccessR
 	}
 	return append(reviews, generateSelfSubjectAccessReviews(certResource, "create", "get", "list", "watch")...)
 }
+
+type getSelfSubjectAccessReviewsFunc func(string) []authorizationv1.SelfSubjectAccessReview
 
 func getRegistrationSelfSubjectAccessReviews(clusterName string) []authorizationv1.SelfSubjectAccessReview {
 	reviews := []authorizationv1.SelfSubjectAccessReview{}

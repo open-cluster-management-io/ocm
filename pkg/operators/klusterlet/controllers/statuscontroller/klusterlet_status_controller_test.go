@@ -167,30 +167,35 @@ func TestSync(t *testing.T) {
 	}{
 		{
 			name:       "No bootstrap secret",
-			object:     []runtime.Object{},
+			object:     []runtime.Object{newSecret(helpers.HubKubeConfigSecret, "test")},
 			klusterlet: newKlusterlet("testklusterlet", "test", ""),
 			expectedConditions: []operatorapiv1.StatusCondition{
-				testinghelper.NamedCondition(klusterletRegistrationDegraded, "BootStrapSecretMissing", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletRegistrationDegraded, "BootstrapSecretMissing,HubKubeConfigMissing,GetDeploymentFailed", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletWorKDegraded, "HubKubeConfigMissing,GetDeploymentFailed", metav1.ConditionTrue),
 			},
 		},
 		{
 			name: "Bad bootstrap secret",
 			object: []runtime.Object{
+				newSecret(helpers.HubKubeConfigSecret, "test"),
 				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfigSecret, "test", []byte("badsecret")),
 			},
 			klusterlet: newKlusterlet("testklusterlet", "test", ""),
 			expectedConditions: []operatorapiv1.StatusCondition{
-				testinghelper.NamedCondition(klusterletRegistrationDegraded, "BootstrapSecretError", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletRegistrationDegraded, "BootstrapSecretError,HubKubeConfigMissing,GetDeploymentFailed", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletWorKDegraded, "HubKubeConfigMissing,GetDeploymentFailed", metav1.ConditionTrue),
 			},
 		},
 		{
 			name: "Unauthorized bootstrap secret",
 			object: []runtime.Object{
+				newSecret(helpers.HubKubeConfigSecret, "test"),
 				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
 			},
 			klusterlet: newKlusterlet("testklusterlet", "test", ""),
 			expectedConditions: []operatorapiv1.StatusCondition{
-				testinghelper.NamedCondition(klusterletRegistrationDegraded, "BootstrapSecretUnauthorized", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletRegistrationDegraded, "BootstrapSecretUnauthorized,HubKubeConfigMissing,GetDeploymentFailed", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletWorKDegraded, "HubKubeConfigMissing,GetDeploymentFailed", metav1.ConditionTrue),
 			},
 		},
 		{
@@ -201,21 +206,21 @@ func TestSync(t *testing.T) {
 			klusterlet:                    newKlusterlet("testklusterlet", "test", ""),
 			allowToOperateManagedClusters: true,
 			expectedConditions: []operatorapiv1.StatusCondition{
-				testinghelper.NamedCondition(klusterletRegistrationDegraded, "HubKubeConfigSecretMissing", metav1.ConditionTrue),
-				testinghelper.NamedCondition(klusterletWorKDegraded, "HubKubeConfigSecretMissing", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletRegistrationDegraded, "HubKubeConfigSecretMissing,GetDeploymentFailed", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletWorKDegraded, "HubKubeConfigSecretMissing,GetDeploymentFailed", metav1.ConditionTrue),
 			},
 		},
 		{
 			name: "No cluster name secret",
 			object: []runtime.Object{
 				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
-				newSecret(helpers.HubKubeConfigSecret, "test"),
+				newSecretWithKubeConfig(helpers.HubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
 			},
 			allowToOperateManagedClusters: true,
 			klusterlet:                    newKlusterlet("testklusterlet", "test", ""),
 			expectedConditions: []operatorapiv1.StatusCondition{
-				testinghelper.NamedCondition(klusterletRegistrationDegraded, "ClusterNameMissing", metav1.ConditionTrue),
-				testinghelper.NamedCondition(klusterletWorKDegraded, "ClusterNameMissing", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletRegistrationDegraded, "ClusterNameMissing,GetDeploymentFailed", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletWorKDegraded, "ClusterNameMissing,GetDeploymentFailed", metav1.ConditionTrue),
 			},
 		},
 		{
@@ -227,8 +232,8 @@ func TestSync(t *testing.T) {
 			allowToOperateManagedClusters: true,
 			klusterlet:                    newKlusterlet("testklusterlet", "test", "cluster1"),
 			expectedConditions: []operatorapiv1.StatusCondition{
-				testinghelper.NamedCondition(klusterletRegistrationDegraded, "KubeConfigMissing", metav1.ConditionTrue),
-				testinghelper.NamedCondition(klusterletWorKDegraded, "KubeConfigMissing", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletRegistrationDegraded, "HubKubeConfigMissing,GetDeploymentFailed", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletWorKDegraded, "HubKubeConfigMissing,GetDeploymentFailed", metav1.ConditionTrue),
 			},
 		},
 		{
@@ -240,12 +245,12 @@ func TestSync(t *testing.T) {
 			allowToOperateManagedClusters: true,
 			klusterlet:                    newKlusterlet("testklusterlet", "test", "cluster1"),
 			expectedConditions: []operatorapiv1.StatusCondition{
-				testinghelper.NamedCondition(klusterletRegistrationDegraded, "HubConfigSecretError", metav1.ConditionTrue),
-				testinghelper.NamedCondition(klusterletWorKDegraded, "HubConfigSecretError", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletRegistrationDegraded, "HubKubeConfigError,GetDeploymentFailed", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletWorKDegraded, "HubKubeConfigError,GetDeploymentFailed", metav1.ConditionTrue),
 			},
 		},
 		{
-			name: "Unauthorized hub config secret (registration)",
+			name: "Unauthorized hub config secret",
 			object: []runtime.Object{
 				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
 				newSecretWithKubeConfig(helpers.HubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
@@ -253,20 +258,8 @@ func TestSync(t *testing.T) {
 			allowToOperateManagedClusters: true,
 			klusterlet:                    newKlusterlet("testklusterlet", "test", "cluster1"),
 			expectedConditions: []operatorapiv1.StatusCondition{
-				testinghelper.NamedCondition(klusterletRegistrationDegraded, "HubConfigSecretUnauthorized", metav1.ConditionTrue),
-			},
-		},
-		{
-			name: "Unauthorized hub config secret (work)",
-			object: []runtime.Object{
-				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
-				newSecretWithKubeConfig(helpers.HubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
-			},
-			allowToOperateManagedClusters:      true,
-			allowToOperateManagedClusterStatus: true,
-			klusterlet:                         newKlusterlet("testklusterlet", "test", "cluster1"),
-			expectedConditions: []operatorapiv1.StatusCondition{
-				testinghelper.NamedCondition(klusterletWorKDegraded, "HubConfigSecretUnauthorized", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletRegistrationDegraded, "HubKubeConfigUnauthorized,GetDeploymentFailed", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletWorKDegraded, "HubKubeConfigUnauthorized,GetDeploymentFailed", metav1.ConditionTrue),
 			},
 		},
 		{
@@ -282,8 +275,8 @@ func TestSync(t *testing.T) {
 			allowToOperateManifestWorks:        true,
 			klusterlet:                         newKlusterlet("testklusterlet", "test", "cluster1"),
 			expectedConditions: []operatorapiv1.StatusCondition{
-				testinghelper.NamedCondition(klusterletRegistrationDegraded, "UnavailableRegistrationPod", metav1.ConditionTrue),
-				testinghelper.NamedCondition(klusterletWorKDegraded, "UnavailableWorkPod", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletRegistrationDegraded, "UnavailablePods", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletWorKDegraded, "UnavailablePods", metav1.ConditionTrue),
 			},
 		},
 		{
