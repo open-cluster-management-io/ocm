@@ -1,8 +1,10 @@
 package e2e
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -431,4 +433,71 @@ func (t *Tester) GetClusterNameFromKlusterlet(klusterletName string) (string, er
 	}
 
 	return string(clusterNameByte), nil
+}
+
+// TODO: only output the details of created resources during e2e
+func (t *Tester) OutputDebugLogs() {
+	klusterletes, err := t.OperatorClient.OperatorV1().Klusterlets().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		klog.Errorf("failed to list klusterlets. error: %v", err)
+	}
+	for _, klusterlet := range klusterletes.Items {
+		klog.Infof("klusterlet %v : %#v \n", klusterlet.Name, klusterlet)
+	}
+
+	managedClusters, err := t.ClusterClient.ClusterV1().ManagedClusters().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		klog.Errorf("failed to list managedClusters. error: %v", err)
+	}
+	for _, managedCluster := range managedClusters.Items {
+		klog.Infof("managedCluster %v : %#v \n", managedCluster.Name, managedCluster)
+	}
+
+	registrationPods, err := t.KubeClient.CoreV1().Pods("").List(context.Background(),
+		metav1.ListOptions{LabelSelector: "app=klusterlet-registration-agent"})
+	if err != nil {
+		klog.Errorf("failed to list registration pods. error: %v", err)
+	}
+
+	manifestWorkPods, err := t.KubeClient.CoreV1().Pods("").List(context.Background(),
+		metav1.ListOptions{LabelSelector: "app=klusterlet-manifestwork-agent"})
+	if err != nil {
+		klog.Errorf("failed to get manifestwork pods. error: %v", err)
+	}
+
+	agentPods := append(registrationPods.Items, manifestWorkPods.Items...)
+	for _, pod := range agentPods {
+		klog.Infof("klusterlet agent pod %v/%v : %#v \n", pod.Namespace, pod.Name, pod)
+		logs, err := t.PodLog(pod.Name, pod.Namespace, int64(10))
+		if err != nil {
+			klog.Errorf("failed to get pod %v/%v log. error: %v", pod.Namespace, pod.Name, err)
+			continue
+		}
+		klog.Infof("pod %v/%v logs:\n %v \n", pod.Namespace, pod.Name, logs)
+	}
+
+	manifestWorks, err := t.WorkClient.WorkV1().ManifestWorks("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		klog.Errorf("failed to list manifestWorks. error: %v", err)
+	}
+	for _, manifestWork := range manifestWorks.Items {
+		klog.Infof("manifestWork %v/%v : %#v \n", manifestWork.Namespace, manifestWork.Name, manifestWork)
+	}
+}
+
+func (t *Tester) PodLog(podName, nameSpace string, lines int64) (string, error) {
+	podLogs, err := t.KubeClient.CoreV1().Pods(nameSpace).
+		GetLogs(podName, &corev1.PodLogOptions{TailLines: &lines}).Stream(context.TODO())
+	if err != nil {
+		return "", err
+	}
+	defer podLogs.Close()
+
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, podLogs)
+	if err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }

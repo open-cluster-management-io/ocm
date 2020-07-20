@@ -7,21 +7,29 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestE2E(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "E2E Suite")
-}
-
 var t *Tester
+
+func TestE2E(tt *testing.T) {
+	var err error
+	t, err = NewTester("")
+	if err != nil {
+		tt.Fatalf("failed to new tester. error:%v", err)
+	}
+
+	OutputFail := func(message string, callerSkip ...int) {
+		t.OutputDebugLogs()
+		Fail(message, callerSkip...)
+	}
+
+	RegisterFailHandler(OutputFail)
+	RunSpecs(tt, "registration-operator E2E Suite")
+}
 
 // This suite is sensitive to the following environment variables:
 //
 // - KUBECONFIG is the location of the kubeconfig file to use
 var _ = BeforeSuite(func() {
 	var err error
-
-	t, err = NewTester("")
-	Expect(err).ToNot(HaveOccurred())
 
 	Eventually(func() error {
 		return t.CheckHubReady()
