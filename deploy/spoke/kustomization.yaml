@@ -1,12 +1,14 @@
 
 # Adds namespace to all resources.
-namespace: open-cluster-management
+namespace: open-cluster-management-agent
 
 resources:
 - ./component_namespace.yaml
 - ./cluster_namespace.yaml
 - ./service_account.yaml
+- ./clusterrole.yaml
 - ./clusterrole_binding.yaml
+- ./clusterrole_binding_addition.yaml
 - ./deployment.yaml
 
 images:

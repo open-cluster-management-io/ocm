@@ -7,6 +7,7 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
 	targets/openshift/deps.mk \
 	targets/openshift/images.mk \
+	targets/openshift/bindata.mk \
 	lib/tmp.mk \
 )
 
@@ -19,6 +20,8 @@ KUSTOMIZE?=$(PERMANENT_TMP_GOPATH)/bin/kustomize
 KUSTOMIZE_VERSION?=v3.5.4
 KUSTOMIZE_ARCHIVE_NAME?=kustomize_$(KUSTOMIZE_VERSION)_$(GOHOSTOS)_$(GOHOSTARCH).tar.gz
 kustomize_dir:=$(dir $(KUSTOMIZE))
+
+$(call add-bindata,e2e,./deploy/spoke/...,bindata,bindata,./test/e2e/bindata/bindata.go)
 
 # This will call a macro called "build-image" which will generate image specific targets based on the parameters:
 # $0 - macro name
@@ -39,17 +42,35 @@ hub-kubeconfig-secret: cluster-ip
 	cp $(KUBECONFIG) hub-kubeconfig
 	$(KUBECTL) apply -f deploy/spoke/component_namespace.yaml
 	$(KUBECTL) config set clusters.kind-kind.server https://$(CLUSTER_IP) --kubeconfig hub-kubeconfig
-	$(KUBECTL) delete secret hub-kubeconfig-secret -n open-cluster-management --ignore-not-found
-	$(KUBECTL) create secret generic hub-kubeconfig-secret --from-file=kubeconfig=hub-kubeconfig -n open-cluster-management
+	$(KUBECTL) delete secret hub-kubeconfig-secret -n open-cluster-management-agent --ignore-not-found
+	$(KUBECTL) create secret generic hub-kubeconfig-secret --from-file=kubeconfig=hub-kubeconfig -n open-cluster-management-agent
+	$(RM) ./hub-kubeconfig
+
+e2e-hub-kubeconfig-secret: cluster-ip
+	cp $(KUBECONFIG) e2e-hub-kubeconfig
+	$(KUBECTL) apply -f deploy/spoke/component_namespace.yaml
+	$(KUBECTL) config set clusters.kind-kind.server https://$(CLUSTER_IP) --kubeconfig e2e-hub-kubeconfig
+	$(KUBECTL) delete secret e2e-hub-kubeconfig-secret -n open-cluster-management-agent --ignore-not-found
+	$(KUBECTL) create secret generic e2e-hub-kubeconfig-secret --from-file=kubeconfig=e2e-hub-kubeconfig -n open-cluster-management-agent
+	$(RM) ./e2e-hub-kubeconfig
 
 install-crd:
 	$(KUBECTL) apply -f vendor/github.com/open-cluster-management/api/work/v1/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml
+	$(KUBECTL) apply -f vendor/github.com/open-cluster-management/api/work/v1/0000_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml
 
 deploy-work-agent: ensure-kustomize hub-kubeconfig-secret install-crd
 	cp deploy/spoke/kustomization.yaml deploy/spoke/kustomization.yaml.tmp
 	cd deploy/spoke && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/work:latest=$(IMAGE_NAME)
 	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) apply -f -
 	mv deploy/spoke/kustomization.yaml.tmp deploy/spoke/kustomization.yaml
+
+uninstall-crd:
+	$(KUBECTL) delete -f vendor/github.com/open-cluster-management/api/work/v1/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml --ignore-not-found
+	$(KUBECTL) delete -f vendor/github.com/open-cluster-management/api/work/v1/0000_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml --ignore-not-found
+
+clean-work-agent: uninstall-crd
+	$(KUBECTL) -n cluster1 delete manifestworks --all
+	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) delete --ignore-not-found -f -
 
 ensure-kustomize:
 ifeq "" "$(wildcard $(KUSTOMIZE))"
@@ -62,15 +83,16 @@ else
 	$(info Using existing kustomize from "$(KUSTOMIZE)")
 endif
 
+build: build-e2e
+
 build-e2e:
 	go test -c ./test/e2e
 
-test-e2e: build-e2e deploy-work-agent
+test-e2e: build-e2e install-crd e2e-hub-kubeconfig-secret
 	./e2e.test -test.v -ginkgo.v
 
 clean-e2e:
 	$(RM) ./e2e.test
-	$(RM) ./hub-kubeconfig
 
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...
 
