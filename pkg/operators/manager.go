@@ -80,6 +80,10 @@ func RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd
 	if err != nil {
 		return err
 	}
+	apiExtensionClient, err := apiextensionsclient.NewForConfig(controllerContext.KubeConfig)
+	if err != nil {
+		return err
+	}
 	version, err := kubeClient.ServerVersion()
 	if err != nil {
 		return err
@@ -107,6 +111,7 @@ func RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd
 
 	klusterletController := klusterletcontroller.NewKlusterletController(
 		kubeClient,
+		apiExtensionClient,
 		operatorClient.OperatorV1().Klusterlets(),
 		operatorInformer.Operator().V1().Klusterlets(),
 		kubeInformer.Core().V1().Secrets(),

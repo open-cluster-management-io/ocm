@@ -25,6 +25,45 @@ func (AppliedManifestResourceMeta) SwaggerDoc() map[string]string {
 	return map_AppliedManifestResourceMeta
 }
 
+var map_AppliedManifestWork = map[string]string{
+	"":       "AppliedManifestWork represents an applied manifestwork on managed cluster. It is placed on managed cluster. An AppliedManifestWork links to a manifestwork on a hub recording resources deployed in the managed cluster. When the agent is removed from managed cluster, cluster-admin on managed cluster can delete appliedmanifestwork to remove resources deployed by the agent. The name of the appliedmanifestwork must be in the format of {hash of hub's first kube-apiserver url}-{manifestwork name}",
+	"spec":   "Spec represents the desired configuration of AppliedManifestWork",
+	"status": "Status represents the current status of AppliedManifestWork",
+}
+
+func (AppliedManifestWork) SwaggerDoc() map[string]string {
+	return map_AppliedManifestWork
+}
+
+var map_AppliedManifestWorkList = map[string]string{
+	"":         "AppliedManifestWorkList is a collection of appliedmanifestworks.",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+	"items":    "Items is a list of appliedmanifestworks.",
+}
+
+func (AppliedManifestWorkList) SwaggerDoc() map[string]string {
+	return map_AppliedManifestWorkList
+}
+
+var map_AppliedManifestWorkSpec = map[string]string{
+	"":                 "AppliedManifestWorkSpec represents the desired configuration of AppliedManifestWork",
+	"hubHash":          "HubHash represents the hash of the first hub kube apiserver to identify which hub this AppliedManifestWork links to.",
+	"manifestWorkName": "ManifestWorkName represents the name of the related manifestwork on hub.",
+}
+
+func (AppliedManifestWorkSpec) SwaggerDoc() map[string]string {
+	return map_AppliedManifestWorkSpec
+}
+
+var map_AppliedManifestWorkStatus = map[string]string{
+	"":                 "AppliedManifestWorkStatus represents the current status of AppliedManifestWork",
+	"appliedResources": "AppliedResources represents a list of resources defined within the manifestwork that are applied. Only resources with valid GroupVersionResource, namespace, and name are suitable. An item in this slice is deleted when there is no mapped manifest in manifestwork.Spec or by finalizer. The resource relating to the item will also be removed from managed cluster. The deleted resource may still be present until the finalizers for that resource are finished. However, the resource will not be undeleted, so it can be removed from this list and eventual consistency is preserved.",
+}
+
+func (AppliedManifestWorkStatus) SwaggerDoc() map[string]string {
+	return map_AppliedManifestWorkStatus
+}
+
 var map_Manifest = map[string]string{
 	"": "Manifest represents a resource to be deployed on managed cluster",
 }
@@ -97,10 +136,9 @@ func (ManifestWorkSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ManifestWorkStatus = map[string]string{
-	"":                 "ManifestWorkStatus represents the current status of managed cluster ManifestWork",
-	"conditions":       "Conditions contains the different condition statuses for this work. Valid condition types are: 1. Applied represents workload in ManifestWork is applied successfully on managed cluster. 2. Progressing represents workload in ManifestWork is being applied on managed cluster. 3. Available represents workload in ManifestWork exists on the managed cluster. 4. Degraded represents the current state of workload does not match the desired state for a certain period.",
-	"resourceStatus":   "ResourceStatus represents the status of each resource in manifestwork deployed on managed cluster. The Klusterlet agent on managed cluster syncs the condition from managed to the hub.",
-	"appliedResources": "AppliedResources represents a list of resources defined within the manifestwork that are applied. Only resources with valid GroupVersionResource, namespace, and name are suitable. An item in this slice is deleted when there is no mapped manifest in manifestwork.Spec or by finalizer. The resource relating to the item will also be removed from managed cluster. The deleted resource may still be present until the finalizers for that resource are finished. However, the resource will not be undeleted, so it can be removed from this list and eventual consistency is preserved.",
+	"":               "ManifestWorkStatus represents the current status of managed cluster ManifestWork",
+	"conditions":     "Conditions contains the different condition statuses for this work. Valid condition types are: 1. Applied represents workload in ManifestWork is applied successfully on managed cluster. 2. Progressing represents workload in ManifestWork is being applied on managed cluster. 3. Available represents workload in ManifestWork exists on the managed cluster. 4. Degraded represents the current state of workload does not match the desired state for a certain period.",
+	"resourceStatus": "ResourceStatus represents the status of each resource in manifestwork deployed on managed cluster. The Klusterlet agent on managed cluster syncs the condition from managed to the hub.",
 }
 
 func (ManifestWorkStatus) SwaggerDoc() map[string]string {

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +41,10 @@ const (
 )
 
 var (
+	crdStaticFiles = []string{
+		"manifests/klusterlet/0000_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml",
+	}
+
 	staticResourceFiles = []string{
 		"manifests/klusterlet/klusterlet-registration-serviceaccount.yaml",
 		"manifests/klusterlet/klusterlet-registration-clusterrole.yaml",
@@ -59,16 +64,18 @@ var (
 )
 
 type klusterletController struct {
-	klusterletClient  operatorv1client.KlusterletInterface
-	klusterletLister  operatorlister.KlusterletLister
-	kubeClient        kubernetes.Interface
-	kubeVersion       *version.Version
-	operatorNamespace string
+	klusterletClient   operatorv1client.KlusterletInterface
+	klusterletLister   operatorlister.KlusterletLister
+	kubeClient         kubernetes.Interface
+	apiExtensionClient apiextensionsclient.Interface
+	kubeVersion        *version.Version
+	operatorNamespace  string
 }
 
 // NewKlusterletController construct klusterlet controller
 func NewKlusterletController(
 	kubeClient kubernetes.Interface,
+	apiExtensionClient apiextensionsclient.Interface,
 	klusterletClient operatorv1client.KlusterletInterface,
 	klusterletInformer operatorinformer.KlusterletInformer,
 	secretInformer coreinformer.SecretInformer,
@@ -77,11 +84,12 @@ func NewKlusterletController(
 	operatorNamespace string,
 	recorder events.Recorder) factory.Controller {
 	controller := &klusterletController{
-		kubeClient:        kubeClient,
-		klusterletClient:  klusterletClient,
-		klusterletLister:  klusterletInformer.Lister(),
-		kubeVersion:       kubeVersion,
-		operatorNamespace: operatorNamespace,
+		kubeClient:         kubeClient,
+		apiExtensionClient: apiExtensionClient,
+		klusterletClient:   klusterletClient,
+		klusterletLister:   klusterletInformer.Lister(),
+		kubeVersion:        kubeVersion,
+		operatorNamespace:  operatorNamespace,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -223,13 +231,14 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 
 	// Apply static files
+	appliedStaticFiles := append(crdStaticFiles, staticResourceFiles...)
 	resourceResults := resourceapply.ApplyDirectly(
-		resourceapply.NewKubeClientHolder(n.kubeClient),
+		resourceapply.NewKubeClientHolder(n.kubeClient).WithAPIExtensionsClient(n.apiExtensionClient),
 		controllerContext.Recorder(),
 		func(name string) ([]byte, error) {
 			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
 		},
-		staticResourceFiles...,
+		appliedStaticFiles...,
 	)
 
 	for _, result := range resourceResults {
@@ -358,7 +367,7 @@ func (n *klusterletController) cleanUp(ctx context.Context, controllerContext fa
 		err := helpers.CleanUpStaticObject(
 			ctx,
 			n.kubeClient,
-			nil,
+			n.apiExtensionClient,
 			nil,
 			func(name string) ([]byte, error) {
 				return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil

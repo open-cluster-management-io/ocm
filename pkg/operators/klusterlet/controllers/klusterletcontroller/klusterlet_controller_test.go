@@ -13,6 +13,7 @@ import (
 	testinghelper "github.com/open-cluster-management/registration-operator/pkg/helpers/testing"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	fakeapiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,10 +25,11 @@ import (
 )
 
 type testController struct {
-	controller     *klusterletController
-	kubeClient     *fakekube.Clientset
-	operatorClient *fakeoperatorclient.Clientset
-	operatorStore  cache.Store
+	controller         *klusterletController
+	kubeClient         *fakekube.Clientset
+	apiExtensionClient *fakeapiextensions.Clientset
+	operatorClient     *fakeoperatorclient.Clientset
+	operatorStore      cache.Store
 }
 
 func newSecret(name, namespace string) *corev1.Secret {
@@ -86,26 +88,29 @@ func newNamespace(name string) *corev1.Namespace {
 
 func newTestController(klusterlet *opratorapiv1.Klusterlet, objects ...runtime.Object) *testController {
 	fakeKubeClient := fakekube.NewSimpleClientset(objects...)
+	fakeAPIExtensionClient := fakeapiextensions.NewSimpleClientset()
 	fakeOperatorClient := fakeoperatorclient.NewSimpleClientset(klusterlet)
 	operatorInformers := operatorinformers.NewSharedInformerFactory(fakeOperatorClient, 5*time.Minute)
 	kubeVersion, _ := version.ParseGeneric("v1.18.0")
 
 	hubController := &klusterletController{
-		klusterletClient:  fakeOperatorClient.OperatorV1().Klusterlets(),
-		kubeClient:        fakeKubeClient,
-		klusterletLister:  operatorInformers.Operator().V1().Klusterlets().Lister(),
-		kubeVersion:       kubeVersion,
-		operatorNamespace: "open-cluster-management",
+		klusterletClient:   fakeOperatorClient.OperatorV1().Klusterlets(),
+		kubeClient:         fakeKubeClient,
+		apiExtensionClient: fakeAPIExtensionClient,
+		klusterletLister:   operatorInformers.Operator().V1().Klusterlets().Lister(),
+		kubeVersion:        kubeVersion,
+		operatorNamespace:  "open-cluster-management",
 	}
 
 	store := operatorInformers.Operator().V1().Klusterlets().Informer().GetStore()
 	store.Add(klusterlet)
 
 	return &testController{
-		controller:     hubController,
-		kubeClient:     fakeKubeClient,
-		operatorClient: fakeOperatorClient,
-		operatorStore:  store,
+		controller:         hubController,
+		kubeClient:         fakeKubeClient,
+		apiExtensionClient: fakeAPIExtensionClient,
+		operatorClient:     fakeOperatorClient,
+		operatorStore:      store,
 	}
 }
 
@@ -258,6 +263,18 @@ func TestSyncDeploy(t *testing.T) {
 		ensureObject(t, object, klusterlet)
 	}
 
+	apiExtenstionAction := controller.apiExtensionClient.Actions()
+	createCRDObjects := []runtime.Object{}
+	for _, action := range apiExtenstionAction {
+		if action.GetVerb() == "create" && action.GetResource().Resource == "customresourcedefinitions" {
+			object := action.(clienttesting.CreateActionImpl).Object
+			createCRDObjects = append(createCRDObjects, object)
+		}
+	}
+	if len(createCRDObjects) != 1 {
+		t.Errorf("Expect 1 objects created in the sync loop, actual %d", len(createCRDObjects))
+	}
+
 	operatorAction := controller.operatorClient.Actions()
 	if len(operatorAction) != 2 {
 		t.Errorf("Expect 2 actions in the sync loop, actual %#v", operatorAction)
@@ -295,6 +312,19 @@ func TestSyncDelete(t *testing.T) {
 
 	if len(kubeActions) != 12 {
 		t.Errorf("Expected 12 delete actions, but got %d", len(kubeActions))
+	}
+
+	deleteCRDActions := []clienttesting.DeleteActionImpl{}
+	crdActions := controller.apiExtensionClient.Actions()
+	for _, action := range crdActions {
+		if action.GetVerb() == "delete" {
+			deleteAction := action.(clienttesting.DeleteActionImpl)
+			deleteActions = append(deleteCRDActions, deleteAction)
+		}
+	}
+
+	if len(crdActions) != 0 {
+		t.Errorf("Expected 0 delete actions, but got %d", len(crdActions))
 	}
 }
 

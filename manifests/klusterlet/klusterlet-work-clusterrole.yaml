@@ -27,3 +27,13 @@ rules:
 - apiGroups: ["", "events.k8s.io"]
   resources: ["events"]
   verbs: ["create", "patch", "update"]
+# Allow agent to managed appliedmanifestworks
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["appliedmanifestworks"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["appliedmanifestworks/status"]
+  verbs: ["patch", "update"]
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["appliedmanifestworks/finalizers"]
+  verbs: ["update"]

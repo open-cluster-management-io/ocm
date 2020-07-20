@@ -3,9 +3,12 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"k8s.io/klog"
 	"os"
 	"time"
+
+	"k8s.io/klog"
+
+	"github.com/onsi/gomega"
 
 	clusterclient "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	operatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned"
@@ -24,7 +27,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/retry"
 )
 
 type Tester struct {
@@ -134,8 +136,8 @@ func (t *Tester) CreateKlusterlet(name, clusterName, agentNamespace string) (*op
 			Name: name,
 		},
 		Spec: operatorapiv1.KlusterletSpec{
-			RegistrationImagePullSpec: "quay.io/open-cluster-management/registration",
-			WorkImagePullSpec:         "quay.io/open-cluster-management/work",
+			RegistrationImagePullSpec: "quay.io/open-cluster-management/registration:latest",
+			WorkImagePullSpec:         "quay.io/open-cluster-management/work:latest",
 			ExternalServerURLs: []operatorapiv1.ServerURL{
 				{
 					URL: "https://localhost",
@@ -221,23 +223,20 @@ func (t *Tester) ApproveCSR(clusterName string) error {
 
 	for i := range csrs.Items {
 		csr := &csrs.Items[i]
-		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			if csr, err = csrClient.Get(context.TODO(), csr.Name, metav1.GetOptions{}); err != nil {
-				return err
-			}
-
-			if isCSRInTerminalState(&csr.Status) {
-				return nil
-			}
-
-			csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
-				Type:    certificatesv1beta1.CertificateApproved,
-				Reason:  "Approved by E2E",
-				Message: "Approved as part of e2e",
-			})
-			_, err = csrClient.UpdateApproval(context.TODO(), csr, metav1.UpdateOptions{})
+		if csr, err = csrClient.Get(context.TODO(), csr.Name, metav1.GetOptions{}); err != nil {
 			return err
+		}
+
+		if isCSRInTerminalState(&csr.Status) {
+			return nil
+		}
+
+		csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
+			Type:    certificatesv1beta1.CertificateApproved,
+			Reason:  "Approved by E2E",
+			Message: "Approved as part of e2e",
 		})
+		_, err = csrClient.UpdateApproval(context.TODO(), csr, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -258,19 +257,16 @@ func isCSRInTerminalState(status *certificatesv1beta1.CertificateSigningRequestS
 }
 
 func (t *Tester) AcceptsClient(clusterName string) error {
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		managedCluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(),
-			clusterName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		managedCluster.Spec.HubAcceptsClient = true
-		managedCluster.Spec.LeaseDurationSeconds = 5
-		managedCluster, err = t.ClusterClient.ClusterV1().ManagedClusters().Update(context.TODO(),
-			managedCluster, metav1.UpdateOptions{})
+	managedCluster, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(),
+		clusterName, metav1.GetOptions{})
+	if err != nil {
 		return err
-	})
+	}
+
+	managedCluster.Spec.HubAcceptsClient = true
+	managedCluster.Spec.LeaseDurationSeconds = 5
+	_, err = t.ClusterClient.ClusterV1().ManagedClusters().Update(context.TODO(),
+		managedCluster, metav1.UpdateOptions{})
 	return err
 }
 
@@ -332,40 +328,38 @@ func (t *Tester) CreateWorkOfConfigMap(name, clusterName, configMapName, configM
 		Create(context.TODO(), manifestWork, metav1.CreateOptions{})
 }
 
-func (t *Tester) cleanKlusterletResources(klusterletName string) error {
+func (t *Tester) cleanKlusterletResources(klusterletName, clusterName string) error {
 	if klusterletName == "" {
 		return fmt.Errorf("the klusterlet name should not be null")
 	}
 
-	clusterName, err := t.GetClusterNameFromKlusterlet(klusterletName)
-	if err != nil {
-		return err
-	}
-
-	// clean the manifest works
-	manifestWorks, err := t.WorkClient.WorkV1().ManifestWorks(clusterName).
-		List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-
-	for _, work := range manifestWorks.Items {
-		// ignore if failed to delete
-		_ = t.WorkClient.WorkV1().ManifestWorks(work.Namespace).
-			Delete(context.TODO(), work.Name, metav1.DeleteOptions{})
-	}
-
 	// clean the klusterlets
-	err = t.OperatorClient.OperatorV1().Klusterlets().Delete(context.TODO(), klusterletName, metav1.DeleteOptions{})
+	err := t.OperatorClient.OperatorV1().Klusterlets().Delete(context.TODO(), klusterletName, metav1.DeleteOptions{})
 	if err != nil {
 		return err
 	}
+
+	gomega.Eventually(func() bool {
+		_, err := t.OperatorClient.OperatorV1().Klusterlets().Get(context.TODO(), klusterletName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return true
+		}
+		return false
+	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeTrue())
 
 	// clean the managed clusters
 	err = t.ClusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
 	if err != nil {
 		return err
 	}
+
+	gomega.Eventually(func() bool {
+		_, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return true
+		}
+		return false
+	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeTrue())
 
 	return nil
 }
