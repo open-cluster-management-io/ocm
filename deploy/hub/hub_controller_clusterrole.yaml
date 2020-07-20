@@ -38,3 +38,8 @@ rules:
 - apiGroups: ["register.open-cluster-management.io"]
   resources: ["managedclusters/accept"]
   verbs: ["update"]
+# Allow hub to approve certificates that are signed by kubernetes.io/kube-apiserver-client (kube1.18.3+ needs)
+- apiGroups: ["certificates.k8s.io"]
+  resources: ["signers"]
+  resourceNames: ["kubernetes.io/kube-apiserver-client"]
+  verbs: ["approve"]
