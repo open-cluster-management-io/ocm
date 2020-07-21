@@ -369,7 +369,8 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "KlusterletRegistrationDegraded", "BootStrapSecretMissing", metav1.ConditionTrue)
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "KlusterletRegistrationDegraded", "BootstrapSecretMissing,HubKubeConfigMissing,UnavailablePods", metav1.ConditionTrue)
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "KlusterletWorkDegraded", "HubKubeConfigMissing,UnavailablePods", metav1.ConditionTrue)
 
 			// Create a bootstrap secret and make sure the kubeconfig can work
 			bootStrapSecret := &corev1.Secret{
@@ -384,8 +385,8 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(), bootStrapSecret, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "KlusterletRegistrationDegraded", "KubeConfigMissing", metav1.ConditionTrue)
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "KlusterletWorkDegraded", "KubeConfigMissing", metav1.ConditionTrue)
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "KlusterletRegistrationDegraded", "HubKubeConfigMissing,UnavailablePods", metav1.ConditionTrue)
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "KlusterletWorkDegraded", "HubKubeConfigMissing,UnavailablePods", metav1.ConditionTrue)
 
 			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.HubKubeConfigSecret, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -396,8 +397,8 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(), hubSecret, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "KlusterletRegistrationDegraded", "UnavailableRegistrationPod", metav1.ConditionTrue)
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "KlusterletWorkDegraded", "UnavailableWorkPod", metav1.ConditionTrue)
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "KlusterletRegistrationDegraded", "UnavailablePods", metav1.ConditionTrue)
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "KlusterletWorkDegraded", "UnavailablePods", metav1.ConditionTrue)
 
 			// Update replica of deployment
 			registrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
