@@ -64,9 +64,6 @@ func (m *ManifestWorkFinalizeController) sync(ctx context.Context, controllerCon
 	klog.V(4).Infof("Reconciling ManifestWork %q", manifestWorkName)
 
 	manifestWork, err := m.manifestWorkLister.Get(manifestWorkName)
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
 
 	// Delete appliedmanifestwork if relating manfiestwork is not found or being deleted
 	switch {
@@ -86,15 +83,17 @@ func (m *ManifestWorkFinalizeController) sync(ctx context.Context, controllerCon
 		return nil
 	}
 
-	appliedManifestWorkPresent, err := m.ifAppliedManifestWorkPresent(ctx, appliedManifestWorkName)
-	if err != nil {
+	_, err = m.appliedManifestWorkLister.Get(appliedManifestWorkName)
+	switch {
+	case errors.IsNotFound(err):
+		// if the instance is not found, then we simply continue below this block to remove the finalizer
+	case err != nil:
 		return err
-	}
-
-	// If appliedmanifestwork found, requeue the manifestwork to check in the next loop.
-	if appliedManifestWorkPresent {
+	default:
+		// appliedmanifestwork still exists, requeue the manifestwork to check in the next loop.
 		controllerContext.Queue().AddAfter(manifestWorkName, m.rateLimiter.When(manifestWorkName))
 		return nil
+
 	}
 
 	// Now we can remove manifestwork finalizer
@@ -126,18 +125,4 @@ func (m *ManifestWorkFinalizeController) deleteAppliedManifestWork(ctx context.C
 	}
 
 	return m.appliedManifestWorkClient.Delete(ctx, appliedManifestWorkName, metav1.DeleteOptions{})
-}
-
-// ifAppliedManifestWorkPresent checks appliedmanifestwork is present.
-// It returns false only when appliedmanifestwork is not found, otherwise returns true.
-func (m *ManifestWorkFinalizeController) ifAppliedManifestWorkPresent(ctx context.Context, appliedManifestWorkName string) (bool, error) {
-	_, err := m.appliedManifestWorkLister.Get(appliedManifestWorkName)
-	switch {
-	case errors.IsNotFound(err):
-		return false, nil
-	case err != nil:
-		return true, err
-	}
-
-	return true, nil
 }
