@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: manifestwork-admission
+spec:
+  selector:
+    app: manifestwork-admission
+  ports:
+  - port: 443
+    targetPort: 6443

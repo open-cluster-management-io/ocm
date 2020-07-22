@@ -17,6 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
 const (
@@ -108,6 +109,19 @@ var _ = ginkgo.Describe("Work agent", func() {
 			ns.Name = ns2
 			_, err = spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// make sure the api service v1.admission.cluster.open-cluster-management.io is available
+			gomega.Eventually(func() bool {
+				apiService, err := hubAPIServiceClient.APIServices().Get(context.TODO(), apiserviceName, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				if len(apiService.Status.Conditions) == 0 {
+					return false
+				}
+				return apiService.Status.Conditions[0].Type == apiregistrationv1.Available &&
+					apiService.Status.Conditions[0].Status == apiregistrationv1.ConditionTrue
+			}, 60*time.Second, 1*time.Second).Should(gomega.BeTrue())
 		})
 
 		ginkgo.AfterEach(func() {
