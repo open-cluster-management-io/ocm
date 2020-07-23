@@ -1,6 +1,6 @@
 # Cluster Registration
 
-Contains controllers that support the registration of spoke clusters to a hub to
+Contains controllers that support the registration of managed clusters to a hub to
 place them under management.
 
 ## Community, discussion, contribution, and support
