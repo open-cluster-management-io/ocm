@@ -30,7 +30,8 @@ Check the [Development Doc](docs/development.md) for how to contribute to the re
 These instructions assume:
 
 - You have a running kubernetes cluster
-- You have `KUBECONFIG` environment variable set to a kubeconfig file giving you cluster-admin role on that cluster
+- You have `KUBECONFIG` environment variable set to a kubeconfig file giving you cluster-admin
+  role on that cluster
 
 ### Deploy Hub
 
@@ -44,7 +45,8 @@ These instructions assume:
 
 ## Security Response
 
-If you've found a security issue that you'd like to disclose confidentially please contact Red Hat's Product Security team. Details at https://access.redhat.com/security/team/contact
+If you've found a security issue that you'd like to disclose confidentially please contact
+Red Hat's Product Security team. Details at https://access.redhat.com/security/team/contact
 
 <!--
 ## XXX References
