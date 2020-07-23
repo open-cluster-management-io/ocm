@@ -35,6 +35,7 @@ These instructions assume:
 ### Deploy Hub
 
 1. Run `make deploy-hub`
+2. Run `make deploy-webhook`
 
 ### Deploy Spoke
 
