@@ -65,7 +65,7 @@ func NewAppliedManifestWorkController(
 			return accessor.GetName()
 		}, manifestWorkInformer.Informer()).
 		WithInformersQueueKeyFunc(helper.AppliedManifestworkQueueKeyFunc(hubHash), appliedManifestWorkInformer.Informer()).
-		WithSync(controller.sync).ToController("StaleManifestDeletionController", recorder)
+		WithSync(controller.sync).ToController("AppliedManifestWorkController", recorder)
 }
 
 func (m *AppliedManifestWorkController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
@@ -182,7 +182,9 @@ func findUntrackedResources(appliedResources, newAppliedResources []workapiv1.Ap
 	}
 
 	for _, resource := range appliedResources {
-		if _, ok := resourceIndex[resource]; !ok {
+		key := resource.DeepCopy()
+		key.UID = ""
+		if _, ok := resourceIndex[*key]; !ok {
 			untracked = append(untracked, resource)
 		}
 	}

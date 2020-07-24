@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -11,8 +12,10 @@ import (
 
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 )
@@ -20,182 +23,336 @@ import (
 const (
 	eventuallyTimeout  = 60 // seconds
 	eventuallyInterval = 1  // seconds
+
+	guestbookCrdJson = `{
+		"apiVersion": "apiextensions.k8s.io/v1beta1",
+		"kind": "CustomResourceDefinition",
+		"metadata": {
+			"name": "guestbooks.my.domain"
+		},
+		"spec": {
+			"conversion": {
+				"strategy": "None"
+			},
+			"group": "my.domain",
+			"names": {
+				"kind": "Guestbook",
+				"listKind": "GuestbookList",
+				"plural": "guestbooks",
+				"singular": "guestbook"
+			},
+			"preserveUnknownFields": true,
+			"scope": "Namespaced",
+			"validation": {
+				"openAPIV3Schema": {
+					"properties": {
+						"apiVersion": {
+							"type": "string"
+						},
+						"kind": {
+							"type": "string"
+						},
+						"metadata": {
+							"type": "object"
+						},
+						"spec": {
+							"properties": {
+								"foo": {
+									"type": "string"
+								}
+							},
+							"type": "object"
+						},
+						"status": {
+							"type": "object"
+						}
+					},
+					"type": "object"
+				}
+			},
+			"version": "v1",
+			"versions": [
+				{
+					"name": "v1",
+					"served": true,
+					"storage": true
+				}
+			]
+		}
+	}`
+
+	guestbookCrJson = `{
+		"apiVersion": "my.domain/v1",
+		"kind": "Guestbook",
+		"metadata": {
+			"name": "guestbook1",
+			"namespace": "default"
+		},
+		"spec": {
+			"foo": "bar"
+		}
+	}`
 )
 
 var _ = ginkgo.Describe("Work agent", func() {
-	var clusterName = "cluster1"
-	var ns1 = fmt.Sprintf("ns1-%s", rand.String(8))
-	var ns2 = fmt.Sprintf("ns2-%s", rand.String(8))
-	var err error
+	ginkgo.Context("Work CRUD", func() {
+		var ns1 = fmt.Sprintf("ns1-%s", rand.String(5))
+		var ns2 = fmt.Sprintf("ns2-%s", rand.String(5))
+		var err error
 
-	ginkgo.BeforeEach(func() {
-		// create ns2
-		ns := &corev1.Namespace{}
-		ns.Name = ns2
-		_, err = spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	})
+		ginkgo.BeforeEach(func() {
+			// create ns2
+			ns := &corev1.Namespace{}
+			ns.Name = ns2
+			_, err = spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		})
 
-	ginkgo.AfterEach(func() {
-		// delete ns2
-		err = spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), ns2, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	})
+		ginkgo.AfterEach(func() {
+			// delete ns2
+			err = spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), ns2, metav1.DeleteOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		})
 
-	ginkgo.It("Should create, update and delete manifestwork successfully", func() {
-		ginkgo.By("create manifestwork")
-		cmFinalizers := []string{"cluster.open-cluster-management.io/testing"}
-		objects := []runtime.Object{
-			newConfigmap(ns1, "cm1", nil, nil),
-			newNamespace(ns1),
-			newConfigmap(ns1, "cm2", nil, nil),
-			newConfigmap(ns2, "cm3", nil, cmFinalizers),
-		}
-		work := newManifestWork(clusterName, "", objects...)
-		appliedManifestWorkName := fmt.Sprintf("%s-%s", hubHash, work.Name)
-		work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		// check if resources are applied for manifests
-		gomega.Eventually(func() bool {
-			_, err := spokeKubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm1", metav1.GetOptions{})
-			if err != nil {
-				return false
+		ginkgo.It("Should create, update and delete manifestwork successfully", func() {
+			ginkgo.By("create manifestwork")
+			cmFinalizers := []string{"cluster.open-cluster-management.io/testing"}
+			objects := []runtime.Object{
+				newConfigmap(ns1, "cm1", nil, nil),
+				newNamespace(ns1),
+				newConfigmap(ns1, "cm2", nil, nil),
+				newConfigmap(ns2, "cm3", nil, cmFinalizers),
 			}
+			work := newManifestWork(clusterName, "", objects...)
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			_, err = spokeKubeClient.CoreV1().Namespaces().Get(context.Background(), ns1, metav1.GetOptions{})
-			if err != nil {
-				return false
-			}
-
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm2", metav1.GetOptions{})
-			if err != nil {
-				return false
-			}
-
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
-			if err != nil {
-				return false
-			}
-
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
-		// check status conditions in manifestwork status
-		gomega.Eventually(func() bool {
-			work, err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Get(context.Background(), work.Name, metav1.GetOptions{})
-			if err != nil {
-				return false
-			}
-
-			// check manifest status conditions
-			expectedManifestStatuses := []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}
-			if ok := haveManifestCondition(work.Status.ResourceStatus.Manifests, string(workapiv1.WorkApplied), expectedManifestStatuses); !ok {
-				return false
-			}
-
-			// check work status condition
-			return haveCondition(work.Status.Conditions, string(workapiv1.WorkApplied), metav1.ConditionTrue)
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
-		appliedManifestWork, err := hubWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		// check applied resources in manifestwork status
-		expectedAppliedResources := []workapiv1.AppliedManifestResourceMeta{
-			{Version: "v1", Resource: "configmaps", Namespace: ns1, Name: "cm1"},
-			{Version: "v1", Resource: "configmaps", Namespace: ns1, Name: "cm2"},
-			{Version: "v1", Resource: "configmaps", Namespace: ns2, Name: "cm3"},
-			{Version: "v1", Resource: "namespaces", Name: ns1},
-		}
-		gomega.Expect(reflect.DeepEqual(appliedManifestWork.Status.AppliedResources, expectedAppliedResources)).To(gomega.BeTrue())
-
-		ginkgo.By("update manifestwork")
-		cmData := map[string]string{"x": "y"}
-		newObjects := []runtime.Object{
-			objects[1],
-			objects[2],
-			newConfigmap(ns2, "cm3", cmData, cmFinalizers),
-		}
-		newWork := newManifestWork(clusterName, work.Name, newObjects...)
-		work.Spec.Workload.Manifests = newWork.Spec.Workload.Manifests
-		work, err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Update(context.Background(), work, metav1.UpdateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		// check if cm1 is removed from applied resources list in status
-		gomega.Eventually(func() bool {
-			appliedManifestWork, err = hubWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
-			if err != nil {
-				return false
-			}
-
-			for _, resource := range appliedManifestWork.Status.AppliedResources {
-				if resource.Name == "cm1" {
+			// check if resources are applied for manifests
+			gomega.Eventually(func() bool {
+				_, err := spokeKubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm1", metav1.GetOptions{})
+				if err != nil {
 					return false
 				}
-			}
 
-			// check manifest status conditions
-			expectedManifestStatuses := []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}
-			if ok := haveManifestCondition(work.Status.ResourceStatus.Manifests, string(workapiv1.WorkApplied), expectedManifestStatuses); !ok {
+				_, err = spokeKubeClient.CoreV1().Namespaces().Get(context.Background(), ns1, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+
+				_, err = spokeKubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm2", metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+
+				_, err = spokeKubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// check status conditions in manifestwork status
+			gomega.Eventually(func() bool {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+
+				// check manifest status conditions
+				expectedManifestStatuses := []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}
+				if ok := haveManifestCondition(work.Status.ResourceStatus.Manifests, string(workapiv1.WorkApplied), expectedManifestStatuses); !ok {
+					return false
+				}
+
+				// check work status condition
+				return haveCondition(work.Status.Conditions, string(workapiv1.WorkApplied), metav1.ConditionTrue)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// get the corresponding AppliedManifestWork
+			var appliedManifestWork *workapiv1.AppliedManifestWork
+			gomega.Eventually(func() bool {
+				appliedManifestWorkList, err := hubWorkClient.WorkV1().AppliedManifestWorks().List(context.Background(), metav1.ListOptions{})
+				if err != nil {
+					return false
+				}
+
+				for _, item := range appliedManifestWorkList.Items {
+					if strings.HasSuffix(item.Name, work.Name) {
+						appliedManifestWork = &item
+						return true
+					}
+				}
+
 				return false
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// check applied resources in manifestwork status
+			expectedAppliedResources := []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", Resource: "configmaps", Namespace: ns1, Name: "cm1"},
+				{Version: "v1", Resource: "configmaps", Namespace: ns1, Name: "cm2"},
+				{Version: "v1", Resource: "configmaps", Namespace: ns2, Name: "cm3"},
+				{Version: "v1", Resource: "namespaces", Name: ns1},
 			}
+			gomega.Expect(reflect.DeepEqual(appliedManifestWork.Status.AppliedResources, expectedAppliedResources)).To(gomega.BeTrue())
 
-			// check work status condition
-			return haveCondition(work.Status.Conditions, string(workapiv1.WorkApplied), metav1.ConditionTrue)
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			ginkgo.By("update manifestwork")
+			cmData := map[string]string{"x": "y"}
+			newObjects := []runtime.Object{
+				objects[1],
+				objects[2],
+				newConfigmap(ns2, "cm3", cmData, cmFinalizers),
+			}
+			newWork := newManifestWork(clusterName, work.Name, newObjects...)
+			work.Spec.Workload.Manifests = newWork.Spec.Workload.Manifests
+			work, err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Update(context.Background(), work, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		// check if cm1 is deleted
-		_, err = spokeKubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm1", metav1.GetOptions{})
-		gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+			// check if cm1 is removed from applied resources list in status
+			gomega.Eventually(func() bool {
+				appliedManifestWork, err = hubWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWork.Name, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
 
-		// check if cm3 is updated
-		gomega.Eventually(func() bool {
-			cm, err := spokeKubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
+				for _, resource := range appliedManifestWork.Status.AppliedResources {
+					if resource.Name == "cm1" {
+						return false
+					}
+				}
+
+				work, err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+
+				// check manifest status conditions
+				expectedManifestStatuses := []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}
+				if ok := haveManifestCondition(work.Status.ResourceStatus.Manifests, string(workapiv1.WorkApplied), expectedManifestStatuses); !ok {
+					return false
+				}
+
+				// check work status condition
+				return haveCondition(work.Status.Conditions, string(workapiv1.WorkApplied), metav1.ConditionTrue)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// check if cm1 is deleted
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm1", metav1.GetOptions{})
+			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+
+			// check if cm3 is updated
+			gomega.Eventually(func() bool {
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+
+				if !reflect.DeepEqual(cm.Data, cmData) {
+					return false
+				}
+
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			ginkgo.By("delete manifestwork")
+			err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// remove finalizer from cm3 in 2 seconds
+			timer := time.NewTimer(2 * time.Second)
+			go func() {
+				<-timer.C
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
+				if err == nil {
+					cm.Finalizers = nil
+					_, _ = spokeKubeClient.CoreV1().ConfigMaps(ns2).Update(context.Background(), cm, metav1.UpdateOptions{})
+				}
+			}()
+
+			// wait for deletion of manifest work
+			gomega.Eventually(func() bool {
+				_, err := hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if !errors.IsNotFound(err) {
+					return false
+				}
+
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Once manifest work is deleted, its corresponding appliedManifestWorks should be deleted as well
+			_, err = hubWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWork.Name, metav1.GetOptions{})
+			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+
+			// Once manifest work is deleted, all applied resources should have already been deleted too
+			_, err = spokeKubeClient.CoreV1().Namespaces().Get(context.Background(), ns1, metav1.GetOptions{})
+			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm2", metav1.GetOptions{})
+			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
+			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+		})
+	})
+
+	ginkgo.Context("With CRD/CR", func() {
+		var crNamespace = fmt.Sprintf("crns-%s", rand.String(5))
+		var workName string
+		var err error
+
+		ginkgo.BeforeEach(func() {
+			// create namespace for cr
+			ns := &corev1.Namespace{}
+			ns.Name = crNamespace
+			_, err = spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.AfterEach(func() {
+			// delete work
+			err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(context.Background(), workName, metav1.DeleteOptions{})
 			if err != nil {
-				return false
+				gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
 			}
 
-			if !reflect.DeepEqual(cm.Data, cmData) {
-				return false
-			}
+			// delete namespace for cr
+			err = spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), crNamespace, metav1.DeleteOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		})
 
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		ginkgo.It("should create crd/cr with aggregated cluster role successfully", func() {
+			crd, err := newCrd()
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		ginkgo.By("delete manifestwork")
-		err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			clusterRoleName := fmt.Sprintf("cr-%s", rand.String(5))
+			clusterRole := newAggregatedClusterRole(clusterRoleName, "my.domain", "guestbooks")
 
-		// remove finalizer from cm3 in 2 seconds
-		go func() {
-			time.Sleep(2 * time.Second)
-			cm, err := spokeKubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
-			if err == nil {
-				cm.Finalizers = nil
-				_, _ = spokeKubeClient.CoreV1().ConfigMaps(ns2).Update(context.Background(), cm, metav1.UpdateOptions{})
-			}
-		}()
+			cr, err := newCr(crNamespace, "cr1")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		// wait for deletion of manifest work
-		gomega.Eventually(func() bool {
-			_, err := hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Get(context.Background(), work.Name, metav1.GetOptions{})
-			if !errors.IsNotFound(err) {
-				return false
-			}
+			objects := []runtime.Object{crd, clusterRole, cr}
+			work := newManifestWork(clusterName, "", objects...)
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			workName = work.Name
 
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			// check status conditions in manifestwork status
+			gomega.Eventually(func() bool {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
 
-		// Once manifest work is deleted, all applied resources should have already been deleted too
-		_, err = spokeKubeClient.CoreV1().Namespaces().Get(context.Background(), ns1, metav1.GetOptions{})
-		gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+				// check manifest status conditions
+				expectedManifestStatuses := []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}
+				if ok := haveManifestCondition(work.Status.ResourceStatus.Manifests, string(workapiv1.WorkApplied), expectedManifestStatuses); !ok {
+					return false
+				}
 
-		_, err = spokeKubeClient.CoreV1().ConfigMaps(ns1).Get(context.Background(), "cm2", metav1.GetOptions{})
-		gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
-
-		_, err = spokeKubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
-		gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+				// check work status condition
+				return haveCondition(work.Status.Conditions, string(workapiv1.WorkApplied), metav1.ConditionTrue)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		})
 	})
 })
 
@@ -282,4 +439,48 @@ func haveManifestCondition(conditions []workapiv1.ManifestCondition, expectedTyp
 	}
 
 	return true
+}
+
+func newCrd() (crd *unstructured.Unstructured, err error) {
+	crd, err = loadResourceFromJSON(guestbookCrdJson)
+	return crd, err
+}
+
+func newCr(namespace, name string) (cr *unstructured.Unstructured, err error) {
+	cr, err = loadResourceFromJSON(guestbookCrJson)
+	if err != nil {
+		return nil, err
+	}
+
+	cr.SetNamespace(namespace)
+	cr.SetName(name)
+	return cr, nil
+}
+
+func loadResourceFromJSON(json string) (*unstructured.Unstructured, error) {
+	obj := unstructured.Unstructured{}
+	err := obj.UnmarshalJSON([]byte(json))
+	return &obj, err
+}
+
+func newAggregatedClusterRole(name, apiGroup, resource string) *rbacv1.ClusterRole {
+	return &rbacv1.ClusterRole{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterRole",
+			APIVersion: "rbac.authorization.k8s.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"rbac.authorization.k8s.io/aggregate-to-admin": "true",
+			},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{apiGroup},
+				Resources: []string{resource},
+				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+			},
+		},
+	}
 }

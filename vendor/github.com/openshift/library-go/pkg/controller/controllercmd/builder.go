@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog"
@@ -64,6 +65,7 @@ type ControllerBuilder struct {
 	leaderElection          *configv1.LeaderElection
 	fileObserver            fileobserver.Observer
 	fileObserverReactorFn   func(file string, action fileobserver.ActionType) error
+	eventRecorderOptions    record.CorrelatorOptions
 
 	startFunc          StartFunc
 	componentName      string
@@ -175,6 +177,14 @@ func (b *ControllerBuilder) WithInstanceIdentity(identity string) *ControllerBui
 	return b
 }
 
+// WithEventRecorderOptions allows to override the default Kubernetes event recorder correlator options.
+// This is needed if the binary is sending a lot of events.
+// Using events.DefaultOperatorEventRecorderOptions here makes a good default for normal operator binary.
+func (b *ControllerBuilder) WithEventRecorderOptions(options record.CorrelatorOptions) *ControllerBuilder {
+	b.eventRecorderOptions = options
+	return b
+}
+
 // Run starts your controller for you.  It uses leader election if you asked, otherwise it directly calls you
 func (b *ControllerBuilder) Run(ctx context.Context, config *unstructured.Unstructured) error {
 	clientConfig, err := b.getClientConfig()
@@ -195,7 +205,7 @@ func (b *ControllerBuilder) Run(ctx context.Context, config *unstructured.Unstru
 	if err != nil {
 		klog.Warningf("unable to get owner reference (falling back to namespace): %v", err)
 	}
-	eventRecorder := events.NewKubeRecorder(kubeClient.CoreV1().Events(namespace), b.componentName, controllerRef)
+	eventRecorder := events.NewKubeRecorderWithOptions(kubeClient.CoreV1().Events(namespace), b.eventRecorderOptions, b.componentName, controllerRef)
 
 	// if there is file observer defined for this command, add event into default reaction function.
 	if b.fileObserverReactorFn != nil {
@@ -210,7 +220,7 @@ func (b *ControllerBuilder) Run(ctx context.Context, config *unstructured.Unstru
 	if b.versionInfo != nil {
 		buildInfo := metrics.NewGaugeVec(
 			&metrics.GaugeOpts{
-				Name: strings.Replace(b.componentNamespace, "-", "_", -1) + "_build_info",
+				Name: strings.Replace(namespace, "-", "_", -1) + "_build_info",
 				Help: "A metric with a constant '1' value labeled by major, minor, git version, git commit, git tree state, build date, Go version, " +
 					"and compiler from which " + b.componentName + " was built, and platform on which it is running.",
 				StabilityLevel: metrics.ALPHA,
@@ -298,6 +308,7 @@ func (b ControllerBuilder) getOnStartedLeadingFunc(controllerContext *Controller
 
 		select {
 		case <-ctx.Done(): // context closed means the process likely received signal to terminate
+			controllerContext.EventRecorder.Shutdown()
 		case <-stoppedCh:
 			// if context was not cancelled (it is not "done"), but the startFunc terminated, it means it terminated prematurely
 			// when this happen, it means the controllers terminated without error.
