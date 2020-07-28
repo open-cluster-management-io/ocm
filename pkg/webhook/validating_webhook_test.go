@@ -167,7 +167,7 @@ func TestManagedClusterValidate(t *testing.T) {
 				},
 			)
 
-			admissionHook := &ManagedClusterAdmissionHook{kubeClient: kubeClient}
+			admissionHook := &ManagedClusterValidatingAdmissionHook{kubeClient: kubeClient}
 
 			actualResponse := admissionHook.Validate(c.request)
 

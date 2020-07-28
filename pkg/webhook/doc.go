@@ -1,2 +1,2 @@
-// package webhook contains the spoke cluster admission hook to validate the SpokeCluster create and update operations
+// package webhook contains the managed cluster admission hooks to mutate and validate the ManagedCluster create and update operations
 package webhook

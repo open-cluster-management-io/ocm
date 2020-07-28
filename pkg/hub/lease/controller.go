@@ -93,10 +93,6 @@ func (c *leaseController) sync(ctx context.Context, syncCtx factory.SyncContext)
 		}
 
 		leaseDurationSeconds := cluster.Spec.LeaseDurationSeconds
-		// TODO: use CRDs defaulting or mutating admission webhook to eliminate this code.
-		if leaseDurationSeconds == 0 {
-			leaseDurationSeconds = 60
-		}
 
 		gracePeriod := time.Duration(leaseDurationTimes*leaseDurationSeconds) * time.Second
 		// the lease is constantly updated, do nothing
