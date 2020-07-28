@@ -15,6 +15,8 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -24,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -32,6 +33,7 @@ import (
 
 var (
 	staticResourceFiles = []string{
+		"deploy/spoke/appliedmanifestworks.crd.yaml",
 		"deploy/spoke/clusterrole.yaml",
 		"deploy/spoke/component_namespace.yaml",
 		"deploy/spoke/service_account.yaml",
@@ -49,37 +51,41 @@ type workAgentDeployer interface {
 }
 
 type defaultWorkAgentDeployer struct {
-	componentNamespace string
-	clusterName        string
-	nameSuffix         string
-	image              string
-	spokeKubeClient    kubernetes.Interface
-	spokeDynamicClient dynamic.Interface
-	hubWorkClient      workclientset.Interface
+	componentNamespace       string
+	clusterName              string
+	nameSuffix               string
+	image                    string
+	spokeKubeClient          kubernetes.Interface
+	spokeDynamicClient       dynamic.Interface
+	spokeApiExtensionsClient apiextensionsclient.Interface
+	hubWorkClient            workclientset.Interface
 
 	resources []runtime.Object
 }
 
 func newDefaultWorkAgentDeployer(
 	clusterName string,
+	nameSuffix string,
 	image string,
 	spokeKubeClient kubernetes.Interface,
 	spokeDynamicClient dynamic.Interface,
+	spokeApiExtensionsClient apiextensionsclient.Interface,
 	hubWorkClient workclientset.Interface) workAgentDeployer {
 	return &defaultWorkAgentDeployer{
-		componentNamespace: defaultComponentNamespace,
-		clusterName:        clusterName,
-		nameSuffix:         rand.String(5),
-		image:              image,
-		spokeKubeClient:    spokeKubeClient,
-		spokeDynamicClient: spokeDynamicClient,
-		hubWorkClient:      hubWorkClient,
+		componentNamespace:       defaultComponentNamespace,
+		clusterName:              clusterName,
+		nameSuffix:               nameSuffix,
+		image:                    image,
+		spokeKubeClient:          spokeKubeClient,
+		spokeDynamicClient:       spokeDynamicClient,
+		spokeApiExtensionsClient: spokeApiExtensionsClient,
+		hubWorkClient:            hubWorkClient,
 	}
 }
 
 func (d *defaultWorkAgentDeployer) Deploy() error {
 	// Apply static files
-	clientHolder := resourceapply.NewKubeClientHolder(d.spokeKubeClient)
+	clientHolder := resourceapply.NewKubeClientHolder(d.spokeKubeClient).WithAPIExtensionsClient(d.spokeApiExtensionsClient)
 	applyResults := resourceapply.ApplyDirectly(
 		clientHolder,
 		events.NewInMemoryRecorder(""),
@@ -189,6 +195,8 @@ func (d *defaultWorkAgentDeployer) Undeploy() error {
 			err = d.spokeKubeClient.RbacV1().ClusterRoles().Delete(context.TODO(), t.Name, metav1.DeleteOptions{})
 		case *rbacv1.ClusterRoleBinding:
 			err = d.spokeKubeClient.RbacV1().ClusterRoleBindings().Delete(context.TODO(), t.Name, metav1.DeleteOptions{})
+		case *apiextensionsv1beta1.CustomResourceDefinition:
+			err = d.spokeApiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(context.TODO(), t.Name, metav1.DeleteOptions{})
 		default:
 			err = fmt.Errorf("unhandled type %T", resource)
 		}

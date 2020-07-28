@@ -1,5 +1,6 @@
 // Code generated for package bindata by go-bindata DO NOT EDIT. (@generated)
 // sources:
+// deploy/spoke/appliedmanifestworks.crd.yaml
 // deploy/spoke/cluster_namespace.yaml
 // deploy/spoke/clusterrole.yaml
 // deploy/spoke/clusterrole_binding.yaml
@@ -7,6 +8,7 @@
 // deploy/spoke/component_namespace.yaml
 // deploy/spoke/deployment.yaml
 // deploy/spoke/kustomization.yaml
+// deploy/spoke/manifestworks.crd.yaml
 // deploy/spoke/service_account.yaml
 package bindata
 
@@ -59,6 +61,128 @@ func (fi bindataFileInfo) IsDir() bool {
 // Sys return file is sys mode
 func (fi bindataFileInfo) Sys() interface{} {
 	return nil
+}
+
+var _deploySpokeAppliedmanifestworksCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  name: appliedmanifestworks.work.open-cluster-management.io
+spec:
+  group: work.open-cluster-management.io
+  names:
+    kind: AppliedManifestWork
+    listKind: AppliedManifestWorkList
+    plural: appliedmanifestworks
+    singular: appliedmanifestwork
+  scope: "Cluster"
+  preserveUnknownFields: false
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: AppliedManifestWork represents an applied manifestwork on managed
+        cluster. It is placed on managed cluster. An AppliedManifestWork links to
+        a manifestwork on a hub recording resources deployed in the managed cluster.
+        When the agent is removed from managed cluster, cluster-admin on managed cluster
+        can delete appliedmanifestwork to remove resources deployed by the agent.
+        The name of the appliedmanifestwork must be in the format of {hash of hub's
+        first kube-apiserver url}-{manifestwork name}
+      type: object
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: Spec represents the desired configuration of AppliedManifestWork
+          type: object
+          properties:
+            hubHash:
+              description: HubHash represents the hash of the first hub kube apiserver
+                to identify which hub this AppliedManifestWork links to.
+              type: string
+            manifestWorkName:
+              description: ManifestWorkName represents the name of the related manifestwork
+                on hub.
+              type: string
+        status:
+          description: Status represents the current status of AppliedManifestWork
+          type: object
+          properties:
+            appliedResources:
+              description: AppliedResources represents a list of resources defined
+                within the manifestwork that are applied. Only resources with valid
+                GroupVersionResource, namespace, and name are suitable. An item in
+                this slice is deleted when there is no mapped manifest in manifestwork.Spec
+                or by finalizer. The resource relating to the item will also be removed
+                from managed cluster. The deleted resource may still be present until
+                the finalizers for that resource are finished. However, the resource
+                will not be undeleted, so it can be removed from this list and eventual
+                consistency is preserved.
+              type: array
+              items:
+                description: AppliedManifestResourceMeta represents the gvr, name
+                  and namespace of a resource. Since these resources have been created,
+                  they must have valid group, version, resource, namespace, and name.
+                type: object
+                properties:
+                  group:
+                    description: Group is the API Group of the kubernetes resource
+                    type: string
+                  name:
+                    description: Name is the name of the kubernetes resource
+                    type: string
+                  namespace:
+                    description: Name is the namespace of the kubernetes resource,
+                      empty string indicates it is a cluster scoped resource.
+                    type: string
+                  resource:
+                    description: Resource is the resource name of the kubernetes resource
+                    type: string
+                  uid:
+                    description: UID is set on successful deletion of the kubernetes
+                      resource by controller. The resource might be still visible
+                      on the managed cluster after this field is set. It is not directly
+                      settable by a client.
+                    type: string
+                  version:
+                    description: Version is the version of the kubernetes resource
+                    type: string
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func deploySpokeAppliedmanifestworksCrdYamlBytes() ([]byte, error) {
+	return _deploySpokeAppliedmanifestworksCrdYaml, nil
+}
+
+func deploySpokeAppliedmanifestworksCrdYaml() (*asset, error) {
+	bytes, err := deploySpokeAppliedmanifestworksCrdYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "deploy/spoke/appliedmanifestworks.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
 }
 
 var _deploySpokeCluster_namespaceYaml = []byte(`apiVersion: v1
@@ -275,6 +399,7 @@ var _deploySpokeKustomizationYaml = []byte(`
 namespace: open-cluster-management-agent
 
 resources:
+- ./appliedmanifestworks.crd.yaml
 - ./component_namespace.yaml
 - ./cluster_namespace.yaml
 - ./service_account.yaml
@@ -302,6 +427,209 @@ func deploySpokeKustomizationYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "deploy/spoke/kustomization.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _deploySpokeManifestworksCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  name: manifestworks.work.open-cluster-management.io
+spec:
+  group: work.open-cluster-management.io
+  names:
+    kind: ManifestWork
+    listKind: ManifestWorkList
+    plural: manifestworks
+    singular: manifestwork
+  scope: "Namespaced"
+  preserveUnknownFields: false
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: ManifestWork represents a manifests workload that hub wants to
+        deploy on the managed cluster. A manifest workload is defined as a set of
+        kubernetes resources. ManifestWork must be created in the cluster namespace
+        on the hub, so that agent on the corresponding managed cluster can access
+        this resource and deploy on the managed cluster.
+      type: object
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: Spec represents a desired configuration of work to be deployed
+            on the managed cluster.
+          type: object
+          properties:
+            workload:
+              description: Workload represents the manifest workload to be deployed
+                on managed cluster
+              type: object
+              properties:
+                manifests:
+                  description: Manifests represents a list of kuberenetes resources
+                    to be deployed on the managed cluster.
+                  type: array
+                  items:
+                    description: Manifest represents a resource to be deployed on
+                      managed cluster
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                    x-kubernetes-embedded-resource: true
+        status:
+          description: Status represents the current status of work
+          type: object
+          properties:
+            conditions:
+              description: 'Conditions contains the different condition statuses for
+                this work. Valid condition types are: 1. Applied represents workload
+                in ManifestWork is applied successfully on managed cluster. 2. Progressing
+                represents workload in ManifestWork is being applied on managed cluster.
+                3. Available represents workload in ManifestWork exists on the managed
+                cluster. 4. Degraded represents the current state of workload does
+                not match the desired state for a certain period.'
+              type: array
+              items:
+                description: StatusCondition contains condition information for a
+                  ManifestWork applied to a managed cluster.
+                type: object
+                properties:
+                  lastTransitionTime:
+                    description: LastTransitionTime is the last time the condition
+                      changed from one status to another.
+                    type: string
+                    format: date-time
+                  message:
+                    description: Message is a human-readable message indicating details
+                      about the last status change.
+                    type: string
+                  reason:
+                    description: Reason is a (brief) reason for the condition's last
+                      status change.
+                    type: string
+                  status:
+                    description: Status is the status of the condition. One of True,
+                      False, Unknown.
+                    type: string
+                  type:
+                    description: Type is the type of the ManifestWork condition.
+                    type: string
+            resourceStatus:
+              description: ResourceStatus represents the status of each resource in
+                manifestwork deployed on managed cluster. The Klusterlet agent on
+                managed cluster syncs the condition from managed to the hub.
+              type: object
+              properties:
+                manifests:
+                  description: 'Manifests represents the condition of manifests deployed
+                    on managed cluster. Valid condition types are: 1. Progressing
+                    represents the resource is being applied on managed cluster. 2.
+                    Applied represents the resource is applied successfully on managed
+                    cluster. 3. Available represents the resource exists on the managed
+                    cluster. 4. Degraded represents the current state of resource
+                    does not match the desired state for a certain period.'
+                  type: array
+                  items:
+                    description: ManifestCondition represents the conditions of the
+                      resources deployed on managed cluster
+                    type: object
+                    properties:
+                      conditions:
+                        description: Conditions represents the conditions of this
+                          resource on managed cluster
+                        type: array
+                        items:
+                          description: StatusCondition contains condition information
+                            for a ManifestWork applied to a managed cluster.
+                          type: object
+                          properties:
+                            lastTransitionTime:
+                              description: LastTransitionTime is the last time the
+                                condition changed from one status to another.
+                              type: string
+                              format: date-time
+                            message:
+                              description: Message is a human-readable message indicating
+                                details about the last status change.
+                              type: string
+                            reason:
+                              description: Reason is a (brief) reason for the condition's
+                                last status change.
+                              type: string
+                            status:
+                              description: Status is the status of the condition.
+                                One of True, False, Unknown.
+                              type: string
+                            type:
+                              description: Type is the type of the ManifestWork condition.
+                              type: string
+                      resourceMeta:
+                        description: ResourceMeta represents the gvk, name and namespace
+                          of a resoure
+                        type: object
+                        properties:
+                          group:
+                            description: Group is the API Group of the kubernetes
+                              resource
+                            type: string
+                          kind:
+                            description: Kind is the kind of the kubernetes resource
+                            type: string
+                          name:
+                            description: Name is the name of the kubernetes resource
+                            type: string
+                          namespace:
+                            description: Name is the namespace of the kubernetes resource
+                            type: string
+                          ordinal:
+                            description: Ordinal represents the index of the manifest
+                              on spec
+                            type: integer
+                            format: int32
+                          resource:
+                            description: Resource is the resource name of the kubernetes
+                              resource
+                            type: string
+                          version:
+                            description: Version is the version of the kubernetes
+                              resource
+                            type: string
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func deploySpokeManifestworksCrdYamlBytes() ([]byte, error) {
+	return _deploySpokeManifestworksCrdYaml, nil
+}
+
+func deploySpokeManifestworksCrdYaml() (*asset, error) {
+	bytes, err := deploySpokeManifestworksCrdYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "deploy/spoke/manifestworks.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -380,6 +708,7 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
+	"deploy/spoke/appliedmanifestworks.crd.yaml":     deploySpokeAppliedmanifestworksCrdYaml,
 	"deploy/spoke/cluster_namespace.yaml":            deploySpokeCluster_namespaceYaml,
 	"deploy/spoke/clusterrole.yaml":                  deploySpokeClusterroleYaml,
 	"deploy/spoke/clusterrole_binding.yaml":          deploySpokeClusterrole_bindingYaml,
@@ -387,6 +716,7 @@ var _bindata = map[string]func() (*asset, error){
 	"deploy/spoke/component_namespace.yaml":          deploySpokeComponent_namespaceYaml,
 	"deploy/spoke/deployment.yaml":                   deploySpokeDeploymentYaml,
 	"deploy/spoke/kustomization.yaml":                deploySpokeKustomizationYaml,
+	"deploy/spoke/manifestworks.crd.yaml":            deploySpokeManifestworksCrdYaml,
 	"deploy/spoke/service_account.yaml":              deploySpokeService_accountYaml,
 }
 
@@ -433,6 +763,7 @@ type bintree struct {
 var _bintree = &bintree{nil, map[string]*bintree{
 	"deploy": {nil, map[string]*bintree{
 		"spoke": {nil, map[string]*bintree{
+			"appliedmanifestworks.crd.yaml":     {deploySpokeAppliedmanifestworksCrdYaml, map[string]*bintree{}},
 			"cluster_namespace.yaml":            {deploySpokeCluster_namespaceYaml, map[string]*bintree{}},
 			"clusterrole.yaml":                  {deploySpokeClusterroleYaml, map[string]*bintree{}},
 			"clusterrole_binding.yaml":          {deploySpokeClusterrole_bindingYaml, map[string]*bintree{}},
@@ -440,6 +771,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"component_namespace.yaml":          {deploySpokeComponent_namespaceYaml, map[string]*bintree{}},
 			"deployment.yaml":                   {deploySpokeDeploymentYaml, map[string]*bintree{}},
 			"kustomization.yaml":                {deploySpokeKustomizationYaml, map[string]*bintree{}},
+			"manifestworks.crd.yaml":            {deploySpokeManifestworksCrdYaml, map[string]*bintree{}},
 			"service_account.yaml":              {deploySpokeService_accountYaml, map[string]*bintree{}},
 		}},
 	}},

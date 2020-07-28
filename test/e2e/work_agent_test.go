@@ -17,7 +17,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 const (
@@ -96,11 +95,14 @@ const (
 
 var _ = ginkgo.Describe("Work agent", func() {
 	ginkgo.Context("Work CRUD", func() {
-		var ns1 = fmt.Sprintf("ns1-%s", rand.String(5))
-		var ns2 = fmt.Sprintf("ns2-%s", rand.String(5))
+		var ns1 string
+		var ns2 string
 		var err error
 
 		ginkgo.BeforeEach(func() {
+			ns1 = fmt.Sprintf("ns1-%s", nameSuffix)
+			ns2 = fmt.Sprintf("ns2-%s", nameSuffix)
+
 			// create ns2
 			ns := &corev1.Namespace{}
 			ns.Name = ns2
@@ -123,7 +125,7 @@ var _ = ginkgo.Describe("Work agent", func() {
 				newConfigmap(ns1, "cm2", nil, nil),
 				newConfigmap(ns2, "cm3", nil, cmFinalizers),
 			}
-			work := newManifestWork(clusterName, "", objects...)
+			work := newManifestWork(clusterName, fmt.Sprintf("w1-%s", nameSuffix), objects...)
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -204,9 +206,16 @@ var _ = ginkgo.Describe("Work agent", func() {
 				newConfigmap(ns2, "cm3", cmData, cmFinalizers),
 			}
 			newWork := newManifestWork(clusterName, work.Name, newObjects...)
-			work.Spec.Workload.Manifests = newWork.Spec.Workload.Manifests
-			work, err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Update(context.Background(), work, metav1.UpdateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Eventually(func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				work.Spec.Workload.Manifests = newWork.Spec.Workload.Manifests
+				work, err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Update(context.Background(), work, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 			// check if cm1 is removed from applied resources list in status
 			gomega.Eventually(func() bool {
@@ -296,11 +305,14 @@ var _ = ginkgo.Describe("Work agent", func() {
 	})
 
 	ginkgo.Context("With CRD/CR", func() {
-		var crNamespace = fmt.Sprintf("crns-%s", rand.String(5))
+		var crNamespace string
 		var workName string
 		var err error
 
 		ginkgo.BeforeEach(func() {
+			crNamespace = fmt.Sprintf("ns3-%s", nameSuffix)
+			workName = fmt.Sprintf("w2-%s", nameSuffix)
+
 			// create namespace for cr
 			ns := &corev1.Namespace{}
 			ns.Name = crNamespace
@@ -324,17 +336,16 @@ var _ = ginkgo.Describe("Work agent", func() {
 			crd, err := newCrd()
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			clusterRoleName := fmt.Sprintf("cr-%s", rand.String(5))
+			clusterRoleName := fmt.Sprintf("cr-%s", nameSuffix)
 			clusterRole := newAggregatedClusterRole(clusterRoleName, "my.domain", "guestbooks")
 
 			cr, err := newCr(crNamespace, "cr1")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			objects := []runtime.Object{crd, clusterRole, cr}
-			work := newManifestWork(clusterName, "", objects...)
+			work := newManifestWork(clusterName, workName, objects...)
 			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			workName = work.Name
 
 			// check status conditions in manifestwork status
 			gomega.Eventually(func() bool {

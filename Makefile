@@ -55,8 +55,7 @@ e2e-hub-kubeconfig-secret: cluster-ip
 	$(RM) ./e2e-hub-kubeconfig
 
 install-crd:
-	$(KUBECTL) apply -f vendor/github.com/open-cluster-management/api/work/v1/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml
-	$(KUBECTL) apply -f vendor/github.com/open-cluster-management/api/work/v1/0000_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml
+	$(KUBECTL) apply -f deploy/spoke/manifestworks.crd.yaml
 
 deploy-work-agent: ensure-kustomize hub-kubeconfig-secret install-crd
 	cp deploy/spoke/kustomization.yaml deploy/spoke/kustomization.yaml.tmp
@@ -65,11 +64,9 @@ deploy-work-agent: ensure-kustomize hub-kubeconfig-secret install-crd
 	mv deploy/spoke/kustomization.yaml.tmp deploy/spoke/kustomization.yaml
 
 uninstall-crd:
-	$(KUBECTL) delete -f vendor/github.com/open-cluster-management/api/work/v1/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml --ignore-not-found
-	$(KUBECTL) delete -f vendor/github.com/open-cluster-management/api/work/v1/0000_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml --ignore-not-found
+	$(KUBECTL) delete -f deploy/spoke/manifestworks.crd.yaml --ignore-not-found
 
 clean-work-agent: uninstall-crd
-	$(KUBECTL) -n cluster1 delete manifestworks --all
 	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) delete --ignore-not-found -f -
 
 ensure-kustomize:

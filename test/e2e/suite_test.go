@@ -11,8 +11,10 @@ import (
 
 	workclientset "github.com/open-cluster-management/api/client/work/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -21,11 +23,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-const (
-	clusterName = "cluster1"
-)
-
 var (
+	nameSuffix                   string
+	clusterName                  string
 	workImage                    string
 	restConfig                   *rest.Config
 	spokeKubeClient              kubernetes.Interface
@@ -72,7 +72,13 @@ var _ = ginkgo.BeforeSuite(func() {
 	hubWorkClient, err = workclientset.NewForConfig(restConfig)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+	spokeApiExtensionsClient, err := apiextensionsclient.NewForConfig(restConfig)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	nameSuffix = rand.String(5)
+
 	// create cluster namespace
+	clusterName = fmt.Sprintf("cluster-%s", nameSuffix)
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterName,
@@ -85,9 +91,11 @@ var _ = ginkgo.BeforeSuite(func() {
 	ginkgo.By(fmt.Sprintf("deploy work agent with cluster name %q...", clusterName))
 	agentDeployer = newDefaultWorkAgentDeployer(
 		clusterName,
+		nameSuffix,
 		workImage,
 		spokeKubeClient,
 		spokeDynamicClient,
+		spokeApiExtensionsClient,
 		hubWorkClient)
 	err = agentDeployer.Deploy()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
