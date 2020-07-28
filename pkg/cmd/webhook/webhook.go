@@ -10,7 +10,7 @@ import (
 )
 
 func NewAdmissionHook() *cobra.Command {
-	o := admissionserver.NewAdmissionServerOptions(os.Stdout, os.Stderr, &webhook.ManagedClusterAdmissionHook{})
+	o := admissionserver.NewAdmissionServerOptions(os.Stdout, os.Stderr, &webhook.ManagedClusterValidatingAdmissionHook{}, &webhook.ManagedClusterMutatingAdmissionHook{})
 
 	cmd := &cobra.Command{
 		Use:   "webhook",

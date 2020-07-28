@@ -71,10 +71,6 @@ func (c *managedClusterLeaseController) sync(ctx context.Context, syncCtx factor
 	}
 
 	observedLeaseDurationSeconds := cluster.Spec.LeaseDurationSeconds
-	// TODO: use CRDs defaulting or mutating admission webhook to eliminate this code.
-	if observedLeaseDurationSeconds == 0 {
-		observedLeaseDurationSeconds = 60
-	}
 
 	// if lease duration is changed, start a new lease update routine.
 	if c.lastLeaseDurationSeconds != observedLeaseDurationSeconds {

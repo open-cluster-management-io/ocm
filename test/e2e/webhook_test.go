@@ -59,6 +59,18 @@ var _ = ginkgo.Describe("Managed cluster admission hook", func() {
 	})
 
 	ginkgo.Context("Creating a managed cluster", func() {
+		ginkgo.It("Should have the default LeaseDurationSeconds", func() {
+			clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
+			ginkgo.By(fmt.Sprintf("create a managed cluster %q", clusterName))
+
+			_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.TODO(), newManagedCluster(clusterName, false, validURL), metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(managedCluster.Spec.LeaseDurationSeconds).To(gomega.Equal(int32(60)))
+		})
+
 		ginkgo.It("Should respond bad request when creating a managed cluster with invalid external server URLs", func() {
 			clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
 			ginkgo.By(fmt.Sprintf("create a managed cluster %q with an invalid external server URL %q", clusterName, invalidURL))
@@ -110,6 +122,23 @@ var _ = ginkgo.Describe("Managed cluster admission hook", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
+		ginkgo.It("Should not update the LeaseDurationSeconds to zero", func() {
+			ginkgo.By(fmt.Sprintf("try to update managed cluster %q LeaseDurationSeconds to zero", clusterName))
+			err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				managedCluster.Spec.LeaseDurationSeconds = 0
+				_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
+				return err
+			})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(managedCluster.Spec.LeaseDurationSeconds).To(gomega.Equal(int32(60)))
+		})
+
 		ginkgo.It("Should respond bad request when updating a managed cluster with invalid external server URLs", func() {
 			ginkgo.By(fmt.Sprintf("update managed cluster %q with an invalid external server URL %q", clusterName, invalidURL))
 
@@ -140,11 +169,11 @@ var _ = ginkgo.Describe("Managed cluster admission hook", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				spokeCluster, err := unauthorizedClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+				managedCluster, err := unauthorizedClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-				spokeCluster.Spec.HubAcceptsClient = true
-				_, err = unauthorizedClient.ClusterV1().ManagedClusters().Update(context.TODO(), spokeCluster, metav1.UpdateOptions{})
+				managedCluster.Spec.HubAcceptsClient = true
+				_, err = unauthorizedClient.ClusterV1().ManagedClusters().Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
 				return err
 			})
 			gomega.Expect(err).To(gomega.HaveOccurred())

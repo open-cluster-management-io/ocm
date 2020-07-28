@@ -22,14 +22,14 @@ import (
 	"k8s.io/klog"
 )
 
-// ManagedClusterAdmissionHook will validate the creating/updating managedcluster request.
-type ManagedClusterAdmissionHook struct {
+// ManagedClusterValidatingAdmissionHook will validate the creating/updating managedcluster request.
+type ManagedClusterValidatingAdmissionHook struct {
 	kubeClient kubernetes.Interface
 }
 
 // ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the
 // webhook is accessed by the kube apiserver.
-func (a *ManagedClusterAdmissionHook) ValidatingResource() (plural schema.GroupVersionResource, singular string) {
+func (a *ManagedClusterValidatingAdmissionHook) ValidatingResource() (plural schema.GroupVersionResource, singular string) {
 	return schema.GroupVersionResource{
 			Group:    "admission.cluster.open-cluster-management.io",
 			Version:  "v1",
@@ -39,7 +39,7 @@ func (a *ManagedClusterAdmissionHook) ValidatingResource() (plural schema.GroupV
 }
 
 // Validate is called by generic-admission-server when the registered REST resource above is called with an admission request.
-func (a *ManagedClusterAdmissionHook) Validate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+func (a *ManagedClusterValidatingAdmissionHook) Validate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
 	klog.V(4).Infof("validate %q operation for object %q", admissionSpec.Operation, admissionSpec.Object)
 
 	status := &admissionv1beta1.AdmissionResponse{}
@@ -63,14 +63,14 @@ func (a *ManagedClusterAdmissionHook) Validate(admissionSpec *admissionv1beta1.A
 }
 
 // Initialize is called by generic-admission-server on startup to setup initialization that managedclusters webhook needs.
-func (a *ManagedClusterAdmissionHook) Initialize(kubeClientConfig *rest.Config, stopCh <-chan struct{}) error {
+func (a *ManagedClusterValidatingAdmissionHook) Initialize(kubeClientConfig *rest.Config, stopCh <-chan struct{}) error {
 	var err error
 	a.kubeClient, err = kubernetes.NewForConfig(kubeClientConfig)
 	return err
 }
 
 // validateCreateRequest validates create managed cluster operation
-func (a *ManagedClusterAdmissionHook) validateCreateRequest(request *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+func (a *ManagedClusterValidatingAdmissionHook) validateCreateRequest(request *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
 	status := &admissionv1beta1.AdmissionResponse{}
 
 	// validate ManagedCluster object firstly
@@ -96,7 +96,7 @@ func (a *ManagedClusterAdmissionHook) validateCreateRequest(request *admissionv1
 }
 
 // validateUpdateRequest validates update managed cluster operation.
-func (a *ManagedClusterAdmissionHook) validateUpdateRequest(request *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+func (a *ManagedClusterValidatingAdmissionHook) validateUpdateRequest(request *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
 	status := &admissionv1beta1.AdmissionResponse{}
 
 	oldManagedCluster := &clusterv1.ManagedCluster{}
@@ -132,7 +132,7 @@ func (a *ManagedClusterAdmissionHook) validateUpdateRequest(request *admissionv1
 }
 
 // validateManagedClusterObj validates the fileds of ManagedCluster object
-func (a *ManagedClusterAdmissionHook) validateManagedClusterObj(requestObj runtime.RawExtension) (*clusterv1.ManagedCluster, error) {
+func (a *ManagedClusterValidatingAdmissionHook) validateManagedClusterObj(requestObj runtime.RawExtension) (*clusterv1.ManagedCluster, error) {
 	errs := []error{}
 
 	managedCluster := &clusterv1.ManagedCluster{}
@@ -157,7 +157,7 @@ func (a *ManagedClusterAdmissionHook) validateManagedClusterObj(requestObj runti
 
 // allowUpdateHubAcceptsClientField using SubjectAccessReview API to check whether a request user has been authorized to update
 // HubAcceptsClient field
-func (a *ManagedClusterAdmissionHook) allowUpdateAcceptField(userInfo authenticationv1.UserInfo) *admissionv1beta1.AdmissionResponse {
+func (a *ManagedClusterValidatingAdmissionHook) allowUpdateAcceptField(userInfo authenticationv1.UserInfo) *admissionv1beta1.AdmissionResponse {
 	status := &admissionv1beta1.AdmissionResponse{}
 
 	extra := make(map[string]authorizationv1.ExtraValue)
