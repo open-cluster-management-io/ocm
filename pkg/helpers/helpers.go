@@ -225,6 +225,8 @@ func CleanUpStaticObject(
 		err = apiRegistrationClient.APIServices().Delete(ctx, t.Name, metav1.DeleteOptions{})
 	case *admissionv1.ValidatingWebhookConfiguration:
 		err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(ctx, t.Name, metav1.DeleteOptions{})
+	case *admissionv1.MutatingWebhookConfiguration:
+		err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(ctx, t.Name, metav1.DeleteOptions{})
 	default:
 		err = fmt.Errorf("unhandled type %T", object)
 	}
@@ -258,6 +260,33 @@ func ApplyValidatingWebhookConfiguration(
 	}
 
 	actual, err := client.ValidatingWebhookConfigurations().Update(context.TODO(), existingCopy, metav1.UpdateOptions{})
+	return actual, true, err
+}
+
+func ApplyMutatingWebhookConfiguration(
+	client admissionclient.MutatingWebhookConfigurationsGetter,
+	required *admissionv1.MutatingWebhookConfiguration) (*admissionv1.MutatingWebhookConfiguration, bool, error) {
+	existing, err := client.MutatingWebhookConfigurations().Get(context.TODO(), required.Name, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		actual, err := client.MutatingWebhookConfigurations().Create(context.TODO(), required, metav1.CreateOptions{})
+		return actual, true, err
+	}
+	if err != nil {
+		return nil, false, err
+	}
+
+	modified := resourcemerge.BoolPtr(false)
+	existingCopy := existing.DeepCopy()
+	resourcemerge.EnsureObjectMeta(modified, &existingCopy.ObjectMeta, required.ObjectMeta)
+	if !equality.Semantic.DeepEqual(existingCopy.Webhooks, required.Webhooks) {
+		*modified = true
+		existing.Webhooks = required.Webhooks
+	}
+	if !*modified {
+		return existing, false, nil
+	}
+
+	actual, err := client.MutatingWebhookConfigurations().Update(context.TODO(), existingCopy, metav1.UpdateOptions{})
 	return actual, true, err
 }
 
@@ -322,6 +351,9 @@ func ApplyDirectly(
 		switch t := requiredObj.(type) {
 		case *admissionv1.ValidatingWebhookConfiguration:
 			result.Result, result.Changed, result.Error = ApplyValidatingWebhookConfiguration(
+				client.AdmissionregistrationV1(), t)
+		case *admissionv1.MutatingWebhookConfiguration:
+			result.Result, result.Changed, result.Error = ApplyMutatingWebhookConfiguration(
 				client.AdmissionregistrationV1(), t)
 		case *apiregistrationv1.APIService:
 			result.Result, result.Changed, result.Error = resourceapply.ApplyAPIService(apiRegistrationClient, recorder, t)

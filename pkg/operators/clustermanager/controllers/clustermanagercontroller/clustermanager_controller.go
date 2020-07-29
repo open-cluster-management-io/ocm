@@ -51,6 +51,7 @@ var (
 		"manifests/cluster-manager/cluster-manager-registration-webhook-apiservice.yaml",
 		"manifests/cluster-manager/cluster-manager-registration-webhook-secret.yaml",
 		"manifests/cluster-manager/cluster-manager-registration-webhook-validatingconfiguration.yaml",
+		"manifests/cluster-manager/cluster-manager-registration-webhook-mutatingconfiguration.yaml",
 	}
 
 	deploymentFiles = []string{

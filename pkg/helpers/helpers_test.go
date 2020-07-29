@@ -179,6 +179,24 @@ func newValidatingWebhookConfiguration(name, svc, svcNameSpace string) *admissio
 	}
 }
 
+func newMutatingWebhookConfiguration(name, svc, svcNameSpace string) *admissionv1.MutatingWebhookConfiguration {
+	return &admissionv1.MutatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Webhooks: []admissionv1.MutatingWebhook{
+			{
+				ClientConfig: admissionv1.WebhookClientConfig{
+					Service: &admissionv1.ServiceReference{
+						Name:      svc,
+						Namespace: svcNameSpace,
+					},
+				},
+			},
+		},
+	}
+}
+
 func newUnstructured(
 	apiVersion, kind, namespace, name string, content map[string]interface{}) *unstructured.Unstructured {
 	object := &unstructured.Unstructured{
@@ -250,6 +268,48 @@ func TestApplyValidatingWebhookConfiguration(t *testing.T) {
 	}
 }
 
+func TestApplyMutatingWebhookConfiguration(t *testing.T) {
+	testcase := []struct {
+		name          string
+		existing      []runtime.Object
+		expected      *admissionv1.MutatingWebhookConfiguration
+		expectUpdated bool
+	}{
+		{
+			name:          "Create a new configuration",
+			expectUpdated: true,
+			existing:      []runtime.Object{},
+			expected:      newMutatingWebhookConfiguration("test", "svc1", "svc1"),
+		},
+		{
+			name:          "update an existing configuration",
+			expectUpdated: true,
+			existing:      []runtime.Object{newMutatingWebhookConfiguration("test", "svc1", "svc1")},
+			expected:      newMutatingWebhookConfiguration("test", "svc2", "svc2"),
+		},
+		{
+			name:          "skip update",
+			expectUpdated: false,
+			existing:      []runtime.Object{newMutatingWebhookConfiguration("test", "svc1", "svc1")},
+			expected:      newMutatingWebhookConfiguration("test", "svc1", "svc1"),
+		},
+	}
+
+	for _, c := range testcase {
+		t.Run(c.name, func(t *testing.T) {
+			fakeKubeClient := fakekube.NewSimpleClientset(c.existing...)
+			_, updated, err := ApplyMutatingWebhookConfiguration(fakeKubeClient.AdmissionregistrationV1(), c.expected)
+			if err != nil {
+				t.Errorf("Expected no error when applying: %v", err)
+			}
+
+			if updated != c.expectUpdated {
+				t.Errorf("Expect update is %t, but got %t", c.expectUpdated, updated)
+			}
+		})
+	}
+}
+
 func TestApplyDirectly(t *testing.T) {
 	testcase := []struct {
 		name           string
@@ -260,11 +320,12 @@ func TestApplyDirectly(t *testing.T) {
 		{
 			name: "Apply webhooks & apiservice & secret",
 			applyFiles: map[string]runtime.Object{
-				"webhooks":   newUnstructured("admissionregistration.k8s.io/v1", "ValidatingWebhookConfiguration", "", "", map[string]interface{}{"webhooks": []interface{}{}}),
-				"apiservice": newUnstructured("apiregistration.k8s.io/v1", "APIService", "", "", map[string]interface{}{"spec": map[string]interface{}{"service": map[string]string{"name": "svc1", "namespace": "svc1"}}}),
-				"secret":     newUnstructured("v1", "Secret", "ns1", "n1", map[string]interface{}{"data": map[string]interface{}{"key1": []byte("key1")}}),
+				"validatingwebhooks": newUnstructured("admissionregistration.k8s.io/v1", "ValidatingWebhookConfiguration", "", "", map[string]interface{}{"webhooks": []interface{}{}}),
+				"mutatingwebhooks":   newUnstructured("admissionregistration.k8s.io/v1", "MutatingWebhookConfiguration", "", "", map[string]interface{}{"webhooks": []interface{}{}}),
+				"apiservice":         newUnstructured("apiregistration.k8s.io/v1", "APIService", "", "", map[string]interface{}{"spec": map[string]interface{}{"service": map[string]string{"name": "svc1", "namespace": "svc1"}}}),
+				"secret":             newUnstructured("v1", "Secret", "ns1", "n1", map[string]interface{}{"data": map[string]interface{}{"key1": []byte("key1")}}),
 			},
-			applyFileNames: []string{"webhooks", "apiservice", "secret"},
+			applyFileNames: []string{"validatingwebhooks", "mutatingwebhooks", "apiservice", "secret"},
 			expectErr:      false,
 		},
 		{
@@ -313,11 +374,12 @@ func TestApplyDirectly(t *testing.T) {
 
 func TestDeleteStaticObject(t *testing.T) {
 	applyFiles := map[string]runtime.Object{
-		"webhooks":   newUnstructured("admissionregistration.k8s.io/v1", "ValidatingWebhookConfiguration", "", "", map[string]interface{}{"webhooks": []interface{}{}}),
-		"apiservice": newUnstructured("apiregistration.k8s.io/v1", "APIService", "", "", map[string]interface{}{"spec": map[string]interface{}{"service": map[string]string{"name": "svc1", "namespace": "svc1"}}}),
-		"secret":     newUnstructured("v1", "Secret", "ns1", "n1", map[string]interface{}{"data": map[string]interface{}{"key1": []byte("key1")}}),
-		"crd":        newUnstructured("apiextensions.k8s.io/v1beta1", "CustomResourceDefinition", "", "", map[string]interface{}{}),
-		"kind1":      newUnstructured("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": []byte("key1")}}),
+		"validatingwebhooks": newUnstructured("admissionregistration.k8s.io/v1", "ValidatingWebhookConfiguration", "", "", map[string]interface{}{"webhooks": []interface{}{}}),
+		"mutatingwebhooks":   newUnstructured("admissionregistration.k8s.io/v1", "MutatingWebhookConfiguration", "", "", map[string]interface{}{"webhooks": []interface{}{}}),
+		"apiservice":         newUnstructured("apiregistration.k8s.io/v1", "APIService", "", "", map[string]interface{}{"spec": map[string]interface{}{"service": map[string]string{"name": "svc1", "namespace": "svc1"}}}),
+		"secret":             newUnstructured("v1", "Secret", "ns1", "n1", map[string]interface{}{"data": map[string]interface{}{"key1": []byte("key1")}}),
+		"crd":                newUnstructured("apiextensions.k8s.io/v1beta1", "CustomResourceDefinition", "", "", map[string]interface{}{}),
+		"kind1":              newUnstructured("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": []byte("key1")}}),
 	}
 	testcase := []struct {
 		name          string
@@ -325,8 +387,13 @@ func TestDeleteStaticObject(t *testing.T) {
 		expectErr     bool
 	}{
 		{
-			name:          "Delete webhooks",
-			applyFileName: "webhooks",
+			name:          "Delete validating webhooks",
+			applyFileName: "validatingwebhooks",
+			expectErr:     false,
+		},
+		{
+			name:          "Delete mutating webhooks",
+			applyFileName: "mutatingwebhooks",
 			expectErr:     false,
 		},
 		{
