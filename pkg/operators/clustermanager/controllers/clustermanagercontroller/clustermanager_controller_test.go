@@ -123,7 +123,7 @@ func TestSyncDeploy(t *testing.T) {
 	}
 
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 12)
+	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 13)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager)
 	}
@@ -179,7 +179,7 @@ func TestSyncDelete(t *testing.T) {
 			deleteKubeActions = append(deleteKubeActions, deleteKubeAction)
 		}
 	}
-	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 10)
+	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 11)
 
 	deleteCRDActions := []clienttesting.DeleteActionImpl{}
 	crdActions := controller.apiExtensionClient.Actions()

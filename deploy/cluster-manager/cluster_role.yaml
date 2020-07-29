@@ -32,7 +32,7 @@ rules:
   verbs: ["create", "get", "list", "update", "watch", "patch", "delete"]
 # Allow the registration-operator to create validatingwebhookconfigurration
 - apiGroups: ["admissionregistration.k8s.io"]
-  resources: ["validatingwebhookconfigurations"]
+  resources: ["validatingwebhookconfigurations", "mutatingwebhookconfigurations"]
   verbs: ["create", "get", "list", "update", "watch", "patch", "delete"]
 # Allow the nuclues to manage clustermanager apis.
 - apiGroups: ["operator.open-cluster-management.io"]
