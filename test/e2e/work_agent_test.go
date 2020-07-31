@@ -163,12 +163,16 @@ var _ = ginkgo.Describe("Work agent", func() {
 
 				// check manifest status conditions
 				expectedManifestStatuses := []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}
-				if ok := haveManifestCondition(work.Status.ResourceStatus.Manifests, string(workapiv1.WorkApplied), expectedManifestStatuses); !ok {
+				if ok := haveManifestCondition(work.Status.ResourceStatus.Manifests, string(workapiv1.ManifestApplied), expectedManifestStatuses); !ok {
+					return false
+				}
+				if ok := haveManifestCondition(work.Status.ResourceStatus.Manifests, string(workapiv1.ManifestAvailable), expectedManifestStatuses); !ok {
 					return false
 				}
 
 				// check work status condition
-				return haveCondition(work.Status.Conditions, string(workapiv1.WorkApplied), metav1.ConditionTrue)
+				return haveCondition(work.Status.Conditions, string(workapiv1.WorkApplied), metav1.ConditionTrue) &&
+					haveCondition(work.Status.Conditions, string(workapiv1.WorkAvailable), metav1.ConditionTrue)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// get the corresponding AppliedManifestWork
@@ -237,12 +241,16 @@ var _ = ginkgo.Describe("Work agent", func() {
 
 				// check manifest status conditions
 				expectedManifestStatuses := []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}
-				if ok := haveManifestCondition(work.Status.ResourceStatus.Manifests, string(workapiv1.WorkApplied), expectedManifestStatuses); !ok {
+				if ok := haveManifestCondition(work.Status.ResourceStatus.Manifests, string(workapiv1.ManifestApplied), expectedManifestStatuses); !ok {
+					return false
+				}
+				if ok := haveManifestCondition(work.Status.ResourceStatus.Manifests, string(workapiv1.ManifestAvailable), expectedManifestStatuses); !ok {
 					return false
 				}
 
 				// check work status condition
-				return haveCondition(work.Status.Conditions, string(workapiv1.WorkApplied), metav1.ConditionTrue)
+				return haveCondition(work.Status.Conditions, string(workapiv1.WorkApplied), metav1.ConditionTrue) &&
+					haveCondition(work.Status.Conditions, string(workapiv1.WorkAvailable), metav1.ConditionTrue)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// check if cm1 is deleted
@@ -356,12 +364,16 @@ var _ = ginkgo.Describe("Work agent", func() {
 
 				// check manifest status conditions
 				expectedManifestStatuses := []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}
-				if ok := haveManifestCondition(work.Status.ResourceStatus.Manifests, string(workapiv1.WorkApplied), expectedManifestStatuses); !ok {
+				if ok := haveManifestCondition(work.Status.ResourceStatus.Manifests, string(workapiv1.ManifestApplied), expectedManifestStatuses); !ok {
+					return false
+				}
+				if ok := haveManifestCondition(work.Status.ResourceStatus.Manifests, string(workapiv1.ManifestAvailable), expectedManifestStatuses); !ok {
 					return false
 				}
 
 				// check work status condition
-				return haveCondition(work.Status.Conditions, string(workapiv1.WorkApplied), metav1.ConditionTrue)
+				return haveCondition(work.Status.Conditions, string(workapiv1.WorkApplied), metav1.ConditionTrue) &&
+					haveCondition(work.Status.Conditions, string(workapiv1.WorkAvailable), metav1.ConditionTrue)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 		})
 	})

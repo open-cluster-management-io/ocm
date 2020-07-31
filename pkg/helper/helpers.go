@@ -125,7 +125,7 @@ func MergeStatusConditions(conditions []workapiv1.StatusCondition, newConditions
 	for _, newCondition := range newConditions {
 		// merge two conditions if necessary
 		if condition, ok := cm[newCondition.Type]; ok {
-			merged = append(merged, mergeStatusCondition(condition, newCondition))
+			merged = append(merged, MergeStatusCondition(condition, newCondition))
 			continue
 		}
 
@@ -136,9 +136,9 @@ func MergeStatusConditions(conditions []workapiv1.StatusCondition, newConditions
 	return merged
 }
 
-// mergeStatusCondition returns a new status condition which merges the properties from the two input conditions.
+// MergeStatusCondition returns a new status condition which merges the properties from the two input conditions.
 // It assumes the two conditions have the same condition type.
-func mergeStatusCondition(condition, newCondition workapiv1.StatusCondition) workapiv1.StatusCondition {
+func MergeStatusCondition(condition, newCondition workapiv1.StatusCondition) workapiv1.StatusCondition {
 	merged := workapiv1.StatusCondition{
 		Type:    newCondition.Type,
 		Status:  newCondition.Status,
