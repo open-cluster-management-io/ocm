@@ -16,7 +16,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-  name: cluster-manager.v0.2.0
+  name: cluster-manager.v0.1.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -135,7 +135,6 @@ spec:
           - admissionregistration.k8s.io
           resources:
           - validatingwebhookconfigurations
-          - mutatingwebhookconfigurations
           verbs:
           - create
           - get
@@ -200,7 +199,7 @@ spec:
               - args:
                 - /registration-operator
                 - hub
-                image: quay.io/open-cluster-management/registration-operator:latest
+                image: quay.io/open-cluster-management/registration-operator:0.0.1
                 imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:
@@ -238,5 +237,4 @@ spec:
   maturity: alpha
   provider:
     name: open-cluster-management
-  replaces: cluster-manager.v0.1.0
-  version: 0.2.0
+  version: 0.1.0

@@ -24,7 +24,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-  name: klusterlet.v0.1.0
+  name: klusterlet.v0.2.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -228,4 +228,5 @@ spec:
   - {}
   maturity: alpha
   provider: {}
-  version: 0.1.0
+  replaces: klusterlet.v0.1.0
+  version: 0.2.0
