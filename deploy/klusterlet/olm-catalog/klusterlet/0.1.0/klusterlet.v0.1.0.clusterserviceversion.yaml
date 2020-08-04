@@ -6,29 +6,37 @@ metadata:
       [
         {
           "apiVersion": "operator.open-cluster-management.io/v1",
-          "kind": "ClusterManager",
+          "kind": "Klusterlet",
           "metadata": {
-            "name": "cluster-manager"
+            "name": "klusterlet"
           },
           "spec": {
-            "registrationImagePullSpec": "quay.io/open-cluster-management/registration"
+            "clusterName": "cluster1",
+            "externalServerURLs": [
+              {
+                "url": "https://localhost"
+              }
+            ],
+            "namespace": "open-cluster-management-agent",
+            "registrationImagePullSpec": "quay.io/open-cluster-management/registration",
+            "workImagePullSpec": "quay.io/open-cluster-management/work"
           }
         }
       ]
     capabilities: Basic Install
-  name: cluster-manager.v0.2.0
+  name: klusterlet.v0.1.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: ClusterManager defines the configurations of controllers running
-        hub that govern registration and work distribution for attached Klusterlets
-      displayName: ClusterManager
-      kind: ClusterManager
-      name: clustermanagers.operator.open-cluster-management.io
+    - description: Klusterlet defines the configurations of agents running on the
+        managed cluster
+      displayName: Klusterlet
+      kind: Klusterlet
+      name: klusterlets.operator.open-cluster-management.io
       version: v1
-  displayName: Cluster Manager
+  displayName: Klusterlet
   icon:
   - base64data: ""
     mediatype: ""
@@ -39,11 +47,9 @@ spec:
         - apiGroups:
           - ""
           resources:
-          - configmaps
-          - namespaces
-          - serviceaccounts
-          - services
           - secrets
+          - configmaps
+          - serviceaccounts
           verbs:
           - create
           - get
@@ -58,6 +64,15 @@ spec:
           - subjectaccessreviews
           verbs:
           - create
+        - apiGroups:
+          - ""
+          resources:
+          - namespaces
+          verbs:
+          - create
+          - get
+          - list
+          - watch
         - apiGroups:
           - ""
           - events.k8s.io
@@ -108,72 +123,36 @@ spec:
           - escalate
           - bind
         - apiGroups:
-          - apiextensions.k8s.io
+          - operator.open-cluster-management.io
           resources:
-          - customresourcedefinitions
+          - klusterlets
           verbs:
-          - create
           - get
           - list
-          - update
           - watch
-          - patch
-          - delete
-        - apiGroups:
-          - apiregistration.k8s.io
-          resources:
-          - apiservices
-          verbs:
-          - create
-          - get
-          - list
           - update
-          - watch
-          - patch
-          - delete
-        - apiGroups:
-          - admissionregistration.k8s.io
-          resources:
-          - validatingwebhookconfigurations
-          - mutatingwebhookconfigurations
-          verbs:
-          - create
-          - get
-          - list
-          - update
-          - watch
           - patch
           - delete
         - apiGroups:
           - operator.open-cluster-management.io
           resources:
-          - clustermanagers
-          verbs:
-          - get
-          - list
-          - watch
-          - update
-          - delete
-        - apiGroups:
-          - operator.open-cluster-management.io
-          resources:
-          - clustermanagers/status
+          - klusterlets/status
           verbs:
           - update
           - patch
-        serviceAccountName: cluster-manager
+        serviceAccountName: klusterlet
       deployments:
-      - name: cluster-manager
+      - name: klusterlet
         spec:
           replicas: 3
           selector:
             matchLabels:
-              app: cluster-manager
+              app: klusterlet
           strategy: {}
           template:
             metadata:
               labels:
-                app: cluster-manager
+                app: klusterlet
             spec:
               affinity:
                 podAntiAffinity:
@@ -184,7 +163,7 @@ spec:
                         - key: app
                           operator: In
                           values:
-                          - cluster-manager
+                          - klusterlet
                       topologyKey: failure-domain.beta.kubernetes.io/zone
                     weight: 70
                   - podAffinityTerm:
@@ -193,14 +172,14 @@ spec:
                         - key: app
                           operator: In
                           values:
-                          - cluster-manager
+                          - klusterlet
                       topologyKey: kubernetes.io/hostname
                     weight: 30
               containers:
               - args:
                 - /registration-operator
-                - hub
-                image: quay.io/open-cluster-management/registration-operator:latest
+                - klusterlet
+                image: quay.io/open-cluster-management/registration-operator:0.0.1
                 imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:
@@ -209,7 +188,7 @@ spec:
                     scheme: HTTPS
                   initialDelaySeconds: 2
                   periodSeconds: 10
-                name: registration-operator
+                name: klusterlet
                 readinessProbe:
                   httpGet:
                     path: /healthz
@@ -220,7 +199,7 @@ spec:
                   requests:
                     cpu: 100m
                     memory: 128Mi
-              serviceAccountName: cluster-manager
+              serviceAccountName: klusterlet
     strategy: deployment
   installModes:
   - supported: true
@@ -236,7 +215,5 @@ spec:
   maintainers:
   - {}
   maturity: alpha
-  provider:
-    name: open-cluster-management
-  replaces: cluster-manager.v0.1.0
-  version: 0.2.0
+  provider: {}
+  version: 0.1.0

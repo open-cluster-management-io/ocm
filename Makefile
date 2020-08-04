@@ -16,6 +16,9 @@ IMAGE_REGISTRY?=quay.io/open-cluster-management
 IMAGE_TAG?=latest
 IMAGE_NAME?=$(IMAGE_REGISTRY)/registration-operator:$(IMAGE_TAG)
 
+# CSV_VERSION is used to generate new CSV manifests
+CSV_VERSION?=0.2.0
+
 # WORK_IMAGE can be set in the env to override calculated value
 WORK_TAG?=latest
 WORK_IMAGE?=$(IMAGE_REGISTRY)/work:$(WORK_TAG)
@@ -63,9 +66,10 @@ verify-crds:
 
 verify: verify-crds
 
+# should set the correct IMAGE_TAG and IMAGE_NAME for the new csv
 update-csv: ensure-operator-sdk
-	$(OPERATOR_SDK) generate csv --crd-dir=deploy/cluster-manager/crds --deploy-dir=deploy/cluster-manager --output-dir=deploy/cluster-manager/olm-catalog/cluster-manager --operator-name=cluster-manager --csv-version=0.1.0
-	$(OPERATOR_SDK) generate csv --crd-dir=deploy/klusterlet/crds --deploy-dir=deploy/klusterlet --output-dir=deploy/klusterlet/olm-catalog/klusterlet --operator-name=klusterlet --csv-version=0.1.0
+	$(OPERATOR_SDK) generate csv --crd-dir=deploy/cluster-manager/crds --deploy-dir=deploy/cluster-manager --output-dir=deploy/cluster-manager/olm-catalog/cluster-manager --operator-name=cluster-manager --csv-version=$(CSV_VERSION)
+	$(OPERATOR_SDK) generate csv --crd-dir=deploy/klusterlet/crds --deploy-dir=deploy/klusterlet --output-dir=deploy/klusterlet/olm-catalog/klusterlet --operator-name=klusterlet --csv-version=$(CSV_VERSION)
 
 munge-hub-csv:
 	mkdir -p munge-csv
@@ -92,14 +96,14 @@ install-olm: ensure-operator-sdk
 deploy-hub: deploy-hub-operator apply-hub-cr
 
 deploy-hub-operator: install-olm munge-hub-csv
-	$(OPERATOR_SDK) run --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/cluster-manager/olm-catalog/cluster-manager --olm-namespace $(OLM_NAMESPACE) --timeout 10m
+	$(OPERATOR_SDK) run --olm --operator-namespace open-cluster-management --operator-version $(CSV_VERSION) --manifests deploy/cluster-manager/olm-catalog/cluster-manager --olm-namespace $(OLM_NAMESPACE) --timeout 10m
 	
 apply-hub-cr:
 	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," deploy/cluster-manager/crds/operator_open-cluster-management_clustermanagers.cr.yaml | $(KUBECTL) apply -f -
 
 clean-hub: ensure-operator-sdk
 	$(KUBECTL) delete -f deploy/cluster-manager/crds/operator_open-cluster-management_clustermanagers.cr.yaml --ignore-not-found
-	$(OPERATOR_SDK) cleanup --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/cluster-manager/olm-catalog/cluster-manager --olm-namespace $(OLM_NAMESPACE) --timeout 10m
+	$(OPERATOR_SDK) cleanup --olm --operator-namespace open-cluster-management --operator-version $(CSV_VERSION) --manifests deploy/cluster-manager/olm-catalog/cluster-manager --olm-namespace $(OLM_NAMESPACE) --timeout 10m
 
 cluster-ip:
   CLUSTER_IP?=$(shell $(KUBECTL) get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}")
@@ -123,14 +127,14 @@ e2e-bootstrap-secret: cluster-ip
 deploy-spoke: deploy-spoke-operator apply-spoke-cr
 
 deploy-spoke-operator: install-olm munge-spoke-csv bootstrap-secret
-	$(OPERATOR_SDK) run --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/klusterlet/olm-catalog/klusterlet --olm-namespace $(OLM_NAMESPACE) --timeout 10m
+	$(OPERATOR_SDK) run --olm --operator-namespace open-cluster-management --operator-version $(CSV_VERSION) --manifests deploy/klusterlet/olm-catalog/klusterlet --olm-namespace $(OLM_NAMESPACE) --timeout 10m
 
 apply-spoke-cr:
 	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," deploy/klusterlet/crds/operator_open-cluster-management_klusterlets.cr.yaml | $(KUBECTL) apply -f -
 
 clean-spoke: ensure-operator-sdk
 	$(KUBECTL) delete -f deploy/klusterlet/crds/operator_open-cluster-management_klusterlets.cr.yaml --ignore-not-found
-	$(OPERATOR_SDK) cleanup --olm --operator-namespace open-cluster-management --operator-version 0.1.0 --manifests deploy/klusterlet/olm-catalog/klusterlet --olm-namespace $(OLM_NAMESPACE) --timeout 10m
+	$(OPERATOR_SDK) cleanup --olm --operator-namespace open-cluster-management --operator-version $(CSV_VERSION) --manifests deploy/klusterlet/olm-catalog/klusterlet --olm-namespace $(OLM_NAMESPACE) --timeout 10m
 
 test-e2e: deploy-hub deploy-spoke-operator run-e2e
 
