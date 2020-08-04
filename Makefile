@@ -63,6 +63,12 @@ deploy-work-agent: ensure-kustomize hub-kubeconfig-secret install-crd
 	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) apply -f -
 	mv deploy/spoke/kustomization.yaml.tmp deploy/spoke/kustomization.yaml
 
+deploy-webhook: ensure-kustomize
+	cp deploy/webhook/kustomization.yaml deploy/webhook/kustomization.yaml.tmp
+	cd deploy/webhook && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/work:latest=$(IMAGE_NAME)
+	$(KUSTOMIZE) build deploy/webhook | $(KUBECTL) apply -f -
+	mv deploy/webhook/kustomization.yaml.tmp deploy/webhook/kustomization.yaml
+
 uninstall-crd:
 	$(KUBECTL) delete -f deploy/spoke/manifestworks.crd.yaml --ignore-not-found
 
@@ -85,7 +91,7 @@ build: build-e2e
 build-e2e:
 	go test -c ./test/e2e
 
-test-e2e: build-e2e install-crd e2e-hub-kubeconfig-secret
+test-e2e: build-e2e install-crd deploy-webhook e2e-hub-kubeconfig-secret
 	./e2e.test -test.v -ginkgo.v
 
 clean-e2e:

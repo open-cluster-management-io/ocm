@@ -201,6 +201,10 @@ github.com/openshift/build-machinery-go/make/targets/golang
 github.com/openshift/build-machinery-go/make/targets/openshift
 github.com/openshift/build-machinery-go/make/targets/openshift/operator
 github.com/openshift/build-machinery-go/scripts
+# github.com/openshift/generic-admission-server v1.14.1-0.20200514123932-ccc9079d8bdb
+github.com/openshift/generic-admission-server/pkg/apiserver
+github.com/openshift/generic-admission-server/pkg/cmd/server
+github.com/openshift/generic-admission-server/pkg/registry/admissionreview
 # github.com/openshift/library-go v0.0.0-20200617154932-eaf8c138def4
 github.com/openshift/library-go/pkg/config/client
 github.com/openshift/library-go/pkg/config/configdefaults

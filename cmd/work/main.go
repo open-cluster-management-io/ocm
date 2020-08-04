@@ -14,6 +14,7 @@ import (
 	"k8s.io/component-base/logs"
 
 	"github.com/open-cluster-management/work/pkg/cmd/spoke"
+	"github.com/open-cluster-management/work/pkg/cmd/webhook"
 	"github.com/open-cluster-management/work/pkg/version"
 )
 
@@ -50,6 +51,7 @@ func newWorkCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(spoke.NewWorkloadAgent())
+	cmd.AddCommand(webhook.NewAdmissionHook())
 
 	return cmd
 }

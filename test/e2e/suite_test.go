@@ -19,6 +19,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
@@ -31,6 +32,7 @@ var (
 	spokeKubeClient              kubernetes.Interface
 	spokeDynamicClient           dynamic.Interface
 	hubWorkClient                workclientset.Interface
+	hubAPIServiceClient          *apiregistrationclient.ApiregistrationV1Client
 	hubKubeconfigSecretNamespace string
 	hubKubeconfigSecretName      string
 	agentDeployer                workAgentDeployer
@@ -76,6 +78,9 @@ var _ = ginkgo.BeforeSuite(func() {
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	nameSuffix = rand.String(5)
+
+	hubAPIServiceClient, err = apiregistrationclient.NewForConfig(restConfig)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	// create cluster namespace
 	clusterName = fmt.Sprintf("cluster-%s", nameSuffix)

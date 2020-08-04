@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: manifestwork-admission
+  labels:
+    app: manifestwork-admission
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: manifestwork-admission
+  template:
+    metadata:
+      labels:
+        app: manifestwork-admission
+    spec:
+      serviceAccountName: manifestwork-admission-sa
+      containers:
+      - name: manifestwork-admission
+        image: quay.io/open-cluster-management/work:latest
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/work"
+          - "webhook"
+          - "--cert-dir=/tmp"
+          - "--secure-port=6443"
