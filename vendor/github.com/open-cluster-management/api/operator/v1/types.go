@@ -26,9 +26,13 @@ type ClusterManager struct {
 
 // ClusterManagerSpec represents a desired deployment configuration of controllers that govern registration and work distribution for attached Klusterlets.
 type ClusterManagerSpec struct {
-	// RegistrationImagePullSpec represents the desired image of registration controller installed on hub.
+	// RegistrationImagePullSpec represents the desired image of registration controller/webhook installed on hub.
 	// +required
 	RegistrationImagePullSpec string `json:"registrationImagePullSpec"`
+
+	// WorkImagePullSpec represents the desired image configuration of work controller/webhook installed on hub.
+	// +required
+	WorkImagePullSpec string `json:"workImagePullSpec,omitempty"`
 }
 
 // ClusterManagerStatus represents the current status of the registration and work distribution controllers running on the hub.

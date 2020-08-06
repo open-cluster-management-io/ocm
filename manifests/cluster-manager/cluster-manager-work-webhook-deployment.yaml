@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .ClusterManagerName }}-registration-webhook
+  name: {{ .ClusterManagerName }}-work-webhook
   namespace: open-cluster-management-hub
   labels:
-    app: {{ .ClusterManagerName }}-registration-webhook
+    app: {{ .ClusterManagerName }}-work-webhook
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: {{ .ClusterManagerName }}-registration-webhook
+      app: {{ .ClusterManagerName }}-work-webhook
   template:
     metadata:
       labels:
-        app: {{ .ClusterManagerName }}-registration-webhook
+        app: {{ .ClusterManagerName }}-work-webhook
     spec:
       affinity:
         podAntiAffinity:
@@ -26,7 +26,7 @@ spec:
                 - key: app
                   operator: In
                   values:
-                  - {{ .ClusterManagerName }}-registration-webhook
+                  - {{ .ClusterManagerName }}-work-webhook
           - weight: 30
             podAffinityTerm:
               topologyKey: kubernetes.io/hostname
@@ -35,14 +35,14 @@ spec:
                 - key: app
                   operator: In
                   values:
-                  - {{ .ClusterManagerName }}-registration-webhook
-      serviceAccountName: {{ .ClusterManagerName }}-registration-webhook-sa
+                  - {{ .ClusterManagerName }}-work-webhook
+      serviceAccountName: {{ .ClusterManagerName }}-work-webhook-sa
       containers:
-      - name: {{ .ClusterManagerName }}-registration-webhook-sa
-        image: {{ .RegistrationImage }}
+      - name: {{ .ClusterManagerName }}-work-webhook-sa
+        image: {{ .WorkImage }}
         imagePullPolicy: IfNotPresent
         args:
-          - "/registration"
+          - "/work"
           - "webhook"
           - "--secure-port=6443"
           - "--tls-cert-file=/serving-cert/tls.crt"
@@ -71,5 +71,5 @@ spec:
       volumes:
       - name: webhook-secret
         secret:
-          secretName: registration-webhook-serving-cert
+          secretName: work-webhook-serving-cert
 

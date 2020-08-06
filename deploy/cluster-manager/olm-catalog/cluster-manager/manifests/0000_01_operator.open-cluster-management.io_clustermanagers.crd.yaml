@@ -39,7 +39,11 @@ spec:
           properties:
             registrationImagePullSpec:
               description: RegistrationImagePullSpec represents the desired image
-                of registration controller installed on hub.
+                of registration controller/webhook installed on hub.
+              type: string
+            workImagePullSpec:
+              description: WorkImagePullSpec represents the desired image configuration
+                of work controller/webhook installed on hub.
               type: string
         status:
           description: Status represents the current status of controllers that govern

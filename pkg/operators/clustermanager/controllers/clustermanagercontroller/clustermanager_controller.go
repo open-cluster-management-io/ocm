@@ -52,19 +52,30 @@ var (
 		"manifests/cluster-manager/cluster-manager-registration-webhook-secret.yaml",
 		"manifests/cluster-manager/cluster-manager-registration-webhook-validatingconfiguration.yaml",
 		"manifests/cluster-manager/cluster-manager-registration-webhook-mutatingconfiguration.yaml",
+		"manifests/cluster-manager/cluster-manager-work-webhook-clusterrole.yaml",
+		"manifests/cluster-manager/cluster-manager-work-webhook-clusterrolebinding.yaml",
+		"manifests/cluster-manager/cluster-manager-work-webhook-service.yaml",
+		"manifests/cluster-manager/cluster-manager-work-webhook-serviceaccount.yaml",
+		"manifests/cluster-manager/cluster-manager-work-webhook-apiservice.yaml",
+		"manifests/cluster-manager/cluster-manager-work-webhook-secret.yaml",
+		"manifests/cluster-manager/cluster-manager-work-webhook-validatingconfiguration.yaml",
 	}
 
 	deploymentFiles = []string{
 		"manifests/cluster-manager/cluster-manager-registration-deployment.yaml",
 		"manifests/cluster-manager/cluster-manager-registration-webhook-deployment.yaml",
+		"manifests/cluster-manager/cluster-manager-work-webhook-deployment.yaml",
 	}
 )
 
 const (
-	clusterManagerFinalizer     = "operator.open-cluster-management.io/cluster-manager-cleanup"
-	clusterManagerWebhookSecret = "webhook-serving-cert"
-	clusterManagerApplied       = "Applied"
-	clusterManagerAvailable     = "Available"
+	clusterManagerFinalizer    = "operator.open-cluster-management.io/cluster-manager-cleanup"
+	registrationWebhookSecret  = "registration-webhook-serving-cert"
+	registrationWebhookService = "cluster-manager-registration-webhook"
+	workWebhookSecret          = "work-webhook-serving-cert"
+	workWebhookService         = "cluster-manager-work-webhook"
+	clusterManagerApplied      = "Applied"
+	clusterManagerAvailable    = "Available"
 )
 
 type clusterManagerController struct {
@@ -106,14 +117,15 @@ func NewClusterManagerController(
 
 // hubConfig is used to render the template of hub manifests
 type hubConfig struct {
-	ClusterManagerName                       string
-	ClusterManagerNamespace                  string
-	RegistrationImage                        string
-	ClusterManagerWebhookSecret              string
-	ClusterManagerWebhookRegistrationService string
-	RegistrationAPIServiceCABundle           string
-	RegistrationServingCert                  string
-	RegistrationServingKey                   string
+	ClusterManagerName             string
+	RegistrationImage              string
+	RegistrationAPIServiceCABundle string
+	RegistrationServingCert        string
+	RegistrationServingKey         string
+	WorkImage                      string
+	WorkAPIServiceCABundle         string
+	WorkServingCert                string
+	WorkServingKey                 string
 }
 
 func (n *clusterManagerController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
@@ -131,11 +143,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	clusterManager = clusterManager.DeepCopy()
 
 	config := hubConfig{
-		ClusterManagerName:                       clusterManager.Name,
-		ClusterManagerNamespace:                  helpers.ClusterManagerNamespace,
-		RegistrationImage:                        clusterManager.Spec.RegistrationImagePullSpec,
-		ClusterManagerWebhookSecret:              clusterManagerWebhookSecret,
-		ClusterManagerWebhookRegistrationService: fmt.Sprintf("%s-registration-webhook", clusterManager.Name),
+		ClusterManagerName: clusterManager.Name,
+		RegistrationImage:  clusterManager.Spec.RegistrationImagePullSpec,
+		WorkImage:          clusterManager.Spec.WorkImagePullSpec,
 	}
 
 	// Update finalizer at first
@@ -162,14 +172,24 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		return n.removeClusterManagerFinalizer(ctx, clusterManager)
 	}
 
+	// Ensure serving cert for webhooks
 	ca, cert, key, err := n.ensureServingCertAndCA(
-		ctx, config.ClusterManagerNamespace, config.ClusterManagerWebhookSecret, config.ClusterManagerWebhookRegistrationService)
+		ctx, helpers.ClusterManagerNamespace, registrationWebhookSecret, registrationWebhookService)
 	if err != nil {
 		return err
 	}
 	config.RegistrationAPIServiceCABundle = base64.StdEncoding.EncodeToString(ca)
 	config.RegistrationServingCert = base64.StdEncoding.EncodeToString(cert)
 	config.RegistrationServingKey = base64.StdEncoding.EncodeToString(key)
+
+	ca, cert, key, err = n.ensureServingCertAndCA(
+		ctx, helpers.ClusterManagerNamespace, workWebhookSecret, workWebhookService)
+	if err != nil {
+		return err
+	}
+	config.WorkAPIServiceCABundle = base64.StdEncoding.EncodeToString(ca)
+	config.WorkServingCert = base64.StdEncoding.EncodeToString(cert)
+	config.WorkServingKey = base64.StdEncoding.EncodeToString(key)
 
 	// Apply static files
 	resourceResults := helpers.ApplyDirectly(

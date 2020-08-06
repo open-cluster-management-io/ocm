@@ -8,5 +8,5 @@ roleRef:
   name: open-cluster-management:{{ .ClusterManagerName }}-registration:controller
 subjects:
 - kind: ServiceAccount
-  namespace: {{ .ClusterManagerNamespace }}
+  namespace: open-cluster-management-hub
   name: {{ .ClusterManagerName }}-registration-controller-sa

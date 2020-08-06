@@ -2,7 +2,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: {{ .ClusterManagerName }}-registration-controller
-  namespace: {{ .ClusterManagerNamespace }}
+  namespace: open-cluster-management-hub
   labels:
     app: clustermanager-controller
 spec:
