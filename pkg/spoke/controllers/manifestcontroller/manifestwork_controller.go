@@ -152,10 +152,11 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 			errs = append(errs, result.Error)
 		}
 
-		resourceMeta, err := buildManifestResourceMeta(index, result.Result, m.restMapper)
+		resourceMeta, err := buildManifestResourceMeta(index, result.Result, manifestWork.Spec.Workload.Manifests[index], m.restMapper)
 		if err != nil {
 			errs = append(errs, err)
 		}
+
 		manifestCondition := workapiv1.ManifestCondition{
 			ResourceMeta: resourceMeta,
 			Conditions:   []workapiv1.StatusCondition{},
@@ -169,7 +170,6 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 
 	// merge the new manifest conditions with the existing manifest conditions
 	manifestWork.Status.ResourceStatus.Manifests = helper.MergeManifestConditions(manifestWork.Status.ResourceStatus.Manifests, newManifestConditions)
-
 	// Update work status
 	_, _, err = helper.UpdateManifestWorkStatus(
 		ctx, m.manifestWorkClient, manifestWork.Name, m.generateUpdateStatusFunc(manifestWork.Status.ResourceStatus))
@@ -378,7 +378,40 @@ func buildAppliedStatusCondition(err error) workapiv1.StatusCondition {
 	}
 }
 
-func buildManifestResourceMeta(index int, object runtime.Object, restMapper *resource.Mapper) (resourceMeta workapiv1.ManifestResourceMeta, err error) {
+// buildManifestResourceMeta returns resource meta for manifest. It tries to get the resource
+// meta from the result object in ApplyResult struct. If the resource meta is incompleted, fall
+// back to manifest template for the meta info.
+func buildManifestResourceMeta(index int, object runtime.Object, manifest workapiv1.Manifest, restMapper *resource.Mapper) (resourceMeta workapiv1.ManifestResourceMeta, err error) {
+	errs := []error{}
+
+	resourceMeta, err = buildResourceMeta(index, object, restMapper)
+	if err != nil {
+		errs = append(errs, err)
+	} else if len(resourceMeta.Kind) > 0 && len(resourceMeta.Version) > 0 && len(resourceMeta.Name) > 0 {
+		return resourceMeta, nil
+	}
+
+	// try to get resource meta from manifest if the one got from apply result is incompleted
+	switch {
+	case manifest.Object != nil:
+		object = manifest.Object
+	default:
+		unstructuredObj := &unstructured.Unstructured{}
+		if err = unstructuredObj.UnmarshalJSON(manifest.Raw); err != nil {
+			errs = append(errs, err)
+			return resourceMeta, utilerrors.NewAggregate(errs)
+		}
+		object = unstructuredObj
+	}
+	resourceMeta, err = buildResourceMeta(index, object, restMapper)
+	if err == nil {
+		return resourceMeta, nil
+	}
+
+	return resourceMeta, utilerrors.NewAggregate(errs)
+}
+
+func buildResourceMeta(index int, object runtime.Object, restMapper *resource.Mapper) (resourceMeta workapiv1.ManifestResourceMeta, err error) {
 	resourceMeta = workapiv1.ManifestResourceMeta{
 		Ordinal: int32(index),
 	}

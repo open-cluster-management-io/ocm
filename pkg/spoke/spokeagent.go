@@ -8,6 +8,7 @@ import (
 	"github.com/open-cluster-management/work/pkg/spoke/controllers/appliedmanifestcontroller"
 	"github.com/open-cluster-management/work/pkg/spoke/controllers/finalizercontroller"
 	"github.com/open-cluster-management/work/pkg/spoke/controllers/manifestcontroller"
+	"github.com/open-cluster-management/work/pkg/spoke/controllers/statuscontroller"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/cobra"
@@ -132,6 +133,13 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 		spokeWorkInformerFactory.Work().V1().AppliedManifestWorks(),
 		hubhash,
 	)
+	availableStatusController := statuscontroller.NewAvailableStatusController(
+		controllerContext.EventRecorder,
+		spokeDynamicClient,
+		hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName),
+		workInformerFactory.Work().V1().ManifestWorks(),
+		workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks(o.SpokeClusterName),
+	)
 
 	go workInformerFactory.Start(ctx.Done())
 	go spokeWorkInformerFactory.Start(ctx.Done())
@@ -140,6 +148,7 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 	go appliedManifestWorkController.Run(ctx, 1)
 	go manifestWorkController.Run(ctx, 1)
 	go manifestWorkFinalizeController.Run(ctx, 1)
+	go availableStatusController.Run(ctx, 1)
 	<-ctx.Done()
 	return nil
 }

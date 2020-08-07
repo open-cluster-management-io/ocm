@@ -562,7 +562,7 @@ func TestAllInCondition(t *testing.T) {
 	}
 }
 
-func TestBuildManifestResourceMeta(t *testing.T) {
+func TestBuildResourceMeta(t *testing.T) {
 	var secret *corev1.Secret
 	var u *unstructured.Unstructured
 
@@ -613,7 +613,48 @@ func TestBuildManifestResourceMeta(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			actual, err := buildManifestResourceMeta(0, c.object, c.restMapper)
+			actual, err := buildResourceMeta(0, c.object, c.restMapper)
+			if err != nil {
+				t.Errorf("Should be success with no err: %v", err)
+			}
+
+			actual.Ordinal = c.expected.Ordinal
+			if !equality.Semantic.DeepEqual(actual, c.expected) {
+				t.Errorf(diff.ObjectDiff(actual, c.expected))
+			}
+		})
+	}
+}
+
+func TestBuildManifestResourceMeta(t *testing.T) {
+	cases := []struct {
+		name           string
+		applyResult    runtime.Object
+		manifestObject runtime.Object
+		restMapper     *resource.Mapper
+		expected       workapiv1.ManifestResourceMeta
+	}{
+		{
+			name:        "extract meta from apply result",
+			applyResult: spoketesting.NewSecret("test1", "ns1", "value1"),
+			restMapper:  spoketesting.NewFakeRestMapper(),
+			expected:    workapiv1.ManifestResourceMeta{Version: "v1", Kind: "Secret", Resource: "secrets", Namespace: "ns1", Name: "test1"},
+		},
+		{
+			name:           "fall back to manifest",
+			manifestObject: spoketesting.NewSecret("test2", "ns2", "value2"),
+			restMapper:     spoketesting.NewFakeRestMapper(),
+			expected:       workapiv1.ManifestResourceMeta{Version: "v1", Kind: "Secret", Resource: "secrets", Namespace: "ns2", Name: "test2"},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			manifest := workapiv1.Manifest{}
+			if c.manifestObject != nil {
+				manifest.Object = c.manifestObject
+			}
+			actual, err := buildManifestResourceMeta(0, c.applyResult, manifest, c.restMapper)
 			if err != nil {
 				t.Errorf("Should be success with no err: %v", err)
 			}
