@@ -53,7 +53,8 @@ var _ = ginkgo.Describe("ClusterManager", func() {
 
 			// Check clusterrole/clusterrolebinding
 			hubRegistrationClusterRole := fmt.Sprintf("open-cluster-management:%s-registration:controller", clusterManagerName)
-			hubWebhookClusterRole := fmt.Sprintf("open-cluster-management:%s-registration:webhook", clusterManagerName)
+			hubRegistrationWebhookClusterRole := fmt.Sprintf("open-cluster-management:%s-registration:webhook", clusterManagerName)
+			hubWorkWebhookClusterRole := fmt.Sprintf("open-cluster-management:%s-registration:webhook", clusterManagerName)
 			gomega.Eventually(func() bool {
 				if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubRegistrationClusterRole, metav1.GetOptions{}); err != nil {
 					return false
@@ -61,7 +62,13 @@ var _ = ginkgo.Describe("ClusterManager", func() {
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubWebhookClusterRole, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubRegistrationWebhookClusterRole, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubWorkWebhookClusterRole, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -73,7 +80,13 @@ var _ = ginkgo.Describe("ClusterManager", func() {
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), hubWebhookClusterRole, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), hubRegistrationWebhookClusterRole, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), hubWorkWebhookClusterRole, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -81,7 +94,8 @@ var _ = ginkgo.Describe("ClusterManager", func() {
 
 			// Check service account
 			hubRegistrationSA := fmt.Sprintf("%s-registration-controller-sa", clusterManagerName)
-			hubWebhookSA := fmt.Sprintf("%s-registration-webhook-sa", clusterManagerName)
+			hubRegistrationWebhookSA := fmt.Sprintf("%s-registration-webhook-sa", clusterManagerName)
+			hubWorkWebhookSA := fmt.Sprintf("%s-work-webhook-sa", clusterManagerName)
 			gomega.Eventually(func() bool {
 				if _, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(context.Background(), hubRegistrationSA, metav1.GetOptions{}); err != nil {
 					return false
@@ -89,7 +103,13 @@ var _ = ginkgo.Describe("ClusterManager", func() {
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(context.Background(), hubWebhookSA, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(context.Background(), hubRegistrationWebhookSA, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.CoreV1().ServiceAccounts(hubNamespace).Get(context.Background(), hubWorkWebhookSA, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -103,9 +123,17 @@ var _ = ginkgo.Describe("ClusterManager", func() {
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
-			hubWebhookDeployment := fmt.Sprintf("%s-registration-webhook", clusterManagerName)
+			hubRegistrationWebhookDeployment := fmt.Sprintf("%s-registration-webhook", clusterManagerName)
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubWebhookDeployment, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationWebhookDeployment, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			hubWorkWebhookDeployment := fmt.Sprintf("%s-work-webhook", clusterManagerName)
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubWorkWebhookDeployment, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -113,16 +141,35 @@ var _ = ginkgo.Describe("ClusterManager", func() {
 
 			// Check service
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.CoreV1().Services(hubNamespace).Get(context.Background(), hubWebhookDeployment, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.CoreV1().Services(hubNamespace).Get(context.Background(), "cluster-manager-registration-webhook", metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.CoreV1().Services(hubNamespace).Get(context.Background(), "cluster-manager-work-webhook", metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Check webhook secret
-			webhookSecret := "webhook-serving-cert"
+			registrationWebhookSecret := "registration-webhook-serving-cert"
 			gomega.Eventually(func() bool {
-				s, err := kubeClient.CoreV1().Secrets(hubNamespace).Get(context.Background(), webhookSecret, metav1.GetOptions{})
+				s, err := kubeClient.CoreV1().Secrets(hubNamespace).Get(context.Background(), registrationWebhookSecret, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				if s.Data == nil || s.Data["ca.crt"] == nil || s.Data["tls.crt"] == nil || s.Data["tls.key"] == nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			workWebhookSecret := "work-webhook-serving-cert"
+			gomega.Eventually(func() bool {
+				s, err := kubeClient.CoreV1().Secrets(hubNamespace).Get(context.Background(), workWebhookSecret, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -133,9 +180,17 @@ var _ = ginkgo.Describe("ClusterManager", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Check validating webhook
-			validtingWebhook := "managedclustervalidators.admission.cluster.open-cluster-management.io"
+			registrationValidtingWebhook := "managedclustervalidators.admission.cluster.open-cluster-management.io"
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(context.Background(), validtingWebhook, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(context.Background(), registrationValidtingWebhook, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			workValidtingWebhook := "manifestworkvalidators.admission.work.open-cluster-management.io"
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(context.Background(), workValidtingWebhook, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true

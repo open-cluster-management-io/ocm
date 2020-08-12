@@ -3,6 +3,7 @@ package clustermanagercontroller
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -96,7 +97,7 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.Cl
 	case *corev1.Namespace:
 		testinghelper.AssertEqualNameNamespace(t, access.GetName(), "", helpers.ClusterManagerNamespace, "")
 	case *appsv1.Deployment:
-		if hubCore.Spec.RegistrationImagePullSpec != o.Spec.Template.Spec.Containers[0].Image {
+		if strings.Contains(o.Name, "registration") && hubCore.Spec.RegistrationImagePullSpec != o.Spec.Template.Spec.Containers[0].Image {
 			t.Errorf("Image does not match to the expected.")
 		}
 	}
@@ -123,7 +124,7 @@ func TestSyncDeploy(t *testing.T) {
 	}
 
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 13)
+	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 20)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager)
 	}
@@ -148,7 +149,7 @@ func TestSyncDeploy(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(createAPIServiceObjects), 1)
+	testinghelper.AssertEqualNumber(t, len(createAPIServiceObjects), 2)
 
 	clusterManagerAction := controller.operatorClient.Actions()
 	testinghelper.AssertEqualNumber(t, len(clusterManagerAction), 2)
@@ -179,7 +180,7 @@ func TestSyncDelete(t *testing.T) {
 			deleteKubeActions = append(deleteKubeActions, deleteKubeAction)
 		}
 	}
-	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 11)
+	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 17)
 
 	deleteCRDActions := []clienttesting.DeleteActionImpl{}
 	crdActions := controller.apiExtensionClient.Actions()
@@ -201,7 +202,7 @@ func TestSyncDelete(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(deleteAPIServiceActions), 1)
+	testinghelper.AssertEqualNumber(t, len(deleteAPIServiceActions), 2)
 
 	for _, action := range deleteKubeActions {
 		switch action.Resource.Resource {

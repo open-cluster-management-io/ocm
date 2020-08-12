@@ -76,6 +76,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		},
 		Spec: operatorapiv1.ClusterManagerSpec{
 			RegistrationImagePullSpec: "quay.io/open-cluster-management/registration",
+			WorkImagePullSpec:         "quay.io/open-cluster-management/work",
 		},
 	}
 	_, err = operatorClient.OperatorV1().ClusterManagers().Create(context.Background(), clusterManager, metav1.CreateOptions{})

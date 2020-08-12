@@ -4,3 +4,4 @@ metadata:
   name: cluster-manager
 spec:
   registrationImagePullSpec: quay.io/open-cluster-management/registration
+  workImagePullSpec: quay.io/open-cluster-management/work

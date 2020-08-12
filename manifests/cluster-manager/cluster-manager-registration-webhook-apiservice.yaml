@@ -6,8 +6,8 @@ spec:
   group: admission.cluster.open-cluster-management.io
   version: v1
   service:
-    name: {{ .ClusterManagerWebhookRegistrationService }}
-    namespace: {{ .ClusterManagerNamespace }}
+    name: cluster-manager-registration-webhook
+    namespace: open-cluster-management-hub
   caBundle: {{ .RegistrationAPIServiceCABundle }}
   groupPriorityMinimum: 10000
   versionPriority: 20

@@ -30,20 +30,21 @@ import (
 )
 
 type Tester struct {
-	KubeClient                 kubernetes.Interface
-	ClusterCfg                 *rest.Config
-	OperatorClient             operatorclient.Interface
-	ClusterClient              clusterclient.Interface
-	WorkClient                 workv1client.Interface
-	bootstrapHubSecret         *corev1.Secret
-	EventuallyTimeout          time.Duration
-	EventuallyInterval         time.Duration
-	clusterManagerNamespace    string
-	klusterletDefaultNamespace string
-	hubRegistrationDeployment  string
-	hubWebhookDeployment       string
-	operatorNamespace          string
-	klusterletOperator         string
+	KubeClient                       kubernetes.Interface
+	ClusterCfg                       *rest.Config
+	OperatorClient                   operatorclient.Interface
+	ClusterClient                    clusterclient.Interface
+	WorkClient                       workv1client.Interface
+	bootstrapHubSecret               *corev1.Secret
+	EventuallyTimeout                time.Duration
+	EventuallyInterval               time.Duration
+	clusterManagerNamespace          string
+	klusterletDefaultNamespace       string
+	hubRegistrationDeployment        string
+	hubRegistrationWebhookDeployment string
+	hubWorkWebhookDeployment         string
+	operatorNamespace                string
+	klusterletOperator               string
 }
 
 // kubeconfigPath is the path of kubeconfig file, will be get from env "KUBECONFIG" by default.
@@ -52,14 +53,15 @@ type Tester struct {
 func NewTester(kubeconfigPath string) (*Tester, error) {
 	var err error
 	var tester = Tester{
-		EventuallyTimeout:          60 * time.Second, // seconds
-		EventuallyInterval:         1 * time.Second,  // seconds
-		clusterManagerNamespace:    helpers.ClusterManagerNamespace,
-		klusterletDefaultNamespace: helpers.KlusterletDefaultNamespace,
-		hubRegistrationDeployment:  "cluster-manager-registration-controller",
-		hubWebhookDeployment:       "cluster-manager-registration-webhook",
-		operatorNamespace:          "open-cluster-management",
-		klusterletOperator:         "klusterlet",
+		EventuallyTimeout:                60 * time.Second, // seconds
+		EventuallyInterval:               1 * time.Second,  // seconds
+		clusterManagerNamespace:          helpers.ClusterManagerNamespace,
+		klusterletDefaultNamespace:       helpers.KlusterletDefaultNamespace,
+		hubRegistrationDeployment:        "cluster-manager-registration-controller",
+		hubRegistrationWebhookDeployment: "cluster-manager-registration-webhook",
+		hubWorkWebhookDeployment:         "cluster-manager-work-webhook",
+		operatorNamespace:                "open-cluster-management",
+		klusterletOperator:               "klusterlet",
 	}
 
 	if kubeconfigPath == "" {
@@ -378,7 +380,12 @@ func (t *Tester) CheckHubReady() error {
 	}
 
 	if _, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
-		Get(context.TODO(), t.hubWebhookDeployment, metav1.GetOptions{}); err != nil {
+		Get(context.TODO(), t.hubRegistrationWebhookDeployment, metav1.GetOptions{}); err != nil {
+		return err
+	}
+
+	if _, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
+		Get(context.TODO(), t.hubWorkWebhookDeployment, metav1.GetOptions{}); err != nil {
 		return err
 	}
 	return nil
