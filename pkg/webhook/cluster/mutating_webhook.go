@@ -1,4 +1,4 @@
-package webhook
+package cluster
 
 import (
 	"encoding/json"
