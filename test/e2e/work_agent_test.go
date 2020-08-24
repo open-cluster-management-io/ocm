@@ -14,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -185,8 +186,8 @@ var _ = ginkgo.Describe("Work agent", func() {
 				}
 
 				// check work status condition
-				return haveCondition(work.Status.Conditions, string(workapiv1.WorkApplied), metav1.ConditionTrue) &&
-					haveCondition(work.Status.Conditions, string(workapiv1.WorkAvailable), metav1.ConditionTrue)
+				return meta.IsStatusConditionPresentAndEqual(work.Status.Conditions, workapiv1.WorkApplied, metav1.ConditionTrue) &&
+					meta.IsStatusConditionPresentAndEqual(work.Status.Conditions, workapiv1.WorkAvailable, metav1.ConditionTrue)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// get the corresponding AppliedManifestWork
@@ -273,8 +274,8 @@ var _ = ginkgo.Describe("Work agent", func() {
 				}
 
 				// check work status condition
-				return haveCondition(work.Status.Conditions, string(workapiv1.WorkApplied), metav1.ConditionTrue) &&
-					haveCondition(work.Status.Conditions, string(workapiv1.WorkAvailable), metav1.ConditionTrue)
+				return meta.IsStatusConditionPresentAndEqual(work.Status.Conditions, workapiv1.WorkApplied, metav1.ConditionTrue) &&
+					meta.IsStatusConditionPresentAndEqual(work.Status.Conditions, workapiv1.WorkAvailable, metav1.ConditionTrue)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// check if cm1 is deleted
@@ -396,8 +397,8 @@ var _ = ginkgo.Describe("Work agent", func() {
 				}
 
 				// check work status condition
-				return haveCondition(work.Status.Conditions, string(workapiv1.WorkApplied), metav1.ConditionTrue) &&
-					haveCondition(work.Status.Conditions, string(workapiv1.WorkAvailable), metav1.ConditionTrue)
+				return meta.IsStatusConditionPresentAndEqual(work.Status.Conditions, workapiv1.WorkApplied, metav1.ConditionTrue) &&
+					meta.IsStatusConditionPresentAndEqual(work.Status.Conditions, workapiv1.WorkAvailable, metav1.ConditionTrue)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 		})
 	})
@@ -452,23 +453,6 @@ func newConfigmap(namespace, name string, data map[string]string, finalizers []s
 	return cm
 }
 
-func haveCondition(conditions []workapiv1.StatusCondition, expectedType string, expectedStatus metav1.ConditionStatus) bool {
-	found := false
-	for _, condition := range conditions {
-		if condition.Type != expectedType {
-			continue
-		}
-		found = true
-
-		if condition.Status != expectedStatus {
-			return false
-		}
-		return true
-	}
-
-	return found
-}
-
 func haveManifestCondition(conditions []workapiv1.ManifestCondition, expectedType string, expectedStatuses []metav1.ConditionStatus) bool {
 	if len(conditions) != len(expectedStatuses) {
 		return false
@@ -480,7 +464,7 @@ func haveManifestCondition(conditions []workapiv1.ManifestCondition, expectedTyp
 			continue
 		}
 
-		if ok := haveCondition(condition.Conditions, expectedType, expectedStatus); !ok {
+		if ok := meta.IsStatusConditionPresentAndEqual(condition.Conditions, expectedType, expectedStatus); !ok {
 			return false
 		}
 	}

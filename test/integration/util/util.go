@@ -7,6 +7,7 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -15,23 +16,6 @@ import (
 
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
 )
-
-func HaveCondition(conditions []workapiv1.StatusCondition, expectedType string, expectedStatus metav1.ConditionStatus) bool {
-	found := false
-	for _, condition := range conditions {
-		if condition.Type != expectedType {
-			continue
-		}
-		found = true
-
-		if condition.Status != expectedStatus {
-			return false
-		}
-		return true
-	}
-
-	return found
-}
 
 func HaveManifestCondition(conditions []workapiv1.ManifestCondition, expectedType string, expectedStatuses []metav1.ConditionStatus) bool {
 	if len(conditions) != len(expectedStatuses) {
@@ -44,7 +28,7 @@ func HaveManifestCondition(conditions []workapiv1.ManifestCondition, expectedTyp
 			continue
 		}
 
-		if ok := HaveCondition(condition.Conditions, expectedType, expectedStatus); !ok {
+		if ok := meta.IsStatusConditionPresentAndEqual(condition.Conditions, expectedType, expectedStatus); !ok {
 			return false
 		}
 	}

@@ -17,8 +17,8 @@ import (
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 )
 
-func newCondition(name, status, reason, message string, lastTransition *metav1.Time) workapiv1.StatusCondition {
-	ret := workapiv1.StatusCondition{
+func newCondition(name, status, reason, message string, lastTransition *metav1.Time) metav1.Condition {
+	ret := metav1.Condition{
 		Type:    name,
 		Status:  metav1.ConditionStatus(status),
 		Reason:  reason,
@@ -30,14 +30,14 @@ func newCondition(name, status, reason, message string, lastTransition *metav1.T
 	return ret
 }
 
-func updateSpokeClusterConditionFn(cond workapiv1.StatusCondition) UpdateManifestWorkStatusFunc {
+func updateSpokeClusterConditionFn(cond metav1.Condition) UpdateManifestWorkStatusFunc {
 	return func(oldStatus *workapiv1.ManifestWorkStatus) error {
-		SetStatusCondition(&oldStatus.Conditions, cond)
+		meta.SetStatusCondition(&oldStatus.Conditions, cond)
 		return nil
 	}
 }
 
-func newManifestCondition(ordinal int32, resource string, conds ...workapiv1.StatusCondition) workapiv1.ManifestCondition {
+func newManifestCondition(ordinal int32, resource string, conds ...metav1.Condition) workapiv1.ManifestCondition {
 	return workapiv1.ManifestCondition{
 		ResourceMeta: workapiv1.ManifestResourceMeta{Ordinal: ordinal, Resource: resource},
 		Conditions:   conds,
@@ -75,52 +75,52 @@ func TestUpdateStatusCondition(t *testing.T) {
 
 	cases := []struct {
 		name               string
-		startingConditions []workapiv1.StatusCondition
-		newCondition       workapiv1.StatusCondition
+		startingConditions []metav1.Condition
+		newCondition       metav1.Condition
 		expectedUpdated    bool
-		expectedConditions []workapiv1.StatusCondition
+		expectedConditions []metav1.Condition
 	}{
 		{
 			name:               "add to empty",
-			startingConditions: []workapiv1.StatusCondition{},
+			startingConditions: []metav1.Condition{},
 			newCondition:       newCondition("test", "True", "my-reason", "my-message", nil),
 			expectedUpdated:    true,
-			expectedConditions: []workapiv1.StatusCondition{newCondition("test", "True", "my-reason", "my-message", nil)},
+			expectedConditions: []metav1.Condition{newCondition("test", "True", "my-reason", "my-message", nil)},
 		},
 		{
 			name: "add to non-conflicting",
-			startingConditions: []workapiv1.StatusCondition{
+			startingConditions: []metav1.Condition{
 				newCondition("two", "True", "my-reason", "my-message", nil),
 			},
 			newCondition:    newCondition("one", "True", "my-reason", "my-message", nil),
 			expectedUpdated: true,
-			expectedConditions: []workapiv1.StatusCondition{
+			expectedConditions: []metav1.Condition{
 				newCondition("two", "True", "my-reason", "my-message", nil),
 				newCondition("one", "True", "my-reason", "my-message", nil),
 			},
 		},
 		{
 			name: "change existing status",
-			startingConditions: []workapiv1.StatusCondition{
+			startingConditions: []metav1.Condition{
 				newCondition("two", "True", "my-reason", "my-message", nil),
 				newCondition("one", "True", "my-reason", "my-message", nil),
 			},
 			newCondition:    newCondition("one", "False", "my-different-reason", "my-othermessage", nil),
 			expectedUpdated: true,
-			expectedConditions: []workapiv1.StatusCondition{
+			expectedConditions: []metav1.Condition{
 				newCondition("two", "True", "my-reason", "my-message", nil),
 				newCondition("one", "False", "my-different-reason", "my-othermessage", nil),
 			},
 		},
 		{
 			name: "leave existing transition time",
-			startingConditions: []workapiv1.StatusCondition{
+			startingConditions: []metav1.Condition{
 				newCondition("two", "True", "my-reason", "my-message", nil),
 				newCondition("one", "True", "my-reason", "my-message", &beforeish),
 			},
 			newCondition:    newCondition("one", "True", "my-reason", "my-message", &afterish),
 			expectedUpdated: false,
-			expectedConditions: []workapiv1.StatusCondition{
+			expectedConditions: []metav1.Condition{
 				newCondition("two", "True", "my-reason", "my-message", nil),
 				newCondition("one", "True", "my-reason", "my-message", &beforeish),
 			},
@@ -267,43 +267,43 @@ func TestMergeStatusConditions(t *testing.T) {
 
 	cases := []struct {
 		name               string
-		startingConditions []workapiv1.StatusCondition
-		newConditions      []workapiv1.StatusCondition
-		expectedConditions []workapiv1.StatusCondition
+		startingConditions []metav1.Condition
+		newConditions      []metav1.Condition
+		expectedConditions []metav1.Condition
 	}{
 		{
 			name: "add status condition",
-			newConditions: []workapiv1.StatusCondition{
+			newConditions: []metav1.Condition{
 				newCondition("one", "True", "my-reason", "my-message", nil),
 			},
-			expectedConditions: []workapiv1.StatusCondition{
+			expectedConditions: []metav1.Condition{
 				newCondition("one", "True", "my-reason", "my-message", nil),
 			},
 		},
 		{
 			name: "merge status condition",
-			startingConditions: []workapiv1.StatusCondition{
+			startingConditions: []metav1.Condition{
 				newCondition("one", "True", "my-reason", "my-message", nil),
 			},
-			newConditions: []workapiv1.StatusCondition{
+			newConditions: []metav1.Condition{
 				newCondition("one", "False", "my-reason", "my-message", nil),
 				newCondition("two", "True", "my-reason", "my-message", nil),
 			},
-			expectedConditions: []workapiv1.StatusCondition{
+			expectedConditions: []metav1.Condition{
 				newCondition("one", "False", "my-reason", "my-message", nil),
 				newCondition("two", "True", "my-reason", "my-message", nil),
 			},
 		},
 		{
 			name: "remove old status condition",
-			startingConditions: []workapiv1.StatusCondition{
+			startingConditions: []metav1.Condition{
 				newCondition("one", "False", "my-reason", "my-message", &transitionTime),
 				newCondition("two", "True", "my-reason", "my-message", nil),
 			},
-			newConditions: []workapiv1.StatusCondition{
+			newConditions: []metav1.Condition{
 				newCondition("one", "False", "my-reason", "my-message", nil),
 			},
-			expectedConditions: []workapiv1.StatusCondition{
+			expectedConditions: []metav1.Condition{
 				newCondition("one", "False", "my-reason", "my-message", &transitionTime),
 				newCondition("two", "True", "my-reason", "my-message", nil),
 			},

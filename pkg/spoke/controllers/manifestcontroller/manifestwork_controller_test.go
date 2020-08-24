@@ -67,7 +67,7 @@ func (t *testController) withUnstructuredObject(objects ...runtime.Object) *test
 	return t
 }
 
-func assertCondition(t *testing.T, conditions []workapiv1.StatusCondition, expectedCondition string, expectedStatus metav1.ConditionStatus) {
+func assertCondition(t *testing.T, conditions []metav1.Condition, expectedCondition string, expectedStatus metav1.ConditionStatus) {
 	conditionTypeFound := false
 	for _, condition := range conditions {
 		if condition.Type != expectedCondition {
@@ -229,8 +229,8 @@ func (t *testCase) validate(
 	}
 }
 
-func newCondition(name, status, reason, message string, lastTransition *metav1.Time) workapiv1.StatusCondition {
-	ret := workapiv1.StatusCondition{
+func newCondition(name, status, reason, message string, lastTransition *metav1.Time) metav1.Condition {
+	ret := metav1.Condition{
 		Type:    name,
 		Status:  metav1.ConditionStatus(status),
 		Reason:  reason,
@@ -242,7 +242,7 @@ func newCondition(name, status, reason, message string, lastTransition *metav1.T
 	return ret
 }
 
-func newManifestCondition(ordinal int32, resource string, conds ...workapiv1.StatusCondition) workapiv1.ManifestCondition {
+func newManifestCondition(ordinal int32, resource string, conds ...metav1.Condition) workapiv1.ManifestCondition {
 	return workapiv1.ManifestCondition{
 		ResourceMeta: workapiv1.ManifestResourceMeta{Ordinal: ordinal, Resource: resource},
 		Conditions:   conds,
@@ -424,14 +424,14 @@ func TestGenerateUpdateStatusFunc(t *testing.T) {
 
 	cases := []struct {
 		name                     string
-		startingStatusConditions []workapiv1.StatusCondition
+		startingStatusConditions []metav1.Condition
 		manifestConditions       []workapiv1.ManifestCondition
-		expectedStatusConditions []workapiv1.StatusCondition
+		expectedStatusConditions []metav1.Condition
 	}{
 		{
 			name:                     "no manifest condition exists",
 			manifestConditions:       []workapiv1.ManifestCondition{},
-			expectedStatusConditions: []workapiv1.StatusCondition{},
+			expectedStatusConditions: []metav1.Condition{},
 		},
 		{
 			name: "all manifests are applied successfully",
@@ -439,7 +439,7 @@ func TestGenerateUpdateStatusFunc(t *testing.T) {
 				newManifestCondition(0, "resource0", newCondition(string(workapiv1.ManifestApplied), string(metav1.ConditionTrue), "my-reason", "my-message", nil)),
 				newManifestCondition(1, "resource1", newCondition(string(workapiv1.ManifestApplied), string(metav1.ConditionTrue), "my-reason", "my-message", nil)),
 			},
-			expectedStatusConditions: []workapiv1.StatusCondition{
+			expectedStatusConditions: []metav1.Condition{
 				newCondition(string(workapiv1.WorkApplied), string(metav1.ConditionTrue), "AppliedManifestWorkComplete", "Apply manifest work complete", nil),
 			},
 		},
@@ -449,33 +449,33 @@ func TestGenerateUpdateStatusFunc(t *testing.T) {
 				newManifestCondition(0, "resource0", newCondition(string(workapiv1.ManifestApplied), string(metav1.ConditionTrue), "my-reason", "my-message", nil)),
 				newManifestCondition(1, "resource1", newCondition(string(workapiv1.ManifestApplied), string(metav1.ConditionFalse), "my-reason", "my-message", nil)),
 			},
-			expectedStatusConditions: []workapiv1.StatusCondition{
+			expectedStatusConditions: []metav1.Condition{
 				newCondition(string(workapiv1.WorkApplied), string(metav1.ConditionFalse), "AppliedManifestWorkFailed", "Failed to apply manifest work", nil),
 			},
 		},
 		{
 			name: "update existing status condition",
-			startingStatusConditions: []workapiv1.StatusCondition{
+			startingStatusConditions: []metav1.Condition{
 				newCondition(string(workapiv1.WorkApplied), string(metav1.ConditionTrue), "AppliedManifestWorkComplete", "Apply manifest work complete", &transitionTime),
 			},
 			manifestConditions: []workapiv1.ManifestCondition{
 				newManifestCondition(0, "resource0", newCondition(string(workapiv1.ManifestApplied), string(metav1.ConditionTrue), "my-reason", "my-message", nil)),
 				newManifestCondition(1, "resource1", newCondition(string(workapiv1.ManifestApplied), string(metav1.ConditionTrue), "my-reason", "my-message", nil)),
 			},
-			expectedStatusConditions: []workapiv1.StatusCondition{
+			expectedStatusConditions: []metav1.Condition{
 				newCondition(string(workapiv1.WorkApplied), string(metav1.ConditionTrue), "AppliedManifestWorkComplete", "Apply manifest work complete", &transitionTime),
 			},
 		},
 		{
 			name: "override existing status conditions",
-			startingStatusConditions: []workapiv1.StatusCondition{
+			startingStatusConditions: []metav1.Condition{
 				newCondition(string(workapiv1.WorkApplied), string(metav1.ConditionTrue), "AppliedManifestWorkComplete", "Apply manifest work complete", nil),
 			},
 			manifestConditions: []workapiv1.ManifestCondition{
 				newManifestCondition(0, "resource0", newCondition(string(workapiv1.ManifestApplied), string(metav1.ConditionTrue), "my-reason", "my-message", nil)),
 				newManifestCondition(1, "resource1", newCondition(string(workapiv1.ManifestApplied), string(metav1.ConditionFalse), "my-reason", "my-message", nil)),
 			},
-			expectedStatusConditions: []workapiv1.StatusCondition{
+			expectedStatusConditions: []metav1.Condition{
 				newCondition(string(workapiv1.WorkApplied), string(metav1.ConditionFalse), "AppliedManifestWorkFailed", "Failed to apply manifest work", nil),
 			},
 		},

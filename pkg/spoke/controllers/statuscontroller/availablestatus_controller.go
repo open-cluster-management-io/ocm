@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ControllerSyncInterval is exposed so that integration tests can crank up the constroller resync speed.
@@ -104,7 +104,7 @@ func (c *AvailableStatusController) syncManifestWork(ctx context.Context, origin
 	// handle status condition of manifests
 	for index, manifest := range manifestWork.Status.ResourceStatus.Manifests {
 		availableStatusCondition := buildAvailableStatusCondition(manifest.ResourceMeta, c.spokeDynamicClient)
-		newConditions := helper.MergeStatusConditions(manifest.Conditions, []workapiv1.StatusCondition{availableStatusCondition})
+		newConditions := helper.MergeStatusConditions(manifest.Conditions, []metav1.Condition{availableStatusCondition})
 		if !reflect.DeepEqual(manifestWork.Status.ResourceStatus.Manifests[index].Conditions, newConditions) {
 			manifestWork.Status.ResourceStatus.Manifests[index].Conditions = newConditions
 			needStatusUpdate = true
@@ -112,7 +112,7 @@ func (c *AvailableStatusController) syncManifestWork(ctx context.Context, origin
 	}
 
 	// handle status condition of manifestwork
-	var workStatusConditions []workapiv1.StatusCondition
+	var workStatusConditions []metav1.Condition
 	switch {
 	case len(manifestWork.Status.ResourceStatus.Manifests) == 0:
 		// remove condition with type Available if no Manifests exists
@@ -124,7 +124,7 @@ func (c *AvailableStatusController) syncManifestWork(ctx context.Context, origin
 	default:
 		// aggregate ManifestConditions and update work status condition
 		workAvailableStatusCondition := aggregateManifestConditions(manifestWork.Status.ResourceStatus.Manifests)
-		workStatusConditions = helper.MergeStatusConditions(manifestWork.Status.Conditions, []workapiv1.StatusCondition{workAvailableStatusCondition})
+		workStatusConditions = helper.MergeStatusConditions(manifestWork.Status.Conditions, []metav1.Condition{workAvailableStatusCondition})
 	}
 	manifestWork.Status.Conditions = workStatusConditions
 
@@ -140,7 +140,7 @@ func (c *AvailableStatusController) syncManifestWork(ctx context.Context, origin
 
 // aggregateManifestConditions aggregates status conditions of manifests and returns a status
 // condition for manifestwork
-func aggregateManifestConditions(manifests []workapiv1.ManifestCondition) workapiv1.StatusCondition {
+func aggregateManifestConditions(manifests []workapiv1.ManifestCondition) metav1.Condition {
 	available, unavailable, unknown := 0, 0, 0
 	for _, manifest := range manifests {
 		for _, condition := range manifest.Conditions {
@@ -161,21 +161,21 @@ func aggregateManifestConditions(manifests []workapiv1.ManifestCondition) workap
 
 	switch {
 	case unavailable > 0:
-		return workapiv1.StatusCondition{
+		return metav1.Condition{
 			Type:    string(workapiv1.WorkAvailable),
 			Status:  metav1.ConditionFalse,
 			Reason:  "ResourcesNotAvailable",
 			Message: fmt.Sprintf("%d of %d resources are not available", unavailable, len(manifests)),
 		}
 	case unknown > 0:
-		return workapiv1.StatusCondition{
+		return metav1.Condition{
 			Type:    string(workapiv1.WorkAvailable),
 			Status:  metav1.ConditionUnknown,
 			Reason:  "ResourcesStatusUnknown",
 			Message: fmt.Sprintf("%d of %d resources have unknown status", unknown, len(manifests)),
 		}
 	default:
-		return workapiv1.StatusCondition{
+		return metav1.Condition{
 			Type:    string(workapiv1.WorkAvailable),
 			Status:  metav1.ConditionTrue,
 			Reason:  "ResourcesAvailable",
@@ -185,11 +185,11 @@ func aggregateManifestConditions(manifests []workapiv1.ManifestCondition) workap
 }
 
 // buildAvailableStatusCondition returns a StatusCondition with type Available for a given manifest resource
-func buildAvailableStatusCondition(resourceMeta workapiv1.ManifestResourceMeta, dynamicClient dynamic.Interface) workapiv1.StatusCondition {
+func buildAvailableStatusCondition(resourceMeta workapiv1.ManifestResourceMeta, dynamicClient dynamic.Interface) metav1.Condition {
 	conditionType := string(workapiv1.ManifestAvailable)
 
 	if len(resourceMeta.Resource) == 0 || len(resourceMeta.Version) == 0 || len(resourceMeta.Name) == 0 {
-		return workapiv1.StatusCondition{
+		return metav1.Condition{
 			Type:    conditionType,
 			Status:  metav1.ConditionUnknown,
 			Reason:  "IncompletedResourceMeta",
@@ -203,7 +203,7 @@ func buildAvailableStatusCondition(resourceMeta workapiv1.ManifestResourceMeta, 
 		Resource: resourceMeta.Resource,
 	}, dynamicClient)
 	if err != nil {
-		return workapiv1.StatusCondition{
+		return metav1.Condition{
 			Type:    conditionType,
 			Status:  metav1.ConditionUnknown,
 			Reason:  "FetchingResourceFailed",
@@ -212,7 +212,7 @@ func buildAvailableStatusCondition(resourceMeta workapiv1.ManifestResourceMeta, 
 	}
 
 	if available {
-		return workapiv1.StatusCondition{
+		return metav1.Condition{
 			Type:    conditionType,
 			Status:  metav1.ConditionTrue,
 			Reason:  "ResourceAvailable",
@@ -220,7 +220,7 @@ func buildAvailableStatusCondition(resourceMeta workapiv1.ManifestResourceMeta, 
 		}
 	}
 
-	return workapiv1.StatusCondition{
+	return metav1.Condition{
 		Type:    conditionType,
 		Status:  metav1.ConditionFalse,
 		Reason:  "ResourceNotAvailable",

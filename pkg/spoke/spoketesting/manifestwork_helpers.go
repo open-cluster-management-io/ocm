@@ -110,9 +110,14 @@ func NewManifestWork(index int, objects ...*unstructured.Unstructured) (*workapi
 }
 
 func NewAppliedManifestWork(hash string, index int) *workapiv1.AppliedManifestWork {
+	workName := fmt.Sprintf("work-%d", index)
 	return &workapiv1.AppliedManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("%s-work-%d", hash, index),
+			Name: fmt.Sprintf("%s-%s", hash, workName),
+		},
+		Spec: workapiv1.AppliedManifestWorkSpec{
+			HubHash:          hash,
+			ManifestWorkName: workName,
 		},
 		Status: workapiv1.AppliedManifestWorkStatus{},
 	}

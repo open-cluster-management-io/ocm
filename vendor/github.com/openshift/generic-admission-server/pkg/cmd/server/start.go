@@ -31,7 +31,6 @@ func NewAdmissionServerOptions(out, errOut io.Writer, admissionHooks ...apiserve
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
 			apiserver.Codecs.LegacyCodec(admissionv1beta1.SchemeGroupVersion),
-			nil,
 		),
 
 		AdmissionHooks: admissionHooks,

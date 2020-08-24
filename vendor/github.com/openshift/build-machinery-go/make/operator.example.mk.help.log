@@ -6,6 +6,7 @@ clean-binaries
 help
 image-ocp-openshift-apiserver-operator
 images
+telepresence
 test
 test-unit
 update

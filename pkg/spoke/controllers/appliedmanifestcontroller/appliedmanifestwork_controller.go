@@ -15,7 +15,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned/typed/work/v1"
 	workinformer "github.com/open-cluster-management/api/client/work/informers/externalversions/work/v1"
