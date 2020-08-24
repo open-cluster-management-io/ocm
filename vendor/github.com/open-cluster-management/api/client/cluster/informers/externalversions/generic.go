@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	v1 "github.com/open-cluster-management/api/cluster/v1"
+	v1alpha1 "github.com/open-cluster-management/api/cluster/v1alpha1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -39,6 +40,12 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	// Group=cluster.open-cluster-management.io, Version=v1
 	case v1.SchemeGroupVersion.WithResource("managedclusters"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1().ManagedClusters().Informer()}, nil
+
+		// Group=cluster.open-cluster-management.io, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithResource("managedclustersets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1alpha1().ManagedClusterSets().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("managedclustersetbindings"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1alpha1().ManagedClusterSetBindings().Informer()}, nil
 
 	}
 

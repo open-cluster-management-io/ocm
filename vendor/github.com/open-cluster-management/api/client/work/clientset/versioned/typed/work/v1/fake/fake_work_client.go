@@ -12,6 +12,10 @@ type FakeWorkV1 struct {
 	*testing.Fake
 }
 
+func (c *FakeWorkV1) AppliedManifestWorks() v1.AppliedManifestWorkInterface {
+	return &FakeAppliedManifestWorks{c}
+}
+
 func (c *FakeWorkV1) ManifestWorks(namespace string) v1.ManifestWorkInterface {
 	return &FakeManifestWorks{c, namespace}
 }

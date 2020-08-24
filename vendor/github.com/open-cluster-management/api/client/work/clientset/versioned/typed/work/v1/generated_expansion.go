@@ -2,4 +2,6 @@
 
 package v1
 
+type AppliedManifestWorkExpansion interface{}
+
 type ManifestWorkExpansion interface{}

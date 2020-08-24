@@ -3,13 +3,29 @@ kind: CustomResourceDefinition
 metadata:
   name: managedclusters.cluster.open-cluster-management.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.hubAcceptsClient
+    name: Hub Accepted
+    type: boolean
+  - JSONPath: .spec.managedClusterClientConfigs[*].url
+    name: Managed Cluster URLs
+    type: string
+  - JSONPath: .status.conditions[?(@.type=="ManagedClusterJoined")].status
+    name: Joined
+    type: string
+  - JSONPath: .status.conditions[?(@.type=="ManagedClusterConditionAvailable")].status
+    name: Available
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: cluster.open-cluster-management.io
   names:
     kind: ManagedCluster
     listKind: ManagedClusterList
     plural: managedclusters
     singular: managedcluster
-  scope: "Cluster"
+  scope: Cluster
   subresources:
     status: {}
   preserveUnknownFields: false
