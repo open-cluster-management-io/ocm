@@ -1,7 +1,9 @@
 // Code generated for package bindata by go-bindata DO NOT EDIT. (@generated)
 // sources:
 // manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml
+// manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml
 // manifests/cluster-manager/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml
+// manifests/cluster-manager/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml
 // manifests/cluster-manager/cluster-manager-namespace.yaml
 // manifests/cluster-manager/cluster-manager-registration-clusterrole.yaml
 // manifests/cluster-manager/cluster-manager-registration-clusterrolebinding.yaml
@@ -258,6 +260,172 @@ func manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclust
 	return a, nil
 }
 
+var _manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersetsCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  name: managedclustersets.cluster.open-cluster-management.io
+spec:
+  group: cluster.open-cluster-management.io
+  names:
+    kind: ManagedClusterSet
+    listKind: ManagedClusterSetList
+    plural: managedclustersets
+    singular: managedclusterset
+  scope: Cluster
+  subresources:
+    status: {}
+  preserveUnknownFields: false
+  validation:
+    openAPIV3Schema:
+      description: "ManagedClusterSet defines a group of ManagedClusters that user's
+        workload can run on. A workload can be defined to deployed on a ManagedClusterSet,
+        which mean: \n 1. The workload can run on any ManagedCluster in the ManagedClusterSet
+        2. The workload cannot run on any ManagedCluster outside the ManagedClusterSet
+        3. The service exposed by the workload can be shared in any ManagedCluster
+        in the ManagedClusterSet"
+      type: object
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: Spec defines the attributes of the desired ManagedClusters
+          type: object
+          properties:
+            clusterSelectors:
+              description: ClusterSelectors represents a slice of selectors to select
+                ManagedClusters If empty, the ManagedClusterSet will include all ManagedClusters
+                If more than one ClusterSelector are specified in the slice, OR operation
+                will be used between them.
+              type: array
+              items:
+                description: ClusterSelector represents a selector of ManagedClusters
+                  ClusterNames and LabelSelector are mutually exclusive. They cannot
+                  be set at the same time. If none of them is set, all ManagedClusters
+                  will be selected
+                type: object
+                properties:
+                  clusterNames:
+                    description: ClusterNames represents a list of cluster name
+                    type: array
+                    items:
+                      type: string
+                  labelSelector:
+                    description: LabelSelector represents a label selector to select
+                      cluster by label
+                    type: object
+                    properties:
+                      matchExpressions:
+                        description: matchExpressions is a list of label selector
+                          requirements. The requirements are ANDed.
+                        type: array
+                        items:
+                          description: A label selector requirement is a selector
+                            that contains values, a key, and an operator that relates
+                            the key and values.
+                          type: object
+                          required:
+                          - key
+                          - operator
+                          properties:
+                            key:
+                              description: key is the label key that the selector
+                                applies to.
+                              type: string
+                            operator:
+                              description: operator represents a key's relationship
+                                to a set of values. Valid operators are In, NotIn,
+                                Exists and DoesNotExist.
+                              type: string
+                            values:
+                              description: values is an array of string values. If
+                                the operator is In or NotIn, the values array must
+                                be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced
+                                during a strategic merge patch.
+                              type: array
+                              items:
+                                type: string
+                      matchLabels:
+                        description: matchLabels is a map of {key,value} pairs. A
+                          single {key,value} in the matchLabels map is equivalent
+                          to an element of matchExpressions, whose key field is "key",
+                          the operator is "In", and the values array contains only
+                          "value". The requirements are ANDed.
+                        type: object
+                        additionalProperties:
+                          type: string
+        status:
+          description: Status represents the current status of the ManagedClusterSet
+          type: object
+          properties:
+            conditions:
+              description: Conditions contains the different condition statuses for
+                this ManagedClusterSet.
+              type: array
+              items:
+                description: StatusCondition contains condition information for a
+                  ManagedClusterSet.
+                type: object
+                properties:
+                  lastTransitionTime:
+                    description: LastTransitionTime is the last time the condition
+                      changed from one status to another.
+                    type: string
+                    format: date-time
+                  message:
+                    description: Message is a human-readable message indicating details
+                      about the last status change.
+                    type: string
+                  reason:
+                    description: Reason is a (brief) reason for the condition's last
+                      status change.
+                    type: string
+                  status:
+                    description: Status is the status of the condition. One of True,
+                      False, Unknown.
+                    type: string
+                  type:
+                    description: Type is the type of the ManagedClusterSet condition.
+                    type: string
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersetsCrdYamlBytes() ([]byte, error) {
+	return _manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersetsCrdYaml, nil
+}
+
+func manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersetsCrdYaml() (*asset, error) {
+	bytes, err := manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersetsCrdYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _manifestsClusterManager0000_00_workOpenClusterManagementIo_manifestworksCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
@@ -457,6 +625,79 @@ func manifestsClusterManager0000_00_workOpenClusterManagementIo_manifestworksCrd
 	}
 
 	info := bindataFileInfo{name: "manifests/cluster-manager/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _manifestsClusterManager0000_01_clustersOpenClusterManagementIo_managedclustersetbindingsCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  name: managedclustersetbindings.cluster.open-cluster-management.io
+spec:
+  group: cluster.open-cluster-management.io
+  names:
+    kind: ManagedClusterSetBinding
+    listKind: ManagedClusterSetBindingList
+    plural: managedclustersetbindings
+    singular: managedclustersetbinding
+  scope: Namespaced
+  preserveUnknownFields: false
+  validation:
+    openAPIV3Schema:
+      description: ManagedClusterSetBinding projects a ManagedClusterSet into a certain
+        namespace. User is able to create a ManagedClusterSetBinding in a namespace
+        and bind it to a ManagedClusterSet if they have an RBAC rule to GET on the
+        virtual subresource of managedclustersets/bind. Workloads created in the same
+        namespace can only be distributed to ManagedClusters in ManagedClustersets
+        bound in this namespace by higher level controllers.
+      type: object
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: Spec defines the attributes of ManagedClusterSetBinding.
+          type: object
+          properties:
+            clusterSet:
+              description: ClusterSet is the name of the ManagedClusterSet to bind.
+                User is allowed to set or update this field if they have an RBAC rule
+                to GET on the virtual subresource of managedclustersets/bind.
+              type: string
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func manifestsClusterManager0000_01_clustersOpenClusterManagementIo_managedclustersetbindingsCrdYamlBytes() ([]byte, error) {
+	return _manifestsClusterManager0000_01_clustersOpenClusterManagementIo_managedclustersetbindingsCrdYaml, nil
+}
+
+func manifestsClusterManager0000_01_clustersOpenClusterManagementIo_managedclustersetbindingsCrdYaml() (*asset, error) {
+	bytes, err := manifestsClusterManager0000_01_clustersOpenClusterManagementIo_managedclustersetbindingsCrdYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "manifests/cluster-manager/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1376,30 +1617,32 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml": manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersCrdYaml,
-	"manifests/cluster-manager/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml":       manifestsClusterManager0000_00_workOpenClusterManagementIo_manifestworksCrdYaml,
-	"manifests/cluster-manager/cluster-manager-namespace.yaml":                                       manifestsClusterManagerClusterManagerNamespaceYaml,
-	"manifests/cluster-manager/cluster-manager-registration-clusterrole.yaml":                        manifestsClusterManagerClusterManagerRegistrationClusterroleYaml,
-	"manifests/cluster-manager/cluster-manager-registration-clusterrolebinding.yaml":                 manifestsClusterManagerClusterManagerRegistrationClusterrolebindingYaml,
-	"manifests/cluster-manager/cluster-manager-registration-deployment.yaml":                         manifestsClusterManagerClusterManagerRegistrationDeploymentYaml,
-	"manifests/cluster-manager/cluster-manager-registration-serviceaccount.yaml":                     manifestsClusterManagerClusterManagerRegistrationServiceaccountYaml,
-	"manifests/cluster-manager/cluster-manager-registration-webhook-apiservice.yaml":                 manifestsClusterManagerClusterManagerRegistrationWebhookApiserviceYaml,
-	"manifests/cluster-manager/cluster-manager-registration-webhook-clusterrole.yaml":                manifestsClusterManagerClusterManagerRegistrationWebhookClusterroleYaml,
-	"manifests/cluster-manager/cluster-manager-registration-webhook-clusterrolebinding.yaml":         manifestsClusterManagerClusterManagerRegistrationWebhookClusterrolebindingYaml,
-	"manifests/cluster-manager/cluster-manager-registration-webhook-deployment.yaml":                 manifestsClusterManagerClusterManagerRegistrationWebhookDeploymentYaml,
-	"manifests/cluster-manager/cluster-manager-registration-webhook-mutatingconfiguration.yaml":      manifestsClusterManagerClusterManagerRegistrationWebhookMutatingconfigurationYaml,
-	"manifests/cluster-manager/cluster-manager-registration-webhook-secret.yaml":                     manifestsClusterManagerClusterManagerRegistrationWebhookSecretYaml,
-	"manifests/cluster-manager/cluster-manager-registration-webhook-service.yaml":                    manifestsClusterManagerClusterManagerRegistrationWebhookServiceYaml,
-	"manifests/cluster-manager/cluster-manager-registration-webhook-serviceaccount.yaml":             manifestsClusterManagerClusterManagerRegistrationWebhookServiceaccountYaml,
-	"manifests/cluster-manager/cluster-manager-registration-webhook-validatingconfiguration.yaml":    manifestsClusterManagerClusterManagerRegistrationWebhookValidatingconfigurationYaml,
-	"manifests/cluster-manager/cluster-manager-work-webhook-apiservice.yaml":                         manifestsClusterManagerClusterManagerWorkWebhookApiserviceYaml,
-	"manifests/cluster-manager/cluster-manager-work-webhook-clusterrole.yaml":                        manifestsClusterManagerClusterManagerWorkWebhookClusterroleYaml,
-	"manifests/cluster-manager/cluster-manager-work-webhook-clusterrolebinding.yaml":                 manifestsClusterManagerClusterManagerWorkWebhookClusterrolebindingYaml,
-	"manifests/cluster-manager/cluster-manager-work-webhook-deployment.yaml":                         manifestsClusterManagerClusterManagerWorkWebhookDeploymentYaml,
-	"manifests/cluster-manager/cluster-manager-work-webhook-secret.yaml":                             manifestsClusterManagerClusterManagerWorkWebhookSecretYaml,
-	"manifests/cluster-manager/cluster-manager-work-webhook-service.yaml":                            manifestsClusterManagerClusterManagerWorkWebhookServiceYaml,
-	"manifests/cluster-manager/cluster-manager-work-webhook-serviceaccount.yaml":                     manifestsClusterManagerClusterManagerWorkWebhookServiceaccountYaml,
-	"manifests/cluster-manager/cluster-manager-work-webhook-validatingconfiguration.yaml":            manifestsClusterManagerClusterManagerWorkWebhookValidatingconfigurationYaml,
+	"manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml":           manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersCrdYaml,
+	"manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml":        manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersetsCrdYaml,
+	"manifests/cluster-manager/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml":                 manifestsClusterManager0000_00_workOpenClusterManagementIo_manifestworksCrdYaml,
+	"manifests/cluster-manager/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml": manifestsClusterManager0000_01_clustersOpenClusterManagementIo_managedclustersetbindingsCrdYaml,
+	"manifests/cluster-manager/cluster-manager-namespace.yaml":                                                 manifestsClusterManagerClusterManagerNamespaceYaml,
+	"manifests/cluster-manager/cluster-manager-registration-clusterrole.yaml":                                  manifestsClusterManagerClusterManagerRegistrationClusterroleYaml,
+	"manifests/cluster-manager/cluster-manager-registration-clusterrolebinding.yaml":                           manifestsClusterManagerClusterManagerRegistrationClusterrolebindingYaml,
+	"manifests/cluster-manager/cluster-manager-registration-deployment.yaml":                                   manifestsClusterManagerClusterManagerRegistrationDeploymentYaml,
+	"manifests/cluster-manager/cluster-manager-registration-serviceaccount.yaml":                               manifestsClusterManagerClusterManagerRegistrationServiceaccountYaml,
+	"manifests/cluster-manager/cluster-manager-registration-webhook-apiservice.yaml":                           manifestsClusterManagerClusterManagerRegistrationWebhookApiserviceYaml,
+	"manifests/cluster-manager/cluster-manager-registration-webhook-clusterrole.yaml":                          manifestsClusterManagerClusterManagerRegistrationWebhookClusterroleYaml,
+	"manifests/cluster-manager/cluster-manager-registration-webhook-clusterrolebinding.yaml":                   manifestsClusterManagerClusterManagerRegistrationWebhookClusterrolebindingYaml,
+	"manifests/cluster-manager/cluster-manager-registration-webhook-deployment.yaml":                           manifestsClusterManagerClusterManagerRegistrationWebhookDeploymentYaml,
+	"manifests/cluster-manager/cluster-manager-registration-webhook-mutatingconfiguration.yaml":                manifestsClusterManagerClusterManagerRegistrationWebhookMutatingconfigurationYaml,
+	"manifests/cluster-manager/cluster-manager-registration-webhook-secret.yaml":                               manifestsClusterManagerClusterManagerRegistrationWebhookSecretYaml,
+	"manifests/cluster-manager/cluster-manager-registration-webhook-service.yaml":                              manifestsClusterManagerClusterManagerRegistrationWebhookServiceYaml,
+	"manifests/cluster-manager/cluster-manager-registration-webhook-serviceaccount.yaml":                       manifestsClusterManagerClusterManagerRegistrationWebhookServiceaccountYaml,
+	"manifests/cluster-manager/cluster-manager-registration-webhook-validatingconfiguration.yaml":              manifestsClusterManagerClusterManagerRegistrationWebhookValidatingconfigurationYaml,
+	"manifests/cluster-manager/cluster-manager-work-webhook-apiservice.yaml":                                   manifestsClusterManagerClusterManagerWorkWebhookApiserviceYaml,
+	"manifests/cluster-manager/cluster-manager-work-webhook-clusterrole.yaml":                                  manifestsClusterManagerClusterManagerWorkWebhookClusterroleYaml,
+	"manifests/cluster-manager/cluster-manager-work-webhook-clusterrolebinding.yaml":                           manifestsClusterManagerClusterManagerWorkWebhookClusterrolebindingYaml,
+	"manifests/cluster-manager/cluster-manager-work-webhook-deployment.yaml":                                   manifestsClusterManagerClusterManagerWorkWebhookDeploymentYaml,
+	"manifests/cluster-manager/cluster-manager-work-webhook-secret.yaml":                                       manifestsClusterManagerClusterManagerWorkWebhookSecretYaml,
+	"manifests/cluster-manager/cluster-manager-work-webhook-service.yaml":                                      manifestsClusterManagerClusterManagerWorkWebhookServiceYaml,
+	"manifests/cluster-manager/cluster-manager-work-webhook-serviceaccount.yaml":                               manifestsClusterManagerClusterManagerWorkWebhookServiceaccountYaml,
+	"manifests/cluster-manager/cluster-manager-work-webhook-validatingconfiguration.yaml":                      manifestsClusterManagerClusterManagerWorkWebhookValidatingconfigurationYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -1445,30 +1688,32 @@ type bintree struct {
 var _bintree = &bintree{nil, map[string]*bintree{
 	"manifests": {nil, map[string]*bintree{
 		"cluster-manager": {nil, map[string]*bintree{
-			"0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml": {manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersCrdYaml, map[string]*bintree{}},
-			"0000_00_work.open-cluster-management.io_manifestworks.crd.yaml":       {manifestsClusterManager0000_00_workOpenClusterManagementIo_manifestworksCrdYaml, map[string]*bintree{}},
-			"cluster-manager-namespace.yaml":                                       {manifestsClusterManagerClusterManagerNamespaceYaml, map[string]*bintree{}},
-			"cluster-manager-registration-clusterrole.yaml":                        {manifestsClusterManagerClusterManagerRegistrationClusterroleYaml, map[string]*bintree{}},
-			"cluster-manager-registration-clusterrolebinding.yaml":                 {manifestsClusterManagerClusterManagerRegistrationClusterrolebindingYaml, map[string]*bintree{}},
-			"cluster-manager-registration-deployment.yaml":                         {manifestsClusterManagerClusterManagerRegistrationDeploymentYaml, map[string]*bintree{}},
-			"cluster-manager-registration-serviceaccount.yaml":                     {manifestsClusterManagerClusterManagerRegistrationServiceaccountYaml, map[string]*bintree{}},
-			"cluster-manager-registration-webhook-apiservice.yaml":                 {manifestsClusterManagerClusterManagerRegistrationWebhookApiserviceYaml, map[string]*bintree{}},
-			"cluster-manager-registration-webhook-clusterrole.yaml":                {manifestsClusterManagerClusterManagerRegistrationWebhookClusterroleYaml, map[string]*bintree{}},
-			"cluster-manager-registration-webhook-clusterrolebinding.yaml":         {manifestsClusterManagerClusterManagerRegistrationWebhookClusterrolebindingYaml, map[string]*bintree{}},
-			"cluster-manager-registration-webhook-deployment.yaml":                 {manifestsClusterManagerClusterManagerRegistrationWebhookDeploymentYaml, map[string]*bintree{}},
-			"cluster-manager-registration-webhook-mutatingconfiguration.yaml":      {manifestsClusterManagerClusterManagerRegistrationWebhookMutatingconfigurationYaml, map[string]*bintree{}},
-			"cluster-manager-registration-webhook-secret.yaml":                     {manifestsClusterManagerClusterManagerRegistrationWebhookSecretYaml, map[string]*bintree{}},
-			"cluster-manager-registration-webhook-service.yaml":                    {manifestsClusterManagerClusterManagerRegistrationWebhookServiceYaml, map[string]*bintree{}},
-			"cluster-manager-registration-webhook-serviceaccount.yaml":             {manifestsClusterManagerClusterManagerRegistrationWebhookServiceaccountYaml, map[string]*bintree{}},
-			"cluster-manager-registration-webhook-validatingconfiguration.yaml":    {manifestsClusterManagerClusterManagerRegistrationWebhookValidatingconfigurationYaml, map[string]*bintree{}},
-			"cluster-manager-work-webhook-apiservice.yaml":                         {manifestsClusterManagerClusterManagerWorkWebhookApiserviceYaml, map[string]*bintree{}},
-			"cluster-manager-work-webhook-clusterrole.yaml":                        {manifestsClusterManagerClusterManagerWorkWebhookClusterroleYaml, map[string]*bintree{}},
-			"cluster-manager-work-webhook-clusterrolebinding.yaml":                 {manifestsClusterManagerClusterManagerWorkWebhookClusterrolebindingYaml, map[string]*bintree{}},
-			"cluster-manager-work-webhook-deployment.yaml":                         {manifestsClusterManagerClusterManagerWorkWebhookDeploymentYaml, map[string]*bintree{}},
-			"cluster-manager-work-webhook-secret.yaml":                             {manifestsClusterManagerClusterManagerWorkWebhookSecretYaml, map[string]*bintree{}},
-			"cluster-manager-work-webhook-service.yaml":                            {manifestsClusterManagerClusterManagerWorkWebhookServiceYaml, map[string]*bintree{}},
-			"cluster-manager-work-webhook-serviceaccount.yaml":                     {manifestsClusterManagerClusterManagerWorkWebhookServiceaccountYaml, map[string]*bintree{}},
-			"cluster-manager-work-webhook-validatingconfiguration.yaml":            {manifestsClusterManagerClusterManagerWorkWebhookValidatingconfigurationYaml, map[string]*bintree{}},
+			"0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml":           {manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersCrdYaml, map[string]*bintree{}},
+			"0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml":        {manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersetsCrdYaml, map[string]*bintree{}},
+			"0000_00_work.open-cluster-management.io_manifestworks.crd.yaml":                 {manifestsClusterManager0000_00_workOpenClusterManagementIo_manifestworksCrdYaml, map[string]*bintree{}},
+			"0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml": {manifestsClusterManager0000_01_clustersOpenClusterManagementIo_managedclustersetbindingsCrdYaml, map[string]*bintree{}},
+			"cluster-manager-namespace.yaml":                                                 {manifestsClusterManagerClusterManagerNamespaceYaml, map[string]*bintree{}},
+			"cluster-manager-registration-clusterrole.yaml":                                  {manifestsClusterManagerClusterManagerRegistrationClusterroleYaml, map[string]*bintree{}},
+			"cluster-manager-registration-clusterrolebinding.yaml":                           {manifestsClusterManagerClusterManagerRegistrationClusterrolebindingYaml, map[string]*bintree{}},
+			"cluster-manager-registration-deployment.yaml":                                   {manifestsClusterManagerClusterManagerRegistrationDeploymentYaml, map[string]*bintree{}},
+			"cluster-manager-registration-serviceaccount.yaml":                               {manifestsClusterManagerClusterManagerRegistrationServiceaccountYaml, map[string]*bintree{}},
+			"cluster-manager-registration-webhook-apiservice.yaml":                           {manifestsClusterManagerClusterManagerRegistrationWebhookApiserviceYaml, map[string]*bintree{}},
+			"cluster-manager-registration-webhook-clusterrole.yaml":                          {manifestsClusterManagerClusterManagerRegistrationWebhookClusterroleYaml, map[string]*bintree{}},
+			"cluster-manager-registration-webhook-clusterrolebinding.yaml":                   {manifestsClusterManagerClusterManagerRegistrationWebhookClusterrolebindingYaml, map[string]*bintree{}},
+			"cluster-manager-registration-webhook-deployment.yaml":                           {manifestsClusterManagerClusterManagerRegistrationWebhookDeploymentYaml, map[string]*bintree{}},
+			"cluster-manager-registration-webhook-mutatingconfiguration.yaml":                {manifestsClusterManagerClusterManagerRegistrationWebhookMutatingconfigurationYaml, map[string]*bintree{}},
+			"cluster-manager-registration-webhook-secret.yaml":                               {manifestsClusterManagerClusterManagerRegistrationWebhookSecretYaml, map[string]*bintree{}},
+			"cluster-manager-registration-webhook-service.yaml":                              {manifestsClusterManagerClusterManagerRegistrationWebhookServiceYaml, map[string]*bintree{}},
+			"cluster-manager-registration-webhook-serviceaccount.yaml":                       {manifestsClusterManagerClusterManagerRegistrationWebhookServiceaccountYaml, map[string]*bintree{}},
+			"cluster-manager-registration-webhook-validatingconfiguration.yaml":              {manifestsClusterManagerClusterManagerRegistrationWebhookValidatingconfigurationYaml, map[string]*bintree{}},
+			"cluster-manager-work-webhook-apiservice.yaml":                                   {manifestsClusterManagerClusterManagerWorkWebhookApiserviceYaml, map[string]*bintree{}},
+			"cluster-manager-work-webhook-clusterrole.yaml":                                  {manifestsClusterManagerClusterManagerWorkWebhookClusterroleYaml, map[string]*bintree{}},
+			"cluster-manager-work-webhook-clusterrolebinding.yaml":                           {manifestsClusterManagerClusterManagerWorkWebhookClusterrolebindingYaml, map[string]*bintree{}},
+			"cluster-manager-work-webhook-deployment.yaml":                                   {manifestsClusterManagerClusterManagerWorkWebhookDeploymentYaml, map[string]*bintree{}},
+			"cluster-manager-work-webhook-secret.yaml":                                       {manifestsClusterManagerClusterManagerWorkWebhookSecretYaml, map[string]*bintree{}},
+			"cluster-manager-work-webhook-service.yaml":                                      {manifestsClusterManagerClusterManagerWorkWebhookServiceYaml, map[string]*bintree{}},
+			"cluster-manager-work-webhook-serviceaccount.yaml":                               {manifestsClusterManagerClusterManagerWorkWebhookServiceaccountYaml, map[string]*bintree{}},
+			"cluster-manager-work-webhook-validatingconfiguration.yaml":                      {manifestsClusterManagerClusterManagerWorkWebhookValidatingconfigurationYaml, map[string]*bintree{}},
 		}},
 	}},
 }}
