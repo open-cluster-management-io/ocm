@@ -5,6 +5,7 @@ set -o nounset
 set -o pipefail
 
 HUB_CRD_FILES="./vendor/github.com/open-cluster-management/api/cluster/v1/*.crd.yaml
+./vendor/github.com/open-cluster-management/api/cluster/v1alpha1/*.crd.yaml
 ./vendor/github.com/open-cluster-management/api/work/v1/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml
 "
 
