@@ -6,6 +6,8 @@ import (
 	clientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	clusterv1 "github.com/open-cluster-management/api/client/cluster/clientset/versioned/typed/cluster/v1"
 	fakeclusterv1 "github.com/open-cluster-management/api/client/cluster/clientset/versioned/typed/cluster/v1/fake"
+	clusterv1alpha1 "github.com/open-cluster-management/api/client/cluster/clientset/versioned/typed/cluster/v1alpha1"
+	fakeclusterv1alpha1 "github.com/open-cluster-management/api/client/cluster/clientset/versioned/typed/cluster/v1alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -63,4 +65,9 @@ var _ clientset.Interface = &Clientset{}
 // ClusterV1 retrieves the ClusterV1Client
 func (c *Clientset) ClusterV1() clusterv1.ClusterV1Interface {
 	return &fakeclusterv1.FakeClusterV1{Fake: &c.Fake}
+}
+
+// ClusterV1alpha1 retrieves the ClusterV1alpha1Client
+func (c *Clientset) ClusterV1alpha1() clusterv1alpha1.ClusterV1alpha1Interface {
+	return &fakeclusterv1alpha1.FakeClusterV1alpha1{Fake: &c.Fake}
 }

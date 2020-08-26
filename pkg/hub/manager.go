@@ -14,6 +14,7 @@ import (
 	"github.com/open-cluster-management/registration/pkg/hub/csr"
 	"github.com/open-cluster-management/registration/pkg/hub/lease"
 	"github.com/open-cluster-management/registration/pkg/hub/managedcluster"
+	"github.com/open-cluster-management/registration/pkg/hub/managedclusterset"
 	"github.com/open-cluster-management/registration/pkg/hub/rbacfinalizerdeletion"
 
 	kubeinformers "k8s.io/client-go/informers"
@@ -72,6 +73,13 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		controllerContext.EventRecorder,
 	)
 
+	managedClusterSetController := managedclusterset.NewManagedClusterSetController(
+		clusterClient,
+		clusterInformers.Cluster().V1().ManagedClusters(),
+		clusterInformers.Cluster().V1alpha1().ManagedClusterSets(),
+		controllerContext.EventRecorder,
+	)
+
 	go clusterInformers.Start(ctx.Done())
 	go workInformers.Start(ctx.Done())
 	go kubeInfomers.Start(ctx.Done())
@@ -80,6 +88,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	go csrController.Run(ctx, 1)
 	go leaseController.Run(ctx, 1)
 	go rbacFinalizerController.Run(ctx, 1)
+	go managedClusterSetController.Run(ctx, 1)
 
 	<-ctx.Done()
 	return nil
