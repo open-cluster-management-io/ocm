@@ -214,7 +214,17 @@ var _ = ginkgo.Describe("Work agent", func() {
 				{Version: "v1", Resource: "configmaps", Namespace: ns2, Name: "cm3"},
 				{Version: "v1", Resource: "namespaces", Name: ns1},
 			}
-			gomega.Expect(reflect.DeepEqual(appliedManifestWork.Status.AppliedResources, expectedAppliedResources)).To(gomega.BeTrue())
+			actualAppliedResources := []workapiv1.AppliedManifestResourceMeta{}
+			for _, appliedResource := range appliedManifestWork.Status.AppliedResources {
+				actualAppliedResources = append(actualAppliedResources, workapiv1.AppliedManifestResourceMeta{
+					Group:     appliedResource.Group,
+					Version:   appliedResource.Version,
+					Resource:  appliedResource.Resource,
+					Namespace: appliedResource.Namespace,
+					Name:      appliedResource.Name,
+				})
+			}
+			gomega.Expect(reflect.DeepEqual(actualAppliedResources, expectedAppliedResources)).To(gomega.BeTrue())
 
 			ginkgo.By("update manifestwork")
 			cmData := map[string]string{"x": "y"}

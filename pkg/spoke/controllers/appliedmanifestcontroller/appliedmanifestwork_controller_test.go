@@ -38,39 +38,46 @@ func TestSyncManifestWork(t *testing.T) {
 		appliedResources                   []workapiv1.AppliedManifestResourceMeta
 		manifests                          []workapiv1.ManifestCondition
 		validateAppliedManifestWorkActions func(t *testing.T, actions []clienttesting.Action)
-		validateDynamicActions             func(t *testing.T, actions []clienttesting.Action)
+		expectedDeleteActions              []clienttesting.DeleteActionImpl
 		expectedQueueLen                   int
 	}{
 		{
 			name: "skip when no applied resource changed",
-			appliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
+			existingResources: []runtime.Object{
+				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
 			},
-			manifests: []workapiv1.ManifestCondition{newManifest("g1", "v1", "r1", "ns1", "n1")},
+			appliedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
+			},
+			manifests: []workapiv1.ManifestCondition{newManifest("", "v1", "secrets", "ns1", "n1")},
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) > 0 {
 					t.Fatal(spew.Sdump(actions))
 				}
 			},
-			validateDynamicActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) > 0 {
-					t.Fatal(spew.Sdump(actions))
-				}
-			},
+			expectedDeleteActions: []clienttesting.DeleteActionImpl{},
 		},
 		{
 			name: "delete untracked resources",
+			existingResources: []runtime.Object{
+				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
+				spoketesting.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2"),
+				spoketesting.NewUnstructuredSecret("ns3", "n3", false, "ns3-n3"),
+				spoketesting.NewUnstructuredSecret("ns4", "n4", false, "ns4-n4"),
+				spoketesting.NewUnstructuredSecret("ns5", "n5", false, "ns5-n5"),
+				spoketesting.NewUnstructuredSecret("ns6", "n6", false, "ns6-n6"),
+			},
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
-				{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
-				{Group: "g3", Version: "v3", Resource: "r3", Namespace: "ns3", Name: "n3"},
-				{Group: "g4", Version: "v4", Resource: "r4", Namespace: "ns4", Name: "n4"},
+				{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
+				{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
+				{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns3", Name: "n3", UID: "ns3-n3"},
+				{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns4", Name: "n4", UID: "ns4-n4"},
 			},
 			manifests: []workapiv1.ManifestCondition{
-				newManifest("g1", "v1", "r1", "ns1", "n1"),
-				newManifest("g2", "v2", "r2", "ns2", "n2"),
-				newManifest("g5", "v5", "r5", "ns5", "n5"),
-				newManifest("g6", "v6", "r6", "ns6", "n6"),
+				newManifest("", "v1", "secrets", "ns1", "n1"),
+				newManifest("", "v1", "secrets", "ns2", "n2"),
+				newManifest("", "v1", "secrets", "ns5", "n5"),
+				newManifest("", "v1", "secrets", "ns6", "n6"),
 			},
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 1 {
@@ -78,39 +85,31 @@ func TestSyncManifestWork(t *testing.T) {
 				}
 				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
 				if !reflect.DeepEqual(work.Status.AppliedResources, []workapiv1.AppliedManifestResourceMeta{
-					{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
-					{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
-					{Group: "g5", Version: "v5", Resource: "r5", Namespace: "ns5", Name: "n5"},
-					{Group: "g6", Version: "v6", Resource: "r6", Namespace: "ns6", Name: "n6"},
+					{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
+					{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
+					{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns3", Name: "n3", UID: "ns3-n3"},
+					{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns4", Name: "n4", UID: "ns4-n4"},
+					{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns5", Name: "n5", UID: "ns5-n5"},
+					{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns6", Name: "n6", UID: "ns6-n6"},
 				}) {
 					t.Fatal(spew.Sdump(actions))
 				}
 			},
-			validateDynamicActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 2 {
-					t.Fatal(spew.Sdump(actions))
-				}
-
-				action := actions[0].(clienttesting.GetAction)
-				resource, namespace, name := action.GetResource(), action.GetNamespace(), action.GetName()
-				if !reflect.DeepEqual(resource, schema.GroupVersionResource{Group: "g3", Version: "v3", Resource: "r3"}) || namespace != "ns3" || name != "n3" {
-					t.Fatal(spew.Sdump(actions))
-				}
-				action = actions[1].(clienttesting.GetAction)
-				resource, namespace, name = action.GetResource(), action.GetNamespace(), action.GetName()
-				if !reflect.DeepEqual(resource, schema.GroupVersionResource{Group: "g4", Version: "v4", Resource: "r4"}) || namespace != "ns4" || name != "n4" {
-					t.Fatal(spew.Sdump(actions))
-				}
+			expectedDeleteActions: []clienttesting.DeleteActionImpl{
+				clienttesting.NewDeleteAction(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}, "ns3", "n3"),
+				clienttesting.NewDeleteAction(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}, "ns4", "n4"),
 			},
 		},
 		{
 			name: "requeue work when applied resource for stale manifest is deleting",
 			existingResources: []runtime.Object{
+				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
+				spoketesting.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2"),
 				spoketesting.NewUnstructuredSecret("ns3", "n3", true, "ns3-n3"),
 			},
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1"},
-				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2"},
+				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
+				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
 				{Version: "v1", Resource: "secrets", Namespace: "ns3", Name: "n3", UID: "ns3-n3"},
 			},
 			manifests: []workapiv1.ManifestCondition{
@@ -122,23 +121,15 @@ func TestSyncManifestWork(t *testing.T) {
 					t.Fatal(spew.Sdump(actions))
 				}
 			},
-			validateDynamicActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatal(spew.Sdump(actions))
-				}
-
-				action := actions[0].(clienttesting.GetAction)
-				resource, namespace, name := action.GetResource(), action.GetNamespace(), action.GetName()
-				if !reflect.DeepEqual(resource, schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}) || namespace != "ns3" || name != "n3" {
-					t.Fatal(spew.Sdump(actions))
-				}
-			},
-			expectedQueueLen: 1,
+			expectedDeleteActions: []clienttesting.DeleteActionImpl{},
+			expectedQueueLen:      1,
 		},
 		{
 			name: "ignore re-created resource",
 			existingResources: []runtime.Object{
 				spoketesting.NewUnstructuredSecret("ns3", "n3", false, "ns3-n3-recreated"),
+				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
+				spoketesting.NewUnstructuredSecret("ns5", "n5", false, "ns5-n5"),
 			},
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", Resource: "secrets", Namespace: "ns3", Name: "n3", UID: "ns3-n3"},
@@ -154,28 +145,41 @@ func TestSyncManifestWork(t *testing.T) {
 				}
 				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
 				if !reflect.DeepEqual(work.Status.AppliedResources, []workapiv1.AppliedManifestResourceMeta{
-					{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1"},
-					{Version: "v1", Resource: "secrets", Namespace: "ns5", Name: "n5"},
+					{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
+					{Version: "v1", Resource: "secrets", Namespace: "ns5", Name: "n5", UID: "ns5-n5"},
 				}) {
 					t.Fatal(spew.Sdump(actions))
 				}
 			},
-			validateDynamicActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 2 {
+			expectedDeleteActions: []clienttesting.DeleteActionImpl{},
+		},
+		{
+			name: "update resource uid",
+			existingResources: []runtime.Object{
+				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
+				spoketesting.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2-updated"),
+			},
+			appliedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
+				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
+			},
+			manifests: []workapiv1.ManifestCondition{
+				newManifest("", "v1", "secrets", "ns1", "n1"),
+				newManifest("", "v1", "secrets", "ns2", "n2"),
+			},
+			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 1 {
 					t.Fatal(spew.Sdump(actions))
 				}
-
-				action := actions[0].(clienttesting.GetAction)
-				resource, namespace, name := action.GetResource(), action.GetNamespace(), action.GetName()
-				if !reflect.DeepEqual(resource, schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}) || namespace != "ns3" || name != "n3" {
-					t.Fatal(spew.Sdump(actions))
-				}
-				action = actions[1].(clienttesting.GetAction)
-				resource, namespace, name = action.GetResource(), action.GetNamespace(), action.GetName()
-				if !reflect.DeepEqual(resource, schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}) || namespace != "ns4" || name != "n4" {
+				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
+				if !reflect.DeepEqual(work.Status.AppliedResources, []workapiv1.AppliedManifestResourceMeta{
+					{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
+					{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2-updated"},
+				}) {
 					t.Fatal(spew.Sdump(actions))
 				}
 			},
+			expectedDeleteActions: []clienttesting.DeleteActionImpl{},
 		},
 	}
 
@@ -207,7 +211,16 @@ func TestSyncManifestWork(t *testing.T) {
 				t.Fatal(err)
 			}
 			c.validateAppliedManifestWorkActions(t, fakeClient.Actions())
-			c.validateDynamicActions(t, fakeDynamicClient.Actions())
+
+			deleteActions := []clienttesting.DeleteActionImpl{}
+			for _, action := range fakeDynamicClient.Actions() {
+				if action.GetVerb() == "delete" {
+					deleteActions = append(deleteActions, action.(clienttesting.DeleteActionImpl))
+				}
+			}
+			if !reflect.DeepEqual(c.expectedDeleteActions, deleteActions) {
+				t.Fatal(spew.Sdump(deleteActions))
+			}
 
 			queueLen := controllerContext.Queue().Len()
 			if queueLen != c.expectedQueueLen {

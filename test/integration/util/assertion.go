@@ -181,6 +181,18 @@ func AssertAppliedResources(hubHash, workName string, gvrs []schema.GroupVersion
 			return false
 		}
 
-		return reflect.DeepEqual(appliedManifestWork.Status.AppliedResources, appliedResources)
+		// remove uid from each AppliedManifestResourceMeta
+		var actualAppliedResources []workapiv1.AppliedManifestResourceMeta
+		for _, appliedResource := range appliedManifestWork.Status.AppliedResources {
+			actualAppliedResources = append(actualAppliedResources, workapiv1.AppliedManifestResourceMeta{
+				Group:     appliedResource.Group,
+				Version:   appliedResource.Version,
+				Resource:  appliedResource.Resource,
+				Namespace: appliedResource.Namespace,
+				Name:      appliedResource.Name,
+			})
+		}
+
+		return reflect.DeepEqual(actualAppliedResources, appliedResources)
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }

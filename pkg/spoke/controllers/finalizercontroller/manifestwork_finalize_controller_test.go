@@ -186,7 +186,6 @@ func TestSyncManifestWorkController(t *testing.T) {
 				},
 			},
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				fmt.Printf("Actions are %#v\n", actions)
 				if len(actions) != 1 {
 					t.Errorf("Expect 2 actions on appliedmanifestwork, but have %d", len(actions))
 				}
