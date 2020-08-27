@@ -28,6 +28,7 @@ resources:
 - ./managedcluster.crd.yaml
 - ./manifestwork.crd.yaml
 - ./managedclusterset.crd.yaml
+- ./managedclustersetbinding.crd.yaml
 - ./namespace.yaml
 - ./service_account.yaml
 - ./hub_controller_clusterrole_binding.yaml

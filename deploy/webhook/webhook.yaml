@@ -53,3 +53,32 @@ webhooks:
   admissionReviewVersions: ["v1beta1"]
   sideEffects: None
   timeoutSeconds: 3
+
+---
+
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: managedclustersetbindingvalidators.admission.cluster.open-cluster-management.io
+webhooks:
+- name: managedclustersetbindingvalidators.admission.cluster.open-cluster-management.io
+  failurePolicy: Fail
+  clientConfig:
+    service:
+      # reach the webhook via the registered aggregated API
+      namespace: default
+      name: kubernetes
+      path: /apis/admission.cluster.open-cluster-management.io/v1/managedclustersetbindingvalidators
+  rules:
+  - operations:
+    - CREATE
+    - UPDATE
+    apiGroups:
+    - cluster.open-cluster-management.io
+    apiVersions:
+    - "*"
+    resources:
+    - managedclustersetbindings
+  admissionReviewVersions: ["v1beta1"]
+  sideEffects: None
+  timeoutSeconds: 3

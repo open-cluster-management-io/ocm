@@ -3,14 +3,20 @@ package webhook
 import (
 	"os"
 
-	"github.com/open-cluster-management/registration/pkg/webhook"
+	clusterwebhook "github.com/open-cluster-management/registration/pkg/webhook/cluster"
+	clustersetbindingwebhook "github.com/open-cluster-management/registration/pkg/webhook/clustersetbinding"
 	admissionserver "github.com/openshift/generic-admission-server/pkg/cmd/server"
 	"github.com/spf13/cobra"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 )
 
 func NewAdmissionHook() *cobra.Command {
-	o := admissionserver.NewAdmissionServerOptions(os.Stdout, os.Stderr, &webhook.ManagedClusterValidatingAdmissionHook{}, &webhook.ManagedClusterMutatingAdmissionHook{})
+	o := admissionserver.NewAdmissionServerOptions(
+		os.Stdout,
+		os.Stderr,
+		&clusterwebhook.ManagedClusterValidatingAdmissionHook{},
+		&clusterwebhook.ManagedClusterMutatingAdmissionHook{},
+		&clustersetbindingwebhook.ManagedClusterSetBindingValidatingAdmissionHook{})
 
 	cmd := &cobra.Command{
 		Use:   "webhook",
