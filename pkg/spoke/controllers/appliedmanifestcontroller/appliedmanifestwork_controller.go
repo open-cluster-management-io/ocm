@@ -94,6 +94,10 @@ func (m *AppliedManifestWorkController) sync(ctx context.Context, controllerCont
 	if err != nil {
 		return err
 	}
+	// no work to do if we're deleted
+	if !appliedManifestWork.DeletionTimestamp.IsZero() {
+		return nil
+	}
 
 	return m.syncManifestWork(ctx, controllerContext, manifestWork, appliedManifestWork)
 }
@@ -111,9 +115,28 @@ func (m *AppliedManifestWorkController) syncManifestWork(
 	// spec because manifests in spec are only resource templates, while resource status records the real resources
 	// maintained by the manifest work.
 	var appliedResources []workapiv1.AppliedManifestResourceMeta
+	var errs []error
 	for _, resourceStatus := range manifestWork.Status.ResourceStatus.Manifests {
 		gvr := schema.GroupVersionResource{Group: resourceStatus.ResourceMeta.Group, Version: resourceStatus.ResourceMeta.Version, Resource: resourceStatus.ResourceMeta.Resource}
 		if len(gvr.Resource) == 0 || len(gvr.Version) == 0 || len(resourceStatus.ResourceMeta.Name) == 0 {
+			continue
+		}
+
+		u, err := m.spokeDynamicClient.
+			Resource(gvr).
+			Namespace(resourceStatus.ResourceMeta.Namespace).
+			Get(context.TODO(), resourceStatus.ResourceMeta.Name, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			klog.V(2).Infof(
+				"Resource %v with key %s/%s does not exist",
+				gvr, resourceStatus.ResourceMeta.Namespace, resourceStatus.ResourceMeta.Name)
+			continue
+		}
+
+		if err != nil {
+			errs = append(errs, fmt.Errorf(
+				"Failed to get resource %v with key %s/%s: %w",
+				gvr, resourceStatus.ResourceMeta.Namespace, resourceStatus.ResourceMeta.Name, err))
 			continue
 		}
 
@@ -123,7 +146,11 @@ func (m *AppliedManifestWorkController) syncManifestWork(
 			Resource:  resourceStatus.ResourceMeta.Resource,
 			Namespace: resourceStatus.ResourceMeta.Namespace,
 			Name:      resourceStatus.ResourceMeta.Name,
+			UID:       string(u.GetUID()),
 		})
+	}
+	if len(errs) != 0 {
+		return utilerrors.NewAggregate(errs)
 	}
 
 	// delete applied resources which are no longer maintained by manifest work
@@ -178,7 +205,9 @@ func findUntrackedResources(appliedResources, newAppliedResources []workapiv1.Ap
 
 	resourceIndex := map[workapiv1.AppliedManifestResourceMeta]struct{}{}
 	for _, resource := range newAppliedResources {
-		resourceIndex[resource] = struct{}{}
+		key := resource.DeepCopy()
+		key.UID = ""
+		resourceIndex[*key] = struct{}{}
 	}
 
 	for _, resource := range appliedResources {

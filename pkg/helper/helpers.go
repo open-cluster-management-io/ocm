@@ -18,6 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
@@ -264,6 +265,7 @@ func UpdateManifestWorkStatus(
 }
 
 // DeleteAppliedResources deletes all given applied resources and returns those pending for finalization
+// If the uid recorded in resources is different from what we get by client, ignore the deletion.
 func DeleteAppliedResources(resources []workapiv1.AppliedManifestResourceMeta, dynamicClient dynamic.Interface) ([]workapiv1.AppliedManifestResourceMeta, []error) {
 	var resourcesPendingFinalization []workapiv1.AppliedManifestResourceMeta
 	var errs []error
@@ -286,28 +288,18 @@ func DeleteAppliedResources(resources []workapiv1.AppliedManifestResourceMeta, d
 			continue
 		}
 
-		pendingFinalization := u.GetDeletionTimestamp() != nil && !u.GetDeletionTimestamp().IsZero()
-		waitingForFinalization := len(resource.UID) > 0
-		if pendingFinalization {
-			if waitingForFinalization && resource.UID != string(u.GetUID()) {
-				// the instance is deleted, so do not add to the resourcesPendingDeletion list
-				continue
-			}
-
-			// if we aren't waiting for finalization or the UID does match, then we want to ensure we add it to the pending list
-			newResource := copyAppliedResource(resource)
-			newResource.UID = string(u.GetUID())
-			resourcesPendingFinalization = append(resourcesPendingFinalization, newResource)
+		if resource.UID != string(u.GetUID()) {
+			// the traced instance has been deleted, and forget this item.
 			continue
 		}
 
-		// forget this item if the UID does not match the resource UID we previously deleted
-		if waitingForFinalization && resource.UID != string(u.GetUID()) {
+		if u.GetDeletionTimestamp() != nil && !u.GetDeletionTimestamp().IsZero() {
+			resourcesPendingFinalization = append(resourcesPendingFinalization, resource)
 			continue
 		}
 
 		// delete the resource which is not deleted yet
-		uid := u.GetUID()
+		uid := types.UID(resource.UID)
 		err = dynamicClient.
 			Resource(gvr).
 			Namespace(resource.Namespace).
@@ -330,25 +322,11 @@ func DeleteAppliedResources(resources []workapiv1.AppliedManifestResourceMeta, d
 			continue
 		}
 
-		// set UID of applied resource once deletion is successful
-		newResource := copyAppliedResource(resource)
-		newResource.UID = string(u.GetUID())
-		resourcesPendingFinalization = append(resourcesPendingFinalization, newResource)
+		resourcesPendingFinalization = append(resourcesPendingFinalization, resource)
 		klog.V(2).Infof("Delete resource %v with key %s/%s", gvr, resource.Namespace, resource.Name)
 	}
 
 	return resourcesPendingFinalization, errs
-}
-
-func copyAppliedResource(resource workapiv1.AppliedManifestResourceMeta) workapiv1.AppliedManifestResourceMeta {
-	return workapiv1.AppliedManifestResourceMeta{
-		Group:     resource.Group,
-		Version:   resource.Version,
-		Resource:  resource.Resource,
-		Name:      resource.Name,
-		Namespace: resource.Namespace,
-		UID:       resource.UID,
-	}
 }
 
 // GuessObjectGroupVersionKind returns GVK for the passed runtime object.

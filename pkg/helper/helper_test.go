@@ -348,7 +348,6 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
 			},
 			expectedResourcesPendingFinalization: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
 				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
 			},
 		},
