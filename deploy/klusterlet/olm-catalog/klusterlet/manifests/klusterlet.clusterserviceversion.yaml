@@ -117,6 +117,7 @@ spec:
           - get
           - list
           - watch
+          - delete
         - apiGroups:
           - ""
           - events.k8s.io
