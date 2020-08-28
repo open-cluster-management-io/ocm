@@ -348,7 +348,6 @@ func TestFailedToApplyResource(t *testing.T) {
 
 	// Add a reactor on fake client to throw error when creating secret on namespace ns2
 	controller.kubeClient.PrependReactor("create", "secrets", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-		fmt.Printf("the action get into %v\n", action)
 		if action.GetVerb() != "create" {
 			return false, nil, nil
 		}
@@ -485,7 +484,7 @@ func TestGenerateUpdateStatusFunc(t *testing.T) {
 	controller := &ManifestWorkController{}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			updateStatusFunc := controller.generateUpdateStatusFunc(workapiv1.ManifestResourceStatus{Manifests: c.manifestConditions})
+			updateStatusFunc := controller.generateUpdateStatusFunc(c.manifestConditions)
 			manifestWorkStatus := &workapiv1.ManifestWorkStatus{
 				Conditions: c.startingStatusConditions,
 			}

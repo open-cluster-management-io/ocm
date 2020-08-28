@@ -168,11 +168,9 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 		newManifestConditions = append(newManifestConditions, manifestCondition)
 	}
 
-	// merge the new manifest conditions with the existing manifest conditions
-	manifestWork.Status.ResourceStatus.Manifests = helper.MergeManifestConditions(manifestWork.Status.ResourceStatus.Manifests, newManifestConditions)
 	// Update work status
 	_, _, err = helper.UpdateManifestWorkStatus(
-		ctx, m.manifestWorkClient, manifestWork.Name, m.generateUpdateStatusFunc(manifestWork.Status.ResourceStatus))
+		ctx, m.manifestWorkClient, manifestWork.Name, m.generateUpdateStatusFunc(newManifestConditions))
 	if err != nil {
 		errs = append(errs, fmt.Errorf("Failed to update work status with err %w", err))
 	}
@@ -267,15 +265,16 @@ func (m *ManifestWorkController) applyUnstructrued(data []byte, owner metav1.Own
 // Rules to generate work status conditions from manifest conditions
 // #1: Applied - work status condition (with type Applied) is applied if all manifest conditions (with type Applied) are applied
 // TODO: add rules for other condition types, like Progressing, Available, Degraded
-func (m *ManifestWorkController) generateUpdateStatusFunc(manifestStatus workapiv1.ManifestResourceStatus) helper.UpdateManifestWorkStatusFunc {
+func (m *ManifestWorkController) generateUpdateStatusFunc(newManifestConditions []workapiv1.ManifestCondition) helper.UpdateManifestWorkStatusFunc {
 	return func(oldStatus *workapiv1.ManifestWorkStatus) error {
-		oldStatus.ResourceStatus = manifestStatus
+		// merge the new manifest conditions with the existing manifest conditions
+		oldStatus.ResourceStatus.Manifests = helper.MergeManifestConditions(oldStatus.ResourceStatus.Manifests, newManifestConditions)
 
 		// aggregate manifest condition to generate work condition
 		newConditions := []workapiv1.StatusCondition{}
 
 		// handle condition type Applied
-		if inCondition, exists := allInCondition(string(workapiv1.ManifestApplied), manifestStatus.Manifests); exists {
+		if inCondition, exists := allInCondition(string(workapiv1.ManifestApplied), newManifestConditions); exists {
 			appliedCondition := workapiv1.StatusCondition{
 				Type: string(workapiv1.WorkApplied),
 			}

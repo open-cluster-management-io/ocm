@@ -41,6 +41,28 @@ func TestSyncManifestWork(t *testing.T) {
 			},
 		},
 		{
+			name: "Do not update if existing conditions are correct",
+			existingResources: []runtime.Object{
+				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
+			},
+			manifests: []workapiv1.ManifestCondition{
+				newManifestWthCondition("", "v1", "secrets", "ns1", "n1"),
+			},
+			workConditions: []workapiv1.StatusCondition{
+				{
+					Type:    string(workapiv1.WorkAvailable),
+					Status:  metav1.ConditionTrue,
+					Reason:  "ResourcesAvailable",
+					Message: "All resources are available",
+				},
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 0 {
+					t.Fatal(spew.Sdump(actions))
+				}
+			},
+		},
+		{
 			name: "build status with existing resource",
 			existingResources: []runtime.Object{
 				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
@@ -164,6 +186,19 @@ func newManifest(group, version, resource, namespace, name string) workapiv1.Man
 			Name:      name,
 		},
 	}
+}
+
+func newManifestWthCondition(group, version, resource, namespace, name string) workapiv1.ManifestCondition {
+	cond := newManifest(group, version, resource, namespace, name)
+	cond.Conditions = []workapiv1.StatusCondition{
+		{
+			Type:    string(workapiv1.ManifestAvailable),
+			Status:  metav1.ConditionTrue,
+			Reason:  "ResourceAvailable",
+			Message: "Resource is available",
+		},
+	}
+	return cond
 }
 
 func hasStatusCondition(conditions []workapiv1.StatusCondition, conditionType string, status metav1.ConditionStatus) bool {
