@@ -202,10 +202,22 @@ func TestMergeManifestConditions(t *testing.T) {
 				newManifestCondition(0, "resource1", newCondition("one", "True", "my-reason", "my-message", nil)),
 			},
 			newConditions: []workapiv1.ManifestCondition{
-				newManifestCondition(0, "resource1", newCondition("two", "True", "my-reason", "my-message", nil)),
+				newManifestCondition(0, "resource1", newCondition("one", "False", "my-reason", "my-message", nil)),
 			},
 			expectedConditions: []workapiv1.ManifestCondition{
-				newManifestCondition(0, "resource1", newCondition("two", "True", "my-reason", "my-message", nil)),
+				newManifestCondition(0, "resource1", newCondition("one", "False", "my-reason", "my-message", nil)),
+			},
+		},
+		{
+			name: "merge new",
+			startingConditions: []workapiv1.ManifestCondition{
+				newManifestCondition(0, "resource1", newCondition("one", "True", "my-reason", "my-message", nil)),
+			},
+			newConditions: []workapiv1.ManifestCondition{
+				newManifestCondition(0, "resource1", newCondition("two", "False", "my-reason", "my-message", nil)),
+			},
+			expectedConditions: []workapiv1.ManifestCondition{
+				newManifestCondition(0, "resource1", newCondition("one", "True", "my-reason", "my-message", nil), newCondition("two", "False", "my-reason", "my-message", nil)),
 			},
 		},
 		{
@@ -293,6 +305,7 @@ func TestMergeStatusConditions(t *testing.T) {
 			},
 			expectedConditions: []workapiv1.StatusCondition{
 				newCondition("one", "False", "my-reason", "my-message", &transitionTime),
+				newCondition("two", "True", "my-reason", "my-message", nil),
 			},
 		},
 	}

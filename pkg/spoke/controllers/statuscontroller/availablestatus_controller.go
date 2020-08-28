@@ -100,11 +100,15 @@ func (c *AvailableStatusController) syncManifestWork(ctx context.Context, origin
 	klog.V(4).Infof("Reconciling ManifestWork %q", originalManifestWork.Name)
 	manifestWork := originalManifestWork.DeepCopy()
 
+	needStatusUpdate := false
 	// handle status condition of manifests
 	for index, manifest := range manifestWork.Status.ResourceStatus.Manifests {
 		availableStatusCondition := buildAvailableStatusCondition(manifest.ResourceMeta, c.spokeDynamicClient)
-		newConditions := mergeStatusConditions(manifest.Conditions, availableStatusCondition)
-		manifestWork.Status.ResourceStatus.Manifests[index].Conditions = newConditions
+		newConditions := helper.MergeStatusConditions(manifest.Conditions, []workapiv1.StatusCondition{availableStatusCondition})
+		if !reflect.DeepEqual(manifestWork.Status.ResourceStatus.Manifests[index].Conditions, newConditions) {
+			manifestWork.Status.ResourceStatus.Manifests[index].Conditions = newConditions
+			needStatusUpdate = true
+		}
 	}
 
 	// handle status condition of manifestwork
@@ -120,12 +124,12 @@ func (c *AvailableStatusController) syncManifestWork(ctx context.Context, origin
 	default:
 		// aggregate ManifestConditions and update work status condition
 		workAvailableStatusCondition := aggregateManifestConditions(manifestWork.Status.ResourceStatus.Manifests)
-		workStatusConditions = mergeStatusConditions(manifestWork.Status.Conditions, workAvailableStatusCondition)
+		workStatusConditions = helper.MergeStatusConditions(manifestWork.Status.Conditions, []workapiv1.StatusCondition{workAvailableStatusCondition})
 	}
 	manifestWork.Status.Conditions = workStatusConditions
 
 	// no work if the status of manifestwork does not change
-	if reflect.DeepEqual(originalManifestWork.Status.Conditions, manifestWork.Status.Conditions) {
+	if !needStatusUpdate && reflect.DeepEqual(originalManifestWork.Status.Conditions, manifestWork.Status.Conditions) {
 		return nil
 	}
 
@@ -234,27 +238,4 @@ func isResourceAvailable(namespace, name string, gvr schema.GroupVersionResource
 		return false, err
 	}
 	return true, nil
-}
-
-func mergeStatusConditions(conditions []workapiv1.StatusCondition, newCondition workapiv1.StatusCondition) []workapiv1.StatusCondition {
-	mergedConditions := []workapiv1.StatusCondition{}
-
-	merged := false
-	for _, condition := range conditions {
-		// merge two conditions if necessary
-		if condition.Type == newCondition.Type {
-			mergedConditions = append(mergedConditions, helper.MergeStatusCondition(condition, newCondition))
-			merged = true
-			continue
-		}
-
-		mergedConditions = append(mergedConditions, condition)
-	}
-
-	if !merged {
-		newCondition.LastTransitionTime = metav1.NewTime(time.Now())
-		mergedConditions = append(mergedConditions, newCondition)
-	}
-
-	return mergedConditions
 }
