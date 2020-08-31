@@ -310,8 +310,8 @@ func TestSyncDelete(t *testing.T) {
 		}
 	}
 
-	if len(kubeActions) != 12 {
-		t.Errorf("Expected 12 delete actions, but got %d", len(kubeActions))
+	if len(kubeActions) != 13 {
+		t.Errorf("Expected 13 delete actions, but got %d", len(kubeActions))
 	}
 
 	deleteCRDActions := []clienttesting.DeleteActionImpl{}
@@ -545,7 +545,7 @@ func TestDeployOnKube111(t *testing.T) {
 		}
 	}
 
-	if len(kubeActions) != 14 {
-		t.Errorf("Expected 14 delete actions, but got %d", len(kubeActions))
+	if len(kubeActions) != 15 {
+		t.Errorf("Expected 15 delete actions, but got %d", len(kubeActions))
 	}
 }

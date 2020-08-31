@@ -399,7 +399,13 @@ func (n *klusterletController) cleanUp(ctx context.Context, controllerContext fa
 			}
 		}
 	}
-	return nil
+
+	// remove the klusterlet namespace
+	err = n.kubeClient.CoreV1().Namespaces().Delete(ctx, config.KlusterletNamespace, metav1.DeleteOptions{})
+	if errors.IsNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 func (n *klusterletController) removeKlusterletFinalizer(ctx context.Context, deploy *operatorapiv1.Klusterlet) error {

@@ -90,7 +90,7 @@ deploy: install-olm deploy-hub deploy-spoke unmunge-csv
 clean-deploy: clean-spoke clean-hub
 
 install-olm: ensure-operator-sdk
-	$(KUBECTL) get crds | grep clusterserviceversion ; if [ $$? -ne 0 ] ; then $(OPERATOR_SDK) olm install --version 0.14.1; fi
+	$(KUBECTL) get crds | grep clusterserviceversion ; if [ $$? -ne 0 ] ; then $(OPERATOR_SDK) olm install --version 0.15.0; fi
 	$(KUBECTL) get ns open-cluster-management ; if [ $$? -ne 0 ] ; then $(KUBECTL) create ns open-cluster-management ; fi
 
 deploy-hub: deploy-hub-operator apply-hub-cr
