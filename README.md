@@ -20,12 +20,6 @@ You can reach the maintainers of this project at:
 
 ### Prerequisites
 
-Check the [Development Doc](docs/development.md) for how to contribute to the repo.
-
-## How to Deploy
-
-### Prerequisites
-
 These instructions assume:
 
 - You have a running kubernetes cluster
