@@ -10,10 +10,13 @@ import (
 )
 
 // KlusterletLister helps list Klusterlets.
+// All objects returned here must be treated as read-only.
 type KlusterletLister interface {
 	// List lists all Klusterlets in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.Klusterlet, err error)
 	// Get retrieves the Klusterlet from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.Klusterlet, error)
 	KlusterletListerExpansion
 }

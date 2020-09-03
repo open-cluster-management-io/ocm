@@ -1,4 +1,4 @@
-FROM docker.io/openshift/origin-release:golang-1.13 AS builder
+FROM docker.io/openshift/origin-release:golang-1.14 AS builder
 WORKDIR /go/src/github.com/open-cluster-management/registration-operator
 COPY . .
 ENV GO_PACKAGE github.com/open-cluster-management/registration-operator

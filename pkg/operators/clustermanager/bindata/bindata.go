@@ -189,42 +189,92 @@ spec:
                 on the managed cluster.
               type: object
               additionalProperties:
-                type: string
+                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                anyOf:
+                - type: integer
+                - type: string
+                x-kubernetes-int-or-string: true
             capacity:
               description: Capacity represents the total resource capacity from all
                 nodeStatuses on the managed cluster.
               type: object
               additionalProperties:
-                type: string
+                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                anyOf:
+                - type: integer
+                - type: string
+                x-kubernetes-int-or-string: true
             conditions:
               description: Conditions contains the different condition statuses for
                 this managed cluster.
               type: array
               items:
-                description: StatusCondition contains condition information for a
-                  managed cluster.
+                description: "Condition contains details for one aspect of the current
+                  state of this API Resource. --- This struct is intended for direct
+                  use as an array at the field path .status.conditions.  For example,
+                  type FooStatus struct{     // Represents the observations of a foo's
+                  current state.     // Known .status.conditions.type are: \"Available\",
+                  \"Progressing\", and \"Degraded\"     // +patchMergeKey=type     //
+                  +patchStrategy=merge     // +listType=map     // +listMapKey=type
+                  \    Conditions []metav1.Condition ` + "`" + `json:\"conditions,omitempty\"
+                  patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` + "`" + `
+                  \n     // other fields }"
                 type: object
+                required:
+                - lastTransitionTime
+                - message
+                - reason
+                - status
+                - type
                 properties:
                   lastTransitionTime:
-                    description: LastTransitionTime is the last time the condition
-                      changed from one status to another.
+                    description: lastTransitionTime is the last time the condition
+                      transitioned from one status to another. This should be when
+                      the underlying condition changed.  If that is not known, then
+                      using the time when the API field changed is acceptable.
                     type: string
                     format: date-time
                   message:
-                    description: Message is a human-readable message indicating details
-                      about the last status change.
+                    description: message is a human readable message indicating details
+                      about the transition. This may be an empty string.
                     type: string
+                    maxLength: 32768
+                  observedGeneration:
+                    description: observedGeneration represents the .metadata.generation
+                      that the condition was set based upon. For instance, if .metadata.generation
+                      is currently 12, but the .status.conditions[x].observedGeneration
+                      is 9, the condition is out of date with respect to the current
+                      state of the instance.
+                    type: integer
+                    format: int64
+                    minimum: 0
                   reason:
-                    description: Reason is a (brief) reason for the condition's last
-                      status change.
+                    description: reason contains a programmatic identifier indicating
+                      the reason for the condition's last transition. Producers of
+                      specific condition types may define expected values and meanings
+                      for this field, and whether the values are considered a guaranteed
+                      API. The value should be a CamelCase string. This field may
+                      not be empty.
                     type: string
+                    maxLength: 1024
+                    minLength: 1
+                    pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
                   status:
-                    description: Status is the status of the condition. One of True,
-                      False, Unknown.
+                    description: status of the condition, one of True, False, Unknown.
                     type: string
+                    enum:
+                    - "True"
+                    - "False"
+                    - Unknown
                   type:
-                    description: Type is the type of the cluster condition.
+                    description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      --- Many .condition.type values are consistent across resources
+                      like Available, but because arbitrary conditions can be useful
+                      (see .node.status.conditions), the ability to deconflict is
+                      important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
                     type: string
+                    maxLength: 316
+                    pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
             version:
               description: Version represents the kubernetes version of the managed
                 cluster.
@@ -305,14 +355,14 @@ spec:
           properties:
             clusterSelectors:
               description: ClusterSelectors represents a slice of selectors to select
-                ManagedClusters If empty, the ManagedClusterSet will include all ManagedClusters
+                ManagedClusters If empty, the ManagedClusterSet will include no ManagedCluster.
                 If more than one ClusterSelector are specified in the slice, OR operation
                 will be used between them.
               type: array
               items:
                 description: ClusterSelector represents a selector of ManagedClusters
                   ClusterNames and LabelSelector are mutually exclusive. They cannot
-                  be set at the same time. If none of them is set, all ManagedClusters
+                  be set at the same time. If none of them is set, no ManagedCluster
                   will be selected
                 type: object
                 properties:
@@ -375,30 +425,72 @@ spec:
                 this ManagedClusterSet.
               type: array
               items:
-                description: StatusCondition contains condition information for a
-                  ManagedClusterSet.
+                description: "Condition contains details for one aspect of the current
+                  state of this API Resource. --- This struct is intended for direct
+                  use as an array at the field path .status.conditions.  For example,
+                  type FooStatus struct{     // Represents the observations of a foo's
+                  current state.     // Known .status.conditions.type are: \"Available\",
+                  \"Progressing\", and \"Degraded\"     // +patchMergeKey=type     //
+                  +patchStrategy=merge     // +listType=map     // +listMapKey=type
+                  \    Conditions []metav1.Condition ` + "`" + `json:\"conditions,omitempty\"
+                  patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` + "`" + `
+                  \n     // other fields }"
                 type: object
+                required:
+                - lastTransitionTime
+                - message
+                - reason
+                - status
+                - type
                 properties:
                   lastTransitionTime:
-                    description: LastTransitionTime is the last time the condition
-                      changed from one status to another.
+                    description: lastTransitionTime is the last time the condition
+                      transitioned from one status to another. This should be when
+                      the underlying condition changed.  If that is not known, then
+                      using the time when the API field changed is acceptable.
                     type: string
                     format: date-time
                   message:
-                    description: Message is a human-readable message indicating details
-                      about the last status change.
+                    description: message is a human readable message indicating details
+                      about the transition. This may be an empty string.
                     type: string
+                    maxLength: 32768
+                  observedGeneration:
+                    description: observedGeneration represents the .metadata.generation
+                      that the condition was set based upon. For instance, if .metadata.generation
+                      is currently 12, but the .status.conditions[x].observedGeneration
+                      is 9, the condition is out of date with respect to the current
+                      state of the instance.
+                    type: integer
+                    format: int64
+                    minimum: 0
                   reason:
-                    description: Reason is a (brief) reason for the condition's last
-                      status change.
+                    description: reason contains a programmatic identifier indicating
+                      the reason for the condition's last transition. Producers of
+                      specific condition types may define expected values and meanings
+                      for this field, and whether the values are considered a guaranteed
+                      API. The value should be a CamelCase string. This field may
+                      not be empty.
                     type: string
+                    maxLength: 1024
+                    minLength: 1
+                    pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
                   status:
-                    description: Status is the status of the condition. One of True,
-                      False, Unknown.
+                    description: status of the condition, one of True, False, Unknown.
                     type: string
+                    enum:
+                    - "True"
+                    - "False"
+                    - Unknown
                   type:
-                    description: Type is the type of the ManagedClusterSet condition.
+                    description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      --- Many .condition.type values are consistent across resources
+                      like Available, but because arbitrary conditions can be useful
+                      (see .node.status.conditions), the ability to deconflict is
+                      important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
                     type: string
+                    maxLength: 316
+                    pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
   version: v1alpha1
   versions:
   - name: v1alpha1
@@ -498,30 +590,72 @@ spec:
                 not match the desired state for a certain period.'
               type: array
               items:
-                description: StatusCondition contains condition information for a
-                  ManifestWork applied to a managed cluster.
+                description: "Condition contains details for one aspect of the current
+                  state of this API Resource. --- This struct is intended for direct
+                  use as an array at the field path .status.conditions.  For example,
+                  type FooStatus struct{     // Represents the observations of a foo's
+                  current state.     // Known .status.conditions.type are: \"Available\",
+                  \"Progressing\", and \"Degraded\"     // +patchMergeKey=type     //
+                  +patchStrategy=merge     // +listType=map     // +listMapKey=type
+                  \    Conditions []metav1.Condition ` + "`" + `json:\"conditions,omitempty\"
+                  patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` + "`" + `
+                  \n     // other fields }"
                 type: object
+                required:
+                - lastTransitionTime
+                - message
+                - reason
+                - status
+                - type
                 properties:
                   lastTransitionTime:
-                    description: LastTransitionTime is the last time the condition
-                      changed from one status to another.
+                    description: lastTransitionTime is the last time the condition
+                      transitioned from one status to another. This should be when
+                      the underlying condition changed.  If that is not known, then
+                      using the time when the API field changed is acceptable.
                     type: string
                     format: date-time
                   message:
-                    description: Message is a human-readable message indicating details
-                      about the last status change.
+                    description: message is a human readable message indicating details
+                      about the transition. This may be an empty string.
                     type: string
+                    maxLength: 32768
+                  observedGeneration:
+                    description: observedGeneration represents the .metadata.generation
+                      that the condition was set based upon. For instance, if .metadata.generation
+                      is currently 12, but the .status.conditions[x].observedGeneration
+                      is 9, the condition is out of date with respect to the current
+                      state of the instance.
+                    type: integer
+                    format: int64
+                    minimum: 0
                   reason:
-                    description: Reason is a (brief) reason for the condition's last
-                      status change.
+                    description: reason contains a programmatic identifier indicating
+                      the reason for the condition's last transition. Producers of
+                      specific condition types may define expected values and meanings
+                      for this field, and whether the values are considered a guaranteed
+                      API. The value should be a CamelCase string. This field may
+                      not be empty.
                     type: string
+                    maxLength: 1024
+                    minLength: 1
+                    pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
                   status:
-                    description: Status is the status of the condition. One of True,
-                      False, Unknown.
+                    description: status of the condition, one of True, False, Unknown.
                     type: string
+                    enum:
+                    - "True"
+                    - "False"
+                    - Unknown
                   type:
-                    description: Type is the type of the ManifestWork condition.
+                    description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      --- Many .condition.type values are consistent across resources
+                      like Available, but because arbitrary conditions can be useful
+                      (see .node.status.conditions), the ability to deconflict is
+                      important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
                     type: string
+                    maxLength: 316
+                    pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
             resourceStatus:
               description: ResourceStatus represents the status of each resource in
                 manifestwork deployed on managed cluster. The Klusterlet agent on
@@ -547,30 +681,78 @@ spec:
                           resource on managed cluster
                         type: array
                         items:
-                          description: StatusCondition contains condition information
-                            for a ManifestWork applied to a managed cluster.
+                          description: "Condition contains details for one aspect
+                            of the current state of this API Resource. --- This struct
+                            is intended for direct use as an array at the field path
+                            .status.conditions.  For example, type FooStatus struct{
+                            \    // Represents the observations of a foo's current
+                            state.     // Known .status.conditions.type are: \"Available\",
+                            \"Progressing\", and \"Degraded\"     // +patchMergeKey=type
+                            \    // +patchStrategy=merge     // +listType=map     //
+                            +listMapKey=type     Conditions []metav1.Condition ` + "`" + `json:\"conditions,omitempty\"
+                            patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` + "`" + `
+                            \n     // other fields }"
                           type: object
+                          required:
+                          - lastTransitionTime
+                          - message
+                          - reason
+                          - status
+                          - type
                           properties:
                             lastTransitionTime:
-                              description: LastTransitionTime is the last time the
-                                condition changed from one status to another.
+                              description: lastTransitionTime is the last time the
+                                condition transitioned from one status to another.
+                                This should be when the underlying condition changed.  If
+                                that is not known, then using the time when the API
+                                field changed is acceptable.
                               type: string
                               format: date-time
                             message:
-                              description: Message is a human-readable message indicating
-                                details about the last status change.
+                              description: message is a human readable message indicating
+                                details about the transition. This may be an empty
+                                string.
                               type: string
+                              maxLength: 32768
+                            observedGeneration:
+                              description: observedGeneration represents the .metadata.generation
+                                that the condition was set based upon. For instance,
+                                if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration
+                                is 9, the condition is out of date with respect to
+                                the current state of the instance.
+                              type: integer
+                              format: int64
+                              minimum: 0
                             reason:
-                              description: Reason is a (brief) reason for the condition's
-                                last status change.
+                              description: reason contains a programmatic identifier
+                                indicating the reason for the condition's last transition.
+                                Producers of specific condition types may define expected
+                                values and meanings for this field, and whether the
+                                values are considered a guaranteed API. The value
+                                should be a CamelCase string. This field may not be
+                                empty.
                               type: string
+                              maxLength: 1024
+                              minLength: 1
+                              pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
                             status:
-                              description: Status is the status of the condition.
-                                One of True, False, Unknown.
+                              description: status of the condition, one of True, False,
+                                Unknown.
                               type: string
+                              enum:
+                              - "True"
+                              - "False"
+                              - Unknown
                             type:
-                              description: Type is the type of the ManifestWork condition.
+                              description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                                --- Many .condition.type values are consistent across
+                                resources like Available, but because arbitrary conditions
+                                can be useful (see .node.status.conditions), the ability
+                                to deconflict is important. The regex it matches is
+                                (dns1123SubdomainFmt/)?(qualifiedNameFmt)
                               type: string
+                              maxLength: 316
+                              pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       resourceMeta:
                         description: ResourceMeta represents the gvk, name and namespace
                           of a resoure
@@ -648,9 +830,9 @@ spec:
     openAPIV3Schema:
       description: ManagedClusterSetBinding projects a ManagedClusterSet into a certain
         namespace. User is able to create a ManagedClusterSetBinding in a namespace
-        and bind it to a ManagedClusterSet if they have an RBAC rule to GET on the
-        virtual subresource of managedclustersets/bind. Workloads created in the same
-        namespace can only be distributed to ManagedClusters in ManagedClustersets
+        and bind it to a ManagedClusterSet if they have an RBAC rule to CREATE on
+        the virtual subresource of managedclustersets/bind. Workloads created in the
+        same namespace can only be distributed to ManagedClusters in ManagedClusterSets
         bound in this namespace by higher level controllers.
       type: object
       properties:
@@ -672,9 +854,11 @@ spec:
           properties:
             clusterSet:
               description: ClusterSet is the name of the ManagedClusterSet to bind.
-                User is allowed to set or update this field if they have an RBAC rule
-                to GET on the virtual subresource of managedclustersets/bind.
+                It must match the instance name of the ManagedClusterSetBinding and
+                cannot change once created. User is allowed to set this field if they
+                have an RBAC rule to CREATE on the virtual subresource of managedclustersets/bind.
               type: string
+              minLength: 1
   version: v1alpha1
   versions:
   - name: v1alpha1

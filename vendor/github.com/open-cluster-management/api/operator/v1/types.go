@@ -48,7 +48,7 @@ type ClusterManagerStatus struct {
 	// Progressing: components in hub are in a transitioning state.
 	// Degraded: components in hub do not match the desired configuration and only provide
 	// degraded service.
-	Conditions []StatusCondition `json:"conditions"`
+	Conditions []metav1.Condition `json:"conditions"`
 
 	// Generations are used to determine when an item needs to be reconciled or has changed in a way that needs a reaction.
 	// +optional
@@ -196,7 +196,7 @@ type KlusterletStatus struct {
 	// Progressing: components in the managed cluster are in a transitioning state.
 	// Degraded: components in the managed cluster do not match the desired configuration and only provide
 	// degraded service.
-	Conditions []StatusCondition `json:"conditions"`
+	Conditions []metav1.Condition `json:"conditions"`
 
 	// Generations are used to determine when an item needs to be reconciled or has changed in a way that needs a reaction.
 	// +optional
@@ -219,27 +219,4 @@ type KlusterletList struct {
 
 	// Items is a list of Klusterlet agent.
 	Items []Klusterlet `json:"items"`
-}
-
-// StatusCondition contains condition information.
-type StatusCondition struct {
-	// Type is the type of the cluster condition.
-	// +required
-	Type string `json:"type"`
-
-	// Status is the status of the condition. One of True, False, Unknown.
-	// +required
-	Status metav1.ConditionStatus `json:"status"`
-
-	// LastTransitionTime is the last time the condition changed from one status to another.
-	// +required
-	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
-
-	// Reason is a (brief) reason for the condition's last status change.
-	// +required
-	Reason string `json:"reason"`
-
-	// Message is a human-readable message indicating details about the last status change.
-	// +required
-	Message string `json:"message"`
 }

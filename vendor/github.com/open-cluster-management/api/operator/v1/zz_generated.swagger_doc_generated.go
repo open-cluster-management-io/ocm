@@ -135,17 +135,4 @@ func (ServerURL) SwaggerDoc() map[string]string {
 	return map_ServerURL
 }
 
-var map_StatusCondition = map[string]string{
-	"":                   "StatusCondition contains condition information.",
-	"type":               "Type is the type of the cluster condition.",
-	"status":             "Status is the status of the condition. One of True, False, Unknown.",
-	"lastTransitionTime": "LastTransitionTime is the last time the condition changed from one status to another.",
-	"reason":             "Reason is a (brief) reason for the condition's last status change.",
-	"message":            "Message is a human-readable message indicating details about the last status change.",
-}
-
-func (StatusCondition) SwaggerDoc() map[string]string {
-	return map_StatusCondition
-}
-
 // AUTO-GENERATED FUNCTIONS END HERE

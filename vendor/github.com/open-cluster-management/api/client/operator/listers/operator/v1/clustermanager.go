@@ -10,10 +10,13 @@ import (
 )
 
 // ClusterManagerLister helps list ClusterManagers.
+// All objects returned here must be treated as read-only.
 type ClusterManagerLister interface {
 	// List lists all ClusterManagers in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ClusterManager, err error)
 	// Get retrieves the ClusterManager from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.ClusterManager, error)
 	ClusterManagerListerExpansion
 }

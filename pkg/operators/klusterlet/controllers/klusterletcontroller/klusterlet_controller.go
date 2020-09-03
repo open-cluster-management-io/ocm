@@ -15,7 +15,7 @@ import (
 	appsinformer "k8s.io/client-go/informers/apps/v1"
 	coreinformer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -177,14 +177,14 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			ObjectMeta: metav1.ObjectMeta{Name: config.KlusterletNamespace},
 		}, metav1.CreateOptions{})
 		if createErr != nil {
-			helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
+			helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
 				Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
 				Message: fmt.Sprintf("Failed to create namespace %q: %v", config.KlusterletNamespace, createErr),
 			}))
 			return createErr
 		}
 	case err != nil:
-		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
+		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
 			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
 			Message: fmt.Sprintf("Failed to get namespace %q: %v", config.KlusterletNamespace, err),
 		}))
@@ -203,7 +203,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	)
 
 	if err != nil {
-		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
+		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
 			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
 			Message: fmt.Sprintf("Failed to sync image pull secret to namespace %q: %v", config.KlusterletNamespace, err),
 		}))
@@ -249,7 +249,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 	if len(errs) > 0 {
 		applyErrors := operatorhelpers.NewMultiLineAggregate(errs)
-		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
+		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
 			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
 			Message: applyErrors.Error(),
 		}))
@@ -270,14 +270,14 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		}
 		hubSecret, err = n.kubeClient.CoreV1().Secrets(config.KlusterletNamespace).Create(ctx, hubSecret, metav1.CreateOptions{})
 		if err != nil {
-			helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
+			helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
 				Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
 				Message: fmt.Sprintf("Failed to create hub kubeconfig secret -n %q %q: %v", hubSecret.Namespace, hubSecret.Name, err),
 			}))
 			return err
 		}
 	case err != nil:
-		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
+		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
 			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
 			Message: fmt.Sprintf("Failed to get hub kubeconfig secret with error %v", err),
 		}))
@@ -294,7 +294,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		controllerContext.Recorder(),
 		"manifests/klusterlet/klusterlet-registration-deployment.yaml")
 	if err != nil {
-		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
+		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
 			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
 			Message: fmt.Sprintf("Failed to deploy registration deployment with error %v", err),
 		}))
@@ -319,7 +319,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		controllerContext.Recorder(),
 		"manifests/klusterlet/klusterlet-work-deployment.yaml")
 	if err != nil {
-		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
+		helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
 			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
 			Message: fmt.Sprintf("Failed to deploy work deployment with error %v", err),
 		}))
@@ -329,7 +329,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 	// if we get here, we have successfully applied everything and should indicate that
 	helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName,
-		helpers.UpdateKlusterletConditionFn(operatorapiv1.StatusCondition{
+		helpers.UpdateKlusterletConditionFn(metav1.Condition{
 			Type: klusterletApplied, Status: metav1.ConditionTrue, Reason: "KlusterletApplied",
 			Message: "Klusterlet Component Applied"}),
 		helpers.UpdateKlusterletGenerationsFn(registrationGeneration, workGeneration),

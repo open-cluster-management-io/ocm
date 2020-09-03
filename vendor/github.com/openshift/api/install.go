@@ -37,6 +37,7 @@ import (
 	"github.com/openshift/api/authorization"
 	"github.com/openshift/api/build"
 	"github.com/openshift/api/config"
+	"github.com/openshift/api/helm"
 	"github.com/openshift/api/image"
 	"github.com/openshift/api/imageregistry"
 	"github.com/openshift/api/kubecontrolplane"
@@ -44,6 +45,7 @@ import (
 	"github.com/openshift/api/oauth"
 	"github.com/openshift/api/openshiftcontrolplane"
 	"github.com/openshift/api/operator"
+	"github.com/openshift/api/operatorcontrolplane"
 	"github.com/openshift/api/osin"
 	"github.com/openshift/api/project"
 	"github.com/openshift/api/quota"
@@ -64,6 +66,7 @@ var (
 		authorization.Install,
 		build.Install,
 		config.Install,
+		helm.Install,
 		image.Install,
 		imageregistry.Install,
 		kubecontrolplane.Install,
@@ -71,6 +74,7 @@ var (
 		oauth.Install,
 		openshiftcontrolplane.Install,
 		operator.Install,
+		operatorcontrolplane.Install,
 		osin.Install,
 		project.Install,
 		quota.Install,

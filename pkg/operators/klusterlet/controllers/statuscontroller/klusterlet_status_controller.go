@@ -20,7 +20,7 @@ import (
 	appslister "k8s.io/client-go/listers/apps/v1"
 	corelister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -28,7 +28,6 @@ import (
 	operatorv1client "github.com/open-cluster-management/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "github.com/open-cluster-management/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "github.com/open-cluster-management/api/client/operator/listers/operator/v1"
-	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
 	"github.com/open-cluster-management/registration-operator/pkg/helpers"
 )
 
@@ -135,7 +134,7 @@ func checkAgentDegradedCondition(
 	ctx context.Context, kubeClient kubernetes.Interface,
 	agentName, degradedType string,
 	agent klusterletAgent,
-	degradedCheckFns []degradedCheckFunc) operatorapiv1.StatusCondition {
+	degradedCheckFns []degradedCheckFunc) metav1.Condition {
 	degradedConditionReasons := []string{}
 	degradedConditionMessages := []string{}
 	for _, degradedCheckFn := range degradedCheckFns {
@@ -148,7 +147,7 @@ func checkAgentDegradedCondition(
 	}
 
 	if len(degradedConditionReasons) == 0 {
-		return operatorapiv1.StatusCondition{
+		return metav1.Condition{
 			Type:    degradedType,
 			Status:  metav1.ConditionFalse,
 			Reason:  fmt.Sprintf("%sFunctional", agentName),
@@ -156,7 +155,7 @@ func checkAgentDegradedCondition(
 		}
 	}
 
-	return operatorapiv1.StatusCondition{
+	return metav1.Condition{
 		Type:    degradedType,
 		Status:  metav1.ConditionTrue,
 		Reason:  strings.Join(degradedConditionReasons, ","),
@@ -164,14 +163,14 @@ func checkAgentDegradedCondition(
 	}
 }
 
-type degradedCheckFunc func(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) *operatorapiv1.StatusCondition
+type degradedCheckFunc func(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) *metav1.Condition
 
 // Check bootstrap secret, if the secret is invalid, return registration degraded condition
-func checkBootstrapSecret(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) *operatorapiv1.StatusCondition {
+func checkBootstrapSecret(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) *metav1.Condition {
 	// Check if bootstrap secret exists
 	bootstrapSecret, err := kubeClient.CoreV1().Secrets(agent.namespace).Get(ctx, helpers.BootstrapHubKubeConfigSecret, metav1.GetOptions{})
 	if err != nil {
-		return &operatorapiv1.StatusCondition{
+		return &metav1.Condition{
 			Reason:  "BootstrapSecretMissing",
 			Message: fmt.Sprintf("Failed to get bootstrap secret %q %q: %v", agent.namespace, helpers.BootstrapHubKubeConfigSecret, err),
 		}
@@ -180,7 +179,7 @@ func checkBootstrapSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 	// Check if bootstrap secret works by building kube client
 	bootstrapClient, err := buildKubeClientWithSecret(bootstrapSecret)
 	if err != nil {
-		return &operatorapiv1.StatusCondition{
+		return &metav1.Condition{
 			Reason: "BootstrapSecretError",
 			Message: fmt.Sprintf("Failed to build bootstrap kube client with bootstrap secret %q %q: %v",
 				agent.namespace, helpers.BootstrapHubKubeConfigSecret, err),
@@ -190,14 +189,14 @@ func checkBootstrapSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 	// Check the bootstrap client permissions by creating SelfSubjectAccessReviews
 	allowed, failedReview, err := createSelfSubjectAccessReviews(ctx, bootstrapClient, getBootstrapSelfSubjectAccessReviews())
 	if err != nil {
-		return &operatorapiv1.StatusCondition{
+		return &metav1.Condition{
 			Reason: "BootstrapSecretError",
 			Message: fmt.Sprintf("Failed to create %+v with bootstrap secret %q %q: %v",
 				failedReview, agent.namespace, helpers.BootstrapHubKubeConfigSecret, err),
 		}
 	}
 	if !allowed {
-		return &operatorapiv1.StatusCondition{
+		return &metav1.Condition{
 			Reason: "BootstrapSecretUnauthorized",
 			Message: fmt.Sprintf("Operation for resource %+v is not allowed with bootstrap secret %q %q",
 				failedReview.Spec.ResourceAttributes, agent.namespace, helpers.BootstrapHubKubeConfigSecret),
@@ -208,17 +207,17 @@ func checkBootstrapSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 }
 
 // Check hub-kubeconfig-secret, if the secret is invalid, return degraded condition
-func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) *operatorapiv1.StatusCondition {
+func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) *metav1.Condition {
 	hubConfigSecret, err := kubeClient.CoreV1().Secrets(agent.namespace).Get(ctx, helpers.HubKubeConfigSecret, metav1.GetOptions{})
 	if err != nil {
-		return &operatorapiv1.StatusCondition{
+		return &metav1.Condition{
 			Reason:  "HubKubeConfigSecretMissing",
 			Message: fmt.Sprintf("Failed to get hub kubeconfig secret %q %q: %v", agent.namespace, helpers.HubKubeConfigSecret, err),
 		}
 	}
 
 	if hubConfigSecret.Data["kubeconfig"] == nil {
-		return &operatorapiv1.StatusCondition{
+		return &metav1.Condition{
 			Reason: "HubKubeConfigMissing",
 			Message: fmt.Sprintf("Failed to get kubeconfig from `kubectl get secret -n %q %q -ojsonpath='{.data.kubeconfig}'`. "+
 				"This is set by the klusterlet registration deployment, but the CSR must be approved by the cluster-admin on the hub.",
@@ -228,7 +227,7 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 
 	hubClient, err := buildKubeClientWithSecret(hubConfigSecret)
 	if err != nil {
-		return &operatorapiv1.StatusCondition{
+		return &metav1.Condition{
 			Reason: "HubKubeConfigError",
 			Message: fmt.Sprintf("Failed to build hub kube client with hub config secret %q %q: %v",
 				hubConfigSecret.Namespace, hubConfigSecret.Name, err),
@@ -239,7 +238,7 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 	// If cluster name is empty, read cluster name from hub config secret
 	if clusterName == "" {
 		if hubConfigSecret.Data["cluster-name"] == nil {
-			return &operatorapiv1.StatusCondition{
+			return &metav1.Condition{
 				Reason: "ClusterNameMissing",
 				Message: fmt.Sprintf(
 					"Failed to get cluster name from `kubectl get secret -n %q %q -ojsonpath='{.data.cluster-name}`."+
@@ -252,14 +251,14 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 	// Check the hub kubeconfig permissions by creating SelfSubjectAccessReviews
 	allowed, failedReview, err := createSelfSubjectAccessReviews(ctx, hubClient, agent.getSSARFunc(agent.clusterName))
 	if err != nil {
-		return &operatorapiv1.StatusCondition{
+		return &metav1.Condition{
 			Reason: "HubKubeConfigError",
 			Message: fmt.Sprintf("Failed to create %+v with hub config secret %q %q: %v",
 				failedReview, hubConfigSecret.Namespace, hubConfigSecret.Name, err),
 		}
 	}
 	if !allowed {
-		return &operatorapiv1.StatusCondition{
+		return &metav1.Condition{
 			Reason: "HubKubeConfigUnauthorized",
 			Message: fmt.Sprintf("Operation for resource %+v is not allowed with hub config secret %q %q",
 				failedReview.Spec.ResourceAttributes, hubConfigSecret.Namespace, hubConfigSecret.Name),
@@ -270,16 +269,16 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 }
 
 // Check agent deployment, if the desired replicas is not equal to available replicas, return degraded condition
-func checkAgentDeployment(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) *operatorapiv1.StatusCondition {
+func checkAgentDeployment(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) *metav1.Condition {
 	deployment, err := kubeClient.AppsV1().Deployments(agent.namespace).Get(ctx, agent.deploymentName, metav1.GetOptions{})
 	if err != nil {
-		return &operatorapiv1.StatusCondition{
+		return &metav1.Condition{
 			Reason:  "GetDeploymentFailed",
 			Message: fmt.Sprintf("Failed to get deployment %q %q: %v", agent.namespace, agent.deploymentName, err),
 		}
 	}
 	if unavailablePod := helpers.NumOfUnavailablePod(deployment); unavailablePod > 0 {
-		return &operatorapiv1.StatusCondition{
+		return &metav1.Condition{
 			Reason: "UnavailablePods",
 			Message: fmt.Sprintf("%v of requested instances are unavailable of deployment %q %q",
 				unavailablePod, agent.namespace, agent.deploymentName),
