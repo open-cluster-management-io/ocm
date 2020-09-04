@@ -1,0 +1,96 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  name: clustermanagementaddons.addon.open-cluster-management.io
+spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.addOnMeta.displayName
+    name: DISPLAY NAME
+    type: string
+  - JSONPath: .spec.addOnConfiguration.crdName
+    name: CRD NAME
+    type: string
+  group: addon.open-cluster-management.io
+  names:
+    kind: ClusterManagementAddOn
+    listKind: ClusterManagementAddOnList
+    plural: clustermanagementaddons
+    singular: clustermanagementaddon
+  preserveUnknownFields: false
+  scope: Cluster
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: ClusterManagementAddOn represents the registration of an add-on
+        to the cluster manager. This resource allows the user to discover which add-on
+        is available for the cluster manager and also provides metadata information
+        about the add-on. This resource also provides a linkage to ManagedClusterAddOn,
+        the name of the ClusterManagementAddOn resource will be used for the namespace-scoped
+        ManagedClusterAddOn resource. ClusterManagementAddOn is a cluster-scoped resource.
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: spec represents a desired configuration for the agent on the
+            cluster management add-on.
+          properties:
+            addOnConfiguration:
+              description: addOnConfiguration is a reference to configuration information
+                for the add-on. In scenario where a multiple add-ons share the same
+                add-on CRD, multiple ClusterManagementAddOn resources need to be created
+                and reference the same AddOnConfiguration.
+              properties:
+                crName:
+                  description: crName is the name of the CR used to configure instances
+                    of the managed add-on. This field should be configured if add-on
+                    CR have a consistent name across the all of the ManagedCluster
+                    instaces.
+                  type: string
+                crdName:
+                  description: crdName is the name of the CRD used to configure instances
+                    of the managed add-on. This field should be configured if the
+                    add-on have a CRD that controls the configuration of the add-on.
+                  type: string
+              type: object
+            addOnMeta:
+              description: addOnMeta is a reference to the metadata information for
+                the add-on.
+              properties:
+                description:
+                  description: description represents the detailed description of
+                    the add-on.
+                  type: string
+                displayName:
+                  description: displayName represents the name of add-on that will
+                    be displayed.
+                  type: string
+              type: object
+          type: object
+        status:
+          description: status represents the current status of cluster management
+            add-on.
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
