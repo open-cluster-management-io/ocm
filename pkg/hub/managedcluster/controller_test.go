@@ -42,7 +42,7 @@ func TestSyncManagedCluster(t *testing.T) {
 			name:            "accept a spoke cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewAcceptingManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				expectedCondition := v1.StatusCondition{
+				expectedCondition := metav1.Condition{
 					Type:    v1.ManagedClusterConditionHubAccepted,
 					Status:  metav1.ConditionTrue,
 					Reason:  "HubClusterAdminAccepted",
@@ -65,7 +65,7 @@ func TestSyncManagedCluster(t *testing.T) {
 			name:            "deny an accepted spoke cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewDeniedManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				expectedCondition := v1.StatusCondition{
+				expectedCondition := metav1.Condition{
 					Type:    v1.ManagedClusterConditionHubAccepted,
 					Status:  metav1.ConditionFalse,
 					Reason:  "HubClusterAdminDenied",

@@ -31,7 +31,7 @@ type ManagedClusterSet struct {
 // ManagedClusterSetSpec describes the attributes of the desired ManagedClusters
 type ManagedClusterSetSpec struct {
 	// ClusterSelectors represents a slice of selectors to select ManagedClusters
-	// If empty, the ManagedClusterSet will include all ManagedClusters
+	// If empty, the ManagedClusterSet will include no ManagedCluster.
 	// If more than one ClusterSelector are specified in the slice, OR operation
 	// will be used between them.
 	// +optional
@@ -40,7 +40,7 @@ type ManagedClusterSetSpec struct {
 
 // ClusterSelector represents a selector of ManagedClusters
 // ClusterNames and LabelSelector are mutually exclusive. They cannot be set at the
-// same time. If none of them is set, all ManagedClusters will be selected
+// same time. If none of them is set, no ManagedCluster will be selected
 type ClusterSelector struct {
 	// ClusterNames represents a list of cluster name
 	// +optional
@@ -54,30 +54,7 @@ type ClusterSelector struct {
 // ManagedClusterSetStatus represents the current status of the ManagedClusterSet.
 type ManagedClusterSetStatus struct {
 	// Conditions contains the different condition statuses for this ManagedClusterSet.
-	Conditions []StatusCondition `json:"conditions"`
-}
-
-// StatusCondition contains condition information for a ManagedClusterSet.
-type StatusCondition struct {
-	// Type is the type of the ManagedClusterSet condition.
-	// +required
-	Type string `json:"type"`
-
-	// Status is the status of the condition. One of True, False, Unknown.
-	// +required
-	Status metav1.ConditionStatus `json:"status"`
-
-	// LastTransitionTime is the last time the condition changed from one status to another.
-	// +required
-	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
-
-	// Reason is a (brief) reason for the condition's last status change.
-	// +required
-	Reason string `json:"reason"`
-
-	// Message is a human-readable message indicating details about the last status change.
-	// +required
-	Message string `json:"message"`
+	Conditions []metav1.Condition `json:"conditions"`
 }
 
 const (
@@ -106,9 +83,9 @@ type ManagedClusterSetList struct {
 
 // ManagedClusterSetBinding projects a ManagedClusterSet into a certain namespace.
 // User is able to create a ManagedClusterSetBinding in a namespace and bind it to a
-// ManagedClusterSet if they have an RBAC rule to GET on the virtual subresource of
+// ManagedClusterSet if they have an RBAC rule to CREATE on the virtual subresource of
 // managedclustersets/bind. Workloads created in the same namespace can only be
-// distributed to ManagedClusters in ManagedClustersets bound in this namespace by
+// distributed to ManagedClusters in ManagedClusterSets bound in this namespace by
 // higher level controllers.
 type ManagedClusterSetBinding struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -120,9 +97,11 @@ type ManagedClusterSetBinding struct {
 
 // ManagedClusterSetBindingSpec defines the attributes of ManagedClusterSetBinding.
 type ManagedClusterSetBindingSpec struct {
-	// ClusterSet is the name of the ManagedClusterSet to bind. User is allowed
-	// to set or update this field if they have an RBAC rule to GET on the
+	// ClusterSet is the name of the ManagedClusterSet to bind. It must match the
+	// instance name of the ManagedClusterSetBinding and cannot change once created.
+	// User is allowed to set this field if they have an RBAC rule to CREATE on the
 	// virtual subresource of managedclustersets/bind.
+	// +kubebuilder:validation:MinLength=1
 	ClusterSet string `json:"clusterSet"`
 }
 

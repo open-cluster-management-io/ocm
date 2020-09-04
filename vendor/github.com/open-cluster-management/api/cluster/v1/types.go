@@ -84,7 +84,7 @@ type ClientConfig struct {
 // ManagedClusterStatus represents the current status of joined managed cluster.
 type ManagedClusterStatus struct {
 	// Conditions contains the different condition statuses for this managed cluster.
-	Conditions []StatusCondition `json:"conditions"`
+	Conditions []metav1.Condition `json:"conditions"`
 
 	// Capacity represents the total resource capacity from all nodeStatuses
 	// on the managed cluster.
@@ -133,29 +133,6 @@ const (
 // ResourceList defines a map for the quantity of different resources, the definition
 // matches the ResourceList defined in k8s.io/api/core/v1
 type ResourceList map[ResourceName]resource.Quantity
-
-// StatusCondition contains condition information for a managed cluster.
-type StatusCondition struct {
-	// Type is the type of the cluster condition.
-	// +required
-	Type string `json:"type"`
-
-	// Status is the status of the condition. One of True, False, Unknown.
-	// +required
-	Status metav1.ConditionStatus `json:"status"`
-
-	// LastTransitionTime is the last time the condition changed from one status to another.
-	// +required
-	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
-
-	// Reason is a (brief) reason for the condition's last status change.
-	// +required
-	Reason string `json:"reason"`
-
-	// Message is a human-readable message indicating details about the last status change.
-	// +required
-	Message string `json:"message"`
-}
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

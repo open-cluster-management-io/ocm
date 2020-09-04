@@ -58,7 +58,7 @@ func TestHealthCheck(t *testing.T) {
 			httpStatus:  http.StatusInternalServerError,
 			responseMsg: "internal server error",
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				expectedCondition := clusterv1.StatusCondition{
+				expectedCondition := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionFalse,
 					Reason:  "ManagedClusterKubeAPIServerUnavailable",
@@ -74,7 +74,7 @@ func TestHealthCheck(t *testing.T) {
 			clusters:   []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			httpStatus: http.StatusOK,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				expectedCondition := clusterv1.StatusCondition{
+				expectedCondition := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ManagedClusterAvailable",
@@ -90,7 +90,7 @@ func TestHealthCheck(t *testing.T) {
 			clusters:   []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			httpStatus: http.StatusNotFound,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				expectedCondition := clusterv1.StatusCondition{
+				expectedCondition := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ManagedClusterAvailable",
@@ -106,7 +106,7 @@ func TestHealthCheck(t *testing.T) {
 			clusters:   []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			httpStatus: http.StatusForbidden,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				expectedCondition := clusterv1.StatusCondition{
+				expectedCondition := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ManagedClusterAvailable",

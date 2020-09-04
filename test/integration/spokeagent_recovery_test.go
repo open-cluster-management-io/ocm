@@ -9,13 +9,13 @@ import (
 	"github.com/onsi/gomega"
 
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
-	"github.com/open-cluster-management/registration/pkg/helpers"
 	"github.com/open-cluster-management/registration/pkg/spoke"
 	"github.com/open-cluster-management/registration/test/integration/util"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 )
 
 var _ = ginkgo.Describe("Agent Recovery", func() {
@@ -113,7 +113,7 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 			if err != nil {
 				return false
 			}
-			joined := helpers.FindManagedClusterCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
+			joined := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
 			if joined == nil {
 				return false
 			}
@@ -207,7 +207,7 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 			if err != nil {
 				return false
 			}
-			joined := helpers.FindManagedClusterCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
+			joined := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
 			if joined == nil {
 				return false
 			}

@@ -7,9 +7,9 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/meta"
 
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
-	"github.com/open-cluster-management/registration/pkg/helpers"
 	"github.com/open-cluster-management/registration/pkg/spoke"
 	"github.com/open-cluster-management/registration/test/integration/util"
 
@@ -85,7 +85,7 @@ var _ = ginkgo.Describe("Joining Process", func() {
 			if err != nil {
 				return false
 			}
-			accpeted := helpers.FindManagedClusterCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
+			accpeted := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
 			if accpeted == nil {
 				return false
 			}
@@ -110,7 +110,7 @@ var _ = ginkgo.Describe("Joining Process", func() {
 			if err != nil {
 				return false
 			}
-			joined := helpers.FindManagedClusterCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
+			joined := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
 			if joined == nil {
 				return false
 			}

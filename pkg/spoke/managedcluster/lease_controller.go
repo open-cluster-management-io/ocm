@@ -9,11 +9,11 @@ import (
 	clusterv1informer "github.com/open-cluster-management/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "github.com/open-cluster-management/api/client/cluster/listers/cluster/v1"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
-	"github.com/open-cluster-management/registration/pkg/helpers"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -64,8 +64,7 @@ func (c *managedClusterLeaseController) sync(ctx context.Context, syncCtx factor
 	}
 
 	// the managed cluster is not accepted, make sure there is no lease update routine.
-	acceptedCondition := helpers.FindManagedClusterCondition(cluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
-	if !helpers.IsConditionTrue(acceptedCondition) {
+	if !meta.IsStatusConditionTrue(cluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted) {
 		c.leaseUpdater.stop()
 		return nil
 	}

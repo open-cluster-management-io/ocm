@@ -10,10 +10,13 @@ import (
 )
 
 // ManagedClusterLister helps list ManagedClusters.
+// All objects returned here must be treated as read-only.
 type ManagedClusterLister interface {
 	// List lists all ManagedClusters in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ManagedCluster, err error)
 	// Get retrieves the ManagedCluster from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.ManagedCluster, error)
 	ManagedClusterListerExpansion
 }

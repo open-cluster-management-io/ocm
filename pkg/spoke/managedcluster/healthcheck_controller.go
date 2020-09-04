@@ -70,9 +70,9 @@ func (c *managedClusterHealthCheckController) sync(ctx context.Context, syncCtx 
 }
 
 // using readyz api to check the status of kube apiserver
-func (c *managedClusterHealthCheckController) checkKubeAPIServerStatus(ctx context.Context) clusterv1.StatusCondition {
+func (c *managedClusterHealthCheckController) checkKubeAPIServerStatus(ctx context.Context) metav1.Condition {
 	statusCode := 0
-	condition := clusterv1.StatusCondition{Type: clusterv1.ManagedClusterConditionAvailable}
+	condition := metav1.Condition{Type: clusterv1.ManagedClusterConditionAvailable}
 	result := c.managedClusterDiscoveryClient.RESTClient().Get().AbsPath("/readyz").Do(ctx).StatusCode(&statusCode)
 	if statusCode == http.StatusOK {
 		condition.Status = metav1.ConditionTrue

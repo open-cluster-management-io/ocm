@@ -57,7 +57,7 @@ func TestIntegration(t *testing.T) {
 }
 
 var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
-	logf.SetLogger(zap.LoggerTo(ginkgo.GinkgoWriter, true))
+	logf.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
 
 	ginkgo.By("bootstrapping test environment")
 

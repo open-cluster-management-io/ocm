@@ -105,6 +105,11 @@ type Client interface {
 	Reader
 	Writer
 	StatusClient
+
+	// Scheme returns the scheme this client is using.
+	Scheme() *runtime.Scheme
+	// RESTMapper returns the rest this client is using.
+	RESTMapper() meta.RESTMapper
 }
 
 // IndexerFunc knows how to take an object and turn it into a series

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
-	"time"
 
 	clusterclientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
@@ -23,6 +22,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -39,42 +39,6 @@ var (
 
 func init() {
 	utilruntime.Must(api.InstallKube(genericScheme))
-}
-
-func IsConditionTrue(condition *clusterv1.StatusCondition) bool {
-	if condition == nil {
-		return false
-	}
-	return condition.Status == metav1.ConditionTrue
-}
-
-func FindManagedClusterCondition(conditions []clusterv1.StatusCondition, conditionType string) *clusterv1.StatusCondition {
-	for i := range conditions {
-		if conditions[i].Type == conditionType {
-			return &conditions[i]
-		}
-	}
-	return nil
-}
-
-func SetManagedClusterCondition(conditions *[]clusterv1.StatusCondition, newCondition clusterv1.StatusCondition) {
-	if conditions == nil {
-		conditions = &[]clusterv1.StatusCondition{}
-	}
-	existingCondition := FindManagedClusterCondition(*conditions, newCondition.Type)
-	if existingCondition == nil {
-		newCondition.LastTransitionTime = metav1.NewTime(time.Now())
-		*conditions = append(*conditions, newCondition)
-		return
-	}
-
-	if existingCondition.Status != newCondition.Status {
-		existingCondition.Status = newCondition.Status
-		existingCondition.LastTransitionTime = metav1.NewTime(time.Now())
-	}
-
-	existingCondition.Reason = newCondition.Reason
-	existingCondition.Message = newCondition.Message
 }
 
 type UpdateManagedClusterStatusFunc func(status *clusterv1.ManagedClusterStatus) error
@@ -119,9 +83,9 @@ func UpdateManagedClusterStatus(
 	return updatedManagedClusterStatus, updated, err
 }
 
-func UpdateManagedClusterConditionFn(cond clusterv1.StatusCondition) UpdateManagedClusterStatusFunc {
+func UpdateManagedClusterConditionFn(cond metav1.Condition) UpdateManagedClusterStatusFunc {
 	return func(oldStatus *clusterv1.ManagedClusterStatus) error {
-		SetManagedClusterCondition(&oldStatus.Conditions, cond)
+		meta.SetStatusCondition(&oldStatus.Conditions, cond)
 		return nil
 	}
 }

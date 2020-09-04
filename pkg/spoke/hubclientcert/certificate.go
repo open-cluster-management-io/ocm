@@ -10,7 +10,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // HasValidKubeconfig checks if there exists a valid kubeconfig in the given secret

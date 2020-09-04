@@ -313,7 +313,7 @@ func newManagedClusterSet(name string, clusterSelectors []clusterv1alpha1.Cluste
 	return clusterSet
 }
 
-func hasCondition(conditions []clusterv1alpha1.StatusCondition, conditionType string, status metav1.ConditionStatus, reason, message string) bool {
+func hasCondition(conditions []metav1.Condition, conditionType string, status metav1.ConditionStatus, reason, message string) bool {
 	for _, condition := range conditions {
 		if condition.Type != conditionType {
 			continue

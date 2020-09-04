@@ -12,10 +12,10 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
-	"github.com/open-cluster-management/registration/pkg/helpers"
 	"github.com/open-cluster-management/registration/pkg/spoke"
 	"github.com/open-cluster-management/registration/test/integration/util"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 )
@@ -79,7 +79,7 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 		case <-time.After(time.Duration(2*5*util.TestLeaseDurationSeconds) * time.Second):
 			managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			availableCond := helpers.FindManagedClusterCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
+			availableCond := meta.FindStatusCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
 			gomega.Expect(availableCond).ShouldNot(gomega.BeNil())
 			gomega.Expect(availableCond.Status).Should(gomega.Equal(metav1.ConditionTrue))
 		}
@@ -135,7 +135,7 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 			if err != nil {
 				return false
 			}
-			availableCond := helpers.FindManagedClusterCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
+			availableCond := meta.FindStatusCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
 			if availableCond == nil {
 				return false
 			}
@@ -150,7 +150,7 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 		case <-time.After(time.Duration(5*util.TestLeaseDurationSeconds+1) * time.Second):
 			managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			availableCond := helpers.FindManagedClusterCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
+			availableCond := meta.FindStatusCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
 			gomega.Expect(availableCond).ShouldNot(gomega.BeNil())
 			gomega.Expect(availableCond.Status).Should(gomega.Equal(metav1.ConditionUnknown))
 		}
@@ -176,7 +176,7 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 		case <-time.After(time.Duration(5*util.TestLeaseDurationSeconds+1) * time.Second):
 			managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			availableCond := helpers.FindManagedClusterCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
+			availableCond := meta.FindStatusCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
 			gomega.Expect(availableCond).ShouldNot(gomega.BeNil())
 			gomega.Expect(availableCond.Status).Should(gomega.Equal(metav1.ConditionTrue))
 		}

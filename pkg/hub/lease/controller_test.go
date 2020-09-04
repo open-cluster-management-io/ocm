@@ -49,7 +49,7 @@ func TestSync(t *testing.T) {
 			clusters:      []runtime.Object{testinghelpers.NewAvailableManagedCluster()},
 			clusterLeases: []runtime.Object{testinghelpers.NewManagedClusterLease(now.Add(-5 * time.Minute))},
 			validateActions: func(t *testing.T, leaseActions, clusterActions []clienttesting.Action) {
-				expected := clusterv1.StatusCondition{
+				expected := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionUnknown,
 					Reason:  "ManagedClusterLeaseUpdateStopped",

@@ -33,52 +33,52 @@ func TestUpdateStatusCondition(t *testing.T) {
 
 	cases := []struct {
 		name               string
-		startingConditions []clusterv1.StatusCondition
-		newCondition       clusterv1.StatusCondition
+		startingConditions []metav1.Condition
+		newCondition       metav1.Condition
 		expextedUpdated    bool
-		expectedConditions []clusterv1.StatusCondition
+		expectedConditions []metav1.Condition
 	}{
 		{
 			name:               "add to empty",
-			startingConditions: []clusterv1.StatusCondition{},
+			startingConditions: []metav1.Condition{},
 			newCondition:       testinghelpers.NewManagedClusterCondition("test", "True", "my-reason", "my-message", nil),
 			expextedUpdated:    true,
-			expectedConditions: []clusterv1.StatusCondition{testinghelpers.NewManagedClusterCondition("test", "True", "my-reason", "my-message", nil)},
+			expectedConditions: []metav1.Condition{testinghelpers.NewManagedClusterCondition("test", "True", "my-reason", "my-message", nil)},
 		},
 		{
 			name: "add to non-conflicting",
-			startingConditions: []clusterv1.StatusCondition{
+			startingConditions: []metav1.Condition{
 				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
 			},
 			newCondition:    testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", nil),
 			expextedUpdated: true,
-			expectedConditions: []clusterv1.StatusCondition{
+			expectedConditions: []metav1.Condition{
 				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
 				testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", nil),
 			},
 		},
 		{
 			name: "change existing status",
-			startingConditions: []clusterv1.StatusCondition{
+			startingConditions: []metav1.Condition{
 				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
 				testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", nil),
 			},
 			newCondition:    testinghelpers.NewManagedClusterCondition("one", "False", "my-different-reason", "my-othermessage", nil),
 			expextedUpdated: true,
-			expectedConditions: []clusterv1.StatusCondition{
+			expectedConditions: []metav1.Condition{
 				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
 				testinghelpers.NewManagedClusterCondition("one", "False", "my-different-reason", "my-othermessage", nil),
 			},
 		},
 		{
 			name: "leave existing transition time",
-			startingConditions: []clusterv1.StatusCondition{
+			startingConditions: []metav1.Condition{
 				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
 				testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", &beforeish),
 			},
 			newCondition:    testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", &afterish),
 			expextedUpdated: false,
-			expectedConditions: []clusterv1.StatusCondition{
+			expectedConditions: []metav1.Condition{
 				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
 				testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", &beforeish),
 			},

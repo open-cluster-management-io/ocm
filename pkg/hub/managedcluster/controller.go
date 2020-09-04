@@ -18,7 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -98,9 +98,8 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	}
 
 	if !managedCluster.Spec.HubAcceptsClient {
-		acceptedCondition := helpers.FindManagedClusterCondition(managedCluster.Status.Conditions, v1.ManagedClusterConditionHubAccepted)
 		// Current spoke cluster is not accepted, do nothing.
-		if !helpers.IsConditionTrue(acceptedCondition) {
+		if !meta.IsStatusConditionTrue(managedCluster.Status.Conditions, v1.ManagedClusterConditionHubAccepted) {
 			return nil
 		}
 
@@ -115,7 +114,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 			ctx,
 			c.clusterClient,
 			managedClusterName,
-			helpers.UpdateManagedClusterConditionFn(v1.StatusCondition{
+			helpers.UpdateManagedClusterConditionFn(metav1.Condition{
 				Type:    v1.ManagedClusterConditionHubAccepted,
 				Status:  metav1.ConditionFalse,
 				Reason:  "HubClusterAdminDenied",
@@ -150,7 +149,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	}
 
 	// We add the accepted condition to spoke cluster
-	acceptedCondition := v1.StatusCondition{
+	acceptedCondition := metav1.Condition{
 		Type:    v1.ManagedClusterConditionHubAccepted,
 		Status:  metav1.ConditionTrue,
 		Reason:  "HubClusterAdminAccepted",
