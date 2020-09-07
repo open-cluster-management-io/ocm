@@ -128,6 +128,13 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	)
 	go spokeClusterCreatingController.Run(ctx, 1)
 
+	hubKubeconfigSecretController := hubclientcert.NewHubKubeconfigSecretController(
+		o.HubKubeconfigDir, o.ComponentNamespace, o.HubKubeconfigSecret,
+		spokeKubeInformerFactory.Core().V1().Secrets(),
+		controllerContext.EventRecorder,
+	)
+	go hubKubeconfigSecretController.Run(ctx, 1)
+
 	// check if there already exists a valid client config for hub
 	ok, err := o.hasValidHubClientConfig()
 	if err != nil {

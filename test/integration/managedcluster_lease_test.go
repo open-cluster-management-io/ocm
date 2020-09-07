@@ -68,9 +68,6 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 			if _, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret); err != nil {
 				return false
 			}
-			if err := util.MountHubKubeConfigs(kubeClient, hubKubeconfigDir, testNamespace, hubKubeconfigSecret); err != nil {
-				return false
-			}
 			return true
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
@@ -121,9 +118,6 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 		// simulate k8s to mount the hub kubeconfig secret after the bootstrap is finished
 		gomega.Eventually(func() bool {
 			if _, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret); err != nil {
-				return false
-			}
-			if err := util.MountHubKubeConfigs(kubeClient, hubKubeconfigDir, testNamespace, hubKubeconfigSecret); err != nil {
 				return false
 			}
 			return true

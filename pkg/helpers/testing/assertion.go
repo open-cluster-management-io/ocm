@@ -1,6 +1,9 @@
 package testing
 
 import (
+	"bytes"
+	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
 
@@ -182,5 +185,20 @@ func AssertLeaseUpdated(t *testing.T, lease, lastLease *coordinationv1.Lease) {
 	}
 	if !lease.Spec.RenewTime.BeforeTime(&metav1.Time{Time: lastLease.Spec.RenewTime.Time}) {
 		t.Errorf("expected lease updated, but failed")
+	}
+}
+
+// AssertFileExist asserts a given file exists
+func AssertFileExist(t *testing.T, filePath string) {
+	if _, err := os.Stat(filePath); err != nil {
+		t.Errorf("expected file %q exits, but got error %v", filePath, err)
+	}
+}
+
+// AssertFileContent asserts a given file content
+func AssertFileContent(t *testing.T, filePath string, expectedContent []byte) {
+	content, _ := ioutil.ReadFile(filePath)
+	if !bytes.Equal(content, expectedContent) {
+		t.Errorf("expect %v, but got %v", expectedContent, content)
 	}
 }

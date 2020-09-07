@@ -32,7 +32,6 @@ resources:
 - ./role.yaml
 - ./role_binding.yaml
 - ./deployment.yaml
-- ./secret.yaml
 
 images:
 - name: quay.io/open-cluster-management/registration:latest

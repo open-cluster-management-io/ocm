@@ -162,6 +162,23 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+		sa := &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: nsName,
+				Name:      "spoke-agent-sa",
+			},
+		}
+		err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
+			var err error
+			_, err = hubClient.CoreV1().ServiceAccounts(nsName).Create(context.TODO(), sa, metav1.CreateOptions{})
+			if err != nil {
+				return false, err
+			}
+
+			return true, nil
+		})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 		var (
 			deployment         *unstructured.Unstructured
 			deploymentResource = schema.GroupVersionResource{
@@ -176,43 +193,6 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
 			var err error
 			_, err = hubDynamicClient.Resource(deploymentResource).Namespace(nsName).Create(context.TODO(), deployment, metav1.CreateOptions{})
-			if err != nil {
-				return false, err
-			}
-
-			return true, nil
-		})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		secret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: nsName,
-				Name:      "hub-kubeconfig-secret",
-			},
-			Data: map[string][]byte{
-				"placeholder": []byte("YWRtaW4="),
-			},
-		}
-		err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-			var err error
-			_, err = hubClient.CoreV1().Secrets(nsName).Create(context.TODO(), secret, metav1.CreateOptions{})
-			if err != nil {
-				return false, err
-			}
-
-			return true, nil
-		})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		sa := &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: nsName,
-				Name:      "spoke-agent-sa",
-			},
-		}
-		err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-			var err error
-			_, err = hubClient.CoreV1().ServiceAccounts(nsName).Create(context.TODO(), sa, metav1.CreateOptions{})
 			if err != nil {
 				return false, err
 			}

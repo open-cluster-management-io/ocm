@@ -7,7 +7,6 @@
 // deploy/spoke/namespace.yaml
 // deploy/spoke/role.yaml
 // deploy/spoke/role_binding.yaml
-// deploy/spoke/secret.yaml
 // deploy/spoke/service_account.yaml
 package bindata
 
@@ -149,16 +148,15 @@ spec:
         - name: bootstrap-secret
           mountPath: "/spoke/bootstrap"
           readOnly: true
-        - name: hub-kubeconfig-secret
+        - name: hub-kubeconfig
           mountPath: "/spoke/hub-kubeconfig"
-          readOnly: true
       volumes:
       - name: bootstrap-secret
         secret:
           secretName: bootstrap-secret
-      - name: hub-kubeconfig-secret
-        secret:
-          secretName: hub-kubeconfig-secret
+      - name: hub-kubeconfig
+        emptyDir:
+          medium: Memory
 `)
 
 func deploySpokeDeploymentYamlBytes() ([]byte, error) {
@@ -210,7 +208,6 @@ resources:
 - ./role.yaml
 - ./role_binding.yaml
 - ./deployment.yaml
-- ./secret.yaml
 
 images:
 - name: quay.io/open-cluster-management/registration:latest
@@ -315,30 +312,6 @@ func deploySpokeRole_bindingYaml() (*asset, error) {
 	return a, nil
 }
 
-var _deploySpokeSecretYaml = []byte(`apiVersion: v1
-kind: Secret
-metadata:
-  name: hub-kubeconfig-secret
-type: Opaque
-data:
-  placeholder: YWRtaW4=
-`)
-
-func deploySpokeSecretYamlBytes() ([]byte, error) {
-	return _deploySpokeSecretYaml, nil
-}
-
-func deploySpokeSecretYaml() (*asset, error) {
-	bytes, err := deploySpokeSecretYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "deploy/spoke/secret.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
 var _deploySpokeService_accountYaml = []byte(`apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -419,7 +392,6 @@ var _bindata = map[string]func() (*asset, error){
 	"deploy/spoke/namespace.yaml":           deploySpokeNamespaceYaml,
 	"deploy/spoke/role.yaml":                deploySpokeRoleYaml,
 	"deploy/spoke/role_binding.yaml":        deploySpokeRole_bindingYaml,
-	"deploy/spoke/secret.yaml":              deploySpokeSecretYaml,
 	"deploy/spoke/service_account.yaml":     deploySpokeService_accountYaml,
 }
 
@@ -473,7 +445,6 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"namespace.yaml":           {deploySpokeNamespaceYaml, map[string]*bintree{}},
 			"role.yaml":                {deploySpokeRoleYaml, map[string]*bintree{}},
 			"role_binding.yaml":        {deploySpokeRole_bindingYaml, map[string]*bintree{}},
-			"secret.yaml":              {deploySpokeSecretYaml, map[string]*bintree{}},
 			"service_account.yaml":     {deploySpokeService_accountYaml, map[string]*bintree{}},
 		}},
 	}},

@@ -69,10 +69,6 @@ var _ = ginkgo.Describe("Certificate Rotation", func() {
 			return true
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
-		// simulate k8s to mount the hub kubeconfig secret
-		err = util.MountHubKubeConfigs(kubeClient, hubKubeconfigDir, testNamespace, hubKubeconfigSecret)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
 		// the agent should rotate the certificate because the certificate with a short valid time
 		// the hub controller should auto approve it
 		gomega.Eventually(func() bool {

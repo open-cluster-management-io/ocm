@@ -307,41 +307,6 @@ func GetFilledHubKubeConfigSecret(kubeClient kubernetes.Interface, secretNamespa
 	return secret, nil
 }
 
-func MountHubKubeConfigs(kubeClient kubernetes.Interface, hubKubeConfigDir, secretNamespace, secretName string) error {
-	if _, err := os.Stat(hubKubeConfigDir); os.IsNotExist(err) {
-		if err = os.MkdirAll(hubKubeConfigDir, 0755); err != nil {
-			return err
-		}
-	}
-
-	secret, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	if err := ioutil.WriteFile(path.Join(hubKubeConfigDir, "cluster-name"), secret.Data["cluster-name"], 0644); err != nil {
-		return err
-	}
-
-	if err := ioutil.WriteFile(path.Join(hubKubeConfigDir, "agent-name"), secret.Data["agent-name"], 0644); err != nil {
-		return err
-	}
-
-	if err := ioutil.WriteFile(path.Join(hubKubeConfigDir, "tls.crt"), secret.Data["tls.crt"], 0644); err != nil {
-		return err
-	}
-
-	if err := ioutil.WriteFile(path.Join(hubKubeConfigDir, "tls.key"), secret.Data["tls.key"], 0644); err != nil {
-		return err
-	}
-
-	if err := ioutil.WriteFile(path.Join(hubKubeConfigDir, "kubeconfig"), secret.Data["kubeconfig"], 0644); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func FindUnapprovedSpokeCSR(kubeClient kubernetes.Interface, spokeClusterName string) (*certificates.CertificateSigningRequest, error) {
 	csrList, err := kubeClient.CertificatesV1beta1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("open-cluster-management.io/cluster-name=%s", spokeClusterName),
