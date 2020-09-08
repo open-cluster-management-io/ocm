@@ -41,7 +41,7 @@ var (
 //   IMAGE_NAME is unset: IMAGE_REGISTRY/registration:latest
 // - KUBECONFIG is the location of the kubeconfig file to use
 var _ = ginkgo.BeforeSuite(func() {
-	logf.SetLogger(zap.LoggerTo(ginkgo.GinkgoWriter, true))
+	logf.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
 	registrationImage = os.Getenv("IMAGE_NAME")
 	if registrationImage == "" {
 		imageRegistry := os.Getenv("IMAGE_REGISTRY")

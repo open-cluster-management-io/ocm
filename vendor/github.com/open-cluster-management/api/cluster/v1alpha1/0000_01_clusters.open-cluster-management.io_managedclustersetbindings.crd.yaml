@@ -16,9 +16,9 @@ spec:
     openAPIV3Schema:
       description: ManagedClusterSetBinding projects a ManagedClusterSet into a certain
         namespace. User is able to create a ManagedClusterSetBinding in a namespace
-        and bind it to a ManagedClusterSet if they have an RBAC rule to GET on the
-        virtual subresource of managedclustersets/bind. Workloads created in the same
-        namespace can only be distributed to ManagedClusters in ManagedClustersets
+        and bind it to a ManagedClusterSet if they have an RBAC rule to CREATE on
+        the virtual subresource of managedclustersets/bind. Workloads created in the
+        same namespace can only be distributed to ManagedClusters in ManagedClusterSets
         bound in this namespace by higher level controllers.
       type: object
       properties:
@@ -40,9 +40,11 @@ spec:
           properties:
             clusterSet:
               description: ClusterSet is the name of the ManagedClusterSet to bind.
-                User is allowed to set or update this field if they have an RBAC rule
-                to GET on the virtual subresource of managedclustersets/bind.
+                It must match the instance name of the ManagedClusterSetBinding and
+                cannot change once created. User is allowed to set this field if they
+                have an RBAC rule to CREATE on the virtual subresource of managedclustersets/bind.
               type: string
+              minLength: 1
   version: v1alpha1
   versions:
   - name: v1alpha1

@@ -10,10 +10,13 @@ import (
 )
 
 // AppliedManifestWorkLister helps list AppliedManifestWorks.
+// All objects returned here must be treated as read-only.
 type AppliedManifestWorkLister interface {
 	// List lists all AppliedManifestWorks in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.AppliedManifestWork, err error)
 	// Get retrieves the AppliedManifestWork from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.AppliedManifestWork, error)
 	AppliedManifestWorkListerExpansion
 }

@@ -14,13 +14,14 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	discovery "k8s.io/client-go/discovery"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	corev1lister "k8s.io/client-go/listers/core/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // managedClusterJoiningController add the joined condition to a ManagedCluster on the managed cluster after it is accepted by hub cluster admin.
@@ -66,8 +67,7 @@ func (c managedClusterJoiningController) sync(ctx context.Context, syncCtx facto
 	}
 
 	// current managed cluster is not accepted, do nothing.
-	acceptedCondition := helpers.FindManagedClusterCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
-	if !helpers.IsConditionTrue(acceptedCondition) {
+	if !meta.IsStatusConditionTrue(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted) {
 		syncCtx.Recorder().Eventf("ManagedClusterIsNotAccepted", "Managed cluster %q is not accepted by hub yet", c.clusterName)
 		return nil
 	}
@@ -84,11 +84,10 @@ func (c managedClusterJoiningController) sync(ctx context.Context, syncCtx facto
 	}
 
 	updateStatusFuncs := []helpers.UpdateManagedClusterStatusFunc{}
-	joinedCondition := helpers.FindManagedClusterCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
-	joined := helpers.IsConditionTrue(joinedCondition)
 	// current managed cluster did not join the hub cluster, join it.
+	joined := meta.IsStatusConditionTrue(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
 	if !joined {
-		updateStatusFuncs = append(updateStatusFuncs, helpers.UpdateManagedClusterConditionFn(clusterv1.StatusCondition{
+		updateStatusFuncs = append(updateStatusFuncs, helpers.UpdateManagedClusterConditionFn(metav1.Condition{
 			Type:    clusterv1.ManagedClusterConditionJoined,
 			Status:  metav1.ConditionTrue,
 			Reason:  "ManagedClusterJoined",

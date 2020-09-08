@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // managedClusterSetController reconciles instances of ManagedClusterSet on the hub.
@@ -111,7 +111,7 @@ func (c *managedClusterSetController) syncClusterSet(ctx context.Context, cluste
 	}
 
 	selectedClusters := sets.NewString()
-	selectedCondition := clusterv1alpha1.StatusCondition{
+	selectedCondition := metav1.Condition{
 		Type: clusterv1alpha1.ManagedClusterSetConditionEmpty,
 	}
 
@@ -185,32 +185,16 @@ func (c *managedClusterSetController) selectClusters(selector clusterv1alpha1.Cl
 
 // updateClusterSetStatus updates the status of cluster set with a new status condition
 // No work if the status of the cluster set does not change
-func (c *managedClusterSetController) updateClusterSetStatus(ctx context.Context, clusterSet *clusterv1alpha1.ManagedClusterSet, newCondition clusterv1alpha1.StatusCondition) error {
-	newConditions := []clusterv1alpha1.StatusCondition{}
-
-	merged := false
-	for _, condition := range clusterSet.Status.Conditions {
-		if condition.Type == newCondition.Type {
-			newConditions = append(newConditions, mergeStatusCondition(condition, newCondition))
-			merged = true
-			continue
-		}
-		newConditions = append(newConditions, condition)
-	}
-
-	if !merged {
-		newCondition.LastTransitionTime = metav1.Now()
-		newConditions = append(newConditions, newCondition)
-	}
+func (c *managedClusterSetController) updateClusterSetStatus(ctx context.Context, clusterSet *clusterv1alpha1.ManagedClusterSet, newCondition metav1.Condition) error {
+	newClusterSet := clusterSet.DeepCopy()
+	meta.SetStatusCondition(&newClusterSet.Status.Conditions, newCondition)
 
 	// skip update if cluster set status does not change
-	if reflect.DeepEqual(clusterSet.Status.Conditions, newConditions) {
+	if reflect.DeepEqual(clusterSet.Status.Conditions, newClusterSet.Status.Conditions) {
 		return nil
 	}
 
-	clusterSet = clusterSet.DeepCopy()
-	clusterSet.Status.Conditions = newConditions
-	_, err := c.clusterClient.ClusterV1alpha1().ManagedClusterSets().UpdateStatus(ctx, clusterSet, metav1.UpdateOptions{})
+	_, err := c.clusterClient.ClusterV1alpha1().ManagedClusterSets().UpdateStatus(ctx, newClusterSet, metav1.UpdateOptions{})
 	return err
 }
 
@@ -226,22 +210,4 @@ func convertLabels(labelSelector *metav1.LabelSelector) (labels.Selector, error)
 	}
 
 	return labels.Everything(), nil
-}
-
-// mergeStatusCondition merges two given status conditions
-func mergeStatusCondition(condition, newCondition clusterv1alpha1.StatusCondition) clusterv1alpha1.StatusCondition {
-	merged := clusterv1alpha1.StatusCondition{
-		Type:    newCondition.Type,
-		Status:  newCondition.Status,
-		Reason:  newCondition.Reason,
-		Message: newCondition.Message,
-	}
-
-	if condition.Status == newCondition.Status {
-		merged.LastTransitionTime = condition.LastTransitionTime
-	} else {
-		merged.LastTransitionTime = metav1.Now()
-	}
-
-	return merged
 }

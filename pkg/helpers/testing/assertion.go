@@ -91,16 +91,9 @@ func AssertFinalizers(t *testing.T, obj runtime.Object, finalizers []string) {
 // the expected condition
 func AssertManagedClusterCondition(
 	t *testing.T,
-	actualConditions []clusterv1.StatusCondition,
-	expectedCondition clusterv1.StatusCondition) {
-	var cond *clusterv1.StatusCondition
-	for i := range actualConditions {
-		condition := actualConditions[i]
-		if condition.Type == expectedCondition.Type {
-			cond = &condition
-			break
-		}
-	}
+	actualConditions []metav1.Condition,
+	expectedCondition metav1.Condition) {
+	cond := meta.FindStatusCondition(actualConditions, expectedCondition.Type)
 	if cond == nil {
 		t.Errorf("expected condition %s but got: %s", expectedCondition.Type, cond.Type)
 	}

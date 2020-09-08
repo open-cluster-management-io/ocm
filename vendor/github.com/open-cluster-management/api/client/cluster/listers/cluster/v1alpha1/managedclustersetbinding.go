@@ -10,8 +10,10 @@ import (
 )
 
 // ManagedClusterSetBindingLister helps list ManagedClusterSetBindings.
+// All objects returned here must be treated as read-only.
 type ManagedClusterSetBindingLister interface {
 	// List lists all ManagedClusterSetBindings in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.ManagedClusterSetBinding, err error)
 	// ManagedClusterSetBindings returns an object that can list and get ManagedClusterSetBindings.
 	ManagedClusterSetBindings(namespace string) ManagedClusterSetBindingNamespaceLister
@@ -42,10 +44,13 @@ func (s *managedClusterSetBindingLister) ManagedClusterSetBindings(namespace str
 }
 
 // ManagedClusterSetBindingNamespaceLister helps list and get ManagedClusterSetBindings.
+// All objects returned here must be treated as read-only.
 type ManagedClusterSetBindingNamespaceLister interface {
 	// List lists all ManagedClusterSetBindings in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.ManagedClusterSetBinding, err error)
 	// Get retrieves the ManagedClusterSetBinding from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.ManagedClusterSetBinding, error)
 	ManagedClusterSetBindingNamespaceListerExpansion
 }

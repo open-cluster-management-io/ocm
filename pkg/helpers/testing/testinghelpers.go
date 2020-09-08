@@ -148,8 +148,8 @@ func NewDeletingManagedCluster() *clusterv1.ManagedCluster {
 	}
 }
 
-func NewManagedClusterCondition(name, status, reason, message string, lastTransition *metav1.Time) clusterv1.StatusCondition {
-	ret := clusterv1.StatusCondition{
+func NewManagedClusterCondition(name, status, reason, message string, lastTransition *metav1.Time) metav1.Condition {
+	ret := metav1.Condition{
 		Type:    name,
 		Status:  metav1.ConditionStatus(status),
 		Reason:  reason,

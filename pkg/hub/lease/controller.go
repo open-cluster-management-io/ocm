@@ -16,6 +16,7 @@ import (
 
 	coordv1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	coordinformers "k8s.io/client-go/informers/coordination/v1"
@@ -63,8 +64,7 @@ func (c *leaseController) sync(ctx context.Context, syncCtx factory.SyncContext)
 	}
 	for _, cluster := range clusters {
 		// cluster is not accepted, skip it.
-		acceptedCondition := helpers.FindManagedClusterCondition(cluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
-		if !helpers.IsConditionTrue(acceptedCondition) {
+		if !meta.IsStatusConditionTrue(cluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted) {
 			continue
 		}
 
@@ -102,7 +102,7 @@ func (c *leaseController) sync(ctx context.Context, syncCtx factory.SyncContext)
 		}
 
 		// the lease is not constantly updated, update it to unknown
-		conditionUpdateFn := helpers.UpdateManagedClusterConditionFn(clusterv1.StatusCondition{
+		conditionUpdateFn := helpers.UpdateManagedClusterConditionFn(metav1.Condition{
 			Type:   clusterv1.ManagedClusterConditionAvailable,
 			Status: metav1.ConditionUnknown,
 			Reason: "ManagedClusterLeaseUpdateStopped",

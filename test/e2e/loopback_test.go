@@ -12,6 +12,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -305,12 +306,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 				return false, err
 			}
 
-			condition := helpers.FindManagedClusterCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
-			if condition == nil {
-				return false, nil
-			}
-
-			if helpers.IsConditionTrue(condition) {
+			if meta.IsStatusConditionTrue(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted) {
 				return true, nil
 			}
 
@@ -326,9 +322,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 				return false, err
 			}
 
-			condition := helpers.FindManagedClusterCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
-
-			return helpers.IsConditionTrue(condition), nil
+			return meta.IsStatusConditionTrue(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined), nil
 		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -339,8 +333,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 				return false, err
 			}
 
-			condition := helpers.FindManagedClusterCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
-			return helpers.IsConditionTrue(condition), nil
+			return meta.IsStatusConditionTrue(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable), nil
 		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -388,8 +381,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 				return false, err
 			}
 
-			condition := helpers.FindManagedClusterCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
-			return helpers.IsConditionTrue(condition), nil
+			return meta.IsStatusConditionTrue(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable), nil
 		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})

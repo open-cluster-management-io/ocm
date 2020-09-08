@@ -10,8 +10,10 @@ import (
 )
 
 // ManifestWorkLister helps list ManifestWorks.
+// All objects returned here must be treated as read-only.
 type ManifestWorkLister interface {
 	// List lists all ManifestWorks in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ManifestWork, err error)
 	// ManifestWorks returns an object that can list and get ManifestWorks.
 	ManifestWorks(namespace string) ManifestWorkNamespaceLister
@@ -42,10 +44,13 @@ func (s *manifestWorkLister) ManifestWorks(namespace string) ManifestWorkNamespa
 }
 
 // ManifestWorkNamespaceLister helps list and get ManifestWorks.
+// All objects returned here must be treated as read-only.
 type ManifestWorkNamespaceLister interface {
 	// List lists all ManifestWorks in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ManifestWork, err error)
 	// Get retrieves the ManifestWork from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.ManifestWork, error)
 	ManifestWorkNamespaceListerExpansion
 }

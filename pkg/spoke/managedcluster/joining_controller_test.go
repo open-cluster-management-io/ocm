@@ -45,7 +45,7 @@ func TestSyncManagedCluster(t *testing.T) {
 				testinghelpers.NewNode("testnode1", testinghelpers.NewResourceList(32, 64), testinghelpers.NewResourceList(16, 32)),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				expectedCondition := clusterv1.StatusCondition{
+				expectedCondition := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionJoined,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ManagedClusterJoined",
@@ -90,7 +90,7 @@ func TestSyncManagedCluster(t *testing.T) {
 				testinghelpers.NewNode("testnode2", testinghelpers.NewResourceList(32, 64), testinghelpers.NewResourceList(16, 32)),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				expectedCondition := clusterv1.StatusCondition{
+				expectedCondition := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionJoined,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ManagedClusterJoined",
