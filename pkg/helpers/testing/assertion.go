@@ -5,6 +5,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,14 +31,14 @@ func AssertGet(t *testing.T, actual clienttesting.Action, group, version, resour
 	}
 }
 
-func NamedCondition(name, reason string, status metav1.ConditionStatus) opratorapiv1.StatusCondition {
-	return opratorapiv1.StatusCondition{Type: name, Status: status, Reason: reason}
+func NamedCondition(name, reason string, status metav1.ConditionStatus) metav1.Condition {
+	return metav1.Condition{Type: name, Status: status, Reason: reason}
 }
 
-func AssertOnlyConditions(t *testing.T, actual runtime.Object, expectedConditions ...opratorapiv1.StatusCondition) {
+func AssertOnlyConditions(t *testing.T, actual runtime.Object, expectedConditions ...metav1.Condition) {
 	t.Helper()
 
-	var actualConditions []opratorapiv1.StatusCondition
+	var actualConditions []metav1.Condition
 	if klusterlet, ok := actual.(*opratorapiv1.Klusterlet); ok {
 		actualConditions = klusterlet.Status.Conditions
 	} else {
@@ -49,7 +50,7 @@ func AssertOnlyConditions(t *testing.T, actual runtime.Object, expectedCondition
 	}
 
 	for _, expectedCondition := range expectedConditions {
-		actual := helpers.FindOperatorCondition(actualConditions, expectedCondition.Type)
+		actual := meta.FindStatusCondition(actualConditions, expectedCondition.Type)
 		if actual == nil {
 			t.Errorf("missing %v in %v", spew.Sdump(expectedCondition), spew.Sdump(actual))
 		}

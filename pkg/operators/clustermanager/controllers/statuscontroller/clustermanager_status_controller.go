@@ -10,12 +10,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
 	appslister "k8s.io/client-go/listers/apps/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	operatorv1client "github.com/open-cluster-management/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "github.com/open-cluster-management/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "github.com/open-cluster-management/api/client/operator/listers/operator/v1"
-	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
 	"github.com/open-cluster-management/registration-operator/pkg/helpers"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -75,7 +74,7 @@ func (s *clusterManagerStatusController) sync(ctx context.Context, controllerCon
 	registrationDeployment, err := s.deploymentLister.Deployments(helpers.ClusterManagerNamespace).Get(registrationDeploymentName)
 	if err != nil {
 		_, _, err := helpers.UpdateClusterManagerStatus(ctx, s.clusterManagerClient, clusterManager.Name,
-			helpers.UpdateClusterManagerConditionFn(operatorapiv1.StatusCondition{
+			helpers.UpdateClusterManagerConditionFn(metav1.Condition{
 				Type:    registrationDegraded,
 				Status:  metav1.ConditionTrue,
 				Reason:  "GetRegistrationDeploymentFailed",
@@ -87,7 +86,7 @@ func (s *clusterManagerStatusController) sync(ctx context.Context, controllerCon
 
 	if unavailablePod := helpers.NumOfUnavailablePod(registrationDeployment); unavailablePod > 0 {
 		_, _, err := helpers.UpdateClusterManagerStatus(ctx, s.clusterManagerClient, clusterManager.Name,
-			helpers.UpdateClusterManagerConditionFn(operatorapiv1.StatusCondition{
+			helpers.UpdateClusterManagerConditionFn(metav1.Condition{
 				Type:    registrationDegraded,
 				Status:  metav1.ConditionTrue,
 				Reason:  "UnavailableRegistrationPod",
@@ -98,7 +97,7 @@ func (s *clusterManagerStatusController) sync(ctx context.Context, controllerCon
 	}
 
 	_, _, err = helpers.UpdateClusterManagerStatus(ctx, s.clusterManagerClient, clusterManager.Name,
-		helpers.UpdateClusterManagerConditionFn(operatorapiv1.StatusCondition{
+		helpers.UpdateClusterManagerConditionFn(metav1.Condition{
 			Type:    registrationDegraded,
 			Status:  metav1.ConditionFalse,
 			Reason:  "RegistrationFunctional",

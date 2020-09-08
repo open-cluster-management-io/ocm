@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
 	"github.com/openshift/library-go/pkg/assets"
@@ -232,7 +232,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	conditions := &clusterManager.Status.Conditions
 	observedKlusterletGeneration := clusterManager.Status.ObservedGeneration
 	if len(errs) == 0 {
-		helpers.SetOperatorCondition(conditions, operatorapiv1.StatusCondition{
+		meta.SetStatusCondition(conditions, metav1.Condition{
 			Type:    clusterManagerApplied,
 			Status:  metav1.ConditionTrue,
 			Reason:  "ClusterManagerApplied",
@@ -240,7 +240,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		})
 		observedKlusterletGeneration = clusterManager.Generation
 	} else {
-		helpers.SetOperatorCondition(conditions, operatorapiv1.StatusCondition{
+		meta.SetStatusCondition(conditions, metav1.Condition{
 			Type:    clusterManagerApplied,
 			Status:  metav1.ConditionFalse,
 			Reason:  "ClusterManagerApplyFailed",

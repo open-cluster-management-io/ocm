@@ -3,7 +3,6 @@ package helpers
 import (
 	"context"
 	"fmt"
-	"time"
 
 	operatorv1client "github.com/open-cluster-management/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
@@ -47,42 +46,6 @@ func init() {
 	utilruntime.Must(admissionv1.AddToScheme(genericScheme))
 }
 
-func IsConditionTrue(condition *operatorapiv1.StatusCondition) bool {
-	if condition == nil {
-		return false
-	}
-	return condition.Status == metav1.ConditionTrue
-}
-
-func FindOperatorCondition(conditions []operatorapiv1.StatusCondition, conditionType string) *operatorapiv1.StatusCondition {
-	for i := range conditions {
-		if conditions[i].Type == conditionType {
-			return &conditions[i]
-		}
-	}
-	return nil
-}
-
-func SetOperatorCondition(conditions *[]operatorapiv1.StatusCondition, newCondition operatorapiv1.StatusCondition) {
-	if conditions == nil {
-		conditions = &[]operatorapiv1.StatusCondition{}
-	}
-	existingCondition := FindOperatorCondition(*conditions, newCondition.Type)
-	if existingCondition == nil {
-		newCondition.LastTransitionTime = metav1.NewTime(time.Now())
-		*conditions = append(*conditions, newCondition)
-		return
-	}
-
-	if existingCondition.Status != newCondition.Status {
-		existingCondition.Status = newCondition.Status
-		existingCondition.LastTransitionTime = metav1.NewTime(time.Now())
-	}
-
-	existingCondition.Reason = newCondition.Reason
-	existingCondition.Message = newCondition.Message
-}
-
 type UpdateClusterManagerStatusFunc func(status *operatorapiv1.ClusterManagerStatus) error
 
 func UpdateClusterManagerStatus(
@@ -124,10 +87,10 @@ func UpdateClusterManagerStatus(
 	return updatedClusterManagerStatus, updated, err
 }
 
-func UpdateClusterManagerConditionFn(conds ...operatorapiv1.StatusCondition) UpdateClusterManagerStatusFunc {
+func UpdateClusterManagerConditionFn(conds ...metav1.Condition) UpdateClusterManagerStatusFunc {
 	return func(oldStatus *operatorapiv1.ClusterManagerStatus) error {
 		for _, cond := range conds {
-			SetOperatorCondition(&oldStatus.Conditions, cond)
+			meta.SetStatusCondition(&oldStatus.Conditions, cond)
 		}
 		return nil
 	}
@@ -174,10 +137,10 @@ func UpdateKlusterletStatus(
 	return updatedKlusterletStatus, updated, err
 }
 
-func UpdateKlusterletConditionFn(conds ...operatorapiv1.StatusCondition) UpdateKlusterletStatusFunc {
+func UpdateKlusterletConditionFn(conds ...metav1.Condition) UpdateKlusterletStatusFunc {
 	return func(oldStatus *operatorapiv1.KlusterletStatus) error {
 		for _, cond := range conds {
-			SetOperatorCondition(&oldStatus.Conditions, cond)
+			meta.SetStatusCondition(&oldStatus.Conditions, cond)
 		}
 		return nil
 	}

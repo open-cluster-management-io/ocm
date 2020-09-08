@@ -10,8 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
-
-	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
 )
 
 func NewIntegrationTestEventRecorder(componet string) events.Recorder {
@@ -54,7 +52,7 @@ func (r *IntegrationTestEventRecorder) Shutdown() {
 	return
 }
 
-func HasCondition(conditions []operatorapiv1.StatusCondition, expectedType, expectedReason string, expectedStatus metav1.ConditionStatus) bool {
+func HasCondition(conditions []metav1.Condition, expectedType, expectedReason string, expectedStatus metav1.ConditionStatus) bool {
 	found := false
 	for _, condition := range conditions {
 		fmt.Printf(">>> %v \n", condition)
