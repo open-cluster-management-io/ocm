@@ -20,7 +20,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // AppliedManifestWorkFinalizeController handles cleanup of appliedmanifestwork resources before deletion is allowed.

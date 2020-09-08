@@ -19,7 +19,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned/typed/work/v1"
 	workinformer "github.com/open-cluster-management/api/client/work/informers/externalversions/work/v1"
@@ -159,7 +159,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 
 		manifestCondition := workapiv1.ManifestCondition{
 			ResourceMeta: resourceMeta,
-			Conditions:   []workapiv1.StatusCondition{},
+			Conditions:   []metav1.Condition{},
 		}
 
 		// Add applied status condition
@@ -271,12 +271,12 @@ func (m *ManifestWorkController) generateUpdateStatusFunc(newManifestConditions 
 		oldStatus.ResourceStatus.Manifests = helper.MergeManifestConditions(oldStatus.ResourceStatus.Manifests, newManifestConditions)
 
 		// aggregate manifest condition to generate work condition
-		newConditions := []workapiv1.StatusCondition{}
+		newConditions := []metav1.Condition{}
 
 		// handle condition type Applied
 		if inCondition, exists := allInCondition(string(workapiv1.ManifestApplied), newManifestConditions); exists {
-			appliedCondition := workapiv1.StatusCondition{
-				Type: string(workapiv1.WorkApplied),
+			appliedCondition := metav1.Condition{
+				Type: workapiv1.WorkApplied,
 			}
 			if inCondition {
 				appliedCondition.Status = metav1.ConditionTrue
@@ -359,9 +359,9 @@ func allInCondition(conditionType string, manifests []workapiv1.ManifestConditio
 	return exists, exists
 }
 
-func buildAppliedStatusCondition(err error) workapiv1.StatusCondition {
+func buildAppliedStatusCondition(err error) metav1.Condition {
 	if err != nil {
-		return workapiv1.StatusCondition{
+		return metav1.Condition{
 			Type:    string(workapiv1.ManifestApplied),
 			Status:  metav1.ConditionFalse,
 			Reason:  "AppliedManifestFailed",
@@ -369,7 +369,7 @@ func buildAppliedStatusCondition(err error) workapiv1.StatusCondition {
 		}
 	}
 
-	return workapiv1.StatusCondition{
+	return metav1.Condition{
 		Type:    string(workapiv1.ManifestApplied),
 		Status:  metav1.ConditionTrue,
 		Reason:  "AppliedManifestComplete",

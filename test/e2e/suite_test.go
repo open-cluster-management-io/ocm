@@ -50,7 +50,7 @@ func TestE2e(t *testing.T) {
 //   IMAGE_NAME is unset: IMAGE_REGISTRY/work:latest
 // - KUBECONFIG is the location of the kubeconfig file to use
 var _ = ginkgo.BeforeSuite(func() {
-	logf.SetLogger(zap.LoggerTo(ginkgo.GinkgoWriter, true))
+	logf.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
 	workImage = os.Getenv("IMAGE_NAME")
 	if workImage == "" {
 		imageRegistry := os.Getenv("IMAGE_REGISTRY")

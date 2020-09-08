@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/robfig/cron/v3"
+	"github.com/robfig/cron"
 	"k8s.io/apimachinery/pkg/runtime"
 	errorutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -197,6 +197,8 @@ func (f *Factory) ToController(name string, eventRecorder events.Recorder) Contr
 		resyncSchedules:    cronSchedules,
 		cachesToSync:       append([]cache.InformerSynced{}, f.cachesToSync...),
 		syncContext:        ctx,
+		postStartHooks:     f.postStartHooks,
+		cacheSyncTimeout:   defaultCacheSyncTimeout,
 	}
 
 	for i := range f.informerQueueKeys {

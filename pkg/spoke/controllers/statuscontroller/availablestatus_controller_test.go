@@ -19,12 +19,12 @@ func TestSyncManifestWork(t *testing.T) {
 		name              string
 		existingResources []runtime.Object
 		manifests         []workapiv1.ManifestCondition
-		workConditions    []workapiv1.StatusCondition
+		workConditions    []metav1.Condition
 		validateActions   func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
 			name: "remove available status from work whose manifests become empty",
-			workConditions: []workapiv1.StatusCondition{
+			workConditions: []metav1.Condition{
 				{
 					Type: string(workapiv1.WorkAvailable),
 				},
@@ -48,7 +48,7 @@ func TestSyncManifestWork(t *testing.T) {
 			manifests: []workapiv1.ManifestCondition{
 				newManifestWthCondition("", "v1", "secrets", "ns1", "n1"),
 			},
-			workConditions: []workapiv1.StatusCondition{
+			workConditions: []metav1.Condition{
 				{
 					Type:    string(workapiv1.WorkAvailable),
 					Status:  metav1.ConditionTrue,
@@ -190,7 +190,7 @@ func newManifest(group, version, resource, namespace, name string) workapiv1.Man
 
 func newManifestWthCondition(group, version, resource, namespace, name string) workapiv1.ManifestCondition {
 	cond := newManifest(group, version, resource, namespace, name)
-	cond.Conditions = []workapiv1.StatusCondition{
+	cond.Conditions = []metav1.Condition{
 		{
 			Type:    string(workapiv1.ManifestAvailable),
 			Status:  metav1.ConditionTrue,
@@ -201,7 +201,7 @@ func newManifestWthCondition(group, version, resource, namespace, name string) w
 	return cond
 }
 
-func hasStatusCondition(conditions []workapiv1.StatusCondition, conditionType string, status metav1.ConditionStatus) bool {
+func hasStatusCondition(conditions []metav1.Condition, conditionType string, status metav1.ConditionStatus) bool {
 	for _, condition := range conditions {
 		if condition.Type != conditionType {
 			continue

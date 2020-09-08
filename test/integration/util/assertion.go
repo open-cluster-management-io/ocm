@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -34,7 +35,7 @@ func AssertWorkCondition(namespace, name string, workClient workclientset.Interf
 		}
 
 		// check work status condition
-		return HaveCondition(work.Status.Conditions, expectedType, expectedWorkStatus)
+		return meta.IsStatusConditionPresentAndEqual(work.Status.Conditions, expectedType, expectedWorkStatus)
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }
 

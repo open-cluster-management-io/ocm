@@ -5,29 +5,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// StatusCondition contains condition information for a ManifestWork applied to a managed cluster.
-type StatusCondition struct {
-	// Type is the type of the ManifestWork condition.
-	// +required
-	Type string `json:"type"`
-
-	// Status is the status of the condition. One of True, False, Unknown.
-	// +required
-	Status metav1.ConditionStatus `json:"status"`
-
-	// LastTransitionTime is the last time the condition changed from one status to another.
-	// +required
-	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
-
-	// Reason is a (brief) reason for the condition's last status change.
-	// +required
-	Reason string `json:"reason"`
-
-	// Message is a human-readable message indicating details about the last status change.
-	// +required
-	Message string `json:"message"`
-}
-
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:subresource:status
@@ -140,7 +117,7 @@ type ManifestWorkStatus struct {
 	// 3. Available represents workload in ManifestWork exists on the managed cluster.
 	// 4. Degraded represents the current state of workload does not match the desired
 	// state for a certain period.
-	Conditions []StatusCondition `json:"conditions"`
+	Conditions []metav1.Condition `json:"conditions"`
 
 	// ResourceStatus represents the status of each resource in manifestwork deployed on
 	// managed cluster. The Klusterlet agent on managed cluster syncs the condition from managed to the hub.
@@ -161,22 +138,19 @@ type ManifestResourceStatus struct {
 	Manifests []ManifestCondition `json:"manifests,omitempty"`
 }
 
-// WorkStatusConditionType represents the condition type of the work
-type WorkStatusConditionType string
-
 const (
 	// WorkProgressing represents that the work is in the progress to be
 	// applied on the managed cluster.
-	WorkProgressing WorkStatusConditionType = "Progressing"
+	WorkProgressing string = "Progressing"
 	// WorkApplied represents that the workload defined in work is
 	// succesfully applied on the managed cluster.
-	WorkApplied WorkStatusConditionType = "Applied"
+	WorkApplied string = "Applied"
 	// WorkAvailable represents that all resources of the work exists on
 	// the managed cluster.
-	WorkAvailable WorkStatusConditionType = "Available"
+	WorkAvailable string = "Available"
 	// WorkDegraded represents that the current state of work does not match
 	// the desired state for a certain period.
-	WorkDegraded WorkStatusConditionType = "Degraded"
+	WorkDegraded string = "Degraded"
 )
 
 // ManifestCondition represents the conditions of the resources deployed on
@@ -188,7 +162,7 @@ type ManifestCondition struct {
 
 	// Conditions represents the conditions of this resource on managed cluster
 	// +required
-	Conditions []StatusCondition `json:"conditions"`
+	Conditions []metav1.Condition `json:"conditions"`
 }
 
 // ManifestConditionType represents the condition type of a single
