@@ -1025,11 +1025,11 @@ webhooks:
 - name: managedclustersetbindingvalidators.admission.cluster.open-cluster-management.io
   failurePolicy: Fail
   clientConfig:
-  service:
-    # reach the webhook via the registered aggregated API
-    namespace: default
-    name: kubernetes
-    path: /apis/admission.cluster.open-cluster-management.io/v1/managedclustersetbindingvalidators
+    service:
+      # reach the webhook via the registered aggregated API
+      namespace: default
+      name: kubernetes
+      path: /apis/admission.cluster.open-cluster-management.io/v1/managedclustersetbindingvalidators
   rules:
   - operations:
     - CREATE
