@@ -39,7 +39,7 @@ func newWorkCommand() *cobra.Command {
 		Use:   "work",
 		Short: "Spoke Cluster Work",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
+			_ = cmd.Help()
 			os.Exit(1)
 		},
 	}
