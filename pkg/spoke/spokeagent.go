@@ -344,7 +344,7 @@ func (o *SpokeAgentOptions) hasValidHubClientConfig() (bool, error) {
 	}
 
 	certPath := path.Join(o.HubKubeconfigDir, hubclientcert.TLSCertFile)
-	certData, err := ioutil.ReadFile(certPath)
+	certData, err := ioutil.ReadFile(path.Clean(certPath))
 	if err != nil {
 		klog.V(4).Infof("Unable to load TLS cert file %q", certPath)
 		return false, nil
@@ -368,7 +368,7 @@ func (o *SpokeAgentOptions) getOrGenerateClusterAgentNames() (string, string) {
 
 		// and then load the cluster name from the mounted secret
 		clusterNameFilePath := path.Join(o.HubKubeconfigDir, hubclientcert.ClusterNameFile)
-		clusterNameBytes, err := ioutil.ReadFile(clusterNameFilePath)
+		clusterNameBytes, err := ioutil.ReadFile(path.Clean(clusterNameFilePath))
 		if err != nil {
 			// generate random cluster name if faild
 			clusterName = generateClusterName()
@@ -379,7 +379,7 @@ func (o *SpokeAgentOptions) getOrGenerateClusterAgentNames() (string, string) {
 
 	// try to load agent name from the mounted secret
 	agentNameFilePath := path.Join(o.HubKubeconfigDir, hubclientcert.AgentNameFile)
-	agentNameBytes, err := ioutil.ReadFile(agentNameFilePath)
+	agentNameBytes, err := ioutil.ReadFile(path.Clean(agentNameFilePath))
 	var agentName string
 	if err != nil {
 		// generate random agent name if faild

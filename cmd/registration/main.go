@@ -43,7 +43,9 @@ func newRegistrationCommand() *cobra.Command {
 		Use:   "registration",
 		Short: "Spoke Cluster Registration",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
+			if err := cmd.Help(); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+			}
 			os.Exit(1)
 		},
 	}
