@@ -73,7 +73,7 @@ deploy-all: deploy-hub deploy-webhook bootstrap-secret deploy-spoke
 build: build-e2e
 
 build-e2e:
-	go test -c ./test/e2e
+	go test -c ./test/e2e -mod=vendor
 
 test-e2e: build-e2e ensure-kustomize deploy-hub deploy-webhook e2e-bootstrap-secret
 	./e2e.test -test.v -ginkgo.v
