@@ -58,13 +58,13 @@ func TestKlusterletSecretQueueKeyFunc(t *testing.T) {
 	}{
 		{
 			name:        "key by hub config secret",
-			object:      newSecret(HubKubeConfigSecret, "test"),
+			object:      newSecret(HubKubeConfig, "test"),
 			klusterlet:  newKlusterlet("testklusterlet", "test", ""),
 			expectedKey: "testklusterlet",
 		},
 		{
 			name:        "key by bootstrap secret",
-			object:      newSecret(BootstrapHubKubeConfigSecret, "test"),
+			object:      newSecret(BootstrapHubKubeConfig, "test"),
 			klusterlet:  newKlusterlet("testklusterlet", "test", ""),
 			expectedKey: "testklusterlet",
 		},
@@ -76,7 +76,7 @@ func TestKlusterletSecretQueueKeyFunc(t *testing.T) {
 		},
 		{
 			name:        "key by klusterlet with empty namespace",
-			object:      newSecret(BootstrapHubKubeConfigSecret, KlusterletDefaultNamespace),
+			object:      newSecret(BootstrapHubKubeConfig, KlusterletDefaultNamespace),
 			klusterlet:  newKlusterlet("testklusterlet", "", ""),
 			expectedKey: "testklusterlet",
 		},

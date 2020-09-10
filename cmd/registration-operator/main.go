@@ -38,7 +38,7 @@ func newNucleusCommand() *cobra.Command {
 		Use:   "registration-operator",
 		Short: "Nucleus Operator",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
+			_ = cmd.Help()
 			os.Exit(1)
 		},
 	}

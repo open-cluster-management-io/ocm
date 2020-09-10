@@ -16,10 +16,10 @@ import (
 const (
 	// KlusterletDefaultNamespace is the default namespace of klusterlet
 	KlusterletDefaultNamespace = "open-cluster-management-agent"
-	//BootstrapHubKubeConfigSecret is the secret name of bootstrap kubeconfig secret to connect to hub
-	BootstrapHubKubeConfigSecret = "bootstrap-hub-kubeconfig"
-	//HubKubeConfigSecret is the secret name of kubeconfig secret to connect to hub with mtls
-	HubKubeConfigSecret = "hub-kubeconfig-secret"
+	// BootstrapHubKubeConfig is the secret name of bootstrap kubeconfig secret to connect to hub
+	BootstrapHubKubeConfig = "bootstrap-hub-kubeconfig"
+	// HubKubeConfig is the secret name of kubeconfig secret to connect to hub with mtls
+	HubKubeConfig = "hub-kubeconfig-secret"
 	// ClusterManagerNamespace is the namespace to deploy cluster manager components
 	ClusterManagerNamespace = "open-cluster-management-hub"
 )
@@ -30,7 +30,7 @@ func KlusterletSecretQueueKeyFunc(klusterletLister operatorlister.KlusterletList
 		namespace := accessor.GetNamespace()
 		name := accessor.GetName()
 		interestedObjectFound := false
-		if name == HubKubeConfigSecret || name == BootstrapHubKubeConfigSecret {
+		if name == HubKubeConfig || name == BootstrapHubKubeConfig {
 			interestedObjectFound = true
 		}
 		if !interestedObjectFound {

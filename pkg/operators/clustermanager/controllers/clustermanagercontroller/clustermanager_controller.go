@@ -75,7 +75,7 @@ const (
 	clusterManagerFinalizer    = "operator.open-cluster-management.io/cluster-manager-cleanup"
 	registrationWebhookSecret  = "registration-webhook-serving-cert"
 	registrationWebhookService = "cluster-manager-registration-webhook"
-	workWebhookSecret          = "work-webhook-serving-cert"
+	workWebhookCert            = "work-webhook-serving-cert"
 	workWebhookService         = "cluster-manager-work-webhook"
 	clusterManagerApplied      = "Applied"
 	clusterManagerAvailable    = "Available"
@@ -186,7 +186,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	config.RegistrationServingKey = base64.StdEncoding.EncodeToString(key)
 
 	ca, cert, key, err = n.ensureServingCertAndCA(
-		ctx, helpers.ClusterManagerNamespace, workWebhookSecret, workWebhookService)
+		ctx, helpers.ClusterManagerNamespace, workWebhookCert, workWebhookService)
 	if err != nil {
 		return err
 	}

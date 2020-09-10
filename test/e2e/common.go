@@ -51,7 +51,7 @@ type Tester struct {
 
 // kubeconfigPath is the path of kubeconfig file, will be get from env "KUBECONFIG" by default.
 // bootstrapHubSecret is the bootstrap hub kubeconfig secret, and the format is "namespace/secretName".
-// Default of bootstrapHubSecret is helpers.KlusterletDefaultNamespace/helpers.BootstrapHubKubeConfigSecret.
+// Default of bootstrapHubSecret is helpers.KlusterletDefaultNamespace/helpers.BootstrapHubKubeConfig.
 func NewTester(kubeconfigPath string) (*Tester, error) {
 	var err error
 	var tester = Tester{
@@ -110,7 +110,7 @@ func (t *Tester) SetOperatorNamespace(ns string) *Tester {
 
 func (t *Tester) SetBootstrapHubSecret(bootstrapHubSecret string) error {
 	var err error
-	var bootstrapHubSecretName = helpers.BootstrapHubKubeConfigSecret
+	var bootstrapHubSecretName = helpers.BootstrapHubKubeConfig
 	var bootstrapHubSecretNamespace = helpers.KlusterletDefaultNamespace
 	if bootstrapHubSecret != "" {
 		bootstrapHubSecretNamespace, bootstrapHubSecretName, err = cache.SplitMetaNamespaceKey(bootstrapHubSecret)
