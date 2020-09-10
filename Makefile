@@ -89,7 +89,7 @@ endif
 build: build-e2e
 
 build-e2e:
-	go test -c ./test/e2e
+	go test -c ./test/e2e -mod=vendor
 
 test-e2e: build-e2e install-crd deploy-webhook e2e-hub-kubeconfig-secret
 	./e2e.test -test.v -ginkgo.v
