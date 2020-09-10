@@ -45,3 +45,8 @@ Next approve the csr and set managecluster to be accepcted by hub with the follo
 kubectl certificate approve {csr name}
 kubectl patch managedcluster {cluster name} -p='{"spec":{"hubAcceptsClient":true}}' --type=merge
 ```
+
+## Security Response
+
+If you've found a security issue that you'd like to disclose confidentially please contact
+Red Hat's Product Security team. Details at https://access.redhat.com/security/team/contact
