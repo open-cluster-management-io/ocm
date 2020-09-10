@@ -168,11 +168,11 @@ type degradedCheckFunc func(ctx context.Context, kubeClient kubernetes.Interface
 // Check bootstrap secret, if the secret is invalid, return registration degraded condition
 func checkBootstrapSecret(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) *metav1.Condition {
 	// Check if bootstrap secret exists
-	bootstrapSecret, err := kubeClient.CoreV1().Secrets(agent.namespace).Get(ctx, helpers.BootstrapHubKubeConfigSecret, metav1.GetOptions{})
+	bootstrapSecret, err := kubeClient.CoreV1().Secrets(agent.namespace).Get(ctx, helpers.BootstrapHubKubeConfig, metav1.GetOptions{})
 	if err != nil {
 		return &metav1.Condition{
 			Reason:  "BootstrapSecretMissing",
-			Message: fmt.Sprintf("Failed to get bootstrap secret %q %q: %v", agent.namespace, helpers.BootstrapHubKubeConfigSecret, err),
+			Message: fmt.Sprintf("Failed to get bootstrap secret %q %q: %v", agent.namespace, helpers.BootstrapHubKubeConfig, err),
 		}
 	}
 
@@ -182,7 +182,7 @@ func checkBootstrapSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 		return &metav1.Condition{
 			Reason: "BootstrapSecretError",
 			Message: fmt.Sprintf("Failed to build bootstrap kube client with bootstrap secret %q %q: %v",
-				agent.namespace, helpers.BootstrapHubKubeConfigSecret, err),
+				agent.namespace, helpers.BootstrapHubKubeConfig, err),
 		}
 	}
 
@@ -192,14 +192,14 @@ func checkBootstrapSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 		return &metav1.Condition{
 			Reason: "BootstrapSecretError",
 			Message: fmt.Sprintf("Failed to create %+v with bootstrap secret %q %q: %v",
-				failedReview, agent.namespace, helpers.BootstrapHubKubeConfigSecret, err),
+				failedReview, agent.namespace, helpers.BootstrapHubKubeConfig, err),
 		}
 	}
 	if !allowed {
 		return &metav1.Condition{
 			Reason: "BootstrapSecretUnauthorized",
 			Message: fmt.Sprintf("Operation for resource %+v is not allowed with bootstrap secret %q %q",
-				failedReview.Spec.ResourceAttributes, agent.namespace, helpers.BootstrapHubKubeConfigSecret),
+				failedReview.Spec.ResourceAttributes, agent.namespace, helpers.BootstrapHubKubeConfig),
 		}
 	}
 
@@ -208,11 +208,11 @@ func checkBootstrapSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 
 // Check hub-kubeconfig-secret, if the secret is invalid, return degraded condition
 func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) *metav1.Condition {
-	hubConfigSecret, err := kubeClient.CoreV1().Secrets(agent.namespace).Get(ctx, helpers.HubKubeConfigSecret, metav1.GetOptions{})
+	hubConfigSecret, err := kubeClient.CoreV1().Secrets(agent.namespace).Get(ctx, helpers.HubKubeConfig, metav1.GetOptions{})
 	if err != nil {
 		return &metav1.Condition{
 			Reason:  "HubKubeConfigSecretMissing",
-			Message: fmt.Sprintf("Failed to get hub kubeconfig secret %q %q: %v", agent.namespace, helpers.HubKubeConfigSecret, err),
+			Message: fmt.Sprintf("Failed to get hub kubeconfig secret %q %q: %v", agent.namespace, helpers.HubKubeConfig, err),
 		}
 	}
 
@@ -295,7 +295,7 @@ func buildKubeClientWithSecret(secret *corev1.Secret) (kubernetes.Interface, err
 	defer os.RemoveAll(tempdir)
 
 	for key, data := range secret.Data {
-		if err := ioutil.WriteFile(path.Join(tempdir, key), data, 0644); err != nil {
+		if err := ioutil.WriteFile(path.Join(tempdir, key), data, 0600); err != nil {
 			return nil, err
 		}
 	}

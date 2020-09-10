@@ -167,7 +167,7 @@ func TestSync(t *testing.T) {
 	}{
 		{
 			name:       "No bootstrap secret",
-			object:     []runtime.Object{newSecret(helpers.HubKubeConfigSecret, "test")},
+			object:     []runtime.Object{newSecret(helpers.HubKubeConfig, "test")},
 			klusterlet: newKlusterlet("testklusterlet", "test", ""),
 			expectedConditions: []metav1.Condition{
 				testinghelper.NamedCondition(klusterletRegistrationDegraded, "BootstrapSecretMissing,HubKubeConfigMissing,GetDeploymentFailed", metav1.ConditionTrue),
@@ -177,8 +177,8 @@ func TestSync(t *testing.T) {
 		{
 			name: "Bad bootstrap secret",
 			object: []runtime.Object{
-				newSecret(helpers.HubKubeConfigSecret, "test"),
-				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfigSecret, "test", []byte("badsecret")),
+				newSecret(helpers.HubKubeConfig, "test"),
+				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfig, "test", []byte("badsecret")),
 			},
 			klusterlet: newKlusterlet("testklusterlet", "test", ""),
 			expectedConditions: []metav1.Condition{
@@ -189,8 +189,8 @@ func TestSync(t *testing.T) {
 		{
 			name: "Unauthorized bootstrap secret",
 			object: []runtime.Object{
-				newSecret(helpers.HubKubeConfigSecret, "test"),
-				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
+				newSecret(helpers.HubKubeConfig, "test"),
+				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfig, "test", newKubeConfig(apiServerHost)),
 			},
 			klusterlet: newKlusterlet("testklusterlet", "test", ""),
 			expectedConditions: []metav1.Condition{
@@ -201,7 +201,7 @@ func TestSync(t *testing.T) {
 		{
 			name: "No hubconfig secret",
 			object: []runtime.Object{
-				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
+				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfig, "test", newKubeConfig(apiServerHost)),
 			},
 			klusterlet:                    newKlusterlet("testklusterlet", "test", ""),
 			allowToOperateManagedClusters: true,
@@ -213,8 +213,8 @@ func TestSync(t *testing.T) {
 		{
 			name: "No cluster name secret",
 			object: []runtime.Object{
-				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
-				newSecretWithKubeConfig(helpers.HubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
+				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfig, "test", newKubeConfig(apiServerHost)),
+				newSecretWithKubeConfig(helpers.HubKubeConfig, "test", newKubeConfig(apiServerHost)),
 			},
 			allowToOperateManagedClusters: true,
 			klusterlet:                    newKlusterlet("testklusterlet", "test", ""),
@@ -226,8 +226,8 @@ func TestSync(t *testing.T) {
 		{
 			name: "No kubeconfig secret",
 			object: []runtime.Object{
-				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
-				newSecret(helpers.HubKubeConfigSecret, "test"),
+				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfig, "test", newKubeConfig(apiServerHost)),
+				newSecret(helpers.HubKubeConfig, "test"),
 			},
 			allowToOperateManagedClusters: true,
 			klusterlet:                    newKlusterlet("testklusterlet", "test", "cluster1"),
@@ -239,8 +239,8 @@ func TestSync(t *testing.T) {
 		{
 			name: "Bad hub config secret",
 			object: []runtime.Object{
-				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
-				newSecretWithKubeConfig(helpers.HubKubeConfigSecret, "test", []byte("badkubeconfig")),
+				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfig, "test", newKubeConfig(apiServerHost)),
+				newSecretWithKubeConfig(helpers.HubKubeConfig, "test", []byte("badkubeconfig")),
 			},
 			allowToOperateManagedClusters: true,
 			klusterlet:                    newKlusterlet("testklusterlet", "test", "cluster1"),
@@ -252,8 +252,8 @@ func TestSync(t *testing.T) {
 		{
 			name: "Unauthorized hub config secret",
 			object: []runtime.Object{
-				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
-				newSecretWithKubeConfig(helpers.HubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
+				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfig, "test", newKubeConfig(apiServerHost)),
+				newSecretWithKubeConfig(helpers.HubKubeConfig, "test", newKubeConfig(apiServerHost)),
 			},
 			allowToOperateManagedClusters: true,
 			klusterlet:                    newKlusterlet("testklusterlet", "test", "cluster1"),
@@ -265,8 +265,8 @@ func TestSync(t *testing.T) {
 		{
 			name: "Unavailable pod in deployments",
 			object: []runtime.Object{
-				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
-				newSecretWithKubeConfig(helpers.HubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
+				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfig, "test", newKubeConfig(apiServerHost)),
+				newSecretWithKubeConfig(helpers.HubKubeConfig, "test", newKubeConfig(apiServerHost)),
 				newDeployment("testklusterlet-registration-agent", "test", 3, 0),
 				newDeployment("testklusterlet-work-agent", "test", 3, 0),
 			},
@@ -282,8 +282,8 @@ func TestSync(t *testing.T) {
 		{
 			name: "Operator functional",
 			object: []runtime.Object{
-				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
-				newSecretWithKubeConfig(helpers.HubKubeConfigSecret, "test", newKubeConfig(apiServerHost)),
+				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfig, "test", newKubeConfig(apiServerHost)),
+				newSecretWithKubeConfig(helpers.HubKubeConfig, "test", newKubeConfig(apiServerHost)),
 				newDeployment("testklusterlet-registration-agent", "test", 3, 3),
 				newDeployment("testklusterlet-work-agent", "test", 3, 3),
 			},

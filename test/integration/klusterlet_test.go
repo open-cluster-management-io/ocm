@@ -215,7 +215,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			}
 
 			// Update hub config secret to trigger work deployment update
-			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.HubKubeConfigSecret, metav1.GetOptions{})
+			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.HubKubeConfig, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// Update hub secret
@@ -375,7 +375,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			// Create a bootstrap secret and make sure the kubeconfig can work
 			bootStrapSecret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      helpers.BootstrapHubKubeConfigSecret,
+					Name:      helpers.BootstrapHubKubeConfig,
 					Namespace: klusterletNamespace,
 				},
 				Data: map[string][]byte{
@@ -388,7 +388,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "KlusterletRegistrationDegraded", "HubKubeConfigMissing,UnavailablePods", metav1.ConditionTrue)
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "KlusterletWorkDegraded", "HubKubeConfigMissing,UnavailablePods", metav1.ConditionTrue)
 
-			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.HubKubeConfigSecret, metav1.GetOptions{})
+			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.HubKubeConfig, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// Update hub secret and make sure the kubeconfig can work

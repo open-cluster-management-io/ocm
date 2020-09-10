@@ -234,8 +234,8 @@ func ensureObject(t *testing.T, object runtime.Object, klusterlet *opratorapiv1.
 // TestSyncDeploy test deployment of klusterlet components
 func TestSyncDeploy(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
-	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfigSecret, "testns")
-	hubKubeConfigSecret := newSecret(helpers.HubKubeConfigSecret, "testns")
+	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
+	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
 	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	namespace := newNamespace("testns")
 	controller := newTestController(klusterlet, bootStrapSecret, hubKubeConfigSecret, namespace)
@@ -375,8 +375,8 @@ func TestGetServersFromKlusterlet(t *testing.T) {
 func TestClusterNameChange(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	namespace := newNamespace("testns")
-	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfigSecret, "testns")
-	hubSecret := newSecret(helpers.HubKubeConfigSecret, "testns")
+	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
+	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
 	hubSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	hubSecret.Data["cluster-name"] = []byte("cluster1")
 	controller := newTestController(klusterlet, bootStrapSecret, hubSecret, namespace)
@@ -424,9 +424,9 @@ func TestClusterNameChange(t *testing.T) {
 		}
 
 		getAction := action.(clienttesting.GetActionImpl)
-		if getAction.Name != helpers.HubKubeConfigSecret {
+		if getAction.Name != helpers.HubKubeConfig {
 			return false, nil, errors.NewNotFound(
-				corev1.Resource("secrets"), helpers.HubKubeConfigSecret)
+				corev1.Resource("secrets"), helpers.HubKubeConfig)
 		}
 		return true, hubSecret, nil
 	})
@@ -455,8 +455,8 @@ func TestClusterNameChange(t *testing.T) {
 
 func TestSyncWithPullSecret(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
-	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfigSecret, "testns")
-	hubKubeConfigSecret := newSecret(helpers.HubKubeConfigSecret, "testns")
+	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
+	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
 	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	namespace := newNamespace("testns")
 	pullSecret := newSecret(imagePullSecret, "open-cluster-management")
@@ -484,8 +484,8 @@ func TestSyncWithPullSecret(t *testing.T) {
 
 func TestDeployOnKube111(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
-	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfigSecret, "testns")
-	hubKubeConfigSecret := newSecret(helpers.HubKubeConfigSecret, "testns")
+	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
+	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
 	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	namespace := newNamespace("testns")
 	controller := newTestController(klusterlet, bootStrapSecret, hubKubeConfigSecret, namespace)
