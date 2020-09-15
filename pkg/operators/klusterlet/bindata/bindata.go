@@ -301,9 +301,8 @@ spec:
         - name: bootstrap-secret
           mountPath: "/spoke/bootstrap"
           readOnly: true
-        - name: hub-kubeconfig-secret
+        - name: hub-kubeconfig
           mountPath: "/spoke/hub-kubeconfig"
-          readOnly: true
         livenessProbe:
           httpGet:
             path: /healthz
@@ -325,9 +324,9 @@ spec:
       - name: bootstrap-secret
         secret:
           secretName: {{ .BootStrapKubeConfigSecret }}
-      - name: hub-kubeconfig-secret
-        secret:
-          secretName: {{ .HubKubeConfigSecret }}
+      - name: hub-kubeconfig
+        emptyDir:
+          medium: Memory
 `)
 
 func manifestsKlusterletKlusterletRegistrationDeploymentYamlBytes() ([]byte, error) {
