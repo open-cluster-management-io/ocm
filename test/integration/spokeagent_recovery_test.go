@@ -103,10 +103,6 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 			return true
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
-		// simulate k8s to mount the hub kubeconfig secret
-		err = util.MountHubKubeConfigs(kubeClient, hubKubeconfigDir, testNamespace, hubKubeconfigSecret)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
 		// the spoke cluster should have joined condition finally
 		gomega.Eventually(func() bool {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
@@ -196,10 +192,6 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 			}
 			return true
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
-		// simulate k8s to mount the hub kubeconfig secret
-		err = util.MountHubKubeConfigs(kubeClient, hubKubeconfigDir, testNamespace, hubKubeconfigSecret)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// the spoke cluster should have joined condition finally
 		gomega.Eventually(func() bool {

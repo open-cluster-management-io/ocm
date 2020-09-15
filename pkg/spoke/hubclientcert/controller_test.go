@@ -3,7 +3,6 @@ package hubclientcert
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
@@ -48,21 +46,8 @@ func TestSync(t *testing.T) {
 				if _, ok := actual.(*certificates.CertificateSigningRequest); !ok {
 					t.Errorf("expected csr was created, but failed")
 				}
-				expectedSecret := &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: testNamespace,
-						Name:      testSecretName,
-					},
-					Data: map[string][]byte{
-						ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
-						AgentNameFile:   []byte(testAgentName),
-					},
-				}
-				testinghelpers.AssertActions(t, agentActions, "create")
-				actualSecret := agentActions[0].(clienttesting.CreateActionImpl).Object
-				if !reflect.DeepEqual(expectedSecret, actualSecret) {
-					t.Errorf("expected secret %v, but got %v", expectedSecret, actualSecret)
-				}
+
+				testinghelpers.AssertNoActions(t, agentActions)
 			},
 		},
 		{
