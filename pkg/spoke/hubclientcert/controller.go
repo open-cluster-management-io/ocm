@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509/pkix"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -140,6 +141,20 @@ func (c *ClientCertForHubController) sync(ctx context.Context, syncCtx factory.S
 		}
 		syncCtx.Recorder().Event("ClientCertificateCreated", "A new client certificate is available")
 		return nil
+	}
+
+	// save the cluster name and agent name into secret if they are not saved yet
+	newSecretConfig := map[string][]byte{}
+	for k, v := range secret.Data {
+		newSecretConfig[k] = v
+	}
+	newSecretConfig[ClusterNameFile] = []byte(c.clusterName)
+	newSecretConfig[AgentNameFile] = []byte(c.agentName)
+	if !reflect.DeepEqual(newSecretConfig, secret.Data) {
+		secret.Data = newSecretConfig
+		if err := c.saveHubKubeconfigSecret(secret); err != nil {
+			return err
+		}
 	}
 
 	// create a csr to request new client certificate if
