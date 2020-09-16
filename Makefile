@@ -70,8 +70,6 @@ deploy-spoke: ensure-kustomize
 
 deploy-all: deploy-hub deploy-webhook bootstrap-secret deploy-spoke
 
-build: build-e2e
-
 build-e2e:
 	go test -c ./test/e2e -mod=vendor
 
