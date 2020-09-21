@@ -50,3 +50,7 @@ kubectl patch managedcluster {cluster name} -p='{"spec":{"hubAcceptsClient":true
 
 If you've found a security issue that you'd like to disclose confidentially please contact
 Red Hat's Product Security team. Details at https://access.redhat.com/security/team/contact
+
+## License
+
+This code is released under the Apache 2.0 license. See the file LICENSE for more information.
