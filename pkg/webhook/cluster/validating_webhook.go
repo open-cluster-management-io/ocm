@@ -22,6 +22,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const (
+	clusterSetLabel = "cluster.open-cluster-management.io/clusterset"
+)
+
 // ManagedClusterValidatingAdmissionHook will validate the creating/updating managedcluster request.
 type ManagedClusterValidatingAdmissionHook struct {
 	kubeClient kubernetes.Interface
@@ -84,15 +88,21 @@ func (a *ManagedClusterValidatingAdmissionHook) validateCreateRequest(request *a
 		return status
 	}
 
-	// the HubAcceptsClient field is not changed, finish the validation process
-	if !managedCluster.Spec.HubAcceptsClient {
-		status.Allowed = true
-		return status
+	if managedCluster.Spec.HubAcceptsClient {
+		// the HubAcceptsClient field is changed, we need to check the request user whether
+		// has been allowed to change the HubAcceptsClient field with SubjectAccessReview api
+		if status := a.allowUpdateAcceptField(request.UserInfo); !status.Allowed {
+			return status
+		}
 	}
 
-	// the HubAcceptsClient field is changed, we need to check the request user whether
-	// has been allowed to change the HubAcceptsClient field with SubjectAccessReview api
-	return a.allowUpdateAcceptField(request.UserInfo)
+	// check whether the request user has been allowed to set clusterset label
+	var clusterSetName string
+	if len(managedCluster.Labels) > 0 {
+		clusterSetName = managedCluster.Labels[clusterSetLabel]
+	}
+
+	return a.allowSetClusterSetLabel(request.UserInfo, "", clusterSetName)
 }
 
 // validateUpdateRequest validates update managed cluster operation.
@@ -120,15 +130,24 @@ func (a *ManagedClusterValidatingAdmissionHook) validateUpdateRequest(request *a
 		return status
 	}
 
-	// the HubAcceptsClient field is not changed, finish the validation process
-	if newManagedCluster.Spec.HubAcceptsClient == oldManagedCluster.Spec.HubAcceptsClient {
-		status.Allowed = true
-		return status
+	if newManagedCluster.Spec.HubAcceptsClient != oldManagedCluster.Spec.HubAcceptsClient {
+		// the HubAcceptsClient field is changed, we need to check the request user whether
+		// has been allowed to update the HubAcceptsClient field with SubjectAccessReview api
+		if status := a.allowUpdateAcceptField(request.UserInfo); !status.Allowed {
+			return status
+		}
 	}
 
-	// the HubAcceptsClient field is changed, we need to check the request user whether
-	// has been allowed to update the HubAcceptsClient field with SubjectAccessReview api
-	return a.allowUpdateAcceptField(request.UserInfo)
+	// check whether the request user has been allowed to set clusterset label
+	var originalClusterSetName, currentClusterSetName string
+	if len(oldManagedCluster.Labels) > 0 {
+		originalClusterSetName = oldManagedCluster.Labels[clusterSetLabel]
+	}
+	if len(newManagedCluster.Labels) > 0 {
+		currentClusterSetName = newManagedCluster.Labels[clusterSetLabel]
+	}
+
+	return a.allowSetClusterSetLabel(request.UserInfo, originalClusterSetName, currentClusterSetName)
 }
 
 // validateManagedClusterObj validates the fileds of ManagedCluster object
@@ -194,6 +213,77 @@ func (a *ManagedClusterValidatingAdmissionHook) allowUpdateAcceptField(userInfo 
 		status.Result = &metav1.Status{
 			Status: metav1.StatusFailure, Code: http.StatusForbidden, Reason: metav1.StatusReasonForbidden,
 			Message: fmt.Sprintf("user %q cannot update the HubAcceptsClient field", userInfo.Username),
+		}
+		return status
+	}
+
+	status.Allowed = true
+	return status
+}
+
+// allowSetClusterSetLabel checks whether a request user has been authorized to set clusterset label
+func (a *ManagedClusterValidatingAdmissionHook) allowSetClusterSetLabel(userInfo authenticationv1.UserInfo, originalClusterSet, newClusterSet string) *admissionv1beta1.AdmissionResponse {
+	if originalClusterSet == newClusterSet {
+		return &admissionv1beta1.AdmissionResponse{Allowed: true}
+	}
+
+	if len(originalClusterSet) > 0 {
+		if status := a.allowUpdateClusterSet(userInfo, originalClusterSet); !status.Allowed {
+			return status
+		}
+	}
+
+	if len(newClusterSet) > 0 {
+		if status := a.allowUpdateClusterSet(userInfo, newClusterSet); !status.Allowed {
+			return status
+		}
+	}
+
+	return &admissionv1beta1.AdmissionResponse{
+		Allowed: true,
+	}
+}
+
+// allowUpdateClusterSet checks whether a request user has been authorized to add/remove a ManagedCluster
+// to/from the ManagedClusterSet
+func (a *ManagedClusterValidatingAdmissionHook) allowUpdateClusterSet(userInfo authenticationv1.UserInfo, clusterSetName string) *admissionv1beta1.AdmissionResponse {
+	status := &admissionv1beta1.AdmissionResponse{}
+
+	extra := make(map[string]authorizationv1.ExtraValue)
+	for k, v := range userInfo.Extra {
+		extra[k] = authorizationv1.ExtraValue(v)
+	}
+
+	sar := &authorizationv1.SubjectAccessReview{
+		Spec: authorizationv1.SubjectAccessReviewSpec{
+			User:   userInfo.Username,
+			UID:    userInfo.UID,
+			Groups: userInfo.Groups,
+			Extra:  extra,
+			ResourceAttributes: &authorizationv1.ResourceAttributes{
+				Group:       "cluster.open-cluster-management.io",
+				Resource:    "managedclustersets",
+				Subresource: "join",
+				Name:        clusterSetName,
+				Verb:        "create",
+			},
+		},
+	}
+	sar, err := a.kubeClient.AuthorizationV1().SubjectAccessReviews().Create(context.TODO(), sar, metav1.CreateOptions{})
+	if err != nil {
+		status.Allowed = false
+		status.Result = &metav1.Status{
+			Status: metav1.StatusFailure, Code: http.StatusForbidden, Reason: metav1.StatusReasonForbidden,
+			Message: err.Error(),
+		}
+		return status
+	}
+
+	if !sar.Status.Allowed {
+		status.Allowed = false
+		status.Result = &metav1.Status{
+			Status: metav1.StatusFailure, Code: http.StatusForbidden, Reason: metav1.StatusReasonForbidden,
+			Message: fmt.Sprintf("user %q cannot add/remove a ManagedCluster to/from ManagedClusterSet %q", userInfo.Username, clusterSetName),
 		}
 		return status
 	}

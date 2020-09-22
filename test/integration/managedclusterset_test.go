@@ -13,6 +13,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 )
 
+const (
+	clusterSetLabel = "cluster.open-cluster-management.io/clusterset"
+)
+
 var _ = ginkgo.Describe("ManagedClusterSet", func() {
 	ginkgo.It("should create cluster set and keep it synced successfully ", func() {
 		ginkgo.By("Create a ManagedClusterSet")
@@ -20,17 +24,6 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 		managedClusterSet := &clusterv1alpha1.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: managedClusterSetName,
-			},
-			Spec: clusterv1alpha1.ManagedClusterSetSpec{
-				ClusterSelectors: []clusterv1alpha1.ClusterSelector{
-					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"env": "prod",
-							},
-						},
-					},
-				},
 			},
 		}
 
@@ -64,7 +57,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: managedClusterName,
 				Labels: map[string]string{
-					"env": "prod",
+					clusterSetLabel: managedClusterSetName,
 				},
 			},
 			Spec: clusterv1.ManagedClusterSpec{
