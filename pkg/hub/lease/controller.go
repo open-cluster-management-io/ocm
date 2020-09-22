@@ -93,6 +93,11 @@ func (c *leaseController) sync(ctx context.Context, syncCtx factory.SyncContext)
 		}
 
 		leaseDurationSeconds := cluster.Spec.LeaseDurationSeconds
+		// for backward compatible, release-2.1 has mutating admission webhook to mutate this field,
+		// but release-2.0 does not have the mutating admission webhook
+		if leaseDurationSeconds == 0 {
+			leaseDurationSeconds = 60
+		}
 
 		gracePeriod := time.Duration(leaseDurationTimes*leaseDurationSeconds) * time.Second
 		// the lease is constantly updated, do nothing
