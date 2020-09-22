@@ -70,6 +70,11 @@ func (c *managedClusterLeaseController) sync(ctx context.Context, syncCtx factor
 	}
 
 	observedLeaseDurationSeconds := cluster.Spec.LeaseDurationSeconds
+	// for backward compatible, release-2.1 has mutating admission webhook to mutate this field,
+	// but release-2.0 does not have the mutating admission webhook
+	if observedLeaseDurationSeconds == 0 {
+		observedLeaseDurationSeconds = 60
+	}
 
 	// if lease duration is changed, start a new lease update routine.
 	if c.lastLeaseDurationSeconds != observedLeaseDurationSeconds {
