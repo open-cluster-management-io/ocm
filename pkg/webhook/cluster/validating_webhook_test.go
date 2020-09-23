@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
+	clusterv1alpha1 "github.com/open-cluster-management/api/cluster/v1alpha1"
 	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
@@ -30,6 +31,7 @@ func TestManagedClusterValidate(t *testing.T) {
 		request                *admissionv1beta1.AdmissionRequest
 		expectedResponse       *admissionv1beta1.AdmissionResponse
 		allowUpdateAcceptField bool
+		allowUpdateClusterSets map[string]bool
 	}{
 		{
 			name: "validate non-managedclusters request",
@@ -150,6 +152,104 @@ func TestManagedClusterValidate(t *testing.T) {
 			},
 			allowUpdateAcceptField: true,
 		},
+		{
+			name: "validate setting clusterset label",
+			request: &admissionv1beta1.AdmissionRequest{
+				Resource:  managedclustersSchema,
+				Operation: admissionv1beta1.Create,
+				Object:    newManagedClusterObjWithClientSet("clusterset1"),
+			},
+			expectedResponse: &admissionv1beta1.AdmissionResponse{
+				Allowed: true,
+			},
+			allowUpdateClusterSets: map[string]bool{
+				"clusterset1": true,
+			},
+		},
+		{
+			name: "validate setting clusterset label without permission",
+			request: &admissionv1beta1.AdmissionRequest{
+				Resource:  managedclustersSchema,
+				Operation: admissionv1beta1.Create,
+				Object:    newManagedClusterObjWithClientSet("clusterset1"),
+			},
+			expectedResponse: &admissionv1beta1.AdmissionResponse{
+				Allowed: false,
+				Result: &metav1.Status{
+					Status: metav1.StatusFailure, Code: http.StatusForbidden, Reason: metav1.StatusReasonForbidden,
+					Message: "user \"\" cannot add/remove a ManagedCluster to/from ManagedClusterSet \"clusterset1\"",
+				},
+			},
+			allowUpdateClusterSets: map[string]bool{
+				"clusterset1": false,
+			},
+		},
+		{
+			name: "validate updating clusterset label",
+			request: &admissionv1beta1.AdmissionRequest{
+				Resource:  managedclustersSchema,
+				Operation: admissionv1beta1.Update,
+				OldObject: newManagedClusterObjWithClientSet("clusterset1"),
+				Object:    newManagedClusterObjWithClientSet("clusterset2"),
+			},
+			expectedResponse: &admissionv1beta1.AdmissionResponse{
+				Allowed: true,
+			},
+			allowUpdateClusterSets: map[string]bool{
+				"clusterset1": true,
+				"clusterset2": true,
+			},
+		},
+		{
+			name: "validate updating clusterset label without permission",
+			request: &admissionv1beta1.AdmissionRequest{
+				Resource:  managedclustersSchema,
+				Operation: admissionv1beta1.Update,
+				OldObject: newManagedClusterObjWithClientSet("clusterset1"),
+				Object:    newManagedClusterObjWithClientSet("clusterset2"),
+			},
+			expectedResponse: &admissionv1beta1.AdmissionResponse{
+				Allowed: false,
+				Result: &metav1.Status{
+					Status: metav1.StatusFailure, Code: http.StatusForbidden, Reason: metav1.StatusReasonForbidden,
+					Message: "user \"\" cannot add/remove a ManagedCluster to/from ManagedClusterSet \"clusterset1\"",
+				},
+			},
+		},
+		{
+			name: "validate updating clusterset label with partial permission",
+			request: &admissionv1beta1.AdmissionRequest{
+				Resource:  managedclustersSchema,
+				Operation: admissionv1beta1.Update,
+				OldObject: newManagedClusterObjWithClientSet("clusterset1"),
+				Object:    newManagedClusterObjWithClientSet("clusterset2"),
+			},
+			expectedResponse: &admissionv1beta1.AdmissionResponse{
+				Allowed: false,
+				Result: &metav1.Status{
+					Status: metav1.StatusFailure, Code: http.StatusForbidden, Reason: metav1.StatusReasonForbidden,
+					Message: "user \"\" cannot add/remove a ManagedCluster to/from ManagedClusterSet \"clusterset2\"",
+				},
+			},
+			allowUpdateClusterSets: map[string]bool{
+				"clusterset1": true,
+			},
+		},
+		{
+			name: "validate resetting clusterset label",
+			request: &admissionv1beta1.AdmissionRequest{
+				Resource:  managedclustersSchema,
+				Operation: admissionv1beta1.Update,
+				OldObject: newManagedClusterObjWithClientSet("clusterset1"),
+				Object:    newManagedClusterObjWithClientSet(""),
+			},
+			expectedResponse: &admissionv1beta1.AdmissionResponse{
+				Allowed: true,
+			},
+			allowUpdateClusterSets: map[string]bool{
+				"clusterset1": true,
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -159,9 +259,19 @@ func TestManagedClusterValidate(t *testing.T) {
 				"create",
 				"subjectaccessreviews",
 				func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					allowed := false
+
+					sar := action.(clienttesting.CreateAction).GetObject().(*authorizationv1.SubjectAccessReview)
+					switch sar.Spec.ResourceAttributes.Resource {
+					case "managedclusters":
+						allowed = c.allowUpdateAcceptField
+					case "managedclustersets":
+						allowed = c.allowUpdateClusterSets[sar.Spec.ResourceAttributes.Name]
+					}
+
 					return true, &authorizationv1.SubjectAccessReview{
 						Status: authorizationv1.SubjectAccessReviewStatus{
-							Allowed: c.allowUpdateAcceptField,
+							Allowed: allowed,
 						},
 					}, nil
 				},
@@ -201,5 +311,24 @@ func newManagedClusterObjWithClientConfigs(clientConfig clusterv1.ClientConfig) 
 	clusterObj, _ := json.Marshal(managedCluster)
 	return runtime.RawExtension{
 		Raw: clusterObj,
+	}
+}
+
+func newManagedClusterObjWithClientSet(clusterSetName string) runtime.RawExtension {
+	managedCluster := testinghelpers.NewManagedCluster()
+	managedCluster.Labels = map[string]string{
+		clusterSetLabel: clusterSetName,
+	}
+	clusterObj, _ := json.Marshal(managedCluster)
+	return runtime.RawExtension{
+		Raw: clusterObj,
+	}
+}
+
+func newManagedClusterSet(name string) *clusterv1alpha1.ManagedClusterSet {
+	return &clusterv1alpha1.ManagedClusterSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
 	}
 }
