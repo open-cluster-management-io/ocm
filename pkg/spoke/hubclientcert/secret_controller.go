@@ -91,7 +91,7 @@ func (s *hubKubeconfigSecretController) sync(ctx context.Context, syncCtx factor
 
 // writeConfigFile creates or updates a specified file and record an event to log it.
 func writeConfigFile(filename string, data []byte, recorder events.Recorder) error {
-	lastData, err := ioutil.ReadFile(filename)
+	lastData, err := ioutil.ReadFile(path.Clean(filename))
 	if os.IsNotExist(err) {
 		if err := ioutil.WriteFile(path.Clean(filename), data, 0400); err != nil {
 			return err
