@@ -1226,7 +1226,7 @@ webhooks:
     - managedclustersetbindings
   admissionReviewVersions: ["v1beta1"]
   sideEffects: None
-  timeoutSeconds: 3
+  timeoutSeconds: 10
 `)
 
 func manifestsClusterManagerClusterManagerRegistrationWebhookClustersetbindingValidatingconfigurationYamlBytes() ([]byte, error) {
@@ -1361,7 +1361,7 @@ webhooks:
     - managedclusters
   admissionReviewVersions: ["v1beta1"]
   sideEffects: None
-  timeoutSeconds: 3
+  timeoutSeconds: 10
 `)
 
 func manifestsClusterManagerClusterManagerRegistrationWebhookMutatingconfigurationYamlBytes() ([]byte, error) {
@@ -1481,7 +1481,7 @@ webhooks:
     - managedclusters
   admissionReviewVersions: ["v1beta1"]
   sideEffects: None
-  timeoutSeconds: 3
+  timeoutSeconds: 10
 `)
 
 func manifestsClusterManagerClusterManagerRegistrationWebhookValidatingconfigurationYamlBytes() ([]byte, error) {
@@ -1782,7 +1782,7 @@ webhooks:
     - manifestworks
   admissionReviewVersions: ["v1beta1"]
   sideEffects: None
-  timeoutSeconds: 3
+  timeoutSeconds: 10
 `)
 
 func manifestsClusterManagerClusterManagerWorkWebhookValidatingconfigurationYamlBytes() ([]byte, error) {
