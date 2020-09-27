@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"path"
+	"reflect"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 )
@@ -167,6 +169,16 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 		err = util.ApproveSpokeClusterCSRWithExpiredCert(kubeClient, spokeClusterName)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
+		var firstHubKubeConfigSecret *corev1.Secret
+		// the hub kubeconfig secret should be filled after the csr is approved
+		gomega.Eventually(func() bool {
+			firstHubKubeConfigSecret, err = util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret)
+			if err != nil {
+				return false
+			}
+			return true
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
 		// agent should bootstrap again due to the invalid hub config
 		var secondCSRName string
 		gomega.Eventually(func() bool {
@@ -181,15 +193,22 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 		// a new csr should be recreated
 		gomega.Expect(firstCSRName).ShouldNot(gomega.BeEquivalentTo(secondCSRName))
 
-		// approve the new csr
+		// approve the new csr with a valid hub config
 		err = util.ApproveSpokeClusterCSR(kubeClient, spokeClusterName, time.Hour*24)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		// the hub kubeconfig secret should be filled after the csr is approved
+		// wait the hub kubeconfig secret is updated with the valid hub config
 		gomega.Eventually(func() bool {
-			if _, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret); err != nil {
+			secondHubKubeConfigSecret, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret)
+			if err != nil {
 				return false
 			}
+
+			// the hub kubeconfig secret should be updated
+			if reflect.DeepEqual(firstHubKubeConfigSecret.Data, secondHubKubeConfigSecret.Data) {
+				return false
+			}
+
 			return true
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
