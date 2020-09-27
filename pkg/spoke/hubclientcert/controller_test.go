@@ -31,6 +31,7 @@ var commonName = fmt.Sprintf("%s%s:%s", subjectPrefix, testinghelpers.TestManage
 func TestSync(t *testing.T) {
 	cases := []struct {
 		name            string
+		queueKey        string
 		secrets         []runtime.Object
 		approvedCSRCert *testinghelpers.TestCert
 		keyDataExpected bool
@@ -40,6 +41,7 @@ func TestSync(t *testing.T) {
 		{
 			name:            "agent bootstrap",
 			secrets:         []runtime.Object{},
+			queueKey:        "key",
 			keyDataExpected: true,
 			csrNameExpected: true,
 			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
@@ -59,15 +61,16 @@ func TestSync(t *testing.T) {
 						AgentNameFile:   []byte(testAgentName),
 					},
 				}
-				testinghelpers.AssertActions(t, agentActions, "create")
-				actualSecret := agentActions[0].(clienttesting.CreateActionImpl).Object
+				testinghelpers.AssertActions(t, agentActions, "get", "create")
+				actualSecret := agentActions[1].(clienttesting.CreateActionImpl).Object
 				if !reflect.DeepEqual(expectedSecret, actualSecret) {
 					t.Errorf("expected secret %v, but got %v", expectedSecret, actualSecret)
 				}
 			},
 		},
 		{
-			name: "syc csr after bootstrap",
+			name:     "syc csr after bootstrap",
+			queueKey: testSecretName,
 			secrets: []runtime.Object{
 				testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "1", nil, map[string][]byte{
 					ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
@@ -78,15 +81,16 @@ func TestSync(t *testing.T) {
 			approvedCSRCert: testinghelpers.NewTestCert(testinghelpers.TestManagedClusterName, 10*time.Second),
 			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, hubActions, "get")
-				testinghelpers.AssertActions(t, agentActions, "update")
-				actual := agentActions[0].(clienttesting.UpdateActionImpl).Object
+				testinghelpers.AssertActions(t, agentActions, "get", "update")
+				actual := agentActions[1].(clienttesting.UpdateActionImpl).Object
 				if !hasValidKubeconfig(actual.(*corev1.Secret)) {
 					t.Error("kubeconfig secret is invalid")
 				}
 			},
 		},
 		{
-			name: "sync a valid hub kubeconfig secret",
+			name:     "sync a valid hub kubeconfig secret",
+			queueKey: testSecretName,
 			secrets: []runtime.Object{
 				testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "1", testinghelpers.NewTestCert(commonName, 100*time.Second), map[string][]byte{
 					ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
@@ -96,11 +100,12 @@ func TestSync(t *testing.T) {
 			},
 			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
 				testinghelpers.AssertNoActions(t, hubActions)
-				testinghelpers.AssertNoActions(t, agentActions)
+				testinghelpers.AssertActions(t, agentActions, "get")
 			},
 		},
 		{
-			name: "sync an expiring hub kubeconfig secret",
+			name:     "sync an expiring hub kubeconfig secret",
+			queueKey: testSecretName,
 			secrets: []runtime.Object{
 				testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "1", testinghelpers.NewTestCert(commonName, -3*time.Second), map[string][]byte{
 					ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
@@ -116,7 +121,7 @@ func TestSync(t *testing.T) {
 				if _, ok := actual.(*certificates.CertificateSigningRequest); !ok {
 					t.Errorf("expected csr was created, but failed")
 				}
-				testinghelpers.AssertNoActions(t, agentActions)
+				testinghelpers.AssertActions(t, agentActions, "get")
 			},
 		},
 	}
@@ -141,10 +146,6 @@ func TestSync(t *testing.T) {
 
 			agentKubeClient := kubefake.NewSimpleClientset(c.secrets...)
 			agentInformerFactory := informers.NewSharedInformerFactory(agentKubeClient, 3*time.Minute)
-			secretStore := agentInformerFactory.Core().V1().Secrets().Informer().GetStore()
-			for _, secret := range c.secrets {
-				secretStore.Add(secret)
-			}
 
 			controller := &ClientCertForHubController{
 				clusterName:                  testinghelpers.TestManagedClusterName,
@@ -168,7 +169,7 @@ func TestSync(t *testing.T) {
 				controller.hubClientConfig = clientConfig
 			}
 
-			err := controller.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, ""))
+			err := controller.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, c.queueKey))
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
 			}

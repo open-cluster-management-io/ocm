@@ -14,7 +14,9 @@ import (
 	certificates "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
@@ -40,6 +42,8 @@ const (
 	clusterNameAnnotation = "open-cluster-management.io/cluster-name"
 	ClusterNameFile       = "cluster-name"
 	AgentNameFile         = "agent-name"
+
+	irrelevantSecretKey = "irrelevantSecretKey"
 )
 
 // ControllerSyncInterval is exposed so that integration tests can crank up the constroller sync speed.
@@ -99,15 +103,36 @@ func NewClientCertForHubController(
 	}
 
 	return factory.New().
-		WithInformers(hubCSRInformer.Informer(), spokeSecretInformer.Informer()).
+		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
+			accessor, err := meta.Accessor(obj)
+			if err != nil {
+				return irrelevantSecretKey
+			}
+			// we want to only care about the hub kubeconfig secret, others are irrelevant
+			if accessor.GetNamespace() == hubKubeconfigSecretNamespace && accessor.GetName() == kubeconfigSecretName {
+				return accessor.GetName()
+			}
+			return irrelevantSecretKey
+		}, spokeSecretInformer.Informer()).
+		WithInformers(hubCSRInformer.Informer()).
 		WithSync(c.sync).
 		ResyncEvery(ControllerSyncInterval).
 		ToController(controllerName, recorder)
 }
 
 func (c *ClientCertForHubController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	// there are three cases for the quequeKey
+	// 1. queueKey equals irrelevantSecretKey, this key is the result of other secret changes on managed cluster, ignore it
+	// 2. queueKey equals hub kubeconfig secret name, this key is the result of the hub kubeconfig secret changes on managed
+	//    cluster, reconcile the secret
+	// 3. queueKey equals defautl queue key value ("key"), this key is the result of the csr changes on hub, we need
+	//    reconcile the hub kubeconfig secret
+	queueKey := syncCtx.QueueKey()
+	if queueKey == irrelevantSecretKey {
+		return nil
+	}
 	// get hubKubeconfigSecret
-	secret, err := c.spokeSecretLister.Secrets(c.hubKubeconfigSecretNamespace).Get(c.hubKubeconfigSecretName)
+	secret, err := c.spokeCoreClient.Secrets(c.hubKubeconfigSecretNamespace).Get(ctx, c.hubKubeconfigSecretName, metav1.GetOptions{})
 	switch {
 	case kerrors.IsNotFound(err):
 		secret = &corev1.Secret{
@@ -168,6 +193,7 @@ func (c *ClientCertForHubController) sync(ctx context.Context, syncCtx factory.S
 
 		total := notAfter.Sub(*notBefore)
 		remaining := notAfter.Sub(time.Now())
+		klog.V(4).Infof("Client certificate time total=%v, remaining=%v, remaining/total=%v", total, remaining, remaining.Seconds()/total.Seconds())
 		if remaining.Seconds()/total.Seconds() > 0.2 {
 			// Do nothing if the client certificate is valid and has more than 20% of its life remaining
 			klog.V(4).Info("Client certificate is valid and has more than 20% of its life remaining")
