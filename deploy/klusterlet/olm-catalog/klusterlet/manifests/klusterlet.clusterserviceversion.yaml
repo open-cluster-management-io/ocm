@@ -237,7 +237,6 @@ spec:
                 - /registration-operator
                 - klusterlet
                 image: quay.io/open-cluster-management/registration-operator:latest
-                imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:
                     path: /healthz

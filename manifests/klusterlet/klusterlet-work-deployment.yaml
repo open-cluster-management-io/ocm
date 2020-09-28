@@ -40,7 +40,6 @@ spec:
       containers:
       - name: klusterlet-manifestwork-agent
         image: {{ .WorkImage }}
-        imagePullPolicy: IfNotPresent
         args:
           - "/work"
           - "agent"

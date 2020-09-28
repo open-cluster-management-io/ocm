@@ -288,7 +288,6 @@ spec:
       containers:
       - name: registration-controller
         image: {{ .RegistrationImage }}
-        imagePullPolicy: IfNotPresent
         args:
           - "/registration"
           - "agent"
@@ -586,7 +585,6 @@ spec:
       containers:
       - name: klusterlet-manifestwork-agent
         image: {{ .WorkImage }}
-        imagePullPolicy: IfNotPresent
         args:
           - "/work"
           - "agent"
