@@ -3,9 +3,6 @@ package statuscontroller
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path"
 	"strings"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -288,21 +285,41 @@ func checkAgentDeployment(ctx context.Context, kubeClient kubernetes.Interface, 
 }
 
 func buildKubeClientWithSecret(secret *corev1.Secret) (kubernetes.Interface, error) {
-	tempdir, err := ioutil.TempDir("", "kube")
+	kubeconfigData, ok := secret.Data["kubeconfig"]
+	if !ok {
+		return nil, fmt.Errorf("unable to find kubeconfig in secret %q %q",
+			secret.Namespace, secret.Name)
+	}
+
+	config, err := clientcmd.Load(kubeconfigData)
 	if err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(tempdir)
 
-	for key, data := range secret.Data {
-		if err := ioutil.WriteFile(path.Join(tempdir, key), data, 0600); err != nil {
-			return nil, err
+	context, ok := config.Contexts[config.CurrentContext]
+	if !ok {
+		return nil, fmt.Errorf("unable to find the current context %q from the kubeconfig in secret %q %q",
+			config.CurrentContext, secret.Namespace, secret.Name)
+	}
+
+	if authInfo, ok := config.AuthInfos[context.AuthInfo]; ok {
+		// use embeded cert/key data instead of references to external cert/key files to
+		// disable cert rotation
+		if certData, ok := secret.Data["tls.crt"]; ok && len(authInfo.ClientCertificateData) == 0 {
+			authInfo.ClientCertificateData = certData
+			authInfo.ClientCertificate = ""
+		}
+		if keyData, ok := secret.Data["tls.key"]; ok && len(authInfo.ClientKeyData) == 0 {
+			authInfo.ClientKeyData = keyData
+			authInfo.ClientKey = ""
 		}
 	}
-	restConfig, err := clientcmd.BuildConfigFromFlags("", path.Join(tempdir, "kubeconfig"))
+
+	restConfig, err := clientcmd.NewDefaultClientConfig(*config, nil).ClientConfig()
 	if err != nil {
 		return nil, err
 	}
+
 	return kubernetes.NewForConfig(restConfig)
 }
 
