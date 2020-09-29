@@ -991,7 +991,6 @@ spec:
       containers:
       - name: hub-registration-controller
         image: {{ .RegistrationImage }}
-        imagePullPolicy: IfNotPresent
         args:
           - "/registration"
           - "controller"
@@ -1225,7 +1224,6 @@ spec:
       containers:
       - name: {{ .ClusterManagerName }}-registration-webhook-sa
         image: {{ .RegistrationImage }}
-        imagePullPolicy: IfNotPresent
         args:
           - "/registration"
           - "webhook"
@@ -1569,7 +1567,6 @@ spec:
       containers:
       - name: {{ .ClusterManagerName }}-work-webhook-sa
         image: {{ .WorkImage }}
-        imagePullPolicy: IfNotPresent
         args:
           - "/work"
           - "webhook"
