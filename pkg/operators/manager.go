@@ -18,6 +18,7 @@ import (
 	"github.com/open-cluster-management/registration-operator/pkg/helpers"
 	"github.com/open-cluster-management/registration-operator/pkg/operators/clustermanager/controllers/clustermanagercontroller"
 	clustermanagerstatuscontroller "github.com/open-cluster-management/registration-operator/pkg/operators/clustermanager/controllers/statuscontroller"
+	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/controllers/bootstrapcontroller"
 	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/controllers/klusterletcontroller"
 	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/controllers/statuscontroller"
 )
@@ -119,6 +120,7 @@ func RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd
 		kubeVersion,
 		operatorNamespace,
 		controllerContext.EventRecorder)
+
 	statusController := statuscontroller.NewKlusterletStatusController(
 		kubeClient,
 		operatorClient.OperatorV1().Klusterlets(),
@@ -128,10 +130,19 @@ func RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd
 		controllerContext.EventRecorder,
 	)
 
+	bootstrapController := bootstrapcontroller.NewBootstrapController(
+		kubeClient,
+		operatorInformer.Operator().V1().Klusterlets(),
+		kubeInformer.Core().V1().Secrets(),
+		controllerContext.EventRecorder,
+	)
+
 	go operatorInformer.Start(ctx.Done())
 	go kubeInformer.Start(ctx.Done())
 	go klusterletController.Run(ctx, 1)
 	go statusController.Run(ctx, 1)
+	go bootstrapController.Run(ctx, 1)
+
 	<-ctx.Done()
 	return nil
 }
