@@ -7,14 +7,17 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	corev1informers "k8s.io/client-go/informers/core/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	corev1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
 )
@@ -25,18 +28,21 @@ type hubKubeconfigSecretController struct {
 	hubKubeconfigDir             string
 	hubKubeconfigSecretNamespace string
 	hubKubeconfigSecretName      string
+	spokeCoreClient              corev1client.CoreV1Interface
 	spokeSecretLister            corev1lister.SecretLister
 }
 
 // NewHubKubeconfigSecretController returns a new HubKubeconfigSecretController
 func NewHubKubeconfigSecretController(
 	hubKubeconfigDir, hubKubeconfigSecretNamespace, hubKubeconfigSecretName string,
+	spokeCoreClient corev1client.CoreV1Interface,
 	spokeSecretInformer corev1informers.SecretInformer,
 	recorder events.Recorder) factory.Controller {
 	s := &hubKubeconfigSecretController{
 		hubKubeconfigDir:             hubKubeconfigDir,
 		hubKubeconfigSecretNamespace: hubKubeconfigSecretNamespace,
 		hubKubeconfigSecretName:      hubKubeconfigSecretName,
+		spokeCoreClient:              spokeCoreClient,
 		spokeSecretLister:            spokeSecretInformer.Lister(),
 	}
 
@@ -53,16 +59,17 @@ func NewHubKubeconfigSecretController(
 				return ""
 			}, spokeSecretInformer.Informer()).
 		WithSync(s.sync).
+		ResyncEvery(5*time.Minute).
 		ToController("HubKubeconfigSecretController", recorder)
 }
 
 func (s *hubKubeconfigSecretController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	hubKubeconfigSecretName := syncCtx.QueueKey()
-	if hubKubeconfigSecretName == "" {
+	queueKey := syncCtx.QueueKey()
+	if queueKey == "" {
 		return nil
 	}
-	klog.V(4).Infof("Reconciling Hub KubeConfig secret %q", hubKubeconfigSecretName)
-	secret, err := s.spokeSecretLister.Secrets(s.hubKubeconfigSecretNamespace).Get(hubKubeconfigSecretName)
+	klog.V(4).Infof("Reconciling Hub KubeConfig secret %q", s.hubKubeconfigSecretName)
+	secret, err := s.spokeCoreClient.Secrets(s.hubKubeconfigSecretNamespace).Get(ctx, s.hubKubeconfigSecretName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		return nil
 	}
