@@ -36,6 +36,7 @@ func TestHubKubeconfigSecretSync(t *testing.T) {
 		{
 			name:     "no secret",
 			queueKey: "",
+			secret:   testinghelpers.NewHubKubeconfigSecret("irrelevant", "irrelevant", "", nil, map[string][]byte{}),
 			validateFiles: func(t *testing.T, hubKubeconfigDir string) {
 				files, err := ioutil.ReadDir(hubKubeconfigDir)
 				if err != nil {
@@ -108,7 +109,7 @@ func TestHubKubeconfigSecretSync(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			kubeClient := kubefake.NewSimpleClientset()
+			kubeClient := kubefake.NewSimpleClientset(c.secret)
 			kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Minute*10)
 			secretStore := kubeInformerFactory.Core().V1().Secrets().Informer().GetStore()
 			if c.secret != nil {
@@ -127,6 +128,7 @@ func TestHubKubeconfigSecretSync(t *testing.T) {
 				hubKubeconfigDir:             hubKubeconfigDir,
 				hubKubeconfigSecretName:      testSecretName,
 				hubKubeconfigSecretNamespace: testNamespace,
+				spokeCoreClient:              kubeClient.CoreV1(),
 				spokeSecretLister:            kubeInformerFactory.Core().V1().Secrets().Lister(),
 			}
 			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, c.queueKey))

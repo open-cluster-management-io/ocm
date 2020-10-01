@@ -130,6 +130,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 
 	hubKubeconfigSecretController := hubclientcert.NewHubKubeconfigSecretController(
 		o.HubKubeconfigDir, o.ComponentNamespace, o.HubKubeconfigSecret,
+		spokeKubeClient.CoreV1(),
 		spokeKubeInformerFactory.Core().V1().Secrets(),
 		controllerContext.EventRecorder,
 	)
