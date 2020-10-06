@@ -100,7 +100,7 @@ func (s *hubKubeconfigSecretController) sync(ctx context.Context, syncCtx factor
 func writeConfigFile(filename string, data []byte, recorder events.Recorder) error {
 	lastData, err := ioutil.ReadFile(path.Clean(filename))
 	if os.IsNotExist(err) {
-		if err := ioutil.WriteFile(path.Clean(filename), data, 0400); err != nil {
+		if err := ioutil.WriteFile(path.Clean(filename), data, 0600); err != nil {
 			return err
 		}
 		recorder.Event("HubKubeConfigFileCreated", fmt.Sprintf("Hub config file %q is created from hub kubeconfig secret", filename))
@@ -114,7 +114,7 @@ func writeConfigFile(filename string, data []byte, recorder events.Recorder) err
 		return nil
 	}
 
-	if err := ioutil.WriteFile(path.Clean(filename), data, 0400); err != nil {
+	if err := ioutil.WriteFile(path.Clean(filename), data, 0600); err != nil {
 		return err
 	}
 
