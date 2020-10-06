@@ -60,7 +60,9 @@ type requestWatermark struct {
 }
 
 func (w *requestWatermark) recordMutating(mutatingVal int) {
-	w.mutatingObserver.Set(float64(mutatingVal))
+	// Disabled, as this takes a long time to process when this is the first request in a while.
+	// See https://github.com/kubernetes/kubernetes/issues/95300
+	//w.mutatingObserver.Set(float64(mutatingVal))
 
 	w.lock.Lock()
 	defer w.lock.Unlock()
@@ -71,7 +73,9 @@ func (w *requestWatermark) recordMutating(mutatingVal int) {
 }
 
 func (w *requestWatermark) recordReadOnly(readOnlyVal int) {
-	w.readOnlyObserver.Set(float64(readOnlyVal))
+	// Disabled, as this takes a long time to process when this is the first request in a while.
+	// See https://github.com/kubernetes/kubernetes/issues/95300
+	//w.readOnlyObserver.Set(float64(readOnlyVal))
 
 	w.lock.Lock()
 	defer w.lock.Unlock()
