@@ -26,3 +26,6 @@ require (
 	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
 	sigs.k8s.io/controller-runtime v0.6.1-0.20200829232221-efc74d056b24
 )
+
+// temporary hack fix for https://github.com/kubernetes/kubernetes/issues/95300
+replace k8s.io/apiserver => github.com/staebler/apiserver v0.19.1-0.20201005174924-a3ef0d1e45df
