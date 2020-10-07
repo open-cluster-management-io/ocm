@@ -5,14 +5,14 @@ metadata:
   name: managedclusteraddons.addon.open-cluster-management.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .status.conditions[?(@.type=="Progressing")].status
-    name: Progressing
-    type: string
   - JSONPath: .status.conditions[?(@.type=="Available")].status
     name: Available
     type: string
   - JSONPath: .status.conditions[?(@.type=="Degraded")].status
     name: Degraded
+    type: string
+  - JSONPath: .status.conditions[?(@.type=="Progressing")].status
+    name: Progressing
     type: string
   group: addon.open-cluster-management.io
   names:
