@@ -12,5 +12,5 @@ do
     cp $f ./manifests/klusterlet/
 done
 
-cp $CLUSTER_MANAGER_CRD_FILE ./deploy/cluster-manager/crds/
-cp $KLUSTERLET_CRD_FILE ./deploy/klusterlet/crds/
+cp $CLUSTER_MANAGER_CRD_FILE ./deploy/cluster-manager/config/crds/
+cp $KLUSTERLET_CRD_FILE ./deploy/klusterlet/config/crds/

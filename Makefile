@@ -17,7 +17,7 @@ IMAGE_TAG?=latest
 IMAGE_NAME?=$(IMAGE_REGISTRY)/registration-operator:$(IMAGE_TAG)
 
 # CSV_VERSION is used to generate new CSV manifests
-CSV_VERSION?=0.2.0
+CSV_VERSION?=0.3.0
 
 # WORK_IMAGE can be set in the env to override calculated value
 WORK_TAG?=latest
@@ -28,10 +28,11 @@ REGISTRATION_TAG?=latest
 REGISTRATION_IMAGE?=$(IMAGE_REGISTRY)/registration:$(REGISTRATION_TAG)
 
 OPERATOR_SDK?=$(PERMANENT_TMP_GOPATH)/bin/operator-sdk
-OPERATOR_SDK_VERSION?=v0.17.0
+OPERATOR_SDK_VERSION?=v1.0.1
 operatorsdk_gen_dir:=$(dir $(OPERATOR_SDK))
 # On openshift, OLM is installed into openshift-operator-lifecycle-manager
 OLM_NAMESPACE?=olm
+OLM_VERSION?=0.16.1
 
 KUBECTL?=kubectl
 KUBECONFIG?=./.kubeconfig
@@ -66,10 +67,17 @@ verify-crds:
 
 verify: verify-crds
 
-# should set the correct IMAGE_TAG and IMAGE_NAME for the new csv
 update-csv: ensure-operator-sdk
-	$(OPERATOR_SDK) generate csv --crd-dir=deploy/cluster-manager/crds --deploy-dir=deploy/cluster-manager --output-dir=deploy/cluster-manager/olm-catalog/cluster-manager --operator-name=cluster-manager --csv-version=$(CSV_VERSION)
-	$(OPERATOR_SDK) generate csv --crd-dir=deploy/klusterlet/crds --deploy-dir=deploy/klusterlet --output-dir=deploy/klusterlet/olm-catalog/klusterlet --operator-name=klusterlet --csv-version=$(CSV_VERSION)
+	cd deploy/cluster-manager && ../../$(OPERATOR_SDK) generate bundle --manifests --deploy-dir config/ --crds-dir config/crds/ --output-dir olm-catalog/cluster-manager/ --version $(CSV_VERSION)
+	cd deploy/klusterlet && ../../$(OPERATOR_SDK) generate bundle --manifests --deploy-dir config/ --crds-dir config/crds/ --output-dir olm-catalog/klusterlet/ --version=$(CSV_VERSION)
+
+	# TODO: delete this when operator-sdk fix this issue that sets 'null' to array in yaml.
+	$(SED_CMD) -e "s,rules: null,rules: []," -i deploy/cluster-manager/olm-catalog/cluster-manager/manifests/cluster-manager.clusterserviceversion.yaml
+	$(SED_CMD) -e "s,rules: null,rules: []," -i deploy/klusterlet/olm-catalog/klusterlet/manifests/klusterlet.clusterserviceversion.yaml
+
+	# delete useless serviceaccounts in manifests although they are copied from config by operator-sdk.
+	rm ./deploy/cluster-manager/olm-catalog/cluster-manager/manifests/cluster-manager_v1_serviceaccount.yaml
+	rm ./deploy/klusterlet/olm-catalog/klusterlet/manifests/klusterlet_v1_serviceaccount.yaml
 
 munge-hub-csv:
 	mkdir -p munge-csv
@@ -90,20 +98,20 @@ deploy: install-olm deploy-hub deploy-spoke unmunge-csv
 clean-deploy: clean-spoke clean-hub
 
 install-olm: ensure-operator-sdk
-	$(KUBECTL) get crds | grep clusterserviceversion ; if [ $$? -ne 0 ] ; then $(OPERATOR_SDK) olm install --version 0.15.0; fi
+	$(KUBECTL) get crds | grep clusterserviceversion ; if [ $$? -ne 0 ] ; then $(OPERATOR_SDK) olm install --version $(OLM_VERSION); fi
 	$(KUBECTL) get ns open-cluster-management ; if [ $$? -ne 0 ] ; then $(KUBECTL) create ns open-cluster-management ; fi
 
 deploy-hub: deploy-hub-operator apply-hub-cr
 
 deploy-hub-operator: install-olm munge-hub-csv
-	$(OPERATOR_SDK) run --olm --operator-namespace open-cluster-management --operator-version $(CSV_VERSION) --manifests deploy/cluster-manager/olm-catalog/cluster-manager --olm-namespace $(OLM_NAMESPACE) --timeout 10m
-	
+	$(OPERATOR_SDK) run packagemanifests deploy/cluster-manager/olm-catalog/cluster-manager/ --namespace open-cluster-management --version $(CSV_VERSION) --install-mode SingleNamespace=open-cluster-management --timeout=10m
+
 apply-hub-cr:
-	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," deploy/cluster-manager/crds/operator_open-cluster-management_clustermanagers.cr.yaml | $(KUBECTL) apply -f -
+	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers.cr.yaml | $(KUBECTL) apply -f -
 
 clean-hub: ensure-operator-sdk
-	$(KUBECTL) delete -f deploy/cluster-manager/crds/operator_open-cluster-management_clustermanagers.cr.yaml --ignore-not-found
-	$(OPERATOR_SDK) cleanup --olm --operator-namespace open-cluster-management --operator-version $(CSV_VERSION) --manifests deploy/cluster-manager/olm-catalog/cluster-manager --olm-namespace $(OLM_NAMESPACE) --timeout 10m
+	$(KUBECTL) delete -f deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers.cr.yaml --ignore-not-found
+	$(OPERATOR_SDK) cleanup cluster-manager --namespace open-cluster-management --timeout 10m
 
 cluster-ip:
   CLUSTER_IP?=$(shell $(KUBECTL) get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}")
@@ -127,14 +135,14 @@ e2e-bootstrap-secret: cluster-ip
 deploy-spoke: deploy-spoke-operator apply-spoke-cr
 
 deploy-spoke-operator: install-olm munge-spoke-csv bootstrap-secret
-	$(OPERATOR_SDK) run --olm --operator-namespace open-cluster-management --operator-version $(CSV_VERSION) --manifests deploy/klusterlet/olm-catalog/klusterlet --olm-namespace $(OLM_NAMESPACE) --timeout 10m
+	$(OPERATOR_SDK) run packagemanifests deploy/klusterlet/olm-catalog/klusterlet/ --namespace open-cluster-management --version $(CSV_VERSION) --install-mode SingleNamespace=open-cluster-management --timeout=10m
 
 apply-spoke-cr:
-	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," deploy/klusterlet/crds/operator_open-cluster-management_klusterlets.cr.yaml | $(KUBECTL) apply -f -
+	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," deploy/klusterlet/config/samples/operator_open-cluster-management_klusterlets.cr.yaml | $(KUBECTL) apply -f -
 
 clean-spoke: ensure-operator-sdk
-	$(KUBECTL) delete -f deploy/klusterlet/crds/operator_open-cluster-management_klusterlets.cr.yaml --ignore-not-found
-	$(OPERATOR_SDK) cleanup --olm --operator-namespace open-cluster-management --operator-version $(CSV_VERSION) --manifests deploy/klusterlet/olm-catalog/klusterlet --olm-namespace $(OLM_NAMESPACE) --timeout 10m
+	$(KUBECTL) delete -f deploy/klusterlet/config/samples/operator_open-cluster-management_klusterlets.cr.yaml --ignore-not-found
+	$(OPERATOR_SDK) cleanup klusterlet --namespace open-cluster-management --timeout 10m
 
 test-e2e: deploy-hub deploy-spoke-operator run-e2e
 

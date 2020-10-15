@@ -19,19 +19,20 @@ metadata:
     capabilities: Basic Install
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
-    containerImage: quay.io/repository/open-cluster-management/registration-operator:0.0.2
-    createdAt: "2020-07-30T20:00:31Z"
+    containerImage: quay.io/repository/open-cluster-management/registration-operator:latest
+    createdAt: "2020-10-15T20:00:31Z"
     description: Manages the installation and upgrade of the ClusterManager.
+    operators.operatorframework.io/builder: operator-sdk-v1.0.1
+    operators.operatorframework.io/project_layout: go
     repository: https://github.com/open-cluster-management/registration-operator
     support: Red Hat, Inc.
-  name: cluster-manager.v0.2.0
+  name: cluster-manager.v0.3.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: ClusterManager defines the configurations of controllers running
-        hub that govern registration and work distribution for attached Klusterlets
+    - description: ClusterManager defines the configurations of controllers running hub that govern registration and work distribution for attached Klusterlets
       displayName: ClusterManager
       kind: ClusterManager
       name: clustermanagers.operator.open-cluster-management.io
@@ -255,6 +256,9 @@ spec:
                     cpu: 100m
                     memory: 128Mi
               serviceAccountName: cluster-manager
+      permissions:
+      - rules: []
+        serviceAccountName: cluster-manager
     strategy: deployment
   installModes:
   - supported: true
@@ -281,8 +285,8 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc.
-  replaces: cluster-manager.v0.1.0
+  replaces: cluster-manager.v0.2.0
   selector:
     matchLabels:
       app: cluster-manager
-  version: 0.2.0
+  version: 0.3.0

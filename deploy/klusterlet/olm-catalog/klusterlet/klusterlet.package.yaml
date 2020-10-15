@@ -1,5 +1,5 @@
 channels:
-- currentCSV: klusterlet.v0.2.0
+- currentCSV: klusterlet.v0.3.0
   name: stable
 defaultChannel: stable
 packageName: klusterlet
