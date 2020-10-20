@@ -12,6 +12,6 @@ do
     diff -N $f ./manifests/klusterlet/$(basename $f) || ( echo 'crd content is incorrect' && false )
 done
 
-diff -N $CLUSTER_MANAGER_CRD_FILE ./deploy/cluster-manager/crds/$(basename $CLUSTER_MANAGER_CRD_FILE) || ( echo 'crd content is incorrect' && false )
-diff -N $KLUSTERLET_CRD_FILE ./deploy/klusterlet/crds/$(basename $KLUSTERLET_CRD_FILE) || ( echo 'crd content is incorrect' && false )
+diff -N $CLUSTER_MANAGER_CRD_FILE ./deploy/cluster-manager/config/crds/$(basename $CLUSTER_MANAGER_CRD_FILE) || ( echo 'crd content is incorrect' && false )
+diff -N $KLUSTERLET_CRD_FILE ./deploy/klusterlet/config/crds/$(basename $KLUSTERLET_CRD_FILE) || ( echo 'crd content is incorrect' && false )
 
