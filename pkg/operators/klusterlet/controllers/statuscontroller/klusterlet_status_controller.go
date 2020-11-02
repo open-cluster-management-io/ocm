@@ -148,7 +148,7 @@ func checkAgentDegradedCondition(
 			Type:    degradedType,
 			Status:  metav1.ConditionFalse,
 			Reason:  fmt.Sprintf("%sFunctional", agentName),
-			Message: fmt.Sprintf("%s is managing credentials", agentName),
+			Message: fmt.Sprintf("%s is functioning correctly", agentName),
 		}
 	}
 
