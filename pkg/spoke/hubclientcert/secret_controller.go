@@ -47,16 +47,21 @@ func NewHubKubeconfigSecretController(
 	}
 
 	return factory.New().
-		WithInformersQueueKeyFunc(
+		WithFilteredEventsInformersQueueKeyFunc(
 			func(obj runtime.Object) string {
+				accessor, _ := meta.Accessor(obj)
+				return accessor.GetName()
+			},
+			func(obj interface{}) bool {
 				accessor, err := meta.Accessor(obj)
 				if err != nil {
-					return ""
+					return false
 				}
+				// only enqueue when hub kubeconfig secret is changed
 				if accessor.GetNamespace() == hubKubeconfigSecretNamespace && accessor.GetName() == hubKubeconfigSecretName {
-					return accessor.GetName()
+					return true
 				}
-				return ""
+				return false
 			}, spokeSecretInformer.Informer()).
 		WithSync(s.sync).
 		ResyncEvery(5*time.Minute).
@@ -64,10 +69,6 @@ func NewHubKubeconfigSecretController(
 }
 
 func (s *hubKubeconfigSecretController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	queueKey := syncCtx.QueueKey()
-	if queueKey == "" {
-		return nil
-	}
 	klog.V(4).Infof("Reconciling Hub KubeConfig secret %q", s.hubKubeconfigSecretName)
 	secret, err := s.spokeCoreClient.Secrets(s.hubKubeconfigSecretNamespace).Get(ctx, s.hubKubeconfigSecretName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {

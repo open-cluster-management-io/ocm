@@ -103,17 +103,23 @@ func NewClientCertForHubController(
 	}
 
 	return factory.New().
-		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
-			accessor, err := meta.Accessor(obj)
-			if err != nil {
-				return irrelevantSecretKey
-			}
-			// we want to only care about the hub kubeconfig secret, others are irrelevant
-			if accessor.GetNamespace() == hubKubeconfigSecretNamespace && accessor.GetName() == kubeconfigSecretName {
+		WithFilteredEventsInformersQueueKeyFunc(
+			func(obj runtime.Object) string {
+				accessor, _ := meta.Accessor(obj)
 				return accessor.GetName()
-			}
-			return irrelevantSecretKey
-		}, spokeSecretInformer.Informer()).
+			},
+			func(obj interface{}) bool {
+				accessor, err := meta.Accessor(obj)
+				if err != nil {
+					return false
+				}
+				// only enqueue when hub kubeconfig secret is changed
+				if accessor.GetNamespace() == hubKubeconfigSecretNamespace && accessor.GetName() == kubeconfigSecretName {
+					return true
+				}
+				return false
+			},
+			spokeSecretInformer.Informer()).
 		WithInformers(hubCSRInformer.Informer()).
 		WithSync(c.sync).
 		ResyncEvery(ControllerSyncInterval).
@@ -121,16 +127,6 @@ func NewClientCertForHubController(
 }
 
 func (c *ClientCertForHubController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	// there are three cases for the quequeKey
-	// 1. queueKey equals irrelevantSecretKey, this key is the result of other secret changes on managed cluster, ignore it
-	// 2. queueKey equals hub kubeconfig secret name, this key is the result of the hub kubeconfig secret changes on managed
-	//    cluster, reconcile the secret
-	// 3. queueKey equals defautl queue key value ("key"), this key is the result of the csr changes on hub, we need
-	//    reconcile the hub kubeconfig secret
-	queueKey := syncCtx.QueueKey()
-	if queueKey == irrelevantSecretKey {
-		return nil
-	}
 	// get hubKubeconfigSecret
 	secret, err := c.spokeCoreClient.Secrets(c.hubKubeconfigSecretNamespace).Get(ctx, c.hubKubeconfigSecretName, metav1.GetOptions{})
 	switch {
