@@ -105,7 +105,7 @@ install-olm: ensure-operator-sdk
 
 install-olm-kind: ensure-operator-sdk
 	$(KUBECTL) --kubeconfig=$(KLUSTERLET_KIND_KUBECONFIG) get crds | grep clusterserviceversion ; if [ $$? -ne 0 ] ; then $(OPERATOR_SDK) olm install --version $(OLM_VERSION); fi
-	$(KUBECTL) --kubeconfig=$(KLUSTERLET_KIND_KUBECONFIG) get ns open-cluster-management ; if [ $$? -ne 0 ] ; then $(KUBECTL) create ns open-cluster-management ; fi
+	$(KUBECTL) --kubeconfig=$(KLUSTERLET_KIND_KUBECONFIG) get ns open-cluster-management ; if [ $$? -ne 0 ] ; then $(KUBECTL) --kubeconfig=$(KLUSTERLET_KIND_KUBECONFIG) create ns open-cluster-management ; fi
 
 deploy-hub: deploy-hub-operator apply-hub-cr
 
@@ -122,7 +122,7 @@ clean-hub: ensure-operator-sdk
 cluster-ip:
   CLUSTER_IP?=$(shell $(KUBECTL) get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}")
 
-cluster-ip-kind:
+cluster-hub-ip-kind:
   CLUSTER_IP_KIND?=$(shell $(KUBECTL) --kubeconfig=$(HUB_KIND_KUBECONFIG) config view | grep server | awk '{ print $2 }' | cut -f3 -d/ | cut -f1 -d:)
 
 bootstrap-secret: cluster-ip
@@ -133,7 +133,7 @@ bootstrap-secret: cluster-ip
 	$(KUBECTL) delete secret bootstrap-hub-kubeconfig -n open-cluster-management-agent --ignore-not-found
 	$(KUBECTL) create secret generic bootstrap-hub-kubeconfig --from-file=kubeconfig=dev-kubeconfig -n open-cluster-management-agent
 
-bootstrap-secret-kind: cluster-ip-kind
+bootstrap-secret-kind: cluster-hub-ip-kind
 	cp $(HUB_KIND_KUBECONFIG) dev-kubeconfig
 	$(KUBECTL) --kubeconfig=$(KLUSTERLET_KIND_KUBECONFIG) get ns open-cluster-management-agent; if [ $$? -ne 0 ] ; then $(KUBECTL) --kubeconfig=$(KLUSTERLET_KIND_KUBECONFIG) create ns open-cluster-management-agent; fi
 	$(KUBECTL) --kubeconfig dev-kubeconfig config set clusters.kind-$(KIND_CLUSTER).server https://$(CLUSTER_IP_KIND)
@@ -162,7 +162,7 @@ apply-spoke-cr:
 	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," deploy/klusterlet/config/samples/operator_open-cluster-management_klusterlets.cr.yaml | $(KUBECTL) apply -f -
 
 apply-spoke-cr-kind:
-	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," deploy/klusterlet/config/samples/operator_open-cluster-management_klusterlets.cr.yaml | $(KUBECTL) --kubeconfig=$(KLUSTERLET_KIND_KUBECONFIG) apply -f -
+	$(KUBECTL) --kubeconfig=$(KLUSTERLET_KIND_KUBECONFIG) apply -f deploy/klusterlet/config/samples/operator_open-cluster-management_klusterlets.cr.yaml
 
 clean-spoke: ensure-operator-sdk
 	$(KUBECTL) delete -f deploy/klusterlet/config/samples/operator_open-cluster-management_klusterlets.cr.yaml --ignore-not-found
