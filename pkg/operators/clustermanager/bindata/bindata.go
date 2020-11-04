@@ -903,6 +903,13 @@ rules:
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["managedclustersets/status"]
   verbs: ["update", "patch"]
+# Allow to access metrics API
+- apiGroups: ["authentication.k8s.io"]
+  resources: ["tokenreviews"]
+  verbs: ["create"]
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["create"]
 `)
 
 func manifestsClusterManagerClusterManagerRegistrationClusterroleYamlBytes() ([]byte, error) {
