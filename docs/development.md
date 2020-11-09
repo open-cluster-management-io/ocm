@@ -1,4 +1,0 @@
-
-# Development
-
-**Pending Update ...**
