@@ -2,6 +2,10 @@
 
 Minimum cluster registration and work
 
+## Community, discussion, contribution, and support
+
+Check the [CONTRIBUTING Doc](CONTRIBUTING.md) for how to contribute to the repo.
+
 # How to Deploy
 
 ## Deploy all-in-one deployment on kind
