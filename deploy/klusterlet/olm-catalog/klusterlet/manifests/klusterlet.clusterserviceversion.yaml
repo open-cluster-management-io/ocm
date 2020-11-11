@@ -29,7 +29,7 @@ metadata:
     containerImage: quay.io/repository/open-cluster-management/registration-operator:latest
     createdAt: "2020-10-15T20:00:31Z"
     description: Manages the installation and upgrade of the Klusterlet.
-    operators.operatorframework.io/builder: operator-sdk-v1.0.1
+    operators.operatorframework.io/builder: operator-sdk-v1.1.0
     operators.operatorframework.io/project_layout: go
     repository: https://github.com/open-cluster-management/registration-operator
     support: Red Hat, Inc.
@@ -257,9 +257,6 @@ spec:
                     cpu: 100m
                     memory: 128Mi
               serviceAccountName: klusterlet
-      permissions:
-      - rules: []
-        serviceAccountName: klusterlet
     strategy: deployment
   installModes:
   - supported: true
