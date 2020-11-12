@@ -28,7 +28,7 @@ REGISTRATION_TAG?=latest
 REGISTRATION_IMAGE?=$(IMAGE_REGISTRY)/registration:$(REGISTRATION_TAG)
 
 OPERATOR_SDK?=$(PERMANENT_TMP_GOPATH)/bin/operator-sdk
-OPERATOR_SDK_VERSION?=v1.0.1
+OPERATOR_SDK_VERSION?=v1.1.0
 operatorsdk_gen_dir:=$(dir $(OPERATOR_SDK))
 # On openshift, OLM is installed into openshift-operator-lifecycle-manager
 OLM_NAMESPACE?=olm
@@ -73,10 +73,6 @@ update-csv: ensure-operator-sdk
 	cd deploy/cluster-manager && ../../$(OPERATOR_SDK) generate bundle --manifests --deploy-dir config/ --crds-dir config/crds/ --output-dir olm-catalog/cluster-manager/ --version $(CSV_VERSION)
 	cd deploy/klusterlet && ../../$(OPERATOR_SDK) generate bundle --manifests --deploy-dir config/ --crds-dir config/crds/ --output-dir olm-catalog/klusterlet/ --version=$(CSV_VERSION)
 
-	# TODO: delete this when operator-sdk fix this issue that sets 'null' to array in yaml.
-	$(SED_CMD) -e "s,rules: null,rules: []," -i deploy/cluster-manager/olm-catalog/cluster-manager/manifests/cluster-manager.clusterserviceversion.yaml
-	$(SED_CMD) -e "s,rules: null,rules: []," -i deploy/klusterlet/olm-catalog/klusterlet/manifests/klusterlet.clusterserviceversion.yaml
-
 	# delete useless serviceaccounts in manifests although they are copied from config by operator-sdk.
 	rm ./deploy/cluster-manager/olm-catalog/cluster-manager/manifests/cluster-manager_v1_serviceaccount.yaml
 	rm ./deploy/klusterlet/olm-catalog/klusterlet/manifests/klusterlet_v1_serviceaccount.yaml
@@ -110,7 +106,7 @@ install-olm-kind: ensure-operator-sdk
 deploy-hub: deploy-hub-operator apply-hub-cr
 
 deploy-hub-operator: install-olm munge-hub-csv
-	$(OPERATOR_SDK) run packagemanifests deploy/cluster-manager/olm-catalog/cluster-manager/ --namespace open-cluster-management --version $(CSV_VERSION) --install-mode SingleNamespace=open-cluster-management --timeout=10m
+	$(OPERATOR_SDK) run packagemanifests deploy/cluster-manager/olm-catalog/cluster-manager/ --namespace open-cluster-management --version $(CSV_VERSION) --install-mode OwnNamespace --timeout=10m
 
 apply-hub-cr:
 	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers.cr.yaml | $(KUBECTL) apply -f -
@@ -151,7 +147,7 @@ e2e-bootstrap-secret: cluster-ip
 deploy-spoke: deploy-spoke-operator apply-spoke-cr
 
 deploy-spoke-operator: install-olm munge-spoke-csv bootstrap-secret
-	$(OPERATOR_SDK) run packagemanifests deploy/klusterlet/olm-catalog/klusterlet/ --namespace open-cluster-management --version $(CSV_VERSION) --install-mode SingleNamespace=open-cluster-management --timeout=10m
+	$(OPERATOR_SDK) run packagemanifests deploy/klusterlet/olm-catalog/klusterlet/ --namespace open-cluster-management --version $(CSV_VERSION) --install-mode OwnNamespace --timeout=10m
 
 deploy-spoke-kind: deploy-spoke-operator-kind apply-spoke-cr-kind
 
