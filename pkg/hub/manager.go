@@ -18,21 +18,31 @@ import (
 	"github.com/open-cluster-management/registration/pkg/hub/rbacfinalizerdeletion"
 
 	kubeinformers "k8s.io/client-go/informers"
+	"k8s.io/client-go/rest"
 )
 
 // RunControllerManager starts the controllers on hub to manage spoke cluster registration.
 func RunControllerManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
-	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
+	// If qps in kubconfig is not set, increase the qps and burst to enhance the ability of kube client to handle
+	// requests in concurrent
+	// TODO: Use ClientConnectionOverrides flags to change qps/burst when library-go exposes them in the future
+	kubeConfig := rest.CopyConfig(controllerContext.KubeConfig)
+	if kubeConfig.QPS == 0.0 {
+		kubeConfig.QPS = 100.0
+		kubeConfig.Burst = 200
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
 	}
 
-	clusterClient, err := clusterv1client.NewForConfig(controllerContext.KubeConfig)
+	clusterClient, err := clusterv1client.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
 	}
 
-	workClient, err := workv1client.NewForConfig(controllerContext.KubeConfig)
+	workClient, err := workv1client.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
 	}
