@@ -10,10 +10,14 @@ rules:
 - apiGroups: ["certificates.k8s.io"]
   resources: ["certificatesigningrequests/status"]
   verbs: ["update"]
-# Allow hub to get/list/watch/create/delete namespace and service account
+# Allow hub to get/list/watch/create/delete configmap, namespace and service account
 - apiGroups: [""]
   resources: ["namespaces", "serviceaccounts", "configmaps", "events"]
   verbs: ["get", "list", "watch", "create", "delete", "update"]
+# Allow hub to record events
+- apiGroups: ["", "events.k8s.io"]
+  resources: ["events"]
+  verbs: ["get", "create", "delete", "update"]
 # Allow hub to manage clusterrole/clusterrolebinding/role/rolebinding
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterroles", "clusterrolebindings", "roles", "rolebindings"]
