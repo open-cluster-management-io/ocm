@@ -2,6 +2,8 @@
 
 package v1alpha1
 
+type ClusterClaimExpansion interface{}
+
 type ManagedClusterSetExpansion interface{}
 
 type ManagedClusterSetBindingExpansion interface{}

@@ -2,6 +2,10 @@
 
 package v1alpha1
 
+// ClusterClaimListerExpansion allows custom methods to be added to
+// ClusterClaimLister.
+type ClusterClaimListerExpansion interface{}
+
 // ManagedClusterSetListerExpansion allows custom methods to be added to
 // ManagedClusterSetLister.
 type ManagedClusterSetListerExpansion interface{}

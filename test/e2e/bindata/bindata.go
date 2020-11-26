@@ -1,5 +1,6 @@
 // Code generated for package bindata by go-bindata DO NOT EDIT. (@generated)
 // sources:
+// deploy/spoke/clusterclaim.crd.yaml
 // deploy/spoke/clusterrole.yaml
 // deploy/spoke/clusterrole_binding.yaml
 // deploy/spoke/deployment.yaml
@@ -61,6 +62,76 @@ func (fi bindataFileInfo) Sys() interface{} {
 	return nil
 }
 
+var _deploySpokeClusterclaimCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: clusterclaims.cluster.open-cluster-management.io
+spec:
+  group: cluster.open-cluster-management.io
+  names:
+    kind: ClusterClaim
+    listKind: ClusterClaimList
+    plural: clusterclaims
+    singular: clusterclaim
+  scope: Cluster
+  preserveUnknownFields: false
+  validation:
+    openAPIV3Schema:
+      description: ClusterClaim represents cluster information that a managed cluster
+        claims ClusterClaims with well known names include,   1. id.k8s.io, it contains
+        a unique identifier for the cluster.   2. clusterset.k8s.io, it contains an
+        identifier that relates the cluster      to the ClusterSet in which it belongs.
+      type: object
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: Spec defines the attributes of the ClusterClaim.
+          type: object
+          properties:
+            value:
+              description: Value is a claim-dependent string
+              type: string
+              maxLength: 1024
+              minLength: 1
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func deploySpokeClusterclaimCrdYamlBytes() ([]byte, error) {
+	return _deploySpokeClusterclaimCrdYaml, nil
+}
+
+func deploySpokeClusterclaimCrdYaml() (*asset, error) {
+	bytes, err := deploySpokeClusterclaimCrdYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "deploy/spoke/clusterclaim.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _deploySpokeClusterroleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -72,6 +143,11 @@ rules:
 - apiGroups: ["authorization.k8s.io"]
   resources: ["subjectaccessreviews"]
   verbs: ["create"]
+# Allow agent to list clusterclaims
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["clusterclaims"]
+  verbs: ["get", "list", "watch"]
+
 `)
 
 func deploySpokeClusterroleYamlBytes() ([]byte, error) {
@@ -201,6 +277,7 @@ namespace: open-cluster-management
 # here. These are deployed via a "make install" dependency.
 
 resources:
+- ./clusterclaim.crd.yaml
 - ./namespace.yaml
 - ./service_account.yaml
 - ./clusterrole.yaml
@@ -385,6 +462,7 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
+	"deploy/spoke/clusterclaim.crd.yaml":    deploySpokeClusterclaimCrdYaml,
 	"deploy/spoke/clusterrole.yaml":         deploySpokeClusterroleYaml,
 	"deploy/spoke/clusterrole_binding.yaml": deploySpokeClusterrole_bindingYaml,
 	"deploy/spoke/deployment.yaml":          deploySpokeDeploymentYaml,
@@ -438,6 +516,7 @@ type bintree struct {
 var _bintree = &bintree{nil, map[string]*bintree{
 	"deploy": {nil, map[string]*bintree{
 		"spoke": {nil, map[string]*bintree{
+			"clusterclaim.crd.yaml":    {deploySpokeClusterclaimCrdYaml, map[string]*bintree{}},
 			"clusterrole.yaml":         {deploySpokeClusterroleYaml, map[string]*bintree{}},
 			"clusterrole_binding.yaml": {deploySpokeClusterrole_bindingYaml, map[string]*bintree{}},
 			"deployment.yaml":          {deploySpokeDeploymentYaml, map[string]*bintree{}},
