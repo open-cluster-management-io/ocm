@@ -152,7 +152,7 @@ deploy-spoke-operator: install-olm munge-spoke-csv bootstrap-secret
 deploy-spoke-kind: deploy-spoke-operator-kind apply-spoke-cr-kind
 
 deploy-spoke-operator-kind: install-olm-kind munge-spoke-csv bootstrap-secret-kind
-	$(OPERATOR_SDK) run packagemanifests deploy/klusterlet/olm-catalog/klusterlet/ --namespace open-cluster-management --version $(CSV_VERSION) --install-mode SingleNamespace=open-cluster-management --timeout=10m
+	$(OPERATOR_SDK) run packagemanifests deploy/klusterlet/olm-catalog/klusterlet/ --namespace open-cluster-management --version $(CSV_VERSION) --install-mode OwnNamespace --timeout=10m
 
 apply-spoke-cr:
 	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," deploy/klusterlet/config/samples/operator_open-cluster-management_klusterlets.cr.yaml | $(KUBECTL) apply -f -
