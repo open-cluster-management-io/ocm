@@ -46,6 +46,7 @@ var (
 	}
 
 	staticResourceFiles = []string{
+		"manifests/klusterlet/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml",
 		"manifests/klusterlet/klusterlet-registration-serviceaccount.yaml",
 		"manifests/klusterlet/klusterlet-registration-clusterrole.yaml",
 		"manifests/klusterlet/klusterlet-registration-clusterrolebinding.yaml",

@@ -31,6 +31,16 @@ func (ManagedCluster) SwaggerDoc() map[string]string {
 	return map_ManagedCluster
 }
 
+var map_ManagedClusterClaim = map[string]string{
+	"":      "ManagedClusterClaim represents a ClusterClaim collected from a managed cluster.",
+	"name":  "Name is the name of a ClusterClaim resource on managed cluster. It's a well known or customized name to identify the claim.",
+	"value": "Value is a claim-dependent string",
+}
+
+func (ManagedClusterClaim) SwaggerDoc() map[string]string {
+	return map_ManagedClusterClaim
+}
+
 var map_ManagedClusterList = map[string]string{
 	"":         "ManagedClusterList is a collection of managed cluster.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
@@ -53,11 +63,12 @@ func (ManagedClusterSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ManagedClusterStatus = map[string]string{
-	"":            "ManagedClusterStatus represents the current status of joined managed cluster.",
-	"conditions":  "Conditions contains the different condition statuses for this managed cluster.",
-	"capacity":    "Capacity represents the total resource capacity from all nodeStatuses on the managed cluster.",
-	"allocatable": "Allocatable represents the total allocatable resources on the managed cluster.",
-	"version":     "Version represents the kubernetes version of the managed cluster.",
+	"":              "ManagedClusterStatus represents the current status of joined managed cluster.",
+	"conditions":    "Conditions contains the different condition statuses for this managed cluster.",
+	"capacity":      "Capacity represents the total resource capacity from all nodeStatuses on the managed cluster.",
+	"allocatable":   "Allocatable represents the total allocatable resources on the managed cluster.",
+	"version":       "Version represents the kubernetes version of the managed cluster.",
+	"clusterClaims": "ClusterClaims represents cluster information that a managed cluster claims, for example a unique cluster identifier (id.k8s.io) and kubernetes version (kubeversion.open-cluster-management.io). They are written from the managed cluster. The set of claims is not uniform across a fleet, some claims can be vendor or version specific and may not be included from all managed clusters.",
 }
 
 func (ManagedClusterStatus) SwaggerDoc() map[string]string {
