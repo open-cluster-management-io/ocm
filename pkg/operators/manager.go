@@ -15,6 +15,7 @@ import (
 
 	operatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned"
 	operatorinformer "github.com/open-cluster-management/api/client/operator/informers/externalversions"
+	workclientset "github.com/open-cluster-management/api/client/work/clientset/versioned"
 	"github.com/open-cluster-management/registration-operator/pkg/helpers"
 	"github.com/open-cluster-management/registration-operator/pkg/operators/clustermanager/controllers/clustermanagercontroller"
 	clustermanagerstatuscontroller "github.com/open-cluster-management/registration-operator/pkg/operators/clustermanager/controllers/statuscontroller"
@@ -103,6 +104,11 @@ func RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd
 	}
 	operatorInformer := operatorinformer.NewSharedInformerFactory(operatorClient, 5*time.Minute)
 
+	workClient, err := workclientset.NewForConfig(controllerContext.KubeConfig)
+	if err != nil {
+		return err
+	}
+
 	// Read component namespace
 	operatorNamespace := defaultComponentNamespace
 	nsBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
@@ -117,6 +123,7 @@ func RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd
 		operatorInformer.Operator().V1().Klusterlets(),
 		kubeInformer.Core().V1().Secrets(),
 		kubeInformer.Apps().V1().Deployments(),
+		workClient.WorkV1().AppliedManifestWorks(),
 		kubeVersion,
 		operatorNamespace,
 		controllerContext.EventRecorder)

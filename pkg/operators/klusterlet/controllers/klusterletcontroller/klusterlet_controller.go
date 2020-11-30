@@ -2,8 +2,10 @@ package klusterletcontroller
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -28,6 +30,7 @@ import (
 	operatorv1client "github.com/open-cluster-management/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "github.com/open-cluster-management/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "github.com/open-cluster-management/api/client/operator/listers/operator/v1"
+	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned/typed/work/v1"
 	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
 	"github.com/open-cluster-management/registration-operator/pkg/helpers"
 	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/bindata"
@@ -35,9 +38,10 @@ import (
 )
 
 const (
-	klusterletFinalizer = "operator.open-cluster-management.io/klusterlet-cleanup"
-	imagePullSecret     = "open-cluster-management-image-pull-credentials"
-	klusterletApplied   = "Applied"
+	klusterletFinalizer          = "operator.open-cluster-management.io/klusterlet-cleanup"
+	imagePullSecret              = "open-cluster-management-image-pull-credentials"
+	klusterletApplied            = "Applied"
+	appliedManifestWorkFinalizer = "cluster.open-cluster-management.io/applied-manifest-work-cleanup"
 )
 
 var (
@@ -65,12 +69,13 @@ var (
 )
 
 type klusterletController struct {
-	klusterletClient   operatorv1client.KlusterletInterface
-	klusterletLister   operatorlister.KlusterletLister
-	kubeClient         kubernetes.Interface
-	apiExtensionClient apiextensionsclient.Interface
-	kubeVersion        *version.Version
-	operatorNamespace  string
+	klusterletClient          operatorv1client.KlusterletInterface
+	klusterletLister          operatorlister.KlusterletLister
+	kubeClient                kubernetes.Interface
+	apiExtensionClient        apiextensionsclient.Interface
+	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
+	kubeVersion               *version.Version
+	operatorNamespace         string
 }
 
 // NewKlusterletController construct klusterlet controller
@@ -81,16 +86,18 @@ func NewKlusterletController(
 	klusterletInformer operatorinformer.KlusterletInformer,
 	secretInformer coreinformer.SecretInformer,
 	deploymentInformer appsinformer.DeploymentInformer,
+	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
 	kubeVersion *version.Version,
 	operatorNamespace string,
 	recorder events.Recorder) factory.Controller {
 	controller := &klusterletController{
-		kubeClient:         kubeClient,
-		apiExtensionClient: apiExtensionClient,
-		klusterletClient:   klusterletClient,
-		klusterletLister:   klusterletInformer.Lister(),
-		kubeVersion:        kubeVersion,
-		operatorNamespace:  operatorNamespace,
+		kubeClient:                kubeClient,
+		apiExtensionClient:        apiExtensionClient,
+		klusterletClient:          klusterletClient,
+		klusterletLister:          klusterletInformer.Lister(),
+		appliedManifestWorkClient: appliedManifestWorkClient,
+		kubeVersion:               kubeVersion,
+		operatorNamespace:         operatorNamespace,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -128,7 +135,6 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		return err
 	}
 	klusterlet = klusterlet.DeepCopy()
-
 	config := klusterletConfig{
 		KlusterletName:            klusterlet.Name,
 		KlusterletNamespace:       klusterlet.Spec.Namespace,
@@ -356,6 +362,20 @@ func (n *klusterletController) cleanUp(ctx context.Context, controllerContext fa
 		return err
 	}
 
+	// get hub host from bootstrap kubeconfig
+	var hubHost string
+	bootstrapKubeConfigSecret, err := n.kubeClient.CoreV1().Secrets(config.KlusterletNamespace).Get(ctx, config.BootStrapKubeConfigSecret, metav1.GetOptions{})
+	switch {
+	case err == nil:
+		restConfig, err := helpers.LoadClientConfigFromSecret(bootstrapKubeConfigSecret)
+		if err != nil {
+			return fmt.Errorf("unable to load kubeconfig from secret %q %q: %w", config.KlusterletNamespace, config.BootStrapKubeConfigSecret, err)
+		}
+		hubHost = restConfig.Host
+	case !errors.IsNotFound(err):
+		return err
+	}
+
 	// Remove secret
 	err = n.kubeClient.CoreV1().Secrets(config.KlusterletNamespace).Delete(ctx, config.HubKubeConfigSecret, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
@@ -403,13 +423,26 @@ func (n *klusterletController) cleanUp(ctx context.Context, controllerContext fa
 
 	// remove the klusterlet namespace
 	err = n.kubeClient.CoreV1().Namespaces().Delete(ctx, config.KlusterletNamespace, metav1.DeleteOptions{})
-	if errors.IsNotFound(err) {
-		return nil
+	if err != nil && !errors.IsNotFound(err) {
+		return err
 	}
-	return err
+
+	// remove AppliedManifestWorks
+	if len(hubHost) > 0 {
+		return n.cleanUpAppliedManifestWorks(ctx, hubHost)
+	}
+	return nil
 }
 
 func (n *klusterletController) removeKlusterletFinalizer(ctx context.Context, deploy *operatorapiv1.Klusterlet) error {
+	// reload klusterlet
+	deploy, err := n.klusterletClient.Get(ctx, deploy.Name, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
 	copiedFinalizers := []string{}
 	for i := range deploy.Finalizers {
 		if deploy.Finalizers[i] == klusterletFinalizer {
@@ -417,7 +450,6 @@ func (n *klusterletController) removeKlusterletFinalizer(ctx context.Context, de
 		}
 		copiedFinalizers = append(copiedFinalizers, deploy.Finalizers[i])
 	}
-
 	if len(deploy.Finalizers) != len(copiedFinalizers) {
 		deploy.Finalizers = copiedFinalizers
 		_, err := n.klusterletClient.Update(ctx, deploy, metav1.UpdateOptions{})
@@ -425,6 +457,56 @@ func (n *klusterletController) removeKlusterletFinalizer(ctx context.Context, de
 	}
 
 	return nil
+}
+
+// cleanUpAppliedManifestWorks removes finalizer from the AppliedManifestWorks whose name starts with
+// the hash of the given hub host.
+func (n *klusterletController) cleanUpAppliedManifestWorks(ctx context.Context, hubHost string) error {
+	appliedManifestWorks, err := n.appliedManifestWorkClient.List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("unable to list AppliedManifestWorks: %w", err)
+	}
+	errs := []error{}
+	prefix := fmt.Sprintf("%s-", fmt.Sprintf("%x", sha256.Sum256([]byte(hubHost))))
+	for _, appliedManifestWork := range appliedManifestWorks.Items {
+		// ignore AppliedManifestWork for other klusterlet
+		if !strings.HasPrefix(appliedManifestWork.Name, prefix) {
+			continue
+		}
+
+		// remove finalizer if exists
+		if mutated := removeFinalizer(&appliedManifestWork, appliedManifestWorkFinalizer); !mutated {
+			continue
+		}
+
+		_, err := n.appliedManifestWorkClient.Update(ctx, &appliedManifestWork, metav1.UpdateOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			errs = append(errs, fmt.Errorf("unable to remove finalizer from AppliedManifestWork %q: %w", appliedManifestWork.Name, err))
+		}
+	}
+	return operatorhelpers.NewMultiLineAggregate(errs)
+}
+
+// removeFinalizer removes a finalizer from the list. It mutates its input.
+func removeFinalizer(obj runtime.Object, finalizerName string) bool {
+	if obj == nil || reflect.ValueOf(obj).IsNil() {
+		return false
+	}
+
+	newFinalizers := []string{}
+	accessor, _ := meta.Accessor(obj)
+	found := false
+	for _, finalizer := range accessor.GetFinalizers() {
+		if finalizer == finalizerName {
+			found = true
+			continue
+		}
+		newFinalizers = append(newFinalizers, finalizer)
+	}
+	if found {
+		accessor.SetFinalizers(newFinalizers)
+	}
+	return found
 }
 
 func readClusterNameFromSecret(secret *corev1.Secret) (string, error) {

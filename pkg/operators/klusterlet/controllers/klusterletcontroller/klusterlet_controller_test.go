@@ -1,6 +1,7 @@
 package klusterletcontroller
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"strings"
 	"testing"
@@ -8,7 +9,9 @@ import (
 
 	fakeoperatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned/fake"
 	operatorinformers "github.com/open-cluster-management/api/client/operator/informers/externalversions"
+	fakeworkclient "github.com/open-cluster-management/api/client/work/clientset/versioned/fake"
 	opratorapiv1 "github.com/open-cluster-management/api/operator/v1"
+	workapiv1 "github.com/open-cluster-management/api/work/v1"
 	"github.com/open-cluster-management/registration-operator/pkg/helpers"
 	testinghelper "github.com/open-cluster-management/registration-operator/pkg/helpers/testing"
 	appsv1 "k8s.io/api/apps/v1"
@@ -18,10 +21,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/version"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 )
 
 type testController struct {
@@ -29,6 +35,7 @@ type testController struct {
 	kubeClient         *fakekube.Clientset
 	apiExtensionClient *fakeapiextensions.Clientset
 	operatorClient     *fakeoperatorclient.Clientset
+	workClient         *fakeworkclient.Clientset
 	operatorStore      cache.Store
 }
 
@@ -86,20 +93,22 @@ func newNamespace(name string) *corev1.Namespace {
 	}
 }
 
-func newTestController(klusterlet *opratorapiv1.Klusterlet, objects ...runtime.Object) *testController {
+func newTestController(klusterlet *opratorapiv1.Klusterlet, appliedManifestWorks []runtime.Object, objects ...runtime.Object) *testController {
 	fakeKubeClient := fakekube.NewSimpleClientset(objects...)
 	fakeAPIExtensionClient := fakeapiextensions.NewSimpleClientset()
 	fakeOperatorClient := fakeoperatorclient.NewSimpleClientset(klusterlet)
+	fakeWorkClient := fakeworkclient.NewSimpleClientset(appliedManifestWorks...)
 	operatorInformers := operatorinformers.NewSharedInformerFactory(fakeOperatorClient, 5*time.Minute)
 	kubeVersion, _ := version.ParseGeneric("v1.18.0")
 
 	hubController := &klusterletController{
-		klusterletClient:   fakeOperatorClient.OperatorV1().Klusterlets(),
-		kubeClient:         fakeKubeClient,
-		apiExtensionClient: fakeAPIExtensionClient,
-		klusterletLister:   operatorInformers.Operator().V1().Klusterlets().Lister(),
-		kubeVersion:        kubeVersion,
-		operatorNamespace:  "open-cluster-management",
+		klusterletClient:          fakeOperatorClient.OperatorV1().Klusterlets(),
+		kubeClient:                fakeKubeClient,
+		apiExtensionClient:        fakeAPIExtensionClient,
+		appliedManifestWorkClient: fakeWorkClient.WorkV1().AppliedManifestWorks(),
+		klusterletLister:          operatorInformers.Operator().V1().Klusterlets().Lister(),
+		kubeVersion:               kubeVersion,
+		operatorNamespace:         "open-cluster-management",
 	}
 
 	store := operatorInformers.Operator().V1().Klusterlets().Informer().GetStore()
@@ -110,6 +119,7 @@ func newTestController(klusterlet *opratorapiv1.Klusterlet, objects ...runtime.O
 		kubeClient:         fakeKubeClient,
 		apiExtensionClient: fakeAPIExtensionClient,
 		operatorClient:     fakeOperatorClient,
+		workClient:         fakeWorkClient,
 		operatorStore:      store,
 	}
 }
@@ -238,7 +248,7 @@ func TestSyncDeploy(t *testing.T) {
 	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
 	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	namespace := newNamespace("testns")
-	controller := newTestController(klusterlet, bootStrapSecret, hubKubeConfigSecret, namespace)
+	controller := newTestController(klusterlet, nil, bootStrapSecret, hubKubeConfigSecret, namespace)
 	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
 
 	err := controller.controller.sync(nil, syncContext)
@@ -292,8 +302,15 @@ func TestSyncDelete(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "")
 	now := metav1.Now()
 	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
+	bootstrapKubeConfigSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
+	bootstrapKubeConfigSecret.Data["kubeconfig"] = newKubeConfig("testhost")
 	namespace := newNamespace("testns")
-	controller := newTestController(klusterlet, namespace)
+	appliedManifestWorks := []runtime.Object{
+		newAppliedManifestWorks("testhost", nil, false),
+		newAppliedManifestWorks("testhost", []string{appliedManifestWorkFinalizer}, true),
+		newAppliedManifestWorks("testhost-2", []string{appliedManifestWorkFinalizer}, false),
+	}
+	controller := newTestController(klusterlet, appliedManifestWorks, namespace, bootstrapKubeConfigSecret)
 	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
 
 	err := controller.controller.sync(nil, syncContext)
@@ -310,8 +327,8 @@ func TestSyncDelete(t *testing.T) {
 		}
 	}
 
-	if len(kubeActions) != 13 {
-		t.Errorf("Expected 13 delete actions, but got %d", len(kubeActions))
+	if len(deleteActions) != 13 {
+		t.Errorf("Expected 13 delete actions, but got %d", len(deleteActions))
 	}
 
 	deleteCRDActions := []clienttesting.DeleteActionImpl{}
@@ -319,12 +336,26 @@ func TestSyncDelete(t *testing.T) {
 	for _, action := range crdActions {
 		if action.GetVerb() == "delete" {
 			deleteAction := action.(clienttesting.DeleteActionImpl)
-			deleteActions = append(deleteCRDActions, deleteAction)
+			deleteCRDActions = append(deleteCRDActions, deleteAction)
 		}
 	}
 
-	if len(crdActions) != 1 {
-		t.Errorf("Expected 1 delete action, but got %d", len(crdActions))
+	if len(deleteCRDActions) != 1 {
+		t.Errorf("Expected 1 delete actions, but got %d", len(deleteCRDActions))
+	}
+
+	updateWorkActions := []clienttesting.UpdateActionImpl{}
+	workActions := controller.workClient.Actions()
+	for _, action := range workActions {
+		if action.GetVerb() == "update" {
+			updateAction := action.(clienttesting.UpdateActionImpl)
+			updateWorkActions = append(updateWorkActions, updateAction)
+			continue
+		}
+	}
+
+	if len(updateWorkActions) != 1 {
+		t.Errorf("Expected 1 update action, but got %d", len(updateWorkActions))
 	}
 }
 
@@ -379,7 +410,7 @@ func TestClusterNameChange(t *testing.T) {
 	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
 	hubSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	hubSecret.Data["cluster-name"] = []byte("cluster1")
-	controller := newTestController(klusterlet, bootStrapSecret, hubSecret, namespace)
+	controller := newTestController(klusterlet, nil, bootStrapSecret, hubSecret, namespace)
 	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
 	err := controller.controller.sync(nil, syncContext)
 	if err != nil {
@@ -460,7 +491,7 @@ func TestSyncWithPullSecret(t *testing.T) {
 	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	namespace := newNamespace("testns")
 	pullSecret := newSecret(imagePullSecret, "open-cluster-management")
-	controller := newTestController(klusterlet, bootStrapSecret, hubKubeConfigSecret, namespace, pullSecret)
+	controller := newTestController(klusterlet, nil, bootStrapSecret, hubKubeConfigSecret, namespace, pullSecret)
 	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
 
 	err := controller.controller.sync(nil, syncContext)
@@ -485,10 +516,11 @@ func TestSyncWithPullSecret(t *testing.T) {
 func TestDeployOnKube111(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
+	bootStrapSecret.Data["kubeconfig"] = newKubeConfig("testhost")
 	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
 	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	namespace := newNamespace("testns")
-	controller := newTestController(klusterlet, bootStrapSecret, hubKubeConfigSecret, namespace)
+	controller := newTestController(klusterlet, nil, bootStrapSecret, hubKubeConfigSecret, namespace)
 	kubeVersion, _ := version.ParseGeneric("v1.11.0")
 	controller.controller.kubeVersion = kubeVersion
 	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
@@ -545,7 +577,37 @@ func TestDeployOnKube111(t *testing.T) {
 		}
 	}
 
-	if len(kubeActions) != 15 {
+	if len(deleteActions) != 15 {
 		t.Errorf("Expected 15 delete actions, but got %d", len(kubeActions))
 	}
+}
+
+func newKubeConfig(host string) []byte {
+	configData, _ := runtime.Encode(clientcmdlatest.Codec, &clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{"test-cluster": {
+			Server:                host,
+			InsecureSkipTLSVerify: true,
+		}},
+		Contexts: map[string]*clientcmdapi.Context{"test-context": {
+			Cluster: "test-cluster",
+		}},
+		CurrentContext: "test-context",
+	})
+	return configData
+}
+
+func newAppliedManifestWorks(host string, finalizers []string, terminated bool) *workapiv1.AppliedManifestWork {
+	w := &workapiv1.AppliedManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       fmt.Sprintf("%s-%s", fmt.Sprintf("%x", sha256.Sum256([]byte(host))), rand.String(6)),
+			Finalizers: finalizers,
+		},
+	}
+
+	if terminated {
+		now := metav1.Now()
+		w.DeletionTimestamp = &now
+	}
+
+	return w
 }
