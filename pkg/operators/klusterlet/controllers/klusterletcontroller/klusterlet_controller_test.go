@@ -271,8 +271,8 @@ func TestSyncDeploy(t *testing.T) {
 			createCRDObjects = append(createCRDObjects, object)
 		}
 	}
-	if len(createCRDObjects) != 1 {
-		t.Errorf("Expect 1 objects created in the sync loop, actual %d", len(createCRDObjects))
+	if len(createCRDObjects) != 2 {
+		t.Errorf("Expect 2 objects created in the sync loop, actual %d", len(createCRDObjects))
 	}
 
 	operatorAction := controller.operatorClient.Actions()
@@ -323,8 +323,8 @@ func TestSyncDelete(t *testing.T) {
 		}
 	}
 
-	if len(crdActions) != 0 {
-		t.Errorf("Expected 0 delete actions, but got %d", len(crdActions))
+	if len(crdActions) != 1 {
+		t.Errorf("Expected 1 delete action, but got %d", len(crdActions))
 	}
 }
 

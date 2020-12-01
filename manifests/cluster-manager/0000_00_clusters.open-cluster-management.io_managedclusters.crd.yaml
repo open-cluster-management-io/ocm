@@ -122,6 +122,31 @@ spec:
                 - type: integer
                 - type: string
                 x-kubernetes-int-or-string: true
+            clusterClaims:
+              description: ClusterClaims represents cluster information that a managed
+                cluster claims, for example a unique cluster identifier (id.k8s.io)
+                and kubernetes version (kubeversion.open-cluster-management.io). They
+                are written from the managed cluster. The set of claims is not uniform
+                across a fleet, some claims can be vendor or version specific and
+                may not be included from all managed clusters.
+              type: array
+              items:
+                description: ManagedClusterClaim represents a ClusterClaim collected
+                  from a managed cluster.
+                type: object
+                properties:
+                  name:
+                    description: Name is the name of a ClusterClaim resource on managed
+                      cluster. It's a well known or customized name to identify the
+                      claim.
+                    type: string
+                    maxLength: 253
+                    minLength: 1
+                  value:
+                    description: Value is a claim-dependent string
+                    type: string
+                    maxLength: 1024
+                    minLength: 1
             conditions:
               description: Conditions contains the different condition statuses for
                 this managed cluster.

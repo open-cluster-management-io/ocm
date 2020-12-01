@@ -34,6 +34,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ManagedClusterSetList{},
 		&ManagedClusterSetBinding{},
 		&ManagedClusterSetBindingList{},
+		&ClusterClaim{},
+		&ClusterClaimList{},
 	)
 	metav1.AddToGroupVersion(scheme, GroupVersion)
 	return nil

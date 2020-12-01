@@ -11,3 +11,8 @@ rules:
 - apiGroups: ["authorization.k8s.io"]
   resources: ["subjectaccessreviews"]
   verbs: ["create"]
+# Allow agent to list clusterclaims
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["clusterclaims"]
+  verbs: ["get", "list", "watch"]
+

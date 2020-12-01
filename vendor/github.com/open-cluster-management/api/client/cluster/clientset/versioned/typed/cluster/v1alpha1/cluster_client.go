@@ -10,6 +10,7 @@ import (
 
 type ClusterV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	ClusterClaimsGetter
 	ManagedClusterSetsGetter
 	ManagedClusterSetBindingsGetter
 }
@@ -17,6 +18,10 @@ type ClusterV1alpha1Interface interface {
 // ClusterV1alpha1Client is used to interact with features provided by the cluster.open-cluster-management.io group.
 type ClusterV1alpha1Client struct {
 	restClient rest.Interface
+}
+
+func (c *ClusterV1alpha1Client) ClusterClaims() ClusterClaimInterface {
+	return newClusterClaims(c)
 }
 
 func (c *ClusterV1alpha1Client) ManagedClusterSets() ManagedClusterSetInterface {
