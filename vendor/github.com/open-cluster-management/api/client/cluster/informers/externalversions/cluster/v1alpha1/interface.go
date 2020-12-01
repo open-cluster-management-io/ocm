@@ -8,6 +8,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// ClusterClaims returns a ClusterClaimInformer.
+	ClusterClaims() ClusterClaimInformer
 	// ManagedClusterSets returns a ManagedClusterSetInformer.
 	ManagedClusterSets() ManagedClusterSetInformer
 	// ManagedClusterSetBindings returns a ManagedClusterSetBindingInformer.
@@ -23,6 +25,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// ClusterClaims returns a ClusterClaimInformer.
+func (v *version) ClusterClaims() ClusterClaimInformer {
+	return &clusterClaimInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ManagedClusterSets returns a ManagedClusterSetInformer.

@@ -12,6 +12,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -19,6 +20,7 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
+	clusterv1alpha1 "github.com/open-cluster-management/api/cluster/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +36,51 @@ import (
 var spokeNamespace string = ""
 
 var _ = ginkgo.Describe("Loopback registration [development]", func() {
+	var clusterId string
+	ginkgo.BeforeEach(func() {
+		// apply ClusterClaim crd
+		claimCrd, err := claimCrd()
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gvr := schema.GroupVersionResource{
+			Group:    "apiextensions.k8s.io",
+			Version:  "v1beta1",
+			Resource: "customresourcedefinitions",
+		}
+		err = hubDynamicClient.Resource(gvr).Delete(context.TODO(), claimCrd.GetName(), metav1.DeleteOptions{})
+		if !errors.IsNotFound(err) {
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		}
+		_, err = hubDynamicClient.Resource(gvr).Create(context.TODO(), claimCrd, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		// create ClusterClaim cr
+		clusterId = rand.String(12)
+		claim := &clusterv1alpha1.ClusterClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "id.k8s.io",
+			},
+			Spec: clusterv1alpha1.ClusterClaimSpec{
+				Value: clusterId,
+			},
+		}
+		// delete the claim if exists
+		err = clusterClient.ClusterV1alpha1().ClusterClaims().Delete(context.TODO(), claim.Name, metav1.DeleteOptions{})
+		if !errors.IsNotFound(err) {
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		}
+		// create the claim
+		err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
+			var err error
+			_, err = clusterClient.ClusterV1alpha1().ClusterClaims().Create(context.TODO(), claim, metav1.CreateOptions{})
+			if err != nil {
+				return false, err
+			}
+
+			return true, nil
+		})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	})
+
 	ginkgo.It("Should register the hub as a managed cluster", func() {
 		var (
 			err    error
@@ -364,6 +411,23 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 			return meta.IsStatusConditionTrue(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable), nil
 		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ginkgo.By("Make sure ClusterClaims are synced")
+		clusterClaims := []clusterv1.ManagedClusterClaim{
+			{
+				Name:  "id.k8s.io",
+				Value: clusterId,
+			},
+		}
+		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+			managedCluster, err := managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+
+			return reflect.DeepEqual(clusterClaims, managedCluster.Status.ClusterClaims), nil
+		})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 })
 
@@ -383,6 +447,14 @@ func assetToUnstructured(name string) (*unstructured.Unstructured, error) {
 	default:
 		return nil, fmt.Errorf("failed to convert object, unexpected type %s", reflect.TypeOf(obj))
 	}
+}
+
+func claimCrd() (*unstructured.Unstructured, error) {
+	crd, err := assetToUnstructured("deploy/spoke/clusterclaim.crd.yaml")
+	if err != nil {
+		return nil, err
+	}
+	return crd, nil
 }
 
 func spokeCR(suffix string) (*unstructured.Unstructured, error) {

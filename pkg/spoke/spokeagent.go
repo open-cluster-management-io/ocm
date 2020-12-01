@@ -49,6 +49,7 @@ type SpokeAgentOptions struct {
 	HubKubeconfigDir         string
 	SpokeExternalServerURLs  []string
 	ClusterHealthCheckPeriod time.Duration
+	MaxClusterClaims         int
 }
 
 // NewSpokeAgentOptions returns a SpokeAgentOptions
@@ -57,6 +58,7 @@ func NewSpokeAgentOptions() *SpokeAgentOptions {
 		HubKubeconfigSecret:      "hub-kubeconfig-secret",
 		HubKubeconfigDir:         "/spoke/hub-kubeconfig",
 		ClusterHealthCheckPeriod: 1 * time.Minute,
+		MaxClusterClaims:         20,
 	}
 }
 
@@ -249,14 +251,32 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		controllerContext.EventRecorder,
 	)
 
+	spokeClusterClient, err := clusterv1client.NewForConfig(controllerContext.KubeConfig)
+	if err != nil {
+		return err
+	}
+	spokeClusterInformers := clusterv1informers.NewSharedInformerFactory(spokeClusterClient, 10*time.Minute)
+
+	// create managedClusterClaimController to sync cluster claims
+	managedClusterClaimController := managedcluster.NewManagedClusterClaimController(
+		o.ClusterName,
+		o.MaxClusterClaims,
+		hubClusterClient,
+		hubClusterInformerFactory.Cluster().V1().ManagedClusters(),
+		spokeClusterInformers.Cluster().V1alpha1().ClusterClaims(),
+		controllerContext.EventRecorder,
+	)
+
 	go hubKubeInformerFactory.Start(ctx.Done())
 	go hubClusterInformerFactory.Start(ctx.Done())
 	go spokeKubeInformerFactory.Start(ctx.Done())
+	go spokeClusterInformers.Start(ctx.Done())
 
 	go clientCertForHubController.Run(ctx, 1)
 	go managedClusterJoiningController.Run(ctx, 1)
 	go managedClusterLeaseController.Run(ctx, 1)
 	go managedClusterHealthCheckController.Run(ctx, 1)
+	go managedClusterClaimController.Run(ctx, 1)
 
 	<-ctx.Done()
 	return nil
@@ -276,6 +296,8 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 		"A list of reachable spoke cluster api server URLs for hub cluster.")
 	fs.DurationVar(&o.ClusterHealthCheckPeriod, "cluster-healthcheck-period", o.ClusterHealthCheckPeriod,
 		"The period to check managed cluster kube-apiserver health")
+	fs.IntVar(&o.MaxClusterClaims, "cluster-claims-max", o.MaxClusterClaims,
+		"The max number of cluster claims to expose.")
 }
 
 // Validate verifies the inputs.

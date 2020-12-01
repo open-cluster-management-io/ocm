@@ -39,7 +39,7 @@ func AssertError(t *testing.T, actual error, expectedErr string) {
 // AssertActions asserts the actual actions have the expected action verb
 func AssertActions(t *testing.T, actualActions []clienttesting.Action, expectedVerbs ...string) {
 	if len(actualActions) != len(expectedVerbs) {
-		t.Errorf("expected %d call but got: %#v", len(expectedVerbs), actualActions)
+		t.Fatalf("expected %d call but got: %#v", len(expectedVerbs), actualActions)
 	}
 	for i, expected := range expectedVerbs {
 		if actualActions[i].GetVerb() != expected {

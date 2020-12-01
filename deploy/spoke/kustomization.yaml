@@ -25,6 +25,7 @@ namespace: open-cluster-management
 # here. These are deployed via a "make install" dependency.
 
 resources:
+- ./clusterclaim.crd.yaml
 - ./namespace.yaml
 - ./service_account.yaml
 - ./clusterrole.yaml

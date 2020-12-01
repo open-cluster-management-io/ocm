@@ -95,6 +95,14 @@ type ManagedClusterStatus struct {
 
 	// Version represents the kubernetes version of the managed cluster.
 	Version ManagedClusterVersion `json:"version,omitempty"`
+
+	// ClusterClaims represents cluster information that a managed cluster claims,
+	// for example a unique cluster identifier (id.k8s.io) and kubernetes version
+	// (kubeversion.open-cluster-management.io). They are written from the managed
+	// cluster. The set of claims is not uniform across a fleet, some claims can be
+	// vendor or version specific and may not be included from all managed clusters.
+	// +optional
+	ClusterClaims []ManagedClusterClaim `json:"clusterClaims,omitempty"`
 }
 
 // ManagedClusterVersion represents version information about the managed cluster.
@@ -103,6 +111,20 @@ type ManagedClusterVersion struct {
 	// Kubernetes is the kubernetes version of managed cluster.
 	// +optional
 	Kubernetes string `json:"kubernetes,omitempty"`
+}
+
+// ManagedClusterClaim represents a ClusterClaim collected from a managed cluster.
+type ManagedClusterClaim struct {
+	// Name is the name of a ClusterClaim resource on managed cluster. It's a well known
+	// or customized name to identify the claim.
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name,omitempty"`
+
+	// Value is a claim-dependent string
+	// +kubebuilder:validation:MaxLength=1024
+	// +kubebuilder:validation:MinLength=1
+	Value string `json:"value,omitempty"`
 }
 
 const (
