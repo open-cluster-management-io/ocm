@@ -24,7 +24,7 @@ import (
 var _ = ginkgo.Describe("Cluster Claim", func() {
 	var managedClusterName, hubKubeconfigSecret, hubKubeconfigDir string
 	var claims []*clusterv1alpha1.ClusterClaim
-	var maxClusterClaims int
+	var maxCustomClusterClaims int
 	var err error
 
 	ginkgo.JustBeforeEach(func() {
@@ -55,7 +55,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 				HubKubeconfigSecret:      hubKubeconfigSecret,
 				HubKubeconfigDir:         hubKubeconfigDir,
 				ClusterHealthCheckPeriod: 1 * time.Minute,
-				MaxClusterClaims:         maxClusterClaims,
+				MaxCustomClusterClaims:   maxCustomClusterClaims,
 			}
 			err := agentOptions.RunSpokeAgent(context.Background(), &controllercmd.ControllerContext{
 				KubeConfig:    spokeCfg,
@@ -145,7 +145,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 
 	ginkgo.Context("Sync all claims", func() {
 		ginkgo.BeforeEach(func() {
-			maxClusterClaims = 20
+			maxCustomClusterClaims = 20
 			claims = []*clusterv1alpha1.ClusterClaim{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -248,7 +248,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 
 	ginkgo.Context("Truncate exposed claims", func() {
 		ginkgo.BeforeEach(func() {
-			maxClusterClaims = 5
+			maxCustomClusterClaims = 5
 			claims = []*clusterv1alpha1.ClusterClaim{}
 			for i := 0; i < 10; i++ {
 				claims = append(claims, &clusterv1alpha1.ClusterClaim{
@@ -272,7 +272,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 					return false
 				}
 
-				return len(spokeCluster.Status.ClusterClaims) == maxClusterClaims
+				return len(spokeCluster.Status.ClusterClaims) == maxCustomClusterClaims
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 		})
 	})

@@ -49,7 +49,7 @@ type SpokeAgentOptions struct {
 	HubKubeconfigDir         string
 	SpokeExternalServerURLs  []string
 	ClusterHealthCheckPeriod time.Duration
-	MaxClusterClaims         int
+	MaxCustomClusterClaims   int
 }
 
 // NewSpokeAgentOptions returns a SpokeAgentOptions
@@ -58,7 +58,7 @@ func NewSpokeAgentOptions() *SpokeAgentOptions {
 		HubKubeconfigSecret:      "hub-kubeconfig-secret",
 		HubKubeconfigDir:         "/spoke/hub-kubeconfig",
 		ClusterHealthCheckPeriod: 1 * time.Minute,
-		MaxClusterClaims:         20,
+		MaxCustomClusterClaims:   20,
 	}
 }
 
@@ -260,7 +260,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	// create managedClusterClaimController to sync cluster claims
 	managedClusterClaimController := managedcluster.NewManagedClusterClaimController(
 		o.ClusterName,
-		o.MaxClusterClaims,
+		o.MaxCustomClusterClaims,
 		hubClusterClient,
 		hubClusterInformerFactory.Cluster().V1().ManagedClusters(),
 		spokeClusterInformers.Cluster().V1alpha1().ClusterClaims(),
@@ -296,8 +296,8 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 		"A list of reachable spoke cluster api server URLs for hub cluster.")
 	fs.DurationVar(&o.ClusterHealthCheckPeriod, "cluster-healthcheck-period", o.ClusterHealthCheckPeriod,
 		"The period to check managed cluster kube-apiserver health")
-	fs.IntVar(&o.MaxClusterClaims, "cluster-claims-max", o.MaxClusterClaims,
-		"The max number of cluster claims to expose.")
+	fs.IntVar(&o.MaxCustomClusterClaims, "max-custom-cluster-claims", o.MaxCustomClusterClaims,
+		"The max number of custom cluster claims to expose.")
 }
 
 // Validate verifies the inputs.
