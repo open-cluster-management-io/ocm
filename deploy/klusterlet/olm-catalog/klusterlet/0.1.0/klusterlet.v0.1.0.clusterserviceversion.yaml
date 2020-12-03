@@ -26,7 +26,7 @@ metadata:
     capabilities: Basic Install
     categories: Integration & Delivery,OpenShift Optional
     certified: 'false'
-    containerImage: quay.io/repository/open-cluster-management/registration-operator:0.0.1
+    containerImage: quay.io/open-cluster-management/registration-operator:0.0.1
     createdAt: 2020-07-30T20:00:31Z
     description: Manages the installation and upgrade of the Klusterlet.
     repository: https://github.com/open-cluster-management/registration-operator

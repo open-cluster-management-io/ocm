@@ -26,7 +26,7 @@ metadata:
     capabilities: Basic Install
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
-    containerImage: quay.io/repository/open-cluster-management/registration-operator:latest
+    containerImage: quay.io/open-cluster-management/registration-operator:latest
     createdAt: "2020-10-15T20:00:31Z"
     description: Manages the installation and upgrade of the Klusterlet.
     operators.operatorframework.io/builder: operator-sdk-v1.1.0
