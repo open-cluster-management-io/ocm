@@ -66,7 +66,7 @@ func (c managedClusterClaimController) sync(ctx context.Context, syncCtx factory
 		return fmt.Errorf("unable to get managed cluster with name %q from hub: %w", c.clusterName, err)
 	}
 
-	// current managed cluster does not join the hub yet, do nothing.
+	// current managed cluster has not joined the hub yet, do nothing.
 	if !meta.IsStatusConditionTrue(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined) {
 		syncCtx.Recorder().Eventf("ManagedClusterIsNotAccepted", "Managed cluster %q does not join the hub yet", c.clusterName)
 		return nil
