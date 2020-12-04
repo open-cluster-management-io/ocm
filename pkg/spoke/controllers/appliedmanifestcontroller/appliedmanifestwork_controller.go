@@ -74,7 +74,7 @@ func (m *AppliedManifestWorkController) sync(ctx context.Context, controllerCont
 
 	manifestWork, err := m.manifestWorkLister.Get(manifestWorkName)
 	if errors.IsNotFound(err) {
-		// work  not found, could have been deleted, do nothing.
+		// work not found, could have been deleted, do nothing.
 		return nil
 	}
 	if err != nil {
@@ -88,7 +88,7 @@ func (m *AppliedManifestWorkController) sync(ctx context.Context, controllerCont
 	appliedManifestWorkName := fmt.Sprintf("%s-%s", m.hubHash, manifestWork.Name)
 	appliedManifestWork, err := m.appliedManifestWorkLister.Get(appliedManifestWorkName)
 	if errors.IsNotFound(err) {
-		// appliedmanifestwork  not found, could have been deleted, do nothing.
+		// appliedmanifestwork not found, could have been deleted, do nothing.
 		return nil
 	}
 	if err != nil {
