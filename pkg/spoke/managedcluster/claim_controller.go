@@ -26,27 +26,27 @@ import (
 
 // managedClusterClaimController exposes cluster claims created on managed cluster on hub after it joins the hub.
 type managedClusterClaimController struct {
-	clusterName      string
-	hubClusterClient clientset.Interface
-	hubClusterLister clusterv1listers.ManagedClusterLister
-	claimLister      clusterv1alpha1listers.ClusterClaimLister
-	maxClusterClaims int
+	clusterName            string
+	hubClusterClient       clientset.Interface
+	hubClusterLister       clusterv1listers.ManagedClusterLister
+	claimLister            clusterv1alpha1listers.ClusterClaimLister
+	maxCustomClusterClaims int
 }
 
 // NewManagedClusterClaimController creates a new managed cluster claim controller on the managed cluster.
 func NewManagedClusterClaimController(
 	clusterName string,
-	maxClusterClaims int,
+	maxCustomClusterClaims int,
 	hubClusterClient clientset.Interface,
 	hubManagedClusterInformer clusterv1informer.ManagedClusterInformer,
 	claimInformer clusterv1alpha1informer.ClusterClaimInformer,
 	recorder events.Recorder) factory.Controller {
 	c := &managedClusterClaimController{
-		clusterName:      clusterName,
-		maxClusterClaims: maxClusterClaims,
-		hubClusterClient: hubClusterClient,
-		hubClusterLister: hubManagedClusterInformer.Lister(),
-		claimLister:      claimInformer.Lister(),
+		clusterName:            clusterName,
+		maxCustomClusterClaims: maxCustomClusterClaims,
+		hubClusterClient:       hubClusterClient,
+		hubClusterLister:       hubManagedClusterInformer.Lister(),
+		claimLister:            claimInformer.Lister(),
 	}
 
 	return factory.New().
@@ -56,7 +56,7 @@ func NewManagedClusterClaimController(
 			return accessor.GetName()
 		}, hubManagedClusterInformer.Informer()).
 		WithSync(c.sync).
-		ToController("ManagedClusterClaimController", recorder)
+		ToController("ClusterClaimController", recorder)
 }
 
 // sync maintains the cluster claims in status of the managed cluster on hub once it joins the hub.
@@ -81,7 +81,7 @@ func (c managedClusterClaimController) sync(ctx context.Context, syncCtx factory
 func (c managedClusterClaimController) exposeClaims(ctx context.Context, syncCtx factory.SyncContext,
 	managedCluster *clusterv1.ManagedCluster) error {
 	reservedClaims := []clusterv1.ManagedClusterClaim{}
-	customizedClaims := []clusterv1.ManagedClusterClaim{}
+	customClaims := []clusterv1.ManagedClusterClaim{}
 	clusterClaims, err := c.claimLister.List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("unable to list cluster claims: %w", err)
@@ -97,7 +97,7 @@ func (c managedClusterClaimController) exposeClaims(ctx context.Context, syncCtx
 			reservedClaims = append(reservedClaims, managedClusterClaim)
 			continue
 		}
-		customizedClaims = append(customizedClaims, managedClusterClaim)
+		customClaims = append(customClaims, managedClusterClaim)
 	}
 
 	// sort claims by name
@@ -105,17 +105,19 @@ func (c managedClusterClaimController) exposeClaims(ctx context.Context, syncCtx
 		return reservedClaims[i].Name < reservedClaims[j].Name
 	})
 
-	sort.SliceStable(customizedClaims, func(i, j int) bool {
-		return customizedClaims[i].Name < customizedClaims[j].Name
+	sort.SliceStable(customClaims, func(i, j int) bool {
+		return customClaims[i].Name < customClaims[j].Name
 	})
 
-	// merge and truncated claims
-	claims := append(reservedClaims, customizedClaims...)
-	if total := len(claims); total > c.maxClusterClaims {
-		claims = claims[:c.maxClusterClaims]
-		syncCtx.Recorder().Eventf("ExposedClusterClaimsTruncated", "%d cluster claims are found. It exceeds the max cluster claims number (%d). %d cluster claims are not exposed.",
-			total, c.maxClusterClaims, total-c.maxClusterClaims)
+	// truncate custom claims if the number exceeds `max-custom-cluster-claims`
+	if n := len(customClaims); n > c.maxCustomClusterClaims {
+		customClaims = customClaims[:c.maxCustomClusterClaims]
+		syncCtx.Recorder().Eventf("CustomClusterClaimsTruncated", "%d cluster claims are found. It exceeds the max number of custom cluster claims (%d). %d custom cluster claims are not exposed.",
+			n, c.maxCustomClusterClaims, n-c.maxCustomClusterClaims)
 	}
+
+	// merge reserved claims and custom claims
+	claims := append(reservedClaims, customClaims...)
 
 	// update the status of the managed cluster
 	updateStatusFuncs := []helpers.UpdateManagedClusterStatusFunc{updateClusterClaimsFn(clusterv1.ManagedClusterStatus{

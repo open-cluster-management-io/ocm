@@ -83,11 +83,11 @@ func TestSync(t *testing.T) {
 			}
 
 			ctrl := managedClusterClaimController{
-				clusterName:      testinghelpers.TestManagedClusterName,
-				maxClusterClaims: 20,
-				hubClusterClient: clusterClient,
-				hubClusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				claimLister:      clusterInformerFactory.Cluster().V1alpha1().ClusterClaims().Lister(),
+				clusterName:            testinghelpers.TestManagedClusterName,
+				maxCustomClusterClaims: 20,
+				hubClusterClient:       clusterClient,
+				hubClusterLister:       clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
+				claimLister:            clusterInformerFactory.Cluster().V1alpha1().ClusterClaims().Lister(),
 			}
 
 			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, ""))
@@ -100,12 +100,12 @@ func TestSync(t *testing.T) {
 
 func TestExposeClaims(t *testing.T) {
 	cases := []struct {
-		name             string
-		cluster          *clusterv1.ManagedCluster
-		claims           []*clusterv1alpha1.ClusterClaim
-		maxClusterClaims int
-		validateActions  func(t *testing.T, actions []clienttesting.Action)
-		expectedErr      string
+		name                   string
+		cluster                *clusterv1.ManagedCluster
+		claims                 []*clusterv1alpha1.ClusterClaim
+		maxCustomClusterClaims int
+		validateActions        func(t *testing.T, actions []clienttesting.Action)
+		expectedErr            string
 	}{
 		{
 			name:    "sync claims into status of the managed cluster",
@@ -136,7 +136,7 @@ func TestExposeClaims(t *testing.T) {
 			},
 		},
 		{
-			name:    "truncate cluster claims",
+			name:    "truncate custom cluster claims",
 			cluster: testinghelpers.NewJoinedManagedCluster(),
 			claims: []*clusterv1alpha1.ClusterClaim{
 				{
@@ -172,7 +172,7 @@ func TestExposeClaims(t *testing.T) {
 					},
 				},
 			},
-			maxClusterClaims: 3,
+			maxCustomClusterClaims: 2,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, actions, "get", "update")
 				cluster := actions[1].(clienttesting.UpdateActionImpl).Object
@@ -232,16 +232,16 @@ func TestExposeClaims(t *testing.T) {
 				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims().Informer().GetStore().Add(claim)
 			}
 
-			if c.maxClusterClaims == 0 {
-				c.maxClusterClaims = 20
+			if c.maxCustomClusterClaims == 0 {
+				c.maxCustomClusterClaims = 20
 			}
 
 			ctrl := managedClusterClaimController{
-				clusterName:      testinghelpers.TestManagedClusterName,
-				maxClusterClaims: c.maxClusterClaims,
-				hubClusterClient: clusterClient,
-				hubClusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				claimLister:      clusterInformerFactory.Cluster().V1alpha1().ClusterClaims().Lister(),
+				clusterName:            testinghelpers.TestManagedClusterName,
+				maxCustomClusterClaims: c.maxCustomClusterClaims,
+				hubClusterClient:       clusterClient,
+				hubClusterLister:       clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
+				claimLister:            clusterInformerFactory.Cluster().V1alpha1().ClusterClaims().Lister(),
 			}
 
 			syncErr := ctrl.exposeClaims(context.TODO(), testinghelpers.NewFakeSyncContext(t, c.cluster.Name), c.cluster)
