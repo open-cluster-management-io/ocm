@@ -108,11 +108,10 @@ func (c *leaseController) sync(ctx context.Context, syncCtx factory.SyncContext)
 
 		// the lease is not constantly updated, update it to unknown
 		conditionUpdateFn := helpers.UpdateManagedClusterConditionFn(metav1.Condition{
-			Type:   clusterv1.ManagedClusterConditionAvailable,
-			Status: metav1.ConditionUnknown,
-			Reason: "ManagedClusterLeaseUpdateStopped",
-			Message: fmt.Sprintf("Registration agent stopped updating its lease within %.0f minutes.",
-				now.Sub(observedLease.Spec.RenewTime.Time).Minutes()),
+			Type:    clusterv1.ManagedClusterConditionAvailable,
+			Status:  metav1.ConditionUnknown,
+			Reason:  "ManagedClusterLeaseUpdateStopped",
+			Message: fmt.Sprintf("Registration agent stopped updating its lease."),
 		})
 		_, updated, err := helpers.UpdateManagedClusterStatus(ctx, c.clusterClient, cluster.Name, conditionUpdateFn)
 		if err != nil {

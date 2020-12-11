@@ -53,7 +53,7 @@ func TestSync(t *testing.T) {
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionUnknown,
 					Reason:  "ManagedClusterLeaseUpdateStopped",
-					Message: "Registration agent stopped updating its lease within 5 minutes.",
+					Message: "Registration agent stopped updating its lease.",
 				}
 				testinghelpers.AssertActions(t, clusterActions, "get", "update")
 				actual := clusterActions[1].(clienttesting.UpdateActionImpl).Object
