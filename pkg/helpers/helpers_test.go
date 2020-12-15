@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
+	corev1 "k8s.io/api/core/v1"
 	fakeapiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -21,6 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	fakekube "k8s.io/client-go/kubernetes/fake"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 	fakeapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
 )
 
@@ -545,5 +549,97 @@ func TestUpdateGeneration(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestLoadClientConfigFromSecret(t *testing.T) {
+	testcase := []struct {
+		name             string
+		secret           *corev1.Secret
+		expectedCertData []byte
+		expectedKeyData  []byte
+		expectedErr      string
+	}{
+		{
+			name:        "load from secret without kubeconfig",
+			secret:      newKubeConfigSecret("ns1", "secret1", nil, nil, nil),
+			expectedErr: "unable to find kubeconfig in secret \"ns1\" \"secret1\"",
+		},
+		{
+			name:   "load kubeconfig without references to external key/cert files",
+			secret: newKubeConfigSecret("ns1", "secret1", newKubeConfig("", ""), nil, nil),
+		},
+		{
+			name:             "load kubeconfig with references to external key/cert files",
+			secret:           newKubeConfigSecret("ns1", "secret1", newKubeConfig("tls.crt", "tls.key"), []byte("--- TRUNCATED ---"), []byte("--- REDACTED ---")),
+			expectedCertData: []byte("--- TRUNCATED ---"),
+			expectedKeyData:  []byte("--- REDACTED ---"),
+		},
+	}
+
+	for _, c := range testcase {
+		t.Run(c.name, func(t *testing.T) {
+			config, err := LoadClientConfigFromSecret(c.secret)
+
+			if len(c.expectedErr) > 0 && err == nil {
+				t.Errorf("expected %q error", c.expectedErr)
+			}
+
+			if len(c.expectedErr) > 0 && err != nil && err.Error() != c.expectedErr {
+				t.Errorf("expected %q error, but got %q", c.expectedErr, err.Error())
+			}
+
+			if len(c.expectedErr) == 0 && err != nil {
+				t.Errorf("unexpected err: %v", err)
+			}
+
+			if len(c.expectedCertData) > 0 && !reflect.DeepEqual(c.expectedCertData, config.CertData) {
+				t.Errorf("unexpected cert data")
+			}
+
+			if len(c.expectedKeyData) > 0 && !reflect.DeepEqual(c.expectedKeyData, config.KeyData) {
+				t.Errorf("unexpected key data")
+			}
+		})
+	}
+}
+
+func newKubeConfig(certFile, keyFile string) []byte {
+	configData, _ := runtime.Encode(clientcmdlatest.Codec, &clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{"test-cluster": {
+			Server:                "https://test-host:443",
+			InsecureSkipTLSVerify: true,
+		}},
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{"test-auth": {
+			ClientCertificate: certFile,
+			ClientKey:         keyFile,
+		}},
+		Contexts: map[string]*clientcmdapi.Context{"test-context": {
+			Cluster:  "test-cluster",
+			AuthInfo: "test-auth",
+		}},
+		CurrentContext: "test-context",
+	})
+	return configData
+}
+
+func newKubeConfigSecret(namespace, name string, kubeConfigData, certData, keyData []byte) *corev1.Secret {
+	data := map[string][]byte{}
+	if len(kubeConfigData) > 0 {
+		data["kubeconfig"] = kubeConfigData
+	}
+	if len(certData) > 0 {
+		data["tls.crt"] = certData
+	}
+	if len(keyData) > 0 {
+		data["tls.key"] = keyData
+	}
+
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: data,
 	}
 }

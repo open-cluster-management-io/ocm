@@ -23,6 +23,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	admissionclient "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
@@ -415,4 +417,38 @@ func UpdateKlusterletGenerationsFn(generations ...operatorapiv1.GenerationStatus
 		}
 		return nil
 	}
+}
+
+// LoadClientConfigFromSecret returns a client config loaded from the given secret
+func LoadClientConfigFromSecret(secret *corev1.Secret) (*restclient.Config, error) {
+	kubeconfigData, ok := secret.Data["kubeconfig"]
+	if !ok {
+		return nil, fmt.Errorf("unable to find kubeconfig in secret %q %q",
+			secret.Namespace, secret.Name)
+	}
+
+	config, err := clientcmd.Load(kubeconfigData)
+	if err != nil {
+		return nil, err
+	}
+
+	context, ok := config.Contexts[config.CurrentContext]
+	if !ok {
+		return nil, fmt.Errorf("unable to find the current context %q from the kubeconfig in secret %q %q",
+			config.CurrentContext, secret.Namespace, secret.Name)
+	}
+
+	if authInfo, ok := config.AuthInfos[context.AuthInfo]; ok {
+		// use embeded cert/key data instead of references to external cert/key files
+		if certData, ok := secret.Data["tls.crt"]; ok && len(authInfo.ClientCertificateData) == 0 {
+			authInfo.ClientCertificateData = certData
+			authInfo.ClientCertificate = ""
+		}
+		if keyData, ok := secret.Data["tls.key"]; ok && len(authInfo.ClientKeyData) == 0 {
+			authInfo.ClientKeyData = keyData
+			authInfo.ClientKey = ""
+		}
+	}
+
+	return clientcmd.NewDefaultClientConfig(*config, nil).ClientConfig()
 }

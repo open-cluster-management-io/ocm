@@ -161,8 +161,10 @@ github.com/open-cluster-management/api/client/operator/informers/externalversion
 github.com/open-cluster-management/api/client/operator/informers/externalversions/operator/v1
 github.com/open-cluster-management/api/client/operator/listers/operator/v1
 github.com/open-cluster-management/api/client/work/clientset/versioned
+github.com/open-cluster-management/api/client/work/clientset/versioned/fake
 github.com/open-cluster-management/api/client/work/clientset/versioned/scheme
 github.com/open-cluster-management/api/client/work/clientset/versioned/typed/work/v1
+github.com/open-cluster-management/api/client/work/clientset/versioned/typed/work/v1/fake
 github.com/open-cluster-management/api/cluster/v1
 github.com/open-cluster-management/api/cluster/v1alpha1
 github.com/open-cluster-management/api/operator/v1
