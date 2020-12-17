@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
@@ -31,6 +32,23 @@ func AssertError(t *testing.T, actual error, expectedErr string) {
 		return
 	}
 	if len(expectedErr) == 0 && actual != nil {
+		t.Errorf("unexpected err: %v", actual)
+		return
+	}
+}
+
+// AssertError asserts the actual error representation starts with the expected prerfix,
+// if the expected error prefix is empty, the actual should be nil
+func AssertErrorWithPrefix(t *testing.T, actual error, expectedErrorPrefix string) {
+	if len(expectedErrorPrefix) > 0 && actual == nil {
+		t.Errorf("expected error with prefix %q", expectedErrorPrefix)
+		return
+	}
+	if len(expectedErrorPrefix) > 0 && actual != nil && !strings.HasPrefix(actual.Error(), expectedErrorPrefix) {
+		t.Errorf("expected error with prefix %q, but got %q", expectedErrorPrefix, actual.Error())
+		return
+	}
+	if len(expectedErrorPrefix) == 0 && actual != nil {
 		t.Errorf("unexpected err: %v", actual)
 		return
 	}

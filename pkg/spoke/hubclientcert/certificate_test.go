@@ -44,9 +44,10 @@ func TestCSRApproved(t *testing.T) {
 
 func TestValidKubeconfig(t *testing.T) {
 	cases := []struct {
-		name    string
-		secret  *corev1.Secret
-		isValid bool
+		name       string
+		secret     *corev1.Secret
+		commonName string
+		isValid    bool
 	}{
 		{
 			name:   "no data",
@@ -75,16 +76,24 @@ func TestValidKubeconfig(t *testing.T) {
 			}),
 		},
 		{
+			name: "unmatched common name",
+			secret: testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "", testinghelpers.NewTestCert("test", 60*time.Second), map[string][]byte{
+				KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
+			}),
+			commonName: "wrong-common-name",
+		},
+		{
 			name: "valid hub config",
 			secret: testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "", testinghelpers.NewTestCert("test", 60*time.Second), map[string][]byte{
 				KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
 			}),
-			isValid: true,
+			commonName: "test",
+			isValid:    true,
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			isValid := hasValidKubeconfig(c.secret)
+			isValid := hasValidKubeconfig(c.secret, c.commonName)
 			if isValid != c.isValid {
 				t.Errorf("expected %t, but got %t", c.isValid, isValid)
 			}
@@ -137,6 +146,46 @@ func TestGetCertValidityPeriod(t *testing.T) {
 			}
 			if !c.expectedCert.NotAfter.Equal(*notAfter) {
 				t.Errorf("expect %v, but got %v", expectedCerts[0].NotAfter, *notAfter)
+			}
+		})
+	}
+}
+
+func TestGetClusterAgentNamesFromCertificate(t *testing.T) {
+	cases := []struct {
+		name                string
+		certData            []byte
+		expectedClusterName string
+		expectedAgentName   string
+		expectedErrorPrefix string
+	}{
+		{
+			name:                "cert data is invalid",
+			certData:            []byte("invalid cert"),
+			expectedErrorPrefix: "unable to parse certificate:",
+		},
+		{
+			name:     "cert with invalid commmon name",
+			certData: testinghelpers.NewTestCert("test", 60*time.Second).Cert,
+		},
+		{
+			name:                "valid cert with correct common name",
+			certData:            testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second).Cert,
+			expectedClusterName: "cluster1",
+			expectedAgentName:   "agent1",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			clusterName, agentName, err := GetClusterAgentNamesFromCertificate(c.certData)
+			testinghelpers.AssertErrorWithPrefix(t, err, c.expectedErrorPrefix)
+
+			if clusterName != c.expectedClusterName {
+				t.Errorf("expect %v, but got %v", c.expectedClusterName, clusterName)
+			}
+
+			if agentName != c.expectedAgentName {
+				t.Errorf("expect %v, but got %v", c.expectedAgentName, agentName)
 			}
 		})
 	}

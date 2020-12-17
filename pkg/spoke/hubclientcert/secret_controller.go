@@ -18,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	corev1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -29,7 +28,6 @@ type hubKubeconfigSecretController struct {
 	hubKubeconfigSecretNamespace string
 	hubKubeconfigSecretName      string
 	spokeCoreClient              corev1client.CoreV1Interface
-	spokeSecretLister            corev1lister.SecretLister
 }
 
 // NewHubKubeconfigSecretController returns a new HubKubeconfigSecretController
@@ -43,7 +41,6 @@ func NewHubKubeconfigSecretController(
 		hubKubeconfigSecretNamespace: hubKubeconfigSecretNamespace,
 		hubKubeconfigSecretName:      hubKubeconfigSecretName,
 		spokeCoreClient:              spokeCoreClient,
-		spokeSecretLister:            spokeSecretInformer.Lister(),
 	}
 
 	return factory.New().
@@ -70,55 +67,52 @@ func NewHubKubeconfigSecretController(
 
 func (s *hubKubeconfigSecretController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	klog.V(4).Infof("Reconciling Hub KubeConfig secret %q", s.hubKubeconfigSecretName)
-	secret, err := s.spokeCoreClient.Secrets(s.hubKubeconfigSecretNamespace).Get(ctx, s.hubKubeconfigSecretName, metav1.GetOptions{})
+	return DumpSecret(s.spokeCoreClient, s.hubKubeconfigSecretNamespace, s.hubKubeconfigSecretName, s.hubKubeconfigDir, ctx, syncCtx.Recorder())
+}
+
+// DumpSecret dumps the data in the given seccret into a directory in file system.
+// The output directory will be created if not exists.
+// TO DO: remove the file once the corresponding key is removed from secret.
+func DumpSecret(
+	coreV1Client corev1client.CoreV1Interface,
+	secretNamespace, secretName, outputDir string,
+	ctx context.Context,
+	recorder events.Recorder) error {
+	secret, err := coreV1Client.Secrets(secretNamespace).Get(ctx, secretName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("unable to get secret %s/%s : %w", s.hubKubeconfigSecretNamespace, s.hubKubeconfigSecretName, err)
+		return fmt.Errorf("unable to get secret %s/%s : %w", secretNamespace, secretName, err)
 	}
 
-	// if the secret is invalid, ignore it
-	if !hasValidKubeconfig(secret) {
-		return nil
+	if err := os.MkdirAll(outputDir, 0700); err != nil {
+		return fmt.Errorf("unable to create dir %q : %w", outputDir, err)
 	}
 
-	if err := os.MkdirAll(s.hubKubeconfigDir, 0700); err != nil {
-		return fmt.Errorf("unable to create dir %q : %w", s.hubKubeconfigDir, err)
-	}
-
-	// create/update configuration files from the secret
+	// create/update files from the secret
 	for key, data := range secret.Data {
-		configFilePath := path.Join(s.hubKubeconfigDir, key)
-		if err := writeConfigFile(configFilePath, data, syncCtx.Recorder()); err != nil {
-			return fmt.Errorf("unable to write config file %q: %w", configFilePath, err)
+		filename := path.Clean(path.Join(outputDir, key))
+		lastData, err := ioutil.ReadFile(filename)
+		switch {
+		case os.IsNotExist(err):
+			// create file
+			if err := ioutil.WriteFile(filename, data, 0600); err != nil {
+				return fmt.Errorf("unable to write file %q: %w", filename, err)
+			}
+			recorder.Event("FileCreated", fmt.Sprintf("File %q is created from secret %s/%s", filename, secretNamespace, secretName))
+		case err != nil:
+			return fmt.Errorf("unable to read file %q: %w", filename, err)
+		case bytes.Equal(lastData, data):
+			// skip file without any change
+			continue
+		default:
+			// update file
+			if err := ioutil.WriteFile(path.Clean(filename), data, 0600); err != nil {
+				return fmt.Errorf("unable to write file %q: %w", filename, err)
+			}
+			recorder.Event("FileUpdated", fmt.Sprintf("File %q is updated from secret %s/%s", filename, secretNamespace, secretName))
 		}
 	}
-	return nil
-}
-
-// writeConfigFile creates or updates a specified file and record an event to log it.
-func writeConfigFile(filename string, data []byte, recorder events.Recorder) error {
-	lastData, err := ioutil.ReadFile(path.Clean(filename))
-	if os.IsNotExist(err) {
-		if err := ioutil.WriteFile(path.Clean(filename), data, 0600); err != nil {
-			return err
-		}
-		recorder.Event("HubKubeConfigFileCreated", fmt.Sprintf("Hub config file %q is created from hub kubeconfig secret", filename))
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-
-	if bytes.Equal(lastData, data) {
-		return nil
-	}
-
-	if err := ioutil.WriteFile(path.Clean(filename), data, 0600); err != nil {
-		return err
-	}
-
-	recorder.Event("HubKubeConfigFileUpdated", fmt.Sprintf("Hub config file %q is updated from hub kubeconfig secret", filename))
 	return nil
 }
