@@ -91,7 +91,7 @@ func (a *ManagedClusterValidatingAdmissionHook) validateCreateRequest(request *a
 	if managedCluster.Spec.HubAcceptsClient {
 		// the HubAcceptsClient field is changed, we need to check the request user whether
 		// has been allowed to change the HubAcceptsClient field with SubjectAccessReview api
-		if status := a.allowUpdateAcceptField(request.UserInfo); !status.Allowed {
+		if status := a.allowUpdateAcceptField(managedCluster.Name, request.UserInfo); !status.Allowed {
 			return status
 		}
 	}
@@ -133,7 +133,7 @@ func (a *ManagedClusterValidatingAdmissionHook) validateUpdateRequest(request *a
 	if newManagedCluster.Spec.HubAcceptsClient != oldManagedCluster.Spec.HubAcceptsClient {
 		// the HubAcceptsClient field is changed, we need to check the request user whether
 		// has been allowed to update the HubAcceptsClient field with SubjectAccessReview api
-		if status := a.allowUpdateAcceptField(request.UserInfo); !status.Allowed {
+		if status := a.allowUpdateAcceptField(newManagedCluster.Name, request.UserInfo); !status.Allowed {
 			return status
 		}
 	}
@@ -176,7 +176,7 @@ func (a *ManagedClusterValidatingAdmissionHook) validateManagedClusterObj(reques
 
 // allowUpdateHubAcceptsClientField using SubjectAccessReview API to check whether a request user has been authorized to update
 // HubAcceptsClient field
-func (a *ManagedClusterValidatingAdmissionHook) allowUpdateAcceptField(userInfo authenticationv1.UserInfo) *admissionv1beta1.AdmissionResponse {
+func (a *ManagedClusterValidatingAdmissionHook) allowUpdateAcceptField(clusterName string, userInfo authenticationv1.UserInfo) *admissionv1beta1.AdmissionResponse {
 	status := &admissionv1beta1.AdmissionResponse{}
 
 	extra := make(map[string]authorizationv1.ExtraValue)
@@ -195,6 +195,7 @@ func (a *ManagedClusterValidatingAdmissionHook) allowUpdateAcceptField(userInfo 
 				Resource:    "managedclusters",
 				Verb:        "update",
 				Subresource: "accept",
+				Name:        clusterName,
 			},
 		},
 	}

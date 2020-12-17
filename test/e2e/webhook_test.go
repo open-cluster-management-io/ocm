@@ -126,6 +126,31 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				)))
 			})
 
+			ginkgo.It("Should accept the request when creating an accepted managed cluster by authorized user", func() {
+				sa := fmt.Sprintf("webhook-sa-%s", rand.String(6))
+				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
+
+				ginkgo.By(fmt.Sprintf("create an managed cluster %q with authorized service account %q", clusterName, sa))
+				authorizedClient, err := buildClusterClient(saNamespace, sa, []rbacv1.PolicyRule{
+					{
+						APIGroups: []string{"cluster.open-cluster-management.io"},
+						Resources: []string{"managedclusters"},
+						Verbs:     []string{"create", "get", "update"},
+					},
+					{
+						APIGroups:     []string{"register.open-cluster-management.io"},
+						Resources:     []string{"managedclusters/accept"},
+						ResourceNames: []string{clusterName},
+						Verbs:         []string{"update"},
+					},
+				}, nil)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				managedCluster := newManagedCluster(clusterName, true, validURL)
+				_, err = authorizedClient.ClusterV1().ManagedClusters().Create(context.TODO(), managedCluster, metav1.CreateOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			})
+
 			ginkgo.It("Should accept the request when creating a managed cluster with clusterset specified by authorized user", func() {
 				clusterSetName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
 				ginkgo.By(fmt.Sprintf("create a managed cluster set %q", clusterSetName))
