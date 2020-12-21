@@ -27,6 +27,8 @@ These instructions assume:
 - You have `KUBECONFIG` environment variable set to a kubeconfig file giving you cluster-admin
   role on that cluster
 
+> Notice: The time of hub and managed clusters should be synchronized.
+
 ### Deploy Hub
 
 1. Run `make deploy-hub`
