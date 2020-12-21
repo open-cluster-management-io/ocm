@@ -83,7 +83,7 @@ func TestSync(t *testing.T) {
 				testinghelpers.AssertActions(t, hubActions, "get")
 				testinghelpers.AssertActions(t, agentActions, "get", "update")
 				actual := agentActions[1].(clienttesting.UpdateActionImpl).Object
-				if !hasValidKubeconfig(actual.(*corev1.Secret)) {
+				if !hasValidKubeconfig(actual.(*corev1.Secret), "") {
 					t.Error("kubeconfig secret is invalid")
 				}
 			},

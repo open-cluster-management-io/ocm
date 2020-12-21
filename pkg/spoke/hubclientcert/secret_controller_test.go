@@ -10,15 +10,15 @@ import (
 	"time"
 
 	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
+	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	kubeinformers "k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 )
 
-func TestHubKubeconfigSecretSync(t *testing.T) {
-	testDir, err := ioutil.TempDir("", "testhubkubeconfigsecretsync")
+func TestDumpSecret(t *testing.T) {
+	testDir, err := ioutil.TempDir("", "dumpsecret")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -37,20 +37,6 @@ func TestHubKubeconfigSecretSync(t *testing.T) {
 			name:     "no secret",
 			queueKey: "",
 			secret:   testinghelpers.NewHubKubeconfigSecret("irrelevant", "irrelevant", "", nil, map[string][]byte{}),
-			validateFiles: func(t *testing.T, hubKubeconfigDir string) {
-				files, err := ioutil.ReadDir(hubKubeconfigDir)
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
-				if len(files) != 0 {
-					t.Errorf("expect no files, but get %d files", len(files))
-				}
-			},
-		},
-		{
-			name:     "invalid secret",
-			queueKey: testSecretName,
-			secret:   testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "", nil, map[string][]byte{}),
 			validateFiles: func(t *testing.T, hubKubeconfigDir string) {
 				files, err := ioutil.ReadDir(hubKubeconfigDir)
 				if err != nil {
@@ -110,11 +96,6 @@ func TestHubKubeconfigSecretSync(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			kubeClient := kubefake.NewSimpleClientset(c.secret)
-			kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Minute*10)
-			secretStore := kubeInformerFactory.Core().V1().Secrets().Informer().GetStore()
-			if c.secret != nil {
-				secretStore.Add(c.secret)
-			}
 
 			hubKubeconfigDir := path.Join(testDir, fmt.Sprintf("/%s/hub-kubeconfig", rand.String(6)))
 			if err := os.MkdirAll(hubKubeconfigDir, 0755); err != nil {
@@ -124,16 +105,9 @@ func TestHubKubeconfigSecretSync(t *testing.T) {
 				testinghelpers.WriteFile(path.Join(hubKubeconfigDir, k), v)
 			}
 
-			ctrl := hubKubeconfigSecretController{
-				hubKubeconfigDir:             hubKubeconfigDir,
-				hubKubeconfigSecretName:      testSecretName,
-				hubKubeconfigSecretNamespace: testNamespace,
-				spokeCoreClient:              kubeClient.CoreV1(),
-				spokeSecretLister:            kubeInformerFactory.Core().V1().Secrets().Lister(),
-			}
-			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, c.queueKey))
-			if syncErr != nil {
-				t.Errorf("unexpected err: %v", syncErr)
+			err = DumpSecret(kubeClient.CoreV1(), testNamespace, testSecretName, hubKubeconfigDir, context.TODO(), eventstesting.NewTestingEventRecorder(t))
+			if err != nil {
+				t.Errorf("unexpected err: %v", err)
 			}
 
 			c.validateFiles(t, hubKubeconfigDir)

@@ -179,9 +179,9 @@ func (c *ClientCertForHubController) sync(ctx context.Context, syncCtx factory.S
 	}
 
 	// create a csr to request new client certificate if
-	// a. there is no client certificate
+	// a. there is no valid client certificate issued for the current cluster/agent
 	// b. client certificate exists and has less than 20% of its life remaining
-	if hasValidKubeconfig(secret) {
+	if hasValidKubeconfig(secret, fmt.Sprintf("%s%s:%s", subjectPrefix, c.clusterName, c.agentName)) {
 		notBefore, notAfter, err := getCertValidityPeriod(secret)
 		if err != nil {
 			return err

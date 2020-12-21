@@ -3,6 +3,7 @@ package hubclientcert
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	certificates "k8s.io/api/certificates/v1beta1"
@@ -18,7 +19,9 @@ import (
 //   1. KubeconfigFile exists
 //   2. TLSKeyFile exists
 //   3. TLSCertFile exists and the certificate is not expired
-func hasValidKubeconfig(secret *corev1.Secret) bool {
+//   4. If not empty, the given commonName matches the common name of the subject in the
+//      certificate stored in TLSCertFile
+func hasValidKubeconfig(secret *corev1.Secret, commonName string) bool {
 	if secret.Data == nil {
 		klog.V(4).Infof("No kubeconfig found in secret %q", secret.Namespace+"/"+secret.Name)
 		return false
@@ -46,7 +49,25 @@ func hasValidKubeconfig(secret *corev1.Secret) bool {
 		return false
 	}
 
-	return valid
+	if len(commonName) == 0 || !valid {
+		return valid
+	}
+
+	// check the common name of the subject in certification
+	certs, err := certutil.ParseCertsPEM(certData)
+	if err != nil {
+		klog.V(4).Infof("unable to parse certificate: %v", err)
+		return false
+	}
+
+	for _, cert := range certs {
+		if cert.Subject.CommonName == commonName {
+			return true
+		}
+	}
+
+	klog.V(4).Infof("certificate is not issued for %q", commonName)
+	return false
 }
 
 // IsCertificateValid return true if all certs in client certificate are not expired.
@@ -153,4 +174,26 @@ func isCSRApproved(csr *certificates.CertificateSigningRequest) bool {
 	}
 
 	return approved
+}
+
+// GetClusterAgentNamesFromCertificate returns the cluster name and agent name by parsing
+// the common name of the certification
+func GetClusterAgentNamesFromCertificate(certData []byte) (clusterName, agentName string, err error) {
+	certs, err := certutil.ParseCertsPEM(certData)
+	if err != nil {
+		return "", "", fmt.Errorf("unable to parse certificate: %w", err)
+	}
+
+	for _, cert := range certs {
+		if ok := strings.HasPrefix(cert.Subject.CommonName, subjectPrefix); !ok {
+			continue
+		}
+		names := strings.Split(strings.TrimPrefix(cert.Subject.CommonName, subjectPrefix), ":")
+		if len(names) != 2 {
+			continue
+		}
+		return names[0], names[1], nil
+	}
+
+	return "", "", nil
 }

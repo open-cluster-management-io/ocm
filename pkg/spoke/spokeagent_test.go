@@ -2,6 +2,7 @@ package spoke
 
 import (
 	"bytes"
+	"context"
 	"io/ioutil"
 	"os"
 	"path"
@@ -10,23 +11,127 @@ import (
 
 	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
 	"github.com/open-cluster-management/registration/pkg/spoke/hubclientcert"
+	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 )
 
 func TestComplete(t *testing.T) {
-	options := NewSpokeAgentOptions()
-	if err := options.Complete(); err != nil {
-		t.Errorf("unexpected error: %v", err)
+	// get component namespace
+	var componentNamespace string
+	nsBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err != nil {
+		componentNamespace = defaultSpokeComponentNamespace
+	} else {
+		componentNamespace = string(nsBytes)
 	}
-	if options.ComponentNamespace == "" {
-		t.Error("component namespace should not be empty")
+
+	cases := []struct {
+		name                string
+		clusterName         string
+		secret              *corev1.Secret
+		expectedClusterName string
+		expectedAgentName   string
+	}{
+		{
+			name: "generate random cluster/agent name",
+		},
+		{
+			name:                "specify cluster name",
+			clusterName:         "cluster1",
+			expectedClusterName: "cluster1",
+		},
+		{
+			name:        "override cluster name in secret with specified value",
+			clusterName: "cluster1",
+			secret: testinghelpers.NewHubKubeconfigSecret(componentNamespace, "hub-kubeconfig-secret", "", nil, map[string][]byte{
+				"cluster-name": []byte("cluster2"),
+				"agent-name":   []byte("agent2"),
+			}),
+			expectedClusterName: "cluster1",
+			expectedAgentName:   "agent2",
+		},
+		{
+			name:        "override cluster name in cert with specified value",
+			clusterName: "cluster1",
+			secret: testinghelpers.NewHubKubeconfigSecret(componentNamespace, "hub-kubeconfig-secret", "", testinghelpers.NewTestCert("system:open-cluster-management:cluster2:agent2", 60*time.Second), map[string][]byte{
+				"kubeconfig":   testinghelpers.NewKubeconfig(nil, nil),
+				"cluster-name": []byte("cluster3"),
+				"agent-name":   []byte("agent3"),
+			}),
+			expectedClusterName: "cluster1",
+			expectedAgentName:   "agent2",
+		},
+		{
+			name: "take cluster/agent name from secret",
+			secret: testinghelpers.NewHubKubeconfigSecret(componentNamespace, "hub-kubeconfig-secret", "", nil, map[string][]byte{
+				"cluster-name": []byte("cluster1"),
+				"agent-name":   []byte("agent1"),
+			}),
+			expectedClusterName: "cluster1",
+			expectedAgentName:   "agent1",
+		},
+		{
+			name:                "take cluster/agent name from cert",
+			secret:              testinghelpers.NewHubKubeconfigSecret(componentNamespace, "hub-kubeconfig-secret", "", testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second), map[string][]byte{}),
+			expectedClusterName: "cluster1",
+			expectedAgentName:   "agent1",
+		},
+		{
+			name: "override cluster name in secret with value from cert",
+			secret: testinghelpers.NewHubKubeconfigSecret(componentNamespace, "hub-kubeconfig-secret", "", testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second), map[string][]byte{
+				"cluster-name": []byte("cluster2"),
+				"agent-name":   []byte("agent2"),
+			}),
+			expectedClusterName: "cluster1",
+			expectedAgentName:   "agent1",
+		},
 	}
-	if options.ClusterName == "" {
-		t.Error("cluster name should not be empty")
-	}
-	if options.AgentName == "" {
-		t.Error("agent name should not be empty")
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			// setup kube client
+			objects := []runtime.Object{}
+			if c.secret != nil {
+				objects = append(objects, c.secret)
+			}
+			kubeClient := kubefake.NewSimpleClientset(objects...)
+
+			// create a tmp dir to dump hub kubeconfig
+			dir, err := ioutil.TempDir("", "hub-kubeconfig")
+			if err != nil {
+				t.Error("unable to create a tmp dir")
+			}
+			defer os.RemoveAll(dir)
+
+			options := &SpokeAgentOptions{
+				ClusterName:         c.clusterName,
+				HubKubeconfigSecret: "hub-kubeconfig-secret",
+				HubKubeconfigDir:    dir,
+			}
+
+			if err := options.Complete(kubeClient.CoreV1(), context.TODO(), eventstesting.NewTestingEventRecorder(t)); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if options.ComponentNamespace == "" {
+				t.Error("component namespace should not be empty")
+			}
+			if options.ClusterName == "" {
+				t.Error("cluster name should not be empty")
+			}
+			if options.AgentName == "" {
+				t.Error("agent name should not be empty")
+			}
+			if len(c.expectedClusterName) > 0 && options.ClusterName != c.expectedClusterName {
+				t.Errorf("expect cluster name %q but got %q", c.expectedClusterName, options.ClusterName)
+			}
+			if len(c.expectedAgentName) > 0 && options.AgentName != c.expectedAgentName {
+				t.Errorf("expect agent name %q but got %q", c.expectedAgentName, options.AgentName)
+			}
+		})
 	}
 }
 
@@ -97,15 +202,19 @@ func TestHasValidHubClientConfig(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	cert := testinghelpers.NewTestCert("test", 60*time.Second)
-	kubeconfig := testinghelpers.NewKubeconfig(cert.Key, cert.Cert)
+	cert1 := testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second)
+	cert2 := testinghelpers.NewTestCert("test", 60*time.Second)
+
+	kubeconfig := testinghelpers.NewKubeconfig(nil, nil)
 
 	cases := []struct {
-		name       string
-		kubeconfig []byte
-		tlsCert    []byte
-		tlsKey     []byte
-		isValid    bool
+		name        string
+		clusterName string
+		agentName   string
+		kubeconfig  []byte
+		tlsCert     []byte
+		tlsKey      []byte
+		isValid     bool
 	}{
 		{
 			name:    "no kubeconfig",
@@ -119,15 +228,26 @@ func TestHasValidHubClientConfig(t *testing.T) {
 		{
 			name:       "no tls cert",
 			kubeconfig: kubeconfig,
-			tlsKey:     cert.Key,
+			tlsKey:     cert1.Key,
 			isValid:    false,
 		},
 		{
-			name:       "valid hub client config",
-			kubeconfig: kubeconfig,
-			tlsKey:     cert.Key,
-			tlsCert:    cert.Cert,
-			isValid:    true,
+			name:        "cert is not issued for cluster1:agent1",
+			clusterName: "cluster1",
+			agentName:   "agent1",
+			kubeconfig:  kubeconfig,
+			tlsKey:      cert2.Key,
+			tlsCert:     cert2.Cert,
+			isValid:     false,
+		},
+		{
+			name:        "valid hub client config",
+			clusterName: "cluster1",
+			agentName:   "agent1",
+			kubeconfig:  kubeconfig,
+			tlsKey:      cert1.Key,
+			tlsCert:     cert1.Cert,
+			isValid:     true,
 		},
 	}
 	for _, c := range cases {
@@ -142,7 +262,11 @@ func TestHasValidHubClientConfig(t *testing.T) {
 				testinghelpers.WriteFile(path.Join(tempDir, "tls.crt"), c.tlsCert)
 			}
 
-			options := &SpokeAgentOptions{HubKubeconfigDir: tempDir}
+			options := &SpokeAgentOptions{
+				ClusterName:      c.clusterName,
+				AgentName:        c.agentName,
+				HubKubeconfigDir: tempDir,
+			}
 			valid, err := options.hasValidHubClientConfig()
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
