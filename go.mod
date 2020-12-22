@@ -16,17 +16,14 @@ require (
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d // indirect
-	k8s.io/api v0.19.0
-	k8s.io/apiextensions-apiserver v0.19.0
-	k8s.io/apimachinery v0.19.0
-	k8s.io/apiserver v0.19.0
-	k8s.io/client-go v0.19.0
-	k8s.io/component-base v0.19.0
+	k8s.io/api v0.19.5
+	k8s.io/apiextensions-apiserver v0.19.5
+	k8s.io/apimachinery v0.19.5
+	k8s.io/apiserver v0.19.5
+	k8s.io/client-go v0.19.5
+	k8s.io/component-base v0.19.5
 	k8s.io/klog/v2 v2.3.0
-	k8s.io/kube-aggregator v0.19.0
+	k8s.io/kube-aggregator v0.19.5
 	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
 	sigs.k8s.io/controller-runtime v0.6.1-0.20200829232221-efc74d056b24
 )
-
-// temporary hack fix for https://github.com/kubernetes/kubernetes/issues/95300
-replace k8s.io/apiserver => github.com/staebler/apiserver v0.19.1-0.20201005174924-a3ef0d1e45df
