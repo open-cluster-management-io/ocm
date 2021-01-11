@@ -17,6 +17,7 @@ import (
 	operatorinformer "github.com/open-cluster-management/api/client/operator/informers/externalversions"
 	workclientset "github.com/open-cluster-management/api/client/work/clientset/versioned"
 	"github.com/open-cluster-management/registration-operator/pkg/helpers"
+	certrotationcontroller "github.com/open-cluster-management/registration-operator/pkg/operators/clustermanager/controllers/certrotationcontroller"
 	"github.com/open-cluster-management/registration-operator/pkg/operators/clustermanager/controllers/clustermanagercontroller"
 	clustermanagerstatuscontroller "github.com/open-cluster-management/registration-operator/pkg/operators/clustermanager/controllers/statuscontroller"
 	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/controllers/bootstrapcontroller"
@@ -59,6 +60,7 @@ func RunClusterManagerOperator(ctx context.Context, controllerContext *controlle
 		operatorClient.OperatorV1().ClusterManagers(),
 		operatorInformer.Operator().V1().ClusterManagers(),
 		kubeInformer.Apps().V1().Deployments(),
+		kubeInformer.Core().V1().ConfigMaps(),
 		controllerContext.EventRecorder)
 
 	statusController := clustermanagerstatuscontroller.NewClusterManagerStatusController(
@@ -67,10 +69,19 @@ func RunClusterManagerOperator(ctx context.Context, controllerContext *controlle
 		kubeInformer.Apps().V1().Deployments(),
 		controllerContext.EventRecorder)
 
+	certRotationController := certrotationcontroller.NewCertRotationController(
+		kubeClient,
+		kubeInformer.Core().V1().Secrets(),
+		kubeInformer.Core().V1().ConfigMaps(),
+		operatorInformer.Operator().V1().ClusterManagers(),
+		controllerContext.EventRecorder)
+
 	go operatorInformer.Start(ctx.Done())
 	go kubeInformer.Start(ctx.Done())
 	go clusterManagerController.Run(ctx, 1)
 	go statusController.Run(ctx, 1)
+	go certRotationController.Run(ctx, 1)
+
 	<-ctx.Done()
 	return nil
 }

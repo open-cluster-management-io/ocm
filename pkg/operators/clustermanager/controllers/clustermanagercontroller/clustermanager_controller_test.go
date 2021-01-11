@@ -1,8 +1,6 @@
 package clustermanagercontroller
 
 import (
-	"context"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -18,9 +16,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	kubeinformers "k8s.io/client-go/informers"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/util/cert"
 	fakeapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
 
 	"github.com/open-cluster-management/registration-operator/pkg/helpers"
@@ -48,6 +46,8 @@ func newClusterManager(name string) *operatorapiv1.ClusterManager {
 }
 
 func newTestController(clustermanager *operatorapiv1.ClusterManager) *testController {
+	kubeClient := fakekube.NewSimpleClientset()
+	kubeInfomers := kubeinformers.NewSharedInformerFactory(kubeClient, 5*time.Minute)
 	fakeOperatorClient := fakeoperatorlient.NewSimpleClientset(clustermanager)
 	operatorInformers := operatorinformers.NewSharedInformerFactory(fakeOperatorClient, 5*time.Minute)
 
@@ -55,6 +55,7 @@ func newTestController(clustermanager *operatorapiv1.ClusterManager) *testContro
 		clusterManagerClient: fakeOperatorClient.OperatorV1().ClusterManagers(),
 		clusterManagerLister: operatorInformers.Operator().V1().ClusterManagers().Lister(),
 		currentGeneration:    make([]int64, len(deploymentFiles)),
+		configMapLister:      kubeInfomers.Core().V1().ConfigMaps().Lister(),
 	}
 
 	store := operatorInformers.Operator().V1().ClusterManagers().Informer().GetStore()
@@ -124,7 +125,7 @@ func TestSyncDeploy(t *testing.T) {
 	}
 
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 21)
+	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 19)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager)
 	}
@@ -180,7 +181,7 @@ func TestSyncDelete(t *testing.T) {
 			deleteKubeActions = append(deleteKubeActions, deleteKubeAction)
 		}
 	}
-	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 18)
+	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 16)
 
 	deleteCRDActions := []clienttesting.DeleteActionImpl{}
 	crdActions := controller.apiExtensionClient.Actions()
@@ -244,47 +245,5 @@ func TestDeleteCRD(t *testing.T) {
 	err = controller.controller.sync(nil, syncContext)
 	if err != nil {
 		t.Errorf("Expected no error when sync: %v", err)
-	}
-}
-
-func TestEnsureServingCertAndCA(t *testing.T) {
-	clusterManager := newClusterManager("testhub")
-	controller := newTestController(clusterManager).withCRDObject().withKubeObject().withAPIServiceObject()
-	ca, certificate, key, err := controller.controller.ensureServingCertAndCA(context.TODO(), "ns1", "kubeconfig", "webhook")
-	if err != nil {
-		t.Errorf("Expect no error when generating serving cert: %v", err)
-	}
-	certs, err := cert.ParseCertsPEM(certificate)
-	if err != nil {
-		t.Errorf("Expect no error when parsing cert")
-	}
-	if len(certs) != 2 {
-		t.Errorf("Expect 2 cert is parsed, actual %d", len(certs))
-	}
-	for _, cert := range certs {
-		if cert.Subject.CommonName != "webhook.ns1.svc" && cert.Subject.CommonName != "cluster-manager-webhook" {
-			t.Errorf("Common name in cert is not correct, actual %s", cert.Subject.CommonName)
-		}
-	}
-
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kubeconfig",
-			Namespace: "ns1",
-		},
-		Data: map[string][]byte{
-			"ca.crt":  ca,
-			"tls.crt": certificate,
-			"tls.key": key,
-		},
-	}
-	controller = newTestController(clusterManager).withCRDObject().withKubeObject(secret).withAPIServiceObject()
-	actualCA, actualCert, actualKey, err := controller.controller.ensureServingCertAndCA(context.TODO(), "ns1", "kubeconfig", "webhook")
-	if err != nil {
-		t.Errorf("Expect no error when generating serving cert: %v", err)
-	}
-
-	if !reflect.DeepEqual(ca, actualCA) || !reflect.DeepEqual(certificate, actualCert) || !reflect.DeepEqual(key, actualKey) {
-		t.Errorf("Expect the cert/key/ca is obtained from secret")
 	}
 }

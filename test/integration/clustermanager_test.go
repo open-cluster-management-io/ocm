@@ -3,21 +3,28 @@ package integration
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/cert"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
 	"github.com/open-cluster-management/registration-operator/pkg/helpers"
 	"github.com/open-cluster-management/registration-operator/pkg/operators"
+	certrotation "github.com/open-cluster-management/registration-operator/pkg/operators/clustermanager/controllers/certrotationcontroller"
 	"github.com/open-cluster-management/registration-operator/test/integration/util"
 )
 
 func startHubOperator(ctx context.Context) {
+	certrotation.SigningCertValidity = time.Second * 30
+	certrotation.TargetCertValidity = time.Second * 10
+	certrotation.ResyncInterval = time.Second * 1
+
 	err := operators.RunClusterManagerOperator(ctx, &controllercmd.ControllerContext{
 		KubeConfig:    restConfig,
 		EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
@@ -161,7 +168,7 @@ var _ = ginkgo.Describe("ClusterManager", func() {
 				if err != nil {
 					return false
 				}
-				if s.Data == nil || s.Data["ca.crt"] == nil || s.Data["tls.crt"] == nil || s.Data["tls.key"] == nil {
+				if s.Data == nil || s.Data["tls.crt"] == nil || s.Data["tls.key"] == nil {
 					return false
 				}
 				return true
@@ -173,7 +180,7 @@ var _ = ginkgo.Describe("ClusterManager", func() {
 				if err != nil {
 					return false
 				}
-				if s.Data == nil || s.Data["ca.crt"] == nil || s.Data["tls.crt"] == nil || s.Data["tls.key"] == nil {
+				if s.Data == nil || s.Data["tls.crt"] == nil || s.Data["tls.key"] == nil {
 					return false
 				}
 				return true
@@ -322,6 +329,84 @@ var _ = ginkgo.Describe("ClusterManager", func() {
 
 			// The cluster manager should be functional at last
 			util.AssertClusterManagerCondition(clusterManagerName, operatorClient, "HubRegistrationDegraded", "RegistrationFunctional", metav1.ConditionFalse)
+		})
+	})
+
+	ginkgo.Context("Serving cert rotation", func() {
+		ginkgo.It("should rotate both serving cert and signing cert before they become expired", func() {
+			secretNames := []string{"signer-secret", "registration-webhook-serving-cert", "work-webhook-serving-cert"}
+			// wait until all secrets and configmap are in place
+			gomega.Eventually(func() bool {
+				for _, name := range secretNames {
+					if _, err := kubeClient.CoreV1().Secrets(hubNamespace).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
+						return false
+					}
+				}
+				if _, err := kubeClient.CoreV1().ConfigMaps(hubNamespace).Get(context.Background(), "ca-bundle-configmap", metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// both serving cert and signing cert should aways be valid
+			gomega.Consistently(func() bool {
+				configmap, err := kubeClient.CoreV1().ConfigMaps(hubNamespace).Get(context.Background(), "ca-bundle-configmap", metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				for _, name := range []string{"signer-secret", "registration-webhook-serving-cert", "work-webhook-serving-cert"} {
+					secret, err := kubeClient.CoreV1().Secrets(hubNamespace).Get(context.Background(), name, metav1.GetOptions{})
+					if err != nil {
+						return false
+					}
+
+					certificates, err := cert.ParseCertsPEM(secret.Data["tls.crt"])
+					if err != nil {
+						return false
+					}
+					if len(certificates) == 0 {
+						return false
+					}
+
+					now := time.Now()
+					certificate := certificates[0]
+					if now.After(certificate.NotAfter) {
+						return false
+					}
+					if now.Before(certificate.NotBefore) {
+						return false
+					}
+
+					if name == "signer-secret" {
+						continue
+					}
+
+					// ensure signing cert of serving certs in the ca bundle configmap
+					caCerts, err := cert.ParseCertsPEM([]byte(configmap.Data["ca-bundle.crt"]))
+					if err != nil {
+						return false
+					}
+
+					found := false
+					for _, caCert := range caCerts {
+						if certificate.Issuer.CommonName != caCert.Subject.CommonName {
+							continue
+						}
+						if now.After(caCert.NotAfter) {
+							return false
+						}
+						if now.Before(caCert.NotBefore) {
+							return false
+						}
+						found = true
+						break
+					}
+					if !found {
+						return false
+					}
+				}
+				return true
+			}, eventuallyTimeout*3, eventuallyInterval*3).Should(gomega.BeTrue())
 		})
 	})
 })

@@ -10,19 +10,19 @@ import (
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/crypto"
 	"github.com/openshift/library-go/pkg/operator/events"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
+	corev1informers "k8s.io/client-go/informers/core/v1"
+	corev1listers "k8s.io/client-go/listers/core/v1"
 
 	operatorv1client "github.com/open-cluster-management/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "github.com/open-cluster-management/api/client/operator/informers/externalversions/operator/v1"
@@ -51,7 +51,6 @@ var (
 		"manifests/cluster-manager/cluster-manager-registration-webhook-service.yaml",
 		"manifests/cluster-manager/cluster-manager-registration-webhook-serviceaccount.yaml",
 		"manifests/cluster-manager/cluster-manager-registration-webhook-apiservice.yaml",
-		"manifests/cluster-manager/cluster-manager-registration-webhook-secret.yaml",
 		"manifests/cluster-manager/cluster-manager-registration-webhook-clustersetbinding-validatingconfiguration.yaml",
 		"manifests/cluster-manager/cluster-manager-registration-webhook-validatingconfiguration.yaml",
 		"manifests/cluster-manager/cluster-manager-registration-webhook-mutatingconfiguration.yaml",
@@ -60,7 +59,6 @@ var (
 		"manifests/cluster-manager/cluster-manager-work-webhook-service.yaml",
 		"manifests/cluster-manager/cluster-manager-work-webhook-serviceaccount.yaml",
 		"manifests/cluster-manager/cluster-manager-work-webhook-apiservice.yaml",
-		"manifests/cluster-manager/cluster-manager-work-webhook-secret.yaml",
 		"manifests/cluster-manager/cluster-manager-work-webhook-validatingconfiguration.yaml",
 	}
 
@@ -72,13 +70,10 @@ var (
 )
 
 const (
-	clusterManagerFinalizer    = "operator.open-cluster-management.io/cluster-manager-cleanup"
-	registrationWebhookSecret  = "registration-webhook-serving-cert"
-	registrationWebhookService = "cluster-manager-registration-webhook"
-	workWebhookCert            = "work-webhook-serving-cert"
-	workWebhookService         = "cluster-manager-work-webhook"
-	clusterManagerApplied      = "Applied"
-	clusterManagerAvailable    = "Available"
+	clusterManagerFinalizer = "operator.open-cluster-management.io/cluster-manager-cleanup"
+	clusterManagerApplied   = "Applied"
+	clusterManagerAvailable = "Available"
+	caBundleConfigmap       = "ca-bundle-configmap"
 )
 
 type clusterManagerController struct {
@@ -88,6 +83,7 @@ type clusterManagerController struct {
 	apiExtensionClient    apiextensionsclient.Interface
 	apiRegistrationClient apiregistrationclient.APIServicesGetter
 	currentGeneration     []int64
+	configMapLister       corev1listers.ConfigMapLister
 }
 
 // NewClusterManagerController construct cluster manager hub controller
@@ -98,6 +94,7 @@ func NewClusterManagerController(
 	clusterManagerClient operatorv1client.ClusterManagerInterface,
 	clusterManagerInformer operatorinformer.ClusterManagerInformer,
 	deploymentInformer appsinformer.DeploymentInformer,
+	configMapInformer corev1informers.ConfigMapInformer,
 	recorder events.Recorder) factory.Controller {
 	controller := &clusterManagerController{
 		kubeClient:            kubeClient,
@@ -105,12 +102,26 @@ func NewClusterManagerController(
 		apiRegistrationClient: apiRegistrationClient,
 		clusterManagerClient:  clusterManagerClient,
 		clusterManagerLister:  clusterManagerInformer.Lister(),
+		configMapLister:       configMapInformer.Lister(),
 		currentGeneration:     make([]int64, len(deploymentFiles)),
 	}
 
 	return factory.New().WithSync(controller.sync).
 		ResyncEvery(3*time.Minute).
 		WithInformersQueueKeyFunc(helpers.ClusterManagerDeploymentQueueKeyFunc(controller.clusterManagerLister), deploymentInformer.Informer()).
+		WithFilteredEventsInformersQueueKeyFunc(
+			helpers.ClusterManagerConfigmapQueueKeyFunc(controller.clusterManagerLister),
+			func(obj interface{}) bool {
+				accessor, _ := meta.Accessor(obj)
+				if namespace := accessor.GetNamespace(); namespace != helpers.ClusterManagerNamespace {
+					return false
+				}
+				if name := accessor.GetName(); name != caBundleConfigmap {
+					return false
+				}
+				return true
+			},
+			configMapInformer.Informer()).
 		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
 			accessor, _ := meta.Accessor(obj)
 			return accessor.GetName()
@@ -123,12 +134,8 @@ type hubConfig struct {
 	ClusterManagerName             string
 	RegistrationImage              string
 	RegistrationAPIServiceCABundle string
-	RegistrationServingCert        string
-	RegistrationServingKey         string
 	WorkImage                      string
 	WorkAPIServiceCABundle         string
-	WorkServingCert                string
-	WorkServingKey                 string
 }
 
 func (n *clusterManagerController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
@@ -175,24 +182,22 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		return n.removeClusterManagerFinalizer(ctx, clusterManager)
 	}
 
-	// Ensure serving cert for webhooks
-	ca, cert, key, err := n.ensureServingCertAndCA(
-		ctx, helpers.ClusterManagerNamespace, registrationWebhookSecret, registrationWebhookService)
-	if err != nil {
+	// try to load ca bundle from configmap
+	caBundle := "placeholder"
+	configmap, err := n.configMapLister.ConfigMaps(helpers.ClusterManagerNamespace).Get(caBundleConfigmap)
+	switch {
+	case errors.IsNotFound(err):
+		// do nothing
+	case err != nil:
 		return err
+	default:
+		if cb := configmap.Data["ca-bundle.crt"]; len(cb) > 0 {
+			caBundle = cb
+		}
 	}
-	config.RegistrationAPIServiceCABundle = base64.StdEncoding.EncodeToString(ca)
-	config.RegistrationServingCert = base64.StdEncoding.EncodeToString(cert)
-	config.RegistrationServingKey = base64.StdEncoding.EncodeToString(key)
-
-	ca, cert, key, err = n.ensureServingCertAndCA(
-		ctx, helpers.ClusterManagerNamespace, workWebhookCert, workWebhookService)
-	if err != nil {
-		return err
-	}
-	config.WorkAPIServiceCABundle = base64.StdEncoding.EncodeToString(ca)
-	config.WorkServingCert = base64.StdEncoding.EncodeToString(cert)
-	config.WorkServingKey = base64.StdEncoding.EncodeToString(key)
+	encodedCaBundle := base64.StdEncoding.EncodeToString([]byte(caBundle))
+	config.RegistrationAPIServiceCABundle = encodedCaBundle
+	config.WorkAPIServiceCABundle = encodedCaBundle
 
 	// Apply static files
 	resourceResults := helpers.ApplyDirectly(
@@ -304,48 +309,6 @@ func (n *clusterManagerController) removeCRD(ctx context.Context, name string) e
 	}
 
 	return fmt.Errorf("CRD %s is still being deleted", name)
-}
-
-// ensureServingCertAndCA generates self signed CA and server key/cert for webhook server.
-// TODO consider ca/cert renewal
-func (n *clusterManagerController) ensureServingCertAndCA(
-	ctx context.Context, namespace, secretName, svcName string) ([]byte, []byte, []byte, error) {
-	secret, err := n.kubeClient.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
-	switch {
-	case err != nil && !errors.IsNotFound(err):
-		return nil, nil, nil, err
-	case err == nil:
-		if secret.Data["ca.crt"] != nil && secret.Data["tls.crt"] != nil && secret.Data["tls.key"] != nil {
-			return secret.Data["ca.crt"], secret.Data["tls.crt"], secret.Data["tls.key"], nil
-		}
-	}
-
-	caConfig, err := crypto.MakeSelfSignedCAConfig("cluster-manager-webhook", 365)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	ca := &crypto.CA{
-		SerialGenerator: &crypto.RandomSerialGenerator{},
-		Config:          caConfig,
-	}
-
-	hostName := fmt.Sprintf("%s.%s.svc", svcName, namespace)
-	server, err := ca.MakeServerCert(sets.NewString(hostName), 365)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	caData, _, err := caConfig.GetPEMBytes()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	certData, keyData, err := server.GetPEMBytes()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return caData, certData, keyData, nil
 }
 
 func (n *clusterManagerController) cleanUp(

@@ -494,10 +494,10 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				if err != nil {
 					return false
 				}
-				if registrationDeployment.CreationTimestamp.Time.Equal(lastRegistrationDeployment.CreationTimestamp.Time) {
+				if registrationDeployment.UID == lastRegistrationDeployment.UID {
 					return false
 				}
-				if workDeployment.CreationTimestamp.Time.Equal(lastWorkDeployment.CreationTimestamp.Time) {
+				if workDeployment.UID == lastWorkDeployment.UID {
 					return false
 				}
 				return true
