@@ -85,7 +85,7 @@ func NewManifestWorkController(
 		WithSync(controller.sync).ResyncEvery(5*time.Minute).ToController("ManifestWorkAgent", recorder)
 }
 
-// sync is the main reconcile loop for manefist work. It is triggered in two scenarios
+// sync is the main reconcile loop for manifest work. It is triggered in two scenarios
 // 1. ManifestWork API changes
 // 2. Resources defined in manifest changed on spoke
 func (m *ManifestWorkController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
@@ -94,7 +94,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 
 	manifestWork, err := m.manifestWorkLister.Get(manifestWorkName)
 	if errors.IsNotFound(err) {
-		// work  not found, could have been deleted, do nothing.
+		// work not found, could have been deleted, do nothing.
 		return nil
 	}
 	if err != nil {
@@ -342,7 +342,7 @@ func isSameUnstructured(obj1, obj2 *unstructured.Unstructured) bool {
 }
 
 // allInCondition checks status of conditions with a particular type in ManifestCondition array.
-// Return true, true only if conditions with the condition type exist and they are all in condition.
+// Return true only if conditions with the condition type exist and they are all in condition.
 func allInCondition(conditionType string, manifests []workapiv1.ManifestCondition) (inCondition bool, exists bool) {
 	for _, manifest := range manifests {
 		for _, condition := range manifest.Conditions {
