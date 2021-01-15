@@ -104,6 +104,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 
 	// create shared informer factory for spoke cluster
 	spokeKubeInformerFactory := informers.NewSharedInformerFactory(spokeKubeClient, 10*time.Minute)
+	namespacedSpokeKubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(spokeKubeClient, 10*time.Minute, informers.WithNamespace(o.ComponentNamespace))
 
 	// get spoke cluster CA bundle
 	spokeClusterCABundle, err := o.getSpokeClusterCABundle(controllerContext.KubeConfig)
@@ -137,7 +138,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	hubKubeconfigSecretController := hubclientcert.NewHubKubeconfigSecretController(
 		o.HubKubeconfigDir, o.ComponentNamespace, o.HubKubeconfigSecret,
 		spokeKubeClient.CoreV1(),
-		spokeKubeInformerFactory.Core().V1().Secrets(),
+		namespacedSpokeKubeInformerFactory.Core().V1().Secrets(),
 		controllerContext.EventRecorder,
 	)
 	go hubKubeconfigSecretController.Run(ctx, 1)
@@ -163,7 +164,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			spokeKubeClient.CoreV1(),
 			bootstrapKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
 			bootstrapInformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
-			spokeKubeInformerFactory.Core().V1().Secrets(),
+			namespacedSpokeKubeInformerFactory.Core().V1().Secrets(),
 			controllerContext.EventRecorder,
 			"BootstrapClientCertForHubController",
 		)
@@ -171,7 +172,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		bootstrapCtx, stopBootstrap := context.WithCancel(ctx)
 
 		go bootstrapInformerFactory.Start(bootstrapCtx.Done())
-		go spokeKubeInformerFactory.Start(bootstrapCtx.Done())
+		go namespacedSpokeKubeInformerFactory.Start(bootstrapCtx.Done())
 
 		go clientCertForHubController.Run(bootstrapCtx, 1)
 
@@ -222,7 +223,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		spokeKubeClient.CoreV1(),
 		hubKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
 		hubKubeInformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
-		spokeKubeInformerFactory.Core().V1().Secrets(),
+		namespacedSpokeKubeInformerFactory.Core().V1().Secrets(),
 		controllerContext.EventRecorder,
 		"ClientCertForHubController",
 	)
@@ -274,6 +275,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	go hubKubeInformerFactory.Start(ctx.Done())
 	go hubClusterInformerFactory.Start(ctx.Done())
 	go spokeKubeInformerFactory.Start(ctx.Done())
+	go namespacedSpokeKubeInformerFactory.Start(ctx.Done())
 	go spokeClusterInformers.Start(ctx.Done())
 
 	go clientCertForHubController.Run(ctx, 1)
