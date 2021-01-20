@@ -22,6 +22,11 @@ const (
 	HubKubeConfig = "hub-kubeconfig-secret"
 	// ClusterManagerNamespace is the namespace to deploy cluster manager components
 	ClusterManagerNamespace = "open-cluster-management-hub"
+
+	RegistrationWebhookSecret  = "registration-webhook-serving-cert"
+	RegistrationWebhookService = "cluster-manager-registration-webhook"
+	WorkWebhookSecret          = "work-webhook-serving-cert"
+	WorkWebhookService         = "cluster-manager-work-webhook"
 )
 
 func KlusterletSecretQueueKeyFunc(klusterletLister operatorlister.KlusterletLister) factory.ObjectQueueKeyFunc {
@@ -92,6 +97,21 @@ func ClusterManagerDeploymentQueueKeyFunc(clusterManagerLister operatorlister.Cl
 			return ""
 		}
 
+		clustermanagers, err := clusterManagerLister.List(labels.Everything())
+		if err != nil {
+			return ""
+		}
+
+		for _, clustermanager := range clustermanagers {
+			return clustermanager.Name
+		}
+
+		return ""
+	}
+}
+
+func ClusterManagerConfigmapQueueKeyFunc(clusterManagerLister operatorlister.ClusterManagerLister) factory.ObjectQueueKeyFunc {
+	return func(obj runtime.Object) string {
 		clustermanagers, err := clusterManagerLister.List(labels.Everything())
 		if err != nil {
 			return ""

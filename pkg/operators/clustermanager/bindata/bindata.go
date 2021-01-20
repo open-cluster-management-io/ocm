@@ -15,7 +15,6 @@
 // manifests/cluster-manager/cluster-manager-registration-webhook-clustersetbinding-validatingconfiguration.yaml
 // manifests/cluster-manager/cluster-manager-registration-webhook-deployment.yaml
 // manifests/cluster-manager/cluster-manager-registration-webhook-mutatingconfiguration.yaml
-// manifests/cluster-manager/cluster-manager-registration-webhook-secret.yaml
 // manifests/cluster-manager/cluster-manager-registration-webhook-service.yaml
 // manifests/cluster-manager/cluster-manager-registration-webhook-serviceaccount.yaml
 // manifests/cluster-manager/cluster-manager-registration-webhook-validatingconfiguration.yaml
@@ -23,7 +22,6 @@
 // manifests/cluster-manager/cluster-manager-work-webhook-clusterrole.yaml
 // manifests/cluster-manager/cluster-manager-work-webhook-clusterrolebinding.yaml
 // manifests/cluster-manager/cluster-manager-work-webhook-deployment.yaml
-// manifests/cluster-manager/cluster-manager-work-webhook-secret.yaml
 // manifests/cluster-manager/cluster-manager-work-webhook-service.yaml
 // manifests/cluster-manager/cluster-manager-work-webhook-serviceaccount.yaml
 // manifests/cluster-manager/cluster-manager-work-webhook-validatingconfiguration.yaml
@@ -1348,33 +1346,6 @@ func manifestsClusterManagerClusterManagerRegistrationWebhookMutatingconfigurati
 	return a, nil
 }
 
-var _manifestsClusterManagerClusterManagerRegistrationWebhookSecretYaml = []byte(`apiVersion: v1
-kind: Secret
-metadata:
-  name: registration-webhook-serving-cert
-  namespace: open-cluster-management-hub
-data:
-  tls.crt: {{ .RegistrationServingCert }}
-  tls.key: {{ .RegistrationServingKey }}
-  ca.crt: {{ .RegistrationAPIServiceCABundle }}
-type: Opaque
-`)
-
-func manifestsClusterManagerClusterManagerRegistrationWebhookSecretYamlBytes() ([]byte, error) {
-	return _manifestsClusterManagerClusterManagerRegistrationWebhookSecretYaml, nil
-}
-
-func manifestsClusterManagerClusterManagerRegistrationWebhookSecretYaml() (*asset, error) {
-	bytes, err := manifestsClusterManagerClusterManagerRegistrationWebhookSecretYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "manifests/cluster-manager/cluster-manager-registration-webhook-secret.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
 var _manifestsClusterManagerClusterManagerRegistrationWebhookServiceYaml = []byte(`apiVersion: v1
 kind: Service
 metadata:
@@ -1648,33 +1619,6 @@ func manifestsClusterManagerClusterManagerWorkWebhookDeploymentYaml() (*asset, e
 	return a, nil
 }
 
-var _manifestsClusterManagerClusterManagerWorkWebhookSecretYaml = []byte(`apiVersion: v1
-kind: Secret
-metadata:
-  name: work-webhook-serving-cert
-  namespace: open-cluster-management-hub
-data:
-  tls.crt: {{ .WorkServingCert }}
-  tls.key: {{ .WorkServingKey }}
-  ca.crt: {{ .WorkAPIServiceCABundle }}
-type: Opaque
-`)
-
-func manifestsClusterManagerClusterManagerWorkWebhookSecretYamlBytes() ([]byte, error) {
-	return _manifestsClusterManagerClusterManagerWorkWebhookSecretYaml, nil
-}
-
-func manifestsClusterManagerClusterManagerWorkWebhookSecretYaml() (*asset, error) {
-	bytes, err := manifestsClusterManagerClusterManagerWorkWebhookSecretYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "manifests/cluster-manager/cluster-manager-work-webhook-secret.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
 var _manifestsClusterManagerClusterManagerWorkWebhookServiceYaml = []byte(`apiVersion: v1
 kind: Service
 metadata:
@@ -1835,7 +1779,6 @@ var _bindata = map[string]func() (*asset, error){
 	"manifests/cluster-manager/cluster-manager-registration-webhook-clustersetbinding-validatingconfiguration.yaml": manifestsClusterManagerClusterManagerRegistrationWebhookClustersetbindingValidatingconfigurationYaml,
 	"manifests/cluster-manager/cluster-manager-registration-webhook-deployment.yaml":                                manifestsClusterManagerClusterManagerRegistrationWebhookDeploymentYaml,
 	"manifests/cluster-manager/cluster-manager-registration-webhook-mutatingconfiguration.yaml":                     manifestsClusterManagerClusterManagerRegistrationWebhookMutatingconfigurationYaml,
-	"manifests/cluster-manager/cluster-manager-registration-webhook-secret.yaml":                                    manifestsClusterManagerClusterManagerRegistrationWebhookSecretYaml,
 	"manifests/cluster-manager/cluster-manager-registration-webhook-service.yaml":                                   manifestsClusterManagerClusterManagerRegistrationWebhookServiceYaml,
 	"manifests/cluster-manager/cluster-manager-registration-webhook-serviceaccount.yaml":                            manifestsClusterManagerClusterManagerRegistrationWebhookServiceaccountYaml,
 	"manifests/cluster-manager/cluster-manager-registration-webhook-validatingconfiguration.yaml":                   manifestsClusterManagerClusterManagerRegistrationWebhookValidatingconfigurationYaml,
@@ -1843,7 +1786,6 @@ var _bindata = map[string]func() (*asset, error){
 	"manifests/cluster-manager/cluster-manager-work-webhook-clusterrole.yaml":                                       manifestsClusterManagerClusterManagerWorkWebhookClusterroleYaml,
 	"manifests/cluster-manager/cluster-manager-work-webhook-clusterrolebinding.yaml":                                manifestsClusterManagerClusterManagerWorkWebhookClusterrolebindingYaml,
 	"manifests/cluster-manager/cluster-manager-work-webhook-deployment.yaml":                                        manifestsClusterManagerClusterManagerWorkWebhookDeploymentYaml,
-	"manifests/cluster-manager/cluster-manager-work-webhook-secret.yaml":                                            manifestsClusterManagerClusterManagerWorkWebhookSecretYaml,
 	"manifests/cluster-manager/cluster-manager-work-webhook-service.yaml":                                           manifestsClusterManagerClusterManagerWorkWebhookServiceYaml,
 	"manifests/cluster-manager/cluster-manager-work-webhook-serviceaccount.yaml":                                    manifestsClusterManagerClusterManagerWorkWebhookServiceaccountYaml,
 	"manifests/cluster-manager/cluster-manager-work-webhook-validatingconfiguration.yaml":                           manifestsClusterManagerClusterManagerWorkWebhookValidatingconfigurationYaml,
@@ -1907,7 +1849,6 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"cluster-manager-registration-webhook-clustersetbinding-validatingconfiguration.yaml": {manifestsClusterManagerClusterManagerRegistrationWebhookClustersetbindingValidatingconfigurationYaml, map[string]*bintree{}},
 			"cluster-manager-registration-webhook-deployment.yaml":                                {manifestsClusterManagerClusterManagerRegistrationWebhookDeploymentYaml, map[string]*bintree{}},
 			"cluster-manager-registration-webhook-mutatingconfiguration.yaml":                     {manifestsClusterManagerClusterManagerRegistrationWebhookMutatingconfigurationYaml, map[string]*bintree{}},
-			"cluster-manager-registration-webhook-secret.yaml":                                    {manifestsClusterManagerClusterManagerRegistrationWebhookSecretYaml, map[string]*bintree{}},
 			"cluster-manager-registration-webhook-service.yaml":                                   {manifestsClusterManagerClusterManagerRegistrationWebhookServiceYaml, map[string]*bintree{}},
 			"cluster-manager-registration-webhook-serviceaccount.yaml":                            {manifestsClusterManagerClusterManagerRegistrationWebhookServiceaccountYaml, map[string]*bintree{}},
 			"cluster-manager-registration-webhook-validatingconfiguration.yaml":                   {manifestsClusterManagerClusterManagerRegistrationWebhookValidatingconfigurationYaml, map[string]*bintree{}},
@@ -1915,7 +1856,6 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"cluster-manager-work-webhook-clusterrole.yaml":                                       {manifestsClusterManagerClusterManagerWorkWebhookClusterroleYaml, map[string]*bintree{}},
 			"cluster-manager-work-webhook-clusterrolebinding.yaml":                                {manifestsClusterManagerClusterManagerWorkWebhookClusterrolebindingYaml, map[string]*bintree{}},
 			"cluster-manager-work-webhook-deployment.yaml":                                        {manifestsClusterManagerClusterManagerWorkWebhookDeploymentYaml, map[string]*bintree{}},
-			"cluster-manager-work-webhook-secret.yaml":                                            {manifestsClusterManagerClusterManagerWorkWebhookSecretYaml, map[string]*bintree{}},
 			"cluster-manager-work-webhook-service.yaml":                                           {manifestsClusterManagerClusterManagerWorkWebhookServiceYaml, map[string]*bintree{}},
 			"cluster-manager-work-webhook-serviceaccount.yaml":                                    {manifestsClusterManagerClusterManagerWorkWebhookServiceaccountYaml, map[string]*bintree{}},
 			"cluster-manager-work-webhook-validatingconfiguration.yaml":                           {manifestsClusterManagerClusterManagerWorkWebhookValidatingconfigurationYaml, map[string]*bintree{}},
