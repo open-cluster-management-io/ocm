@@ -11,9 +11,9 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
 
@@ -43,9 +43,10 @@ func NewManagedClusterCreatingController(
 		spokeCABundle:           spokeCABundle,
 		hubClusterClient:        hubClusterClient,
 	}
+
 	return factory.New().
 		WithSync(c.sync).
-		ResyncEvery(CreatingControllerSyncInterval).
+		ResyncEvery(wait.Jitter(CreatingControllerSyncInterval, 1.0)).
 		ToController("ManagedClusterCreatingController", recorder)
 }
 

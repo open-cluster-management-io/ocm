@@ -54,13 +54,13 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	managedClusterController := managedcluster.NewManagedClusterController(
 		kubeClient,
 		clusterClient,
-		clusterInformers.Cluster().V1().ManagedClusters().Informer(),
+		clusterInformers.Cluster().V1().ManagedClusters(),
 		controllerContext.EventRecorder,
 	)
 
 	csrController := csr.NewCSRApprovingController(
 		kubeClient,
-		kubeInfomers.Certificates().V1beta1().CertificateSigningRequests().Informer(),
+		kubeInfomers.Certificates().V1beta1().CertificateSigningRequests(),
 		controllerContext.EventRecorder,
 	)
 
