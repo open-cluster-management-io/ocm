@@ -3,8 +3,10 @@ package managedcluster
 import (
 	"context"
 	"testing"
+	"time"
 
 	clusterfake "github.com/open-cluster-management/api/client/cluster/clientset/versioned/fake"
+	clusterinformers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
 	v1 "github.com/open-cluster-management/api/cluster/v1"
 	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
 
@@ -26,15 +28,15 @@ func TestSyncManagedCluster(t *testing.T) {
 			name:            "sync a deleted spoke cluster",
 			startingObjects: []runtime.Object{},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get")
+				testinghelpers.AssertNoActions(t, actions)
 			},
 		},
 		{
 			name:            "create a new spoke cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				managedCluster := (actions[1].(clienttesting.UpdateActionImpl).Object).(*v1.ManagedCluster)
+				testinghelpers.AssertActions(t, actions, "update")
+				managedCluster := (actions[0].(clienttesting.UpdateActionImpl).Object).(*v1.ManagedCluster)
 				testinghelpers.AssertFinalizers(t, managedCluster, []string{managedClusterFinalizer})
 			},
 		},
@@ -48,8 +50,8 @@ func TestSyncManagedCluster(t *testing.T) {
 					Reason:  "HubClusterAdminAccepted",
 					Message: "Accepted by hub cluster admin",
 				}
-				testinghelpers.AssertActions(t, actions, "get", "get", "update")
-				actual := actions[2].(clienttesting.UpdateActionImpl).Object
+				testinghelpers.AssertActions(t, actions, "get", "update")
+				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				managedCluster := actual.(*v1.ManagedCluster)
 				testinghelpers.AssertManagedClusterCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
@@ -58,7 +60,7 @@ func TestSyncManagedCluster(t *testing.T) {
 			name:            "sync an accepted spoke cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get", "get")
+				testinghelpers.AssertActions(t, actions, "get")
 			},
 		},
 		{
@@ -71,8 +73,8 @@ func TestSyncManagedCluster(t *testing.T) {
 					Reason:  "HubClusterAdminDenied",
 					Message: "Denied by hub cluster admin",
 				}
-				testinghelpers.AssertActions(t, actions, "get", "get", "update")
-				actual := actions[2].(clienttesting.UpdateActionImpl).Object
+				testinghelpers.AssertActions(t, actions, "get", "update")
+				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				managedCluster := actual.(*v1.ManagedCluster)
 				testinghelpers.AssertManagedClusterCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
@@ -81,8 +83,8 @@ func TestSyncManagedCluster(t *testing.T) {
 			name:            "delete a spoke cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewDeletingManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				managedCluster := (actions[1].(clienttesting.UpdateActionImpl).Object).(*v1.ManagedCluster)
+				testinghelpers.AssertActions(t, actions, "update")
+				managedCluster := (actions[0].(clienttesting.UpdateActionImpl).Object).(*v1.ManagedCluster)
 				testinghelpers.AssertFinalizers(t, managedCluster, []string{})
 			},
 		},
@@ -92,8 +94,13 @@ func TestSyncManagedCluster(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.startingObjects...)
 			kubeClient := kubefake.NewSimpleClientset()
+			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
+			clusterStore := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore()
+			for _, cluster := range c.startingObjects {
+				clusterStore.Add(cluster)
+			}
 
-			ctrl := managedClusterController{kubeClient, clusterClient, eventstesting.NewTestingEventRecorder(t)}
+			ctrl := managedClusterController{kubeClient, clusterClient, clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(), eventstesting.NewTestingEventRecorder(t)}
 			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)

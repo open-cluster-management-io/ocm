@@ -15,7 +15,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
 	"k8s.io/client-go/kubernetes"
+	certificateslisters "k8s.io/client-go/listers/certificates/v1beta1"
 	"k8s.io/klog/v2"
 
 	"github.com/open-cluster-management/registration/pkg/helpers"
@@ -29,20 +31,22 @@ const (
 // csrApprovingController auto approve the renewal CertificateSigningRequests for an accepted spoke cluster on the hub.
 type csrApprovingController struct {
 	kubeClient    kubernetes.Interface
+	csrLister     certificateslisters.CertificateSigningRequestLister
 	eventRecorder events.Recorder
 }
 
 // NewCSRApprovingController creates a new csr approving controller
-func NewCSRApprovingController(kubeClient kubernetes.Interface, csrInformer factory.Informer, recorder events.Recorder) factory.Controller {
+func NewCSRApprovingController(kubeClient kubernetes.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer, recorder events.Recorder) factory.Controller {
 	c := &csrApprovingController{
 		kubeClient:    kubeClient,
+		csrLister:     csrInformer.Lister(),
 		eventRecorder: recorder.WithComponentSuffix("csr-approving-controller"),
 	}
 	return factory.New().
 		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
 			accessor, _ := meta.Accessor(obj)
 			return accessor.GetName()
-		}, csrInformer).
+		}, csrInformer.Informer()).
 		WithSync(c.sync).
 		ToController("CSRApprovingController", recorder)
 }
@@ -50,7 +54,7 @@ func NewCSRApprovingController(kubeClient kubernetes.Interface, csrInformer fact
 func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	csrName := syncCtx.QueueKey()
 	klog.V(4).Infof("Reconciling CertificateSigningRequests %q", csrName)
-	csr, err := c.kubeClient.CertificatesV1beta1().CertificateSigningRequests().Get(ctx, csrName, metav1.GetOptions{})
+	csr, err := c.csrLister.Get(csrName)
 	if errors.IsNotFound(err) {
 		return nil
 	}
@@ -58,6 +62,7 @@ func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncC
 		return err
 	}
 
+	csr = csr.DeepCopy()
 	// Current csr is in terminal state, do nothing.
 	if helpers.IsCSRInTerminalState(&csr.Status) {
 		return nil

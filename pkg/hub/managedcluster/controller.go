@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	clientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
+	informerv1 "github.com/open-cluster-management/api/client/cluster/informers/externalversions/cluster/v1"
+	listerv1 "github.com/open-cluster-management/api/client/cluster/listers/cluster/v1"
 	v1 "github.com/open-cluster-management/api/cluster/v1"
 	"github.com/open-cluster-management/registration/pkg/helpers"
 
@@ -39,6 +41,7 @@ var staticFiles = []string{
 type managedClusterController struct {
 	kubeClient    kubernetes.Interface
 	clusterClient clientset.Interface
+	clusterLister listerv1.ManagedClusterLister
 	eventRecorder events.Recorder
 }
 
@@ -46,18 +49,19 @@ type managedClusterController struct {
 func NewManagedClusterController(
 	kubeClient kubernetes.Interface,
 	clusterClient clientset.Interface,
-	clusterInformer factory.Informer,
+	clusterInformer informerv1.ManagedClusterInformer,
 	recorder events.Recorder) factory.Controller {
 	c := &managedClusterController{
 		kubeClient:    kubeClient,
 		clusterClient: clusterClient,
+		clusterLister: clusterInformer.Lister(),
 		eventRecorder: recorder.WithComponentSuffix("managed-cluster-controller"),
 	}
 	return factory.New().
 		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
 			accessor, _ := meta.Accessor(obj)
 			return accessor.GetName()
-		}, clusterInformer).
+		}, clusterInformer.Informer()).
 		WithSync(c.sync).
 		ToController("ManagedClusterController", recorder)
 }
@@ -65,7 +69,7 @@ func NewManagedClusterController(
 func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	managedClusterName := syncCtx.QueueKey()
 	klog.V(4).Infof("Reconciling ManagedCluster %s", managedClusterName)
-	managedCluster, err := c.clusterClient.ClusterV1().ManagedClusters().Get(ctx, managedClusterName, metav1.GetOptions{})
+	managedCluster, err := c.clusterLister.Get(managedClusterName)
 	if errors.IsNotFound(err) {
 		// Spoke cluster not found, could have been deleted, do nothing.
 		return nil
@@ -74,6 +78,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		return err
 	}
 
+	managedCluster = managedCluster.DeepCopy()
 	if managedCluster.DeletionTimestamp.IsZero() {
 		hasFinalizer := false
 		for i := range managedCluster.Finalizers {

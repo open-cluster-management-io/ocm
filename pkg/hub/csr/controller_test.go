@@ -3,6 +3,7 @@ package csr
 import (
 	"context"
 	"testing"
+	"time"
 
 	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
 
@@ -11,6 +12,7 @@ import (
 	authorizationv1 "k8s.io/api/authorization/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 )
@@ -39,21 +41,21 @@ func TestSync(t *testing.T) {
 			name:         "sync a deleted csr",
 			startingCSRs: []runtime.Object{},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get")
+				testinghelpers.AssertNoActions(t, actions)
 			},
 		},
 		{
 			name:         "sync a denied csr",
 			startingCSRs: []runtime.Object{testinghelpers.NewDeniedCSR(validCSR)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get")
+				testinghelpers.AssertNoActions(t, actions)
 			},
 		},
 		{
 			name:         "sync an approved csr",
 			startingCSRs: []runtime.Object{testinghelpers.NewApprovedCSR(validCSR)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get")
+				testinghelpers.AssertNoActions(t, actions)
 			},
 		},
 		{
@@ -68,15 +70,15 @@ func TestSync(t *testing.T) {
 				ReqBlockType: validCSR.ReqBlockType,
 			})},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get")
+				testinghelpers.AssertNoActions(t, actions)
 			},
 		},
 		{
 			name:         "deny an auto approving csr",
 			startingCSRs: []runtime.Object{testinghelpers.NewCSR(validCSR)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get", "create")
-				testinghelpers.AssertSubjectAccessReviewObj(t, actions[1].(clienttesting.CreateActionImpl).Object)
+				testinghelpers.AssertActions(t, actions, "create")
+				testinghelpers.AssertSubjectAccessReviewObj(t, actions[0].(clienttesting.CreateActionImpl).Object)
 			},
 		},
 		{
@@ -89,8 +91,8 @@ func TestSync(t *testing.T) {
 					Reason:  "AutoApprovedByHubCSRApprovingController",
 					Message: "Auto approving Managed cluster agent certificate after SubjectAccessReview.",
 				}
-				testinghelpers.AssertActions(t, actions, "get", "create", "update")
-				actual := actions[2].(clienttesting.UpdateActionImpl).Object
+				testinghelpers.AssertActions(t, actions, "create", "update")
+				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				testinghelpers.AssertCSRCondition(t, actual.(*certificatesv1beta1.CertificateSigningRequest).Status.Conditions, expectedCondition)
 			},
 		},
@@ -110,8 +112,13 @@ func TestSync(t *testing.T) {
 					}, nil
 				},
 			)
+			informerFactory := informers.NewSharedInformerFactory(kubeClient, 3*time.Minute)
+			csrStore := informerFactory.Certificates().V1beta1().CertificateSigningRequests().Informer().GetStore()
+			for _, csr := range c.startingCSRs {
+				csrStore.Add(csr)
+			}
 
-			ctrl := &csrApprovingController{kubeClient, eventstesting.NewTestingEventRecorder(t)}
+			ctrl := &csrApprovingController{kubeClient, informerFactory.Certificates().V1beta1().CertificateSigningRequests().Lister(), eventstesting.NewTestingEventRecorder(t)}
 			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, validCSR.Name))
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
