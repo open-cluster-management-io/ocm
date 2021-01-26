@@ -8,6 +8,7 @@ import (
 	"time"
 
 	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
+	"github.com/open-cluster-management/registration/pkg/hub/user"
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -26,7 +27,7 @@ const (
 	testCSRName    = "testcsr"
 )
 
-var commonName = fmt.Sprintf("%s%s:%s", subjectPrefix, testinghelpers.TestManagedClusterName, testAgentName)
+var commonName = fmt.Sprintf("%s%s:%s", user.SubjectPrefix, testinghelpers.TestManagedClusterName, testAgentName)
 
 func TestSync(t *testing.T) {
 	cases := []struct {

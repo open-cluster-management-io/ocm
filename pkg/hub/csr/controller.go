@@ -15,16 +15,17 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	certificateslisters "k8s.io/client-go/listers/certificates/v1beta1"
 	"k8s.io/klog/v2"
 
 	"github.com/open-cluster-management/registration/pkg/helpers"
+	"github.com/open-cluster-management/registration/pkg/hub/user"
 )
 
 const (
-	subjectPrefix         = "system:open-cluster-management:"
 	spokeClusterNameLabel = "open-cluster-management.io/cluster-name"
 )
 
@@ -158,16 +159,20 @@ func isSpokeClusterClientCertRenewal(csr *certificatesv1beta1.CertificateSigning
 		return false
 	}
 
-	if len(x509cr.Subject.Organization) != 1 {
+	requestingOrgs := sets.NewString(x509cr.Subject.Organization...)
+	if requestingOrgs.Has(user.SpokeClustersGroup) { // optional common group for backward-compatibility
+		requestingOrgs.Delete(user.SpokeClustersGroup)
+	}
+	if requestingOrgs.Len() != 1 {
 		return false
 	}
 
-	organization := x509cr.Subject.Organization[0]
-	if organization != fmt.Sprintf("%s%s", subjectPrefix, spokeClusterName) {
+	expectedPerClusterOrg := fmt.Sprintf("%s%s", user.SubjectPrefix, spokeClusterName)
+	if !requestingOrgs.Has(expectedPerClusterOrg) {
 		return false
 	}
 
-	if !strings.HasPrefix(x509cr.Subject.CommonName, organization) {
+	if !strings.HasPrefix(x509cr.Subject.CommonName, expectedPerClusterOrg) {
 		return false
 	}
 

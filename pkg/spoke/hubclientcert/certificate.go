@@ -12,6 +12,8 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
+
+	"github.com/open-cluster-management/registration/pkg/hub/user"
 )
 
 // HasValidKubeconfig checks if there exists a valid kubeconfig in the given secret
@@ -185,10 +187,10 @@ func GetClusterAgentNamesFromCertificate(certData []byte) (clusterName, agentNam
 	}
 
 	for _, cert := range certs {
-		if ok := strings.HasPrefix(cert.Subject.CommonName, subjectPrefix); !ok {
+		if ok := strings.HasPrefix(cert.Subject.CommonName, user.SubjectPrefix); !ok {
 			continue
 		}
-		names := strings.Split(strings.TrimPrefix(cert.Subject.CommonName, subjectPrefix), ":")
+		names := strings.Split(strings.TrimPrefix(cert.Subject.CommonName, user.SubjectPrefix), ":")
 		if len(names) != 2 {
 			continue
 		}
