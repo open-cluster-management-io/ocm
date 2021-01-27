@@ -6,12 +6,14 @@ import (
 	"time"
 
 	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
+	"github.com/open-cluster-management/registration/pkg/hub/user"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
@@ -23,9 +25,9 @@ var (
 		Name:         "testcsr",
 		Labels:       map[string]string{"open-cluster-management.io/cluster-name": "managedcluster1"},
 		SignerName:   &signerName,
-		CN:           "system:open-cluster-management:managedcluster1:spokeagent1",
-		Orgs:         []string{"system:open-cluster-management:managedcluster1"},
-		Username:     "system:open-cluster-management:managedcluster1:spokeagent1",
+		CN:           user.SubjectPrefix + "managedcluster1:spokeagent1",
+		Orgs:         []string{user.SubjectPrefix + "managedcluster1", user.ManagedClustersGroup},
+		Username:     user.SubjectPrefix + "managedcluster1:spokeagent1",
 		ReqBlockType: "CERTIFICATE REQUEST",
 	}
 )
@@ -84,6 +86,29 @@ func TestSync(t *testing.T) {
 		{
 			name:                 "allow an auto approving csr",
 			startingCSRs:         []runtime.Object{testinghelpers.NewCSR(validCSR)},
+			autoApprovingAllowed: true,
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				expectedCondition := certificatesv1beta1.CertificateSigningRequestCondition{
+					Type:    certificatesv1beta1.CertificateApproved,
+					Reason:  "AutoApprovedByHubCSRApprovingController",
+					Message: "Auto approving Managed cluster agent certificate after SubjectAccessReview.",
+				}
+				testinghelpers.AssertActions(t, actions, "create", "update")
+				actual := actions[1].(clienttesting.UpdateActionImpl).Object
+				testinghelpers.AssertCSRCondition(t, actual.(*certificatesv1beta1.CertificateSigningRequest).Status.Conditions, expectedCondition)
+			},
+		},
+		{
+			name: "allow an auto approving csr w/o ManagedClusterGroup for backward-compatibility",
+			startingCSRs: []runtime.Object{testinghelpers.NewCSR(testinghelpers.CSRHolder{
+				Name:         validCSR.Name,
+				Labels:       validCSR.Labels,
+				SignerName:   validCSR.SignerName,
+				CN:           validCSR.CN,
+				Orgs:         sets.NewString(validCSR.Orgs...).Delete(user.ManagedClustersGroup).List(),
+				Username:     validCSR.Username,
+				ReqBlockType: validCSR.ReqBlockType,
+			})},
 			autoApprovingAllowed: true,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				expectedCondition := certificatesv1beta1.CertificateSigningRequestCondition{

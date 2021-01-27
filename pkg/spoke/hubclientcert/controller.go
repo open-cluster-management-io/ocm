@@ -28,6 +28,8 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog/v2"
+
+	"github.com/open-cluster-management/registration/pkg/hub/user"
 )
 
 const (
@@ -38,7 +40,6 @@ const (
 	// TLSCertFile is the name of the tls cert file in kubeconfigSecret
 	TLSCertFile = "tls.crt"
 
-	subjectPrefix         = "system:open-cluster-management:"
 	clusterNameAnnotation = "open-cluster-management.io/cluster-name"
 	ClusterNameFile       = "cluster-name"
 	AgentNameFile         = "agent-name"
@@ -181,7 +182,7 @@ func (c *ClientCertForHubController) sync(ctx context.Context, syncCtx factory.S
 	// create a csr to request new client certificate if
 	// a. there is no valid client certificate issued for the current cluster/agent
 	// b. client certificate exists and has less than 20% of its life remaining
-	if hasValidKubeconfig(secret, fmt.Sprintf("%s%s:%s", subjectPrefix, c.clusterName, c.agentName)) {
+	if hasValidKubeconfig(secret, fmt.Sprintf("%s%s:%s", user.SubjectPrefix, c.clusterName, c.agentName)) {
 		notBefore, notAfter, err := getCertValidityPeriod(secret)
 		if err != nil {
 			return err
@@ -284,8 +285,11 @@ func (c *ClientCertForHubController) syncCSR(secret *corev1.Secret) (map[string]
 
 func (c *ClientCertForHubController) createCSR() (string, error) {
 	subject := &pkix.Name{
-		Organization: []string{fmt.Sprintf("%s%s", subjectPrefix, c.clusterName)},
-		CommonName:   fmt.Sprintf("%s%s:%s", subjectPrefix, c.clusterName, c.agentName),
+		Organization: []string{
+			fmt.Sprintf("%s%s", user.SubjectPrefix, c.clusterName),
+			user.ManagedClustersGroup,
+		},
+		CommonName: fmt.Sprintf("%s%s:%s", user.SubjectPrefix, c.clusterName, c.agentName),
 	}
 
 	privateKey, err := keyutil.ParsePrivateKeyPEM(c.keyData)
