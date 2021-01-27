@@ -160,8 +160,8 @@ func isSpokeClusterClientCertRenewal(csr *certificatesv1beta1.CertificateSigning
 	}
 
 	requestingOrgs := sets.NewString(x509cr.Subject.Organization...)
-	if requestingOrgs.Has(user.SpokeClustersGroup) { // optional common group for backward-compatibility
-		requestingOrgs.Delete(user.SpokeClustersGroup)
+	if requestingOrgs.Has(user.ManagedClustersGroup) { // optional common group for backward-compatibility
+		requestingOrgs.Delete(user.ManagedClustersGroup)
 	}
 	if requestingOrgs.Len() != 1 {
 		return false

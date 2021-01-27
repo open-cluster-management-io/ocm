@@ -287,7 +287,7 @@ func (c *ClientCertForHubController) createCSR() (string, error) {
 	subject := &pkix.Name{
 		Organization: []string{
 			fmt.Sprintf("%s%s", user.SubjectPrefix, c.clusterName),
-			user.SpokeClustersGroup,
+			user.ManagedClustersGroup,
 		},
 		CommonName: fmt.Sprintf("%s%s:%s", user.SubjectPrefix, c.clusterName, c.agentName),
 	}
