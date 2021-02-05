@@ -7,6 +7,7 @@ import (
 
 	fakeworkclient "github.com/open-cluster-management/api/client/work/clientset/versioned/fake"
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
+	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -372,7 +373,7 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(scheme, c.existingResources...)
-			actual, err := DeleteAppliedResources(c.resourcesToRemove, fakeDynamicClient)
+			actual, err := DeleteAppliedResources(c.resourcesToRemove, "testing", fakeDynamicClient, eventstesting.NewTestingEventRecorder(t))
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}
