@@ -10,6 +10,7 @@ import (
 	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned/typed/work/v1"
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
 	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -173,7 +174,7 @@ func UpdateManifestWorkStatus(
 
 // DeleteAppliedResources deletes all given applied resources and returns those pending for finalization
 // If the uid recorded in resources is different from what we get by client, ignore the deletion.
-func DeleteAppliedResources(resources []workapiv1.AppliedManifestResourceMeta, dynamicClient dynamic.Interface) ([]workapiv1.AppliedManifestResourceMeta, []error) {
+func DeleteAppliedResources(resources []workapiv1.AppliedManifestResourceMeta, reason string, dynamicClient dynamic.Interface, recorder events.Recorder) ([]workapiv1.AppliedManifestResourceMeta, []error) {
 	var resourcesPendingFinalization []workapiv1.AppliedManifestResourceMeta
 	var errs []error
 
@@ -230,7 +231,7 @@ func DeleteAppliedResources(resources []workapiv1.AppliedManifestResourceMeta, d
 		}
 
 		resourcesPendingFinalization = append(resourcesPendingFinalization, resource)
-		klog.V(2).Infof("Delete resource %v with key %s/%s", gvr, resource.Namespace, resource.Name)
+		recorder.Eventf("ResourceDeleted", "Deleted resource %v with key %s/%s because %s.", gvr, resource.Namespace, resource.Name, reason)
 	}
 
 	return resourcesPendingFinalization, errs

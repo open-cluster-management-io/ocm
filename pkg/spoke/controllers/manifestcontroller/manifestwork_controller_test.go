@@ -9,10 +9,10 @@ import (
 	workinformers "github.com/open-cluster-management/api/client/work/informers/externalversions"
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
 	"github.com/open-cluster-management/work/pkg/spoke/controllers"
-	"github.com/open-cluster-management/work/pkg/spoke/resource"
 	"github.com/open-cluster-management/work/pkg/spoke/spoketesting"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,7 +29,7 @@ type testController struct {
 	kubeClient    *fakekube.Clientset
 }
 
-func newController(work *workapiv1.ManifestWork, appliedWork *workapiv1.AppliedManifestWork, mapper *resource.Mapper) *testController {
+func newController(work *workapiv1.ManifestWork, appliedWork *workapiv1.AppliedManifestWork, mapper meta.RESTMapper) *testController {
 	fakeWorkClient := fakeworkclient.NewSimpleClientset(work)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fakeWorkClient, 5*time.Minute, workinformers.WithNamespace("cluster1"))
 
@@ -568,7 +568,7 @@ func TestBuildResourceMeta(t *testing.T) {
 	cases := []struct {
 		name       string
 		object     runtime.Object
-		restMapper *resource.Mapper
+		restMapper meta.RESTMapper
 		expected   workapiv1.ManifestResourceMeta
 	}{
 		{
@@ -630,7 +630,7 @@ func TestBuildManifestResourceMeta(t *testing.T) {
 		name           string
 		applyResult    runtime.Object
 		manifestObject runtime.Object
-		restMapper     *resource.Mapper
+		restMapper     meta.RESTMapper
 		expected       workapiv1.ManifestResourceMeta
 	}{
 		{

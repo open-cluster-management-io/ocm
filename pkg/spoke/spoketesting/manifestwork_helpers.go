@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
-	"github.com/open-cluster-management/work/pkg/spoke/resource"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -123,7 +123,7 @@ func NewAppliedManifestWork(hash string, index int) *workapiv1.AppliedManifestWo
 	}
 }
 
-func NewFakeRestMapper() *resource.Mapper {
+func NewFakeRestMapper() meta.RESTMapper {
 	resources := []*restmapper.APIGroupResources{
 		{
 			Group: metav1.APIGroup{
@@ -156,9 +156,7 @@ func NewFakeRestMapper() *resource.Mapper {
 			},
 		},
 	}
-	return &resource.Mapper{
-		Mapper: restmapper.NewDiscoveryRESTMapper(resources),
-	}
+	return restmapper.NewDiscoveryRESTMapper(resources)
 }
 
 func AssertAction(t *testing.T, actual clienttesting.Action, expected string) {

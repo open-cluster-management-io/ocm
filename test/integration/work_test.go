@@ -20,7 +20,6 @@ import (
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
 	"github.com/open-cluster-management/work/pkg/spoke"
 	"github.com/open-cluster-management/work/pkg/spoke/controllers/statuscontroller"
-	"github.com/open-cluster-management/work/pkg/spoke/resource"
 	"github.com/open-cluster-management/work/test/integration/util"
 )
 
@@ -52,7 +51,6 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		_, err := spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		resource.MapperRefreshInterval = 2 * time.Second
 		statuscontroller.ControllerReSyncInterval = 3 * time.Second
 
 		var ctx context.Context

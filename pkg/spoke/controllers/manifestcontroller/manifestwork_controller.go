@@ -31,8 +31,9 @@ import (
 
 	"github.com/open-cluster-management/work/pkg/helper"
 	"github.com/open-cluster-management/work/pkg/spoke/controllers"
-	"github.com/open-cluster-management/work/pkg/spoke/resource"
 )
+
+var ResyncInterval = 5 * time.Minute
 
 // ManifestWorkController is to reconcile the workload resources
 // fetched from hub cluster on spoke cluster.
@@ -45,8 +46,7 @@ type ManifestWorkController struct {
 	spokeKubeclient           kubernetes.Interface
 	spokeAPIExtensionClient   apiextensionsclient.Interface
 	hubHash                   string
-	// restMapper is a cached resource mapping obtained fron discovery client
-	restMapper *resource.Mapper
+	restMapper                meta.RESTMapper
 }
 
 // NewManifestWorkController returns a ManifestWorkController
@@ -62,7 +62,7 @@ func NewManifestWorkController(
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
 	appliedManifestWorkInformer workinformer.AppliedManifestWorkInformer,
 	hubHash string,
-	restMapper *resource.Mapper) factory.Controller {
+	restMapper meta.RESTMapper) factory.Controller {
 
 	controller := &ManifestWorkController{
 		manifestWorkClient:        manifestWorkClient,
@@ -82,7 +82,7 @@ func NewManifestWorkController(
 			return accessor.GetName()
 		}, manifestWorkInformer.Informer()).
 		WithInformersQueueKeyFunc(helper.AppliedManifestworkQueueKeyFunc(hubHash), appliedManifestWorkInformer.Informer()).
-		WithSync(controller.sync).ResyncEvery(5*time.Minute).ToController("ManifestWorkAgent", recorder)
+		WithSync(controller.sync).ResyncEvery(ResyncInterval).ToController("ManifestWorkAgent", recorder)
 }
 
 // sync is the main reconcile loop for manifest work. It is triggered in two scenarios
@@ -219,7 +219,7 @@ func (m *ManifestWorkController) decodeUnstructured(data []byte) (schema.GroupVe
 	if err != nil {
 		return schema.GroupVersionResource{}, nil, fmt.Errorf("Failed to decode object: %w", err)
 	}
-	mapping, err := m.restMapper.MappingForGVK(unstructuredObj.GroupVersionKind())
+	mapping, err := m.restMapper.RESTMapping(unstructuredObj.GroupVersionKind().GroupKind(), unstructuredObj.GroupVersionKind().Version)
 	if err != nil {
 		return schema.GroupVersionResource{}, nil, fmt.Errorf("Failed to find gvr from restmapping: %w", err)
 	}
@@ -380,7 +380,7 @@ func buildAppliedStatusCondition(err error) metav1.Condition {
 // buildManifestResourceMeta returns resource meta for manifest. It tries to get the resource
 // meta from the result object in ApplyResult struct. If the resource meta is incompleted, fall
 // back to manifest template for the meta info.
-func buildManifestResourceMeta(index int, object runtime.Object, manifest workapiv1.Manifest, restMapper *resource.Mapper) (resourceMeta workapiv1.ManifestResourceMeta, err error) {
+func buildManifestResourceMeta(index int, object runtime.Object, manifest workapiv1.Manifest, restMapper meta.RESTMapper) (resourceMeta workapiv1.ManifestResourceMeta, err error) {
 	errs := []error{}
 
 	resourceMeta, err = buildResourceMeta(index, object, restMapper)
@@ -410,7 +410,7 @@ func buildManifestResourceMeta(index int, object runtime.Object, manifest workap
 	return resourceMeta, utilerrors.NewAggregate(errs)
 }
 
-func buildResourceMeta(index int, object runtime.Object, restMapper *resource.Mapper) (resourceMeta workapiv1.ManifestResourceMeta, err error) {
+func buildResourceMeta(index int, object runtime.Object, restMapper meta.RESTMapper) (resourceMeta workapiv1.ManifestResourceMeta, err error) {
 	resourceMeta = workapiv1.ManifestResourceMeta{
 		Ordinal: int32(index),
 	}
@@ -440,9 +440,11 @@ func buildResourceMeta(index int, object runtime.Object, restMapper *resource.Ma
 	if restMapper == nil {
 		return resourceMeta, err
 	}
-	if mapping, e := restMapper.MappingForGVK(*gvk); e == nil {
-		resourceMeta.Resource = mapping.Resource.Resource
+	mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return resourceMeta, fmt.Errorf("the server doesn't have a resource type %q", gvk.Kind)
 	}
 
+	resourceMeta.Resource = mapping.Resource.Resource
 	return resourceMeta, err
 }
