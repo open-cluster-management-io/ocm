@@ -52,7 +52,7 @@ func (m *AddFinalizerController) sync(ctx context.Context, controllerContext fac
 
 	manifestWork, err := m.manifestWorkLister.Get(manifestWorkName)
 	if errors.IsNotFound(err) {
-		// work  not found, could have been deleted, do nothing.
+		// work not found, could have been deleted, do nothing.
 		return nil
 	}
 	if err != nil {
