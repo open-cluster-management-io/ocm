@@ -59,7 +59,7 @@ func (m *AppliedManifestWorkFinalizeController) sync(ctx context.Context, contro
 
 	appliedManifestWork, err := m.appliedManifestWorkLister.Get(appliedManifestWorkName)
 	if errors.IsNotFound(err) {
-		// work  not found, could have been deleted, do nothing.
+		// work not found, could have been deleted, do nothing.
 		return nil
 	}
 	if err != nil {
