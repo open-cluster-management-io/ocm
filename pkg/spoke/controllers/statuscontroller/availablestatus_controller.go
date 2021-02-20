@@ -24,7 +24,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// ControllerSyncInterval is exposed so that integration tests can crank up the constroller resync speed.
+// ControllerSyncInterval is exposed so that integration tests can crank up the controller resync speed.
 var ControllerReSyncInterval = 30 * time.Second
 
 // AvailableStatusController is to update the available status conditions of both manifests and manifestworks.
