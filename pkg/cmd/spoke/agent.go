@@ -9,7 +9,7 @@ import (
 	"github.com/open-cluster-management/work/pkg/version"
 )
 
-// NewWorkloadAgent generatee a command to start workload agent
+// NewWorkloadAgent generates a command to start workload agent
 func NewWorkloadAgent() *cobra.Command {
 	o := spoke.NewWorkloadAgentOptions()
 	cmd := controllercmd.

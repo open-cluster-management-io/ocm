@@ -295,7 +295,7 @@ func (m *ManifestWorkController) generateUpdateStatusFunc(newManifestConditions 
 	}
 }
 
-// isDecodeError is to check if the error returned from resourceapply is due to that the object cannnot
+// isDecodeError is to check if the error returned from resourceapply is due to that the object cannot
 // be decoded or no typed client can handle the object.
 func isDecodeError(err error) bool {
 	return err != nil && strings.HasPrefix(err.Error(), "cannot decode")
@@ -308,12 +308,12 @@ func isUnhandledError(err error) bool {
 }
 
 // isSameUnstructured compares the two unstructured object.
-// The comparison ignores the metadata and status field, and check if the two objects are sementically equal.
+// The comparison ignores the metadata and status field, and check if the two objects are semantically equal.
 func isSameUnstructured(obj1, obj2 *unstructured.Unstructured) bool {
 	obj1Copy := obj1.DeepCopy()
 	obj2Copy := obj2.DeepCopy()
 
-	// Comapre gvk, name, namespace at first
+	// Compare gvk, name, namespace at first
 	if obj1Copy.GroupVersionKind() != obj2Copy.GroupVersionKind() {
 		return false
 	}
@@ -332,7 +332,7 @@ func isSameUnstructured(obj1, obj2 *unstructured.Unstructured) bool {
 		return false
 	}
 
-	// Compare sementically after removing metadata and status field
+	// Compare semantically after removing metadata and status field
 	delete(obj1Copy.Object, "metadata")
 	delete(obj2Copy.Object, "metadata")
 	delete(obj1Copy.Object, "status")
