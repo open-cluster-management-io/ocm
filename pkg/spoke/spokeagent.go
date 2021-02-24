@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/openshift/library-go/pkg/controller/factory"
 	"io/ioutil"
 	"os"
 	"path"
@@ -11,6 +12,7 @@ import (
 
 	clusterv1client "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	clusterv1informers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
+	"github.com/open-cluster-management/registration/pkg/features"
 	"github.com/open-cluster-management/registration/pkg/helpers"
 	"github.com/open-cluster-management/registration/pkg/spoke/hubclientcert"
 	"github.com/open-cluster-management/registration/pkg/spoke/managedcluster"
@@ -255,22 +257,24 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		o.ClusterHealthCheckPeriod,
 		controllerContext.EventRecorder,
 	)
-
 	spokeClusterClient, err := clusterv1client.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
 	spokeClusterInformers := clusterv1informers.NewSharedInformerFactory(spokeClusterClient, 10*time.Minute)
 
-	// create managedClusterClaimController to sync cluster claims
-	managedClusterClaimController := managedcluster.NewManagedClusterClaimController(
-		o.ClusterName,
-		o.MaxCustomClusterClaims,
-		hubClusterClient,
-		hubClusterInformerFactory.Cluster().V1().ManagedClusters(),
-		spokeClusterInformers.Cluster().V1alpha1().ClusterClaims(),
-		controllerContext.EventRecorder,
-	)
+	var managedClusterClaimController factory.Controller
+	if features.DefaultMutableFeatureGate.Enabled(features.ClusterClaim) {
+		// create managedClusterClaimController to sync cluster claims
+		managedClusterClaimController = managedcluster.NewManagedClusterClaimController(
+			o.ClusterName,
+			o.MaxCustomClusterClaims,
+			hubClusterClient,
+			hubClusterInformerFactory.Cluster().V1().ManagedClusters(),
+			spokeClusterInformers.Cluster().V1alpha1().ClusterClaims(),
+			controllerContext.EventRecorder,
+		)
+	}
 
 	go hubKubeInformerFactory.Start(ctx.Done())
 	go hubClusterInformerFactory.Start(ctx.Done())
@@ -282,7 +286,9 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	go managedClusterJoiningController.Run(ctx, 1)
 	go managedClusterLeaseController.Run(ctx, 1)
 	go managedClusterHealthCheckController.Run(ctx, 1)
-	go managedClusterClaimController.Run(ctx, 1)
+	if features.DefaultMutableFeatureGate.Enabled(features.ClusterClaim) {
+		go managedClusterClaimController.Run(ctx, 1)
+	}
 
 	<-ctx.Done()
 	return nil
@@ -290,6 +296,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 
 // AddFlags registers flags for Agent
 func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
+	features.DefaultMutableFeatureGate.AddFlag(fs)
 	fs.StringVar(&o.ClusterName, "cluster-name", o.ClusterName,
 		"If non-empty, will use as cluster name instead of generated random name.")
 	fs.StringVar(&o.BootstrapKubeconfig, "bootstrap-kubeconfig", o.BootstrapKubeconfig,
