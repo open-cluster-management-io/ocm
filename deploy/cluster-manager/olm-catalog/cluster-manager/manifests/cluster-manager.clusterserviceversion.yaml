@@ -26,7 +26,7 @@ metadata:
     operators.operatorframework.io/project_layout: go
     repository: https://github.com/open-cluster-management/registration-operator
     support: Red Hat, Inc.
-  name: cluster-manager.v0.3.0
+  name: cluster-manager.v0.4.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -48,12 +48,15 @@ spec:
     ```
     $ kubectl get pods -n open-cluster-management-hub
     NAME                                                       READY   STATUS    RESTARTS   AGE
-    cluster-manager-registration-controller-7c55644568-kms5c   1/1     Running   0          7h13m
-    cluster-manager-registration-controller-7c55644568-mth8f   1/1     Running   0          7h13m
-    cluster-manager-registration-controller-7c55644568-wftnj   1/1     Running   0          7h13m
-    cluster-manager-registration-webhook-77888b7dc4-bwccm      1/1     Running   0          7h13m
-    cluster-manager-registration-webhook-77888b7dc4-qk4tj      1/1     Running   0          7h13m
-    cluster-manager-registration-webhook-77888b7dc4-z9vbp      1/1     Running   0          7h13m
+    cluster-manager-registration-controller-566b5cd967-65s8g   1/1     Running   0          68s
+    cluster-manager-registration-controller-566b5cd967-98hbb   1/1     Running   0          68s
+    cluster-manager-registration-controller-566b5cd967-tdl9f   1/1     Running   0          68s
+    cluster-manager-registration-webhook-5649df75cf-69l6j      1/1     Running   0          68s
+    cluster-manager-registration-webhook-5649df75cf-plmrk      1/1     Running   0          68s
+    cluster-manager-registration-webhook-5649df75cf-s7tjs      1/1     Running   0          68s
+    cluster-manager-work-webhook-776d978d64-cwljs              1/1     Running   0          68s
+    cluster-manager-work-webhook-776d978d64-m62wd              1/1     Running   0          68s
+    cluster-manager-work-webhook-776d978d64-prswn              1/1     Running   0          68s
     ```
 
     There is a ManagedCluster created in the Hub cluster when the managed cluster is registered to the Hub cluster.
@@ -282,8 +285,8 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc.
-  replaces: cluster-manager.v0.2.0
+  replaces: cluster-manager.v0.3.0
   selector:
     matchLabels:
       app: cluster-manager
-  version: 0.3.0
+  version: 0.4.0
