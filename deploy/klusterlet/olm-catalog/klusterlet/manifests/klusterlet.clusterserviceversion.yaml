@@ -33,7 +33,7 @@ metadata:
     operators.operatorframework.io/project_layout: go
     repository: https://github.com/open-cluster-management/registration-operator
     support: Red Hat, Inc.
-  name: klusterlet.v0.3.0
+  name: klusterlet.v0.4.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -283,8 +283,8 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc.
-  replaces: klusterlet.v0.1.0
+  replaces: klusterlet.v0.3.0
   selector:
     matchLabels:
       app: klusterlet
-  version: 0.3.0
+  version: 0.4.0
