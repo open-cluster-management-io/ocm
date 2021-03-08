@@ -141,7 +141,7 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 
 		// after one grace period, make sure the managed available condition is cluster unknown
 		select {
-		case <-time.After(time.Duration(5*util.TestLeaseDurationSeconds+1) * time.Second):
+		case <-time.After(time.Duration(5*util.TestLeaseDurationSeconds+10) * time.Second):
 			managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			availableCond := meta.FindStatusCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)

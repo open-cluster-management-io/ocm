@@ -7,8 +7,8 @@ metadata:
   - cluster.open-cluster-management.io/manifest-work-cleanup
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ .ManagedClusterName }}:managed-cluster-work
+  kind: ClusterRole
+  name: open-cluster-management:managedcluster:work
 subjects:
   # Bind the role with agent user group, the role will be as a common role for all agents
   # TODO: we will consider bind a specific role for each agent by agent name

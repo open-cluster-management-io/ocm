@@ -21,6 +21,7 @@ KUSTOMIZE_VERSION?=v3.5.4
 KUSTOMIZE_ARCHIVE_NAME?=kustomize_$(KUSTOMIZE_VERSION)_$(GOHOSTOS)_$(GOHOSTARCH).tar.gz
 kustomize_dir:=$(dir $(KUSTOMIZE))
 
+$(call add-bindata,clusterrole,./pkg/hub/clusterrole/manifests/...,bindata,bindata,./pkg/hub/clusterrole/bindata/bindata.go)
 $(call add-bindata,managedcluster,./pkg/hub/managedcluster/manifests/...,bindata,bindata,./pkg/hub/managedcluster/bindata/bindata.go)
 $(call add-bindata,spokecluster-e2e,./deploy/spoke/...,bindata,bindata,./test/e2e/bindata/bindata.go)
 

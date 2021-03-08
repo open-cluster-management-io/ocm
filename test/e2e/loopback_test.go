@@ -364,7 +364,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		leaseName := fmt.Sprintf("cluster-lease-%s", clusterName)
+		leaseName := "managed-cluster-lease"
 		ginkgo.By(fmt.Sprintf("Make sure ManagedCluster lease %q exists", leaseName))
 		var lastRenewTime *metav1.MicroTime
 		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
