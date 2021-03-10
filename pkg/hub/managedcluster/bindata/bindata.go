@@ -3,9 +3,7 @@
 // pkg/hub/managedcluster/manifests/managedcluster-clusterrole.yaml
 // pkg/hub/managedcluster/manifests/managedcluster-clusterrolebinding.yaml
 // pkg/hub/managedcluster/manifests/managedcluster-namespace.yaml
-// pkg/hub/managedcluster/manifests/managedcluster-registration-role.yaml
 // pkg/hub/managedcluster/manifests/managedcluster-registration-rolebinding.yaml
-// pkg/hub/managedcluster/manifests/managedcluster-work-role.yaml
 // pkg/hub/managedcluster/manifests/managedcluster-work-rolebinding.yaml
 package bindata
 
@@ -149,34 +147,6 @@ func pkgHubManagedclusterManifestsManagedclusterNamespaceYaml() (*asset, error) 
 	return a, nil
 }
 
-var _pkgHubManagedclusterManifestsManagedclusterRegistrationRoleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: {{ .ManagedClusterName }}:managed-cluster-registration
-  namespace: {{ .ManagedClusterName }}
-rules:
-# Allow spoke registration agent to get/update coordination.k8s.io/lease
-- apiGroups: ["coordination.k8s.io"]
-  resources: ["leases"]
-  resourceNames: ["cluster-lease-{{ .ManagedClusterName }}"]
-  verbs: ["get", "update"]
-`)
-
-func pkgHubManagedclusterManifestsManagedclusterRegistrationRoleYamlBytes() ([]byte, error) {
-	return _pkgHubManagedclusterManifestsManagedclusterRegistrationRoleYaml, nil
-}
-
-func pkgHubManagedclusterManifestsManagedclusterRegistrationRoleYaml() (*asset, error) {
-	bytes, err := pkgHubManagedclusterManifestsManagedclusterRegistrationRoleYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "pkg/hub/managedcluster/manifests/managedcluster-registration-role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
 var _pkgHubManagedclusterManifestsManagedclusterRegistrationRolebindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -184,8 +154,8 @@ metadata:
   namespace: {{ .ManagedClusterName }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ .ManagedClusterName }}:managed-cluster-registration
+  kind: ClusterRole
+  name: open-cluster-management:managedcluster:registration
 subjects:
   # Bind the role with spoke agent user group, the role will be as a common role for all spoke agents
   # TODO: we will consider bind a specific role for each spoke agent by spoke agent name
@@ -209,43 +179,6 @@ func pkgHubManagedclusterManifestsManagedclusterRegistrationRolebindingYaml() (*
 	return a, nil
 }
 
-var _pkgHubManagedclusterManifestsManagedclusterWorkRoleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: {{ .ManagedClusterName }}:managed-cluster-work
-  namespace: {{ .ManagedClusterName }}
-  finalizers:
-  - cluster.open-cluster-management.io/manifest-work-cleanup
-rules:
-# Allow work agent to send event to hub
-- apiGroups: ["", "events.k8s.io"]
-  resources: ["events"]
-  verbs: ["create", "patch", "update"]
-# Allow work agent to get/list/watch/update manifestworks
-- apiGroups: ["work.open-cluster-management.io"]
-  resources: ["manifestworks"]
-  verbs: ["get", "list", "watch", "update"]
-# Allow work agent to update the status of manifestwork
-- apiGroups: ["work.open-cluster-management.io"]
-  resources: ["manifestworks/status"]
-  verbs: ["patch", "update"]
-`)
-
-func pkgHubManagedclusterManifestsManagedclusterWorkRoleYamlBytes() ([]byte, error) {
-	return _pkgHubManagedclusterManifestsManagedclusterWorkRoleYaml, nil
-}
-
-func pkgHubManagedclusterManifestsManagedclusterWorkRoleYaml() (*asset, error) {
-	bytes, err := pkgHubManagedclusterManifestsManagedclusterWorkRoleYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "pkg/hub/managedcluster/manifests/managedcluster-work-role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
 var _pkgHubManagedclusterManifestsManagedclusterWorkRolebindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -255,8 +188,8 @@ metadata:
   - cluster.open-cluster-management.io/manifest-work-cleanup
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ .ManagedClusterName }}:managed-cluster-work
+  kind: ClusterRole
+  name: open-cluster-management:managedcluster:work
 subjects:
   # Bind the role with agent user group, the role will be as a common role for all agents
   # TODO: we will consider bind a specific role for each agent by agent name
@@ -335,9 +268,7 @@ var _bindata = map[string]func() (*asset, error){
 	"pkg/hub/managedcluster/manifests/managedcluster-clusterrole.yaml":              pkgHubManagedclusterManifestsManagedclusterClusterroleYaml,
 	"pkg/hub/managedcluster/manifests/managedcluster-clusterrolebinding.yaml":       pkgHubManagedclusterManifestsManagedclusterClusterrolebindingYaml,
 	"pkg/hub/managedcluster/manifests/managedcluster-namespace.yaml":                pkgHubManagedclusterManifestsManagedclusterNamespaceYaml,
-	"pkg/hub/managedcluster/manifests/managedcluster-registration-role.yaml":        pkgHubManagedclusterManifestsManagedclusterRegistrationRoleYaml,
 	"pkg/hub/managedcluster/manifests/managedcluster-registration-rolebinding.yaml": pkgHubManagedclusterManifestsManagedclusterRegistrationRolebindingYaml,
-	"pkg/hub/managedcluster/manifests/managedcluster-work-role.yaml":                pkgHubManagedclusterManifestsManagedclusterWorkRoleYaml,
 	"pkg/hub/managedcluster/manifests/managedcluster-work-rolebinding.yaml":         pkgHubManagedclusterManifestsManagedclusterWorkRolebindingYaml,
 }
 
@@ -389,9 +320,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 					"managedcluster-clusterrole.yaml":              {pkgHubManagedclusterManifestsManagedclusterClusterroleYaml, map[string]*bintree{}},
 					"managedcluster-clusterrolebinding.yaml":       {pkgHubManagedclusterManifestsManagedclusterClusterrolebindingYaml, map[string]*bintree{}},
 					"managedcluster-namespace.yaml":                {pkgHubManagedclusterManifestsManagedclusterNamespaceYaml, map[string]*bintree{}},
-					"managedcluster-registration-role.yaml":        {pkgHubManagedclusterManifestsManagedclusterRegistrationRoleYaml, map[string]*bintree{}},
 					"managedcluster-registration-rolebinding.yaml": {pkgHubManagedclusterManifestsManagedclusterRegistrationRolebindingYaml, map[string]*bintree{}},
-					"managedcluster-work-role.yaml":                {pkgHubManagedclusterManifestsManagedclusterWorkRoleYaml, map[string]*bintree{}},
 					"managedcluster-work-rolebinding.yaml":         {pkgHubManagedclusterManifestsManagedclusterWorkRolebindingYaml, map[string]*bintree{}},
 				}},
 			}},

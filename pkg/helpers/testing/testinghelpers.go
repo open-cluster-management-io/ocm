@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"fmt"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
@@ -161,10 +160,10 @@ func NewManagedClusterCondition(name, status, reason, message string, lastTransi
 	return ret
 }
 
-func NewManagedClusterLease(renewTime time.Time) *coordv1.Lease {
+func NewManagedClusterLease(name string, renewTime time.Time) *coordv1.Lease {
 	return &coordv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("cluster-lease-%s", TestManagedClusterName),
+			Name:      name,
 			Namespace: TestManagedClusterName,
 		},
 		Spec: coordv1.LeaseSpec{

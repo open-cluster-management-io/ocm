@@ -2,6 +2,7 @@ package lease
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -45,9 +46,12 @@ func TestSync(t *testing.T) {
 			},
 		},
 		{
-			name:          "managed cluster stop update lease",
-			clusters:      []runtime.Object{testinghelpers.NewAvailableManagedCluster()},
-			clusterLeases: []runtime.Object{testinghelpers.NewManagedClusterLease(now.Add(-5 * time.Minute))},
+			name:     "managed cluster stop update lease",
+			clusters: []runtime.Object{testinghelpers.NewAvailableManagedCluster()},
+			clusterLeases: []runtime.Object{
+				testinghelpers.NewManagedClusterLease("managed-cluster-lease", now.Add(-5*time.Minute)),
+				testinghelpers.NewManagedClusterLease(fmt.Sprintf("cluster-lease-%s", testinghelpers.TestManagedClusterName), now.Add(-5*time.Minute)),
+			},
 			validateActions: func(t *testing.T, leaseActions, clusterActions []clienttesting.Action) {
 				expected := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
@@ -63,7 +67,18 @@ func TestSync(t *testing.T) {
 		{
 			name:          "managed cluster is available",
 			clusters:      []runtime.Object{testinghelpers.NewAvailableManagedCluster()},
-			clusterLeases: []runtime.Object{testinghelpers.NewManagedClusterLease(now)},
+			clusterLeases: []runtime.Object{testinghelpers.NewManagedClusterLease("managed-cluster-lease", now)},
+			validateActions: func(t *testing.T, leaseActions, clusterActions []clienttesting.Action) {
+				testinghelpers.AssertNoActions(t, clusterActions)
+			},
+		},
+		{
+			name:     "managed cluster is available (backward compatible)",
+			clusters: []runtime.Object{testinghelpers.NewAvailableManagedCluster()},
+			clusterLeases: []runtime.Object{
+				testinghelpers.NewManagedClusterLease("managed-cluster-lease", now.Add(-5*time.Minute)),
+				testinghelpers.NewManagedClusterLease(fmt.Sprintf("cluster-lease-%s", testinghelpers.TestManagedClusterName), now),
+			},
 			validateActions: func(t *testing.T, leaseActions, clusterActions []clienttesting.Action) {
 				testinghelpers.AssertNoActions(t, clusterActions)
 			},

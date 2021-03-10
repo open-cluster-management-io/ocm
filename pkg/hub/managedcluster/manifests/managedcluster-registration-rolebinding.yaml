@@ -5,8 +5,8 @@ metadata:
   namespace: {{ .ManagedClusterName }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ .ManagedClusterName }}:managed-cluster-registration
+  kind: ClusterRole
+  name: open-cluster-management:managedcluster:registration
 subjects:
   # Bind the role with spoke agent user group, the role will be as a common role for all spoke agents
   # TODO: we will consider bind a specific role for each spoke agent by spoke agent name

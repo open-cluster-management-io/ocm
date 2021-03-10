@@ -11,6 +11,7 @@ import (
 	clusterv1informers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
 	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned"
 	workv1informers "github.com/open-cluster-management/api/client/work/informers/externalversions"
+	"github.com/open-cluster-management/registration/pkg/hub/clusterrole"
 	"github.com/open-cluster-management/registration/pkg/hub/csr"
 	"github.com/open-cluster-management/registration/pkg/hub/lease"
 	"github.com/open-cluster-management/registration/pkg/hub/managedcluster"
@@ -90,6 +91,13 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		controllerContext.EventRecorder,
 	)
 
+	clusterroleController := clusterrole.NewManagedClusterClusterroleController(
+		kubeClient,
+		clusterInformers.Cluster().V1().ManagedClusters(),
+		kubeInfomers.Rbac().V1().ClusterRoles(),
+		controllerContext.EventRecorder,
+	)
+
 	go clusterInformers.Start(ctx.Done())
 	go workInformers.Start(ctx.Done())
 	go kubeInfomers.Start(ctx.Done())
@@ -99,6 +107,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	go leaseController.Run(ctx, 1)
 	go rbacFinalizerController.Run(ctx, 1)
 	go managedClusterSetController.Run(ctx, 1)
+	go clusterroleController.Run(ctx, 1)
 
 	<-ctx.Done()
 	return nil

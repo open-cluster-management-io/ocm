@@ -31,9 +31,7 @@ const (
 var staticFiles = []string{
 	"manifests/managedcluster-clusterrole.yaml",
 	"manifests/managedcluster-clusterrolebinding.yaml",
-	"manifests/managedcluster-registration-role.yaml",
 	"manifests/managedcluster-registration-rolebinding.yaml",
-	"manifests/managedcluster-work-role.yaml",
 	"manifests/managedcluster-work-rolebinding.yaml",
 }
 
@@ -184,7 +182,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 
 func (c *managedClusterController) removeManagedClusterResources(ctx context.Context, managedClusterName string) error {
 	errs := []error{}
-	// Cleap up managed cluster manifests
+	// Clean up managed cluster manifests
 	assetFn := helpers.ManagedClusterAssetFn(manifestDir, managedClusterName)
 	if err := helpers.CleanUpManagedClusterManifests(ctx, c.kubeClient, c.eventRecorder, assetFn, staticFiles...); err != nil {
 		errs = append(errs, err)

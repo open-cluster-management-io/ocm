@@ -1,10 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
-  name: {{ .ManagedClusterName }}:managed-cluster-work
-  namespace: {{ .ManagedClusterName }}
-  finalizers:
-  - cluster.open-cluster-management.io/manifest-work-cleanup
+  name: open-cluster-management:managedcluster:work
 rules:
 # Allow work agent to send event to hub
 - apiGroups: ["", "events.k8s.io"]

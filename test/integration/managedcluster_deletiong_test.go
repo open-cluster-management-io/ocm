@@ -48,14 +48,15 @@ var _ = ginkgo.Describe("Cluster deleting", func() {
 		err = clusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedCluster.Name, metav1.DeleteOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		roleName := fmt.Sprintf("%s:managed-cluster-work", managedCluster.Name)
-		err = kubeClient.RbacV1().Roles(managedCluster.Name).Delete(context.Background(), roleName, metav1.DeleteOptions{})
+		roleBindingName := fmt.Sprintf("%s:managed-cluster-work", managedCluster.Name)
+		err = kubeClient.RbacV1().RoleBindings(managedCluster.Name).Delete(context.Background(), roleBindingName, metav1.DeleteOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		role, err := kubeClient.RbacV1().Roles(managedCluster.Name).Get(context.Background(), roleName, metav1.GetOptions{})
+
+		roleBinding, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).Get(context.Background(), roleBindingName, metav1.GetOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		gomega.Expect(len(role.Finalizers)).Should(gomega.Equal(1))
-		gomega.Expect(role.Finalizers[0]).Should(gomega.Equal("cluster.open-cluster-management.io/manifest-work-cleanup"))
-		gomega.Expect(role.DeletionTimestamp.IsZero()).Should(gomega.BeFalse())
+		gomega.Expect(len(roleBinding.Finalizers)).Should(gomega.Equal(1))
+		gomega.Expect(roleBinding.Finalizers[0]).Should(gomega.Equal("cluster.open-cluster-management.io/manifest-work-cleanup"))
+		gomega.Expect(roleBinding.DeletionTimestamp.IsZero()).Should(gomega.BeFalse())
 
 		// Delete work
 		err = workClient.WorkV1().ManifestWorks(managedCluster.Name).Delete(context.Background(), "work1", metav1.DeleteOptions{})
@@ -70,7 +71,7 @@ var _ = ginkgo.Describe("Cluster deleting", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 		gomega.Eventually(func() bool {
-			_, err := kubeClient.RbacV1().Roles(managedCluster.Name).Get(context.Background(), roleName, metav1.GetOptions{})
+			_, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).Get(context.Background(), roleBindingName, metav1.GetOptions{})
 			if errors.IsNotFound(err) {
 				return true
 			}

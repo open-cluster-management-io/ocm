@@ -2,7 +2,6 @@ package managedcluster
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -60,12 +59,12 @@ func TestLeaseUpdate(t *testing.T) {
 				clusterStore.Add(cluster)
 			}
 
-			hubClient := kubefake.NewSimpleClientset(testinghelpers.NewManagedClusterLease(time.Now()))
+			hubClient := kubefake.NewSimpleClientset(testinghelpers.NewManagedClusterLease("managed-cluster-lease", time.Now()))
 
 			leaseUpdater := &leaseUpdater{
 				hubClient:   hubClient,
 				clusterName: testinghelpers.TestManagedClusterName,
-				leaseName:   fmt.Sprintf("cluster-lease-%s", testinghelpers.TestManagedClusterName),
+				leaseName:   "managed-cluster-lease",
 				recorder:    eventstesting.NewTestingEventRecorder(t),
 			}
 
