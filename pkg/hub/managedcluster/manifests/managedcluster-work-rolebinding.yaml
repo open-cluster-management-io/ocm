@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ .ManagedClusterName }}:managed-cluster-work
+  name: open-cluster-management:managedcluster:{{ .ManagedClusterName }}:work
   namespace: {{ .ManagedClusterName }}
   finalizers:
   - cluster.open-cluster-management.io/manifest-work-cleanup
