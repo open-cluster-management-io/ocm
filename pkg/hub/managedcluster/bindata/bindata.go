@@ -150,7 +150,7 @@ func pkgHubManagedclusterManifestsManagedclusterNamespaceYaml() (*asset, error) 
 var _pkgHubManagedclusterManifestsManagedclusterRegistrationRolebindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ .ManagedClusterName }}:managed-cluster-registration
+  name: open-cluster-management:managedcluster:{{ .ManagedClusterName }}:registration
   namespace: {{ .ManagedClusterName }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -182,7 +182,7 @@ func pkgHubManagedclusterManifestsManagedclusterRegistrationRolebindingYaml() (*
 var _pkgHubManagedclusterManifestsManagedclusterWorkRolebindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ .ManagedClusterName }}:managed-cluster-work
+  name: open-cluster-management:managedcluster:{{ .ManagedClusterName }}:work
   namespace: {{ .ManagedClusterName }}
   finalizers:
   - cluster.open-cluster-management.io/manifest-work-cleanup
