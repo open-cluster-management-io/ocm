@@ -201,19 +201,26 @@ func (m *AppliedManifestWorkController) syncManifestWork(
 }
 
 // findUntrackedResources returns applied resources which are no longer tracked by manifestwork
+// API version should be ignored when checking if a resource is no longer tracked by a manifestwork.
+// This is because we treat resources of same GroupResource but different version equivalent.
+// It also compares UID of the appliedResources to identify the untracked appliedResources because
+// 1. The UID should keep the same for resources with different versions.
+// 2. The UID in the newAppliedResources is always the latest updated one. The only possibility that UID
+// in appliedResources differs from what in newAppliedResources is that this resource is recreated.
+// Its UID in appliedResources is invalid hence recording it as untracked applied resource and delete it is safe.
 func findUntrackedResources(appliedResources, newAppliedResources []workapiv1.AppliedManifestResourceMeta) []workapiv1.AppliedManifestResourceMeta {
 	var untracked []workapiv1.AppliedManifestResourceMeta
 
 	resourceIndex := map[workapiv1.AppliedManifestResourceMeta]struct{}{}
 	for _, resource := range newAppliedResources {
 		key := resource.DeepCopy()
-		key.UID = ""
+		key.UID, key.Version = "", ""
 		resourceIndex[*key] = struct{}{}
 	}
 
 	for _, resource := range appliedResources {
 		key := resource.DeepCopy()
-		key.UID = ""
+		key.UID, key.Version = "", ""
 		if _, ok := resourceIndex[*key]; !ok {
 			untracked = append(untracked, resource)
 		}

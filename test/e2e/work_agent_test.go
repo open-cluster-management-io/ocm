@@ -18,6 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
@@ -25,8 +26,8 @@ const (
 	eventuallyTimeout  = 60 // seconds
 	eventuallyInterval = 1  // seconds
 
-	guestbookCrdJson = `{
-		"apiVersion": "apiextensions.k8s.io/v1beta1",
+	guestBookCRDJson = `{
+		"apiVersion": "apiextensions.k8s.io/v1",
 		"kind": "CustomResourceDefinition",
 		"metadata": {
 			"name": "guestbooks.my.domain"
@@ -42,39 +43,70 @@ const (
 				"plural": "guestbooks",
 				"singular": "guestbook"
 			},
-			"preserveUnknownFields": true,
+			"preserveUnknownFields": false,
 			"scope": "Namespaced",
-			"validation": {
-				"openAPIV3Schema": {
-					"properties": {
-						"apiVersion": {
-							"type": "string"
-						},
-						"kind": {
-							"type": "string"
-						},
-						"metadata": {
-							"type": "object"
-						},
-						"spec": {
-							"properties": {
-								"foo": {
-									"type": "string"
-								}
-							},
-							"type": "object"
-						},
-						"status": {
-							"type": "object"
-						}
-					},
-					"type": "object"
-				}
-			},
-			"version": "v1",
 			"versions": [
 				{
 					"name": "v1",
+					"schema": {
+						"openAPIV3Schema": {
+							"properties": {
+								"apiVersion": {
+									"type": "string"
+								},
+								"kind": {
+									"type": "string"
+								},
+								"metadata": {
+									"type": "object"
+								},
+								"spec": {
+									"properties": {
+										"foo": {
+											"type": "string"
+										}
+									},
+									"type": "object"
+								},
+								"status": {
+									"type": "object"
+								}
+							},
+							"type": "object"
+						}
+					},
+					"served": true,
+					"storage": false
+				},
+				{
+					"name": "v2",
+					"schema": {
+						"openAPIV3Schema": {
+							"properties": {
+								"apiVersion": {
+									"type": "string"
+								},
+								"kind": {
+									"type": "string"
+								},
+								"metadata": {
+									"type": "object"
+								},
+								"spec": {
+									"properties": {
+										"foo": {
+											"type": "string"
+										}
+									},
+									"type": "object"
+								},
+								"status": {
+									"type": "object"
+								}
+							},
+							"type": "object"
+						}
+					},
 					"served": true,
 					"storage": true
 				}
@@ -82,7 +114,7 @@ const (
 		}
 	}`
 
-	guestbookCrJson = `{
+	guestbookCRJson = `{
 		"apiVersion": "my.domain/v1",
 		"kind": "Guestbook",
 		"metadata": {
@@ -91,6 +123,18 @@ const (
 		},
 		"spec": {
 			"foo": "bar"
+		}
+	}`
+
+	upgradedGuestBookCRJson = `{
+		"apiVersion": "my.domain/v2",
+		"kind": "Guestbook",
+		"metadata": {
+			"name": "guestbook1",
+			"namespace": "default"
+		},
+		"spec": {
+			"foo": "foo"
 		}
 	}`
 )
@@ -366,13 +410,13 @@ var _ = ginkgo.Describe("Work agent", func() {
 		})
 
 		ginkgo.It("should create crd/cr with aggregated cluster role successfully", func() {
-			crd, err := newCrd()
+			crd, err := newCrd(guestBookCRDJson)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			clusterRoleName := fmt.Sprintf("cr-%s", nameSuffix)
 			clusterRole := newAggregatedClusterRole(clusterRoleName, "my.domain", "guestbooks")
 
-			cr, err := newCr(crNamespace, "cr1")
+			cr, err := newCr(guestbookCRJson, crNamespace, "cr1")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			objects := []runtime.Object{crd, clusterRole, cr}
@@ -400,6 +444,50 @@ var _ = ginkgo.Describe("Work agent", func() {
 				return meta.IsStatusConditionPresentAndEqual(work.Status.Conditions, workapiv1.WorkApplied, metav1.ConditionTrue) &&
 					meta.IsStatusConditionPresentAndEqual(work.Status.Conditions, workapiv1.WorkAvailable, metav1.ConditionTrue)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Upgrade crd/cr and check if cr resource is recreated.
+			// Get UID of cr resource at first.
+			guestbook, err := spokeDynamicClient.Resource(schema.GroupVersionResource{
+				Resource: "guestbooks",
+				Version:  "v1",
+				Group:    "my.domain",
+			}).Namespace(crNamespace).Get(context.Background(), "cr1", metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			currentUID := guestbook.GetUID()
+
+			// Upgrade crd/cr in the work
+			cr, err = newCr(upgradedGuestBookCRJson, crNamespace, "cr1")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			objects = []runtime.Object{crd, clusterRole, cr}
+			work = newManifestWork(clusterName, workName, objects...)
+
+			// Update work
+			existingWork, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			work.ResourceVersion = existingWork.ResourceVersion
+			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Update(context.Background(), work, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// check if v2 cr is applied
+			gomega.Eventually(func() error {
+				guestbook, err := spokeDynamicClient.Resource(schema.GroupVersionResource{
+					Resource: "guestbooks",
+					Version:  "v2",
+					Group:    "my.domain",
+				}).Namespace(crNamespace).Get(context.Background(), "cr1", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				// Check if the spec in the cr is updated
+				if !reflect.DeepEqual(guestbook.Object["spec"], cr.Object["spec"]) {
+					return fmt.Errorf("Expect CR spec is updated, expected: %v, actual %v", cr.Object["spec"], guestbook.Object["spec"])
+				}
+				// Ensure that the CR is updated rather than recreated
+				if currentUID != guestbook.GetUID() {
+					return fmt.Errorf("Expect UID to be the same, expected: %q, actual %q", currentUID, guestbook.GetUID())
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 		})
 	})
 })
@@ -472,13 +560,13 @@ func haveManifestCondition(conditions []workapiv1.ManifestCondition, expectedTyp
 	return true
 }
 
-func newCrd() (crd *unstructured.Unstructured, err error) {
-	crd, err = loadResourceFromJSON(guestbookCrdJson)
+func newCrd(content string) (crd *unstructured.Unstructured, err error) {
+	crd, err = loadResourceFromJSON(content)
 	return crd, err
 }
 
-func newCr(namespace, name string) (cr *unstructured.Unstructured, err error) {
-	cr, err = loadResourceFromJSON(guestbookCrJson)
+func newCr(content, namespace, name string) (cr *unstructured.Unstructured, err error) {
+	cr, err = loadResourceFromJSON(content)
 	if err != nil {
 		return nil, err
 	}
