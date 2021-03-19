@@ -1,0 +1,51 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: foundation-agent
+  namespace: {{ .AddonInstallNamespace }}
+  labels:
+    app: foundation-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: foundation-agent
+  template:
+    metadata:
+      labels:
+        app: foundation-agent
+    spec:
+      serviceAccountName: foundation-agent-sa
+      securityContext:
+        runAsNonRoot: true
+      volumes:
+      - name: hub-config
+        secret:
+          secretName: {{ .KubeConfigSecret }}
+      containers:
+      - name: foundation-agent
+        image: quay.io/open-cluster-management/multicloud-manager
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/agent"
+          - "--hub-kubeconfig=/var/run/hub/kubeconfig"
+          - "--cluster-name={{ .ClusterName }}"
+          - "--port=4443"
+          - "--agent-address=foundation-agent.open-cluster-management-agent.svc"
+          - "--agent-port=443"
+          - "--insecure=true"
+        volumeMounts:
+          - name: hub-config
+            mountPath: /var/run/hub
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8000
+          failureThreshold: 3
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8000
+          failureThreshold: 3
+          periodSeconds: 10
