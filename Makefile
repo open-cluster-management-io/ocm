@@ -122,7 +122,7 @@ cluster-ip:
   CLUSTER_IP?=$(shell $(KUBECTL) get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}")
 
 cluster-hub-ip-kind:
-  	CLUSTER_IP_KIND?=$(shell $(KUBECTL) --kubeconfig $(HOME)/hub-kubeconfig config view | grep server | awk '{ print $2 }' | cut -f3 -d/ | cut -f1 -d:)
+  	CLUSTER_IP_KIND?=$(shell $(KUBECTL) --kubeconfig $(HOME)/hub-kubeconfig config view | grep server | awk '{ print $2 }' | cut -f3 -d/)
 
 bootstrap-secret: cluster-ip
 	cp $(KUBECONFIG) dev-kubeconfig
