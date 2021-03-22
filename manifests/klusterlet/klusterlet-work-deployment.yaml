@@ -6,7 +6,7 @@ metadata:
   labels:
     app: klusterlet-manifestwork-agent
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: klusterlet-manifestwork-agent

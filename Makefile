@@ -40,6 +40,8 @@ KLUSTERLET_KUBECONFIG_CONTEXT?=$(shell $(KUBECTL) config current-context)
 KLUSTERLET_KIND_KUBECONFIG?=$(HOME)/cluster1-kubeconfig
 HUB_KIND_KUBECONFIG?=$(HOME)/hub-kubeconfig
 KIND_CLUSTER?=kind
+MANAGED_CLUSTER?=cluster1
+HUB_CLUSTER?=hub
 
 OPERATOR_SDK_ARCHOS:=x86_64-linux-gnu
 ifeq ($(GOHOSTOS),darwin)
@@ -100,8 +102,9 @@ install-olm: ensure-operator-sdk
 	$(KUBECTL) get ns open-cluster-management ; if [ $$? -ne 0 ] ; then $(KUBECTL) create ns open-cluster-management ; fi
 
 install-olm-kind: ensure-operator-sdk
-	$(KUBECTL) --kubeconfig=$(KLUSTERLET_KIND_KUBECONFIG) get crds | grep clusterserviceversion ; if [ $$? -ne 0 ] ; then $(OPERATOR_SDK) olm install --version $(OLM_VERSION); fi
-	$(KUBECTL) --kubeconfig=$(KLUSTERLET_KIND_KUBECONFIG) get ns open-cluster-management ; if [ $$? -ne 0 ] ; then $(KUBECTL) --kubeconfig=$(KLUSTERLET_KIND_KUBECONFIG) create ns open-cluster-management ; fi
+	$(KUBECTL) config use-context kind-$(MANAGED_CLUSTER)
+	$(KUBECTL) get crds | grep clusterserviceversion ; if [ $$? -ne 0 ] ; then $(OPERATOR_SDK) olm install --version $(OLM_VERSION); fi
+	$(KUBECTL) get ns open-cluster-management ; if [ $$? -ne 0 ] ; then $(KUBECTL) create ns open-cluster-management ; fi
 
 deploy-hub: deploy-hub-operator apply-hub-cr
 
@@ -119,11 +122,11 @@ cluster-ip:
   CLUSTER_IP?=$(shell $(KUBECTL) get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}")
 
 cluster-hub-ip-kind:
-  CLUSTER_IP_KIND?=$(shell $(KUBECTL) --kubeconfig=$(HUB_KIND_KUBECONFIG) config view | grep server | awk '{ print $2 }' | cut -f3 -d/ | cut -f1 -d:)
+  	CLUSTER_IP_KIND?=$(shell $(KUBECTL) --kubeconfig $(HOME)/hub-kubeconfig config view | grep server | awk '{ print $2 }' | cut -f3 -d/ | cut -f1 -d:)
 
 bootstrap-secret: cluster-ip
 	cp $(KUBECONFIG) dev-kubeconfig
-	$(KUBECTL) config use-context $(KLUSTERLET_KUBECONFIG_CONTEXT)
+	$(KUBECTL) config use-context kind-$(MANAGED_CLUSTER)
 	$(KUBECTL) get ns open-cluster-management-agent; if [ $$? -ne 0 ] ; then $(KUBECTL) create ns open-cluster-management-agent; fi
 	$(KUBECTL) config set clusters.kind-$(KIND_CLUSTER).server https://$(CLUSTER_IP) --kubeconfig dev-kubeconfig
 	$(KUBECTL) delete secret bootstrap-hub-kubeconfig -n open-cluster-management-agent --ignore-not-found
@@ -131,10 +134,11 @@ bootstrap-secret: cluster-ip
 
 bootstrap-secret-kind: cluster-hub-ip-kind
 	cp $(HUB_KIND_KUBECONFIG) dev-kubeconfig
-	$(KUBECTL) --kubeconfig=$(KLUSTERLET_KIND_KUBECONFIG) get ns open-cluster-management-agent; if [ $$? -ne 0 ] ; then $(KUBECTL) --kubeconfig=$(KLUSTERLET_KIND_KUBECONFIG) create ns open-cluster-management-agent; fi
-	$(KUBECTL) --kubeconfig dev-kubeconfig config set clusters.kind-$(KIND_CLUSTER).server https://$(CLUSTER_IP_KIND)
-	$(KUBECTL) --kubeconfig=$(KLUSTERLET_KIND_KUBECONFIG) delete secret bootstrap-hub-kubeconfig -n open-cluster-management-agent --ignore-not-found
-	$(KUBECTL) --kubeconfig=$(KLUSTERLET_KIND_KUBECONFIG) create secret generic bootstrap-hub-kubeconfig --from-file=kubeconfig=dev-kubeconfig -n open-cluster-management-agent
+	$(KUBECTL) config use-context kind-$(MANAGED_CLUSTER)
+	$(KUBECTL) get ns open-cluster-management-agent; if [ $$? -ne 0 ] ; then $(KUBECTL) create ns open-cluster-management-agent; fi
+	$(KUBECTL) --kubeconfig dev-kubeconfig config set clusters.kind-$(HUB_CLUSTER).server https://$(CLUSTER_IP_KIND)
+	$(KUBECTL) delete secret bootstrap-hub-kubeconfig -n open-cluster-management-agent --ignore-not-found
+	$(KUBECTL) create secret generic bootstrap-hub-kubeconfig --from-file=kubeconfig=dev-kubeconfig -n open-cluster-management-agent
 
 # Registration e2e expects to read bootstrap secret from open-cluster-management/e2e-bootstrap-secret
 # TODO: think about how to factor this
@@ -158,7 +162,8 @@ apply-spoke-cr:
 	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," deploy/klusterlet/config/samples/operator_open-cluster-management_klusterlets.cr.yaml | $(KUBECTL) apply -f -
 
 apply-spoke-cr-kind:
-	$(KUBECTL) --kubeconfig=$(KLUSTERLET_KIND_KUBECONFIG) apply -f deploy/klusterlet/config/samples/operator_open-cluster-management_klusterlets.cr.yaml
+	$(KUBECTL) config use-context kind-$(MANAGED_CLUSTER)
+	$(KUBECTL) apply -f deploy/klusterlet/config/samples/operator_open-cluster-management_klusterlets.cr.yaml
 
 clean-spoke: ensure-operator-sdk
 	$(KUBECTL) delete -f deploy/klusterlet/config/samples/operator_open-cluster-management_klusterlets.cr.yaml --ignore-not-found
