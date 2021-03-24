@@ -39,7 +39,6 @@ KUBECONFIG?=./.kubeconfig
 KLUSTERLET_KUBECONFIG_CONTEXT?=$(shell $(KUBECTL) config current-context)
 KLUSTERLET_KIND_KUBECONFIG?=$(HOME)/cluster1-kubeconfig
 HUB_KIND_KUBECONFIG?=$(HOME)/hub-kubeconfig
-KIND_CLUSTER?=kind
 MANAGED_CLUSTER?=cluster1
 HUB_CLUSTER?=hub
 
@@ -126,9 +125,9 @@ cluster-hub-ip-kind:
 
 bootstrap-secret: cluster-ip
 	cp $(KUBECONFIG) dev-kubeconfig
-	$(KUBECTL) config use-context kind-$(MANAGED_CLUSTER)
+	$(KUBECTL) config use-context $(KLUSTERLET_KUBECONFIG_CONTEXT)
 	$(KUBECTL) get ns open-cluster-management-agent; if [ $$? -ne 0 ] ; then $(KUBECTL) create ns open-cluster-management-agent; fi
-	$(KUBECTL) config set clusters.kind-$(KIND_CLUSTER).server https://$(CLUSTER_IP) --kubeconfig dev-kubeconfig
+	$(KUBECTL) config set clusters.kind-$(MANAGED_CLUSTER).server https://$(CLUSTER_IP) --kubeconfig dev-kubeconfig
 	$(KUBECTL) delete secret bootstrap-hub-kubeconfig -n open-cluster-management-agent --ignore-not-found
 	$(KUBECTL) create secret generic bootstrap-hub-kubeconfig --from-file=kubeconfig=dev-kubeconfig -n open-cluster-management-agent
 
