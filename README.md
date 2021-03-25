@@ -11,9 +11,13 @@ Check the [CONTRIBUTING Doc](CONTRIBUTING.md) for how to contribute to the repo.
 ## Deploy all-in-one deployment on kind
 
 1. Create a kind cluster
-2. Deploy all compoenent on the kind cluster
     ```
-    export KIND_CLUSTER={kind cluster name}
+    kind create cluster --name cluster1
+    kind get kubeconfig --name cluster1 > ./.kubeconfig
+    ```
+2. Deploy all components on the kind cluster
+    ```
+    export MANAGED_CLUSTER=cluster1
     make deploy
     ```
 3. To clean the environment, run `make clean-deploy`
@@ -35,7 +39,7 @@ Check the [CONTRIBUTING Doc](CONTRIBUTING.md) for how to contribute to the repo.
 
 ## What is next
 
-After a successfull deployment, a `certificatesigningrequest` and a `managedcluster` will
+After a successful deployment, a `certificatesigningrequest` and a `managedcluster` will
 be created on the hub.
 
 ```
