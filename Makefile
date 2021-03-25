@@ -12,7 +12,7 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 
 # Image URL to use all building/pushing image targets;
 GO_BUILD_PACKAGES :=./examples/...
-IMAGE ?= addon-manager
+IMAGE ?= helloworld-addon
 IMAGE_REGISTRY ?= quay.io/open-cluster-management
 
 GIT_HOST ?= github.com/open-cluster-management

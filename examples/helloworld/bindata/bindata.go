@@ -2,7 +2,8 @@
 // sources:
 // examples/helloworld/manifests/clusterrolebinding.yaml
 // examples/helloworld/manifests/deployment.yaml
-// examples/helloworld/manifests/service.yaml
+// examples/helloworld/manifests/role.yaml
+// examples/helloworld/manifests/rolebinding.yaml
 // examples/helloworld/manifests/serviceaccount.yaml
 package bindata
 
@@ -60,15 +61,16 @@ func (fi bindataFileInfo) Sys() interface{} {
 var _examplesHelloworldManifestsClusterrolebindingYaml = []byte(`kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: foundation-agent
+  name: helloworld-agent
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: cluster-admin
 subjects:
   - kind: ServiceAccount
-    name: foundation-agent-sa
-    namespace: {{ .AddonInstallNamespace }}`)
+    name: helloworld-agent-sa
+    namespace: {{ .AddonInstallNamespace }}
+`)
 
 func examplesHelloworldManifestsClusterrolebindingYamlBytes() ([]byte, error) {
 	return _examplesHelloworldManifestsClusterrolebindingYaml, nil
@@ -88,54 +90,38 @@ func examplesHelloworldManifestsClusterrolebindingYaml() (*asset, error) {
 var _examplesHelloworldManifestsDeploymentYaml = []byte(`kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: foundation-agent
+  name: helloworld-agent
   namespace: {{ .AddonInstallNamespace }}
   labels:
-    app: foundation-agent
+    app: helloworld-agent
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: foundation-agent
+      app: helloworld-agent
   template:
     metadata:
       labels:
-        app: foundation-agent
+        app: helloworld-agent
     spec:
-      serviceAccountName: foundation-agent-sa
-      securityContext:
-        runAsNonRoot: true
+      serviceAccountName: helloworld-agent-sa
       volumes:
       - name: hub-config
         secret:
           secretName: {{ .KubeConfigSecret }}
       containers:
-      - name: foundation-agent
-        image: quay.io/open-cluster-management/multicloud-manager
+      - name: helloworld-agent
+        image: quay.io/open-cluster-management/helloworld-addon
         imagePullPolicy: IfNotPresent
         args:
-          - "/agent"
+          - "/helloworld"
+          - "agent"
           - "--hub-kubeconfig=/var/run/hub/kubeconfig"
           - "--cluster-name={{ .ClusterName }}"
-          - "--port=4443"
-          - "--agent-address=foundation-agent.open-cluster-management-agent.svc"
-          - "--agent-port=443"
-          - "--insecure=true"
         volumeMounts:
           - name: hub-config
             mountPath: /var/run/hub
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 8000
-          failureThreshold: 3
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /readyz
-            port: 8000
-          failureThreshold: 3
-          periodSeconds: 10`)
+`)
 
 func examplesHelloworldManifestsDeploymentYamlBytes() ([]byte, error) {
 	return _examplesHelloworldManifestsDeploymentYaml, nil
@@ -152,34 +138,58 @@ func examplesHelloworldManifestsDeploymentYaml() (*asset, error) {
 	return a, nil
 }
 
-var _examplesHelloworldManifestsServiceYaml = []byte(`kind: Service
-apiVersion: v1
+var _examplesHelloworldManifestsRoleYaml = []byte(`kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: foundation-agent
-  namespace: {{ .AddonInstallNamespace }}
-  labels:
-    app: foundation-agent
-spec:
-  type: ClusterIP
-  ports:
-  - name: app
-    port: 443
-    protocol: TCP
-    targetPort: 4443
-  selector:
-    app: foundation-agent`)
+  name: open-cluster-management:helloworld:agent
+  namespace: {{ .ClusterName }}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+`)
 
-func examplesHelloworldManifestsServiceYamlBytes() ([]byte, error) {
-	return _examplesHelloworldManifestsServiceYaml, nil
+func examplesHelloworldManifestsRoleYamlBytes() ([]byte, error) {
+	return _examplesHelloworldManifestsRoleYaml, nil
 }
 
-func examplesHelloworldManifestsServiceYaml() (*asset, error) {
-	bytes, err := examplesHelloworldManifestsServiceYamlBytes()
+func examplesHelloworldManifestsRoleYaml() (*asset, error) {
+	bytes, err := examplesHelloworldManifestsRoleYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "examples/helloworld/manifests/service.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "examples/helloworld/manifests/role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _examplesHelloworldManifestsRolebindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: open-cluster-management:helloworld:agent
+  namespace: {{ .ClusterName }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: open-cluster-management:helloworld:agent
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: {{ .Group }}
+`)
+
+func examplesHelloworldManifestsRolebindingYamlBytes() ([]byte, error) {
+	return _examplesHelloworldManifestsRolebindingYaml, nil
+}
+
+func examplesHelloworldManifestsRolebindingYaml() (*asset, error) {
+	bytes, err := examplesHelloworldManifestsRolebindingYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "examples/helloworld/manifests/rolebinding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -187,7 +197,7 @@ func examplesHelloworldManifestsServiceYaml() (*asset, error) {
 var _examplesHelloworldManifestsServiceaccountYaml = []byte(`kind: ServiceAccount
 apiVersion: v1
 metadata:
-  name: foundation-agent-sa
+  name: helloworld-agent-sa
   namespace: {{ .AddonInstallNamespace }}
 `)
 
@@ -260,7 +270,8 @@ func AssetNames() []string {
 var _bindata = map[string]func() (*asset, error){
 	"examples/helloworld/manifests/clusterrolebinding.yaml": examplesHelloworldManifestsClusterrolebindingYaml,
 	"examples/helloworld/manifests/deployment.yaml":         examplesHelloworldManifestsDeploymentYaml,
-	"examples/helloworld/manifests/service.yaml":            examplesHelloworldManifestsServiceYaml,
+	"examples/helloworld/manifests/role.yaml":               examplesHelloworldManifestsRoleYaml,
+	"examples/helloworld/manifests/rolebinding.yaml":        examplesHelloworldManifestsRolebindingYaml,
 	"examples/helloworld/manifests/serviceaccount.yaml":     examplesHelloworldManifestsServiceaccountYaml,
 }
 
@@ -310,7 +321,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"manifests": {nil, map[string]*bintree{
 				"clusterrolebinding.yaml": {examplesHelloworldManifestsClusterrolebindingYaml, map[string]*bintree{}},
 				"deployment.yaml":         {examplesHelloworldManifestsDeploymentYaml, map[string]*bintree{}},
-				"service.yaml":            {examplesHelloworldManifestsServiceYaml, map[string]*bintree{}},
+				"role.yaml":               {examplesHelloworldManifestsRoleYaml, map[string]*bintree{}},
+				"rolebinding.yaml":        {examplesHelloworldManifestsRolebindingYaml, map[string]*bintree{}},
 				"serviceaccount.yaml":     {examplesHelloworldManifestsServiceaccountYaml, map[string]*bintree{}},
 			}},
 		}},

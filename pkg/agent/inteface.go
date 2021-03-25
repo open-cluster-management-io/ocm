@@ -39,24 +39,38 @@ type RegistrationOption struct {
 	// +optional
 	CSRApproveCheck func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool
 
+	// PermissionConfig defines the function for an addon to setup rbac permission.
+	PermissionConfig func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error
+
 	// CSRSign signs a csr and returns a certificate. It is used when the addon has its own customized signer.
 	// +optional
 	CSRSign func(csr *certificatesv1.CertificateSigningRequest) []byte
 }
 
-func KubeClientSignerConfigurations(addonName string) func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
+func KubeClientSignerConfigurations(addonName, agentName string) func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
 	return func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
 		return []addonapiv1alpha1.RegistrationConfig{
 			{
 				SignerName: certificatesv1.KubeAPIServerClientSignerName,
 				Subject: addonapiv1alpha1.Subject{
-					User: fmt.Sprintf("open-cluster-management:addon:%s:%s", addonName, cluster.Name),
-					Groups: []string{
-						fmt.Sprintf("open-cluster-management:addon:%s:%s", addonName, cluster.Name),
-						fmt.Sprintf("open-cluster-management:addon:%s", addonName),
-					},
+					User:   DefaultUser(cluster.Name, addonName, agentName),
+					Groups: DefaultGroups(cluster.Name, addonName),
 				},
 			},
 		}
+	}
+}
+
+// DefaultUser returns the default User
+func DefaultUser(clusterName, agentName, addonName string) string {
+	return fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s:agent:%s", clusterName, addonName, agentName)
+}
+
+// DefaultGroups returns the default groups
+func DefaultGroups(clusterName, addonName string) []string {
+	return []string{
+		fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", clusterName, addonName),
+		fmt.Sprintf("system:open-cluster-management:addon:%s", addonName),
+		"system:authenticated",
 	}
 }

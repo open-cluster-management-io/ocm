@@ -17,6 +17,7 @@ import (
 	"k8s.io/component-base/logs"
 
 	"github.com/open-cluster-management/addon-framework/pkg/addonmanager"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 )
 
 func main() {
@@ -36,6 +37,30 @@ func main() {
 }
 
 func newCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "addon",
+		Short: "helloworld example addon",
+		Run: func(cmd *cobra.Command, args []string) {
+			if err := cmd.Help(); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+			}
+			os.Exit(1)
+		},
+	}
+
+	if v := version.Get().String(); len(v) == 0 {
+		cmd.Version = "<unknown>"
+	} else {
+		cmd.Version = v
+	}
+
+	cmd.AddCommand(newControllerCommand())
+	cmd.AddCommand(newAgentCommand())
+
+	return cmd
+}
+
+func newControllerCommand() *cobra.Command {
 	cmd := controllercmd.
 		NewControllerCommandConfig("addon-controller", version.Get(), runController).
 		NewCommand()
@@ -50,9 +75,11 @@ func runController(ctx context.Context, controllerContext *controllercmd.Control
 	if err != nil {
 		return err
 	}
-	agent := &helloWorldAgent{}
-	mgr.AddAgent(agent)
-	agentRegistration := &helloWorldAgentWithRegistration{}
+	agentRegistration := &helloWorldAgent{
+		kubeConfig: controllerContext.KubeConfig,
+		recorder:   controllerContext.EventRecorder,
+		agentName:  utilrand.String(5),
+	}
 	mgr.AddAgent(agentRegistration)
 	mgr.Start(ctx)
 
