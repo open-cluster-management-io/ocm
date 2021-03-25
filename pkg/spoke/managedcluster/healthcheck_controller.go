@@ -73,7 +73,7 @@ func (c *managedClusterHealthCheckController) sync(ctx context.Context, syncCtx 
 func (c *managedClusterHealthCheckController) checkKubeAPIServerStatus(ctx context.Context) metav1.Condition {
 	statusCode := 0
 	condition := metav1.Condition{Type: clusterv1.ManagedClusterConditionAvailable}
-	result := c.managedClusterDiscoveryClient.RESTClient().Get().AbsPath("/readyz").Do(ctx).StatusCode(&statusCode)
+	result := c.managedClusterDiscoveryClient.RESTClient().Get().AbsPath("/livez").Do(ctx).StatusCode(&statusCode)
 	if statusCode == http.StatusOK {
 		condition.Status = metav1.ConditionTrue
 		condition.Reason = "ManagedClusterAvailable"
@@ -81,7 +81,7 @@ func (c *managedClusterHealthCheckController) checkKubeAPIServerStatus(ctx conte
 		return condition
 	}
 
-	// for backward compatible, the readyz endpoint is supported from Kubernetes 1.16, so if the readyz is not found or
+	// for backward compatible, the livez endpoint is supported from Kubernetes 1.16, so if the livez is not found or
 	// forbidden, the healthz endpoint will be used.
 	if statusCode == http.StatusNotFound || statusCode == http.StatusForbidden {
 		result = c.managedClusterDiscoveryClient.RESTClient().Get().AbsPath("/healthz").Do(ctx).StatusCode(&statusCode)
