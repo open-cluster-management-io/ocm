@@ -10,3 +10,11 @@ rules:
   #After release 2.3, we will limit the resource name.
   #resourceNames: ["managed-cluster-lease"]
   verbs: ["get", "update"]
+# Allow agent to get/list/watch managed cluster addons
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["managedclusteraddons"]
+  verbs: ["get", "list", "watch"]
+# Allow agent to update the status of managed cluster addons
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["managedclusteraddons/status"]
+  verbs: ["patch", "update"]

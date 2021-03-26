@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
-	"k8s.io/client-go/kubernetes"
-
+	addonclient "github.com/open-cluster-management/api/client/addon/clientset/versioned"
+	addoninformers "github.com/open-cluster-management/api/client/addon/informers/externalversions"
 	clusterv1client "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	clusterv1informers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
 	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned"
 	workv1informers "github.com/open-cluster-management/api/client/work/informers/externalversions"
+	"github.com/open-cluster-management/registration/pkg/hub/addon"
 	"github.com/open-cluster-management/registration/pkg/hub/clusterrole"
 	"github.com/open-cluster-management/registration/pkg/hub/csr"
 	"github.com/open-cluster-management/registration/pkg/hub/lease"
@@ -18,7 +18,10 @@ import (
 	"github.com/open-cluster-management/registration/pkg/hub/managedclusterset"
 	"github.com/open-cluster-management/registration/pkg/hub/rbacfinalizerdeletion"
 
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
+
 	kubeinformers "k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
@@ -48,9 +51,15 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		return err
 	}
 
+	addOnClient, err := addonclient.NewForConfig(kubeConfig)
+	if err != nil {
+		return err
+	}
+
 	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
 	workInformers := workv1informers.NewSharedInformerFactory(workClient, 10*time.Minute)
 	kubeInfomers := kubeinformers.NewSharedInformerFactory(kubeClient, 10*time.Minute)
+	addOnInformers := addoninformers.NewSharedInformerFactory(addOnClient, 10*time.Minute)
 
 	managedClusterController := managedcluster.NewManagedClusterController(
 		kubeClient,
@@ -98,9 +107,17 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		controllerContext.EventRecorder,
 	)
 
+	addOnHealthCheckController := addon.NewManagedClusterAddOnHealthCheckController(
+		addOnClient,
+		addOnInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		clusterInformers.Cluster().V1().ManagedClusters(),
+		controllerContext.EventRecorder,
+	)
+
 	go clusterInformers.Start(ctx.Done())
 	go workInformers.Start(ctx.Done())
 	go kubeInfomers.Start(ctx.Done())
+	go addOnInformers.Start(ctx.Done())
 
 	go managedClusterController.Run(ctx, 1)
 	go csrController.Run(ctx, 1)
@@ -108,6 +125,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	go rbacFinalizerController.Run(ctx, 1)
 	go managedClusterSetController.Run(ctx, 1)
 	go clusterroleController.Run(ctx, 1)
+	go addOnHealthCheckController.Run(ctx, 1)
 
 	<-ctx.Done()
 	return nil

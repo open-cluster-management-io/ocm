@@ -9,11 +9,14 @@ import (
 	"path"
 	"time"
 
+	addonclient "github.com/open-cluster-management/api/client/addon/clientset/versioned"
+	addoninformers "github.com/open-cluster-management/api/client/addon/informers/externalversions"
 	clusterv1client "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	clusterv1informers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
 	"github.com/open-cluster-management/registration/pkg/clientcert"
 	"github.com/open-cluster-management/registration/pkg/features"
 	"github.com/open-cluster-management/registration/pkg/helpers"
+	"github.com/open-cluster-management/registration/pkg/spoke/addon"
 	"github.com/open-cluster-management/registration/pkg/spoke/managedcluster"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -274,7 +277,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	if err != nil {
 		return err
 	}
-	spokeClusterInformers := clusterv1informers.NewSharedInformerFactory(spokeClusterClient, 10*time.Minute)
+	spokeClusterInformerFactory := clusterv1informers.NewSharedInformerFactory(spokeClusterClient, 10*time.Minute)
 
 	var managedClusterClaimController factory.Controller
 	if features.DefaultMutableFeatureGate.Enabled(features.ClusterClaim) {
@@ -284,7 +287,27 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			o.MaxCustomClusterClaims,
 			hubClusterClient,
 			hubClusterInformerFactory.Cluster().V1().ManagedClusters(),
-			spokeClusterInformers.Cluster().V1alpha1().ClusterClaims(),
+			spokeClusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
+			controllerContext.EventRecorder,
+		)
+	}
+
+	var addOnLeaseController factory.Controller
+	var addOnInformerFactory addoninformers.SharedInformerFactory
+	if features.DefaultMutableFeatureGate.Enabled(features.AddonManagement) {
+		addOnClient, err := addonclient.NewForConfig(hubClientConfig)
+		if err != nil {
+			return err
+		}
+		addOnInformerFactory = addoninformers.NewSharedInformerFactoryWithOptions(
+			addOnClient, 10*time.Minute, addoninformers.WithNamespace(o.ClusterName))
+
+		addOnLeaseController = addon.NewManagedClusterAddOnLeaseController(
+			o.ClusterName,
+			addOnClient,
+			addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
+			spokeKubeInformerFactory.Coordination().V1().Leases(),
+			5*time.Minute, //TODO: this interval time should be allowed to change from outside
 			controllerContext.EventRecorder,
 		)
 	}
@@ -293,7 +316,10 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	go hubClusterInformerFactory.Start(ctx.Done())
 	go spokeKubeInformerFactory.Start(ctx.Done())
 	go namespacedSpokeKubeInformerFactory.Start(ctx.Done())
-	go spokeClusterInformers.Start(ctx.Done())
+	go spokeClusterInformerFactory.Start(ctx.Done())
+	if features.DefaultMutableFeatureGate.Enabled(features.AddonManagement) {
+		go addOnInformerFactory.Start(ctx.Done())
+	}
 
 	go clientCertForHubController.Run(ctx, 1)
 	go managedClusterJoiningController.Run(ctx, 1)
@@ -301,6 +327,9 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	go managedClusterHealthCheckController.Run(ctx, 1)
 	if features.DefaultMutableFeatureGate.Enabled(features.ClusterClaim) {
 		go managedClusterClaimController.Run(ctx, 1)
+	}
+	if features.DefaultMutableFeatureGate.Enabled(features.AddonManagement) {
+		go addOnLeaseController.Run(ctx, 1)
 	}
 
 	<-ctx.Done()

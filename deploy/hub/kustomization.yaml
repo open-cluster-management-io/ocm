@@ -27,6 +27,7 @@ namespace: open-cluster-management
 resources:
 - ./managedcluster.crd.yaml
 - ./manifestwork.crd.yaml
+- ./managedclusteraddons.crd.yaml
 - ./managedclusterset.crd.yaml
 - ./managedclustersetbinding.crd.yaml
 - ./namespace.yaml
