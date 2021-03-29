@@ -275,6 +275,20 @@ func TestFindUntrackedResources(t *testing.T) {
 				{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
 			},
 		},
+		{
+			name: "changing version of original resources does not make it untracked",
+			appliedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
+				{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
+			},
+			newAppliedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Group: "g1", Version: "v2", Resource: "r1", Namespace: "ns1", Name: "n1"},
+				{Group: "g4", Version: "v4", Resource: "r4", Namespace: "ns4", Name: "n4"},
+			},
+			expectedUntrackedResources: []workapiv1.AppliedManifestResourceMeta{
+				{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
+			},
+		},
 	}
 
 	for _, c := range cases {
