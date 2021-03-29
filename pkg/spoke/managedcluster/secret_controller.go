@@ -1,4 +1,4 @@
-package hubclientcert
+package managedcluster
 
 import (
 	"bytes"

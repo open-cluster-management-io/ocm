@@ -23,8 +23,8 @@ import (
 	clusterclientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	workclientset "github.com/open-cluster-management/api/client/work/clientset/versioned"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
+	"github.com/open-cluster-management/registration/pkg/clientcert"
 	"github.com/open-cluster-management/registration/pkg/hub"
-	"github.com/open-cluster-management/registration/pkg/spoke/hubclientcert"
 	"github.com/open-cluster-management/registration/pkg/spoke/managedcluster"
 	"github.com/open-cluster-management/registration/test/integration/util"
 
@@ -65,7 +65,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 
 	// crank up the sync speed
 	transport.CertCallbackRefreshDuration = 5 * time.Second
-	hubclientcert.ControllerSyncInterval = 5 * time.Second
+	clientcert.ControllerResyncInterval = 5 * time.Second
 	managedcluster.CreatingControllerSyncInterval = 1 * time.Second
 
 	// install cluster CRD and start a local kube-apiserver
