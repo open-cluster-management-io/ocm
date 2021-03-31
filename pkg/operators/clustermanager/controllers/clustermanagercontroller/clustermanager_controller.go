@@ -38,9 +38,11 @@ var (
 		"managedclusters.cluster.open-cluster-management.io",
 	}
 	staticResourceFiles = []string{
+		"manifests/cluster-manager/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml",
 		"manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml",
 		"manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml",
 		"manifests/cluster-manager/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml",
+		"manifests/cluster-manager/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml",
 		"manifests/cluster-manager/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml",
 		"manifests/cluster-manager/cluster-manager-registration-clusterrole.yaml",
 		"manifests/cluster-manager/cluster-manager-registration-clusterrolebinding.yaml",

@@ -45,6 +45,7 @@ spec:
           - "agent"
           - "--cluster-name={{ .ClusterName }}"
           - "--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig"
+          - "--feature-gates=AddonManagement=true"
           {{if .ExternalServerURL}}
           - "--spoke-external-server-urls={{ .ExternalServerURL }}"
           {{end}}
