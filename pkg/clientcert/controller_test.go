@@ -1,14 +1,12 @@
-package hubclientcert
+package clientcert
 
 import (
 	"context"
+	"crypto/x509/pkix"
 	"fmt"
 	"reflect"
 	"testing"
 	"time"
-
-	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
-	"github.com/open-cluster-management/registration/pkg/hub/user"
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -17,7 +15,9 @@ import (
 	"k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/clientcmd"
+
+	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
+	"github.com/open-cluster-management/registration/pkg/hub/user"
 )
 
 const (
@@ -30,6 +30,10 @@ const (
 var commonName = fmt.Sprintf("%s%s:%s", user.SubjectPrefix, testinghelpers.TestManagedClusterName, testAgentName)
 
 func TestSync(t *testing.T) {
+	testSubject := &pkix.Name{
+		CommonName: commonName,
+	}
+
 	cases := []struct {
 		name            string
 		queueKey        string
@@ -69,6 +73,7 @@ func TestSync(t *testing.T) {
 				}
 			},
 		},
+
 		{
 			name:     "syc csr after bootstrap",
 			queueKey: testSecretName,
@@ -79,13 +84,18 @@ func TestSync(t *testing.T) {
 				},
 				),
 			},
-			approvedCSRCert: testinghelpers.NewTestCert(testinghelpers.TestManagedClusterName, 10*time.Second),
+			approvedCSRCert: testinghelpers.NewTestCert(commonName, 10*time.Second),
 			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, hubActions, "get")
 				testinghelpers.AssertActions(t, agentActions, "get", "update")
 				actual := agentActions[1].(clienttesting.UpdateActionImpl).Object
-				if !hasValidKubeconfig(actual.(*corev1.Secret), "") {
-					t.Error("kubeconfig secret is invalid")
+				secret := actual.(*corev1.Secret)
+				valid, err := IsCertificateValid(secret.Data[TLSCertFile], testSubject)
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if !valid {
+					t.Error("client certificate is invalid")
 				}
 			},
 		},
@@ -93,7 +103,7 @@ func TestSync(t *testing.T) {
 			name:     "sync a valid hub kubeconfig secret",
 			queueKey: testSecretName,
 			secrets: []runtime.Object{
-				testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "1", testinghelpers.NewTestCert(commonName, 100*time.Second), map[string][]byte{
+				testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "1", testinghelpers.NewTestCert(commonName, 10000*time.Second), map[string][]byte{
 					ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
 					AgentNameFile:   []byte(testAgentName),
 					KubeconfigFile:  testinghelpers.NewKubeconfig(nil, nil),
@@ -135,6 +145,7 @@ func TestSync(t *testing.T) {
 				csrs = append(csrs, csr)
 			}
 			hubKubeClient := kubefake.NewSimpleClientset(csrs...)
+
 			// GenerateName is not working for fake clent, we set the name with prepend reactor
 			hubKubeClient.PrependReactor(
 				"create",
@@ -144,30 +155,36 @@ func TestSync(t *testing.T) {
 				},
 			)
 			hubInformerFactory := informers.NewSharedInformerFactory(hubKubeClient, 3*time.Minute)
-
 			agentKubeClient := kubefake.NewSimpleClientset(c.secrets...)
-			agentInformerFactory := informers.NewSharedInformerFactory(agentKubeClient, 3*time.Minute)
 
-			controller := &ClientCertForHubController{
-				clusterName:                  testinghelpers.TestManagedClusterName,
-				agentName:                    testAgentName,
-				hubKubeconfigSecretNamespace: testNamespace,
-				hubKubeconfigSecretName:      testSecretName,
-				hubCSRLister:                 hubInformerFactory.Certificates().V1beta1().CertificateSigningRequests().Lister(),
-				hubCSRClient:                 hubKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
-				spokeSecretLister:            agentInformerFactory.Core().V1().Secrets().Lister(),
-				spokeCoreClient:              agentKubeClient.CoreV1(),
+			clientCertOption := ClientCertOption{
+				SecretNamespace: testNamespace,
+				SecretName:      testSecretName,
+				AdditonalSecretData: map[string][]byte{
+					ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
+					AgentNameFile:   []byte(testAgentName),
+				},
+			}
+			csrOption := CSROption{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-",
+				},
+				Subject:    testSubject,
+				SignerName: certificates.KubeAPIServerClientSignerName,
+			}
+
+			controller := &clientCertificateController{
+				ClientCertOption: clientCertOption,
+				CSROption:        csrOption,
+				hubCSRLister:     hubInformerFactory.Certificates().V1beta1().CertificateSigningRequests().Lister(),
+				hubCSRClient:     hubKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
+				spokeCoreClient:  agentKubeClient.CoreV1(),
+				controllerName:   "test-agent",
 			}
 
 			if c.approvedCSRCert != nil {
 				controller.csrName = testCSRName
 				controller.keyData = c.approvedCSRCert.Key
-				kubeconfig := testinghelpers.NewKubeconfig(c.approvedCSRCert.Key, c.approvedCSRCert.Cert)
-				clientConfig, err := clientcmd.RESTConfigFromKubeConfig(kubeconfig)
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
-				controller.hubClientConfig = clientConfig
 			}
 
 			err := controller.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, c.queueKey))

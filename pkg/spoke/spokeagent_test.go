@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/open-cluster-management/registration/pkg/clientcert"
 	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
-	"github.com/open-cluster-management/registration/pkg/spoke/hubclientcert"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 
 	corev1 "k8s.io/api/core/v1"
@@ -306,8 +306,8 @@ func TestGetOrGenerateClusterAgentNames(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			if c.options.HubKubeconfigDir != "" {
-				testinghelpers.WriteFile(path.Join(tempDir, hubclientcert.ClusterNameFile), []byte(c.expectedClusterName))
-				testinghelpers.WriteFile(path.Join(tempDir, hubclientcert.AgentNameFile), []byte(c.expectedAgentName))
+				testinghelpers.WriteFile(path.Join(tempDir, clientcert.ClusterNameFile), []byte(c.expectedClusterName))
+				testinghelpers.WriteFile(path.Join(tempDir, clientcert.AgentNameFile), []byte(c.expectedAgentName))
 			}
 			clusterName, agentName := c.options.getOrGenerateClusterAgentNames()
 			if clusterName != c.expectedClusterName {

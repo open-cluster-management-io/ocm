@@ -1,4 +1,4 @@
-package hubclientcert
+package managedcluster
 
 import (
 	"context"
@@ -9,12 +9,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/open-cluster-management/registration/pkg/clientcert"
 	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	kubefake "k8s.io/client-go/kubernetes/fake"
+)
+
+const (
+	testNamespace  = "testns"
+	testSecretName = "testsecret"
 )
 
 func TestDumpSecret(t *testing.T) {
@@ -54,42 +60,42 @@ func TestDumpSecret(t *testing.T) {
 				testNamespace, testSecretName, "",
 				testinghelpers.NewTestCert("test", 60*time.Second),
 				map[string][]byte{
-					ClusterNameFile: []byte("test"),
-					AgentNameFile:   []byte("test"),
-					KubeconfigFile:  testinghelpers.NewKubeconfig(nil, nil),
+					clientcert.ClusterNameFile: []byte("test"),
+					clientcert.AgentNameFile:   []byte("test"),
+					clientcert.KubeconfigFile:  testinghelpers.NewKubeconfig(nil, nil),
 				},
 			),
 			validateFiles: func(t *testing.T, hubKubeconfigDir string) {
-				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, ClusterNameFile), []byte("test"))
-				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, AgentNameFile), []byte("test"))
-				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, KubeconfigFile), kubeConfigFile)
-				testinghelpers.AssertFileExist(t, path.Join(hubKubeconfigDir, TLSKeyFile))
-				testinghelpers.AssertFileExist(t, path.Join(hubKubeconfigDir, TLSCertFile))
+				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, clientcert.ClusterNameFile), []byte("test"))
+				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, clientcert.AgentNameFile), []byte("test"))
+				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, clientcert.KubeconfigFile), kubeConfigFile)
+				testinghelpers.AssertFileExist(t, path.Join(hubKubeconfigDir, clientcert.TLSKeyFile))
+				testinghelpers.AssertFileExist(t, path.Join(hubKubeconfigDir, clientcert.TLSCertFile))
 			},
 		},
 		{
 			name:     "secret is updated",
 			queueKey: testSecretName,
 			oldConfigData: map[string][]byte{
-				ClusterNameFile: []byte("test"),
-				AgentNameFile:   []byte("test"),
-				KubeconfigFile:  []byte("test"),
+				clientcert.ClusterNameFile: []byte("test"),
+				clientcert.AgentNameFile:   []byte("test"),
+				clientcert.KubeconfigFile:  []byte("test"),
 			},
 			secret: testinghelpers.NewHubKubeconfigSecret(
 				testNamespace, testSecretName, "",
 				testinghelpers.NewTestCert("test", 60*time.Second),
 				map[string][]byte{
-					ClusterNameFile: []byte("test1"),
-					AgentNameFile:   []byte("test"),
-					KubeconfigFile:  testinghelpers.NewKubeconfig(nil, nil),
+					clientcert.ClusterNameFile: []byte("test1"),
+					clientcert.AgentNameFile:   []byte("test"),
+					clientcert.KubeconfigFile:  testinghelpers.NewKubeconfig(nil, nil),
 				},
 			),
 			validateFiles: func(t *testing.T, hubKubeconfigDir string) {
-				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, ClusterNameFile), []byte("test1"))
-				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, AgentNameFile), []byte("test"))
-				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, KubeconfigFile), kubeConfigFile)
-				testinghelpers.AssertFileExist(t, path.Join(hubKubeconfigDir, TLSKeyFile))
-				testinghelpers.AssertFileExist(t, path.Join(hubKubeconfigDir, TLSCertFile))
+				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, clientcert.ClusterNameFile), []byte("test1"))
+				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, clientcert.AgentNameFile), []byte("test"))
+				testinghelpers.AssertFileContent(t, path.Join(hubKubeconfigDir, clientcert.KubeconfigFile), kubeConfigFile)
+				testinghelpers.AssertFileExist(t, path.Join(hubKubeconfigDir, clientcert.TLSKeyFile))
+				testinghelpers.AssertFileExist(t, path.Join(hubKubeconfigDir, clientcert.TLSCertFile))
 			},
 		},
 	}

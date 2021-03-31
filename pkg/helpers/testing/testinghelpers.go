@@ -372,7 +372,7 @@ func NewHubKubeconfigSecret(namespace, name, resourceVersion string, cert *TestC
 	return secret
 }
 
-func NewTestCert(commonName string, duration time.Duration) *TestCert {
+func NewTestCertWithSubject(subject pkix.Name, duration time.Duration) *TestCert {
 	caKey, err := rsa.GenerateKey(cryptorand.Reader, 2048)
 	if err != nil {
 		panic(err)
@@ -391,9 +391,7 @@ func NewTestCert(commonName string, duration time.Duration) *TestCert {
 	certDERBytes, err := x509.CreateCertificate(
 		cryptorand.Reader,
 		&x509.Certificate{
-			Subject: pkix.Name{
-				CommonName: commonName,
-			},
+			Subject:      subject,
 			SerialNumber: big.NewInt(1),
 			NotBefore:    caCert.NotBefore,
 			NotAfter:     time.Now().Add(duration).UTC(),
@@ -423,6 +421,12 @@ func NewTestCert(commonName string, duration time.Duration) *TestCert {
 			Bytes: x509.MarshalPKCS1PrivateKey(key),
 		}),
 	}
+}
+
+func NewTestCert(commonName string, duration time.Duration) *TestCert {
+	return NewTestCertWithSubject(pkix.Name{
+		CommonName: commonName,
+	}, duration)
 }
 
 func WriteFile(filename string, data []byte) {

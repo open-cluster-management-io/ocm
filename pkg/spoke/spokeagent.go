@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/openshift/library-go/pkg/controller/factory"
 	"io/ioutil"
 	"os"
 	"path"
@@ -12,12 +11,13 @@ import (
 
 	clusterv1client "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	clusterv1informers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
+	"github.com/open-cluster-management/registration/pkg/clientcert"
 	"github.com/open-cluster-management/registration/pkg/features"
 	"github.com/open-cluster-management/registration/pkg/helpers"
-	"github.com/open-cluster-management/registration/pkg/spoke/hubclientcert"
 	"github.com/open-cluster-management/registration/pkg/spoke/managedcluster"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
+	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 
 	"github.com/spf13/pflag"
@@ -31,7 +31,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 )
@@ -137,7 +136,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	)
 	go spokeClusterCreatingController.Run(ctx, 1)
 
-	hubKubeconfigSecretController := hubclientcert.NewHubKubeconfigSecretController(
+	hubKubeconfigSecretController := managedcluster.NewHubKubeconfigSecretController(
 		o.HubKubeconfigDir, o.ComponentNamespace, o.HubKubeconfigSecret,
 		spokeKubeClient.CoreV1(),
 		namespacedSpokeKubeInformerFactory.Core().V1().Secrets(),
@@ -160,9 +159,16 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		// create a ClientCertForHubController for spoke agent bootstrap
 		bootstrapInformerFactory := informers.NewSharedInformerFactory(bootstrapKubeClient, 10*time.Minute)
 
-		clientCertForHubController := hubclientcert.NewClientCertForHubController(
+		// create a kubeconfig with references to the key/cert files in the same secret
+		kubeconfig := clientcert.BuildKubeconfig(bootstrapClientConfig, clientcert.TLSCertFile, clientcert.TLSKeyFile)
+		kubeconfigData, err := clientcmd.Write(kubeconfig)
+		if err != nil {
+			return err
+		}
+
+		clientCertForHubController := managedcluster.NewClientCertForHubController(
 			o.ClusterName, o.AgentName, o.ComponentNamespace, o.HubKubeconfigSecret,
-			restclient.AnonymousClientConfig(bootstrapClientConfig),
+			kubeconfigData,
 			spokeKubeClient.CoreV1(),
 			bootstrapKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
 			bootstrapInformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
@@ -191,7 +197,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	}
 
 	// create hub clients and shared informer factories from hub kube config
-	hubClientConfig, err := clientcmd.BuildConfigFromFlags("", path.Join(o.HubKubeconfigDir, hubclientcert.KubeconfigFile))
+	hubClientConfig, err := clientcmd.BuildConfigFromFlags("", path.Join(o.HubKubeconfigDir, clientcert.KubeconfigFile))
 	if err != nil {
 		return err
 	}
@@ -218,10 +224,17 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 
 	controllerContext.EventRecorder.Event("HubClientConfigReady", "Client config for hub is ready.")
 
+	// create a kubeconfig with references to the key/cert files in the same secret
+	kubeconfig := clientcert.BuildKubeconfig(hubClientConfig, clientcert.TLSCertFile, clientcert.TLSKeyFile)
+	kubeconfigData, err := clientcmd.Write(kubeconfig)
+	if err != nil {
+		return err
+	}
+
 	// create another ClientCertForHubController for client certificate rotation
-	clientCertForHubController := hubclientcert.NewClientCertForHubController(
+	clientCertForHubController := managedcluster.NewClientCertForHubController(
 		o.ClusterName, o.AgentName, o.ComponentNamespace, o.HubKubeconfigSecret,
-		restclient.AnonymousClientConfig(hubClientConfig),
+		kubeconfigData,
 		spokeKubeClient.CoreV1(),
 		hubKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
 		hubKubeInformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
@@ -354,7 +367,7 @@ func (o *SpokeAgentOptions) Complete(coreV1Client corev1client.CoreV1Interface, 
 	}
 
 	// dump data in hub kubeconfig secret into file system if it exists
-	err = hubclientcert.DumpSecret(coreV1Client, o.ComponentNamespace, o.HubKubeconfigSecret,
+	err = managedcluster.DumpSecret(coreV1Client, o.ComponentNamespace, o.HubKubeconfigSecret,
 		o.HubKubeconfigDir, ctx, recorder)
 	if err != nil {
 		return err
@@ -386,19 +399,19 @@ func generateAgentName() string {
 // completes. Changing the name of the cluster will make the existing hub kubeconfig invalid,
 // because certificate in TLSCertFile is issued to a specific cluster/agent.
 func (o *SpokeAgentOptions) hasValidHubClientConfig() (bool, error) {
-	kubeconfigPath := path.Join(o.HubKubeconfigDir, hubclientcert.KubeconfigFile)
+	kubeconfigPath := path.Join(o.HubKubeconfigDir, clientcert.KubeconfigFile)
 	if _, err := os.Stat(kubeconfigPath); os.IsNotExist(err) {
 		klog.V(4).Infof("Kubeconfig file %q not found", kubeconfigPath)
 		return false, nil
 	}
 
-	keyPath := path.Join(o.HubKubeconfigDir, hubclientcert.TLSKeyFile)
+	keyPath := path.Join(o.HubKubeconfigDir, clientcert.TLSKeyFile)
 	if _, err := os.Stat(keyPath); os.IsNotExist(err) {
 		klog.V(4).Infof("TLS key file %q not found", keyPath)
 		return false, nil
 	}
 
-	certPath := path.Join(o.HubKubeconfigDir, hubclientcert.TLSCertFile)
+	certPath := path.Join(o.HubKubeconfigDir, clientcert.TLSCertFile)
 	certData, err := ioutil.ReadFile(path.Clean(certPath))
 	if err != nil {
 		klog.V(4).Infof("Unable to load TLS cert file %q", certPath)
@@ -406,7 +419,7 @@ func (o *SpokeAgentOptions) hasValidHubClientConfig() (bool, error) {
 	}
 
 	// check if the tls certificate is issued for the current cluster/agent
-	clusterName, agentName, err := hubclientcert.GetClusterAgentNamesFromCertificate(certData)
+	clusterName, agentName, err := managedcluster.GetClusterAgentNamesFromCertificate(certData)
 	if err != nil {
 		return false, nil
 	}
@@ -417,7 +430,7 @@ func (o *SpokeAgentOptions) hasValidHubClientConfig() (bool, error) {
 		return false, nil
 	}
 
-	return hubclientcert.IsCertificateValid(certData)
+	return clientcert.IsCertificateValid(certData, nil)
 }
 
 // getOrGenerateClusterAgentNames returns cluster name and agent name.
@@ -435,10 +448,10 @@ func (o *SpokeAgentOptions) hasValidHubClientConfig() (bool, error) {
 func (o *SpokeAgentOptions) getOrGenerateClusterAgentNames() (string, string) {
 	// try to load cluster/agent name from tls certification
 	var clusterNameInCert, agentNameInCert string
-	certPath := path.Join(o.HubKubeconfigDir, hubclientcert.TLSCertFile)
+	certPath := path.Join(o.HubKubeconfigDir, clientcert.TLSCertFile)
 	certData, certErr := ioutil.ReadFile(path.Clean(certPath))
 	if certErr == nil {
-		clusterNameInCert, agentNameInCert, _ = hubclientcert.GetClusterAgentNamesFromCertificate(certData)
+		clusterNameInCert, agentNameInCert, _ = managedcluster.GetClusterAgentNamesFromCertificate(certData)
 	}
 
 	clusterName := o.ClusterName
@@ -447,7 +460,7 @@ func (o *SpokeAgentOptions) getOrGenerateClusterAgentNames() (string, string) {
 		// TODO, read cluster name from openshift struct if the spoke agent is running in an openshift cluster
 
 		// and then load the cluster name from the mounted secret
-		clusterNameFilePath := path.Join(o.HubKubeconfigDir, hubclientcert.ClusterNameFile)
+		clusterNameFilePath := path.Join(o.HubKubeconfigDir, clientcert.ClusterNameFile)
 		clusterNameBytes, err := ioutil.ReadFile(path.Clean(clusterNameFilePath))
 		switch {
 		case len(clusterNameInCert) > 0:
@@ -466,7 +479,7 @@ func (o *SpokeAgentOptions) getOrGenerateClusterAgentNames() (string, string) {
 	}
 
 	// try to load agent name from the mounted secret
-	agentNameFilePath := path.Join(o.HubKubeconfigDir, hubclientcert.AgentNameFile)
+	agentNameFilePath := path.Join(o.HubKubeconfigDir, clientcert.AgentNameFile)
 	agentNameBytes, err := ioutil.ReadFile(path.Clean(agentNameFilePath))
 	var agentName string
 	switch {

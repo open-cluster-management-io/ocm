@@ -1,18 +1,19 @@
-package hubclientcert
+package clientcert
 
 import (
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"testing"
 	"time"
-
-	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	certutil "k8s.io/client-go/util/cert"
+
+	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
 )
 
-func TestCSRApproved(t *testing.T) {
+func TestIsCSRApproved(t *testing.T) {
 	cases := []struct {
 		name        string
 		csr         *certificates.CertificateSigningRequest
@@ -42,12 +43,12 @@ func TestCSRApproved(t *testing.T) {
 	}
 }
 
-func TestValidKubeconfig(t *testing.T) {
+func TestHasValidHubKubeconfig(t *testing.T) {
 	cases := []struct {
-		name       string
-		secret     *corev1.Secret
-		commonName string
-		isValid    bool
+		name    string
+		secret  *corev1.Secret
+		subject *pkix.Name
+		isValid bool
 	}{
 		{
 			name:   "no data",
@@ -76,24 +77,107 @@ func TestValidKubeconfig(t *testing.T) {
 			}),
 		},
 		{
-			name: "unmatched common name",
-			secret: testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "", testinghelpers.NewTestCert("test", 60*time.Second), map[string][]byte{
+			name: "expired cert",
+			secret: testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "", testinghelpers.NewTestCert("test", -60*time.Second), map[string][]byte{
 				KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
 			}),
-			commonName: "wrong-common-name",
 		},
 		{
-			name: "valid hub config",
+			name: "invalid common name",
 			secret: testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "", testinghelpers.NewTestCert("test", 60*time.Second), map[string][]byte{
 				KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
 			}),
-			commonName: "test",
-			isValid:    true,
+			subject: &pkix.Name{
+				CommonName: "wrong-common-name",
+			},
+		},
+		{
+			name: "valid kubeconfig",
+			secret: testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "", testinghelpers.NewTestCert("test", 60*time.Second), map[string][]byte{
+				KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
+			}),
+			subject: &pkix.Name{
+				CommonName: "test",
+			},
+			isValid: true,
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			isValid := hasValidKubeconfig(c.secret, c.commonName)
+			isValid := HasValidHubKubeconfig(c.secret, c.subject)
+			if isValid != c.isValid {
+				t.Errorf("expected %t, but got %t", c.isValid, isValid)
+			}
+		})
+	}
+}
+
+func TestIsCertificateValid(t *testing.T) {
+	cases := []struct {
+		name     string
+		testCert *testinghelpers.TestCert
+		subject  *pkix.Name
+		isValid  bool
+	}{
+		{
+			name:     "no cert",
+			testCert: &testinghelpers.TestCert{},
+		},
+		{
+			name:     "bad cert",
+			testCert: &testinghelpers.TestCert{Cert: []byte("bad cert")},
+		},
+		{
+			name:     "expired cert",
+			testCert: testinghelpers.NewTestCert("test", -60*time.Second),
+		},
+		{
+			name:     "invalid common name",
+			testCert: testinghelpers.NewTestCert("test", 60*time.Second),
+			subject: &pkix.Name{
+				CommonName: "wrong-common-name",
+			},
+		},
+		{
+			name: "invalid organization",
+			testCert: testinghelpers.NewTestCertWithSubject(pkix.Name{
+				CommonName:   "test",
+				Organization: []string{"a", "b"},
+			}, 60*time.Second),
+			subject: &pkix.Name{
+				CommonName:   "test",
+				Organization: []string{"c"},
+			},
+		},
+		{
+			name: "invalid organizational unit",
+			testCert: testinghelpers.NewTestCertWithSubject(pkix.Name{
+				CommonName:         "test",
+				OrganizationalUnit: []string{"x"},
+			}, 60*time.Second),
+			subject: &pkix.Name{
+				CommonName:         "test",
+				OrganizationalUnit: []string{"y", "z"},
+			},
+		},
+		{
+			name: "valid cert",
+			testCert: testinghelpers.NewTestCertWithSubject(pkix.Name{
+				CommonName:         "test",
+				Organization:       []string{"a", "b"},
+				OrganizationalUnit: []string{"x"},
+			}, 60*time.Second),
+			subject: &pkix.Name{
+				CommonName:         "test",
+				Organization:       []string{"a", "b"},
+				OrganizationalUnit: []string{"x"},
+			},
+			isValid: true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			isValid, _ := IsCertificateValid(c.testCert.Cert, c.subject)
 			if isValid != c.isValid {
 				t.Errorf("expected %t, but got %t", c.isValid, isValid)
 			}
@@ -146,46 +230,6 @@ func TestGetCertValidityPeriod(t *testing.T) {
 			}
 			if !c.expectedCert.NotAfter.Equal(*notAfter) {
 				t.Errorf("expect %v, but got %v", expectedCerts[0].NotAfter, *notAfter)
-			}
-		})
-	}
-}
-
-func TestGetClusterAgentNamesFromCertificate(t *testing.T) {
-	cases := []struct {
-		name                string
-		certData            []byte
-		expectedClusterName string
-		expectedAgentName   string
-		expectedErrorPrefix string
-	}{
-		{
-			name:                "cert data is invalid",
-			certData:            []byte("invalid cert"),
-			expectedErrorPrefix: "unable to parse certificate:",
-		},
-		{
-			name:     "cert with invalid commmon name",
-			certData: testinghelpers.NewTestCert("test", 60*time.Second).Cert,
-		},
-		{
-			name:                "valid cert with correct common name",
-			certData:            testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second).Cert,
-			expectedClusterName: "cluster1",
-			expectedAgentName:   "agent1",
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			clusterName, agentName, err := GetClusterAgentNamesFromCertificate(c.certData)
-			testinghelpers.AssertErrorWithPrefix(t, err, c.expectedErrorPrefix)
-
-			if clusterName != c.expectedClusterName {
-				t.Errorf("expect %v, but got %v", c.expectedClusterName, clusterName)
-			}
-
-			if agentName != c.expectedAgentName {
-				t.Errorf("expect %v, but got %v", c.expectedAgentName, agentName)
 			}
 		})
 	}

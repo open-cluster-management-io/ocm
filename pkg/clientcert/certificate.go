@@ -1,31 +1,30 @@
-package hubclientcert
+package clientcert
 
 import (
+	"crypto/x509/pkix"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
-	certificates "k8s.io/api/certificates/v1beta1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
-
-	"github.com/open-cluster-management/registration/pkg/hub/user"
 )
 
-// HasValidKubeconfig checks if there exists a valid kubeconfig in the given secret
-// Returns true if the conditions below are met:
-//   1. KubeconfigFile exists
+// HasValidClientCertificate checks if there exists a valid client certificate in the given secret
+// Returns true if all the conditions below are met:
+//   1. KubeconfigFile exists when hasKubeconfig is true
 //   2. TLSKeyFile exists
 //   3. TLSCertFile exists and the certificate is not expired
-//   4. If not empty, the given commonName matches the common name of the subject in the
-//      certificate stored in TLSCertFile
-func hasValidKubeconfig(secret *corev1.Secret, commonName string) bool {
-	if secret.Data == nil {
-		klog.V(4).Infof("No kubeconfig found in secret %q", secret.Namespace+"/"+secret.Name)
+//   4. If subject is specified, it matches the subject in the certificate stored in TLSCertFile
+func HasValidHubKubeconfig(secret *corev1.Secret, subject *pkix.Name) bool {
+	if len(secret.Data) == 0 {
+		klog.V(4).Infof("No data found in secret %q", secret.Namespace+"/"+secret.Name)
 		return false
 	}
 
@@ -45,36 +44,19 @@ func hasValidKubeconfig(secret *corev1.Secret, commonName string) bool {
 		return false
 	}
 
-	valid, err := IsCertificateValid(certData)
+	valid, err := IsCertificateValid(certData, subject)
 	if err != nil {
-		klog.V(4).Infof("unable to validate certificate in secret %s: %v", secret.Namespace+"/"+secret.Name, err)
+		klog.V(4).Infof("Unable to validate certificate in secret %s: %v", secret.Namespace+"/"+secret.Name, err)
 		return false
 	}
 
-	if len(commonName) == 0 || !valid {
-		return valid
-	}
-
-	// check the common name of the subject in certification
-	certs, err := certutil.ParseCertsPEM(certData)
-	if err != nil {
-		klog.V(4).Infof("unable to parse certificate: %v", err)
-		return false
-	}
-
-	for _, cert := range certs {
-		if cert.Subject.CommonName == commonName {
-			return true
-		}
-	}
-
-	klog.V(4).Infof("certificate is not issued for %q", commonName)
-	return false
+	return valid
 }
 
-// IsCertificateValid return true if all certs in client certificate are not expired.
-// Otherwise return false
-func IsCertificateValid(certData []byte) (bool, error) {
+// IsCertificateValid return true if
+// 1) All certs in client certificate are not expired.
+// 2) At least one cert matches the given subject if specified
+func IsCertificateValid(certData []byte, subject *pkix.Name) (bool, error) {
 	certs, err := certutil.ParseCertsPEM(certData)
 	if err != nil {
 		return false, errors.New("unable to parse certificate")
@@ -93,7 +75,29 @@ func IsCertificateValid(certData []byte) (bool, error) {
 		}
 	}
 
-	return true, nil
+	if subject == nil {
+		return true, nil
+	}
+
+	// check subject of certificates
+	for _, cert := range certs {
+		if cert.Subject.CommonName != subject.CommonName {
+			continue
+		}
+
+		if !reflect.DeepEqual(cert.Subject.Organization, subject.Organization) {
+			continue
+		}
+
+		if !reflect.DeepEqual(cert.Subject.OrganizationalUnit, subject.OrganizationalUnit) {
+			continue
+		}
+		return true, nil
+	}
+
+	klog.V(4).Infof("Certificate is not issued for subject (cn=%s; o=%s; ou=%s)",
+		subject.CommonName, strings.Join(subject.Organization, ","), strings.Join(subject.OrganizationalUnit, ","))
+	return false, nil
 }
 
 // getCertValidityPeriod returns the validity period of the client certificate in the secret
@@ -137,8 +141,8 @@ func getCertValidityPeriod(secret *corev1.Secret) (*time.Time, *time.Time, error
 	return notBefore, notAfter, nil
 }
 
-// buildKubeconfig builds a kubeconfig based on a rest config template with a cert/key pair
-func buildKubeconfig(clientConfig *restclient.Config, certPath, keyPath string) clientcmdapi.Config {
+// BuildKubeconfig builds a kubeconfig based on a rest config template with a cert/key pair
+func BuildKubeconfig(clientConfig *restclient.Config, certPath, keyPath string) clientcmdapi.Config {
 	// Build kubeconfig.
 	kubeconfig := clientcmdapi.Config{
 		// Define a cluster stanza based on the bootstrap kubeconfig.
@@ -164,38 +168,16 @@ func buildKubeconfig(clientConfig *restclient.Config, certPath, keyPath string) 
 	return kubeconfig
 }
 
-func isCSRApproved(csr *certificates.CertificateSigningRequest) bool {
-	// TODO: need to make it work in csr v1 as well
+// isCSRApproved returns true if the given csr has been approved
+func isCSRApproved(csr *certificatesv1beta1.CertificateSigningRequest) bool {
 	approved := false
 	for _, condition := range csr.Status.Conditions {
-		if condition.Type == certificates.CertificateDenied {
+		if condition.Type == certificatesv1beta1.CertificateDenied {
 			return false
-		} else if condition.Type == certificates.CertificateApproved {
+		} else if condition.Type == certificatesv1beta1.CertificateApproved {
 			approved = true
 		}
 	}
 
 	return approved
-}
-
-// GetClusterAgentNamesFromCertificate returns the cluster name and agent name by parsing
-// the common name of the certification
-func GetClusterAgentNamesFromCertificate(certData []byte) (clusterName, agentName string, err error) {
-	certs, err := certutil.ParseCertsPEM(certData)
-	if err != nil {
-		return "", "", fmt.Errorf("unable to parse certificate: %w", err)
-	}
-
-	for _, cert := range certs {
-		if ok := strings.HasPrefix(cert.Subject.CommonName, user.SubjectPrefix); !ok {
-			continue
-		}
-		names := strings.Split(strings.TrimPrefix(cert.Subject.CommonName, user.SubjectPrefix), ":")
-		if len(names) != 2 {
-			continue
-		}
-		return names[0], names[1], nil
-	}
-
-	return "", "", nil
 }
