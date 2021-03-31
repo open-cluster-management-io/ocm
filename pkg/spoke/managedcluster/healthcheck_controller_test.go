@@ -86,7 +86,7 @@ func TestHealthCheck(t *testing.T) {
 			},
 		},
 		{
-			name:       "there is no readyz endpoint",
+			name:       "there is no livez endpoint",
 			clusters:   []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			httpStatus: http.StatusNotFound,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -102,7 +102,7 @@ func TestHealthCheck(t *testing.T) {
 			},
 		},
 		{
-			name:       "readyz is forbidden",
+			name:       "livez is forbidden",
 			clusters:   []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			httpStatus: http.StatusForbidden,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
