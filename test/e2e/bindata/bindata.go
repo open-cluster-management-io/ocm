@@ -138,8 +138,11 @@ metadata:
   name: open-cluster-management:spoke
 rules:
 - apiGroups: [""]
-  resources: ["nodes", "configmaps", "secrets"]
+  resources: ["nodes", "configmaps"]
   verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]
 - apiGroups: ["authorization.k8s.io"]
   resources: ["subjectaccessreviews"]
   verbs: ["create"]

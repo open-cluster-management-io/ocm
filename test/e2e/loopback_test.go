@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
+	addonv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
 	clusterv1alpha1 "github.com/open-cluster-management/api/cluster/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 
+	"github.com/open-cluster-management/registration/pkg/clientcert"
 	"github.com/open-cluster-management/registration/pkg/helpers"
 	"github.com/open-cluster-management/registration/test/e2e/bindata"
 )
@@ -428,6 +430,104 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 			return reflect.DeepEqual(clusterClaims, managedCluster.Status.ClusterClaims), nil
 		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ginkgo.By("Create addon on hub")
+		addOnName := fmt.Sprintf("loopback-e2e-addon-%v", suffix)
+		// create namespace for addon on spoke
+		addOnNs := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: addOnName,
+			},
+		}
+		_, err = hubClient.CoreV1().Namespaces().Create(context.TODO(), addOnNs, metav1.CreateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		// create an addon
+		addOn := &addonv1alpha1.ManagedClusterAddOn{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      addOnName,
+				Namespace: clusterName,
+				Annotations: map[string]string{
+					"addon.open-cluster-management.io/installNamespace": addOnName,
+					"addon.open-cluster-management.io/registrations":    `[{"signerName":"kubernetes.io/kube-apiserver-client"}]`,
+				},
+			},
+		}
+		_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		ginkgo.By(fmt.Sprintf("Waiting for the CSR for addOn %q to exist", addOnName))
+		err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
+			var err error
+			csrs, err = csrClient.List(context.TODO(), metav1.ListOptions{
+				LabelSelector: fmt.Sprintf("open-cluster-management.io/cluster-name=%s,open-cluster-management.io/addon-name=%s", clusterName, addOnName),
+			})
+			if err != nil {
+				return false, err
+			}
+
+			if len(csrs.Items) >= 1 {
+				return true, nil
+			}
+
+			return false, nil
+		})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ginkgo.By("Approving all pending CSRs")
+		for i := range csrs.Items {
+			csr = &csrs.Items[i]
+
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				csr, err = csrClient.Get(context.TODO(), csr.Name, metav1.GetOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				if helpers.IsCSRInTerminalState(&csr.Status) {
+					return nil
+				}
+
+				csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
+					Type:    certificatesv1beta1.CertificateApproved,
+					Reason:  "Approved by E2E",
+					Message: "Approved as part of Loopback e2e",
+				})
+				_, err := csrClient.UpdateApproval(context.TODO(), csr, metav1.UpdateOptions{})
+				return err
+			})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		}
+
+		ginkgo.By("Check addon client certificate in secret")
+		secretName := fmt.Sprintf("%s-hub-kubeconfig", addOnName)
+		gomega.Eventually(func() bool {
+			secret, err := hubClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
+			if err != nil {
+				return false
+			}
+			if _, ok := secret.Data[clientcert.TLSKeyFile]; !ok {
+				return false
+			}
+			if _, ok := secret.Data[clientcert.TLSCertFile]; !ok {
+				return false
+			}
+			if _, ok := secret.Data[clientcert.KubeconfigFile]; !ok {
+				return false
+			}
+			return true
+		}, 90*time.Second, 1*time.Second).Should(gomega.BeTrue())
+
+		ginkgo.By("Delete the addon and check if secret is gone")
+		err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		gomega.Eventually(func() bool {
+			_, err = hubClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return true
+			}
+
+			return false
+		}, 90*time.Second, 1*time.Second).Should(gomega.BeTrue())
 	})
 })
 
@@ -596,6 +696,7 @@ func spokeDeployment(nsName, clusterName, image string) (*unstructured.Unstructu
 	clusterNameArg := fmt.Sprintf("--cluster-name=%v", clusterName)
 	args[2] = clusterNameArg
 
+	args = append(args, "--feature-gates=AddonManagement=true")
 	if err := unstructured.SetNestedField(containers[0].(map[string]interface{}), args, "args"); err != nil {
 		return nil, err
 	}
