@@ -101,6 +101,19 @@ func NewAvailableManagedCluster() *clusterv1.ManagedCluster {
 	return managedCluster
 }
 
+func NewUnknownManagedCluster() *clusterv1.ManagedCluster {
+	managedCluster := NewAcceptedManagedCluster()
+	availableCondtion := NewManagedClusterCondition(
+		clusterv1.ManagedClusterConditionAvailable,
+		"Unknown",
+		"ManagedClusterUnknown",
+		"Managed cluster is unknown",
+		nil,
+	)
+	managedCluster.Status.Conditions = append(managedCluster.Status.Conditions, availableCondtion)
+	return managedCluster
+}
+
 func NewJoinedManagedCluster() *clusterv1.ManagedCluster {
 	managedCluster := NewAcceptedManagedCluster()
 	joinedCondtion := NewManagedClusterCondition(
@@ -165,6 +178,18 @@ func NewManagedClusterLease(name string, renewTime time.Time) *coordv1.Lease {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: TestManagedClusterName,
+		},
+		Spec: coordv1.LeaseSpec{
+			RenewTime: &metav1.MicroTime{Time: renewTime},
+		},
+	}
+}
+
+func NewAddOnLease(namespace, name string, renewTime time.Time) *coordv1.Lease {
+	return &coordv1.Lease{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
 		},
 		Spec: coordv1.LeaseSpec{
 			RenewTime: &metav1.MicroTime{Time: renewTime},

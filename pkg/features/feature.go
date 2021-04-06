@@ -23,6 +23,10 @@ const (
 	// deployer who disable the feature may need to update claim field in managed cluster status
 	// itself to avoid impact to users.
 	ClusterClaim featuregate.Feature = "ClusterClaim"
+
+	// AddonManagement will start new controllers in the spoke-agent to manage the managed cluster addons
+	// registration and maintains the status of managed cluster addons through watching their leases.
+	AddonManagement featuregate.Feature = "AddonManagement"
 )
 
 var (
@@ -40,5 +44,6 @@ func init() {
 // feature keys.  To add a new feature, define a key for it above and
 // add it here.
 var defaultRegistrationFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	ClusterClaim: {Default: true, PreRelease: featuregate.Beta},
+	ClusterClaim:    {Default: true, PreRelease: featuregate.Beta},
+	AddonManagement: {Default: false, PreRelease: featuregate.Alpha},
 }

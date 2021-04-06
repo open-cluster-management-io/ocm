@@ -17,7 +17,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	clusterv1client "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
+	addonclient "github.com/open-cluster-management/api/client/addon/clientset/versioned"
+	clusterclient "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 )
 
 func TestE2E(t *testing.T) {
@@ -29,7 +30,8 @@ var (
 	hubClient           kubernetes.Interface
 	hubDynamicClient    dynamic.Interface
 	hubAPIServiceClient *apiregistrationclient.ApiregistrationV1Client
-	clusterClient       clusterv1client.Interface
+	hubAddOnClient      addonclient.Interface
+	clusterClient       clusterclient.Interface
 	registrationImage   string
 	clusterCfg          *rest.Config
 )
@@ -74,7 +76,12 @@ var _ = ginkgo.BeforeSuite(func() {
 			return err
 		}
 
-		clusterClient, err = clusterv1client.NewForConfig(clusterCfg)
+		hubAddOnClient, err = addonclient.NewForConfig(clusterCfg)
+		if err != nil {
+			return err
+		}
+
+		clusterClient, err = clusterclient.NewForConfig(clusterCfg)
 
 		return err
 	}()

@@ -147,7 +147,10 @@ rules:
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["clusterclaims"]
   verbs: ["get", "list", "watch"]
-
+# Allow agent to list addons lease
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch"]
 `)
 
 func deploySpokeClusterroleYamlBytes() ([]byte, error) {
