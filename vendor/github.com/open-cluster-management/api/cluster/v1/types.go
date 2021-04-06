@@ -22,14 +22,14 @@ import (
 //
 // The cluster join process follows a double opt-in process:
 //
-// 1. agent on managed cluster creates CSR on hub with cluster UID and agent name.
-// 2. agent on managed cluster creates ManagedCluster on hub.
-// 3. cluster admin on hub approves the CSR for the ManagedCluster's UID and agent name.
-// 4. cluster admin sets spec.acceptClient of ManagedCluster to true.
-// 5. cluster admin on managed cluster creates credential of kubeconfig to hub.
+// 1. Agent on managed cluster creates CSR on hub with cluster UID and agent name.
+// 2. Agent on managed cluster creates ManagedCluster on hub.
+// 3. Cluster admin on hub approves the CSR for UID and agent name of the ManagedCluster.
+// 4. Cluster admin sets spec.acceptClient of ManagedCluster to true.
+// 5. Cluster admin on managed cluster creates credential of kubeconfig to hub.
 //
-// Once the hub creates the cluster namespace, the Klusterlet agent on the Managed Cluster
-// pushes the credential to the hub to use against the managed cluster's kube-apiserver.
+// Once the hub creates the cluster namespace, the Klusterlet agent on the ManagedCluster
+// pushes the credential to the hub to use against the kube-apiserver of the ManagedCluster.
 type ManagedCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -46,24 +46,24 @@ type ManagedCluster struct {
 // and verify its identity.
 type ManagedClusterSpec struct {
 	// ManagedClusterClientConfigs represents a list of the apiserver address of the managed cluster.
-	// If it is empty, managed cluster has no accessible address to be visited from hub.
+	// If it is empty, the managed cluster has no accessible address for the hub to connect with it.
 	// +optional
 	ManagedClusterClientConfigs []ClientConfig `json:"managedClusterClientConfigs,omitempty"`
 
-	// hubAcceptsClient represents that hub accepts the join of Klusterlet agent on
-	// the managed cluster to the hub. The default value is false, and can only be set
+	// hubAcceptsClient represents that hub accepts the joining of Klusterlet agent on
+	// the managed cluster with the hub. The default value is false, and can only be set
 	// true when the user on hub has an RBAC rule to UPDATE on the virtual subresource
 	// of managedclusters/accept.
-	// When the value is set true, a namespace whose name is same as the name of ManagedCluster
-	// is created on hub representing the managed cluster, also role/rolebinding is created on
-	// the namespace to grant the permision of access from agent on managed cluster.
-	// When the value is set false, the namespace representing the managed cluster is
+	// When the value is set true, a namespace whose name is the same as the name of ManagedCluster
+	// is created on the hub. This namespace represents the managed cluster, also role/rolebinding is created on
+	// the namespace to grant the permision of access from the agent on the managed cluster.
+	// When the value is set to false, the namespace representing the managed cluster is
 	// deleted.
 	// +required
 	HubAcceptsClient bool `json:"hubAcceptsClient"`
 
 	// LeaseDurationSeconds is used to coordinate the lease update time of Klusterlet agents on the managed cluster.
-	// If its value is zero, the Klusterlet agent will update its lease every 60s by default
+	// If its value is zero, the Klusterlet agent will update its lease every 60 seconds by default
 	// +optional
 	LeaseDurationSeconds int32 `json:"leaseDurationSeconds,omitempty"`
 }
@@ -71,7 +71,7 @@ type ManagedClusterSpec struct {
 // ClientConfig represents the apiserver address of the managed cluster.
 // TODO include credential to connect to managed cluster kube-apiserver
 type ClientConfig struct {
-	// URL is the url of apiserver endpoint of the managed cluster.
+	// URL is the URL of apiserver endpoint of the managed cluster.
 	// +required
 	URL string `json:"url"`
 
@@ -128,15 +128,15 @@ type ManagedClusterClaim struct {
 }
 
 const (
-	// ManagedClusterConditionJoined means the managed cluster has successfully joined the hub
+	// ManagedClusterConditionJoined means the managed cluster has successfully joined the hub.
 	ManagedClusterConditionJoined string = "ManagedClusterJoined"
 	// ManagedClusterConditionHubAccepted means the request to join the cluster is
-	// approved by cluster-admin on hub
+	// approved by cluster-admin on hub.
 	ManagedClusterConditionHubAccepted string = "HubAcceptedManagedCluster"
 	// ManagedClusterConditionHubDenied means the request to join the cluster is denied by
-	// cluster-admin on hub
+	// cluster-admin on hub.
 	ManagedClusterConditionHubDenied string = "HubDeniedManagedCluster"
-	// ManagedClusterConditionAvailable means the managed cluster is available, if a managed
+	// ManagedClusterConditionAvailable means the managed cluster is available. If a managed
 	// cluster is available, the kube-apiserver is healthy and the Klusterlet agent is
 	// running with the minimum deployment on this managed cluster
 	ManagedClusterConditionAvailable string = "ManagedClusterConditionAvailable"
@@ -153,7 +153,7 @@ const (
 )
 
 // ResourceList defines a map for the quantity of different resources, the definition
-// matches the ResourceList defined in k8s.io/api/core/v1
+// matches the ResourceList defined in k8s.io/api/core/v1.
 type ResourceList map[ResourceName]resource.Quantity
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -166,6 +166,6 @@ type ManagedClusterList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 
-	// Items is a list of managed cluster.
+	// Items is a list of managed clusters.
 	Items []ManagedCluster `json:"items"`
 }

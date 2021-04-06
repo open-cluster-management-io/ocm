@@ -83,9 +83,8 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	testEnv = &envtest.Environment{
 		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths: []string{
-			filepath.Join(".", "vendor", "github.com", "open-cluster-management", "api", "cluster", "v1"),
-			filepath.Join(".", "vendor", "github.com", "open-cluster-management", "api", "cluster", "v1alpha1"),
-			filepath.Join(".", "vendor", "github.com", "open-cluster-management", "api", "work", "v1"),
+			filepath.Join(".", "deploy", "hub"),
+			filepath.Join(".", "deploy", "spoke"),
 		},
 		KubeAPIServerFlags: apiServerFlags,
 	}
