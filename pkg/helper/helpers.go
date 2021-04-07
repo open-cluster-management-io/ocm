@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,6 +39,7 @@ var (
 func init() {
 	// add apiextensions v1beta1 to scheme to support CustomResourceDefinition v1beta1
 	_ = apiextensionsv1beta1.AddToScheme(genericScheme)
+	_ = apiextensionsv1.AddToScheme(genericScheme)
 }
 
 // MergeManifestConditions return a new ManifestCondition array which merges the existing manifest

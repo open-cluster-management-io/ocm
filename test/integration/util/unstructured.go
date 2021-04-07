@@ -16,7 +16,7 @@ import (
 
 const (
 	guestbookCrdJson = `{
-		"apiVersion": "apiextensions.k8s.io/v1beta1",
+		"apiVersion": "apiextensions.k8s.io/v1",
 		"kind": "CustomResourceDefinition",
 		"metadata": {
 			"name": "guestbooks.my.domain"
@@ -32,41 +32,43 @@ const (
 				"plural": "guestbooks",
 				"singular": "guestbook"
 			},
-			"preserveUnknownFields": true,
 			"scope": "Namespaced",
-			"validation": {
-				"openAPIV3Schema": {
-					"properties": {
-						"apiVersion": {
-							"type": "string"
-						},
-						"kind": {
-							"type": "string"
-						},
-						"metadata": {
-							"type": "object"
-						},
-						"spec": {
-							"properties": {
-								"foo": {
-									"type": "string"
-								}
-							},
-							"type": "object"
-						},
-						"status": {
-							"type": "object"
-						}
-					},
-					"type": "object"
-				}
-			},
-			"version": "v1",
 			"versions": [
 				{
 					"name": "v1",
+					"schema": {
+                    	"openAPIV3Schema": {
+							"description": "",
+							"properties": {
+								"apiVersion": {
+									"type": "string"
+								},
+								"kind": {
+									"type": "string"
+								},
+								"metadata": {
+									"type": "object"
+								},
+								"spec": {
+									"properties": {
+										"foo": {
+											"type": "string"
+										}
+									},
+									"type": "object"
+								},
+								"status": {
+									"type": "object"
+								}
+							},
+							"type": "object"
+						}
+					},
 					"served": true,
-					"storage": true
+					"storage": true,
+					"subresources": {
+						"status": {}
+					}
 				}
 			]
 		}
@@ -171,7 +173,7 @@ func init() {
 
 func GuestbookCrd() (crd *unstructured.Unstructured, gvr schema.GroupVersionResource, err error) {
 	crd, err = loadResourceFromJSON(guestbookCrdJson)
-	gvr = schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1beta1", Resource: "customresourcedefinitions"}
+	gvr = schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"}
 	return crd, gvr, err
 }
 

@@ -10,7 +10,7 @@ import (
 // +kubebuilder:subresource:status
 
 // ManifestWork represents a manifests workload that hub wants to deploy on the managed cluster.
-// A manifest workload is defined as a set of kubernetes resources.
+// A manifest workload is defined as a set of Kubernetes resources.
 // ManifestWork must be created in the cluster namespace on the hub, so that agent on the
 // corresponding managed cluster can access this resource and deploy on the managed
 // cluster.
@@ -21,94 +21,94 @@ type ManifestWork struct {
 	// Spec represents a desired configuration of work to be deployed on the managed cluster.
 	Spec ManifestWorkSpec `json:"spec"`
 
-	// Status represents the current status of work
+	// Status represents the current status of work.
 	// +optional
 	Status ManifestWorkStatus `json:"status,omitempty"`
 }
 
 // ManifestWorkSpec represents a desired configuration of manifests to be deployed on the managed cluster.
 type ManifestWorkSpec struct {
-	// Workload represents the manifest workload to be deployed on managed cluster
+	// Workload represents the manifest workload to be deployed on a managed cluster.
 	Workload ManifestsTemplate `json:"workload,omitempty"`
 }
 
-// Manifest represents a resource to be deployed on managed cluster
+// Manifest represents a resource to be deployed on managed cluster.
 type Manifest struct {
 	// +kubebuilder:validation:EmbeddedResource
 	// +kubebuilder:pruning:PreserveUnknownFields
 	runtime.RawExtension `json:",inline"`
 }
 
-// ManifestsTemplate represents the manifest workload to be deployed on managed cluster
+// ManifestsTemplate represents the manifest workload to be deployed on a managed cluster.
 type ManifestsTemplate struct {
-	// Manifests represents a list of kuberenetes resources to be deployed on the managed cluster.
+	// Manifests represents a list of kuberenetes resources to be deployed on a managed cluster.
 	// +optional
 	Manifests []Manifest `json:"manifests,omitempty"`
 }
 
-// ManifestResourceMeta represents the gvk, gvr, name and namespace of a resoure
+// ManifestResourceMeta represents the group, version, kind, as well as the group, version, resource, name and namespace of a resoure.
 type ManifestResourceMeta struct {
-	// Ordinal represents the index of the manifest on spec
+	// Ordinal represents the index of the manifest on spec.
 	// +required
 	Ordinal int32 `json:"ordinal"`
 
-	// Group is the API Group of the kubernetes resource
+	// Group is the API Group of the Kubernetes resource.
 	// +optional
 	Group string `json:"group"`
 
-	// Version is the version of the kubernetes resource
+	// Version is the version of the Kubernetes resource.
 	// +optional
 	Version string `json:"version"`
 
-	// Kind is the kind of the kubernetes resource
+	// Kind is the kind of the Kubernetes resource.
 	// +optional
 	Kind string `json:"kind"`
 
-	// Resource is the resource name of the kubernetes resource
+	// Resource is the resource name of the Kubernetes resource.
 	// +optional
 	Resource string `json:"resource"`
 
-	// Name is the name of the kubernetes resource
+	// Name is the name of the Kubernetes resource.
 	// +optional
 	Name string `json:"name"`
 
-	// Name is the namespace of the kubernetes resource
+	// Name is the namespace of the Kubernetes resource.
 	// +optional
 	Namespace string `json:"namespace"`
 }
 
-// AppliedManifestResourceMeta represents the gvr, name and namespace of a resource.
+// AppliedManifestResourceMeta represents the group, version, resource, name and namespace of a resource.
 // Since these resources have been created, they must have valid group, version, resource, namespace, and name.
 type AppliedManifestResourceMeta struct {
-	// Group is the API Group of the kubernetes resource
+	// Group is the API Group of the Kubernetes resource.
 	// +required
 	Group string `json:"group"`
 
-	// Version is the version of the kubernetes resource
+	// Version is the version of the Kubernetes resource.
 	// +required
 	Version string `json:"version"`
 
-	// Resource is the resource name of the kubernetes resource
+	// Resource is the resource name of the Kubernetes resource.
 	// +required
 	Resource string `json:"resource"`
 
-	// Name is the name of the kubernetes resource
+	// Name is the name of the Kubernetes resource.
 	// +required
 	Name string `json:"name"`
 
-	// Name is the namespace of the kubernetes resource, empty string indicates
+	// Name is the namespace of the Kubernetes resource, empty string indicates
 	// it is a cluster scoped resource.
 	// +required
 	Namespace string `json:"namespace"`
 
-	// UID is set on successful deletion of the kubernetes resource by controller. The
+	// UID is set on successful deletion of the Kubernetes resource by controller. The
 	// resource might be still visible on the managed cluster after this field is set.
 	// It is not directly settable by a client.
 	// +optional
 	UID string `json:"uid,omitempty"`
 }
 
-// ManifestWorkStatus represents the current status of managed cluster ManifestWork
+// ManifestWorkStatus represents the current status of managed cluster ManifestWork.
 type ManifestWorkStatus struct {
 	// Conditions contains the different condition statuses for this work.
 	// Valid condition types are:
@@ -119,8 +119,8 @@ type ManifestWorkStatus struct {
 	// state for a certain period.
 	Conditions []metav1.Condition `json:"conditions"`
 
-	// ResourceStatus represents the status of each resource in manifestwork deployed on
-	// managed cluster. The Klusterlet agent on managed cluster syncs the condition from managed to the hub.
+	// ResourceStatus represents the status of each resource in manifestwork deployed on a
+	// managed cluster. The Klusterlet agent on managed cluster syncs the condition from the managed cluster to the hub.
 	// +optional
 	ResourceStatus ManifestResourceStatus `json:"resourceStatus,omitempty"`
 }
@@ -153,14 +153,14 @@ const (
 	WorkDegraded string = "Degraded"
 )
 
-// ManifestCondition represents the conditions of the resources deployed on
-// managed cluster
+// ManifestCondition represents the conditions of the resources deployed on a
+// managed cluster.
 type ManifestCondition struct {
-	// ResourceMeta represents the gvk, name and namespace of a resoure
+	// ResourceMeta represents the group, version, kind, name and namespace of a resoure.
 	// +required
 	ResourceMeta ManifestResourceMeta `json:"resourceMeta"`
 
-	// Conditions represents the conditions of this resource on managed cluster
+	// Conditions represents the conditions of this resource on a managed cluster.
 	// +required
 	Conditions []metav1.Condition `json:"conditions"`
 }
@@ -170,7 +170,7 @@ type ManifestCondition struct {
 type ManifestConditionType string
 
 const (
-	// ManifestProgressing represents the resource is being applied on the managed cluster
+	// ManifestProgressing represents that the resource is being applied on the managed cluster
 	ManifestProgressing ManifestConditionType = "Progressing"
 	// ManifestApplied represents that the resource object is applied
 	// on the managed cluster.
@@ -202,8 +202,8 @@ type ManifestWorkList struct {
 // +kubebuilder:subresource:status
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// AppliedManifestWork represents an applied manifestwork on managed cluster. It is placed
-// on managed cluster. An AppliedManifestWork links to a manifestwork on a hub recording resources
+// AppliedManifestWork represents an applied manifestwork on managed cluster that is placed
+// on a managed cluster. An AppliedManifestWork links to a manifestwork on a hub recording resources
 // deployed in the managed cluster.
 // When the agent is removed from managed cluster, cluster-admin on managed cluster
 // can delete appliedmanifestwork to remove resources deployed by the agent.
@@ -213,10 +213,10 @@ type AppliedManifestWork struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Spec represents the desired configuration of AppliedManifestWork
+	// Spec represents the desired configuration of AppliedManifestWork.
 	Spec AppliedManifestWorkSpec `json:"spec,omitempty"`
 
-	// Status represents the current status of AppliedManifestWork
+	// Status represents the current status of AppliedManifestWork.
 	// +optional
 	Status AppliedManifestWorkStatus `json:"status,omitempty"`
 }
@@ -228,7 +228,7 @@ type AppliedManifestWorkSpec struct {
 	// +required
 	HubHash string `json:"hubHash"`
 
-	// ManifestWorkName represents the name of the related manifestwork on hub.
+	// ManifestWorkName represents the name of the related manifestwork on the hub.
 	// +required
 	ManifestWorkName string `json:"manifestWorkName"`
 }

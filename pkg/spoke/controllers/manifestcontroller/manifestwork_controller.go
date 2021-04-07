@@ -184,7 +184,8 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 func (m *ManifestWorkController) applyManifest(manifests []workapiv1.Manifest, recorder events.Recorder, owner metav1.OwnerReference) []resourceapply.ApplyResult {
 	clientHolder := resourceapply.NewClientHolder().
 		WithAPIExtensionsClient(m.spokeAPIExtensionClient).
-		WithKubernetes(m.spokeKubeclient)
+		WithKubernetes(m.spokeKubeclient).
+		WithDynamicClient(m.spokeDynamicClient)
 
 	// Using index as the file name and apply manifests
 	indexstrings := []string{}
@@ -206,7 +207,7 @@ func (m *ManifestWorkController) applyManifest(manifests []workapiv1.Manifest, r
 	// TODO we should check the certain error.
 	for index, result := range results {
 		// Use dynamic client when scheme cannot decode manifest or typed client cannot handle the object
-		if isDecodeError(result.Error) || isUnhandledError(result.Error) {
+		if isDecodeError(result.Error) || isUnhandledError(result.Error) || isUnsupportedError(result.Error) {
 			results[index].Result, results[index].Changed, results[index].Error = m.applyUnstructrued(manifests[index].Raw, owner, recorder)
 		}
 	}
@@ -305,6 +306,12 @@ func isDecodeError(err error) bool {
 // client can handle the object
 func isUnhandledError(err error) bool {
 	return err != nil && strings.HasPrefix(err.Error(), "unhandled type")
+}
+
+// isUnsupportedError is to check if the error returned from resourceapply is due to
+// the PR https://github.com/openshift/library-go/pull/1042
+func isUnsupportedError(err error) bool {
+	return err != nil && strings.HasPrefix(err.Error(), "unsupported object type")
 }
 
 // isSameUnstructured compares the two unstructured object.
