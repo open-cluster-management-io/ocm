@@ -12,6 +12,8 @@ import (
 
 	"github.com/onsi/gomega"
 
+	addonv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
+	addonclient "github.com/open-cluster-management/api/client/addon/clientset/versioned"
 	clusterclient "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	operatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned"
 	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned"
@@ -20,9 +22,10 @@ import (
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
 	"github.com/open-cluster-management/registration-operator/pkg/helpers"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/client-go/kubernetes"
@@ -37,6 +40,7 @@ type Tester struct {
 	OperatorClient                   operatorclient.Interface
 	ClusterClient                    clusterclient.Interface
 	WorkClient                       workv1client.Interface
+	AddOnClinet                      addonclient.Interface
 	bootstrapHubSecret               *corev1.Secret
 	EventuallyTimeout                time.Duration
 	EventuallyInterval               time.Duration
@@ -87,6 +91,10 @@ func NewTester(kubeconfigPath string) (*Tester, error) {
 	}
 	if tester.WorkClient, err = workv1client.NewForConfig(tester.ClusterCfg); err != nil {
 		klog.Errorf("failed to get WorkClient. %v", err)
+		return nil, err
+	}
+	if tester.AddOnClinet, err = addonclient.NewForConfig(tester.ClusterCfg); err != nil {
+		klog.Errorf("failed to get AddOnClinet. %v", err)
 		return nil, err
 	}
 
@@ -157,7 +165,7 @@ func (t *Tester) CreateKlusterlet(name, clusterName, agentNamespace string) (*op
 	}
 
 	// create agentNamespace
-	namespace := &v1.Namespace{
+	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: agentNamespace,
 		},
@@ -500,4 +508,65 @@ func (t *Tester) PodLog(podName, nameSpace string, lines int64) (string, error) 
 	}
 
 	return buf.String(), nil
+}
+
+func (t *Tester) CreateManagedClusterAddOn(managedClusterNamespace, addOnName string) error {
+	_, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(managedClusterNamespace).Create(
+		context.TODO(),
+		&addonv1alpha1.ManagedClusterAddOn{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:   managedClusterNamespace,
+				Name:        addOnName,
+				Annotations: map[string]string{"addon.open-cluster-management.io/installNamespace": addOnName},
+			},
+		},
+		metav1.CreateOptions{},
+	)
+	return err
+}
+
+func (t *Tester) CreateManagedClusterAddOnLease(addOnInstallNamespace, addOnName string) error {
+	if _, err := t.KubeClient.CoreV1().Namespaces().Create(
+		context.TODO(),
+		&corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: addOnInstallNamespace,
+			},
+		},
+		metav1.CreateOptions{},
+	); err != nil {
+		return err
+	}
+
+	_, err := t.KubeClient.CoordinationV1().Leases(addOnInstallNamespace).Create(
+		context.TODO(),
+		&coordv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      addOnName,
+				Namespace: addOnInstallNamespace,
+			},
+			Spec: coordv1.LeaseSpec{
+				RenewTime: &metav1.MicroTime{Time: time.Now()},
+			},
+		},
+		metav1.CreateOptions{},
+	)
+	return err
+}
+
+func (t *Tester) CheckManagedClusterAddOnStatus(managedClusterNamespace, addOnName string) error {
+	addOn, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(managedClusterNamespace).Get(context.TODO(), addOnName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	if addOn.Status.Conditions == nil {
+		return fmt.Errorf("there is no conditions in addon %v/%v", managedClusterNamespace, addOnName)
+	}
+
+	if !meta.IsStatusConditionTrue(addOn.Status.Conditions, "ManagedClusterAddOnConditionAvailable") {
+		return fmt.Errorf("The addon %v/%v available condition is not true", managedClusterNamespace, addOnName)
+	}
+
+	return nil
 }

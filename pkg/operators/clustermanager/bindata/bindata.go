@@ -1,8 +1,10 @@
 // Code generated for package bindata by go-bindata DO NOT EDIT. (@generated)
 // sources:
+// manifests/cluster-manager/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml
 // manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml
 // manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml
 // manifests/cluster-manager/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml
+// manifests/cluster-manager/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml
 // manifests/cluster-manager/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml
 // manifests/cluster-manager/cluster-manager-namespace.yaml
 // manifests/cluster-manager/cluster-manager-registration-clusterrole.yaml
@@ -76,6 +78,119 @@ func (fi bindataFileInfo) IsDir() bool {
 // Sys return file is sys mode
 func (fi bindataFileInfo) Sys() interface{} {
 	return nil
+}
+
+var _manifestsClusterManager0000_00_addonOpenClusterManagementIo_clustermanagementaddonsCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  name: clustermanagementaddons.addon.open-cluster-management.io
+spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.addOnMeta.displayName
+    name: DISPLAY NAME
+    type: string
+  - JSONPath: .spec.addOnConfiguration.crdName
+    name: CRD NAME
+    type: string
+  group: addon.open-cluster-management.io
+  names:
+    kind: ClusterManagementAddOn
+    listKind: ClusterManagementAddOnList
+    plural: clustermanagementaddons
+    singular: clustermanagementaddon
+  preserveUnknownFields: false
+  scope: Cluster
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: ClusterManagementAddOn represents the registration of an add-on
+        to the cluster manager. This resource allows the user to discover which add-on
+        is available for the cluster manager and also provides metadata information
+        about the add-on. This resource also provides a linkage to ManagedClusterAddOn,
+        the name of the ClusterManagementAddOn resource will be used for the namespace-scoped
+        ManagedClusterAddOn resource. ClusterManagementAddOn is a cluster-scoped resource.
+      type: object
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: spec represents a desired configuration for the agent on the
+            cluster management add-on.
+          type: object
+          properties:
+            addOnConfiguration:
+              description: addOnConfiguration is a reference to configuration information
+                for the add-on. In scenario where a multiple add-ons share the same
+                add-on CRD, multiple ClusterManagementAddOn resources need to be created
+                and reference the same AddOnConfiguration.
+              type: object
+              properties:
+                crName:
+                  description: crName is the name of the CR used to configure instances
+                    of the managed add-on. This field should be configured if add-on
+                    CR have a consistent name across the all of the ManagedCluster
+                    instaces.
+                  type: string
+                crdName:
+                  description: crdName is the name of the CRD used to configure instances
+                    of the managed add-on. This field should be configured if the
+                    add-on have a CRD that controls the configuration of the add-on.
+                  type: string
+            addOnMeta:
+              description: addOnMeta is a reference to the metadata information for
+                the add-on.
+              type: object
+              properties:
+                description:
+                  description: description represents the detailed description of
+                    the add-on.
+                  type: string
+                displayName:
+                  description: displayName represents the name of add-on that will
+                    be displayed.
+                  type: string
+        status:
+          description: status represents the current status of cluster management
+            add-on.
+          type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func manifestsClusterManager0000_00_addonOpenClusterManagementIo_clustermanagementaddonsCrdYamlBytes() ([]byte, error) {
+	return _manifestsClusterManager0000_00_addonOpenClusterManagementIo_clustermanagementaddonsCrdYaml, nil
+}
+
+func manifestsClusterManager0000_00_addonOpenClusterManagementIo_clustermanagementaddonsCrdYaml() (*asset, error) {
+	bytes, err := manifestsClusterManager0000_00_addonOpenClusterManagementIo_clustermanagementaddonsCrdYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "manifests/cluster-manager/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
 }
 
 var _manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
@@ -775,6 +890,215 @@ func manifestsClusterManager0000_00_workOpenClusterManagementIo_manifestworksCrd
 	return a, nil
 }
 
+var _manifestsClusterManager0000_01_addonOpenClusterManagementIo_managedclusteraddonsCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  name: managedclusteraddons.addon.open-cluster-management.io
+spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.conditions[?(@.type=="Available")].status
+    name: Available
+    type: string
+  - JSONPath: .status.conditions[?(@.type=="Degraded")].status
+    name: Degraded
+    type: string
+  - JSONPath: .status.conditions[?(@.type=="Progressing")].status
+    name: Progressing
+    type: string
+  group: addon.open-cluster-management.io
+  names:
+    kind: ManagedClusterAddOn
+    listKind: ManagedClusterAddOnList
+    plural: managedclusteraddons
+    singular: managedclusteraddon
+  preserveUnknownFields: false
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: ManagedClusterAddOn is the Custom Resource object which holds the
+        current state of an add-on. This object is used by add-on operators to convey
+        their state. This resource should be created in the ManagedCluster namespace.
+      type: object
+      required:
+      - spec
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: spec holds configuration that could apply to any operator.
+          type: object
+        status:
+          description: status holds the information about the state of an operator.  It
+            is consistent with status information across the Kubernetes ecosystem.
+          type: object
+          properties:
+            addOnConfiguration:
+              description: addOnConfiguration is a reference to configuration information
+                for the add-on. This resource is use to locate the configuration resource
+                for the add-on.
+              type: object
+              properties:
+                crName:
+                  description: crName is the name of the CR used to configure instances
+                    of the managed add-on. This field should be configured if add-on
+                    CR have a consistent name across the all of the ManagedCluster
+                    instaces.
+                  type: string
+                crdName:
+                  description: crdName is the name of the CRD used to configure instances
+                    of the managed add-on. This field should be configured if the
+                    add-on have a CRD that controls the configuration of the add-on.
+                  type: string
+            addOnMeta:
+              description: addOnMeta is a reference to the metadata information for
+                the add-on. This should be same as the addOnMeta for the corresponding
+                ClusterManagementAddOn resource.
+              type: object
+              properties:
+                description:
+                  description: description represents the detailed description of
+                    the add-on.
+                  type: string
+                displayName:
+                  description: displayName represents the name of add-on that will
+                    be displayed.
+                  type: string
+            conditions:
+              description: conditions describe the state of the managed and monitored
+                components for the operator.
+              type: array
+              items:
+                description: "Condition contains details for one aspect of the current
+                  state of this API Resource. --- This struct is intended for direct
+                  use as an array at the field path .status.conditions.  For example,
+                  type FooStatus struct{     // Represents the observations of a foo's
+                  current state.     // Known .status.conditions.type are: \"Available\",
+                  \"Progressing\", and \"Degraded\"     // +patchMergeKey=type     //
+                  +patchStrategy=merge     // +listType=map     // +listMapKey=type
+                  \    Conditions []metav1.Condition ` + "`" + `json:\"conditions,omitempty\"
+                  patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` + "`" + `
+                  \n     // other fields }"
+                type: object
+                required:
+                - lastTransitionTime
+                - message
+                - reason
+                - status
+                - type
+                properties:
+                  lastTransitionTime:
+                    description: lastTransitionTime is the last time the condition
+                      transitioned from one status to another. This should be when
+                      the underlying condition changed.  If that is not known, then
+                      using the time when the API field changed is acceptable.
+                    type: string
+                    format: date-time
+                  message:
+                    description: message is a human readable message indicating details
+                      about the transition. This may be an empty string.
+                    type: string
+                    maxLength: 32768
+                  observedGeneration:
+                    description: observedGeneration represents the .metadata.generation
+                      that the condition was set based upon. For instance, if .metadata.generation
+                      is currently 12, but the .status.conditions[x].observedGeneration
+                      is 9, the condition is out of date with respect to the current
+                      state of the instance.
+                    type: integer
+                    format: int64
+                    minimum: 0
+                  reason:
+                    description: reason contains a programmatic identifier indicating
+                      the reason for the condition's last transition. Producers of
+                      specific condition types may define expected values and meanings
+                      for this field, and whether the values are considered a guaranteed
+                      API. The value should be a CamelCase string. This field may
+                      not be empty.
+                    type: string
+                    maxLength: 1024
+                    minLength: 1
+                    pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                  status:
+                    description: status of the condition, one of True, False, Unknown.
+                    type: string
+                    enum:
+                    - "True"
+                    - "False"
+                    - Unknown
+                  type:
+                    description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      --- Many .condition.type values are consistent across resources
+                      like Available, but because arbitrary conditions can be useful
+                      (see .node.status.conditions), the ability to deconflict is
+                      important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                    type: string
+                    maxLength: 316
+                    pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+            relatedObjects:
+              description: 'relatedObjects is a list of objects that are "interesting"
+                or related to this operator. Common uses are: 1. the detailed resource
+                driving the operator 2. operator namespaces 3. operand namespaces
+                4. related ClusterManagementAddon resource'
+              type: array
+              items:
+                description: ObjectReference contains enough information to let you
+                  inspect or modify the referred object.
+                type: object
+                required:
+                - group
+                - name
+                - resource
+                properties:
+                  group:
+                    description: group of the referent.
+                    type: string
+                  name:
+                    description: name of the referent.
+                    type: string
+                  resource:
+                    description: resource of the referent.
+                    type: string
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func manifestsClusterManager0000_01_addonOpenClusterManagementIo_managedclusteraddonsCrdYamlBytes() ([]byte, error) {
+	return _manifestsClusterManager0000_01_addonOpenClusterManagementIo_managedclusteraddonsCrdYaml, nil
+}
+
+func manifestsClusterManager0000_01_addonOpenClusterManagementIo_managedclusteraddonsCrdYaml() (*asset, error) {
+	bytes, err := manifestsClusterManager0000_01_addonOpenClusterManagementIo_managedclusteraddonsCrdYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "manifests/cluster-manager/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _manifestsClusterManager0000_01_clustersOpenClusterManagementIo_managedclustersetbindingsCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
@@ -933,6 +1257,13 @@ rules:
 - apiGroups: ["authorization.k8s.io"]
   resources: ["subjectaccessreviews"]
   verbs: ["create"]
+# Allow hub to manage managed cluster addons
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["managedclusteraddons"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["managedclusteraddons/status"]
+  verbs: ["patch", "update"]
 `)
 
 func manifestsClusterManagerClusterManagerRegistrationClusterroleYamlBytes() ([]byte, error) {
@@ -1764,9 +2095,11 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
+	"manifests/cluster-manager/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml":           manifestsClusterManager0000_00_addonOpenClusterManagementIo_clustermanagementaddonsCrdYaml,
 	"manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml":                manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersCrdYaml,
 	"manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml":             manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersetsCrdYaml,
 	"manifests/cluster-manager/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml":                      manifestsClusterManager0000_00_workOpenClusterManagementIo_manifestworksCrdYaml,
+	"manifests/cluster-manager/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml":              manifestsClusterManager0000_01_addonOpenClusterManagementIo_managedclusteraddonsCrdYaml,
 	"manifests/cluster-manager/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml":      manifestsClusterManager0000_01_clustersOpenClusterManagementIo_managedclustersetbindingsCrdYaml,
 	"manifests/cluster-manager/cluster-manager-namespace.yaml":                                                      manifestsClusterManagerClusterManagerNamespaceYaml,
 	"manifests/cluster-manager/cluster-manager-registration-clusterrole.yaml":                                       manifestsClusterManagerClusterManagerRegistrationClusterroleYaml,
@@ -1834,9 +2167,11 @@ type bintree struct {
 var _bintree = &bintree{nil, map[string]*bintree{
 	"manifests": {nil, map[string]*bintree{
 		"cluster-manager": {nil, map[string]*bintree{
+			"0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml":           {manifestsClusterManager0000_00_addonOpenClusterManagementIo_clustermanagementaddonsCrdYaml, map[string]*bintree{}},
 			"0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml":                {manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersCrdYaml, map[string]*bintree{}},
 			"0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml":             {manifestsClusterManager0000_00_clustersOpenClusterManagementIo_managedclustersetsCrdYaml, map[string]*bintree{}},
 			"0000_00_work.open-cluster-management.io_manifestworks.crd.yaml":                      {manifestsClusterManager0000_00_workOpenClusterManagementIo_manifestworksCrdYaml, map[string]*bintree{}},
+			"0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml":              {manifestsClusterManager0000_01_addonOpenClusterManagementIo_managedclusteraddonsCrdYaml, map[string]*bintree{}},
 			"0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml":      {manifestsClusterManager0000_01_clustersOpenClusterManagementIo_managedclustersetbindingsCrdYaml, map[string]*bintree{}},
 			"cluster-manager-namespace.yaml":                                                      {manifestsClusterManagerClusterManagerNamespaceYaml, map[string]*bintree{}},
 			"cluster-manager-registration-clusterrole.yaml":                                       {manifestsClusterManagerClusterManagerRegistrationClusterroleYaml, map[string]*bintree{}},

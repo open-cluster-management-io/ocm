@@ -264,10 +264,14 @@ kind: ClusterRole
 metadata:
   name: open-cluster-management:{{ .KlusterletName }}-registration:agent
 rules:
-# Allow agent to get/list/watch nodes.
+# Allow agent to get/list/watch nodes and configmaps.
 - apiGroups: [""]
-  resources: ["nodes", "configmaps", "secrets"]
+  resources: ["nodes", "configmaps"]
   verbs: ["get", "list", "watch"]
+# Allow agent to get/list/watch/create/delete/update/patch secrets.
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]
 - apiGroups: ["authorization.k8s.io"]
   resources: ["subjectaccessreviews"]
   verbs: ["create"]
@@ -275,7 +279,10 @@ rules:
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["clusterclaims"]
   verbs: ["get", "list", "watch"]
-
+# Allow agent to list addons lease
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch"]
 `)
 
 func manifestsKlusterletKlusterletRegistrationClusterroleYamlBytes() ([]byte, error) {
@@ -369,6 +376,7 @@ spec:
           - "agent"
           - "--cluster-name={{ .ClusterName }}"
           - "--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig"
+          - "--feature-gates=AddonManagement=true"
           {{if .ExternalServerURL}}
           - "--spoke-external-server-urls={{ .ExternalServerURL }}"
           {{end}}

@@ -146,6 +146,10 @@ github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
 # github.com/open-cluster-management/api v0.0.0-20201126023000-353dd8370f4d
 ## explicit
+github.com/open-cluster-management/api/addon/v1alpha1
+github.com/open-cluster-management/api/client/addon/clientset/versioned
+github.com/open-cluster-management/api/client/addon/clientset/versioned/scheme
+github.com/open-cluster-management/api/client/addon/clientset/versioned/typed/addon/v1alpha1
 github.com/open-cluster-management/api/client/cluster/clientset/versioned
 github.com/open-cluster-management/api/client/cluster/clientset/versioned/scheme
 github.com/open-cluster-management/api/client/cluster/clientset/versioned/typed/cluster/v1

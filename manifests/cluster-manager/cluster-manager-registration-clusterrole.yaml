@@ -61,3 +61,10 @@ rules:
 - apiGroups: ["authorization.k8s.io"]
   resources: ["subjectaccessreviews"]
   verbs: ["create"]
+# Allow hub to manage managed cluster addons
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["managedclusteraddons"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["managedclusteraddons/status"]
+  verbs: ["patch", "update"]

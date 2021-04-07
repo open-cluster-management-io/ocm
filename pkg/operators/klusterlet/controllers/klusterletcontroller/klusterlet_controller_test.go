@@ -162,11 +162,11 @@ func ensureRegistrationDeployment(t *testing.T, deployment *appsv1.Deployment, s
 		t.Errorf("Expect 1 containers in deployment spec, actual %d", len(deployment.Spec.Template.Spec.Containers))
 	}
 	args := deployment.Spec.Template.Spec.Containers[0].Args
-	if serverURL == "" && len(args) != 4 {
-		t.Errorf("Expect 4 args in container spec, actual %d", len(args))
-	}
-	if serverURL != "" && len(deployment.Spec.Template.Spec.Containers[0].Args) != 5 {
+	if serverURL == "" && len(args) != 5 {
 		t.Errorf("Expect 5 args in container spec, actual %d", len(args))
+	}
+	if serverURL != "" && len(deployment.Spec.Template.Spec.Containers[0].Args) != 6 {
+		t.Errorf("Expect 6 args in container spec, actual %d", len(args))
 	}
 	clusterNameArg := ""
 	serverURLArg := ""
