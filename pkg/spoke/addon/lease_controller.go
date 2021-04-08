@@ -2,6 +2,7 @@ package addon
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	addonv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
@@ -20,13 +21,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	coordinformers "k8s.io/client-go/informers/coordination/v1"
+	coordv1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	coordlisters "k8s.io/client-go/listers/coordination/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
 const (
 	//TODO add this to ManagedClusterAddOn api
-	addOnAvailableConditionType = "ManagedClusterAddOnConditionAvailable"
+	addOnAvailableConditionType = "Available"
 	//TODO add this to ManagedClusterAddOn api
 	leaseDurationSeconds = 60
 	leaseDurationTimes   = 5
@@ -35,26 +37,29 @@ const (
 // managedClusterAddOnLeaseController udpates managed cluster addons status on the hub cluster through watching the managed
 // cluster status on the managed cluster.
 type managedClusterAddOnLeaseController struct {
-	clusterName string
-	clock       clock.Clock
-	addOnClient addonclient.Interface
-	addOnLister addonlisterv1alpha1.ManagedClusterAddOnLister
-	leaseLister coordlisters.LeaseLister
+	clusterName    string
+	clock          clock.Clock
+	addOnClient    addonclient.Interface
+	addOnLister    addonlisterv1alpha1.ManagedClusterAddOnLister
+	hubLeaseClient coordv1client.CoordinationV1Interface
+	leaseLister    coordlisters.LeaseLister
 }
 
 // NewManagedClusterAddOnLeaseController returns an instance of managedClusterAddOnLeaseController
 func NewManagedClusterAddOnLeaseController(clusterName string,
 	addOnClient addonclient.Interface,
 	addOnInformer addoninformerv1alpha1.ManagedClusterAddOnInformer,
+	hubLeaseClient coordv1client.CoordinationV1Interface,
 	leaseInformer coordinformers.LeaseInformer,
 	resyncInterval time.Duration,
 	recorder events.Recorder) factory.Controller {
 	c := &managedClusterAddOnLeaseController{
-		clusterName: clusterName,
-		clock:       clock.RealClock{},
-		addOnClient: addOnClient,
-		addOnLister: addOnInformer.Lister(),
-		leaseLister: leaseInformer.Lister(),
+		clusterName:    clusterName,
+		clock:          clock.RealClock{},
+		addOnClient:    addOnClient,
+		addOnLister:    addOnInformer.Lister(),
+		hubLeaseClient: hubLeaseClient,
+		leaseLister:    leaseInformer.Lister(),
 	}
 	return factory.New().
 		WithInformersQueueKeyFunc(c.queueKeyFunc, leaseInformer.Informer()).
@@ -76,7 +81,7 @@ func (c *managedClusterAddOnLeaseController) sync(ctx context.Context, syncCtx f
 				continue
 			}
 			// enqueue the addon to reconcile
-			syncCtx.Queue().Add(addOn)
+			syncCtx.Queue().Add(fmt.Sprintf("%s/%s", addOn.Namespace, addOn.Name))
 		}
 		return nil
 	}
@@ -103,12 +108,39 @@ func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
 	leaseNamespace string,
 	addOn *addonv1alpha1.ManagedClusterAddOn,
 	recorder events.Recorder) error {
+	now := c.clock.Now()
+	gracePeriod := time.Duration(leaseDurationTimes*leaseDurationSeconds) * time.Second
 	// addon lease name should be same with the addon name.
 	observedLease, err := c.leaseLister.Leases(leaseNamespace).Get(addOn.Name)
 
 	var condition metav1.Condition
 	switch {
 	case errors.IsNotFound(err):
+		// for backward compatible, before release-2.3, addons update their leases on hub cluster,
+		// so if we cannot find addon lease on managed cluster, we will try to use addon hub lease.
+		// TODO: after release-2.3, we will remove these code
+		observedLease, err = c.hubLeaseClient.Leases(addOn.Namespace).Get(ctx, addOn.Name, metav1.GetOptions{})
+		if err == nil {
+			if now.Before(observedLease.Spec.RenewTime.Add(gracePeriod)) {
+				// the lease is constantly updated, update its addon status to available
+				condition = metav1.Condition{
+					Type:    addOnAvailableConditionType,
+					Status:  metav1.ConditionTrue,
+					Reason:  "ManagedClusterAddOnLeaseUpdated",
+					Message: "Managed cluster addon agent updates its lease constantly.",
+				}
+				break
+			}
+
+			// the lease is not constantly updated, update its addon status to unavailable
+			condition = metav1.Condition{
+				Type:    addOnAvailableConditionType,
+				Status:  metav1.ConditionFalse,
+				Reason:  "ManagedClusterAddOnLeaseUpdateStopped",
+				Message: "Managed cluster addon agent stopped updating its lease.",
+			}
+			break
+		}
 		condition = metav1.Condition{
 			Type:    addOnAvailableConditionType,
 			Status:  metav1.ConditionUnknown,
@@ -118,8 +150,6 @@ func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
 	case err != nil:
 		return err
 	case err == nil:
-		now := c.clock.Now()
-		gracePeriod := time.Duration(leaseDurationTimes*leaseDurationSeconds) * time.Second
 		if now.Before(observedLease.Spec.RenewTime.Add(gracePeriod)) {
 			// the lease is constantly updated, update its addon status to available
 			condition = metav1.Condition{

@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-const addOnAvailableConditionType = "ManagedClusterAddOnConditionAvailable" //TODO add this to ManagedClusterAddOn api
+const addOnAvailableConditionType = "Available" //TODO add this to ManagedClusterAddOn api
 
 // managedClusterAddonHealthCheckController udpates managed cluster addons status through watching the managed cluster status on
 // the hub cluster.

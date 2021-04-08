@@ -60,7 +60,7 @@ func TestSync(t *testing.T) {
 
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				addOn := actual.(*addonv1alpha1.ManagedClusterAddOn)
-				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "ManagedClusterAddOnConditionAvailable")
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 				if addOnCond == nil {
 					t.Errorf("expected addon available condition, but failed")
 				}

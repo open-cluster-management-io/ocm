@@ -79,7 +79,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 				if found.Status.Conditions == nil {
 					return false, nil
 				}
-				cond := meta.FindStatusCondition(found.Status.Conditions, "ManagedClusterAddOnConditionAvailable")
+				cond := meta.FindStatusCondition(found.Status.Conditions, "Available")
 				return cond.Status == metav1.ConditionTrue, nil
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -106,7 +106,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 				if found.Status.Conditions == nil {
 					return false, nil
 				}
-				cond := meta.FindStatusCondition(found.Status.Conditions, "ManagedClusterAddOnConditionAvailable")
+				cond := meta.FindStatusCondition(found.Status.Conditions, "Available")
 				return cond.Status == metav1.ConditionTrue, nil
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -126,7 +126,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 				if found.Status.Conditions == nil {
 					return false, nil
 				}
-				cond := meta.FindStatusCondition(found.Status.Conditions, "ManagedClusterAddOnConditionAvailable")
+				cond := meta.FindStatusCondition(found.Status.Conditions, "Available")
 				return cond.Status == metav1.ConditionFalse, nil
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -153,7 +153,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 				if found.Status.Conditions == nil {
 					return false, nil
 				}
-				cond := meta.FindStatusCondition(found.Status.Conditions, "ManagedClusterAddOnConditionAvailable")
+				cond := meta.FindStatusCondition(found.Status.Conditions, "Available")
 				return cond.Status == metav1.ConditionTrue, nil
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -170,7 +170,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 				if found.Status.Conditions == nil {
 					return false, nil
 				}
-				cond := meta.FindStatusCondition(found.Status.Conditions, "ManagedClusterAddOnConditionAvailable")
+				cond := meta.FindStatusCondition(found.Status.Conditions, "Available")
 				return cond.Status == metav1.ConditionUnknown, nil
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -231,7 +231,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 				if found.Status.Conditions == nil {
 					return false, nil
 				}
-				cond := meta.FindStatusCondition(found.Status.Conditions, "ManagedClusterAddOnConditionAvailable")
+				cond := meta.FindStatusCondition(found.Status.Conditions, "Available")
 				return cond.Status == metav1.ConditionTrue, nil
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -267,7 +267,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 				if found.Status.Conditions == nil {
 					return false, nil
 				}
-				cond := meta.FindStatusCondition(found.Status.Conditions, "ManagedClusterAddOnConditionAvailable")
+				cond := meta.FindStatusCondition(found.Status.Conditions, "Available")
 				return cond.Status == metav1.ConditionUnknown, nil
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())

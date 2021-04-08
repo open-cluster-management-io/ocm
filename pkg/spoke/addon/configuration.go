@@ -1,13 +1,12 @@
 package addon
 
 import (
-	"fmt"
-
 	addonv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
 )
 
 const (
-	installationNamespaceAnnotation = "addon.open-cluster-management.io/installNamespace"
+	defaultAddOnInstallationNamespace = "open-cluster-management-agent-addon"
+	installationNamespaceAnnotation   = "addon.open-cluster-management.io/installNamespace"
 )
 
 // addonConfig contains addon configuration information.
@@ -20,7 +19,7 @@ type addOnConfig struct {
 func getAddOnConfig(addOn *addonv1alpha1.ManagedClusterAddOn) (*addOnConfig, error) {
 	installationNamespace, ok := addOn.Annotations[installationNamespaceAnnotation]
 	if !ok {
-		return nil, fmt.Errorf("failed to get addon installation namesapce from addon %q", addOn.Name)
+		installationNamespace = defaultAddOnInstallationNamespace
 	}
 
 	addOnConfig := &addOnConfig{
