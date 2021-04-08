@@ -19,9 +19,10 @@ type Network struct {
 	Status NetworkStatus `json:"status,omitempty"`
 }
 
-// NetworkStatus is currently unused. Instead, status
-// is reported in the Network.config.openshift.io object.
+// NetworkStatus is detailed operator status, which is distilled
+// up to the Network clusteroperator object.
 type NetworkStatus struct {
+	OperatorStatus `json:",inline"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -35,6 +36,8 @@ type NetworkList struct {
 
 // NetworkSpec is the top-level network configuration object.
 type NetworkSpec struct {
+	OperatorSpec `json:",inline"`
+
 	// clusterNetwork is the IP address pool to use for pod IPs.
 	// Some network providers, e.g. OpenShift SDN, support multiple ClusterNetworks.
 	// Others only support one. This is equivalent to the cluster-cidr.
@@ -57,6 +60,16 @@ type NetworkSpec struct {
 	// 'false' and multiple network support is enabled.
 	DisableMultiNetwork *bool `json:"disableMultiNetwork,omitempty"`
 
+	// useMultiNetworkPolicy enables a controller which allows for
+	// MultiNetworkPolicy objects to be used on additional networks as
+	// created by Multus CNI. MultiNetworkPolicy are similar to NetworkPolicy
+	// objects, but NetworkPolicy objects only apply to the primary interface.
+	// With MultiNetworkPolicy, you can control the traffic that a pod can receive
+	// over the secondary interfaces. If unset, this property defaults to 'false'
+	// and MultiNetworkPolicy objects are ignored. If 'disableMultiNetwork' is
+	// 'true' then the value of this field is ignored.
+	UseMultiNetworkPolicy *bool `json:"useMultiNetworkPolicy,omitempty"`
+
 	// deployKubeProxy specifies whether or not a standalone kube-proxy should
 	// be deployed by the operator. Some network providers include kube-proxy
 	// or similar functionality. If unset, the plugin will attempt to select
@@ -65,21 +78,25 @@ type NetworkSpec struct {
 	// +optional
 	DeployKubeProxy *bool `json:"deployKubeProxy,omitempty"`
 
+	// disableNetworkDiagnostics specifies whether or not PodNetworkConnectivityCheck
+	// CRs from a test pod to every node, apiserver and LB should be disabled or not.
+	// If unset, this property defaults to 'false' and network diagnostics is enabled.
+	// Setting this to 'true' would reduce the additional load of the pods performing the checks.
+	// +optional
+	// +kubebuilder:default:=false
+	DisableNetworkDiagnostics bool `json:"disableNetworkDiagnostics"`
+
 	// kubeProxyConfig lets us configure desired proxy configuration.
 	// If not specified, sensible defaults will be chosen by OpenShift directly.
 	// Not consumed by all network providers - currently only openshift-sdn.
 	KubeProxyConfig *ProxyConfig `json:"kubeProxyConfig,omitempty"`
 
-	// logLevel allows configuring the logging level of the components deployed
-	// by the operator. Currently only Kuryr SDN is affected by this setting.
-	// Please note that turning on extensive logging may affect performance.
-	// The default value is "Normal".
-	//
-	// Valid values are: "Normal", "Debug", "Trace", "TraceAll".
-	// Defaults to "Normal".
+	// exportNetworkFlows enables and configures the export of network flow metadata from the pod network
+	// by using protocols NetFlow, SFlow or IPFIX. Currently only supported on OVN-Kubernetes plugin.
+	// If unset, flows will not be exported to any collector.
 	// +optional
-	// +kubebuilder:default=Normal
-	LogLevel LogLevel `json:"logLevel,omitempty"`
+	// +kubebuilder:validation:MinProperties=1
+	ExportNetworkFlows *ExportNetworkFlows `json:"exportNetworkFlows,omitempty"`
 }
 
 // ClusterNetworkEntry is a subnet from which to allocate PodIPs. A network of size
@@ -321,6 +338,14 @@ type OVNKubernetesConfig struct {
 	// not using OVN.
 	// +optional
 	HybridOverlayConfig *HybridOverlayConfig `json:"hybridOverlayConfig,omitempty"`
+	// ipsecConfig enables and configures IPsec for pods on the pod network within the
+	// cluster.
+	// +optional
+	IPsecConfig *IPsecConfig `json:"ipsecConfig,omitempty"`
+	// policyAuditConfig is the configuration for network policy audit events. If unset,
+	// reported defaults are used.
+	// +optional
+	PolicyAuditConfig *PolicyAuditConfig `json:"policyAuditConfig,omitempty"`
 }
 
 type HybridOverlayConfig struct {
@@ -330,6 +355,80 @@ type HybridOverlayConfig struct {
 	// Default is 4789
 	// +optional
 	HybridOverlayVXLANPort *uint32 `json:"hybridOverlayVXLANPort,omitempty"`
+}
+
+type IPsecConfig struct {
+}
+
+type ExportNetworkFlows struct {
+	// netFlow defines the NetFlow configuration.
+	// +optional
+	NetFlow *NetFlowConfig `json:"netFlow,omitempty"`
+	// sFlow defines the SFlow configuration.
+	// +optional
+	SFlow *SFlowConfig `json:"sFlow,omitempty"`
+	// ipfix defines IPFIX configuration.
+	// +optional
+	IPFIX *IPFIXConfig `json:"ipfix,omitempty"`
+}
+
+type NetFlowConfig struct {
+	// netFlow defines the NetFlow collectors that will consume the flow data exported from OVS.
+	// It is a list of strings formatted as ip:port
+	// +kubebuilder:validation:MinItems=1
+	Collectors []IPPort `json:"collectors,omitempty"`
+}
+
+type SFlowConfig struct {
+	// sFlowCollectors is list of strings formatted as ip:port
+	// +kubebuilder:validation:MinItems=1
+	Collectors []IPPort `json:"collectors,omitempty"`
+}
+
+type IPFIXConfig struct {
+	// ipfixCollectors is list of strings formatted as ip:port
+	// +kubebuilder:validation:MinItems=1
+	Collectors []IPPort `json:"collectors,omitempty"`
+}
+
+// +kubebuilder:validation:Pattern=`^(([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]):[0-9]+$`
+type IPPort string
+
+type PolicyAuditConfig struct {
+	// rateLimit is the approximate maximum number of messages to generate per-second per-node. If
+	// unset the default of 20 msg/sec is used.
+	// +kubebuilder:default=20
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	RateLimit *uint32 `json:"rateLimit,omitempty"`
+
+	// maxFilesSize is the max size an ACL_audit log file is allowed to reach before rotation occurs
+	// Units are in MB and the Default is 50MB
+	// +kubebuilder:default=50
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	MaxFileSize *uint32 `json:"maxFileSize,omitempty"`
+
+	// destination is the location for policy log messages.
+	// Regardless of this config, persistent logs will always be dumped to the host
+	// at /var/log/ovn/ however
+	// Additionally syslog output may be configured as follows.
+	// Valid values are:
+	// - "libc" -> to use the libc syslog() function of the host node's journdald process
+	// - "udp:host:port" -> for sending syslog over UDP
+	// - "unix:file" -> for using the UNIX domain socket directly
+	// - "null" -> to discard all messages logged to syslog
+	// The default is "null"
+	// +kubebuilder:default=null
+	// +kubebuilder:pattern='^libc$|^null$|^udp:(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]):([0-9]){0,5}$|^unix:(\/[^\/ ]*)+([^\/\s])$'
+	// +optional
+	Destination string `json:"destination,omitempty"`
+
+	// syslogFacility the RFC5424 facility for generated messages, e.g. "kern". Default is "local0"
+	// +kubebuilder:default=local0
+	// +kubebuilder:Enum=kern;user;mail;daemon;auth;syslog;lpr;news;uucp;clock;ftp;ntp;audit;alert;clock2;local0;local1;local2;local3;local4;local5;local6;local7
+	// +optional
+	SyslogFacility string `json:"syslogFacility,omitempty"`
 }
 
 // NetworkType describes the network plugin type to configure

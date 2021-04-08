@@ -15,6 +15,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -195,6 +196,8 @@ func (d *defaultWorkAgentDeployer) Undeploy() error {
 			err = d.spokeKubeClient.RbacV1().ClusterRoles().Delete(context.TODO(), t.Name, metav1.DeleteOptions{})
 		case *rbacv1.ClusterRoleBinding:
 			err = d.spokeKubeClient.RbacV1().ClusterRoleBindings().Delete(context.TODO(), t.Name, metav1.DeleteOptions{})
+		case *apiextensionsv1.CustomResourceDefinition:
+			err = d.spokeApiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(context.TODO(), t.Name, metav1.DeleteOptions{})
 		case *apiextensionsv1beta1.CustomResourceDefinition:
 			err = d.spokeApiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(context.TODO(), t.Name, metav1.DeleteOptions{})
 		default:
