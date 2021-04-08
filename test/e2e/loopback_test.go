@@ -43,7 +43,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		gvr := schema.GroupVersionResource{
 			Group:    "apiextensions.k8s.io",
-			Version:  "v1beta1",
+			Version:  "v1",
 			Resource: "customresourcedefinitions",
 		}
 		err = hubDynamicClient.Resource(gvr).Delete(context.TODO(), claimCrd.GetName(), metav1.DeleteOptions{})
