@@ -4,7 +4,6 @@ import (
 	"crypto/x509/pkix"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -82,14 +81,6 @@ func IsCertificateValid(certData []byte, subject *pkix.Name) (bool, error) {
 	// check subject of certificates
 	for _, cert := range certs {
 		if cert.Subject.CommonName != subject.CommonName {
-			continue
-		}
-
-		if !reflect.DeepEqual(cert.Subject.Organization, subject.Organization) {
-			continue
-		}
-
-		if !reflect.DeepEqual(cert.Subject.OrganizationalUnit, subject.OrganizationalUnit) {
 			continue
 		}
 		return true, nil
