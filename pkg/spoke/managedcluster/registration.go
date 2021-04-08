@@ -7,12 +7,12 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	certificates "k8s.io/api/certificates/v1beta1"
+	certificates "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
+	certificatesinformers "k8s.io/client-go/informers/certificates/v1"
 	corev1informers "k8s.io/client-go/informers/core/v1"
-	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
+	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	certutil "k8s.io/client-go/util/cert"
 

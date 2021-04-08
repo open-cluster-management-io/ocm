@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	certificates "k8s.io/api/certificates/v1beta1"
+	certificates "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -176,8 +176,8 @@ func TestSync(t *testing.T) {
 			controller := &clientCertificateController{
 				ClientCertOption: clientCertOption,
 				CSROption:        csrOption,
-				hubCSRLister:     hubInformerFactory.Certificates().V1beta1().CertificateSigningRequests().Lister(),
-				hubCSRClient:     hubKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
+				hubCSRLister:     hubInformerFactory.Certificates().V1().CertificateSigningRequests().Lister(),
+				hubCSRClient:     hubKubeClient.CertificatesV1().CertificateSigningRequests(),
 				spokeCoreClient:  agentKubeClient.CoreV1(),
 				controllerName:   "test-agent",
 			}

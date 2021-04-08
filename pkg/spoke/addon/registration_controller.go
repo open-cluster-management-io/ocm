@@ -8,15 +8,15 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
-	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
+	certificatesinformers "k8s.io/client-go/informers/certificates/v1"
 	"k8s.io/client-go/kubernetes"
-	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
+	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1"
 	"k8s.io/klog/v2"
 
 	addoninformerv1alpha1 "github.com/open-cluster-management/api/client/addon/informers/externalversions/addon/v1alpha1"
@@ -144,7 +144,7 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 	kubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(c.kubeClient, 10*time.Minute, informers.WithNamespace(config.InstallationNamespace))
 
 	additonalSecretData := map[string][]byte{}
-	if config.SignerName == certificatesv1beta1.KubeAPIServerClientSignerName {
+	if config.SignerName == certificatesv1.KubeAPIServerClientSignerName {
 		additonalSecretData[clientcert.KubeconfigFile] = c.kubeconfigData
 	}
 
@@ -236,14 +236,14 @@ func createCSREventFilterFunc(clusterName, addOnName, signerName string) factory
 		}
 
 		// only enqueue csr with a specific signer name
-		csr, ok := obj.(*certificatesv1beta1.CertificateSigningRequest)
+		csr, ok := obj.(*certificatesv1.CertificateSigningRequest)
 		if !ok {
 			return false
 		}
-		if csr.Spec.SignerName == nil {
+		if len(csr.Spec.SignerName) == 0 {
 			return false
 		}
-		if *csr.Spec.SignerName != signerName {
+		if csr.Spec.SignerName != signerName {
 			return false
 		}
 		return true

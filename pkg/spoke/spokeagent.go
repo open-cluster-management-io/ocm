@@ -173,8 +173,8 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			o.ClusterName, o.AgentName, o.ComponentNamespace, o.HubKubeconfigSecret,
 			kubeconfigData,
 			spokeKubeClient.CoreV1(),
-			bootstrapKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
-			bootstrapInformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
+			bootstrapKubeClient.CertificatesV1().CertificateSigningRequests(),
+			bootstrapInformerFactory.Certificates().V1().CertificateSigningRequests(),
 			namespacedSpokeKubeInformerFactory.Core().V1().Secrets(),
 			controllerContext.EventRecorder,
 			"BootstrapClientCertForHubController",
@@ -215,7 +215,14 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		return err
 	}
 
+	addOnClient, err := addonclient.NewForConfig(hubClientConfig)
+	if err != nil {
+		return err
+	}
+
 	hubKubeInformerFactory := informers.NewSharedInformerFactory(hubKubeClient, 10*time.Minute)
+	addOnInformerFactory := addoninformers.NewSharedInformerFactoryWithOptions(
+		addOnClient, 10*time.Minute, addoninformers.WithNamespace(o.ClusterName))
 	// create a cluster informer factory with name field selector because we just need to handle the current spoke cluster
 	hubClusterInformerFactory := clusterv1informers.NewSharedInformerFactoryWithOptions(
 		hubClusterClient,
@@ -239,8 +246,8 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		o.ClusterName, o.AgentName, o.ComponentNamespace, o.HubKubeconfigSecret,
 		kubeconfigData,
 		spokeKubeClient.CoreV1(),
-		hubKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
-		hubKubeInformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
+		hubKubeClient.CertificatesV1().CertificateSigningRequests(),
+		hubKubeInformerFactory.Certificates().V1().CertificateSigningRequests(),
 		namespacedSpokeKubeInformerFactory.Core().V1().Secrets(),
 		controllerContext.EventRecorder,
 		"ClientCertForHubController",
@@ -294,15 +301,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 
 	var addOnLeaseController factory.Controller
 	var addOnRegistrationController factory.Controller
-	var addOnInformerFactory addoninformers.SharedInformerFactory
 	if features.DefaultMutableFeatureGate.Enabled(features.AddonManagement) {
-		addOnClient, err := addonclient.NewForConfig(hubClientConfig)
-		if err != nil {
-			return err
-		}
-		addOnInformerFactory = addoninformers.NewSharedInformerFactoryWithOptions(
-			addOnClient, 10*time.Minute, addoninformers.WithNamespace(o.ClusterName))
-
 		addOnLeaseController = addon.NewManagedClusterAddOnLeaseController(
 			o.ClusterName,
 			addOnClient,
@@ -318,9 +317,9 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			o.AgentName,
 			kubeconfigData,
 			spokeKubeClient,
-			hubKubeInformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
+			hubKubeInformerFactory.Certificates().V1().CertificateSigningRequests(),
 			addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
-			hubKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
+			hubKubeClient.CertificatesV1().CertificateSigningRequests(),
 			controllerContext.EventRecorder,
 		)
 	}
@@ -330,9 +329,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	go spokeKubeInformerFactory.Start(ctx.Done())
 	go namespacedSpokeKubeInformerFactory.Start(ctx.Done())
 	go spokeClusterInformerFactory.Start(ctx.Done())
-	if features.DefaultMutableFeatureGate.Enabled(features.AddonManagement) {
-		go addOnInformerFactory.Start(ctx.Done())
-	}
+	go addOnInformerFactory.Start(ctx.Done())
 
 	go clientCertForHubController.Run(ctx, 1)
 	go managedClusterJoiningController.Run(ctx, 1)

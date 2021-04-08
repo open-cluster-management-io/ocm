@@ -3,7 +3,7 @@ package addon
 import (
 	"testing"
 
-	certificates "k8s.io/api/certificates/v1beta1"
+	certificates "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/open-cluster-management/registration/pkg/clientcert"
@@ -42,7 +42,7 @@ func TestFilterCSREvents(t *testing.T) {
 					},
 				},
 				Spec: certificates.CertificateSigningRequestSpec{
-					SignerName: &signerName,
+					SignerName: signerName,
 				},
 			},
 			expected: true,

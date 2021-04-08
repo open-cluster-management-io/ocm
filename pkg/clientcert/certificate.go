@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -158,12 +158,12 @@ func BuildKubeconfig(clientConfig *restclient.Config, certPath, keyPath string) 
 }
 
 // isCSRApproved returns true if the given csr has been approved
-func isCSRApproved(csr *certificatesv1beta1.CertificateSigningRequest) bool {
+func isCSRApproved(csr *certificatesv1.CertificateSigningRequest) bool {
 	approved := false
 	for _, condition := range csr.Status.Conditions {
-		if condition.Type == certificatesv1beta1.CertificateDenied {
+		if condition.Type == certificatesv1.CertificateDenied {
 			return false
-		} else if condition.Type == certificatesv1beta1.CertificateApproved {
+		} else if condition.Type == certificatesv1.CertificateApproved {
 			approved = true
 		}
 	}

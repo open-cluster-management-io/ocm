@@ -19,7 +19,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 	errorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -142,12 +142,12 @@ func UpdateManagedClusterAddOnStatusFn(cond metav1.Condition) UpdateManagedClust
 }
 
 // Check whether a CSR is in terminal state
-func IsCSRInTerminalState(status *certificatesv1beta1.CertificateSigningRequestStatus) bool {
+func IsCSRInTerminalState(status *certificatesv1.CertificateSigningRequestStatus) bool {
 	for _, c := range status.Conditions {
-		if c.Type == certificatesv1beta1.CertificateApproved {
+		if c.Type == certificatesv1.CertificateApproved {
 			return true
 		}
-		if c.Type == certificatesv1beta1.CertificateDenied {
+		if c.Type == certificatesv1.CertificateDenied {
 			return true
 		}
 	}
