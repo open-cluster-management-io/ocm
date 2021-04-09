@@ -23,7 +23,7 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/events"
 
-	certificates "k8s.io/api/certificates/v1beta1"
+	certificates "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -308,7 +308,7 @@ func GetFilledHubKubeConfigSecret(kubeClient kubernetes.Interface, secretNamespa
 }
 
 func FindUnapprovedSpokeCSR(kubeClient kubernetes.Interface, spokeClusterName string) (*certificates.CertificateSigningRequest, error) {
-	csrList, err := kubeClient.CertificatesV1beta1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{
+	csrList, err := kubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("open-cluster-management.io/cluster-name=%s", spokeClusterName),
 	})
 	if err != nil {
@@ -331,7 +331,7 @@ func FindUnapprovedSpokeCSR(kubeClient kubernetes.Interface, spokeClusterName st
 }
 
 func FindUnapprovedAddOnCSR(kubeClient kubernetes.Interface, spokeClusterName, addOnName string) (*certificates.CertificateSigningRequest, error) {
-	csrList, err := kubeClient.CertificatesV1beta1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{
+	csrList, err := kubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("open-cluster-management.io/cluster-name=%s,open-cluster-management.io/addon-name=%s", spokeClusterName, addOnName),
 	})
 	if err != nil {
@@ -354,7 +354,7 @@ func FindUnapprovedAddOnCSR(kubeClient kubernetes.Interface, spokeClusterName, a
 }
 
 func FindAutoApprovedSpokeCSR(kubeClient kubernetes.Interface, spokeClusterName string) (*certificates.CertificateSigningRequest, error) {
-	csrList, err := kubeClient.CertificatesV1beta1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{
+	csrList, err := kubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("open-cluster-management.io/cluster-name=%s", spokeClusterName),
 	})
 	if err != nil {
@@ -460,23 +460,24 @@ func ApproveCSR(kubeClient kubernetes.Interface, csr *certificates.CertificateSi
 		Certificate: certBuffer.Bytes(),
 		Conditions:  []certificates.CertificateSigningRequestCondition{},
 	}
-	_, err = kubeClient.CertificatesV1beta1().CertificateSigningRequests().UpdateStatus(context.TODO(), csr, metav1.UpdateOptions{})
+	_, err = kubeClient.CertificatesV1().CertificateSigningRequests().UpdateStatus(context.TODO(), csr, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
 
 	// approve the csr
-	approved, err := kubeClient.CertificatesV1beta1().CertificateSigningRequests().Get(context.TODO(), csr.Name, metav1.GetOptions{})
+	approved, err := kubeClient.CertificatesV1().CertificateSigningRequests().Get(context.TODO(), csr.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 	approved.Status.Conditions = append(approved.Status.Conditions, certificates.CertificateSigningRequestCondition{
 		Type:           certificates.CertificateApproved,
+		Status:         corev1.ConditionTrue,
 		Reason:         "Approved",
 		Message:        "CSR Approved.",
 		LastUpdateTime: metav1.Now(),
 	})
-	_, err = kubeClient.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(context.TODO(), approved, metav1.UpdateOptions{})
+	_, err = kubeClient.CertificatesV1().CertificateSigningRequests().UpdateApproval(context.TODO(), approved.Name, approved, metav1.UpdateOptions{})
 	return err
 }
 

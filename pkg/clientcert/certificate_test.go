@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	certificates "k8s.io/api/certificates/v1beta1"
+	certificates "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	certutil "k8s.io/client-go/util/cert"
 

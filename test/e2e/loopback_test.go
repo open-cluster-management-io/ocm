@@ -22,7 +22,7 @@ import (
 	addonv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
 	clusterv1alpha1 "github.com/open-cluster-management/api/cluster/v1alpha1"
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -251,8 +251,8 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		var (
-			csrs      *certificatesv1beta1.CertificateSigningRequestList
-			csrClient = hubClient.CertificatesV1beta1().CertificateSigningRequests()
+			csrs      *certificatesv1.CertificateSigningRequestList
+			csrClient = hubClient.CertificatesV1().CertificateSigningRequests()
 		)
 
 		ginkgo.By(fmt.Sprintf("Waiting for the CSR for cluster %q to exist", clusterName))
@@ -274,7 +274,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By("Approving all pending CSRs")
-		var csr *certificatesv1beta1.CertificateSigningRequest
+		var csr *certificatesv1.CertificateSigningRequest
 		for i := range csrs.Items {
 			csr = &csrs.Items[i]
 
@@ -286,12 +286,13 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 					return nil
 				}
 
-				csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
-					Type:    certificatesv1beta1.CertificateApproved,
+				csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
+					Type:    certificatesv1.CertificateApproved,
+					Status:  corev1.ConditionTrue,
 					Reason:  "Approved by E2E",
 					Message: "Approved as part of Loopback e2e",
 				})
-				_, err := csrClient.UpdateApproval(context.TODO(), csr, metav1.UpdateOptions{})
+				_, err := csrClient.UpdateApproval(context.TODO(), csr.Name, csr, metav1.UpdateOptions{})
 				return err
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -486,12 +487,13 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 					return nil
 				}
 
-				csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
-					Type:    certificatesv1beta1.CertificateApproved,
+				csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
+					Type:    certificatesv1.CertificateApproved,
+					Status:  corev1.ConditionTrue,
 					Reason:  "Approved by E2E",
 					Message: "Approved as part of Loopback e2e",
 				})
-				_, err := csrClient.UpdateApproval(context.TODO(), csr, metav1.UpdateOptions{})
+				_, err := csrClient.UpdateApproval(context.TODO(), csr.Name, csr, metav1.UpdateOptions{})
 				return err
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())

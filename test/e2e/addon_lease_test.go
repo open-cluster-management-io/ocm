@@ -12,7 +12,7 @@ import (
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
 	"github.com/open-cluster-management/registration/pkg/helpers"
 
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -458,8 +458,8 @@ func createManagedCluster(clusterName, suffix string) (*clusterv1.ManagedCluster
 	}
 
 	var (
-		csrs      *certificatesv1beta1.CertificateSigningRequestList
-		csrClient = hubClient.CertificatesV1beta1().CertificateSigningRequests()
+		csrs      *certificatesv1.CertificateSigningRequestList
+		csrClient = hubClient.CertificatesV1().CertificateSigningRequests()
 	)
 
 	if err := wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
@@ -480,7 +480,7 @@ func createManagedCluster(clusterName, suffix string) (*clusterv1.ManagedCluster
 		return nil, err
 	}
 
-	var csr *certificatesv1beta1.CertificateSigningRequest
+	var csr *certificatesv1.CertificateSigningRequest
 	for i := range csrs.Items {
 		csr = &csrs.Items[i]
 
@@ -494,12 +494,13 @@ func createManagedCluster(clusterName, suffix string) (*clusterv1.ManagedCluster
 				return nil
 			}
 
-			csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
-				Type:    certificatesv1beta1.CertificateApproved,
+			csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
+				Type:    certificatesv1.CertificateApproved,
+				Status:  corev1.ConditionTrue,
 				Reason:  "Approved by E2E",
 				Message: "Approved as part of Loopback e2e",
 			})
-			_, err := csrClient.UpdateApproval(context.TODO(), csr, metav1.UpdateOptions{})
+			_, err := csrClient.UpdateApproval(context.TODO(), csr.Name, csr, metav1.UpdateOptions{})
 			return err
 		}); err != nil {
 			return nil, err

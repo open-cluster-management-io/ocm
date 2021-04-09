@@ -11,7 +11,8 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
@@ -20,11 +21,10 @@ import (
 )
 
 var (
-	signerName = certificatesv1beta1.KubeAPIServerClientSignerName
-	validCSR   = testinghelpers.CSRHolder{
+	validCSR = testinghelpers.CSRHolder{
 		Name:         "testcsr",
 		Labels:       map[string]string{"open-cluster-management.io/cluster-name": "managedcluster1"},
-		SignerName:   &signerName,
+		SignerName:   certificatesv1.KubeAPIServerClientSignerName,
 		CN:           user.SubjectPrefix + "managedcluster1:spokeagent1",
 		Orgs:         []string{user.SubjectPrefix + "managedcluster1", user.ManagedClustersGroup},
 		Username:     user.SubjectPrefix + "managedcluster1:spokeagent1",
@@ -88,14 +88,15 @@ func TestSync(t *testing.T) {
 			startingCSRs:         []runtime.Object{testinghelpers.NewCSR(validCSR)},
 			autoApprovingAllowed: true,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				expectedCondition := certificatesv1beta1.CertificateSigningRequestCondition{
-					Type:    certificatesv1beta1.CertificateApproved,
+				expectedCondition := certificatesv1.CertificateSigningRequestCondition{
+					Type:    certificatesv1.CertificateApproved,
+					Status:  corev1.ConditionTrue,
 					Reason:  "AutoApprovedByHubCSRApprovingController",
 					Message: "Auto approving Managed cluster agent certificate after SubjectAccessReview.",
 				}
 				testinghelpers.AssertActions(t, actions, "create", "update")
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				testinghelpers.AssertCSRCondition(t, actual.(*certificatesv1beta1.CertificateSigningRequest).Status.Conditions, expectedCondition)
+				testinghelpers.AssertCSRCondition(t, actual.(*certificatesv1.CertificateSigningRequest).Status.Conditions, expectedCondition)
 			},
 		},
 		{
@@ -111,14 +112,15 @@ func TestSync(t *testing.T) {
 			})},
 			autoApprovingAllowed: true,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				expectedCondition := certificatesv1beta1.CertificateSigningRequestCondition{
-					Type:    certificatesv1beta1.CertificateApproved,
+				expectedCondition := certificatesv1.CertificateSigningRequestCondition{
+					Type:    certificatesv1.CertificateApproved,
+					Status:  corev1.ConditionTrue,
 					Reason:  "AutoApprovedByHubCSRApprovingController",
 					Message: "Auto approving Managed cluster agent certificate after SubjectAccessReview.",
 				}
 				testinghelpers.AssertActions(t, actions, "create", "update")
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				testinghelpers.AssertCSRCondition(t, actual.(*certificatesv1beta1.CertificateSigningRequest).Status.Conditions, expectedCondition)
+				testinghelpers.AssertCSRCondition(t, actual.(*certificatesv1.CertificateSigningRequest).Status.Conditions, expectedCondition)
 			},
 		},
 	}
@@ -138,12 +140,12 @@ func TestSync(t *testing.T) {
 				},
 			)
 			informerFactory := informers.NewSharedInformerFactory(kubeClient, 3*time.Minute)
-			csrStore := informerFactory.Certificates().V1beta1().CertificateSigningRequests().Informer().GetStore()
+			csrStore := informerFactory.Certificates().V1().CertificateSigningRequests().Informer().GetStore()
 			for _, csr := range c.startingCSRs {
 				csrStore.Add(csr)
 			}
 
-			ctrl := &csrApprovingController{kubeClient, informerFactory.Certificates().V1beta1().CertificateSigningRequests().Lister(), eventstesting.NewTestingEventRecorder(t)}
+			ctrl := &csrApprovingController{kubeClient, informerFactory.Certificates().V1().CertificateSigningRequests().Lister(), eventstesting.NewTestingEventRecorder(t)}
 			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, validCSR.Name))
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
@@ -171,7 +173,7 @@ func TestIsSpokeClusterClientCertRenewal(t *testing.T) {
 			name: "an invalid signer name",
 			csr: testinghelpers.CSRHolder{
 				Labels:     validCSR.Labels,
-				SignerName: &invalidSignerName,
+				SignerName: invalidSignerName,
 			},
 			isRenewal: false,
 		},
@@ -197,7 +199,7 @@ func TestIsSpokeClusterClientCertRenewal(t *testing.T) {
 			name: "an invalid organization",
 			csr: testinghelpers.CSRHolder{
 				Labels:       validCSR.Labels,
-				SignerName:   &signerName,
+				SignerName:   validCSR.SignerName,
 				Orgs:         []string{"test"},
 				ReqBlockType: validCSR.ReqBlockType,
 			},
@@ -231,13 +233,13 @@ func TestIsSpokeClusterClientCertRenewal(t *testing.T) {
 			csr: testinghelpers.CSRHolder{
 				Name:         validCSR.Name,
 				Labels:       validCSR.Labels,
-				SignerName:   nil,
+				SignerName:   "",
 				CN:           validCSR.CN,
 				Orgs:         validCSR.Orgs,
 				Username:     validCSR.Username,
 				ReqBlockType: validCSR.ReqBlockType,
 			},
-			isRenewal: true,
+			isRenewal: false,
 		},
 		{
 			name:      "a renewal csr",

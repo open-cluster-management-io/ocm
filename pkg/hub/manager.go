@@ -70,7 +70,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 
 	csrController := csr.NewCSRApprovingController(
 		kubeClient,
-		kubeInfomers.Certificates().V1beta1().CertificateSigningRequests(),
+		kubeInfomers.Certificates().V1().CertificateSigningRequests(),
 		controllerContext.EventRecorder,
 	)
 

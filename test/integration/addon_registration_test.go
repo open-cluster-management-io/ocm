@@ -20,7 +20,7 @@ import (
 	"github.com/open-cluster-management/registration/pkg/features"
 	"github.com/open-cluster-management/registration/pkg/spoke"
 	"github.com/open-cluster-management/registration/test/integration/util"
-	certificates "k8s.io/api/certificates/v1beta1"
+	certificates "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 

@@ -11,7 +11,7 @@ import (
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
-	certv1beta1 "k8s.io/api/certificates/v1beta1"
+	certv1 "k8s.io/api/certificates/v1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -172,9 +172,9 @@ func AssertSubjectAccessReviewObj(t *testing.T, actual runtime.Object) {
 // AssertCSRCondition asserts the actual csr conditions has the expected condition
 func AssertCSRCondition(
 	t *testing.T,
-	actualConditions []certv1beta1.CertificateSigningRequestCondition,
-	expectedCondition certv1beta1.CertificateSigningRequestCondition) {
-	var cond *certv1beta1.CertificateSigningRequestCondition
+	actualConditions []certv1.CertificateSigningRequestCondition,
+	expectedCondition certv1.CertificateSigningRequestCondition) {
+	var cond *certv1.CertificateSigningRequestCondition
 	for i := range actualConditions {
 		condition := actualConditions[i]
 		if condition.Type == expectedCondition.Type {

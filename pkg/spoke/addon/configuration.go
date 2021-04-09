@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	addonv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 )
 
 const (
@@ -57,7 +57,7 @@ func (c *registrationConfig) x509Subject(clusterName, agentName string) *pkix.Na
 	}
 
 	// set the default organization if signer is KubeAPIServerClientSignerName
-	if c.SignerName == certificatesv1beta1.KubeAPIServerClientSignerName && len(subject.Organization) == 0 {
+	if c.SignerName == certificatesv1.KubeAPIServerClientSignerName && len(subject.Organization) == 0 {
 		subject.Organization = []string{defaultOrganization(clusterName, c.AddOnName)}
 	}
 
@@ -113,11 +113,11 @@ func getRegistrationConfigs(addOnName string, annotations map[string]string) (ma
 
 		// set the default signer name
 		if len(item.SignerName) == 0 {
-			item.SignerName = certificatesv1beta1.KubeAPIServerClientSignerName
+			item.SignerName = certificatesv1.KubeAPIServerClientSignerName
 		}
 		// set the secret name of client certificate
 		switch item.SignerName {
-		case certificatesv1beta1.KubeAPIServerClientSignerName:
+		case certificatesv1.KubeAPIServerClientSignerName:
 			item.secretName = fmt.Sprintf("%s-hub-kubeconfig", addOnName)
 		default:
 			item.secretName = fmt.Sprintf("%s-%s-client-cert", addOnName, strings.ReplaceAll(item.SignerName, "/", "-"))

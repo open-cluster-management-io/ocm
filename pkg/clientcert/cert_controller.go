@@ -12,17 +12,17 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 
-	certificates "k8s.io/api/certificates/v1beta1"
+	certificates "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
+	certificatesinformers "k8s.io/client-go/informers/certificates/v1"
 	corev1informers "k8s.io/client-go/informers/core/v1"
-	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
+	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	certificateslisters "k8s.io/client-go/listers/certificates/v1beta1"
+	certificateslisters "k8s.io/client-go/listers/certificates/v1"
 	cache "k8s.io/client-go/tools/cache"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
@@ -310,7 +310,7 @@ func (c *clientCertificateController) createCSR(ctx context.Context) (string, er
 				certificates.UsageKeyEncipherment,
 				certificates.UsageClientAuth,
 			},
-			SignerName: &c.SignerName,
+			SignerName: c.SignerName,
 		},
 	}
 

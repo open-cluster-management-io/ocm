@@ -10,15 +10,16 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	authorizationv1 "k8s.io/api/authorization/v1"
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
+	certificatesinformers "k8s.io/client-go/informers/certificates/v1"
 	"k8s.io/client-go/kubernetes"
-	certificateslisters "k8s.io/client-go/listers/certificates/v1beta1"
+	certificateslisters "k8s.io/client-go/listers/certificates/v1"
 	"k8s.io/klog/v2"
 
 	"github.com/open-cluster-management/registration/pkg/helpers"
@@ -88,12 +89,13 @@ func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncC
 	}
 
 	// Auto approve the spoke cluster csr
-	csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
-		Type:    certificatesv1beta1.CertificateApproved,
+	csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
+		Type:    certificatesv1.CertificateApproved,
+		Status:  corev1.ConditionTrue,
 		Reason:  "AutoApprovedByHubCSRApprovingController",
 		Message: "Auto approving Managed cluster agent certificate after SubjectAccessReview.",
 	})
-	_, err = c.kubeClient.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(ctx, csr, metav1.UpdateOptions{})
+	_, err = c.kubeClient.CertificatesV1().CertificateSigningRequests().UpdateApproval(ctx, csr.Name, csr, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
@@ -103,7 +105,7 @@ func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncC
 
 // Using SubjectAccessReview API to check whether a spoke agent has been authorized to renew its csr,
 // a spoke agent is authorized after its spoke cluster is accepted by hub cluster admin.
-func (c *csrApprovingController) authorize(ctx context.Context, csr *certificatesv1beta1.CertificateSigningRequest) (bool, error) {
+func (c *csrApprovingController) authorize(ctx context.Context, csr *certificatesv1.CertificateSigningRequest) (bool, error) {
 	extra := make(map[string]authorizationv1.ExtraValue)
 	for k, v := range csr.Spec.Extra {
 		extra[k] = authorizationv1.ExtraValue(v)
@@ -134,16 +136,13 @@ func (c *csrApprovingController) authorize(ctx context.Context, csr *certificate
 // 1. if the signer name in csr request is valid.
 // 2. if organization field and commonName field in csr request is valid.
 // 3. if user name in csr is the same as commonName field in csr request.
-func isSpokeClusterClientCertRenewal(csr *certificatesv1beta1.CertificateSigningRequest) bool {
+func isSpokeClusterClientCertRenewal(csr *certificatesv1.CertificateSigningRequest) bool {
 	spokeClusterName, existed := csr.Labels[spokeClusterNameLabel]
 	if !existed {
 		return false
 	}
 
-	// The CSR signer name must be provided on Kubernetes v1.18.0 and above, so if the signer name is empty,
-	// we should be on an old server, we skip the signer name check
-	if (csr.Spec.SignerName != nil && len(*csr.Spec.SignerName) != 0) &&
-		*csr.Spec.SignerName != certificatesv1beta1.KubeAPIServerClientSignerName {
+	if csr.Spec.SignerName != certificatesv1.KubeAPIServerClientSignerName {
 		return false
 	}
 

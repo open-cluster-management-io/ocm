@@ -21,7 +21,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 
-	certv1beta1 "k8s.io/api/certificates/v1beta1"
+	certv1 "k8s.io/api/certificates/v1"
 	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -278,14 +278,14 @@ func NewUnstructuredObj(apiVersion, kind, namespace, name string) *unstructured.
 type CSRHolder struct {
 	Name         string
 	Labels       map[string]string
-	SignerName   *string
+	SignerName   string
 	CN           string
 	Orgs         []string
 	Username     string
 	ReqBlockType string
 }
 
-func NewCSR(holder CSRHolder) *certv1beta1.CertificateSigningRequest {
+func NewCSR(holder CSRHolder) *certv1.CertificateSigningRequest {
 	insecureRand := rand.New(rand.NewSource(0))
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), insecureRand)
 	if err != nil {
@@ -303,33 +303,35 @@ func NewCSR(holder CSRHolder) *certv1beta1.CertificateSigningRequest {
 	if err != nil {
 		panic(err)
 	}
-	return &certv1beta1.CertificateSigningRequest{
+	return &certv1.CertificateSigningRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:         holder.Name,
 			GenerateName: "csr-",
 			Labels:       holder.Labels,
 		},
-		Spec: certv1beta1.CertificateSigningRequestSpec{
+		Spec: certv1.CertificateSigningRequestSpec{
 			Username:   holder.Username,
-			Usages:     []certv1beta1.KeyUsage{},
+			Usages:     []certv1.KeyUsage{},
 			SignerName: holder.SignerName,
 			Request:    pem.EncodeToMemory(&pem.Block{Type: holder.ReqBlockType, Bytes: csrb}),
 		},
 	}
 }
 
-func NewDeniedCSR(holder CSRHolder) *certv1beta1.CertificateSigningRequest {
+func NewDeniedCSR(holder CSRHolder) *certv1.CertificateSigningRequest {
 	csr := NewCSR(holder)
-	csr.Status.Conditions = append(csr.Status.Conditions, certv1beta1.CertificateSigningRequestCondition{
-		Type: certv1beta1.CertificateDenied,
+	csr.Status.Conditions = append(csr.Status.Conditions, certv1.CertificateSigningRequestCondition{
+		Type:   certv1.CertificateDenied,
+		Status: corev1.ConditionTrue,
 	})
 	return csr
 }
 
-func NewApprovedCSR(holder CSRHolder) *certv1beta1.CertificateSigningRequest {
+func NewApprovedCSR(holder CSRHolder) *certv1.CertificateSigningRequest {
 	csr := NewCSR(holder)
-	csr.Status.Conditions = append(csr.Status.Conditions, certv1beta1.CertificateSigningRequestCondition{
-		Type: certv1beta1.CertificateApproved,
+	csr.Status.Conditions = append(csr.Status.Conditions, certv1.CertificateSigningRequestCondition{
+		Type:   certv1.CertificateApproved,
+		Status: corev1.ConditionTrue,
 	})
 	return csr
 }
