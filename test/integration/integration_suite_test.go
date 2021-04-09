@@ -53,7 +53,8 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	testEnv = &envtest.Environment{
 		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths: []string{
-			filepath.Join(".", "vendor", "github.com", "open-cluster-management", "api", "operator", "v1"),
+			filepath.Join(".", "deploy", "cluster-manager", "olm-catalog", "cluster-manager", "manifests"),
+			filepath.Join(".", "deploy", "klusterlet", "olm-catalog", "klusterlet", "manifests"),
 		},
 	}
 	cfg, err := testEnv.Start()

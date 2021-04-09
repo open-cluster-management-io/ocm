@@ -88,7 +88,8 @@ func (ManagedClusterAddOnList) SwaggerDoc() map[string]string {
 }
 
 var map_ManagedClusterAddOnSpec = map[string]string{
-	"": "ManagedClusterAddOnSpec is empty for now.",
+	"":                 "ManagedClusterAddOnSpec defines the install configuration of an addon agent on managed cluster.",
+	"installNamespace": "installNamespace is the namespace on the managed cluster to install the addon agent. If it is not set, open-cluster-management-agent-addon namespace is used to install the addon agent.",
 }
 
 func (ManagedClusterAddOnSpec) SwaggerDoc() map[string]string {
@@ -101,6 +102,7 @@ var map_ManagedClusterAddOnStatus = map[string]string{
 	"relatedObjects":     "relatedObjects is a list of objects that are \"interesting\" or related to this operator. Common uses are: 1. the detailed resource driving the operator 2. operator namespaces 3. operand namespaces 4. related ClusterManagementAddon resource",
 	"addOnMeta":          "addOnMeta is a reference to the metadata information for the add-on. This should be same as the addOnMeta for the corresponding ClusterManagementAddOn resource.",
 	"addOnConfiguration": "addOnConfiguration is a reference to configuration information for the add-on. This resource is use to locate the configuration resource for the add-on.",
+	"registrations":      "registrations is the conifigurations for the addon agent to register to hub. It should be set by each addon controller on hub to define how the addon agent on managedcluster is registered. With the registration defined, The addon agent can access to kube apiserver with kube style API or other endpoints on hub cluster with client certificate authentication. A csr will be created per registration configuration. If more than one registrationConfig is defined, a csr will be created for each registration configuration. It is not allowed that multiple registrationConfigs have the same signer name. After the csr is approved on the hub cluster, the klusterlet agent will create a secret in the installNamespace for the registrationConfig. If the signerName is \"kubernetes.io/kube-apiserver-client\", the secret name will be \"{addon name}-hub-kubeconfig\" whose contents includes key/cert and kubeconfig. Otherwise, the secret name will be \"{addon name}-{signer name}-client-cert\" whose contents includes key/cert.",
 }
 
 func (ManagedClusterAddOnStatus) SwaggerDoc() map[string]string {
@@ -116,6 +118,27 @@ var map_ObjectReference = map[string]string{
 
 func (ObjectReference) SwaggerDoc() map[string]string {
 	return map_ObjectReference
+}
+
+var map_RegistrationConfig = map[string]string{
+	"":           "RegistrationConfig defines the configuration of the addon agent to register to hub. The Klusterlet agent will create a csr for the addon agent with the registrationConfig.",
+	"signerName": "signerName is the name of signer that addon agent will use to create csr.",
+	"subject":    "subject is the user subject of the addon agent to be registered to the hub. If it is not set, the addon agent will have the default subject \"subject\": {\n\t\"user\": \"system:open-cluster-management:addon:{addonName}:{clusterName}:{agentName}\",\n\t\"groups: [\"system:open-cluster-management:addon\", \"system:open-cluster-management:addon:{addonName}\", \"system:authenticated\"]\n}",
+}
+
+func (RegistrationConfig) SwaggerDoc() map[string]string {
+	return map_RegistrationConfig
+}
+
+var map_Subject = map[string]string{
+	"":                 "Subject is the user subject of the addon agent to be registered to the hub.",
+	"user":             "user is the user name of the addon agent.",
+	"groups":           "groups is the user group of the addon agent.",
+	"organizationUnit": "organizationUnit is the ou of the addon agent",
+}
+
+func (Subject) SwaggerDoc() map[string]string {
+	return map_Subject
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

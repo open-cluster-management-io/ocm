@@ -340,8 +340,8 @@ func TestSyncDelete(t *testing.T) {
 		}
 	}
 
-	if len(deleteCRDActions) != 1 {
-		t.Errorf("Expected 1 delete actions, but got %d", len(deleteCRDActions))
+	if len(deleteCRDActions) != 2 {
+		t.Errorf("Expected 2 delete actions, but got %d", len(deleteCRDActions))
 	}
 
 	updateWorkActions := []clienttesting.UpdateActionImpl{}
