@@ -20,6 +20,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 
+	addonclientset "github.com/open-cluster-management/api/client/addon/clientset/versioned"
 	clusterclientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	workclientset "github.com/open-cluster-management/api/client/work/clientset/versioned"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
@@ -47,6 +48,7 @@ var securePort int
 
 var kubeClient kubernetes.Interface
 var clusterClient clusterclientset.Interface
+var addOnClient addonclientset.Interface
 var workClient workclientset.Interface
 
 var testNamespace string
@@ -114,6 +116,10 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	gomega.Expect(kubeClient).ToNot(gomega.BeNil())
 
 	clusterClient, err = clusterclientset.NewForConfig(cfg)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	gomega.Expect(clusterClient).ToNot(gomega.BeNil())
+
+	addOnClient, err = addonclientset.NewForConfig(cfg)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(clusterClient).ToNot(gomega.BeNil())
 

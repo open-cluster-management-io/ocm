@@ -293,6 +293,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	}
 
 	var addOnLeaseController factory.Controller
+	var addOnRegistrationController factory.Controller
 	var addOnInformerFactory addoninformers.SharedInformerFactory
 	if features.DefaultMutableFeatureGate.Enabled(features.AddonManagement) {
 		addOnClient, err := addonclient.NewForConfig(hubClientConfig)
@@ -309,6 +310,17 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			hubKubeClient.CoordinationV1(),
 			spokeKubeInformerFactory.Coordination().V1().Leases(),
 			5*time.Minute, //TODO: this interval time should be allowed to change from outside
+			controllerContext.EventRecorder,
+		)
+
+		addOnRegistrationController = addon.NewAddOnRegistrationController(
+			o.ClusterName,
+			o.AgentName,
+			kubeconfigData,
+			spokeKubeClient,
+			hubKubeInformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
+			addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
+			hubKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
 			controllerContext.EventRecorder,
 		)
 	}
@@ -331,6 +343,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	}
 	if features.DefaultMutableFeatureGate.Enabled(features.AddonManagement) {
 		go addOnLeaseController.Run(ctx, 1)
+		go addOnRegistrationController.Run(ctx, 1)
 	}
 
 	<-ctx.Done()

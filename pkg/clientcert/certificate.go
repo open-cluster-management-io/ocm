@@ -4,7 +4,6 @@ import (
 	"crypto/x509/pkix"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
@@ -86,8 +85,7 @@ func IsCertificateValid(certData []byte, subject *pkix.Name) (bool, error) {
 		return true, nil
 	}
 
-	klog.V(4).Infof("Certificate is not issued for subject (cn=%s; o=%s; ou=%s)",
-		subject.CommonName, strings.Join(subject.Organization, ","), strings.Join(subject.OrganizationalUnit, ","))
+	klog.V(4).Infof("Certificate is not issued for subject (cn=%s)", subject.CommonName)
 	return false, nil
 }
 

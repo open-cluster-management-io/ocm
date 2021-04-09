@@ -141,14 +141,10 @@ func TestIsCertificateValid(t *testing.T) {
 		{
 			name: "valid cert",
 			testCert: testinghelpers.NewTestCertWithSubject(pkix.Name{
-				CommonName:         "test",
-				Organization:       []string{"a", "b"},
-				OrganizationalUnit: []string{"x"},
+				CommonName: "test",
 			}, 60*time.Second),
 			subject: &pkix.Name{
-				CommonName:         "test",
-				Organization:       []string{"a", "b"},
-				OrganizationalUnit: []string{"x"},
+				CommonName: "test",
 			},
 			isValid: true,
 		},
