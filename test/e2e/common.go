@@ -564,7 +564,7 @@ func (t *Tester) CheckManagedClusterAddOnStatus(managedClusterNamespace, addOnNa
 		return fmt.Errorf("there is no conditions in addon %v/%v", managedClusterNamespace, addOnName)
 	}
 
-	if !meta.IsStatusConditionTrue(addOn.Status.Conditions, "ManagedClusterAddOnConditionAvailable") {
+	if !meta.IsStatusConditionTrue(addOn.Status.Conditions, "Available") {
 		return fmt.Errorf("The addon %v/%v available condition is not true", managedClusterNamespace, addOnName)
 	}
 
