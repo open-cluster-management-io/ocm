@@ -94,23 +94,26 @@ func TestSync(t *testing.T) {
 		name            string
 		queueKey        string
 		addOns          []runtime.Object
+		hubLeases       []runtime.Object
 		leases          []runtime.Object
 		validateActions func(t *testing.T, ctx *testinghelpers.FakeSyncContext, actions []clienttesting.Action)
 	}{
 		{
-			name:     "bad queue key",
-			queueKey: "test/test/test",
-			addOns:   []runtime.Object{},
-			leases:   []runtime.Object{},
+			name:      "bad queue key",
+			queueKey:  "test/test/test",
+			addOns:    []runtime.Object{},
+			hubLeases: []runtime.Object{},
+			leases:    []runtime.Object{},
 			validateActions: func(t *testing.T, ctx *testinghelpers.FakeSyncContext, actions []clienttesting.Action) {
 				testinghelpers.AssertNoActions(t, actions)
 			},
 		},
 		{
-			name:     "no addons",
-			queueKey: "test/test",
-			addOns:   []runtime.Object{},
-			leases:   []runtime.Object{},
+			name:      "no addons",
+			queueKey:  "test/test",
+			addOns:    []runtime.Object{},
+			hubLeases: []runtime.Object{},
+			leases:    []runtime.Object{},
 			validateActions: func(t *testing.T, ctx *testinghelpers.FakeSyncContext, actions []clienttesting.Action) {
 				testinghelpers.AssertNoActions(t, actions)
 			},
@@ -125,12 +128,13 @@ func TestSync(t *testing.T) {
 					Annotations: map[string]string{"addon.open-cluster-management.io/installNamespace": "test"},
 				},
 			}},
-			leases: []runtime.Object{},
+			hubLeases: []runtime.Object{},
+			leases:    []runtime.Object{},
 			validateActions: func(t *testing.T, ctx *testinghelpers.FakeSyncContext, actions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, actions, "get", "update")
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				addOn := actual.(*addonv1alpha1.ManagedClusterAddOn)
-				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "ManagedClusterAddOnConditionAvailable")
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 				if addOnCond == nil {
 					t.Errorf("expected addon available condition, but failed")
 				}
@@ -149,6 +153,7 @@ func TestSync(t *testing.T) {
 					Annotations: map[string]string{"addon.open-cluster-management.io/installNamespace": "test"},
 				},
 			}},
+			hubLeases: []runtime.Object{},
 			leases: []runtime.Object{
 				testinghelpers.NewAddOnLease("test", "test", now.Add(-5*time.Minute)),
 			},
@@ -156,7 +161,7 @@ func TestSync(t *testing.T) {
 				testinghelpers.AssertActions(t, actions, "get", "update")
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				addOn := actual.(*addonv1alpha1.ManagedClusterAddOn)
-				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "ManagedClusterAddOnConditionAvailable")
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 				if addOnCond == nil {
 					t.Errorf("expected addon available condition, but failed")
 				}
@@ -175,6 +180,7 @@ func TestSync(t *testing.T) {
 					Annotations: map[string]string{"addon.open-cluster-management.io/installNamespace": "test"},
 				},
 			}},
+			hubLeases: []runtime.Object{},
 			leases: []runtime.Object{
 				testinghelpers.NewAddOnLease("test", "test", now),
 			},
@@ -182,7 +188,7 @@ func TestSync(t *testing.T) {
 				testinghelpers.AssertActions(t, actions, "get", "update")
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				addOn := actual.(*addonv1alpha1.ManagedClusterAddOn)
-				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "ManagedClusterAddOnConditionAvailable")
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 				if addOnCond == nil {
 					t.Errorf("expected addon available condition, but failed")
 				}
@@ -203,7 +209,7 @@ func TestSync(t *testing.T) {
 				Status: addonv1alpha1.ManagedClusterAddOnStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:    "ManagedClusterAddOnConditionAvailable",
+							Type:    "Available",
 							Status:  metav1.ConditionTrue,
 							Reason:  "ManagedClusterAddOnLeaseUpdated",
 							Message: "Managed cluster addon agent updates its lease constantly.",
@@ -211,6 +217,7 @@ func TestSync(t *testing.T) {
 					},
 				},
 			}},
+			hubLeases: []runtime.Object{},
 			leases: []runtime.Object{
 				testinghelpers.NewAddOnLease("test", "test", now),
 			},
@@ -236,12 +243,37 @@ func TestSync(t *testing.T) {
 					},
 				},
 			},
+			hubLeases: []runtime.Object{},
 			leases: []runtime.Object{
 				testinghelpers.NewAddOnLease("test1", "test1", now.Add(-5*time.Minute)),
 			},
 			validateActions: func(t *testing.T, ctx *testinghelpers.FakeSyncContext, actions []clienttesting.Action) {
-				if ctx.Queue().Len() != 1 {
-					t.Errorf("expected one addon in queue, but failed")
+				if ctx.Queue().Len() != 2 {
+					t.Errorf("expected two addons in queue, but failed")
+				}
+			},
+		},
+		{
+			name:     "addon update its lease constantly (compatibility)",
+			queueKey: "test/test",
+			addOns: []runtime.Object{&addonv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testinghelpers.TestManagedClusterName,
+					Name:      "test",
+				},
+			}},
+			hubLeases: []runtime.Object{testinghelpers.NewAddOnLease(testinghelpers.TestManagedClusterName, "test", now)},
+			leases:    []runtime.Object{},
+			validateActions: func(t *testing.T, ctx *testinghelpers.FakeSyncContext, actions []clienttesting.Action) {
+				testinghelpers.AssertActions(t, actions, "get", "update")
+				actual := actions[1].(clienttesting.UpdateActionImpl).Object
+				addOn := actual.(*addonv1alpha1.ManagedClusterAddOn)
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
+				if addOnCond == nil {
+					t.Errorf("expected addon available condition, but failed")
+				}
+				if addOnCond.Status != metav1.ConditionTrue {
+					t.Errorf("expected addon available condition is available, but failed")
 				}
 			},
 		},
@@ -256,6 +288,8 @@ func TestSync(t *testing.T) {
 				addOnStroe.Add(addOn)
 			}
 
+			hubClient := kubefake.NewSimpleClientset(c.hubLeases...)
+
 			leaseClient := kubefake.NewSimpleClientset(c.leases...)
 			leaseInformerFactory := kubeinformers.NewSharedInformerFactory(leaseClient, time.Minute*10)
 			leaseStore := leaseInformerFactory.Coordination().V1().Leases().Informer().GetStore()
@@ -264,11 +298,12 @@ func TestSync(t *testing.T) {
 			}
 
 			ctrl := &managedClusterAddOnLeaseController{
-				clusterName: testinghelpers.TestManagedClusterName,
-				clock:       clock.NewFakeClock(time.Now()),
-				addOnClient: addOnClient,
-				addOnLister: addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				leaseLister: leaseInformerFactory.Coordination().V1().Leases().Lister(),
+				clusterName:    testinghelpers.TestManagedClusterName,
+				clock:          clock.NewFakeClock(time.Now()),
+				hubLeaseClient: hubClient.CoordinationV1(),
+				addOnClient:    addOnClient,
+				addOnLister:    addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				leaseLister:    leaseInformerFactory.Coordination().V1().Leases().Lister(),
 			}
 			syncCtx := testinghelpers.NewFakeSyncContext(t, c.queueKey)
 			syncErr := ctrl.sync(context.TODO(), syncCtx)
