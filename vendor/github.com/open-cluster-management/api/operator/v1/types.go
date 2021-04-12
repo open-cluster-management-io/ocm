@@ -11,7 +11,7 @@ import (
 // +kubebuilder:resource:scope=Cluster
 
 // ClusterManager configures the controllers on the hub that govern registration and work distribution for attached Klusterlets.
-// ClusterManager will be only deployed in open-cluster-management-hub namespace.
+// ClusterManager will only be deployed in open-cluster-management-hub namespace.
 type ClusterManager struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -43,10 +43,10 @@ type ClusterManagerStatus struct {
 
 	// Conditions contain the different condition statuses for this ClusterManager.
 	// Valid condition types are:
-	// Applied: components in hub are applied.
-	// Available: components in hub are available and ready to serve.
-	// Progressing: components in hub are in a transitioning state.
-	// Degraded: components in hub do not match the desired configuration and only provide
+	// Applied: Components in hub are applied.
+	// Available: Components in hub are available and ready to serve.
+	// Progressing: Components in hub are in a transitioning state.
+	// Degraded: Components in hub do not match the desired configuration and only provide
 	// degraded service.
 	Conditions []metav1.Condition `json:"conditions"`
 
@@ -54,14 +54,14 @@ type ClusterManagerStatus struct {
 	// +optional
 	Generations []GenerationStatus `json:"generations,omitempty"`
 
-	// RelatedResources are used to track the resources that are related to this ClusterManager
+	// RelatedResources are used to track the resources that are related to this ClusterManager.
 	// +optional
 	RelatedResources []RelatedResourceMeta `json:"relatedResources,omitempty"`
 }
 
 // RelatedResourceMeta represents the resource that is managed by an operator
 type RelatedResourceMeta struct {
-	// group is the group of the thing you're tracking
+	// group is the group of the resource that you're tracking
 	// +required
 	Group string `json:"group"`
 
@@ -69,7 +69,7 @@ type RelatedResourceMeta struct {
 	// +required
 	Version string `json:"version"`
 
-	// resource is the resource type of the thing you're tracking
+	// resource is the resource type of the resource that you're tracking
 	// +required
 	Resource string `json:"resource"`
 
@@ -77,35 +77,35 @@ type RelatedResourceMeta struct {
 	// +optional
 	Namespace string `json:"namespace"`
 
-	// name is the name of the thing you're tracking
+	// name is the name of the resource that you're tracking
 	// +required
 	Name string `json:"name"`
 }
 
 // GenerationStatus keeps track of the generation for a given resource so that decisions about forced updates can be made.
-// the definition matches the GenerationStatus defined in github.com/openshift/api/v1
+// The definition matches the GenerationStatus defined in github.com/openshift/api/v1
 type GenerationStatus struct {
-	// group is the group of the thing you're tracking
+	// group is the group of the resource that you're tracking
 	// +required
 	Group string `json:"group"`
 
-	// version is the version of the thing you're tracking
+	// version is the version of the resource that you're tracking
 	// +required
 	Version string `json:"version"`
 
-	// resource is the resource type of the thing you're tracking
+	// resource is the resource type of the resource that you're tracking
 	// +required
 	Resource string `json:"resource"`
 
-	// namespace is where the thing you're tracking is
+	// namespace is where the resource that you're tracking is
 	// +optional
 	Namespace string `json:"namespace"`
 
-	// name is the name of the thing you're tracking
+	// name is the name of the resource that you're tracking
 	// +required
 	Name string `json:"name"`
 
-	// lastGeneration is the last generation of the thing that controller applies
+	// lastGeneration is the last generation of the resource that controller applies
 	// +required
 	LastGeneration int64 `json:"lastGeneration" protobuf:"varint,5,opt,name=lastGeneration"`
 }
@@ -161,7 +161,7 @@ type KlusterletSpec struct {
 	WorkImagePullSpec string `json:"workImagePullSpec,omitempty"`
 
 	// ClusterName is the name of the managed cluster to be created on hub.
-	// The Klusterlet agent generates a random name if it is not set, or discovers the appropriate cluster name on openshift.
+	// The Klusterlet agent generates a random name if it is not set, or discovers the appropriate cluster name on OpenShift.
 	// +optional
 	ClusterName string `json:"clusterName,omitempty"`
 
@@ -191,10 +191,10 @@ type KlusterletStatus struct {
 
 	// Conditions contain the different condition statuses for this Klusterlet.
 	// Valid condition types are:
-	// Applied: components have been applied in the managed cluster.
-	// Available: components in the managed cluster are available and ready to serve.
-	// Progressing: components in the managed cluster are in a transitioning state.
-	// Degraded: components in the managed cluster do not match the desired configuration and only provide
+	// Applied: Components have been applied in the managed cluster.
+	// Available: Components in the managed cluster are available and ready to serve.
+	// Progressing: Components in the managed cluster are in a transitioning state.
+	// Degraded: Components in the managed cluster do not match the desired configuration and only provide
 	// degraded service.
 	Conditions []metav1.Condition `json:"conditions"`
 
@@ -202,7 +202,7 @@ type KlusterletStatus struct {
 	// +optional
 	Generations []GenerationStatus `json:"generations,omitempty"`
 
-	// RelatedResources are used to track the resources that are related to this Klusterlet
+	// RelatedResources are used to track the resources that are related to this Klusterlet.
 	// +optional
 	RelatedResources []RelatedResourceMeta `json:"relatedResources,omitempty"`
 }
@@ -217,6 +217,6 @@ type KlusterletList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 
-	// Items is a list of Klusterlet agent.
+	// Items is a list of Klusterlet agents.
 	Items []Klusterlet `json:"items"`
 }

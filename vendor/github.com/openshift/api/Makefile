@@ -23,6 +23,7 @@ $(call add-crd-gen,authorization,./authorization/v1,./authorization/v1,./authori
 $(call add-crd-gen,config,./config/v1,./config/v1,./config/v1)
 $(call add-crd-gen,helm,./helm/v1beta1,./helm/v1beta1,./helm/v1beta1)
 $(call add-crd-gen,console,./console/v1,./console/v1,./console/v1)
+$(call add-crd-gen,console-alpha,./console/v1alpha1,./console/v1alpha1,./console/v1alpha1)
 $(call add-crd-gen,imageregistry,./imageregistry/v1,./imageregistry/v1,./imageregistry/v1)
 $(call add-crd-gen,operator,./operator/v1,./operator/v1,./operator/v1)
 $(call add-crd-gen,operator-alpha,./operator/v1alpha1,./operator/v1alpha1,./operator/v1alpha1)
@@ -32,6 +33,7 @@ $(call add-crd-gen,samples,./samples/v1,./samples/v1,./samples/v1)
 $(call add-crd-gen,security,./security/v1,./security/v1,./security/v1)
 $(call add-crd-gen,securityinternal,./securityinternal/v1,./securityinternal/v1,./securityinternal/v1)
 $(call add-crd-gen,network,./network/v1,./network/v1,./network/v1)
+$(call add-crd-gen,networkoperator,./networkoperator/v1,./networkoperator/v1,./networkoperator/v1)
 $(call add-crd-gen,operatorcontrolplane,./operatorcontrolplane/v1alpha1,./operatorcontrolplane/v1alpha1,./operatorcontrolplane/v1alpha1)
 
 RUNTIME ?= podman
@@ -41,7 +43,7 @@ verify-scripts:
 	bash -x hack/verify-deepcopy.sh
 	bash -x hack/verify-protobuf.sh
 	bash -x hack/verify-swagger-docs.sh
-	bash -x hack/verify-crds.sh
+	hack/verify-crds.sh
 	bash -x hack/verify-types.sh
 .PHONY: verify-scripts
 verify: verify-scripts verify-codegen-crds

@@ -45,12 +45,17 @@ const (
 )
 
 var (
-	crdStaticFiles = []string{
+	crdV1StaticFiles = []string{
 		"manifests/klusterlet/0000_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml",
+		"manifests/klusterlet/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml",
+	}
+
+	crdV1beta1StaticFiles = []string{
+		"manifests/klusterlet/0001_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml",
+		"manifests/klusterlet/0001_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml",
 	}
 
 	staticResourceFiles = []string{
-		"manifests/klusterlet/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml",
 		"manifests/klusterlet/klusterlet-registration-serviceaccount.yaml",
 		"manifests/klusterlet/klusterlet-registration-clusterrole.yaml",
 		"manifests/klusterlet/klusterlet-registration-clusterrolebinding.yaml",
@@ -238,7 +243,14 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 
 	// Apply static files
-	appliedStaticFiles := append(crdStaticFiles, staticResourceFiles...)
+	var appliedStaticFiles []string
+	// CRD v1beta1 was deprecated from k8s 1.16.0 and will be removed in k8s 1.22
+	if cnt, err := n.kubeVersion.Compare("v1.16.0"); err == nil && cnt < 0 {
+		appliedStaticFiles = append(crdV1beta1StaticFiles, staticResourceFiles...)
+	} else {
+		appliedStaticFiles = append(crdV1StaticFiles, staticResourceFiles...)
+	}
+
 	resourceResults := resourceapply.ApplyDirectly(
 		resourceapply.NewKubeClientHolder(n.kubeClient).WithAPIExtensionsClient(n.apiExtensionClient),
 		controllerContext.Recorder(),
@@ -429,7 +441,33 @@ func (n *klusterletController) cleanUp(ctx context.Context, controllerContext fa
 
 	// remove AppliedManifestWorks
 	if len(hubHost) > 0 {
-		return n.cleanUpAppliedManifestWorks(ctx, hubHost)
+		if err := n.cleanUpAppliedManifestWorks(ctx, hubHost); err != nil {
+			return err
+		}
+	}
+
+	// remove the CRDs
+	var crdStaticFiles []string
+	// CRD v1beta1 was deprecated from k8s 1.16.0 and will be removed in k8s 1.22
+	if cnt, err := n.kubeVersion.Compare("v1.16.0"); err == nil && cnt < 0 {
+		crdStaticFiles = crdV1beta1StaticFiles
+	} else {
+		crdStaticFiles = crdV1StaticFiles
+	}
+	for _, file := range crdStaticFiles {
+		err := helpers.CleanUpStaticObject(
+			ctx,
+			n.kubeClient,
+			n.apiExtensionClient,
+			nil,
+			func(name string) ([]byte, error) {
+				return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
+			},
+			file,
+		)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

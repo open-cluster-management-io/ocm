@@ -2,6 +2,8 @@
 // sources:
 // manifests/klusterlet/0000_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml
 // manifests/klusterlet/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml
+// manifests/klusterlet/0001_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml
+// manifests/klusterlet/0001_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml
 // manifests/klusterlet/klusterlet-registration-clusterrole.yaml
 // manifests/klusterlet/klusterlet-registration-clusterrolebinding.yaml
 // manifests/klusterlet/klusterlet-registration-deployment.yaml
@@ -66,10 +68,9 @@ func (fi bindataFileInfo) Sys() interface{} {
 	return nil
 }
 
-var _manifestsKlusterlet0000_01_workOpenClusterManagementIo_appliedmanifestworksCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _manifestsKlusterlet0000_01_workOpenClusterManagementIo_appliedmanifestworksCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  creationTimestamp: null
   name: appliedmanifestworks.work.open-cluster-management.io
 spec:
   group: work.open-cluster-management.io
@@ -78,93 +79,94 @@ spec:
     listKind: AppliedManifestWorkList
     plural: appliedmanifestworks
     singular: appliedmanifestwork
-  scope: "Cluster"
+  scope: Cluster
   preserveUnknownFields: false
-  subresources:
-    status: {}
-  validation:
-    openAPIV3Schema:
-      description: AppliedManifestWork represents an applied manifestwork on managed
-        cluster. It is placed on managed cluster. An AppliedManifestWork links to
-        a manifestwork on a hub recording resources deployed in the managed cluster.
-        When the agent is removed from managed cluster, cluster-admin on managed cluster
-        can delete appliedmanifestwork to remove resources deployed by the agent.
-        The name of the appliedmanifestwork must be in the format of {hash of hub's
-        first kube-apiserver url}-{manifestwork name}
-      type: object
-      properties:
-        apiVersion:
-          description: 'APIVersion defines the versioned schema of this representation
-            of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-          type: string
-        kind:
-          description: 'Kind is a string value representing the REST resource this
-            object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-          type: string
-        metadata:
-          type: object
-        spec:
-          description: Spec represents the desired configuration of AppliedManifestWork
-          type: object
-          properties:
-            hubHash:
-              description: HubHash represents the hash of the first hub kube apiserver
-                to identify which hub this AppliedManifestWork links to.
-              type: string
-            manifestWorkName:
-              description: ManifestWorkName represents the name of the related manifestwork
-                on hub.
-              type: string
-        status:
-          description: Status represents the current status of AppliedManifestWork
-          type: object
-          properties:
-            appliedResources:
-              description: AppliedResources represents a list of resources defined
-                within the manifestwork that are applied. Only resources with valid
-                GroupVersionResource, namespace, and name are suitable. An item in
-                this slice is deleted when there is no mapped manifest in manifestwork.Spec
-                or by finalizer. The resource relating to the item will also be removed
-                from managed cluster. The deleted resource may still be present until
-                the finalizers for that resource are finished. However, the resource
-                will not be undeleted, so it can be removed from this list and eventual
-                consistency is preserved.
-              type: array
-              items:
-                description: AppliedManifestResourceMeta represents the gvr, name
-                  and namespace of a resource. Since these resources have been created,
-                  they must have valid group, version, resource, namespace, and name.
-                type: object
-                properties:
-                  group:
-                    description: Group is the API Group of the kubernetes resource
-                    type: string
-                  name:
-                    description: Name is the name of the kubernetes resource
-                    type: string
-                  namespace:
-                    description: Name is the namespace of the kubernetes resource,
-                      empty string indicates it is a cluster scoped resource.
-                    type: string
-                  resource:
-                    description: Resource is the resource name of the kubernetes resource
-                    type: string
-                  uid:
-                    description: UID is set on successful deletion of the kubernetes
-                      resource by controller. The resource might be still visible
-                      on the managed cluster after this field is set. It is not directly
-                      settable by a client.
-                    type: string
-                  version:
-                    description: Version is the version of the kubernetes resource
-                    type: string
-  version: v1
   versions:
   - name: v1
+    schema:
+      openAPIV3Schema:
+        description: AppliedManifestWork represents an applied manifestwork on managed
+          cluster that is placed on a managed cluster. An AppliedManifestWork links
+          to a manifestwork on a hub recording resources deployed in the managed cluster.
+          When the agent is removed from managed cluster, cluster-admin on managed
+          cluster can delete appliedmanifestwork to remove resources deployed by the
+          agent. The name of the appliedmanifestwork must be in the format of {hash
+          of hub's first kube-apiserver url}-{manifestwork name}
+        type: object
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Spec represents the desired configuration of AppliedManifestWork.
+            type: object
+            properties:
+              hubHash:
+                description: HubHash represents the hash of the first hub kube apiserver
+                  to identify which hub this AppliedManifestWork links to.
+                type: string
+              manifestWorkName:
+                description: ManifestWorkName represents the name of the related manifestwork
+                  on the hub.
+                type: string
+          status:
+            description: Status represents the current status of AppliedManifestWork.
+            type: object
+            properties:
+              appliedResources:
+                description: AppliedResources represents a list of resources defined
+                  within the manifestwork that are applied. Only resources with valid
+                  GroupVersionResource, namespace, and name are suitable. An item
+                  in this slice is deleted when there is no mapped manifest in manifestwork.Spec
+                  or by finalizer. The resource relating to the item will also be
+                  removed from managed cluster. The deleted resource may still be
+                  present until the finalizers for that resource are finished. However,
+                  the resource will not be undeleted, so it can be removed from this
+                  list and eventual consistency is preserved.
+                type: array
+                items:
+                  description: AppliedManifestResourceMeta represents the group, version,
+                    resource, name and namespace of a resource. Since these resources
+                    have been created, they must have valid group, version, resource,
+                    namespace, and name.
+                  type: object
+                  properties:
+                    group:
+                      description: Group is the API Group of the Kubernetes resource.
+                      type: string
+                    name:
+                      description: Name is the name of the Kubernetes resource.
+                      type: string
+                    namespace:
+                      description: Name is the namespace of the Kubernetes resource,
+                        empty string indicates it is a cluster scoped resource.
+                      type: string
+                    resource:
+                      description: Resource is the resource name of the Kubernetes
+                        resource.
+                      type: string
+                    uid:
+                      description: UID is set on successful deletion of the Kubernetes
+                        resource by controller. The resource might be still visible
+                        on the managed cluster after this field is set. It is not
+                        directly settable by a client.
+                      type: string
+                    version:
+                      description: Version is the version of the Kubernetes resource.
+                      type: string
     served: true
     storage: true
+    subresources:
+      status: {}
 status:
   acceptedNames:
     kind: ""
@@ -188,7 +190,200 @@ func manifestsKlusterlet0000_01_workOpenClusterManagementIo_appliedmanifestworks
 	return a, nil
 }
 
-var _manifestsKlusterlet0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _manifestsKlusterlet0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: clusterclaims.cluster.open-cluster-management.io
+spec:
+  group: cluster.open-cluster-management.io
+  names:
+    kind: ClusterClaim
+    listKind: ClusterClaimList
+    plural: clusterclaims
+    singular: clusterclaim
+  scope: Cluster
+  preserveUnknownFields: false
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ClusterClaim represents cluster information that a managed cluster
+          claims ClusterClaims with well known names include,   1. id.k8s.io, it contains
+          a unique identifier for the cluster.   2. clusterset.k8s.io, it contains
+          an identifier that relates the cluster      to the ClusterSet in which it
+          belongs.
+        type: object
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Spec defines the attributes of the ClusterClaim.
+            type: object
+            properties:
+              value:
+                description: Value is a claim-dependent string
+                type: string
+                maxLength: 1024
+                minLength: 1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func manifestsKlusterlet0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYamlBytes() ([]byte, error) {
+	return _manifestsKlusterlet0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYaml, nil
+}
+
+func manifestsKlusterlet0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYaml() (*asset, error) {
+	bytes, err := manifestsKlusterlet0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "manifests/klusterlet/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _manifestsKlusterlet0001_01_workOpenClusterManagementIo_appliedmanifestworksCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  name: appliedmanifestworks.work.open-cluster-management.io
+spec:
+  group: work.open-cluster-management.io
+  names:
+    kind: AppliedManifestWork
+    listKind: AppliedManifestWorkList
+    plural: appliedmanifestworks
+    singular: appliedmanifestwork
+  scope: "Cluster"
+  preserveUnknownFields: false
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: AppliedManifestWork represents an applied manifestwork on managed
+        cluster that is placed on a managed cluster. An AppliedManifestWork links
+        to a manifestwork on a hub recording resources deployed in the managed cluster.
+        When the agent is removed from managed cluster, cluster-admin on managed cluster
+        can delete appliedmanifestwork to remove resources deployed by the agent.
+        The name of the appliedmanifestwork must be in the format of {hash of hub's
+        first kube-apiserver url}-{manifestwork name}
+      type: object
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: Spec represents the desired configuration of AppliedManifestWork.
+          type: object
+          properties:
+            hubHash:
+              description: HubHash represents the hash of the first hub kube apiserver
+                to identify which hub this AppliedManifestWork links to.
+              type: string
+            manifestWorkName:
+              description: ManifestWorkName represents the name of the related manifestwork
+                on the hub.
+              type: string
+        status:
+          description: Status represents the current status of AppliedManifestWork.
+          type: object
+          properties:
+            appliedResources:
+              description: AppliedResources represents a list of resources defined
+                within the manifestwork that are applied. Only resources with valid
+                GroupVersionResource, namespace, and name are suitable. An item in
+                this slice is deleted when there is no mapped manifest in manifestwork.Spec
+                or by finalizer. The resource relating to the item will also be removed
+                from managed cluster. The deleted resource may still be present until
+                the finalizers for that resource are finished. However, the resource
+                will not be undeleted, so it can be removed from this list and eventual
+                consistency is preserved.
+              type: array
+              items:
+                description: AppliedManifestResourceMeta represents the group, version,
+                  resource, name and namespace of a resource. Since these resources
+                  have been created, they must have valid group, version, resource,
+                  namespace, and name.
+                type: object
+                properties:
+                  group:
+                    description: Group is the API Group of the Kubernetes resource.
+                    type: string
+                  name:
+                    description: Name is the name of the Kubernetes resource.
+                    type: string
+                  namespace:
+                    description: Name is the namespace of the Kubernetes resource,
+                      empty string indicates it is a cluster scoped resource.
+                    type: string
+                  resource:
+                    description: Resource is the resource name of the Kubernetes resource.
+                    type: string
+                  uid:
+                    description: UID is set on successful deletion of the Kubernetes
+                      resource by controller. The resource might be still visible
+                      on the managed cluster after this field is set. It is not directly
+                      settable by a client.
+                    type: string
+                  version:
+                    description: Version is the version of the Kubernetes resource.
+                    type: string
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func manifestsKlusterlet0001_01_workOpenClusterManagementIo_appliedmanifestworksCrdYamlBytes() ([]byte, error) {
+	return _manifestsKlusterlet0001_01_workOpenClusterManagementIo_appliedmanifestworksCrdYaml, nil
+}
+
+func manifestsKlusterlet0001_01_workOpenClusterManagementIo_appliedmanifestworksCrdYaml() (*asset, error) {
+	bytes, err := manifestsKlusterlet0001_01_workOpenClusterManagementIo_appliedmanifestworksCrdYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "manifests/klusterlet/0001_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _manifestsKlusterlet0001_02_clustersOpenClusterManagementIo_clusterclaimsCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clusterclaims.cluster.open-cluster-management.io
@@ -243,17 +438,17 @@ status:
   storedVersions: []
 `)
 
-func manifestsKlusterlet0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYamlBytes() ([]byte, error) {
-	return _manifestsKlusterlet0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYaml, nil
+func manifestsKlusterlet0001_02_clustersOpenClusterManagementIo_clusterclaimsCrdYamlBytes() ([]byte, error) {
+	return _manifestsKlusterlet0001_02_clustersOpenClusterManagementIo_clusterclaimsCrdYaml, nil
 }
 
-func manifestsKlusterlet0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYaml() (*asset, error) {
-	bytes, err := manifestsKlusterlet0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYamlBytes()
+func manifestsKlusterlet0001_02_clustersOpenClusterManagementIo_clusterclaimsCrdYaml() (*asset, error) {
+	bytes, err := manifestsKlusterlet0001_02_clustersOpenClusterManagementIo_clusterclaimsCrdYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "manifests/klusterlet/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "manifests/klusterlet/0001_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -794,6 +989,8 @@ func AssetNames() []string {
 var _bindata = map[string]func() (*asset, error){
 	"manifests/klusterlet/0000_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml": manifestsKlusterlet0000_01_workOpenClusterManagementIo_appliedmanifestworksCrdYaml,
 	"manifests/klusterlet/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml":    manifestsKlusterlet0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYaml,
+	"manifests/klusterlet/0001_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml": manifestsKlusterlet0001_01_workOpenClusterManagementIo_appliedmanifestworksCrdYaml,
+	"manifests/klusterlet/0001_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml":    manifestsKlusterlet0001_02_clustersOpenClusterManagementIo_clusterclaimsCrdYaml,
 	"manifests/klusterlet/klusterlet-registration-clusterrole.yaml":                              manifestsKlusterletKlusterletRegistrationClusterroleYaml,
 	"manifests/klusterlet/klusterlet-registration-clusterrolebinding.yaml":                       manifestsKlusterletKlusterletRegistrationClusterrolebindingYaml,
 	"manifests/klusterlet/klusterlet-registration-deployment.yaml":                               manifestsKlusterletKlusterletRegistrationDeploymentYaml,
@@ -852,6 +1049,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 		"klusterlet": {nil, map[string]*bintree{
 			"0000_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml": {manifestsKlusterlet0000_01_workOpenClusterManagementIo_appliedmanifestworksCrdYaml, map[string]*bintree{}},
 			"0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml":    {manifestsKlusterlet0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYaml, map[string]*bintree{}},
+			"0001_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml": {manifestsKlusterlet0001_01_workOpenClusterManagementIo_appliedmanifestworksCrdYaml, map[string]*bintree{}},
+			"0001_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml":    {manifestsKlusterlet0001_02_clustersOpenClusterManagementIo_clusterclaimsCrdYaml, map[string]*bintree{}},
 			"klusterlet-registration-clusterrole.yaml":                              {manifestsKlusterletKlusterletRegistrationClusterroleYaml, map[string]*bintree{}},
 			"klusterlet-registration-clusterrolebinding.yaml":                       {manifestsKlusterletKlusterletRegistrationClusterrolebindingYaml, map[string]*bintree{}},
 			"klusterlet-registration-deployment.yaml":                               {manifestsKlusterletKlusterletRegistrationDeploymentYaml, map[string]*bintree{}},
