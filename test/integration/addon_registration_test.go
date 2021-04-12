@@ -195,18 +195,28 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// create addon
-		registrations := fmt.Sprintf(`[{"signerName":"%s"}]`, signerName)
 		addOn := &addonv1alpha1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      addOnName,
 				Namespace: managedClusterName,
-				Annotations: map[string]string{
-					"addon.open-cluster-management.io/installNamespace": addOnName,
-					"addon.open-cluster-management.io/registrations":    registrations,
-				},
+			},
+			Spec: addonv1alpha1.ManagedClusterAddOnSpec{
+				InstallNamespace: addOnName,
 			},
 		}
 		_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		created, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		created.Status = addonv1alpha1.ManagedClusterAddOnStatus{
+			Registrations: []addonv1alpha1.RegistrationConfig{
+				{
+					SignerName: signerName,
+				},
+			},
+		}
+		_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.TODO(), created, metav1.UpdateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		assertSuccessCSRApproval()
@@ -250,9 +260,14 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		newSignerName := "example.com/signer1"
-		registrations := fmt.Sprintf(`[{"signerName":"%s"}]`, newSignerName)
-		addOn.Annotations["addon.open-cluster-management.io/registrations"] = registrations
-		_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(context.TODO(), addOn, metav1.UpdateOptions{})
+		addOn.Status = addonv1alpha1.ManagedClusterAddOnStatus{
+			Registrations: []addonv1alpha1.RegistrationConfig{
+				{
+					SignerName: newSignerName,
+				},
+			},
+		}
+		_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.TODO(), addOn, metav1.UpdateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		assertSecretGone(addOnName, getSecretName(addOnName, signerName))
 

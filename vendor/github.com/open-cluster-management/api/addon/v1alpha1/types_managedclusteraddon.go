@@ -29,8 +29,49 @@ type ManagedClusterAddOn struct {
 	Status ManagedClusterAddOnStatus `json:"status"`
 }
 
-// ManagedClusterAddOnSpec is empty for now.
+// ManagedClusterAddOnSpec defines the install configuration of
+// an addon agent on managed cluster.
 type ManagedClusterAddOnSpec struct {
+	// installNamespace is the namespace on the managed cluster to install the addon agent.
+	// If it is not set, open-cluster-management-agent-addon namespace is used to install the addon agent.
+	// +optional
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+	InstallNamespace string `json:"installNamespace,omitempty"`
+}
+
+// RegistrationConfig defines the configuration of the addon agent to register to hub. The Klusterlet agent will
+// create a csr for the addon agent with the registrationConfig.
+type RegistrationConfig struct {
+	// signerName is the name of signer that addon agent will use to create csr.
+	// +required
+	// +kubebuilder:validation:MaxLength=571
+	// +kubebuilder:validation:MinLength=5
+	SignerName string `json:"signerName"`
+
+	// subject is the user subject of the addon agent to be registered to the hub.
+	// If it is not set, the addon agent will have the default subject
+	// "subject": {
+	//	"user": "system:open-cluster-management:addon:{addonName}:{clusterName}:{agentName}",
+	//	"groups: ["system:open-cluster-management:addon", "system:open-cluster-management:addon:{addonName}", "system:authenticated"]
+	// }
+	//
+	// +optional
+	Subject Subject `json:"subject,omitempty"`
+}
+
+// Subject is the user subject of the addon agent to be registered to the hub.
+type Subject struct {
+	// user is the user name of the addon agent.
+	User string `json:"user"`
+
+	// groups is the user group of the addon agent.
+	// +optional
+	Groups []string `json:"groups,omitempty"`
+
+	// organizationUnit is the ou of the addon agent
+	// +optional
+	OrganizationUnits []string `json:"organizationUnit,omitempty"`
 }
 
 // ManagedClusterAddOnStatus provides information about the status of the operator.
@@ -59,7 +100,28 @@ type ManagedClusterAddOnStatus struct {
 	// This resource is use to locate the configuration resource for the add-on.
 	// +optional
 	AddOnConfiguration ConfigCoordinates `json:"addOnConfiguration"`
+
+	// registrations is the conifigurations for the addon agent to register to hub. It should be set by each addon controller
+	// on hub to define how the addon agent on managedcluster is registered. With the registration defined,
+	// The addon agent can access to kube apiserver with kube style API or other endpoints on hub cluster with client
+	// certificate authentication. A csr will be created per registration configuration. If more than one
+	// registrationConfig is defined, a csr will be created for each registration configuration. It is not allowed that
+	// multiple registrationConfigs have the same signer name. After the csr is approved on the hub cluster, the klusterlet
+	// agent will create a secret in the installNamespace for the registrationConfig. If the signerName is
+	// "kubernetes.io/kube-apiserver-client", the secret name will be "{addon name}-hub-kubeconfig" whose contents includes
+	// key/cert and kubeconfig. Otherwise, the secret name will be "{addon name}-{signer name}-client-cert" whose contents includes key/cert.
+	// +optional
+	Registrations []RegistrationConfig `json:"registrations,omitempty"`
 }
+
+const (
+	// ManagedClusterAddOnConditionAvailable represents that the addon agent is running on the managed cluster
+	ManagedClusterAddOnConditionAvailable string = "Available"
+
+	// ManagedClusterAddOnConditionDegraded represents that the addon agent is providing degraded service on
+	// the managed cluster.
+	ManagedClusterAddOnConditionDegraded string = "Degraded"
+)
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 type ObjectReference struct {
