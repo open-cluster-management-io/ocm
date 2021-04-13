@@ -515,9 +515,11 @@ func (t *Tester) CreateManagedClusterAddOn(managedClusterNamespace, addOnName st
 		context.TODO(),
 		&addonv1alpha1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:   managedClusterNamespace,
-				Name:        addOnName,
-				Annotations: map[string]string{"addon.open-cluster-management.io/installNamespace": addOnName},
+				Namespace: managedClusterNamespace,
+				Name:      addOnName,
+			},
+			Spec: addonv1alpha1.ManagedClusterAddOnSpec{
+				InstallNamespace: addOnName,
 			},
 		},
 		metav1.CreateOptions{},
