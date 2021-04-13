@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/x509/pkix"
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -56,21 +55,7 @@ func TestSync(t *testing.T) {
 					t.Errorf("expected csr was created, but failed")
 				}
 
-				expectedSecret := &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: testNamespace,
-						Name:      testSecretName,
-					},
-					Data: map[string][]byte{
-						ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
-						AgentNameFile:   []byte(testAgentName),
-					},
-				}
-				testinghelpers.AssertActions(t, agentActions, "get", "create")
-				actualSecret := agentActions[1].(clienttesting.CreateActionImpl).Object
-				if !reflect.DeepEqual(expectedSecret, actualSecret) {
-					t.Errorf("expected secret %v, but got %v", expectedSecret, actualSecret)
-				}
+				testinghelpers.AssertActions(t, agentActions, "get")
 			},
 		},
 
