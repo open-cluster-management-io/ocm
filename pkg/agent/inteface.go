@@ -12,13 +12,10 @@ import (
 // AgentAddon defines manifests of agent deployed on managed cluster
 type AgentAddon interface {
 	// Manifests returns a list of manifest resources to be deployed on the managed cluster for this addon
-	Manifests(cluster *clusterv1.ManagedCluster) ([]runtime.Object, error)
+	Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error)
 
 	// GetAgentAddonOptions returns the agent options.
-	GetAgentAddonOptions() *AgentAddonOptions
-
-	// GetRegistrationOption returns the options for an addon agent to register to the hub
-	GetRegistrationOption() *RegistrationOption
+	GetAgentAddonOptions() AgentAddonOptions
 }
 
 // AgentAddonOptions are the argumet for creating an addon agent.
@@ -26,8 +23,8 @@ type AgentAddonOptions struct {
 	// AddonName is the name of the addon
 	AddonName string
 
-	// AddonNamespace is the namespace to deploy addon agent on spoke
-	AddonInstallNamespace string
+	// Registration is the registration config for the addon
+	Registration *RegistrationOption
 }
 
 type RegistrationOption struct {

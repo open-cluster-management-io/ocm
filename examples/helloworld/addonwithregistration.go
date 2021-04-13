@@ -35,8 +35,13 @@ var manifestFiles = []string{
 	"examples/helloworld/manifests/serviceaccount.yaml",
 }
 
-func (h *helloWorldAgentWithRegistration) Manifests(cluster *clusterv1.ManagedCluster) ([]runtime.Object, error) {
+func (h *helloWorldAgentWithRegistration) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	objects := []runtime.Object{}
+
+	installNamespace := addon.Spec.InstallNamespace
+	if len(installNamespace) == 0 {
+		installNamespace = "default"
+	}
 
 	manifestConfig := struct {
 		KubeConfigSecret      string
@@ -44,7 +49,7 @@ func (h *helloWorldAgentWithRegistration) Manifests(cluster *clusterv1.ManagedCl
 		AddonInstallNamespace string
 	}{
 		KubeConfigSecret:      fmt.Sprintf("%s-hub-kubeconfig", h.GetAgentAddonOptions().AddonName),
-		AddonInstallNamespace: h.GetAgentAddonOptions().AddonInstallNamespace,
+		AddonInstallNamespace: installNamespace,
 		ClusterName:           cluster.Name,
 	}
 
@@ -59,18 +64,14 @@ func (h *helloWorldAgentWithRegistration) Manifests(cluster *clusterv1.ManagedCl
 	return objects, nil
 }
 
-func (h *helloWorldAgentWithRegistration) GetAgentAddonOptions() *agent.AgentAddonOptions {
-	return &agent.AgentAddonOptions{
-		AddonName:             "addonwithregistration",
-		AddonInstallNamespace: "default",
-	}
-}
-
-func (h *helloWorldAgentWithRegistration) GetRegistrationOption() *agent.RegistrationOption {
-	return &agent.RegistrationOption{
-		CSRConfigurations: agent.KubeClientSignerConfigurations("helloworldwithregistration"),
-		CSRApproveCheck: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
-			return true
+func (h *helloWorldAgentWithRegistration) GetAgentAddonOptions() agent.AgentAddonOptions {
+	return agent.AgentAddonOptions{
+		AddonName: "addonwithregistration",
+		Registration: &agent.RegistrationOption{
+			CSRConfigurations: agent.KubeClientSignerConfigurations("helloworldwithregistration"),
+			CSRApproveCheck: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
+				return true
+			},
 		},
 	}
 }
