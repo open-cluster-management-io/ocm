@@ -8,7 +8,7 @@ require (
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
-	github.com/open-cluster-management/api v0.0.0-20210401125741-b719117321e2
+	github.com/open-cluster-management/api v0.0.0-20210409125704-06f2aec1a73f
 	github.com/openshift/api v0.0.0-20210331193751-3acddb19d360
 	github.com/openshift/build-machinery-go v0.0.0-20210209125900-0da259a2c359
 	github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480

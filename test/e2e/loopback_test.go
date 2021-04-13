@@ -448,13 +448,24 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      addOnName,
 				Namespace: clusterName,
-				Annotations: map[string]string{
-					"addon.open-cluster-management.io/installNamespace": addOnName,
-					"addon.open-cluster-management.io/registrations":    `[{"signerName":"kubernetes.io/kube-apiserver-client"}]`,
-				},
+			},
+			Spec: addonv1alpha1.ManagedClusterAddOnSpec{
+				InstallNamespace: addOnName,
 			},
 		}
 		_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		created, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		created.Status = addonv1alpha1.ManagedClusterAddOnStatus{
+			Registrations: []addonv1alpha1.RegistrationConfig{
+				{
+					SignerName: "kubernetes.io/kube-apiserver-client",
+				},
+			},
+		}
+		_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).UpdateStatus(context.TODO(), created, metav1.UpdateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ginkgo.By(fmt.Sprintf("Waiting for the CSR for addOn %q to exist", addOnName))

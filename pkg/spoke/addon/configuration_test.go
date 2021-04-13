@@ -5,52 +5,83 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+
+	addonv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
+	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestGetRegistrationConfigs(t *testing.T) {
 	addOnName := "addon1"
 	addOnNamespace := "ns1"
-	config1 := newRegistrationConfig(addOnName, addOnNamespace, "kubernetes.io/kube-apiserver-client", "", nil)
-	config2 := newRegistrationConfig(addOnName, addOnNamespace, "mysigner", "", nil)
 
 	cases := []struct {
-		name        string
-		annotations map[string]string
-		configs     []registrationConfig
+		name    string
+		addon   *addonv1alpha1.ManagedClusterAddOn
+		configs []registrationConfig
 	}{
 		{
-			name: "no annotation",
-		},
-		{
 			name: "no registration",
-			annotations: map[string]string{
-				"addon.open-cluster-management.io/installNamespace": addOnNamespace,
+			addon: &addonv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testinghelpers.TestManagedClusterName,
+					Name:      addOnName,
+				},
+				Spec: addonv1alpha1.ManagedClusterAddOnSpec{
+					InstallNamespace: addOnNamespace,
+				},
 			},
 		},
 		{
 			name: "with default signer",
-			annotations: map[string]string{
-				"addon.open-cluster-management.io/installNamespace": addOnNamespace,
-				"addon.open-cluster-management.io/registrations":    `[{}]`,
+			addon: &addonv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testinghelpers.TestManagedClusterName,
+					Name:      addOnName,
+				},
+				Spec: addonv1alpha1.ManagedClusterAddOnSpec{
+					InstallNamespace: addOnNamespace,
+				},
+				Status: addonv1alpha1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1alpha1.RegistrationConfig{
+						{
+							SignerName: "kubernetes.io/kube-apiserver-client",
+						},
+					},
+				},
 			},
 			configs: []registrationConfig{
-				config1,
+				newRegistrationConfig(addOnName, addOnNamespace, "kubernetes.io/kube-apiserver-client", "", nil),
 			},
 		},
 		{
-			name: "with custom signer",
-			annotations: map[string]string{
-				"addon.open-cluster-management.io/installNamespace": addOnNamespace,
-				"addon.open-cluster-management.io/registrations":    `[{"signerName":"mysigner"}]`,
+			name: "with customized signer",
+			addon: &addonv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testinghelpers.TestManagedClusterName,
+					Name:      addOnName,
+				},
+				Spec: addonv1alpha1.ManagedClusterAddOnSpec{
+					InstallNamespace: addOnNamespace,
+				},
+				Status: addonv1alpha1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1alpha1.RegistrationConfig{
+						{
+							SignerName: "mysigner",
+						},
+					},
+				},
 			},
 			configs: []registrationConfig{
-				config2,
+				newRegistrationConfig(addOnName, addOnNamespace, "mysigner", "", nil),
 			},
 		},
 	}
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			configs, err := getRegistrationConfigs(addOnName, c.annotations)
+			configs, err := getRegistrationConfigs(c.addon)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -68,17 +99,20 @@ func TestGetRegistrationConfigs(t *testing.T) {
 }
 
 func newRegistrationConfig(addOnName, addOnNamespace, signerName, commonName string, organization []string) registrationConfig {
-	config := registrationConfig{
-		AddOnName:             addOnName,
-		InstallationNamespace: addOnNamespace,
-		SignerName:            signerName,
-		Subject: certSubject{
-			CommonName:   commonName,
-			Organization: organization,
+	registration := addonv1alpha1.RegistrationConfig{
+		SignerName: signerName,
+		Subject: addonv1alpha1.Subject{
+			User:   commonName,
+			Groups: organization,
 		},
 	}
+	config := registrationConfig{
+		addOnName:             addOnName,
+		installationNamespace: addOnNamespace,
+		registration:          registration,
+	}
 
-	data, _ := json.Marshal(config)
+	data, _ := json.Marshal(registration)
 	h := sha256.New()
 	h.Write(data)
 	config.hash = fmt.Sprintf("%x", h.Sum(nil))

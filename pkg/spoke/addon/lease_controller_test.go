@@ -46,9 +46,11 @@ func TestQueueKeyFunc(t *testing.T) {
 			name: "different install namespace",
 			addOns: []runtime.Object{&addonv1alpha1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:   testinghelpers.TestManagedClusterName,
-					Name:        "test",
-					Annotations: map[string]string{"addon.open-cluster-management.io/installNamespace": "other"},
+					Namespace: testinghelpers.TestManagedClusterName,
+					Name:      "test",
+				},
+				Spec: addonv1alpha1.ManagedClusterAddOnSpec{
+					InstallNamespace: "other",
 				},
 			}},
 			lease:            testinghelpers.NewAddOnLease("test", "test", time.Now()),
@@ -58,9 +60,11 @@ func TestQueueKeyFunc(t *testing.T) {
 			name: "an addon lease",
 			addOns: []runtime.Object{&addonv1alpha1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:   testinghelpers.TestManagedClusterName,
-					Name:        "test",
-					Annotations: map[string]string{"addon.open-cluster-management.io/installNamespace": "test"},
+					Namespace: testinghelpers.TestManagedClusterName,
+					Name:      "test",
+				},
+				Spec: addonv1alpha1.ManagedClusterAddOnSpec{
+					InstallNamespace: "test",
 				},
 			}},
 			lease:            testinghelpers.NewAddOnLease("test", "test", time.Now()),
@@ -123,9 +127,11 @@ func TestSync(t *testing.T) {
 			queueKey: "test/test",
 			addOns: []runtime.Object{&addonv1alpha1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:   testinghelpers.TestManagedClusterName,
-					Name:        "test",
-					Annotations: map[string]string{"addon.open-cluster-management.io/installNamespace": "test"},
+					Namespace: testinghelpers.TestManagedClusterName,
+					Name:      "test",
+				},
+				Spec: addonv1alpha1.ManagedClusterAddOnSpec{
+					InstallNamespace: "test",
 				},
 			}},
 			hubLeases: []runtime.Object{},
@@ -148,9 +154,11 @@ func TestSync(t *testing.T) {
 			queueKey: "test/test",
 			addOns: []runtime.Object{&addonv1alpha1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:   testinghelpers.TestManagedClusterName,
-					Name:        "test",
-					Annotations: map[string]string{"addon.open-cluster-management.io/installNamespace": "test"},
+					Namespace: testinghelpers.TestManagedClusterName,
+					Name:      "test",
+				},
+				Spec: addonv1alpha1.ManagedClusterAddOnSpec{
+					InstallNamespace: "test",
 				},
 			}},
 			hubLeases: []runtime.Object{},
@@ -175,9 +183,11 @@ func TestSync(t *testing.T) {
 			queueKey: "test/test",
 			addOns: []runtime.Object{&addonv1alpha1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:   testinghelpers.TestManagedClusterName,
-					Name:        "test",
-					Annotations: map[string]string{"addon.open-cluster-management.io/installNamespace": "test"},
+					Namespace: testinghelpers.TestManagedClusterName,
+					Name:      "test",
+				},
+				Spec: addonv1alpha1.ManagedClusterAddOnSpec{
+					InstallNamespace: "test",
 				},
 			}},
 			hubLeases: []runtime.Object{},
@@ -202,9 +212,11 @@ func TestSync(t *testing.T) {
 			queueKey: "test/test",
 			addOns: []runtime.Object{&addonv1alpha1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:   testinghelpers.TestManagedClusterName,
-					Name:        "test",
-					Annotations: map[string]string{"addon.open-cluster-management.io/installNamespace": "test"},
+					Namespace: testinghelpers.TestManagedClusterName,
+					Name:      "test",
+				},
+				Spec: addonv1alpha1.ManagedClusterAddOnSpec{
+					InstallNamespace: "test",
 				},
 				Status: addonv1alpha1.ManagedClusterAddOnStatus{
 					Conditions: []metav1.Condition{
@@ -231,9 +243,11 @@ func TestSync(t *testing.T) {
 			addOns: []runtime.Object{
 				&addonv1alpha1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace:   testinghelpers.TestManagedClusterName,
-						Name:        "test1",
-						Annotations: map[string]string{"addon.open-cluster-management.io/installNamespace": "test1"},
+						Namespace: testinghelpers.TestManagedClusterName,
+						Name:      "test1",
+					},
+					Spec: addonv1alpha1.ManagedClusterAddOnSpec{
+						InstallNamespace: "test",
 					},
 				},
 				&addonv1alpha1.ManagedClusterAddOn{

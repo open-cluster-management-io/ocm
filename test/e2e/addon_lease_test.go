@@ -618,9 +618,11 @@ func spokeDeploymentWithAddonManagement(nsName, clusterName, image string) (*uns
 func createManagedClusterAddOn(managedCluster *clusterv1.ManagedCluster, addOnName string) (*addonv1alpha1.ManagedClusterAddOn, error) {
 	addOn := &addonv1alpha1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace:   managedCluster.Name,
-			Name:        addOnName,
-			Annotations: map[string]string{"addon.open-cluster-management.io/installNamespace": addOnName},
+			Namespace: managedCluster.Name,
+			Name:      addOnName,
+		},
+		Spec: addonv1alpha1.ManagedClusterAddOnSpec{
+			InstallNamespace: addOnName,
 		},
 	}
 	return hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Create(context.TODO(), addOn, metav1.CreateOptions{})

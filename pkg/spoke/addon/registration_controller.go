@@ -97,7 +97,7 @@ func (c *addOnRegistrationController) sync(ctx context.Context, syncCtx factory.
 	}
 
 	cachedConfigs := c.addOnRegistrationConfigs[addOnName]
-	configs, err := getRegistrationConfigs(addOnName, addOn.Annotations)
+	configs, err := getRegistrationConfigs(addOn)
 	if err != nil {
 		return err
 	}
@@ -141,35 +141,35 @@ func (c *addOnRegistrationController) sync(ctx context.Context, syncCtx factory.
 // startRegistration starts a client certificate controller with the given config
 func (c *addOnRegistrationController) startRegistration(ctx context.Context, config registrationConfig) context.CancelFunc {
 	ctx, stopFunc := context.WithCancel(ctx)
-	kubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(c.kubeClient, 10*time.Minute, informers.WithNamespace(config.InstallationNamespace))
+	kubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(c.kubeClient, 10*time.Minute, informers.WithNamespace(config.installationNamespace))
 
 	additonalSecretData := map[string][]byte{}
-	if config.SignerName == certificatesv1.KubeAPIServerClientSignerName {
+	if config.registration.SignerName == certificatesv1.KubeAPIServerClientSignerName {
 		additonalSecretData[clientcert.KubeconfigFile] = c.kubeconfigData
 	}
 
 	// build and start a client cert controller
 	clientCertOption := clientcert.ClientCertOption{
-		SecretNamespace:     config.InstallationNamespace,
+		SecretNamespace:     config.installationNamespace,
 		SecretName:          config.secretName,
 		AdditonalSecretData: additonalSecretData,
 	}
 
 	csrOption := clientcert.CSROption{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: fmt.Sprintf("addon-%s-%s-", c.clusterName, config.AddOnName),
+			GenerateName: fmt.Sprintf("addon-%s-%s-", c.clusterName, config.addOnName),
 			Labels: map[string]string{
 				// the labels are only hints. Anyone could set/modify them.
 				clientcert.ClusterNameLabel: c.clusterName,
-				clientcert.AddonNameLabel:   config.AddOnName,
+				clientcert.AddonNameLabel:   config.addOnName,
 			},
 		},
 		Subject:         config.x509Subject(c.clusterName, c.agentName),
-		SignerName:      config.SignerName,
-		EventFilterFunc: createCSREventFilterFunc(c.clusterName, config.AddOnName, config.SignerName),
+		SignerName:      config.registration.SignerName,
+		EventFilterFunc: createCSREventFilterFunc(c.clusterName, config.addOnName, config.registration.SignerName),
 	}
 
-	controllerName := fmt.Sprintf("ClientCertController@addon:%s:signer:%s", config.AddOnName, config.SignerName)
+	controllerName := fmt.Sprintf("ClientCertController@addon:%s:signer:%s", config.addOnName, config.registration.SignerName)
 	clientCertController := clientcert.NewClientCertificateController(
 		clientCertOption,
 		csrOption,
@@ -194,7 +194,7 @@ func (c *addOnRegistrationController) stopRegistration(ctx context.Context, conf
 	}
 
 	// delete the secret generated
-	err := c.kubeClient.CoreV1().Secrets(config.InstallationNamespace).Delete(ctx, config.secretName, metav1.DeleteOptions{})
+	err := c.kubeClient.CoreV1().Secrets(config.installationNamespace).Delete(ctx, config.secretName, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
