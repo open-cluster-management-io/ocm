@@ -165,6 +165,7 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 			},
 		},
 		Subject:         config.x509Subject(c.clusterName, c.agentName),
+		DNSNames:        []string{fmt.Sprintf("%s.addon.open-cluster-management.io", config.addOnName)},
 		SignerName:      config.registration.SignerName,
 		EventFilterFunc: createCSREventFilterFunc(c.clusterName, config.addOnName, config.registration.SignerName),
 	}

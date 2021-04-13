@@ -6,7 +6,6 @@ import (
 	"crypto/x509/pkix"
 	"fmt"
 	"math/rand"
-	"reflect"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -43,7 +42,6 @@ const (
 
 	ClusterNameLabel = "open-cluster-management.io/cluster-name"
 	AddonNameLabel   = "open-cluster-management.io/addon-name"
-	SignerNameLabel  = "open-cluster-management.io/signer-name"
 )
 
 // ControllerResyncInterval is exposed so that integration tests can crank up the constroller sync speed.
@@ -56,6 +54,8 @@ type CSROption struct {
 	ObjectMeta metav1.ObjectMeta
 	// Subject represents the subject of the client certificate used to create csrs
 	Subject *pkix.Name
+	// DNSNames represents DNS names used to create the client certificate
+	DNSNames []string
 	// SignerName is the name of the signer specified in the created csrs
 	SignerName string
 
@@ -183,21 +183,6 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 		return nil
 	}
 
-	// add additional data into client certificate secret
-	newSecretConfig := map[string][]byte{}
-	for k, v := range secret.Data {
-		newSecretConfig[k] = v
-	}
-	for k, v := range c.AdditonalSecretData {
-		newSecretConfig[k] = v
-	}
-	if !reflect.DeepEqual(newSecretConfig, secret.Data) {
-		secret.Data = newSecretConfig
-		if err := c.saveSecret(secret); err != nil {
-			return err
-		}
-	}
-
 	// create a csr to request new client certificate if
 	// a. there is no valid client certificate issued for the current cluster/agent
 	// b. client certificate exists and has less than a random percentage range from 20% to 25% of its life remaining
@@ -296,7 +281,7 @@ func (c *clientCertificateController) createCSR(ctx context.Context) (string, er
 	if err != nil {
 		return "", fmt.Errorf("invalid private key for certificate request: %w", err)
 	}
-	csrData, err := certutil.MakeCSR(privateKey, c.Subject, nil, nil)
+	csrData, err := certutil.MakeCSR(privateKey, c.Subject, c.DNSNames, nil)
 	if err != nil {
 		return "", fmt.Errorf("unable to generate certificate request: %w", err)
 	}
