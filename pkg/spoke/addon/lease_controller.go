@@ -26,11 +26,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-const (
-	//TODO add this to ManagedClusterAddOn api
-	leaseDurationSeconds = 60
-	leaseDurationTimes   = 5
-)
+const leaseDurationTimes = 5
+
+// AddOnLeaseControllerLeaseDurationSeconds is exposed so that integration tests can crank up the lease update speed.
+// TODO: we may add this to ManagedClusterAddOn API to allow addon to adjust its own lease duration seconds
+var AddOnLeaseControllerLeaseDurationSeconds = 60
 
 // managedClusterAddOnLeaseController udpates managed cluster addons status on the hub cluster through watching the managed
 // cluster status on the managed cluster.
@@ -75,7 +75,7 @@ func (c *managedClusterAddOnLeaseController) sync(ctx context.Context, syncCtx f
 		}
 		for _, addOn := range addOns {
 			// enqueue the addon to reconcile
-			syncCtx.Queue().Add(fmt.Sprintf("%s/%s", addOn.Namespace, addOn.Name))
+			syncCtx.Queue().Add(fmt.Sprintf("%s/%s", getAddOnInstallationNamespace(addOn), addOn.Name))
 		}
 		return nil
 	}
@@ -103,7 +103,7 @@ func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
 	addOn *addonv1alpha1.ManagedClusterAddOn,
 	recorder events.Recorder) error {
 	now := c.clock.Now()
-	gracePeriod := time.Duration(leaseDurationTimes*leaseDurationSeconds) * time.Second
+	gracePeriod := time.Duration(leaseDurationTimes*AddOnLeaseControllerLeaseDurationSeconds) * time.Second
 	// addon lease name should be same with the addon name.
 	observedLease, err := c.leaseLister.Leases(leaseNamespace).Get(addOn.Name)
 
@@ -181,8 +181,8 @@ func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
 	}
 	if updated {
 		recorder.Eventf("ManagedClusterAddOnStatusUpdated",
-			"update managed cluster addon %q available condition to %q, due to its lease is not updated constantly",
-			addOn.Name, condition.Status)
+			"update managed cluster addon %q available condition to %q with its lease %q/%q status",
+			addOn.Name, condition.Status, leaseNamespace, addOn.Name)
 	}
 
 	return nil
