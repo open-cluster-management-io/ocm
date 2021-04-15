@@ -45,6 +45,9 @@ const (
 	defaultSpokeComponentNamespace = "open-cluster-management"
 )
 
+// AddOnLeaseControllerSyncInterval is exposed so that integration tests can crank up the constroller sync speed.
+var AddOnLeaseControllerSyncInterval = 5 * time.Minute
+
 // SpokeAgentOptions holds configuration for spoke cluster agent
 type SpokeAgentOptions struct {
 	ComponentNamespace       string
@@ -308,7 +311,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
 			hubKubeClient.CoordinationV1(),
 			spokeKubeInformerFactory.Coordination().V1().Leases(),
-			5*time.Minute, //TODO: this interval time should be allowed to change from outside
+			AddOnLeaseControllerSyncInterval, //TODO: this interval time should be allowed to change from outside
 			controllerContext.EventRecorder,
 		)
 
