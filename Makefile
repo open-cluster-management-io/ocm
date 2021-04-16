@@ -31,3 +31,5 @@ $(call add-bindata,foundation-agent,./examples/helloworld/manifests/...,bindata,
 # $3 - context directory for image build
 # It will generate target "image-$(1)" for building the image and binding it as a prerequisite to target "images".
 $(call build-image,$(IMAGE),$(IMAGE_REGISTRY)/$(IMAGE),./Dockerfile,.)
+
+include ./test/integration-test.mk
