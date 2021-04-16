@@ -24,3 +24,10 @@ spec:
           - "webhook"
           - "--cert-dir=/tmp"
           - "--secure-port=6443"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true

@@ -24,6 +24,13 @@ spec:
           - "agent"
           - "--spoke-cluster-name=cluster1"
           - "--hub-kubeconfig=/spoke/hub-kubeconfig/kubeconfig"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
         volumeMounts:
         - name: hub-kubeconfig-secret
           mountPath: "/spoke/hub-kubeconfig"
