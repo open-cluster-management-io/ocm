@@ -91,5 +91,49 @@ var _ = ginkgo.Describe("ManifestWork admission webhook", func() {
 				admissionName,
 			)))
 		})
+
+		ginkgo.It("Should respond bad request when the size of manifests is more than the limit", func() {
+			manifests := []workapiv1.Manifest{
+				{
+					RawExtension: runtime.RawExtension{
+						Object: newSecretBySize("default", "test1", 10*1024),
+					},
+				},
+				{
+					RawExtension: runtime.RawExtension{
+						Object: newSecretBySize("default", "test2", 10*1024),
+					},
+				},
+				{
+					RawExtension: runtime.RawExtension{
+						Object: newSecretBySize("default", "test3", 10*1024),
+					},
+				},
+				{
+					RawExtension: runtime.RawExtension{
+						Object: newSecretBySize("default", "test4", 10*1024),
+					},
+				},
+				{
+					RawExtension: runtime.RawExtension{
+						Object: newSecretBySize("default", "test5", 10*1024),
+					},
+				},
+			}
+
+			err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				work.Spec.Workload.Manifests = append(work.Spec.Workload.Manifests, manifests...)
+				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Update(context.Background(), work, metav1.UpdateOptions{})
+				return err
+			})
+
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(errors.IsBadRequest(err)).Should(gomega.BeTrue())
+			gomega.Expect(err.Error()).Should(gomega.HavePrefix(fmt.Sprintf(
+				"admission webhook \"%s\" denied the request: the size of manifests is", admissionName)))
+		})
 	})
 })
