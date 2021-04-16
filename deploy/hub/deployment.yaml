@@ -22,3 +22,10 @@ spec:
         args:
           - "/registration"
           - "controller"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true

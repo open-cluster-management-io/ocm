@@ -24,6 +24,13 @@ spec:
           - "agent"
           - "--cluster-name=local-development"
           - "--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
         volumeMounts:
         - name: bootstrap-secret
           mountPath: "/spoke/bootstrap"
