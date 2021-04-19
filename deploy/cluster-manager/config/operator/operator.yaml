@@ -43,6 +43,13 @@ spec:
         args:
           - "/registration-operator"
           - "hub"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
         livenessProbe:
           httpGet:
             path: /healthz
