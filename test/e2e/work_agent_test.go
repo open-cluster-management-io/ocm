@@ -541,6 +541,27 @@ func newConfigmap(namespace, name string, data map[string]string, finalizers []s
 	return cm
 }
 
+func newSecretBySize(namespace, name string, size int32) *corev1.Secret {
+	data := ""
+	for i := int32(0); i < size; i++ {
+		data += "a"
+	}
+
+	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			"test": []byte(data),
+		},
+	}
+}
+
 func haveManifestCondition(conditions []workapiv1.ManifestCondition, expectedType string, expectedStatuses []metav1.ConditionStatus) bool {
 	if len(conditions) != len(expectedStatuses) {
 		return false

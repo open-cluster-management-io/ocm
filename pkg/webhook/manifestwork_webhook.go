@@ -16,7 +16,8 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var manifestLimit = 10
+// ManifestLimit is the max size of manifests data which is 50k bytes.
+const ManifestLimit = 50 * 1024
 
 // ManifestWorkAdmissionHook will validate the creating/updating manifestwork request.
 type ManifestWorkAdmissionHook struct{}
@@ -90,8 +91,13 @@ func (a *ManifestWorkAdmissionHook) validateManifestWorkObj(requestObj runtime.R
 		return fmt.Errorf("manifests should not be empty")
 	}
 
-	if len(work.Spec.Workload.Manifests) > manifestLimit {
-		return fmt.Errorf("number of manifests should not be larger than %d", manifestLimit)
+	totalSize := 0
+	for _, manifest := range work.Spec.Workload.Manifests {
+		totalSize = totalSize + manifest.Size()
+	}
+
+	if totalSize > ManifestLimit {
+		return fmt.Errorf("the size of manifests is %v bytes which exceeds the 50k limit", totalSize)
 	}
 
 	for _, manifest := range work.Spec.Workload.Manifests {

@@ -21,7 +21,6 @@ var manifestWorkSchema = metav1.GroupVersionResource{
 }
 
 func TestManifestWorkValidate(t *testing.T) {
-	manifestLimit = 3
 	cases := []struct {
 		name             string
 		request          *admissionv1beta1.AdmissionRequest
@@ -153,16 +152,17 @@ func TestManifestWorkValidate(t *testing.T) {
 				UserInfo:  authenticationv1.UserInfo{Username: "tester"},
 			},
 			manifests: []*unstructured.Unstructured{
-				spoketesting.NewUnstructured("v1", "Kind", "testns", "test"),
-				spoketesting.NewUnstructured("v1", "Kind", "testns", "test1"),
-				spoketesting.NewUnstructured("v1", "Kind", "testns", "test2"),
-				spoketesting.NewUnstructured("v1", "Kind", "testns", "test3"),
+				spoketesting.NewUnstructuredSecretBySize("test1", "testns", 10*1024),
+				spoketesting.NewUnstructuredSecretBySize("test2", "testns", 10*1024),
+				spoketesting.NewUnstructuredSecretBySize("test3", "testns", 10*1024),
+				spoketesting.NewUnstructuredSecretBySize("test4", "testns", 10*1024),
+				spoketesting.NewUnstructuredSecretBySize("test5", "testns", 10*1024),
 			},
 			expectedResponse: &admissionv1beta1.AdmissionResponse{
 				Allowed: false,
 				Result: &metav1.Status{
 					Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
-					Message: "number of manifests should not be larger than 3",
+					Message: "the size of manifests is 51685 bytes which exceeds the 50k limit",
 				},
 			},
 		},

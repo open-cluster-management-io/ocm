@@ -51,6 +51,25 @@ func NewSecret(name, namespace string, content string) *corev1.Secret {
 	}
 }
 
+func NewUnstructuredSecretBySize(namespace, name string, size int32) *unstructured.Unstructured {
+	data := ""
+	for i := int32(0); i < size; i++ {
+		data += "a"
+	}
+
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Secret",
+			"metadata": map[string]interface{}{
+				"namespace": namespace,
+				"name":      name,
+			},
+			"data": data,
+		},
+	}
+}
+
 func NewUnstructuredSecret(namespace, name string, terminated bool, uid string) *unstructured.Unstructured {
 	u := NewUnstructured("v1", "Secret", namespace, name)
 	if terminated {
