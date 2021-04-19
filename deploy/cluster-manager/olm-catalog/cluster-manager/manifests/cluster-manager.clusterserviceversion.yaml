@@ -258,6 +258,13 @@ spec:
                   requests:
                     cpu: 100m
                     memory: 128Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+                  privileged: false
+                  runAsNonRoot: true
               serviceAccountName: cluster-manager
     strategy: deployment
   installModes:

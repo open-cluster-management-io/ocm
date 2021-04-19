@@ -61,11 +61,7 @@ var _ = Describe("Create klusterlet CR", func() {
 
 		By("waiting for the managed cluster to be created")
 		Eventually(func() error {
-			clusterName, err = t.GetClusterNameFromKlusterlet(klusterletName)
-			if err != nil {
-				return err
-			}
-			_, err = t.GetCreatedManagedCluster(clusterName)
+			clusterName, err = t.GetRandomClusterName()
 			return err
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
 

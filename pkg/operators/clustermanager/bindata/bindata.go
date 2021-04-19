@@ -1419,6 +1419,13 @@ spec:
         args:
           - "/registration"
           - "controller"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
         livenessProbe:
           httpGet:
             path: /healthz
@@ -1655,6 +1662,13 @@ spec:
           - "--secure-port=6443"
           - "--tls-cert-file=/serving-cert/tls.crt"
           - "--tls-private-key-file=/serving-cert/tls.key"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
         livenessProbe:
           httpGet:
             path: /healthz
@@ -1971,6 +1985,13 @@ spec:
           - "--secure-port=6443"
           - "--tls-cert-file=/serving-cert/tls.crt"
           - "--tls-private-key-file=/serving-cert/tls.key"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
         livenessProbe:
           httpGet:
             path: /healthz

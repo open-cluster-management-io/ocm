@@ -49,6 +49,13 @@ spec:
           {{if .ExternalServerURL}}
           - "--spoke-external-server-urls={{ .ExternalServerURL }}"
           {{end}}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
         volumeMounts:
         - name: bootstrap-secret
           mountPath: "/spoke/bootstrap"

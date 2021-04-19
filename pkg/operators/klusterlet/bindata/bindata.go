@@ -575,6 +575,13 @@ spec:
           {{if .ExternalServerURL}}
           - "--spoke-external-server-urls={{ .ExternalServerURL }}"
           {{end}}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
         volumeMounts:
         - name: bootstrap-secret
           mountPath: "/spoke/bootstrap"
@@ -869,6 +876,13 @@ spec:
           - "agent"
           - "--spoke-cluster-name={{ .ClusterName }}"
           - "--hub-kubeconfig=/spoke/hub-kubeconfig/kubeconfig"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
         volumeMounts:
         - name: hub-kubeconfig-secret
           mountPath: "/spoke/hub-kubeconfig"
