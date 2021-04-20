@@ -172,6 +172,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			return err
 		}
 
+		controllerName := fmt.Sprintf("BootstrapClientCertController@cluster:%s", o.ClusterName)
 		clientCertForHubController := managedcluster.NewClientCertForHubController(
 			o.ClusterName, o.AgentName, o.ComponentNamespace, o.HubKubeconfigSecret,
 			kubeconfigData,
@@ -180,7 +181,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			bootstrapInformerFactory.Certificates().V1().CertificateSigningRequests(),
 			namespacedSpokeKubeInformerFactory.Core().V1().Secrets(),
 			controllerContext.EventRecorder,
-			"BootstrapClientCertForHubController",
+			controllerName,
 		)
 
 		bootstrapCtx, stopBootstrap := context.WithCancel(ctx)
@@ -245,6 +246,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	}
 
 	// create another ClientCertForHubController for client certificate rotation
+	controllerName := fmt.Sprintf("ClientCertController@cluster:%s", o.ClusterName)
 	clientCertForHubController := managedcluster.NewClientCertForHubController(
 		o.ClusterName, o.AgentName, o.ComponentNamespace, o.HubKubeconfigSecret,
 		kubeconfigData,
@@ -253,7 +255,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		hubKubeInformerFactory.Certificates().V1().CertificateSigningRequests(),
 		namespacedSpokeKubeInformerFactory.Core().V1().Secrets(),
 		controllerContext.EventRecorder,
-		"ClientCertForHubController",
+		controllerName,
 	)
 
 	// create ManagedClusterJoiningController to reconcile instances of ManagedCluster on the managed cluster
