@@ -38,6 +38,8 @@ type addOnRegistrationController struct {
 	hubCSRClient   csrclient.CertificateSigningRequestInterface
 	recorder       events.Recorder
 
+	startRegistrationFunc func(ctx context.Context, config registrationConfig) context.CancelFunc
+
 	// registrationConfigs maps the addon name to a map of registrationConfigs whose key is the hash of
 	// the registrationConfig
 	addOnRegistrationConfigs map[string]map[string]registrationConfig
@@ -66,6 +68,8 @@ func NewAddOnRegistrationController(
 		addOnRegistrationConfigs: map[string]map[string]registrationConfig{},
 	}
 
+	c.startRegistrationFunc = c.startRegistration
+
 	return factory.New().
 		WithInformersQueueKeyFunc(
 			func(obj runtime.Object) string {
@@ -74,11 +78,38 @@ func NewAddOnRegistrationController(
 			},
 			hubAddOnInformers.Informer()).
 		WithSync(c.sync).
+		ResyncEvery(10*time.Minute).
 		ToController("AddOnRegistrationController", recorder)
 }
 
 func (c *addOnRegistrationController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	addOnName := syncCtx.QueueKey()
+	queueKey := syncCtx.QueueKey()
+	if queueKey != factory.DefaultQueueKey {
+		// sync a particular addOn
+		return c.syncAddOn(ctx, syncCtx, queueKey)
+	}
+
+	// handle resync
+	errs := []error{}
+	for addOnName := range c.addOnRegistrationConfigs {
+		_, err := c.hubAddOnLister.ManagedClusterAddOns(c.clusterName).Get(addOnName)
+		if err == nil {
+			syncCtx.Queue().Add(addOnName)
+			continue
+		}
+		if errors.IsNotFound(err) {
+			// clean up if the addOn no longer exists
+			err = c.cleanup(ctx, addOnName)
+		}
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return operatorhelpers.NewMultiLineAggregate(errs)
+}
+
+func (c *addOnRegistrationController) syncAddOn(ctx context.Context, syncCtx factory.SyncContext, addOnName string) error {
 	klog.V(4).Infof("Reconciling addOn %q", addOnName)
 
 	addOn, err := c.hubAddOnLister.ManagedClusterAddOns(c.clusterName).Get(addOnName)
@@ -126,7 +157,7 @@ func (c *addOnRegistrationController) sync(ctx context.Context, syncCtx factory.
 		}
 
 		// start registration for the new added configs
-		config.stopFunc = c.startRegistration(ctx, config)
+		config.stopFunc = c.startRegistrationFunc(ctx, config)
 		syncedConfigs[hash] = config
 	}
 
