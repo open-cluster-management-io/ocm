@@ -122,7 +122,6 @@ func (c *addOnRegistrationController) syncAddOn(ctx context.Context, syncCtx fac
 	}
 
 	// addon is deleting
-	// TODO: Add/remove finalizer on ManagedClusterAddOn on hub to make sure generated secret will be deleted
 	if !addOn.DeletionTimestamp.IsZero() {
 		return c.cleanup(ctx, addOnName)
 	}
