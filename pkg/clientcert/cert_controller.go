@@ -161,7 +161,7 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 	}
 
 	// reconcile pending csr if exists
-	if c.csrName != "" {
+	if len(c.csrName) > 0 {
 		newSecretConfig, err := c.syncCSR(secret)
 		if err != nil {
 			c.reset()
@@ -180,6 +180,7 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 			return err
 		}
 		syncCtx.Recorder().Eventf("ClientCertificateCreated", "A new client certificate for %s is available", c.controllerName)
+		c.reset()
 		return nil
 	}
 
@@ -224,9 +225,8 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 
 func (c *clientCertificateController) syncCSR(secret *corev1.Secret) (map[string][]byte, error) {
 	// skip if there is no ongoing csr
-	if c.csrName == "" {
-		c.reset()
-		return nil, nil
+	if len(c.csrName) == 0 {
+		return nil, fmt.Errorf("no ongoing csr")
 	}
 
 	// skip if csr no longer exists
@@ -236,9 +236,7 @@ func (c *clientCertificateController) syncCSR(secret *corev1.Secret) (map[string
 		// fallback to fetching csr from hub apiserver in case it is not cached by informer yet
 		csr, err = c.hubCSRClient.Get(context.Background(), c.csrName, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
-			klog.V(4).Infof("Unable to get csr %q. It might have already been deleted.", c.csrName)
-			c.reset()
-			return nil, nil
+			return nil, fmt.Errorf("unable to get csr %q. It might have already been deleted.", c.csrName)
 		}
 	case err != nil:
 		return nil, err
@@ -250,19 +248,17 @@ func (c *clientCertificateController) syncCSR(secret *corev1.Secret) (map[string
 	}
 
 	// skip if csr has no certificate in its status yet
-	if csr.Status.Certificate == nil {
+	if len(csr.Status.Certificate) == 0 {
 		return nil, nil
 	}
 
 	klog.V(4).Infof("Sync csr %v", c.csrName)
 	// check if cert in csr status matches with the corresponding private key
 	if c.keyData == nil {
-		c.reset()
 		return nil, fmt.Errorf("No private key found for certificate in csr: %s", c.csrName)
 	}
 	_, err = tls.X509KeyPair(csr.Status.Certificate, c.keyData)
 	if err != nil {
-		c.reset()
 		return nil, fmt.Errorf("Private key does not match with the certificate in csr: %s", c.csrName)
 	}
 
@@ -271,8 +267,6 @@ func (c *clientCertificateController) syncCSR(secret *corev1.Secret) (map[string
 		TLSKeyFile:  c.keyData,
 	}
 
-	// clear the csr name and private key
-	c.reset()
 	return data, nil
 }
 

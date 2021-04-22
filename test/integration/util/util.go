@@ -330,6 +330,22 @@ func FindUnapprovedSpokeCSR(kubeClient kubernetes.Interface, spokeClusterName st
 	return unapproved, nil
 }
 
+func FindAddOnCSRs(kubeClient kubernetes.Interface, spokeClusterName, addOnName string) ([]*certificates.CertificateSigningRequest, error) {
+	csrList, err := kubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("open-cluster-management.io/cluster-name=%s,open-cluster-management.io/addon-name=%s", spokeClusterName, addOnName),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	csrs := []*certificates.CertificateSigningRequest{}
+	for _, csr := range csrList.Items {
+		csrs = append(csrs, &csr)
+	}
+
+	return csrs, nil
+}
+
 func FindUnapprovedAddOnCSR(kubeClient kubernetes.Interface, spokeClusterName, addOnName string) (*certificates.CertificateSigningRequest, error) {
 	csrList, err := kubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("open-cluster-management.io/cluster-name=%s,open-cluster-management.io/addon-name=%s", spokeClusterName, addOnName),

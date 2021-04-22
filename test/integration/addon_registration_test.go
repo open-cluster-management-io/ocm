@@ -245,6 +245,66 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		assertSecretGone(addOnName, getSecretName(addOnName, signerName))
 	})
 
+	ginkgo.It("should register addon successfully even when the install namespace is not available at the beginning", func() {
+		assertSuccessClusterBootstrap()
+
+		signerName := "kubernetes.io/kube-apiserver-client"
+		ginkgo.By("Create ManagedClusterAddOn cr with required annotations")
+
+		// create addon
+		addOn := &addonv1alpha1.ManagedClusterAddOn{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      addOnName,
+				Namespace: managedClusterName,
+			},
+			Spec: addonv1alpha1.ManagedClusterAddOnSpec{
+				InstallNamespace: addOnName,
+			},
+		}
+		_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		created, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		created.Status = addonv1alpha1.ManagedClusterAddOnStatus{
+			Registrations: []addonv1alpha1.RegistrationConfig{
+				{
+					SignerName: signerName,
+				},
+			},
+		}
+		_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.TODO(), created, metav1.UpdateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		assertSuccessCSRApproval()
+
+		ginkgo.By("Wait for addon namespace")
+		gomega.Consistently(func() bool {
+			csrs, err := util.FindAddOnCSRs(kubeClient, managedClusterName, addOnName)
+			if err != nil {
+				return false
+			}
+			return len(csrs) == 1
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+		ginkgo.By("Create addon namespace")
+		// create addon namespace
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: addOnName,
+			},
+		}
+		_, err = kubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		assertValidClientCertificate(addOnName, getSecretName(addOnName, signerName), signerName)
+
+		ginkgo.By("Delete the addon and check if secret is gone")
+		err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		assertSecretGone(addOnName, getSecretName(addOnName, signerName))
+	})
+
 	ginkgo.It("should register addon with custom signer successfully", func() {
 		assertSuccessClusterBootstrap()
 		signerName := "example.com/signer1"
