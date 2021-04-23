@@ -62,7 +62,7 @@ func KubeClientSignerConfigurations(addonName, agentName string) func(cluster *c
 }
 
 // DefaultUser returns the default User
-func DefaultUser(clusterName, agentName, addonName string) string {
+func DefaultUser(clusterName, addonName, agentName string) string {
 	return fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s:agent:%s", clusterName, addonName, agentName)
 }
 
