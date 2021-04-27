@@ -101,7 +101,7 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 	if err != nil {
 		return err
 	}
-	owner := metav1.NewControllerRef(managedClusterAddon, addonapiv1alpha1.GroupVersion.WithKind("ManagedClusterAddon"))
+	owner := metav1.NewControllerRef(managedClusterAddon, addonapiv1alpha1.GroupVersion.WithKind("ManagedClusterAddOn"))
 
 	managedClusterAddonCopy := managedClusterAddon.DeepCopy()
 	objects, err := agentAddon.Manifests(managedCluster, managedClusterAddon)
