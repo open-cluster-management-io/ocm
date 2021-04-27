@@ -10,6 +10,7 @@ import (
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
 	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -101,6 +102,48 @@ func TestSyncManagedCluster(t *testing.T) {
 						Kubernetes: kubeversion.Get().GitVersion,
 					},
 					Capacity: clusterv1.ResourceList{
+						clusterv1.ResourceCPU:    *resource.NewQuantity(int64(64), resource.DecimalExponent),
+						clusterv1.ResourceMemory: *resource.NewQuantity(int64(1024*1024*128), resource.BinarySI),
+					},
+					Allocatable: clusterv1.ResourceList{
+						clusterv1.ResourceCPU:    *resource.NewQuantity(int64(32), resource.DecimalExponent),
+						clusterv1.ResourceMemory: *resource.NewQuantity(int64(1024*1024*64), resource.BinarySI),
+					},
+				}
+				testinghelpers.AssertActions(t, actions, "get", "update")
+				actual := actions[1].(clienttesting.UpdateActionImpl).Object
+				testinghelpers.AssertManagedClusterCondition(t, actual.(*clusterv1.ManagedCluster).Status.Conditions, expectedCondition)
+				testinghelpers.AssertManagedClusterStatus(t, actual.(*clusterv1.ManagedCluster).Status, expectedStatus)
+			},
+		},
+		{
+			name: "merge a joined managed cluster status",
+			startingObjects: []runtime.Object{
+				testinghelpers.NewManagedClusterWithStatus(
+					corev1.ResourceList{
+						"sockets": *resource.NewQuantity(int64(1200), resource.DecimalExponent),
+						"cores":   *resource.NewQuantity(int64(128), resource.DecimalExponent),
+					},
+					testinghelpers.NewResourceList(16, 32)),
+			},
+			nodes: []runtime.Object{
+				testinghelpers.NewNode("testnode1", testinghelpers.NewResourceList(32, 64), testinghelpers.NewResourceList(16, 32)),
+				testinghelpers.NewNode("testnode2", testinghelpers.NewResourceList(32, 64), testinghelpers.NewResourceList(16, 32)),
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				expectedCondition := metav1.Condition{
+					Type:    clusterv1.ManagedClusterConditionJoined,
+					Status:  metav1.ConditionTrue,
+					Reason:  "ManagedClusterJoined",
+					Message: "Managed cluster joined",
+				}
+				expectedStatus := clusterv1.ManagedClusterStatus{
+					Version: clusterv1.ManagedClusterVersion{
+						Kubernetes: kubeversion.Get().GitVersion,
+					},
+					Capacity: clusterv1.ResourceList{
+						"sockets":                *resource.NewQuantity(int64(1200), resource.DecimalExponent),
+						"cores":                  *resource.NewQuantity(int64(128), resource.DecimalExponent),
 						clusterv1.ResourceCPU:    *resource.NewQuantity(int64(64), resource.DecimalExponent),
 						clusterv1.ResourceMemory: *resource.NewQuantity(int64(1024*1024*128), resource.BinarySI),
 					},
