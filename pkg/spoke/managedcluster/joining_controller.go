@@ -161,6 +161,14 @@ func formatQuantityToMi(q resource.Quantity) resource.Quantity {
 
 func updateClusterResourcesFn(status clusterv1.ManagedClusterStatus) helpers.UpdateManagedClusterStatusFunc {
 	return func(oldStatus *clusterv1.ManagedClusterStatus) error {
+		// merge the old capacity to new capacity, if one old capacity entry does not exist in new capacity,
+		// we add it back to new capacity
+		for key, val := range oldStatus.Capacity {
+			if _, ok := status.Capacity[key]; !ok {
+				status.Capacity[key] = val
+				continue
+			}
+		}
 		oldStatus.Capacity = status.Capacity
 		oldStatus.Allocatable = status.Allocatable
 		oldStatus.Version = status.Version
