@@ -538,6 +538,8 @@ spec:
       app: klusterlet-registration-agent
   template:
     metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: klusterlet-registration-agent
     spec:
@@ -843,6 +845,8 @@ spec:
       app: klusterlet-manifestwork-agent
   template:
     metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: klusterlet-manifestwork-agent
     spec:

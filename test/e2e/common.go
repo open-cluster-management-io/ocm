@@ -169,6 +169,9 @@ func (t *Tester) CreateKlusterlet(name, clusterName, agentNamespace string) (*op
 	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: agentNamespace,
+			Annotations: map[string]string{
+				"workload.openshift.io/allowed": "management",
+			},
 		},
 	}
 	if _, err := t.KubeClient.CoreV1().Namespaces().Get(context.TODO(), agentNamespace, metav1.GetOptions{}); err != nil {
