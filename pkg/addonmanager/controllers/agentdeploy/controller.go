@@ -67,6 +67,21 @@ func NewAddonDeployController(
 			key, _ := cache.MetaNamespaceKeyFunc(obj)
 			return key
 		}, addonInformers.Informer()).
+		WithFilteredEventsInformersQueueKeyFunc(
+			func(obj runtime.Object) string {
+				accessor, _ := meta.Accessor(obj)
+				return fmt.Sprintf("%s/%s", accessor.GetNamespace(), accessor.GetLabels()[AddonWorkLabel])
+			},
+			func(obj interface{}) bool {
+				accessor, _ := meta.Accessor(obj)
+				if accessor.GetLabels() == nil {
+					return false
+				}
+				_, ok := accessor.GetLabels()[AddonWorkLabel]
+				return ok
+			},
+			workInformers.Informer(),
+		).
 		WithSync(c.sync).ToController(fmt.Sprintf("addon-deploy-controller"), recorder)
 }
 

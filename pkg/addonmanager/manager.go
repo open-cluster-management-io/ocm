@@ -17,6 +17,7 @@ import (
 	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned"
 	workv1informers "github.com/open-cluster-management/api/client/work/informers/externalversions"
 	"github.com/openshift/library-go/pkg/operator/events"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -83,8 +84,25 @@ func (a *addonManager) Start(ctx context.Context) error {
 	eventRecorder := events.NewKubeRecorder(
 		kubeClient.CoreV1().Events(namespace), "addon", controllerRef)
 
+	addonNames := []string{}
+	for key := range a.addonAgents {
+		addonNames = append(addonNames, key)
+	}
 	addonInformers := addoninformers.NewSharedInformerFactory(addonClient, 10*time.Minute)
-	workInformers := workv1informers.NewSharedInformerFactory(workClient, 10*time.Minute)
+	workInformers := workv1informers.NewSharedInformerFactoryWithOptions(workClient, 10*time.Minute,
+		workv1informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
+			selector := &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      agentdeploy.AddonWorkLabel,
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   addonNames,
+					},
+				},
+			}
+			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
+		}),
+	)
 	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
 	kubeInfomers := kubeinformers.NewSharedInformerFactory(kubeClient, 10*time.Minute)
 
