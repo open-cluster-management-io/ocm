@@ -21,6 +21,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 
 	placementController := placement.NewPlacementController(
 		clusterInformers.Cluster().V1().ManagedClusters(),
+		clusterInformers.Cluster().V1alpha1().ManagedClusterSets(),
 		controllerContext.EventRecorder,
 	)
 
