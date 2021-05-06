@@ -1,4 +1,4 @@
-package addontesting
+package testing
 
 import (
 	"testing"
