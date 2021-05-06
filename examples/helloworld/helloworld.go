@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/open-cluster-management/addon-framework/examples/helloworld/bindata"
@@ -24,6 +25,8 @@ var (
 	genericCodecs = serializer.NewCodecFactory(genericScheme)
 	genericCodec  = genericCodecs.UniversalDeserializer()
 )
+
+const defaultExampleImage = "quay.io/open-cluster-management/helloworld-addon:latest"
 
 func init() {
 	scheme.AddToScheme(genericScheme)
@@ -61,14 +64,21 @@ func (h *helloWorldAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *ad
 		installNamespace = "default"
 	}
 
+	image := os.Getenv("EXAMPLE_IMAGE_NAME")
+	if len(image) == 0 {
+		image = defaultExampleImage
+	}
+
 	manifestConfig := struct {
 		KubeConfigSecret      string
 		ClusterName           string
 		AddonInstallNamespace string
+		Image                 string
 	}{
 		KubeConfigSecret:      fmt.Sprintf("%s-hub-kubeconfig", h.GetAgentAddonOptions().AddonName),
 		AddonInstallNamespace: installNamespace,
 		ClusterName:           cluster.Name,
+		Image:                 image,
 	}
 
 	for _, file := range manifestFiles {
@@ -92,12 +102,13 @@ func (h *helloWorldAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 				return true
 			},
 			PermissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+				groups := agent.DefaultGroups(cluster.Name, addon.Name)
 				config := struct {
 					ClusterName string
 					Group       string
 				}{
 					ClusterName: cluster.Name,
-					Group:       fmt.Sprintf("open-cluster-management:addon:%s:%s", addon.Name, cluster.Name),
+					Group:       groups[0],
 				}
 
 				kubeclient, err := kubernetes.NewForConfig(h.kubeConfig)

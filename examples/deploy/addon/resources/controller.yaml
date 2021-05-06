@@ -1,0 +1,30 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: helloworld-controller
+  labels:
+    app: helloworld-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: helloworld-controller
+  template:
+    metadata:
+      labels:
+        app: helloworld-controller
+    spec:
+      serviceAccountName: helloworld-sa
+      containers:
+      - name: helloworld-controller
+        image: helloworld-controller
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: EXAMPLE_IMAGE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: image-config
+              key: EXAMPLE_IMAGE_NAME
+        args:
+          - "/helloworld"
+          - "controller"

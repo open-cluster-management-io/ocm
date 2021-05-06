@@ -1,0 +1,12 @@
+namespace: open-cluster-management
+
+resources:
+- resources/clusterrole.yaml
+- resources/controller.yaml
+
+images:
+- name: helloworld-controller
+  newName: quay.io/open-cluster-management/helloworld-addon
+  newTag: latest
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
