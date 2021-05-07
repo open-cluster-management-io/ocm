@@ -104,7 +104,7 @@ func (u *leaseUpdater) start(ctx context.Context, leaseDuration time.Duration) {
 	var updateCtx context.Context
 	updateCtx, u.cancel = context.WithCancel(ctx)
 	go wait.JitterUntilWithContext(updateCtx, u.update, leaseDuration, leaseUpdateJitterFactor, true)
-	u.recorder.Eventf("ManagedClusterLeaseUpdateStrated", "Start to update lease %q on cluster %q", u.leaseName, u.clusterName)
+	u.recorder.Eventf("ManagedClusterLeaseUpdateStarted", "Start to update lease %q on cluster %q", u.leaseName, u.clusterName)
 }
 
 // stop the lease update routine.
