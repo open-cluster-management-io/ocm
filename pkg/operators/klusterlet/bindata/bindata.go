@@ -532,7 +532,7 @@ metadata:
   labels:
     app: klusterlet-registration-agent
 spec:
-  replicas: 3
+  replicas: {{ .Replica }}
   selector:
     matchLabels:
       app: klusterlet-registration-agent
@@ -837,7 +837,7 @@ metadata:
   labels:
     app: klusterlet-manifestwork-agent
 spec:
-  replicas: 3
+  replicas: {{ .Replica }}
   selector:
     matchLabels:
       app: klusterlet-manifestwork-agent

@@ -23,6 +23,7 @@ import (
 	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/controllers/bootstrapcontroller"
 	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/controllers/klusterletcontroller"
 	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/controllers/statuscontroller"
+	configclient "github.com/openshift/client-go/config/clientset/versioned"
 )
 
 // defaultSpokeComponentNamespace is the default namespace in which the operator is deployed
@@ -115,6 +116,12 @@ func RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd
 	}
 	operatorInformer := operatorinformer.NewSharedInformerFactory(operatorClient, 5*time.Minute)
 
+	// Build config client
+	configClient, err := configclient.NewForConfig(controllerContext.KubeConfig)
+	if err != nil {
+		return err
+	}
+
 	workClient, err := workclientset.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
@@ -131,6 +138,7 @@ func RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd
 		kubeClient,
 		apiExtensionClient,
 		operatorClient.OperatorV1().Klusterlets(),
+		configClient.ConfigV1().Infrastructures(),
 		operatorInformer.Operator().V1().Klusterlets(),
 		kubeInformer.Core().V1().Secrets(),
 		kubeInformer.Apps().V1().Deployments(),
