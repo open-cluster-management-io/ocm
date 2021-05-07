@@ -121,6 +121,14 @@ spec:
           - delete
         - apiGroups:
           - ""
+          resources:
+          - nodes
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
           - events.k8s.io
           resources:
           - events

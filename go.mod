@@ -12,6 +12,7 @@ require (
 	github.com/open-cluster-management/api v0.0.0-20210409125704-06f2aec1a73f
 	github.com/openshift/api v0.0.0-20210331193751-3acddb19d360
 	github.com/openshift/build-machinery-go v0.0.0-20210209125900-0da259a2c359
+	github.com/openshift/client-go v0.0.0-20210331195552-cf6c2669e01f
 	github.com/openshift/library-go v0.0.0-20210406144447-d9cdfbd844ea
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5

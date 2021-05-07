@@ -1,6 +1,7 @@
 package klusterletcontroller
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"strings"
@@ -14,6 +15,8 @@ import (
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
 	"github.com/open-cluster-management/registration-operator/pkg/helpers"
 	testinghelper "github.com/open-cluster-management/registration-operator/pkg/helpers/testing"
+	configv1 "github.com/openshift/api/config/v1"
+	fakeconfigclient "github.com/openshift/client-go/config/clientset/versioned/fake"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	fakeapiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
@@ -93,8 +96,20 @@ func newNamespace(name string) *corev1.Namespace {
 	}
 }
 
+func newNode(name string) *corev1.Node {
+	return &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"node-role.kubernetes.io/master": "",
+			},
+		},
+	}
+}
+
 func newTestController(klusterlet *opratorapiv1.Klusterlet, appliedManifestWorks []runtime.Object, objects ...runtime.Object) *testController {
 	fakeKubeClient := fakekube.NewSimpleClientset(objects...)
+	fakeConfigClient := fakeconfigclient.NewSimpleClientset()
 	fakeAPIExtensionClient := fakeapiextensions.NewSimpleClientset()
 	fakeOperatorClient := fakeoperatorclient.NewSimpleClientset(klusterlet)
 	fakeWorkClient := fakeworkclient.NewSimpleClientset(appliedManifestWorks...)
@@ -104,6 +119,7 @@ func newTestController(klusterlet *opratorapiv1.Klusterlet, appliedManifestWorks
 	hubController := &klusterletController{
 		klusterletClient:          fakeOperatorClient.OperatorV1().Klusterlets(),
 		kubeClient:                fakeKubeClient,
+		configClient:              fakeConfigClient.ConfigV1().Infrastructures(),
 		apiExtensionClient:        fakeAPIExtensionClient,
 		appliedManifestWorkClient: fakeWorkClient.WorkV1().AppliedManifestWorks(),
 		klusterletLister:          operatorInformers.Operator().V1().Klusterlets().Lister(),
@@ -510,6 +526,67 @@ func TestSyncWithPullSecret(t *testing.T) {
 
 	if createdSecret == nil || createdSecret.Name != imagePullSecret {
 		t.Errorf("Failed to sync pull secret")
+	}
+}
+
+func TestDeterminReplica(t *testing.T) {
+	cases := []struct {
+		name            string
+		existingNodes   []runtime.Object
+		existingInfra   runtime.Object
+		expectedReplica int32
+	}{
+		{
+			name:            "no infrastructuer, single node",
+			existingNodes:   []runtime.Object{newNode("node1")},
+			expectedReplica: singleReplica,
+		},
+		{
+			name:            "no infrastructuer, multiple node",
+			existingNodes:   []runtime.Object{newNode("node1"), newNode("node2"), newNode("node3")},
+			expectedReplica: defaultReplica,
+		},
+		{
+			name:          "infrastructuer with ha mode",
+			existingNodes: []runtime.Object{},
+			existingInfra: &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: configv1.InfrastructureStatus{
+					ControlPlaneTopology: configv1.HighlyAvailableTopologyMode,
+				},
+			},
+			expectedReplica: defaultReplica,
+		},
+		{
+			name:          "infrastructuer with single node mode",
+			existingNodes: []runtime.Object{},
+			existingInfra: &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: configv1.InfrastructureStatus{
+					ControlPlaneTopology: configv1.SingleReplicaTopologyMode,
+				},
+			},
+			expectedReplica: singleReplica,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+			controller := newTestController(klusterlet, nil, c.existingNodes...)
+			if c.existingInfra != nil {
+				fakeConfiClient := fakeconfigclient.NewSimpleClientset(c.existingInfra)
+				controller.controller.configClient = fakeConfiClient.ConfigV1().Infrastructures()
+			}
+			replica := controller.controller.determineReplica(context.Background())
+			if replica != c.expectedReplica {
+				t.Errorf("Unexpected replica, actual: %d, expected: %d", replica, c.expectedReplica)
+			}
+		})
 	}
 }
 
