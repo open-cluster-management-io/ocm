@@ -6,18 +6,19 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
-	clusterv1client "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
-	clusterv1informers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
+	clusterclient "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
+	clusterinformers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
 	placement "github.com/open-cluster-management/placement/pkg/controllers/placement"
+	placementdecision "github.com/open-cluster-management/placement/pkg/controllers/placementdecision"
 )
 
 // RunControllerManager starts the controllers on hub to make placement decisions.
 func RunControllerManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
-	clusterClient, err := clusterv1client.NewForConfig(controllerContext.KubeConfig)
+	clusterClient, err := clusterclient.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
-	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
+	clusterInformers := clusterinformers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
 
 	placementController := placement.NewPlacementController(
 		clusterInformers.Cluster().V1().ManagedClusters(),
@@ -25,9 +26,17 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		controllerContext.EventRecorder,
 	)
 
+	placementDecisionCreatingController := placementdecision.NewPlacementDecisionCreatingController(
+		clusterClient,
+		clusterInformers.Cluster().V1alpha1().Placements(),
+		clusterInformers.Cluster().V1alpha1().PlacementDecisions(),
+		controllerContext.EventRecorder,
+	)
+
 	go clusterInformers.Start(ctx.Done())
 
 	go placementController.Run(ctx, 1)
+	go placementDecisionCreatingController.Run(ctx, 1)
 
 	<-ctx.Done()
 	return nil
