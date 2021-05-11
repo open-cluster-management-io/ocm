@@ -195,7 +195,12 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	switch {
 	case errors.IsNotFound(err):
 		_, createErr := n.kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{Name: config.KlusterletNamespace},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: config.KlusterletNamespace,
+				Annotations: map[string]string{
+					"workload.openshift.io/allowed": "management",
+				},
+			},
 		}, metav1.CreateOptions{})
 		if createErr != nil {
 			_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
