@@ -1,6 +1,6 @@
 module github.com/open-cluster-management/work
 
-go 1.15
+go 1.16
 
 replace github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1 // ensure compatible between controller-runtime and kube-openapi
 
