@@ -55,6 +55,12 @@ var _ = ginkgo.Describe("Addon CSR", func() {
 		_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+		testAddonImpl.registrations[managedClusterName] = []addonapiv1alpha1.RegistrationConfig{
+			{
+				SignerName: certificatesv1.KubeAPIServerClientSignerName,
+			},
+		}
+
 		addon := &addonapiv1alpha1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
@@ -72,6 +78,7 @@ var _ = ginkgo.Describe("Addon CSR", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		delete(testAddonImpl.registrations, managedClusterName)
 	})
 
 	ginkgo.It("Should approve csr successfully", func() {

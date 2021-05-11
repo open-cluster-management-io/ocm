@@ -45,6 +45,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		delete(testAddonImpl.registrations, managedClusterName)
 	})
 
 	ginkgo.It("Should setup registration successfully", func() {
