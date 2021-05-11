@@ -111,7 +111,7 @@ spec:
           secretName: {{ .KubeConfigSecret }}
       containers:
       - name: helloworld-agent
-        image: quay.io/open-cluster-management/helloworld-addon
+        image: {{ .Image }}
         imagePullPolicy: IfNotPresent
         args:
           - "/helloworld"
