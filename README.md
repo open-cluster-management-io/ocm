@@ -10,21 +10,7 @@ Go to the [Contributing guide](CONTRIBUTING.md) to learn how to get involved.
 
 ## Getting started
 
-- Steps for development: 
-
-  - Be sure every step is a task the user needs to take. 
-  - You can also give the user the results or summary after the step. But results/summaries are not numbered as steps. 
-  - Keep tasks goal oriented.
-  - Sub steps are tabbed in under the main step.
-
-- Steps for deployment:
-
-  - List of steps for deployment.
-  - Please be aware of the community's [deployment images](https://github.com/open-cluster-management/community#deployment-images) special note.
-
-- Steps for test:
-
-  - List of steps for testing.
+run `make build` to build the binary
 
 - Check the [Security guide](SECURITY.md) if you need to report a security issue.
 
