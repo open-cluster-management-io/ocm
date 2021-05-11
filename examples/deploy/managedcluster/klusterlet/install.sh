@@ -47,42 +47,6 @@ for i in {1..7}; do
 
 done
 
-for i in {1..7}; do
-  echo "############$i  Checking managed cluster "
-  $KUBECTL get managedclusters cluster1 1>/dev/null 2>&1
-  if [ $? -eq 0 ]; then
-    break
-  fi
-
-  if [ $i -eq 7 ]; then
-    echo "!!!!!!!!!!  the managed cluster is not created within 3 minutes"
-    $KUBECTL get ns
-    exit 1
-  fi
-  sleep 30
-
-done
-
-CSR_NAME=$($KUBECTL get csr |grep cluster1 | grep Pending |awk '{print $1}')
-$KUBECTL certificate approve "${CSR_NAME}"
-$KUBECTL patch managedclusters cluster1  --type merge --patch '{"spec":{"hubAcceptsClient":true}}'
-
-for i in {1..7}; do
-  echo "############$i  Checking managed cluster namespace is created"
-  $KUBECTL get ns cluster1 1>/dev/null 2>&1
-  if [ $? -eq 0 ]; then
-    break
-  fi
-
-  if [ $i -eq 7 ]; then
-    echo "!!!!!!!!!!  the managed cluster namespace is not created within 3 minutes"
-    $KUBECTL get ns
-    exit 1
-  fi
-  sleep 30
-
-done
-
 echo "############  ManagedCluster klusterlet is installed successfully!!"
 
 echo "############  Cleanup"
