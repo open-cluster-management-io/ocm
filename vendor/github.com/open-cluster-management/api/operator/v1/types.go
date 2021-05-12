@@ -27,12 +27,19 @@ type ClusterManager struct {
 // ClusterManagerSpec represents a desired deployment configuration of controllers that govern registration and work distribution for attached Klusterlets.
 type ClusterManagerSpec struct {
 	// RegistrationImagePullSpec represents the desired image of registration controller/webhook installed on hub.
-	// +required
-	RegistrationImagePullSpec string `json:"registrationImagePullSpec"`
+	// +optional
+	// +kubebuilder:default=quay.io/open-cluster-management/registration
+	RegistrationImagePullSpec string `json:"registrationImagePullSpec,omitempty"`
 
 	// WorkImagePullSpec represents the desired image configuration of work controller/webhook installed on hub.
-	// +required
+	// +optional
+	// +kubebuilder:default=quay.io/open-cluster-management/work
 	WorkImagePullSpec string `json:"workImagePullSpec,omitempty"`
+
+	// PlacementImagePullSpec represents the desired image configuration of placement controller/webhook installed on hub.
+	// +optional
+	// +kubebuilder:default=quay.io/open-cluster-management/placement
+	PlacementImagePullSpec string `json:"placementImagePullSpec,omitempty"`
 }
 
 // ClusterManagerStatus represents the current status of the registration and work distribution controllers running on the hub.
