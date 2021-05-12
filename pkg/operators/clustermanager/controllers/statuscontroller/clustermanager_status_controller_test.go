@@ -32,10 +32,25 @@ func newClusterManager() *operatorapiv1.ClusterManager {
 	}
 }
 
-func newDeployment(desiredReplica, availableReplica int32) *appsv1.Deployment {
+func newRegistrationDeployment(desiredReplica, availableReplica int32) *appsv1.Deployment {
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-registration-controller", testClusterManagerName),
+			Namespace: "open-cluster-management-hub",
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &desiredReplica,
+		},
+		Status: appsv1.DeploymentStatus{
+			AvailableReplicas: availableReplica,
+		},
+	}
+}
+
+func newPlacementDeployment(desiredReplica, availableReplica int32) *appsv1.Deployment {
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-placement-controller", testClusterManagerName),
 			Namespace: "open-cluster-management-hub",
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -74,42 +89,62 @@ func TestSyncStatus(t *testing.T) {
 			},
 		},
 		{
-			name:            "failed to get registration deployment",
+			name:            "no registration deployment and unavailable placement pods",
 			queueKey:        testClusterManagerName,
 			clusterManagers: []runtime.Object{newClusterManager()},
-			deployments:     []runtime.Object{},
+			deployments: []runtime.Object{
+				newPlacementDeployment(3, 0),
+			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelper.AssertEqualNumber(t, len(actions), 2)
+				testinghelper.AssertEqualNumber(t, len(actions), 4)
 				testinghelper.AssertGet(t, actions[0], "operator.open-cluster-management.io", "v1", "clustermanagers")
 				testinghelper.AssertAction(t, actions[1], "update")
-				expectedCondition := testinghelper.NamedCondition(registrationDegraded, "GetRegistrationDeploymentFailed", metav1.ConditionTrue)
-				testinghelper.AssertOnlyConditions(t, actions[1].(clienttesting.UpdateActionImpl).Object, expectedCondition)
+				expectedCondition1 := testinghelper.NamedCondition(registrationDegraded, "GetRegistrationDeploymentFailed", metav1.ConditionTrue)
+				testinghelper.AssertOnlyConditions(t, actions[1].(clienttesting.UpdateActionImpl).Object, expectedCondition1)
+
+				testinghelper.AssertGet(t, actions[2], "operator.open-cluster-management.io", "v1", "clustermanagers")
+				testinghelper.AssertAction(t, actions[3], "update")
+				expectedCondition2 := testinghelper.NamedCondition(placementDegraded, "UnavailablePlacementPod", metav1.ConditionTrue)
+				testinghelper.AssertOnlyConditions(t, actions[3].(clienttesting.UpdateActionImpl).Object, expectedCondition1, expectedCondition2)
 			},
 		},
 		{
-			name:            "unavailable registration pods",
+			name:            "unavailable registration pods and placement functional",
 			queueKey:        testClusterManagerName,
 			clusterManagers: []runtime.Object{newClusterManager()},
-			deployments:     []runtime.Object{newDeployment(3, 0)},
+			deployments: []runtime.Object{
+				newRegistrationDeployment(3, 0),
+				newPlacementDeployment(3, 3),
+			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelper.AssertEqualNumber(t, len(actions), 2)
+				testinghelper.AssertEqualNumber(t, len(actions), 4)
 				testinghelper.AssertGet(t, actions[0], "operator.open-cluster-management.io", "v1", "clustermanagers")
 				testinghelper.AssertAction(t, actions[1], "update")
-				expectedCondition := testinghelper.NamedCondition(registrationDegraded, "UnavailableRegistrationPod", metav1.ConditionTrue)
-				testinghelper.AssertOnlyConditions(t, actions[1].(clienttesting.UpdateActionImpl).Object, expectedCondition)
+				expectedCondition1 := testinghelper.NamedCondition(registrationDegraded, "UnavailableRegistrationPod", metav1.ConditionTrue)
+				testinghelper.AssertOnlyConditions(t, actions[1].(clienttesting.UpdateActionImpl).Object, expectedCondition1)
+
+				testinghelper.AssertGet(t, actions[2], "operator.open-cluster-management.io", "v1", "clustermanagers")
+				testinghelper.AssertAction(t, actions[3], "update")
+				expectedCondition2 := testinghelper.NamedCondition(placementDegraded, "PlacementFunctional", metav1.ConditionFalse)
+				testinghelper.AssertOnlyConditions(t, actions[3].(clienttesting.UpdateActionImpl).Object, expectedCondition1, expectedCondition2)
 			},
 		},
 		{
-			name:            "registration functional",
+			name:            "registration functional and no placement deployment",
 			queueKey:        testClusterManagerName,
 			clusterManagers: []runtime.Object{newClusterManager()},
-			deployments:     []runtime.Object{newDeployment(3, 3)},
+			deployments:     []runtime.Object{newRegistrationDeployment(3, 3)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelper.AssertEqualNumber(t, len(actions), 2)
+				testinghelper.AssertEqualNumber(t, len(actions), 4)
 				testinghelper.AssertGet(t, actions[0], "operator.open-cluster-management.io", "v1", "clustermanagers")
 				testinghelper.AssertAction(t, actions[1], "update")
-				expectedCondition := testinghelper.NamedCondition(registrationDegraded, "RegistrationFunctional", metav1.ConditionFalse)
-				testinghelper.AssertOnlyConditions(t, actions[1].(clienttesting.UpdateActionImpl).Object, expectedCondition)
+				expectedCondition1 := testinghelper.NamedCondition(registrationDegraded, "RegistrationFunctional", metav1.ConditionFalse)
+				testinghelper.AssertOnlyConditions(t, actions[1].(clienttesting.UpdateActionImpl).Object, expectedCondition1)
+
+				testinghelper.AssertGet(t, actions[2], "operator.open-cluster-management.io", "v1", "clustermanagers")
+				testinghelper.AssertAction(t, actions[3], "update")
+				expectedCondition2 := testinghelper.NamedCondition(placementDegraded, "GetPlacementDeploymentFailed", metav1.ConditionTrue)
+				testinghelper.AssertOnlyConditions(t, actions[3].(clienttesting.UpdateActionImpl).Object, expectedCondition1, expectedCondition2)
 			},
 		},
 	}

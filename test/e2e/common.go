@@ -50,6 +50,7 @@ type Tester struct {
 	hubRegistrationDeployment        string
 	hubRegistrationWebhookDeployment string
 	hubWorkWebhookDeployment         string
+	hubPlacementDeployment           string
 	operatorNamespace                string
 	klusterletOperator               string
 }
@@ -67,6 +68,7 @@ func NewTester(kubeconfigPath string) (*Tester, error) {
 		hubRegistrationDeployment:        "cluster-manager-registration-controller",
 		hubRegistrationWebhookDeployment: "cluster-manager-registration-webhook",
 		hubWorkWebhookDeployment:         "cluster-manager-work-webhook",
+		hubPlacementDeployment:           "cluster-manager-placement-controller",
 		operatorNamespace:                "open-cluster-management",
 		klusterletOperator:               "klusterlet",
 	}
@@ -400,7 +402,29 @@ func (t *Tester) CheckHubReady() error {
 
 	if _, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
 		Get(context.TODO(), t.hubWorkWebhookDeployment, metav1.GetOptions{}); err != nil {
+	}
+
+	if _, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
+		Get(context.TODO(), t.hubPlacementDeployment, metav1.GetOptions{}); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (t *Tester) CheckClusterManagerStatus() error {
+	cms, err := t.OperatorClient.OperatorV1().ClusterManagers().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	if len(cms.Items) == 0 {
+		return fmt.Errorf("ClusterManager not found")
+	}
+	cm := cms.Items[0]
+	if meta.IsStatusConditionTrue(cm.Status.Conditions, "HubRegistrationDegraded") {
+		return fmt.Errorf("HubRegistration is degraded")
+	}
+	if meta.IsStatusConditionTrue(cm.Status.Conditions, "HubPlacementDegraded") {
+		return fmt.Errorf("HubPlacement is degraded")
 	}
 	return nil
 }

@@ -36,6 +36,10 @@ var _ = BeforeSuite(func() {
 	}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
 
 	Eventually(func() error {
+		return t.CheckClusterManagerStatus()
+	}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+
+	Eventually(func() error {
 		return t.CheckKlusterletOperatorReady()
 	}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
 

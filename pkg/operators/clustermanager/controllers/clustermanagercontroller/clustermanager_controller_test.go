@@ -99,7 +99,10 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.Cl
 		testinghelper.AssertEqualNameNamespace(t, access.GetName(), "", helpers.ClusterManagerNamespace, "")
 	case *appsv1.Deployment:
 		if strings.Contains(o.Name, "registration") && hubCore.Spec.RegistrationImagePullSpec != o.Spec.Template.Spec.Containers[0].Image {
-			t.Errorf("Image does not match to the expected.")
+			t.Errorf("Registration image does not match to the expected.")
+		}
+		if strings.Contains(o.Name, "placement") && hubCore.Spec.PlacementImagePullSpec != o.Spec.Template.Spec.Containers[0].Image {
+			t.Errorf("Placement image does not match to the expected.")
 		}
 	}
 }
@@ -125,7 +128,7 @@ func TestSyncDeploy(t *testing.T) {
 	}
 
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 19)
+	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 23)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager)
 	}
@@ -139,7 +142,7 @@ func TestSyncDeploy(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(createCRDObjects), 6)
+	testinghelper.AssertEqualNumber(t, len(createCRDObjects), 8)
 
 	createAPIServiceObjects := []runtime.Object{}
 	apiServiceActions := controller.apiRegistrationClient.Actions()
@@ -181,7 +184,7 @@ func TestSyncDelete(t *testing.T) {
 			deleteKubeActions = append(deleteKubeActions, deleteKubeAction)
 		}
 	}
-	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 16)
+	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 19)
 
 	deleteCRDActions := []clienttesting.DeleteActionImpl{}
 	crdActions := controller.apiExtensionClient.Actions()
@@ -192,7 +195,7 @@ func TestSyncDelete(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(deleteCRDActions), 8)
+	testinghelper.AssertEqualNumber(t, len(deleteCRDActions), 10)
 
 	deleteAPIServiceActions := []clienttesting.DeleteActionImpl{}
 	apiServiceActions := controller.apiRegistrationClient.Actions()
