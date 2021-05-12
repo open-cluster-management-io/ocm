@@ -35,6 +35,7 @@ var map_ClusterManagerSpec = map[string]string{
 	"":                          "ClusterManagerSpec represents a desired deployment configuration of controllers that govern registration and work distribution for attached Klusterlets.",
 	"registrationImagePullSpec": "RegistrationImagePullSpec represents the desired image of registration controller/webhook installed on hub.",
 	"workImagePullSpec":         "WorkImagePullSpec represents the desired image configuration of work controller/webhook installed on hub.",
+	"placementImagePullSpec":    "PlacementImagePullSpec represents the desired image configuration of placement controller/webhook installed on hub.",
 }
 
 func (ClusterManagerSpec) SwaggerDoc() map[string]string {

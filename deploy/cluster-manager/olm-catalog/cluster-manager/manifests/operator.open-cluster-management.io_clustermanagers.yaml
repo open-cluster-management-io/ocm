@@ -28,10 +28,16 @@ spec:
           spec:
             description: Spec represents a desired deployment configuration of controllers that govern registration and work distribution for attached Klusterlets.
             properties:
+              placementImagePullSpec:
+                default: quay.io/open-cluster-management/placement
+                description: PlacementImagePullSpec represents the desired image configuration of placement controller/webhook installed on hub.
+                type: string
               registrationImagePullSpec:
+                default: quay.io/open-cluster-management/registration
                 description: RegistrationImagePullSpec represents the desired image of registration controller/webhook installed on hub.
                 type: string
               workImagePullSpec:
+                default: quay.io/open-cluster-management/work
                 description: WorkImagePullSpec represents the desired image configuration of work controller/webhook installed on hub.
                 type: string
             type: object
