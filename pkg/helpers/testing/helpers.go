@@ -5,6 +5,7 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -42,4 +43,26 @@ func AssertActions(t *testing.T, actualActions []clienttesting.Action, expectedV
 // AssertNoActions asserts no actions are happened
 func AssertNoActions(t *testing.T, actualActions []clienttesting.Action) {
 	AssertActions(t, actualActions)
+}
+
+func HasCondition(conditions []metav1.Condition, expectedType, expectedReason string, expectedStatus metav1.ConditionStatus) bool {
+	found := false
+	for _, condition := range conditions {
+		if condition.Type != expectedType {
+			continue
+		}
+		found = true
+
+		if condition.Status != expectedStatus {
+			return false
+		}
+
+		if condition.Reason != expectedReason {
+			return false
+		}
+
+		return true
+	}
+
+	return found
 }

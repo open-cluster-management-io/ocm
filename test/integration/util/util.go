@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/onsi/ginkgo"
-
 	"github.com/openshift/library-go/pkg/operator/events"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func NewIntegrationTestEventRecorder(componet string) events.Recorder {
@@ -46,4 +46,26 @@ func (r *IntegrationTestEventRecorder) Warningf(reason, messageFmt string, args 
 
 func (r *IntegrationTestEventRecorder) Shutdown() {
 	return
+}
+
+func HasCondition(conditions []metav1.Condition, expectedType, expectedReason string, expectedStatus metav1.ConditionStatus) bool {
+	found := false
+	for _, condition := range conditions {
+		if condition.Type != expectedType {
+			continue
+		}
+		found = true
+
+		if condition.Status != expectedStatus {
+			return false
+		}
+
+		if condition.Reason != expectedReason {
+			return false
+		}
+
+		return true
+	}
+
+	return found
 }

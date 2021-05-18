@@ -8,8 +8,7 @@ import (
 
 	clusterclient "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	clusterinformers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
-	placement "github.com/open-cluster-management/placement/pkg/controllers/placement"
-	placementdecision "github.com/open-cluster-management/placement/pkg/controllers/placementdecision"
+	scheduling "github.com/open-cluster-management/placement/pkg/controllers/scheduling"
 )
 
 // RunControllerManager starts the controllers on hub to make placement decisions.
@@ -20,14 +19,11 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	}
 	clusterInformers := clusterinformers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
 
-	placementController := placement.NewPlacementController(
-		clusterInformers.Cluster().V1().ManagedClusters(),
-		clusterInformers.Cluster().V1alpha1().ManagedClusterSets(),
-		controllerContext.EventRecorder,
-	)
-
-	placementDecisionCreatingController := placementdecision.NewPlacementDecisionCreatingController(
+	schedulingController := scheduling.NewSchedulingController(
 		clusterClient,
+		clusterInformers.Cluster().V1().ManagedClusters().Lister(),
+		clusterInformers.Cluster().V1alpha1().ManagedClusterSets().Lister(),
+		clusterInformers.Cluster().V1alpha1().ManagedClusterSetBindings().Lister(),
 		clusterInformers.Cluster().V1alpha1().Placements(),
 		clusterInformers.Cluster().V1alpha1().PlacementDecisions(),
 		controllerContext.EventRecorder,
@@ -35,8 +31,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 
 	go clusterInformers.Start(ctx.Done())
 
-	go placementController.Run(ctx, 1)
-	go placementDecisionCreatingController.Run(ctx, 1)
+	go schedulingController.Run(ctx, 1)
 
 	<-ctx.Done()
 	return nil
