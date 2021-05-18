@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"time"
 
+	"github.com/open-cluster-management/addon-framework/pkg/addonmanager/constants"
 	"github.com/open-cluster-management/addon-framework/pkg/addonmanager/controllers/agentdeploy"
 	"github.com/open-cluster-management/addon-framework/pkg/addonmanager/controllers/certificate"
 	"github.com/open-cluster-management/addon-framework/pkg/addonmanager/controllers/registration"
@@ -94,7 +95,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 			selector := &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
-						Key:      agentdeploy.AddonWorkLabel,
+						Key:      constants.AddonLabel,
 						Operator: metav1.LabelSelectorOpIn,
 						Values:   addonNames,
 					},
@@ -104,7 +105,20 @@ func (a *addonManager) Start(ctx context.Context) error {
 		}),
 	)
 	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
-	kubeInfomers := kubeinformers.NewSharedInformerFactory(kubeClient, 10*time.Minute)
+	kubeInfomers := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute,
+		kubeinformers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
+			selector := &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      constants.AddonLabel,
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   addonNames,
+					},
+				},
+			}
+			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
+		}),
+	)
 
 	deployController := agentdeploy.NewAddonDeployController(
 		workClient,
