@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/open-cluster-management/addon-framework/pkg/addonmanager/constants"
 	"github.com/open-cluster-management/addon-framework/pkg/agent"
 	addoninformerv1alpha1 "github.com/open-cluster-management/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "github.com/open-cluster-management/api/client/addon/listers/addon/v1alpha1"
@@ -22,11 +23,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	certificateslisters "k8s.io/client-go/listers/certificates/v1"
 	"k8s.io/klog/v2"
-)
-
-const (
-	spokeClusterNameLabel = "open-cluster-management.io/cluster-name"
-	spokeAddonNameLabel   = "open-cluster-management.io/addon-name"
 )
 
 // csrApprovingController auto approve the renewal CertificateSigningRequests for an accepted spoke cluster on the hub.
@@ -70,7 +66,7 @@ func NewCSRApprovingController(
 				if len(accessor.GetLabels()) == 0 {
 					return false
 				}
-				addonName := accessor.GetLabels()[spokeAddonNameLabel]
+				addonName := accessor.GetLabels()[constants.AddonLabel]
 				if _, ok := agentAddons[addonName]; !ok {
 					return false
 				}
@@ -97,7 +93,7 @@ func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncC
 		return nil
 	}
 
-	addonName := csr.Labels[spokeAddonNameLabel]
+	addonName := csr.Labels[constants.AddonLabel]
 	agentAddon, ok := c.agentAddons[addonName]
 	if !ok {
 		return nil
@@ -107,7 +103,7 @@ func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncC
 	if registrationOption == nil {
 		return nil
 	}
-	clusterName, ok := csr.Labels[spokeClusterNameLabel]
+	clusterName, ok := csr.Labels[constants.ClusterLabel]
 	if !ok {
 		return nil
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/open-cluster-management/addon-framework/pkg/addonmanager/constants"
 	"github.com/open-cluster-management/addon-framework/pkg/agent"
 	addonapiv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
 	addonv1alpha1client "github.com/open-cluster-management/api/client/addon/clientset/versioned"
@@ -25,11 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-)
-
-// AddonWorkLabel is to label the manifestowk relates to the addon
-const (
-	AddonWorkLabel = "open-cluster-management.io/addon-name"
 )
 
 // managedClusterController reconciles instances of ManagedCluster on the hub.
@@ -70,14 +66,14 @@ func NewAddonDeployController(
 		WithFilteredEventsInformersQueueKeyFunc(
 			func(obj runtime.Object) string {
 				accessor, _ := meta.Accessor(obj)
-				return fmt.Sprintf("%s/%s", accessor.GetNamespace(), accessor.GetLabels()[AddonWorkLabel])
+				return fmt.Sprintf("%s/%s", accessor.GetNamespace(), accessor.GetLabels()[constants.AddonLabel])
 			},
 			func(obj interface{}) bool {
 				accessor, _ := meta.Accessor(obj)
 				if accessor.GetLabels() == nil {
 					return false
 				}
-				_, ok := accessor.GetLabels()[AddonWorkLabel]
+				_, ok := accessor.GetLabels()[constants.AddonLabel]
 				return ok
 			},
 			workInformers.Informer(),
@@ -208,7 +204,7 @@ func buildManifestWorkFromObject(cluster, addonName string, objects []runtime.Ob
 			Name:      fmt.Sprintf("addon-%s-deploy", addonName),
 			Namespace: cluster,
 			Labels: map[string]string{
-				AddonWorkLabel: addonName,
+				constants.AddonLabel: addonName,
 			},
 		},
 		Spec: workapiv1.ManifestWorkSpec{
