@@ -5,3 +5,4 @@ metadata:
 spec:
   registrationImagePullSpec: quay.io/open-cluster-management/registration
   workImagePullSpec: quay.io/open-cluster-management/work
+  placementImagePullSpec: quay.io/open-cluster-management/placement

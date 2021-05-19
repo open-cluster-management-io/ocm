@@ -90,7 +90,7 @@ func ClusterManagerDeploymentQueueKeyFunc(clusterManagerLister operatorlister.Cl
 		if namespace != ClusterManagerNamespace {
 			return ""
 		}
-		if strings.HasSuffix(name, "registration-controller") || strings.HasSuffix(name, "work-controller") {
+		if strings.HasSuffix(name, "registration-controller") || strings.HasSuffix(name, "work-controller") || strings.HasSuffix(name, "placement-controller") {
 			interestedObjectFound = true
 		}
 		if !interestedObjectFound {

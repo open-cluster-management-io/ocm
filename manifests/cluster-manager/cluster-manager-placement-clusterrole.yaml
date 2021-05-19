@@ -1,0 +1,24 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: open-cluster-management:{{ .ClusterManagerName }}-placement:controller
+rules:
+# Allow controller to get/list/watch/create/delete configmaps
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch", "create", "delete", "update"]
+# Allow controller to create/patch/update events
+- apiGroups: ["", "events.k8s.io"]
+  resources: ["events"]
+  verbs: ["create", "patch", "update"]
+# Allow controller to view managedclusters/managedclustersets/managedclustersetbindings
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclusters", "managedclustersets", "managedclustersetbindings"]
+  verbs: ["get", "list", "watch"]
+# Allow controller to manage placements/placementdecisions
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["placements", "placementdecisions"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["placements/status", "placementdecisions/status"]
+  verbs: ["update", "patch"]

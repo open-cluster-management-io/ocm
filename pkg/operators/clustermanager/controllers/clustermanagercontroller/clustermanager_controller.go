@@ -44,6 +44,8 @@ var (
 		"manifests/cluster-manager/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml",
 		"manifests/cluster-manager/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml",
 		"manifests/cluster-manager/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml",
+		"manifests/cluster-manager/0000_03_clusters.open-cluster-management.io_placements.crd.yaml",
+		"manifests/cluster-manager/0000_04_clusters.open-cluster-management.io_placementdecisions.crd.yaml",
 		"manifests/cluster-manager/cluster-manager-registration-clusterrole.yaml",
 		"manifests/cluster-manager/cluster-manager-registration-clusterrolebinding.yaml",
 		"manifests/cluster-manager/cluster-manager-namespace.yaml",
@@ -62,12 +64,16 @@ var (
 		"manifests/cluster-manager/cluster-manager-work-webhook-serviceaccount.yaml",
 		"manifests/cluster-manager/cluster-manager-work-webhook-apiservice.yaml",
 		"manifests/cluster-manager/cluster-manager-work-webhook-validatingconfiguration.yaml",
+		"manifests/cluster-manager/cluster-manager-placement-clusterrole.yaml",
+		"manifests/cluster-manager/cluster-manager-placement-clusterrolebinding.yaml",
+		"manifests/cluster-manager/cluster-manager-placement-serviceaccount.yaml",
 	}
 
 	deploymentFiles = []string{
 		"manifests/cluster-manager/cluster-manager-registration-deployment.yaml",
 		"manifests/cluster-manager/cluster-manager-registration-webhook-deployment.yaml",
 		"manifests/cluster-manager/cluster-manager-work-webhook-deployment.yaml",
+		"manifests/cluster-manager/cluster-manager-placement-deployment.yaml",
 	}
 )
 
@@ -138,6 +144,7 @@ type hubConfig struct {
 	RegistrationAPIServiceCABundle string
 	WorkImage                      string
 	WorkAPIServiceCABundle         string
+	PlacementImage                 string
 }
 
 func (n *clusterManagerController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
@@ -158,6 +165,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		ClusterManagerName: clusterManager.Name,
 		RegistrationImage:  clusterManager.Spec.RegistrationImagePullSpec,
 		WorkImage:          clusterManager.Spec.WorkImagePullSpec,
+		PlacementImage:     clusterManager.Spec.PlacementImagePullSpec,
 	}
 
 	// Update finalizer at first
