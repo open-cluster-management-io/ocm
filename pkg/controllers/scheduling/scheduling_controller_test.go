@@ -166,7 +166,7 @@ func TestGetAvailableClusters(t *testing.T) {
 		{
 			name: "select clusters from a bound clusterset",
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).
-				WithClusterSets([]string{"clusterset1"}).Build(),
+				WithClusterSets("clusterset1").Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet("clusterset1"),
 				testinghelpers.NewClusterSet("clusterset2"),

@@ -39,7 +39,7 @@ spec:
       serviceAccountName: cluster-manager-placement-controller-sa
       containers:
       - name: placement-controller
-        image: quay.io/open-cluster-management/placement
+        image: quay.io/open-cluster-management/placement:latest
         imagePullPolicy: IfNotPresent
         args:
           - "/placement"

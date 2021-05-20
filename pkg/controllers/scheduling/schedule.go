@@ -43,6 +43,7 @@ func schedule(
 	}
 
 	// select clusters and generate cluster decisions
+	// TODO: sort the feasible clusters and make sure the selection stable
 	decisions := selectClusters(placement, feasibleClusters)
 	scheduled, unscheduled := len(decisions), 0
 	if placement.Spec.NumberOfClusters != nil {
