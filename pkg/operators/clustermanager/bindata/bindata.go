@@ -1672,6 +1672,9 @@ rules:
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["placements/status", "placementdecisions/status"]
   verbs: ["update", "patch"]
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["placements/finalizers"]
+  verbs: ["update"]
 `)
 
 func manifestsClusterManagerClusterManagerPlacementClusterroleYamlBytes() ([]byte, error) {
