@@ -213,6 +213,43 @@ func TestExposeClaims(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:    "sync non-customized-only claims into status of the managed cluster",
+			cluster: testinghelpers.NewJoinedManagedCluster(),
+			claims: []*clusterv1alpha1.ClusterClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "a",
+						Labels: map[string]string{labelCustomizedOnly: ""},
+					},
+					Spec: clusterv1alpha1.ClusterClaimSpec{
+						Value: "b",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "c",
+					},
+					Spec: clusterv1alpha1.ClusterClaimSpec{
+						Value: "d",
+					},
+				},
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testinghelpers.AssertActions(t, actions, "get", "update")
+				cluster := actions[1].(clienttesting.UpdateActionImpl).Object
+				expected := []clusterv1.ManagedClusterClaim{
+					{
+						Name:  "c",
+						Value: "d",
+					},
+				}
+				actual := cluster.(*clusterv1.ManagedCluster).Status.ClusterClaims
+				if !reflect.DeepEqual(actual, expected) {
+					t.Errorf("expected cluster claim %v but got: %v", expected, actual)
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {
