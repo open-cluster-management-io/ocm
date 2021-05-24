@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: open-cluster-management:cluster-manager-placement:controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: open-cluster-management:cluster-manager-placement:controller
+subjects:
+- kind: ServiceAccount
+  namespace: open-cluster-management-hub
+  name: cluster-manager-placement-controller-sa
