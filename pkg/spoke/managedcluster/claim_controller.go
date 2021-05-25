@@ -3,6 +3,7 @@ package managedcluster
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/selection"
 	"sort"
 
 	clientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
@@ -23,6 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 )
+
+const labelCustomizedOnly = "open-cluster-management.io/spoke-only"
 
 // managedClusterClaimController exposes cluster claims created on managed cluster on hub after it joins the hub.
 type managedClusterClaimController struct {
@@ -82,7 +85,11 @@ func (c managedClusterClaimController) exposeClaims(ctx context.Context, syncCtx
 	managedCluster *clusterv1.ManagedCluster) error {
 	reservedClaims := []clusterv1.ManagedClusterClaim{}
 	customClaims := []clusterv1.ManagedClusterClaim{}
-	clusterClaims, err := c.claimLister.List(labels.Everything())
+
+	// clusterClaim with label `open-cluster-management.io/spoke-only` will not be synced to managedCluster.Status at hub.
+	requirement, _ := labels.NewRequirement(labelCustomizedOnly, selection.DoesNotExist, []string{})
+	selector := labels.NewSelector().Add(*requirement)
+	clusterClaims, err := c.claimLister.List(selector)
 	if err != nil {
 		return fmt.Errorf("unable to list cluster claims: %w", err)
 	}
