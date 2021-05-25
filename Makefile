@@ -1,3 +1,5 @@
+SHELL :=/bin/bash
+
 all: build
 .PHONY: all
 
@@ -25,7 +27,7 @@ IMAGE_REGISTRY ?= quay.io/open-cluster-management
 IMAGE_TAG ?= latest
 EXAMPLE_IMAGE_NAME ?= $(IMAGE_REGISTRY)/$(IMAGE):$(IMAGE_TAG)
 
-GIT_HOST ?= github.com/open-cluster-management
+GIT_HOST ?= open-cluster-management.io
 BASE_DIR := $(shell basename $(PWD))
 DEST := $(GOPATH)/src/$(GIT_HOST)/$(BASE_DIR)
 

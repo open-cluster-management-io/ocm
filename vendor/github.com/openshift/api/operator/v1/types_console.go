@@ -40,6 +40,7 @@ type ConsoleSpec struct {
 	// The default console route will be maintained to reserve the default hostname
 	// for console if the custom route is removed.
 	// If not specified, default route will be used.
+	// DEPRECATED
 	// +optional
 	Route ConsoleConfigRoute `json:"route"`
 	// plugins defines a list of enabled console plugin names.
@@ -48,6 +49,7 @@ type ConsoleSpec struct {
 }
 
 // ConsoleConfigRoute holds information on external route access to console.
+// DEPRECATED
 type ConsoleConfigRoute struct {
 	// hostname is the desired custom domain under which console will be available.
 	Hostname string `json:"hostname"`
@@ -113,6 +115,29 @@ type ConsoleCustomization struct {
 	// +kubebuilder:validation:Optional
 	// +optional
 	DeveloperCatalog DeveloperConsoleCatalogCustomization `json:"developerCatalog,omitempty"`
+	// projectAccess allows customizing the available list of ClusterRoles in the Developer perspective
+	// Project access page which can be used by a project admin to specify roles to other users and
+	// restrict access within the project. If set, the list will replace the default ClusterRole options.
+	// +kubebuilder:validation:Optional
+	// +optional
+	ProjectAccess ProjectAccess `json:"projectAccess,omitempty"`
+	// quickStarts allows customization of available ConsoleQuickStart resources in console.
+	// +kubebuilder:validation:Optional
+	// +optional
+	QuickStarts QuickStarts `json:"quickStarts,omitempty"`
+	// addPage allows customizing actions on the Add page in developer perspective.
+	// +kubebuilder:validation:Optional
+	// +optional
+	AddPage AddPage `json:"addPage,omitempty"`
+}
+
+// ProjectAccess contains options for project access roles
+type ProjectAccess struct {
+	// availableClusterRoles is the list of ClusterRole names that are assignable to users
+	// through the project access tab.
+	// +kubebuilder:validation:Optional
+	// +optional
+	AvailableClusterRoles []string `json:"availableClusterRoles,omitempty"`
 }
 
 // DeveloperConsoleCatalogCustomization allow cluster admin to configure developer catalog.
@@ -154,6 +179,24 @@ type DeveloperConsoleCatalogCategory struct {
 	// +kubebuilder:validation:Optional
 	// +optional
 	Subcategories []DeveloperConsoleCatalogCategoryMeta `json:"subcategories,omitempty"`
+}
+
+// QuickStarts allow cluster admins to customize available ConsoleQuickStart resources.
+type QuickStarts struct {
+	// disabled is a list of ConsoleQuickStart resource names that are not shown to users.
+	// +kubebuilder:validation:Optional
+	// +optional
+	Disabled []string `json:"disabled,omitempty"`
+}
+
+// AddPage allows customizing actions on the Add page in developer perspective.
+type AddPage struct {
+	// disabledActions is a list of actions that are not shown to users.
+	// Each action in the list is represented by its ID.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:MinItems=1
+	// +optional
+	DisabledActions []string `json:"disabledActions,omitempty"`
 }
 
 // Brand is a specific supported brand within the console.

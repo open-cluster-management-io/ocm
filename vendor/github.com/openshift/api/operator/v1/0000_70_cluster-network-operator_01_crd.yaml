@@ -207,6 +207,16 @@ spec:
                           Kuryr keeps a number of ports ready to be attached to pods.
                           By default port prepopulation is disabled.
                         type: boolean
+                      mtu:
+                        description: mtu is the MTU that Kuryr should use when creating
+                          pod networks in Neutron. The value has to be lower or equal
+                          to the MTU of the nodes network and Neutron has to allow
+                          creation of tenant networks with such MTU. If unset Pod
+                          networks will be created with the same MTU as the nodes
+                          network has.
+                        type: integer
+                        format: int32
+                        minimum: 0
                       openStackServiceNetwork:
                         description: openStackServiceNetwork contains the CIDR of
                           network from which to allocate IPs for OpenStack Octavia's
@@ -407,8 +417,9 @@ spec:
                     properties:
                       collectors:
                         description: ipfixCollectors is list of strings formatted
-                          as ip:port
+                          as ip:port with a maximum of ten items
                         type: array
+                        maxItems: 10
                         minItems: 1
                         items:
                           type: string
@@ -420,8 +431,9 @@ spec:
                       collectors:
                         description: netFlow defines the NetFlow collectors that will
                           consume the flow data exported from OVS. It is a list of
-                          strings formatted as ip:port
+                          strings formatted as ip:port with a maximum of ten items
                         type: array
+                        maxItems: 10
                         minItems: 1
                         items:
                           type: string
@@ -432,8 +444,9 @@ spec:
                     properties:
                       collectors:
                         description: sFlowCollectors is list of strings formatted
-                          as ip:port
+                          as ip:port with a maximum of ten items
                         type: array
+                        maxItems: 10
                         minItems: 1
                         items:
                           type: string
@@ -484,6 +497,17 @@ spec:
                   should manage the component
                 type: string
                 pattern: ^(Managed|Unmanaged|Force|Removed)$
+              migration:
+                description: migration enables and configures the cluster network
+                  migration. Setting this to the target network type to allow changing
+                  the default network. If unset, the operation of changing cluster
+                  default network plugin will be rejected.
+                type: object
+                properties:
+                  networkType:
+                    description: networkType is the target type of network migration
+                      The supported values are OpenShiftSDN, OVNKubernetes
+                    type: string
               observedConfig:
                 description: observedConfig holds a sparse config that controller
                   has observed from the cluster state.  It exists in spec because

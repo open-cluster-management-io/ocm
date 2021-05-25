@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/open-cluster-management/addon-framework/pkg/lease"
-	"github.com/open-cluster-management/addon-framework/pkg/version"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -23,6 +21,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
+	"open-cluster-management.io/addon-framework/pkg/lease"
+	"open-cluster-management.io/addon-framework/pkg/version"
 )
 
 // Helloworld Agent is an example that syncs configmap in cluster namespace of hub cluster

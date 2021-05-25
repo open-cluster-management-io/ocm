@@ -9,15 +9,15 @@ import (
 
 	goflag "flag"
 
-	"github.com/open-cluster-management/addon-framework/pkg/version"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+	"open-cluster-management.io/addon-framework/pkg/version"
 
-	"github.com/open-cluster-management/addon-framework/pkg/addonmanager"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 )
 
 func main() {

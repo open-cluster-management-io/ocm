@@ -50,6 +50,19 @@ spec:
                   of customization options to the web console.
                 type: object
                 properties:
+                  addPage:
+                    description: addPage allows customizing actions on the Add page
+                      in developer perspective.
+                    type: object
+                    properties:
+                      disabledActions:
+                        description: disabledActions is a list of actions that are
+                          not shown to users. Each action in the list is represented
+                          by its ID.
+                        type: array
+                        minItems: 1
+                        items:
+                          type: string
                   brand:
                     description: brand is the default branding of the web console
                       which can be overridden by providing the brand field.  There
@@ -161,6 +174,32 @@ spec:
                       URL. Invalid value will prevent a console rollout.
                     type: string
                     pattern: ^$|^((https):\/\/?)[^\s()<>]+(?:\([\w\d]+\)|([^[:punct:]\s]|\/?))\/$
+                  projectAccess:
+                    description: projectAccess allows customizing the available list
+                      of ClusterRoles in the Developer perspective Project access
+                      page which can be used by a project admin to specify roles to
+                      other users and restrict access within the project. If set,
+                      the list will replace the default ClusterRole options.
+                    type: object
+                    properties:
+                      availableClusterRoles:
+                        description: availableClusterRoles is the list of ClusterRole
+                          names that are assignable to users through the project access
+                          tab.
+                        type: array
+                        items:
+                          type: string
+                  quickStarts:
+                    description: quickStarts allows customization of available ConsoleQuickStart
+                      resources in console.
+                    type: object
+                    properties:
+                      disabled:
+                        description: disabled is a list of ConsoleQuickStart resource
+                          names that are not shown to users.
+                        type: array
+                        items:
+                          type: string
               logLevel:
                 description: "logLevel is an intent based logging for an overall component.
                   \ It does not give fine grained control, but it is a simple way
@@ -230,7 +269,7 @@ spec:
                   domain, manual DNS configurations steps are necessary. The default
                   console route will be maintained to reserve the default hostname
                   for console if the custom route is removed. If not specified, default
-                  route will be used.
+                  route will be used. DEPRECATED
                 type: object
                 properties:
                   hostname:

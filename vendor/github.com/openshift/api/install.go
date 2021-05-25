@@ -31,9 +31,11 @@ import (
 	kstoragev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/openshift/api/apiserver"
 	"github.com/openshift/api/apps"
 	"github.com/openshift/api/authorization"
 	"github.com/openshift/api/build"
+	"github.com/openshift/api/cloudnetwork"
 	"github.com/openshift/api/config"
 	"github.com/openshift/api/helm"
 	"github.com/openshift/api/image"
@@ -61,6 +63,7 @@ import (
 
 var (
 	schemeBuilder = runtime.NewSchemeBuilder(
+		apiserver.Install,
 		apps.Install,
 		authorization.Install,
 		build.Install,
@@ -69,6 +72,7 @@ var (
 		image.Install,
 		imageregistry.Install,
 		kubecontrolplane.Install,
+		cloudnetwork.Install,
 		network.Install,
 		networkoperator.Install,
 		oauth.Install,

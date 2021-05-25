@@ -101,7 +101,7 @@ func (BuildConfigSpec) SwaggerDoc() map[string]string {
 var map_BuildConfigStatus = map[string]string{
 	"":                    "BuildConfigStatus contains current state of the build config object.",
 	"lastVersion":         "lastVersion is used to inform about number of last triggered build.",
-	"imageChangeTriggers": "ImageChangeTriggers is used to capture the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec, including reconciled values of the lastTriggeredImageID and paused fields.",
+	"imageChangeTriggers": "ImageChangeTriggers captures the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec, including the value reconciled by the OpenShift APIServer for the lastTriggeredImageID. There is a single entry in this array for each image change trigger in spec. Each trigger status references the ImageStreamTag that acts as the source of the trigger.",
 }
 
 func (BuildConfigStatus) SwaggerDoc() map[string]string {
@@ -470,10 +470,9 @@ func (ImageChangeTrigger) SwaggerDoc() map[string]string {
 
 var map_ImageChangeTriggerStatus = map[string]string{
 	"":                     "ImageChangeTriggerStatus tracks the latest resolved status of the associated ImageChangeTrigger policy specified in the BuildConfigSpec.Triggers struct.",
-	"lastTriggeredImageID": "lastTriggeredImageID is the sha/id of the imageref cited in the 'from' field the last time this BuildConfig was triggered. It is not necessarily the sha/id of the image change that triggered a build. This field is updated for all image change triggers when any of them triggers a build.",
-	"from":                 "from is the ImageStreamTag that is used as the source of the trigger. This can come from an ImageStream tag referenced in this BuildConfig's triggers, or the From image in this BuildConfig's build strategy.",
-	"paused":               "paused is true if this trigger is temporarily disabled, and the setting on the spec has been reconciled. Optional.",
-	"lastTriggerTime":      "lastTriggerTime is the last time the BuildConfig was triggered by a change in the ImageStreamTag associated with this trigger.",
+	"lastTriggeredImageID": "lastTriggeredImageID represents the sha/id of the ImageStreamTag when a Build for this BuildConfig was started. The lastTriggeredImageID is updated each time a Build for this BuildConfig is started, even if this ImageStreamTag is not the reason the Build is started.",
+	"from":                 "from is the ImageStreamTag that is the source of the trigger.",
+	"lastTriggerTime":      "lastTriggerTime is the last time this particular ImageStreamTag triggered a Build to start. This field is only updated when this trigger specifically started a Build.",
 }
 
 func (ImageChangeTriggerStatus) SwaggerDoc() map[string]string {
@@ -510,6 +509,16 @@ var map_ImageSourcePath = map[string]string{
 
 func (ImageSourcePath) SwaggerDoc() map[string]string {
 	return map_ImageSourcePath
+}
+
+var map_ImageStreamTagReference = map[string]string{
+	"":          "ImageStreamTagReference references the ImageStreamTag in an image change trigger by namespace and name.",
+	"namespace": "namespace is the namespace where the ImageStreamTag for an ImageChangeTrigger is located",
+	"name":      "name is the name of the ImageStreamTag for an ImageChangeTrigger",
+}
+
+func (ImageStreamTagReference) SwaggerDoc() map[string]string {
+	return map_ImageStreamTagReference
 }
 
 var map_JenkinsPipelineBuildStrategy = map[string]string{

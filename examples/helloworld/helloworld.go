@@ -5,10 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/open-cluster-management/addon-framework/examples/helloworld/bindata"
-	"github.com/open-cluster-management/addon-framework/pkg/agent"
-	addonapiv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
-	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -18,6 +14,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"open-cluster-management.io/addon-framework/examples/helloworld/bindata"
+	"open-cluster-management.io/addon-framework/pkg/agent"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 var (

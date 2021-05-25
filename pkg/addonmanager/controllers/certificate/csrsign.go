@@ -5,12 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/open-cluster-management/addon-framework/pkg/addonmanager/constants"
-	"github.com/open-cluster-management/addon-framework/pkg/agent"
-	addoninformerv1alpha1 "github.com/open-cluster-management/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "github.com/open-cluster-management/api/client/addon/listers/addon/v1alpha1"
-	clusterinformers "github.com/open-cluster-management/api/client/cluster/informers/externalversions/cluster/v1"
-	clusterlister "github.com/open-cluster-management/api/client/cluster/listers/cluster/v1"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -22,6 +16,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 	certificateslisters "k8s.io/client-go/listers/certificates/v1"
 	"k8s.io/klog/v2"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
+	"open-cluster-management.io/addon-framework/pkg/agent"
+	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
+	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
+	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 )
 
 // csrApprovingController auto approve the renewal CertificateSigningRequests for an accepted spoke cluster on the hub.

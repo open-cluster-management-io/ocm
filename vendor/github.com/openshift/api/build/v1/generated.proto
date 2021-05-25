@@ -145,8 +145,9 @@ message BuildConfigStatus {
   // lastVersion is used to inform about number of last triggered build.
   optional int64 lastVersion = 1;
 
-  // ImageChangeTriggers is used to capture the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec,
-  // including reconciled values of the lastTriggeredImageID and paused fields.
+  // ImageChangeTriggers captures the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec,
+  // including the value reconciled by the OpenShift APIServer for the lastTriggeredImageID. There is a single entry
+  // in this array for each image change trigger in spec. Each trigger status references the ImageStreamTag that acts as the source of the trigger.
   repeated ImageChangeTriggerStatus imageChangeTriggers = 2;
 }
 
@@ -878,20 +879,16 @@ message ImageChangeTrigger {
 // ImageChangeTriggerStatus tracks the latest resolved status of the associated ImageChangeTrigger policy
 // specified in the BuildConfigSpec.Triggers struct.
 message ImageChangeTriggerStatus {
-  // lastTriggeredImageID is the sha/id of the imageref cited in the 'from' field the last time this BuildConfig was triggered.
-  // It is not necessarily the sha/id of the image change that triggered a build.
-  // This field is updated for all image change triggers when any of them triggers a build.
+  // lastTriggeredImageID represents the sha/id of the ImageStreamTag when a Build for this BuildConfig was started.
+  // The lastTriggeredImageID is updated each time a Build for this BuildConfig is started, even if this ImageStreamTag is not the reason the Build is started.
   optional string lastTriggeredImageID = 1;
 
-  // from is the ImageStreamTag that is used as the source of the trigger.
-  // This can come from an ImageStream tag referenced in this BuildConfig's triggers, or the From image in this BuildConfig's build strategy.
-  optional k8s.io.api.core.v1.ObjectReference from = 2;
+  // from is the ImageStreamTag that is the source of the trigger.
+  optional ImageStreamTagReference from = 2;
 
-  // paused is true if this trigger is temporarily disabled, and the setting on the spec has been reconciled. Optional.
-  optional bool paused = 3;
-
-  // lastTriggerTime is the last time the BuildConfig was triggered by a change in the ImageStreamTag associated with this trigger.
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTriggerTime = 4;
+  // lastTriggerTime is the last time this particular ImageStreamTag triggered a Build to start.
+  // This field is only updated when this trigger specifically started a Build.
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTriggerTime = 3;
 }
 
 // ImageLabel represents a label applied to the resulting image.
@@ -945,6 +942,15 @@ message ImageSourcePath {
   // destinationDir is the relative directory within the build directory
   // where files copied from the image are placed.
   optional string destinationDir = 2;
+}
+
+// ImageStreamTagReference references the ImageStreamTag in an image change trigger by namespace and name.
+message ImageStreamTagReference {
+  // namespace is the namespace where the ImageStreamTag for an ImageChangeTrigger is located
+  optional string namespace = 1;
+
+  // name is the name of the ImageStreamTag for an ImageChangeTrigger
+  optional string name = 2;
 }
 
 // JenkinsPipelineBuildStrategy holds parameters specific to a Jenkins Pipeline build.
