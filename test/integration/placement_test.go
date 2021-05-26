@@ -3,7 +3,6 @@ package integration
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -16,7 +15,6 @@ import (
 	clusterapiv1 "github.com/open-cluster-management/api/cluster/v1"
 	clusterapiv1alpha1 "github.com/open-cluster-management/api/cluster/v1alpha1"
 	controllers "github.com/open-cluster-management/placement/pkg/controllers"
-	"github.com/open-cluster-management/placement/pkg/controllers/scheduling"
 	"github.com/open-cluster-management/placement/test/integration/util"
 )
 
@@ -50,7 +48,6 @@ var _ = ginkgo.Describe("Placement", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		// start controller manager
-		scheduling.ResyncInterval = 10 * time.Second
 		var ctx context.Context
 		ctx, cancel = context.WithCancel(context.Background())
 		go controllers.RunControllerManager(ctx, &controllercmd.ControllerContext{
@@ -169,7 +166,7 @@ var _ = ginkgo.Describe("Placement", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 
-	assertCreatingClusters := func(clusterSetName string, num int) {
+	assertCreatingClusters := func(clusterSetName string, num int, labels ...string) {
 		ginkgo.By(fmt.Sprintf("Create %d clusters", num))
 		for i := 0; i < num; i++ {
 			cluster := &clusterapiv1.ManagedCluster{
@@ -179,6 +176,9 @@ var _ = ginkgo.Describe("Placement", func() {
 						clusterSetLabel: clusterSetName,
 					},
 				},
+			}
+			for i := 1; i < len(labels); i += 2 {
+				cluster.Labels[labels[i-1]] = labels[i]
 			}
 			_, err = clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -212,6 +212,71 @@ var _ = ginkgo.Describe("Placement", func() {
 			err = clusterClient.ClusterV1alpha1().Placements(namespace).Delete(context.Background(), placementName, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			assertPlacementDeleted(placementName)
+		})
+
+		ginkgo.It("Should re-create placementdecisions successfully once placementdecisions are deleted", func() {
+			assertBindingClusterSet(clusterSet1Name)
+			assertCreatingClusters(clusterSet1Name, 5)
+			assertCreatingPlacement(placementName, noc(10), 5)
+
+			ginkgo.By("Delete placementdecisions")
+			placementDecisions, err := clusterClient.ClusterV1alpha1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
+				LabelSelector: placementLabel + "=" + placementName,
+			})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			for _, placementDecision := range placementDecisions.Items {
+				err = clusterClient.ClusterV1alpha1().PlacementDecisions(namespace).Delete(context.Background(), placementDecision.Name, metav1.DeleteOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			}
+
+			// check if the placementdecisions are re-created
+			placement, err := clusterClient.ClusterV1alpha1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			assertPlacementDecisionCreated(placement)
+			assertNumberOfDecisions(placementName, 5)
+		})
+
+		ginkgo.It("Should schedule placement successfully once spec.ClusterSets changes", func() {
+			assertBindingClusterSet(clusterSet1Name)
+			assertBindingClusterSet(clusterSet2Name)
+			assertCreatingClusters(clusterSet1Name, 2)
+			assertCreatingClusters(clusterSet2Name, 3)
+			assertCreatingPlacement(placementName, noc(10), 5)
+
+			// update ClusterSets
+			placement, err := clusterClient.ClusterV1alpha1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			placement.Spec.ClusterSets = []string{clusterSet1Name}
+			placement, err = clusterClient.ClusterV1alpha1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			assertNumberOfDecisions(placementName, 2)
+		})
+
+		ginkgo.It("Should schedule placement successfully once spec.Predicates changes", func() {
+			assertBindingClusterSet(clusterSet1Name)
+			assertCreatingClusters(clusterSet1Name, 2)
+			assertCreatingClusters(clusterSet1Name, 3, "cloud", "Amazon")
+			assertCreatingPlacement(placementName, noc(10), 5)
+
+			// add a predicates
+			placement, err := clusterClient.ClusterV1alpha1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			placement.Spec.Predicates = []clusterapiv1alpha1.ClusterPredicate{
+				{
+					RequiredClusterSelector: clusterapiv1alpha1.ClusterSelector{
+						LabelSelector: metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"cloud": "Amazon",
+							},
+						},
+					},
+				},
+			}
+			placement, err = clusterClient.ClusterV1alpha1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			assertNumberOfDecisions(placementName, 3)
 		})
 
 		ginkgo.It("Should schedule successfully once spec.NumberOfClusters is reduced", func() {

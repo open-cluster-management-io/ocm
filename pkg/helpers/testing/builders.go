@@ -36,7 +36,7 @@ func (b *placementBuilder) WithNOC(noc int32) *placementBuilder {
 	return b
 }
 
-func (b *placementBuilder) WithClusterSets(clusterSets []string) *placementBuilder {
+func (b *placementBuilder) WithClusterSets(clusterSets ...string) *placementBuilder {
 	b.placement.Spec.ClusterSets = clusterSets
 	return b
 }

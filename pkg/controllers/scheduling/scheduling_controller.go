@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -20,6 +19,7 @@ import (
 	"k8s.io/klog/v2"
 
 	clusterclient "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
+	clusterinformerv1 "github.com/open-cluster-management/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterinformerv1alpha1 "github.com/open-cluster-management/api/client/cluster/informers/externalversions/cluster/v1alpha1"
 	clusterlisterv1 "github.com/open-cluster-management/api/client/cluster/listers/cluster/v1"
 	clusterlisterv1alpha1 "github.com/open-cluster-management/api/client/cluster/listers/cluster/v1alpha1"
@@ -28,11 +28,12 @@ import (
 )
 
 const (
-	clusterSetLabel = "cluster.open-cluster-management.io/clusterset"
-	placementLabel  = "cluster.open-cluster-management.io/placement"
+	clusterSetLabel          = "cluster.open-cluster-management.io/clusterset"
+	placementLabel           = "cluster.open-cluster-management.io/placement"
+	schedulingControllerName = "SchedulingController"
 )
 
-var ResyncInterval = 2 * time.Minute
+type enqueuePlacementFunc func(namespace, name string)
 
 // schedulingController schedules cluster decisions for Placements
 type schedulingController struct {
@@ -42,31 +43,76 @@ type schedulingController struct {
 	clusterSetBindingLister clusterlisterv1alpha1.ManagedClusterSetBindingLister
 	placementLister         clusterlisterv1alpha1.PlacementLister
 	placementDecisionLister clusterlisterv1alpha1.PlacementDecisionLister
+	enqueuePlacementFunc    enqueuePlacementFunc
 	scheduleFunc            scheduleFunc
 }
 
 // NewDecisionSchedulingController return an instance of schedulingController
 func NewSchedulingController(
 	clusterClient clusterclient.Interface,
-	clusterLister clusterlisterv1.ManagedClusterLister,
-	clusterSetLister clusterlisterv1alpha1.ManagedClusterSetLister,
-	clusterSetBindingLister clusterlisterv1alpha1.ManagedClusterSetBindingLister,
+	clusterInformer clusterinformerv1.ManagedClusterInformer,
+	clusterSetInformer clusterinformerv1alpha1.ManagedClusterSetInformer,
+	clusterSetBindingInformer clusterinformerv1alpha1.ManagedClusterSetBindingInformer,
 	placementInformer clusterinformerv1alpha1.PlacementInformer,
 	placementDecisionInformer clusterinformerv1alpha1.PlacementDecisionInformer,
 	recorder events.Recorder,
 ) factory.Controller {
+	syncCtx := factory.NewSyncContext(schedulingControllerName, recorder)
+	enqueuePlacementFunc := func(namespace, name string) {
+		syncCtx.Queue().Add(fmt.Sprintf("%s/%s", namespace, name))
+	}
+
 	// build controller
 	c := schedulingController{
 		clusterClient:           clusterClient,
-		clusterLister:           clusterLister,
-		clusterSetLister:        clusterSetLister,
-		clusterSetBindingLister: clusterSetBindingLister,
+		clusterLister:           clusterInformer.Lister(),
+		clusterSetLister:        clusterSetInformer.Lister(),
+		clusterSetBindingLister: clusterSetBindingInformer.Lister(),
 		placementLister:         placementInformer.Lister(),
 		placementDecisionLister: placementDecisionInformer.Lister(),
 		scheduleFunc:            schedule,
+		enqueuePlacementFunc:    enqueuePlacementFunc,
 	}
 
+	// setup event handler for cluster informer.
+	// Once a cluster changes, clusterEventHandler enqueues all placements which are
+	// impacted potentially for further reconciliation. It might not function before the
+	// informers/listers of clusterset/clustersetbinding/placement are synced during
+	// controller booting. But that should not cause any problem because all existing
+	// placements will be enqueued by the controller anyway when booting.
+	clusterInformer.Informer().AddEventHandler(&clusterEventHandler{
+		clusterSetLister:        clusterSetInformer.Lister(),
+		clusterSetBindingLister: clusterSetBindingInformer.Lister(),
+		placementLister:         placementInformer.Lister(),
+		enqueuePlacementFunc:    enqueuePlacementFunc,
+	})
+
+	// setup event handler for clusterset informer
+	// Once a clusterset changes, clusterSetEventHandler enqueues all placements which are
+	// impacted potentially for further reconciliation. It might not function before the
+	// informers/listers of clustersetbinding/placement are synced during controller
+	// booting. But that should not cause any problem because all existing placements will
+	// be enqueued by the controller anyway when booting.
+	clusterSetInformer.Informer().AddEventHandler(&clusterSetEventHandler{
+		clusterSetBindingLister: clusterSetBindingInformer.Lister(),
+		placementLister:         placementInformer.Lister(),
+		enqueuePlacementFunc:    enqueuePlacementFunc,
+	})
+
+	// setup event handler for clustersetbinding informer
+	// Once a clustersetbinding changes, clusterSetBindingEventHandler enqueues all placements
+	// which are impacted potentially for further reconciliation. It might not function before
+	// the informers/listers of clusterset/placement are synced during controller booting. But
+	// that should not cause any problem because all existing placements will be enqueued by
+	// the controller anyway when booting.
+	clusterSetBindingInformer.Informer().AddEventHandler(&clusterSetBindingEventHandler{
+		clusterSetLister:     clusterSetInformer.Lister(),
+		placementLister:      placementInformer.Lister(),
+		enqueuePlacementFunc: enqueuePlacementFunc,
+	})
+
 	return factory.New().
+		WithSyncContext(syncCtx).
 		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
 			key, _ := cache.MetaNamespaceKeyFunc(obj)
 			return key
@@ -87,28 +133,13 @@ func NewSchedulingController(
 			}
 			return false
 		}, placementDecisionInformer.Informer()).
-		// TODO: monitor more resources, like clusters, clustersets and clustersetbindings
+		WithBareInformers(clusterInformer.Informer(), clusterSetInformer.Informer(), clusterSetBindingInformer.Informer()).
 		WithSync(c.sync).
-		ResyncEvery(ResyncInterval).
-		ToController("SchedulingController", recorder)
+		ToController(schedulingControllerName, recorder)
 }
 
 func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	queueKey := syncCtx.QueueKey()
-
-	// handle resync
-	if queueKey == factory.DefaultQueueKey {
-		placements, err := c.placementLister.List(labels.Everything())
-		if err != nil {
-			return err
-		}
-		for _, placement := range placements {
-			syncCtx.Queue().Add(fmt.Sprintf("%s/%s", placement.Namespace, placement.Name))
-		}
-		return nil
-	}
-
-	// sync a placement
 	namespace, name, err := cache.SplitMetaNamespaceKey(queueKey)
 	if err != nil {
 		// ignore placement whose key is not in format: namespace/name

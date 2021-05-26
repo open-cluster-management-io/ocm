@@ -192,6 +192,11 @@ var _ = ginkgo.Describe("Placement", func() {
 		assertNumberOfDecisions(placementName, 5)
 		assertPlacementStatus(placementName, 5, false)
 
+		// create 2 more clusters
+		assertCreatingClusters(clusterSet1Name, 2)
+		assertNumberOfDecisions(placementName, 6)
+		assertPlacementStatus(placementName, 6, true)
+
 		ginkgo.By("Delete placement")
 		err = clusterClient.ClusterV1alpha1().Placements(namespace).Delete(context.TODO(), placementName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
