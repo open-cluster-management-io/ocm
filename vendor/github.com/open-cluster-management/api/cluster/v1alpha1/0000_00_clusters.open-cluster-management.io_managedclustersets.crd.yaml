@@ -8,6 +8,9 @@ spec:
     kind: ManagedClusterSet
     listKind: ManagedClusterSetList
     plural: managedclustersets
+    shortNames:
+    - mclset
+    - mclsets
     singular: managedclusterset
   scope: Cluster
   preserveUnknownFields: false

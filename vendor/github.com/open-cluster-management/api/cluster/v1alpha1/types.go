@@ -8,7 +8,7 @@ import (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope="Cluster"
+// +kubebuilder:resource:scope="Cluster",shortName={"mclset","mclsets"}
 
 // ManagedClusterSet defines a group of ManagedClusters that user's workload can run on.
 // A workload can be defined to deployed on a ManagedClusterSet, which mean:
@@ -65,7 +65,7 @@ type ManagedClusterSetList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:resource:scope="Namespaced"
+// +kubebuilder:resource:scope="Namespaced",shortName={"mclsetbinding","mclsetbindings"}
 
 // ManagedClusterSetBinding projects a ManagedClusterSet into a certain namespace.
 // User is able to create a ManagedClusterSetBinding in a namespace and bind it to a

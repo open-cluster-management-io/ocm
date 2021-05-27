@@ -209,6 +209,9 @@ spec:
     kind: ManagedCluster
     listKind: ManagedClusterList
     plural: managedclusters
+    shortNames:
+    - mcl
+    - mcls
     singular: managedcluster
   scope: Cluster
   preserveUnknownFields: false
@@ -467,6 +470,9 @@ spec:
     kind: ManagedClusterSet
     listKind: ManagedClusterSetList
     plural: managedclustersets
+    shortNames:
+    - mclset
+    - mclsets
     singular: managedclusterset
   scope: Cluster
   preserveUnknownFields: false
@@ -1179,6 +1185,9 @@ spec:
     kind: ManagedClusterSetBinding
     listKind: ManagedClusterSetBindingList
     plural: managedclustersetbindings
+    shortNames:
+    - mclsetbinding
+    - mclsetbindings
     singular: managedclustersetbinding
   scope: Namespaced
   preserveUnknownFields: false
