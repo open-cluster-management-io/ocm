@@ -121,7 +121,7 @@ func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
 					Type:    addonv1alpha1.ManagedClusterAddOnConditionAvailable,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ManagedClusterAddOnLeaseUpdated",
-					Message: "Managed cluster addon agent updates its lease constantly.",
+					Message: fmt.Sprintf("%s add-on is available.", addOn.Name),
 				}
 				break
 			}
@@ -131,7 +131,7 @@ func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
 				Type:    addonv1alpha1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionFalse,
 				Reason:  "ManagedClusterAddOnLeaseUpdateStopped",
-				Message: "Managed cluster addon agent stopped updating its lease.",
+				Message: fmt.Sprintf("%s add-on is not available.", addOn.Name),
 			}
 			break
 		}
@@ -139,7 +139,7 @@ func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
 			Type:    addonv1alpha1.ManagedClusterAddOnConditionAvailable,
 			Status:  metav1.ConditionUnknown,
 			Reason:  "ManagedClusterAddOnLeaseNotFound",
-			Message: "Managed cluster addon agent lease is not found.",
+			Message: fmt.Sprintf("The status of %s add-on is unknown.", addOn.Name),
 		}
 	case err != nil:
 		return err
@@ -150,7 +150,7 @@ func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
 				Type:    addonv1alpha1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionTrue,
 				Reason:  "ManagedClusterAddOnLeaseUpdated",
-				Message: "Managed cluster addon agent updates its lease constantly.",
+				Message: fmt.Sprintf("%s add-on is available.", addOn.Name),
 			}
 			break
 		}
@@ -160,7 +160,7 @@ func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
 			Type:    addonv1alpha1.ManagedClusterAddOnConditionAvailable,
 			Status:  metav1.ConditionFalse,
 			Reason:  "ManagedClusterAddOnLeaseUpdateStopped",
-			Message: "Managed cluster addon agent stopped updating its lease.",
+			Message: fmt.Sprintf("%s add-on is not available.", addOn.Name),
 		}
 	}
 
