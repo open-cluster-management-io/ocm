@@ -8,6 +8,9 @@ spec:
     kind: ManagedClusterSetBinding
     listKind: ManagedClusterSetBindingList
     plural: managedclustersetbindings
+    shortNames:
+    - mclsetbinding
+    - mclsetbindings
     singular: managedclustersetbinding
   scope: Namespaced
   preserveUnknownFields: false

@@ -8,6 +8,9 @@ spec:
     kind: ManagedCluster
     listKind: ManagedClusterList
     plural: managedclusters
+    shortNames:
+    - mcl
+    - mcls
     singular: managedcluster
   scope: Cluster
   preserveUnknownFields: false
