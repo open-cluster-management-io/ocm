@@ -563,7 +563,7 @@ func assetToUnstructured(name string) (*unstructured.Unstructured, error) {
 }
 
 func claimCrd() (*unstructured.Unstructured, error) {
-	crd, err := assetToUnstructured("deploy/spoke/clusterclaim.crd.yaml")
+	crd, err := assetToUnstructured("deploy/spoke/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml")
 	if err != nil {
 		return nil, err
 	}

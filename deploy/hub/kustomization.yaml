@@ -25,11 +25,11 @@ namespace: open-cluster-management
 # here. These are deployed via a "make install" dependency.
 
 resources:
-- ./managedcluster.crd.yaml
-- ./manifestwork.crd.yaml
-- ./managedclusteraddons.crd.yaml
-- ./managedclusterset.crd.yaml
-- ./managedclustersetbinding.crd.yaml
+- ./0000_00_work.open-cluster-management.io_manifestworks.crd.yaml
+- ./0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml
+- ./0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml
+- ./0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml
+- ./0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml
 - ./namespace.yaml
 - ./service_account.yaml
 - ./hub_controller_clusterrole_binding.yaml
