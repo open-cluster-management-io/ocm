@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -19,6 +20,7 @@ import (
 
 	operatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned"
 	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
+	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/controllers/bootstrapcontroller"
 )
 
 func TestIntegration(t *testing.T) {
@@ -46,6 +48,9 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	logf.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
 
 	ginkgo.By("bootstrapping test environment")
+
+	// crank up the sync speed
+	bootstrapcontroller.BootstrapControllerSyncInterval = 2 * time.Second
 
 	var err error
 
