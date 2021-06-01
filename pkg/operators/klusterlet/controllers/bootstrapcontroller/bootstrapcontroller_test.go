@@ -2,6 +2,12 @@ package bootstrapcontroller
 
 import (
 	"context"
+	cryptorand "crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
 	"testing"
 	"time"
 
@@ -19,6 +25,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
+	certutil "k8s.io/client-go/util/cert"
 )
 
 func TestSync(t *testing.T) {
@@ -38,6 +45,21 @@ func TestSync(t *testing.T) {
 			},
 		},
 		{
+			name:     "checking the hub kubeconfig secret",
+			queueKey: "test/test",
+			objects: []runtime.Object{
+				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.47:6443")),
+				newHubKubeConfigSecret("test", time.Now().Add(-60*time.Second).UTC()),
+				newDeployment("test-registration-agent", "test"),
+				newDeployment("test-work-agent", "test"),
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testinghelper.AssertDelete(t, actions[0], "secrets", "test", "hub-kubeconfig-secret")
+				testinghelper.AssertDelete(t, actions[1], "deployments", "test", "test-registration-agent")
+				testinghelper.AssertDelete(t, actions[2], "deployments", "test", "test-work-agent")
+			},
+		},
+		{
 			name:     "the bootstrap is not started",
 			queueKey: "test/test",
 			objects:  []runtime.Object{newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.47:6443"))},
@@ -52,7 +74,7 @@ func TestSync(t *testing.T) {
 			queueKey: "test/test",
 			objects: []runtime.Object{
 				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.47:6443")),
-				newSecret("hub-kubeconfig-secret", "test", newKubeConfig("https://10.0.118.47:6443")),
+				newHubKubeConfigSecret("test", time.Now().Add(60*time.Second).UTC()),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 0 {
@@ -64,8 +86,8 @@ func TestSync(t *testing.T) {
 			name:     "the bootstrap secret is changed",
 			queueKey: "test/test",
 			objects: []runtime.Object{
-				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.47:6443")),
-				newSecret("hub-kubeconfig-secret", "test", newKubeConfig("https://10.0.118.48:6443")),
+				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.48:6443")),
+				newHubKubeConfigSecret("test", time.Now().Add(60*time.Second).UTC()),
 				newDeployment("test-registration-agent", "test"),
 				newDeployment("test-work-agent", "test"),
 			},
@@ -187,6 +209,62 @@ func newKubeConfig(host string) []byte {
 		CurrentContext: "default-context",
 	})
 	return configData
+}
+
+func newHubKubeConfigSecret(namespace string, notAfter time.Time) *corev1.Secret {
+	caKey, err := rsa.GenerateKey(cryptorand.Reader, 2048)
+	if err != nil {
+		panic(err)
+	}
+
+	caCert, err := certutil.NewSelfSignedCACert(certutil.Config{CommonName: "open-cluster-management.io"}, caKey)
+	if err != nil {
+		panic(err)
+	}
+
+	key, err := rsa.GenerateKey(cryptorand.Reader, 2048)
+	if err != nil {
+		panic(err)
+	}
+
+	certDERBytes, err := x509.CreateCertificate(
+		cryptorand.Reader,
+		&x509.Certificate{
+			Subject: pkix.Name{
+				CommonName: "test",
+			},
+			SerialNumber: big.NewInt(1),
+			NotBefore:    caCert.NotBefore,
+			NotAfter:     notAfter,
+			KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+			ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		},
+		caCert,
+		key.Public(),
+		caKey,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	cert, err := x509.ParseCertificate(certDERBytes)
+	if err != nil {
+		panic(err)
+	}
+
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "hub-kubeconfig-secret",
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			"kubeconfig": newKubeConfig("https://10.0.118.47:6443"),
+			"tls.crt": pem.EncodeToMemory(&pem.Block{
+				Type:  certutil.CertificateBlockType,
+				Bytes: cert.Raw,
+			}),
+		},
+	}
 }
 
 func newDeployment(name, namespace string) *appsv1.Deployment {
