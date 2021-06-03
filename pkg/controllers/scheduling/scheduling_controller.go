@@ -33,6 +33,13 @@ const (
 	schedulingControllerName = "SchedulingController"
 )
 
+var noBindingCondition = metav1.Condition{
+	Type:    clusterapiv1alpha1.PlacementConditionSatisfied,
+	Status:  metav1.ConditionFalse,
+	Reason:  "NoManagedClusterSetBindings",
+	Message: "No ManagedClusterSetBindings found in placement namespace",
+}
+
 type enqueuePlacementFunc func(namespace, name string)
 
 // schedulingController schedules cluster decisions for Placements
@@ -163,7 +170,12 @@ func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncCon
 	}
 
 	// get available clusters for this placement
-	clusters, err := c.getAvailableClusters(placement)
+	bindings, err := c.getManagedClusterSetBindings(placement)
+	if err != nil {
+		return err
+	}
+
+	clusters, err := c.getAvailableClusters(placement, bindings)
 	if err != nil {
 		return err
 	}
@@ -174,22 +186,27 @@ func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncCon
 		return err
 	}
 
-	// update placement status if necessary
-	return c.updateStatus(ctx, placement, scheduleResult.scheduled, scheduleResult.unscheduled)
+	// update placement status if necessary to signal no bindings
+	return c.updateStatus(ctx, placement, len(bindings) > 0, scheduleResult.scheduled, scheduleResult.unscheduled)
 }
 
-// getAvailableClusters returns available clusters for the given placement. The clusters must
-// 1) Be from clustersets bound to the placement namespace;
-// 2) Belong to one of particular clustersets if .spec.clusterSets is specified;
-func (c *schedulingController) getAvailableClusters(placement *clusterapiv1alpha1.Placement) ([]*clusterapiv1.ManagedCluster, error) {
+// getManagedClusterSetBindings returns all bindings found in the placement namespace.
+func (c *schedulingController) getManagedClusterSetBindings(placement *clusterapiv1alpha1.Placement) ([]*clusterapiv1alpha1.ManagedClusterSetBinding, error) {
 	// get all clusterset bindings under the placement namespace
 	bindings, err := c.clusterSetBindingLister.ManagedClusterSetBindings(placement.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 	if len(bindings) == 0 {
-		return nil, nil
+		bindings = nil
 	}
+	return bindings, nil
+}
+
+// getAvailableClusters returns available clusters for the given placement. The clusters must
+// 1) Be from clustersets bound to the placement namespace;
+// 2) Belong to one of particular clustersets if .spec.clusterSets is specified;
+func (c *schedulingController) getAvailableClusters(placement *clusterapiv1alpha1.Placement, bindings []*clusterapiv1alpha1.ManagedClusterSetBinding) ([]*clusterapiv1.ManagedCluster, error) {
 
 	// filter out invaid clustersetbindings
 	clusterSetNames := sets.NewString()
@@ -226,10 +243,15 @@ func (c *schedulingController) getAvailableClusters(placement *clusterapiv1alpha
 }
 
 // updateStatus updates the status of the placement according to schedule result.
-func (c *schedulingController) updateStatus(ctx context.Context, placement *clusterapiv1alpha1.Placement, numOfScheduledDecisions, numOfUnscheduledDecisions int) error {
+func (c *schedulingController) updateStatus(ctx context.Context, placement *clusterapiv1alpha1.Placement, bindings bool, numOfScheduledDecisions, numOfUnscheduledDecisions int) error {
 	newPlacement := placement.DeepCopy()
 	newPlacement.Status.NumberOfSelectedClusters = int32(numOfScheduledDecisions)
 	satisfiedCondition := newSatisfiedCondition(numOfUnscheduledDecisions)
+
+	if !bindings {
+		satisfiedCondition = noBindingCondition
+	}
+
 	meta.SetStatusCondition(&newPlacement.Status.Conditions, satisfiedCondition)
 	if reflect.DeepEqual(newPlacement.Status, placement.Status) {
 		return nil
