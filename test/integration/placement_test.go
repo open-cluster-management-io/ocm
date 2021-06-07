@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	clusterSetLabel = "cluster.open-cluster-management.io/clusterset"
-	placementLabel  = "cluster.open-cluster-management.io/placement"
+	clusterSetLabel          = "cluster.open-cluster-management.io/clusterset"
+	placementLabel           = "cluster.open-cluster-management.io/placement"
+	maxNumOfClusterDecisions = 100
 )
 
 var _ = ginkgo.Describe("Placement", func() {
@@ -98,6 +99,10 @@ var _ = ginkgo.Describe("Placement", func() {
 
 	assertNumberOfDecisions := func(placementName string, desiredNOD int) {
 		ginkgo.By("Check the number of decisions in placementdecisions")
+		desiredNOPD := desiredNOD / maxNumOfClusterDecisions
+		if desiredNOD%maxNumOfClusterDecisions != 0 {
+			desiredNOPD++
+		}
 		gomega.Eventually(func() bool {
 			pdl, err := clusterClient.ClusterV1alpha1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
 				LabelSelector: placementLabel + "=" + placementName,
@@ -105,7 +110,7 @@ var _ = ginkgo.Describe("Placement", func() {
 			if err != nil {
 				return false
 			}
-			if len(pdl.Items) == 0 {
+			if len(pdl.Items) != desiredNOPD {
 				return false
 			}
 			actualNOD := 0
@@ -340,6 +345,16 @@ var _ = ginkgo.Describe("Placement", func() {
 			nod := 8
 			assertNumberOfDecisions(placementName, nod)
 			assertPlacementStatus(placementName, nod, false)
+		})
+
+		ginkgo.It("Should create multiple placementdecisions once scheduled", func() {
+			assertBindingClusterSet(clusterSet1Name)
+			assertCreatingClusters(clusterSet1Name, 101)
+			assertCreatingPlacement(placementName, nil, 101)
+
+			nod := 101
+			assertNumberOfDecisions(placementName, nod)
+			assertPlacementStatus(placementName, nod, true)
 		})
 	})
 })
