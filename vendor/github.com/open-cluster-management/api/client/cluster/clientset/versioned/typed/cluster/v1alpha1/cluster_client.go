@@ -13,6 +13,8 @@ type ClusterV1alpha1Interface interface {
 	ClusterClaimsGetter
 	ManagedClusterSetsGetter
 	ManagedClusterSetBindingsGetter
+	PlacementsGetter
+	PlacementDecisionsGetter
 }
 
 // ClusterV1alpha1Client is used to interact with features provided by the cluster.open-cluster-management.io group.
@@ -30,6 +32,14 @@ func (c *ClusterV1alpha1Client) ManagedClusterSets() ManagedClusterSetInterface 
 
 func (c *ClusterV1alpha1Client) ManagedClusterSetBindings(namespace string) ManagedClusterSetBindingInterface {
 	return newManagedClusterSetBindings(c, namespace)
+}
+
+func (c *ClusterV1alpha1Client) Placements(namespace string) PlacementInterface {
+	return newPlacements(c, namespace)
+}
+
+func (c *ClusterV1alpha1Client) PlacementDecisions(namespace string) PlacementDecisionInterface {
+	return newPlacementDecisions(c, namespace)
 }
 
 // NewForConfig creates a new ClusterV1alpha1Client for the given config.

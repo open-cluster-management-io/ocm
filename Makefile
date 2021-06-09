@@ -37,6 +37,16 @@ clean:
 	$(RM) ./registration
 .PHONY: clean
 
+update-crds:
+	bash -x hack/copy-crds.sh
+
+update: update-crds
+
+verify-crds:
+	bash -x hack/verify-crds.sh
+
+verify: verify-crds
+
 deploy-hub: ensure-kustomize
 	cp deploy/hub/kustomization.yaml deploy/hub/kustomization.yaml.tmp
 	cd deploy/hub && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/registration:latest=$(IMAGE_NAME)

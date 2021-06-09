@@ -1,26 +1,26 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: managedclustersetbindings.cluster.open-cluster-management.io
+  name: clusterclaims.cluster.open-cluster-management.io
 spec:
   group: cluster.open-cluster-management.io
   names:
-    kind: ManagedClusterSetBinding
-    listKind: ManagedClusterSetBindingList
-    plural: managedclustersetbindings
-    singular: managedclustersetbinding
-  scope: Namespaced
+    kind: ClusterClaim
+    listKind: ClusterClaimList
+    plural: clusterclaims
+    singular: clusterclaim
+  scope: Cluster
   preserveUnknownFields: false
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ManagedClusterSetBinding projects a ManagedClusterSet into a
-          certain namespace. User is able to create a ManagedClusterSetBinding in
-          a namespace and bind it to a ManagedClusterSet if they have an RBAC rule
-          to CREATE on the virtual subresource of managedclustersets/bind. Workloads
-          created in the same namespace can only be distributed to ManagedClusters
-          in ManagedClusterSets bound in this namespace by higher level controllers.
+        description: ClusterClaim represents cluster information that a managed cluster
+          claims ClusterClaims with well known names include,   1. id.k8s.io, it contains
+          a unique identifier for the cluster.   2. clusterset.k8s.io, it contains
+          an identifier that relates the cluster      to the ClusterSet in which it
+          belongs. ClusterClaims created on a managed cluster will be collected and
+          saved into the status of the corresponding ManagedCluster on hub.
         type: object
         properties:
           apiVersion:
@@ -36,16 +36,13 @@ spec:
           metadata:
             type: object
           spec:
-            description: Spec defines the attributes of ManagedClusterSetBinding.
+            description: Spec defines the attributes of the ClusterClaim.
             type: object
             properties:
-              clusterSet:
-                description: ClusterSet is the name of the ManagedClusterSet to bind.
-                  It must match the instance name of the ManagedClusterSetBinding
-                  and cannot change once created. User is allowed to set this field
-                  if they have an RBAC rule to CREATE on the virtual subresource of
-                  managedclustersets/bind.
+              value:
+                description: Value is a claim-dependent string
                 type: string
+                maxLength: 1024
                 minLength: 1
     served: true
     storage: true

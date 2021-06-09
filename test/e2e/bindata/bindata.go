@@ -1,6 +1,6 @@
 // Code generated for package bindata by go-bindata DO NOT EDIT. (@generated)
 // sources:
-// deploy/spoke/clusterclaim.crd.yaml
+// deploy/spoke/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml
 // deploy/spoke/clusterrole.yaml
 // deploy/spoke/clusterrole_binding.yaml
 // deploy/spoke/deployment.yaml
@@ -62,7 +62,7 @@ func (fi bindataFileInfo) Sys() interface{} {
 	return nil
 }
 
-var _deploySpokeClusterclaimCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1
+var _deploySpoke0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clusterclaims.cluster.open-cluster-management.io
@@ -83,7 +83,8 @@ spec:
           claims ClusterClaims with well known names include,   1. id.k8s.io, it contains
           a unique identifier for the cluster.   2. clusterset.k8s.io, it contains
           an identifier that relates the cluster      to the ClusterSet in which it
-          belongs.
+          belongs. ClusterClaims created on a managed cluster will be collected and
+          saved into the status of the corresponding ManagedCluster on hub.
         type: object
         properties:
           apiVersion:
@@ -117,17 +118,17 @@ status:
   storedVersions: []
 `)
 
-func deploySpokeClusterclaimCrdYamlBytes() ([]byte, error) {
-	return _deploySpokeClusterclaimCrdYaml, nil
+func deploySpoke0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYamlBytes() ([]byte, error) {
+	return _deploySpoke0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYaml, nil
 }
 
-func deploySpokeClusterclaimCrdYaml() (*asset, error) {
-	bytes, err := deploySpokeClusterclaimCrdYamlBytes()
+func deploySpoke0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYaml() (*asset, error) {
+	bytes, err := deploySpoke0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "deploy/spoke/clusterclaim.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "deploy/spoke/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -290,7 +291,7 @@ namespace: open-cluster-management
 # here. These are deployed via a "make install" dependency.
 
 resources:
-- ./clusterclaim.crd.yaml
+- ./0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml
 - ./namespace.yaml
 - ./service_account.yaml
 - ./clusterrole.yaml
@@ -475,7 +476,7 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"deploy/spoke/clusterclaim.crd.yaml":    deploySpokeClusterclaimCrdYaml,
+	"deploy/spoke/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml": deploySpoke0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYaml,
 	"deploy/spoke/clusterrole.yaml":         deploySpokeClusterroleYaml,
 	"deploy/spoke/clusterrole_binding.yaml": deploySpokeClusterrole_bindingYaml,
 	"deploy/spoke/deployment.yaml":          deploySpokeDeploymentYaml,
@@ -529,7 +530,7 @@ type bintree struct {
 var _bintree = &bintree{nil, map[string]*bintree{
 	"deploy": {nil, map[string]*bintree{
 		"spoke": {nil, map[string]*bintree{
-			"clusterclaim.crd.yaml":    {deploySpokeClusterclaimCrdYaml, map[string]*bintree{}},
+			"0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml": {deploySpoke0000_02_clustersOpenClusterManagementIo_clusterclaimsCrdYaml, map[string]*bintree{}},
 			"clusterrole.yaml":         {deploySpokeClusterroleYaml, map[string]*bintree{}},
 			"clusterrole_binding.yaml": {deploySpokeClusterrole_bindingYaml, map[string]*bintree{}},
 			"deployment.yaml":          {deploySpokeDeploymentYaml, map[string]*bintree{}},
