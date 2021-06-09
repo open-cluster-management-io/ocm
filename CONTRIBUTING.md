@@ -47,7 +47,22 @@ After your PR is ready to commit, please run following commands to check your co
 
 ```shell
 make verify
-make test
+```
+
+Run unit testing
+```shell
+make test-unit
+```
+
+Run integration testing
+```shell
+make test-integration
+```
+
+Run e2e testing. During e2e testing, hub and managed cluster share the same Kubernetes cluster.
+```shell
+export KUBECONFIG=</path/to/kubeconfig>
+make test-integration
 ```
 
 ## Build images
@@ -55,8 +70,7 @@ make test
 Make sure your code build passed.
 
 ```shell
-export BUILD_LOCALLY=1
-make
+make images
 ```
 
 Now, you can follow the [getting started guide](./README.md#getting-started) to work with this repository.

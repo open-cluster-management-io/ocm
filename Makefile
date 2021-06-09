@@ -54,6 +54,9 @@ deploy-example: ensure-kustomize
 	$(KUSTOMIZE) build examples/deploy/addon | $(KUBECTL) apply -f -
 	mv examples/deploy/addon/kustomization.yaml.tmp examples/deploy/addon/kustomization.yaml
 
+undeploy-example: ensure-kustomize
+	$(KUSTOMIZE) build examples/deploy/addon | $(KUBECTL) delete --ignore-not-found -f -
+
 build-e2e:
 	go test -c ./test/e2e
 
