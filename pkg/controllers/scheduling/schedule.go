@@ -6,14 +6,21 @@ import (
 	"reflect"
 	"sort"
 
+	errorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	clusterclient "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
 	clusterlisterv1alpha1 "github.com/open-cluster-management/api/client/cluster/listers/cluster/v1alpha1"
 	clusterapiv1 "github.com/open-cluster-management/api/cluster/v1"
 	clusterapiv1alpha1 "github.com/open-cluster-management/api/cluster/v1alpha1"
+)
+
+const (
+	maxNumOfClusterDecisions = 100
 )
 
 type scheduleFunc func(
@@ -86,7 +93,7 @@ func selectClusters(placement *clusterapiv1alpha1.Placement, clusters []*cluster
 }
 
 // bind updates the cluster decisions in the status of the placementdecisions with the given
-// cluster decision slice. New placementdecision will be created if no one exists.
+// cluster decision slice. New placementdecisions will be created if no one exists.
 func bind(
 	ctx context.Context,
 	placement *clusterapiv1alpha1.Placement,
@@ -94,7 +101,44 @@ func bind(
 	clusterClient clusterclient.Interface,
 	placementDecisionLister clusterlisterv1alpha1.PlacementDecisionLister,
 ) error {
-	// query placementdecisions with label selector
+	// sort clusterdecisions by cluster name
+	sort.SliceStable(clusterDecisions, func(i, j int) bool {
+		return clusterDecisions[i].ClusterName < clusterDecisions[j].ClusterName
+	})
+
+	// split the cluster decisions into slices, the size of each slice cannot exceed
+	// maxNumOfClusterDecisions.
+	decisionSlices := [][]clusterapiv1alpha1.ClusterDecision{}
+	remainingDecisions := clusterDecisions
+	for index := 0; len(remainingDecisions) > 0; index++ {
+		var decisionSlice []clusterapiv1alpha1.ClusterDecision
+		switch {
+		case len(remainingDecisions) > maxNumOfClusterDecisions:
+			decisionSlice = remainingDecisions[0:maxNumOfClusterDecisions]
+			remainingDecisions = remainingDecisions[maxNumOfClusterDecisions:]
+		default:
+			decisionSlice = remainingDecisions
+			remainingDecisions = nil
+		}
+		decisionSlices = append(decisionSlices, decisionSlice)
+	}
+
+	// bind cluster decision slices to placementdecisions.
+	errs := []error{}
+	placementDecisionNames := sets.NewString()
+	for index, decisionSlice := range decisionSlices {
+		placementDecisionName := fmt.Sprintf("%s-decision-%d", placement.Name, index+1)
+		placementDecisionNames.Insert(placementDecisionName)
+		err := createOrUpdatePlacementDecision(ctx, placement, placementDecisionName, decisionSlice, clusterClient, placementDecisionLister)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) != 0 {
+		return errorhelpers.NewMultiLineAggregate(errs)
+	}
+
+	// query all placementdecisions of the placement
 	requirement, err := labels.NewRequirement(placementLabel, selection.Equals, []string{placement.Name})
 	if err != nil {
 		return err
@@ -105,45 +149,69 @@ func bind(
 		return err
 	}
 
-	// TODO: support multiple placementdecisions for a placement
-	var placementDecision *clusterapiv1alpha1.PlacementDecision
+	// delete redundant placementdecisions
+	errs = []error{}
+	for _, placementDecision := range placementDecisions {
+		if placementDecisionNames.Has(placementDecision.Name) {
+			continue
+		}
+		err := clusterClient.ClusterV1alpha1().PlacementDecisions(placementDecision.Namespace).Delete(ctx, placementDecision.Name, metav1.DeleteOptions{})
+		if errors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errorhelpers.NewMultiLineAggregate(errs)
+}
+
+// createOrUpdatePlacementDecision creates a new PlacementDecision if it does not exist and
+// then updates the status with the given ClusterDecision slice if necessary
+func createOrUpdatePlacementDecision(
+	ctx context.Context,
+	placement *clusterapiv1alpha1.Placement,
+	placementDecisionName string,
+	clusterDecisions []clusterapiv1alpha1.ClusterDecision,
+	clusterClient clusterclient.Interface,
+	placementDecisionLister clusterlisterv1alpha1.PlacementDecisionLister,
+) error {
+	if len(clusterDecisions) > maxNumOfClusterDecisions {
+		return fmt.Errorf("the number of clusterdecisions %q exceeds the max limitation %q", len(clusterDecisions), maxNumOfClusterDecisions)
+	}
+
+	placementDecision, err := placementDecisionLister.PlacementDecisions(placement.Namespace).Get(placementDecisionName)
 	switch {
-	case len(placementDecisions) > 0:
-		placementDecision = placementDecisions[0]
-	default:
-		// create a placementdecision if not exists
+	case errors.IsNotFound(err):
+		// create the placementdecision if not exists
 		owner := metav1.NewControllerRef(placement, clusterapiv1alpha1.GroupVersion.WithKind("Placement"))
 		placementDecision = &clusterapiv1alpha1.PlacementDecision{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: fmt.Sprintf("%s-", placement.Name),
-				Namespace:    placement.Namespace,
+				Name:      placementDecisionName,
+				Namespace: placement.Namespace,
 				Labels: map[string]string{
 					placementLabel: placement.Name,
 				},
 				OwnerReferences: []metav1.OwnerReference{*owner},
 			},
 		}
+		var err error
 		placementDecision, err = clusterClient.ClusterV1alpha1().PlacementDecisions(placement.Namespace).Create(ctx, placementDecision, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
+	case err != nil:
+		return err
 	}
 
-	// sort by cluster name
-	sort.SliceStable(clusterDecisions, func(i, j int) bool {
-		return clusterDecisions[i].ClusterName < clusterDecisions[j].ClusterName
-	})
-
-	// update the status of the placementdecision if necessary
+	// update the status of the placementdecision if decisions change
 	if reflect.DeepEqual(placementDecision.Status.Decisions, clusterDecisions) {
 		return nil
 	}
+
 	newPlacementDecision := placementDecision.DeepCopy()
 	newPlacementDecision.Status.Decisions = clusterDecisions
 	_, err = clusterClient.ClusterV1alpha1().PlacementDecisions(newPlacementDecision.Namespace).
 		UpdateStatus(ctx, newPlacementDecision, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
