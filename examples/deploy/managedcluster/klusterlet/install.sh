@@ -5,19 +5,10 @@ set -o pipefail
 
 KUBECTL=${KUBECTL:-kubectl}
 
-KLUSTERLET_KUBECONFIG_CONTEXT=$($KUBECTL config current-context)
-KIND_CLUSTER=kind
-
-# On openshift, OLM is installed into openshift-operator-lifecycle-manager
-$KUBECTL get namespace openshift-operator-lifecycle-manager 1>/dev/null 2>&1
-if [ $? -eq 0 ]; then
-  export OLM_NAMESPACE=openshift-operator-lifecycle-manager
-fi
-
 rm -rf registration-operator
 
 echo "############  Cloning registration-operator"
-git clone https://github.com/open-cluster-management/registration-operator.git
+git clone https://github.com/open-cluster-management-io/registration-operator.git
 
 cd registration-operator || {
   printf "cd failed, registration-operator does not exist"
