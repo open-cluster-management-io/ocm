@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/open-cluster-management/addon-framework/pkg/addonmanager/addontesting"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 )
 
 const (

@@ -16,13 +16,13 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
 
-	addonclient "github.com/open-cluster-management/api/client/addon/clientset/versioned"
-	clusterclient "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
-	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
+	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 func TestE2E(t *testing.T) {

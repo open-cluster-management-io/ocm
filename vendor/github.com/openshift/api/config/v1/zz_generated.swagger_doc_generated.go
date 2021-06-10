@@ -725,10 +725,21 @@ var map_AWSPlatformStatus = map[string]string{
 	"":                 "AWSPlatformStatus holds the current status of the Amazon Web Services infrastructure provider.",
 	"region":           "region holds the default AWS region for new AWS resources created by the cluster.",
 	"serviceEndpoints": "ServiceEndpoints list contains custom endpoints which will override default service endpoint of AWS Services. There must be only one ServiceEndpoint for a service.",
+	"resourceTags":     "resourceTags is a list of additional tags to apply to AWS resources created for the cluster. See https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html for information on tagging AWS resources. AWS supports a maximum of 50 tags per resource. OpenShift reserves 25 tags for its use, leaving 25 tags available for the user.",
 }
 
 func (AWSPlatformStatus) SwaggerDoc() map[string]string {
 	return map_AWSPlatformStatus
+}
+
+var map_AWSResourceTag = map[string]string{
+	"":      "AWSResourceTag is a tag to apply to AWS resources created for the cluster.",
+	"key":   "key is the key of the tag",
+	"value": "value is the value of the tag. Some AWS service do not support empty values. Since tags are added to resources in many services, the length of the tag value must meet the requirements of all services.",
+}
+
+func (AWSResourceTag) SwaggerDoc() map[string]string {
+	return map_AWSResourceTag
 }
 
 var map_AWSServiceEndpoint = map[string]string{
@@ -1087,6 +1098,15 @@ func (Network) SwaggerDoc() map[string]string {
 	return map_Network
 }
 
+var map_NetworkMigration = map[string]string{
+	"":            "NetworkMigration represents the cluster network configuration.",
+	"networkType": "NetworkType is the target plugin that is to be deployed. Currently supported values are: OpenShiftSDN, OVNKubernetes",
+}
+
+func (NetworkMigration) SwaggerDoc() map[string]string {
+	return map_NetworkMigration
+}
+
 var map_NetworkSpec = map[string]string{
 	"":                     "NetworkSpec is the desired network configuration. As a general rule, this SHOULD NOT be read directly. Instead, you should consume the NetworkStatus, as it indicates the currently deployed configuration. Currently, most spec fields are immutable after installation. Please view the individual ones for further details on each.",
 	"clusterNetwork":       "IP address pool to use for pod IPs. This field is immutable after installation.",
@@ -1106,6 +1126,7 @@ var map_NetworkStatus = map[string]string{
 	"serviceNetwork":    "IP address pool for services. Currently, we only support a single entry here.",
 	"networkType":       "NetworkType is the plugin that is deployed (e.g. OpenShiftSDN).",
 	"clusterNetworkMTU": "ClusterNetworkMTU is the MTU for inter-pod networking.",
+	"migration":         "Migration contains the cluster network migration configuration.",
 }
 
 func (NetworkStatus) SwaggerDoc() map[string]string {

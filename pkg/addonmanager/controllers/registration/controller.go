@@ -4,12 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/open-cluster-management/addon-framework/pkg/agent"
-	addonv1alpha1client "github.com/open-cluster-management/api/client/addon/clientset/versioned"
-	addoninformerv1alpha1 "github.com/open-cluster-management/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "github.com/open-cluster-management/api/client/addon/listers/addon/v1alpha1"
-	clusterinformers "github.com/open-cluster-management/api/client/cluster/informers/externalversions/cluster/v1"
-	clusterlister "github.com/open-cluster-management/api/client/cluster/listers/cluster/v1"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -19,6 +13,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"open-cluster-management.io/addon-framework/pkg/agent"
+	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
+	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
+	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 )
 
 // managedClusterController reconciles instances of ManagedCluster on the hub.

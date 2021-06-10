@@ -8,18 +8,18 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
-	"github.com/open-cluster-management/addon-framework/pkg/agent"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"open-cluster-management.io/addon-framework/pkg/agent"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
-	"github.com/open-cluster-management/addon-framework/pkg/addonmanager"
-	addonapiv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
-	addonv1alpha1client "github.com/open-cluster-management/api/client/addon/clientset/versioned"
-	clusterv1client "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
-	workclientset "github.com/open-cluster-management/api/client/work/clientset/versioned"
-	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
 	certificatesv1 "k8s.io/api/certificates/v1"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 const (
@@ -46,9 +46,9 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	testEnv = &envtest.Environment{
 		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths: []string{
-			filepath.Join(".", "vendor", "github.com", "open-cluster-management", "api", "work", "v1", "0000_00_work.open-cluster-management.io_manifestworks.crd.yaml"),
-			filepath.Join(".", "vendor", "github.com", "open-cluster-management", "api", "cluster", "v1"),
-			filepath.Join(".", "vendor", "github.com", "open-cluster-management", "api", "addon", "v1alpha1"),
+			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "work", "v1", "0000_00_work.open-cluster-management.io_manifestworks.crd.yaml"),
+			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "cluster", "v1"),
+			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "addon", "v1alpha1"),
 		},
 	}
 

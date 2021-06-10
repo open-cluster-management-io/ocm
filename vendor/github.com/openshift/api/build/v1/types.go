@@ -976,8 +976,9 @@ type BuildConfigStatus struct {
 	// lastVersion is used to inform about number of last triggered build.
 	LastVersion int64 `json:"lastVersion" protobuf:"varint,1,opt,name=lastVersion"`
 
-	// ImageChangeTriggers is used to capture the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec,
-	// including reconciled values of the lastTriggeredImageID and paused fields.
+	// ImageChangeTriggers captures the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec,
+	// including the value reconciled by the OpenShift APIServer for the lastTriggeredImageID. There is a single entry
+	// in this array for each image change trigger in spec. Each trigger status references the ImageStreamTag that acts as the source of the trigger.
 	ImageChangeTriggers []ImageChangeTriggerStatus `json:"imageChangeTriggers,omitempty" protobuf:"bytes,2,rep,name=imageChangeTriggers"`
 }
 
@@ -1022,23 +1023,28 @@ type ImageChangeTrigger struct {
 	Paused bool `json:"paused,omitempty" protobuf:"varint,3,opt,name=paused"`
 }
 
+// ImageStreamTagReference references the ImageStreamTag in an image change trigger by namespace and name.
+type ImageStreamTagReference struct {
+	// namespace is the namespace where the ImageStreamTag for an ImageChangeTrigger is located
+	Namespace string `json:"namespace,omitempty" protobuf:"bytes,1,opt,name=namespace"`
+
+	// name is the name of the ImageStreamTag for an ImageChangeTrigger
+	Name string `json:"name,omitempty" protobuf:"bytes,2,opt,name=name"`
+}
+
 // ImageChangeTriggerStatus tracks the latest resolved status of the associated ImageChangeTrigger policy
 // specified in the BuildConfigSpec.Triggers struct.
 type ImageChangeTriggerStatus struct {
-	// lastTriggeredImageID is the sha/id of the imageref cited in the 'from' field the last time this BuildConfig was triggered.
-	// It is not necessarily the sha/id of the image change that triggered a build.
-	// This field is updated for all image change triggers when any of them triggers a build.
+	// lastTriggeredImageID represents the sha/id of the ImageStreamTag when a Build for this BuildConfig was started.
+	// The lastTriggeredImageID is updated each time a Build for this BuildConfig is started, even if this ImageStreamTag is not the reason the Build is started.
 	LastTriggeredImageID string `json:"lastTriggeredImageID,omitempty" protobuf:"bytes,1,opt,name=lastTriggeredImageID"`
 
-	// from is the ImageStreamTag that is used as the source of the trigger.
-	// This can come from an ImageStream tag referenced in this BuildConfig's triggers, or the From image in this BuildConfig's build strategy.
-	From *corev1.ObjectReference `json:"from,omitempty" protobuf:"bytes,2,opt,name=from"`
+	// from is the ImageStreamTag that is the source of the trigger.
+	From ImageStreamTagReference `json:"from,omitempty" protobuf:"bytes,2,opt,name=from"`
 
-	// paused is true if this trigger is temporarily disabled, and the setting on the spec has been reconciled. Optional.
-	Paused bool `json:"paused,omitempty" protobuf:"varint,3,opt,name=paused"`
-
-	// lastTriggerTime is the last time the BuildConfig was triggered by a change in the ImageStreamTag associated with this trigger.
-	LastTriggerTime metav1.Time `json:"lastTriggerTime,omitempty" protobuf:"bytes,4,opt,name=lastTriggerTime"`
+	// lastTriggerTime is the last time this particular ImageStreamTag triggered a Build to start.
+	// This field is only updated when this trigger specifically started a Build.
+	LastTriggerTime metav1.Time `json:"lastTriggerTime,omitempty" protobuf:"bytes,3,opt,name=lastTriggerTime"`
 }
 
 // BuildTriggerPolicy describes a policy for a single trigger that results in a new Build.
