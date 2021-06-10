@@ -45,18 +45,35 @@ Repo maintainers can assign you an issue or pull request by leaving a
 
 After your PR is ready to commit, please run following commands to check your code.
 
-```shell
-make verify
-make test
-```
+- verify your code 
+  ```shell
+  make verify
+  ```
+- run the unit test
+  ```shell
+  make test
+  ```
+- run the integration test
+  ```shell
+  make test-integration
+  ```
+- run the end-to-end test, prepare a kind cluster and run the following command
+  ```shell
+  export KUBECONFIG={the kubeconfig of your kind cluster that will run the e2e test}
+
+  make images
+
+  kind load docker-image quay.io/open-cluster-management/registration --name {your kind cluster name}
+
+  make test-e2e
+  ```
 
 ## Build images
 
 Make sure your code build passed.
 
 ```shell
-export BUILD_LOCALLY=1
-make
+make images
 ```
 
-Now, you can follow the [getting started guide](./README.md#getting-started) to work with the open-cluster-management registration repository.
+Now, you can follow the [getting started guide](./README.md#Quickstart) to work with the open-cluster-management registration repository.
