@@ -40,7 +40,8 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
 			},
 			scheduleResult: scheduleResult{
-				scheduled: 1,
+				feasibleClusters:   1,
+				scheduledDecisions: 1,
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been created
@@ -64,8 +65,9 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
 			},
 			scheduleResult: scheduleResult{
-				scheduled:   1,
-				unscheduled: 2,
+				feasibleClusters:     1,
+				scheduledDecisions:   1,
+				unscheduledDecisions: 2,
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
@@ -93,7 +95,8 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterSetLabel, clusterSetName).Build(),
 			},
 			scheduleResult: scheduleResult{
-				scheduled: 2,
+				feasibleClusters:   2,
+				scheduledDecisions: 2,
 			},
 			validateActions: testinghelpers.AssertNoActions,
 		},
@@ -111,8 +114,9 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterSetLabel, clusterSetName).Build(),
 			},
 			scheduleResult: scheduleResult{
-				scheduled:   2,
-				unscheduled: 2,
+				feasibleClusters:     2,
+				scheduledDecisions:   2,
+				unscheduledDecisions: 2,
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
@@ -138,8 +142,9 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
 			},
 			scheduleResult: scheduleResult{
-				scheduled:   1,
-				unscheduled: 3,
+				feasibleClusters:     1,
+				scheduledDecisions:   1,
+				unscheduledDecisions: 3,
 			},
 			validateActions: testinghelpers.AssertNoActions,
 		},
@@ -160,11 +165,14 @@ func TestSchedule(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}
-			if result.scheduled != c.scheduleResult.scheduled {
-				t.Errorf("expected %d scheduled, but got %d", c.scheduleResult.scheduled, result.scheduled)
+			if result.feasibleClusters != c.scheduleResult.feasibleClusters {
+				t.Errorf("expected %d feasible clusters, but got %d", c.scheduleResult.feasibleClusters, result.feasibleClusters)
 			}
-			if result.unscheduled != c.scheduleResult.unscheduled {
-				t.Errorf("expected %d unscheduled, but got %d", c.scheduleResult.unscheduled, result.unscheduled)
+			if result.scheduledDecisions != c.scheduleResult.scheduledDecisions {
+				t.Errorf("expected %d scheduled, but got %d", c.scheduleResult.scheduledDecisions, result.scheduledDecisions)
+			}
+			if result.unscheduledDecisions != c.scheduleResult.unscheduledDecisions {
+				t.Errorf("expected %d unscheduled, but got %d", c.scheduleResult.unscheduledDecisions, result.unscheduledDecisions)
 			}
 			c.validateActions(t, clusterClient.Actions())
 		})

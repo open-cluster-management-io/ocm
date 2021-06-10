@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -32,13 +33,6 @@ const (
 	placementLabel           = "cluster.open-cluster-management.io/placement"
 	schedulingControllerName = "SchedulingController"
 )
-
-var noBindingCondition = metav1.Condition{
-	Type:    clusterapiv1alpha1.PlacementConditionSatisfied,
-	Status:  metav1.ConditionFalse,
-	Reason:  "NoManagedClusterSetBindings",
-	Message: "No ManagedClusterSetBindings found in placement namespace",
-}
 
 type enqueuePlacementFunc func(namespace, name string)
 
@@ -169,13 +163,17 @@ func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncCon
 		return nil
 	}
 
-	// get available clusters for this placement
-	bindings, err := c.getManagedClusterSetBindings(placement)
+	// get all valid clustersetbindings in the placement namespace
+	bindings, err := c.getValidManagedClusterSetBindings(placement.Namespace)
 	if err != nil {
 		return err
 	}
 
-	clusters, err := c.getAvailableClusters(placement, bindings)
+	// get eligible clustersets for the placement
+	clusterSetNames := c.getEligibleClusterSets(placement, bindings)
+
+	// get available clusters for the placement
+	clusters, err := c.getAvailableClusters(clusterSetNames)
 	if err != nil {
 		return err
 	}
@@ -187,31 +185,23 @@ func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncCon
 	}
 
 	// update placement status if necessary to signal no bindings
-	return c.updateStatus(ctx, placement, len(bindings) > 0, scheduleResult.scheduled, scheduleResult.unscheduled)
+	return c.updateStatus(ctx, placement, clusterSetNames, len(bindings), len(clusters), scheduleResult)
 }
 
 // getManagedClusterSetBindings returns all bindings found in the placement namespace.
-func (c *schedulingController) getManagedClusterSetBindings(placement *clusterapiv1alpha1.Placement) ([]*clusterapiv1alpha1.ManagedClusterSetBinding, error) {
+func (c *schedulingController) getValidManagedClusterSetBindings(placementNamespace string) ([]*clusterapiv1alpha1.ManagedClusterSetBinding, error) {
 	// get all clusterset bindings under the placement namespace
-	bindings, err := c.clusterSetBindingLister.ManagedClusterSetBindings(placement.Namespace).List(labels.Everything())
+	bindings, err := c.clusterSetBindingLister.ManagedClusterSetBindings(placementNamespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 	if len(bindings) == 0 {
 		bindings = nil
 	}
-	return bindings, nil
-}
 
-// getAvailableClusters returns available clusters for the given placement. The clusters must
-// 1) Be from clustersets bound to the placement namespace;
-// 2) Belong to one of particular clustersets if .spec.clusterSets is specified;
-func (c *schedulingController) getAvailableClusters(placement *clusterapiv1alpha1.Placement, bindings []*clusterapiv1alpha1.ManagedClusterSetBinding) ([]*clusterapiv1.ManagedCluster, error) {
-
-	// filter out invaid clustersetbindings
-	clusterSetNames := sets.NewString()
+	validBindings := []*clusterapiv1alpha1.ManagedClusterSetBinding{}
 	for _, binding := range bindings {
-		// ignore clusterset does not exist
+		// ignore clustersetbinding refers to a non-existent clusterset
 		_, err := c.clusterSetLister.Get(binding.Name)
 		if errors.IsNotFound(err) {
 			continue
@@ -219,7 +209,17 @@ func (c *schedulingController) getAvailableClusters(placement *clusterapiv1alpha
 		if err != nil {
 			return nil, err
 		}
+		validBindings = append(validBindings, binding)
+	}
 
+	return validBindings, nil
+}
+
+// getEligibleClusterSets returns the names of clusterset that eligible for the placement
+func (c *schedulingController) getEligibleClusterSets(placement *clusterapiv1alpha1.Placement, bindings []*clusterapiv1alpha1.ManagedClusterSetBinding) []string {
+	// filter out invaid clustersetbindings
+	clusterSetNames := sets.NewString()
+	for _, binding := range bindings {
 		clusterSetNames.Insert(binding.Name)
 	}
 
@@ -229,12 +229,18 @@ func (c *schedulingController) getAvailableClusters(placement *clusterapiv1alpha
 		clusterSetNames = clusterSetNames.Intersection(sets.NewString(placement.Spec.ClusterSets...))
 	}
 
+	return clusterSetNames.List()
+}
+
+// getAvailableClusters returns available clusters for the given placement. The clusters must
+// 1) Be from clustersets bound to the placement namespace;
+// 2) Belong to one of particular clustersets if .spec.clusterSets is specified;
+func (c *schedulingController) getAvailableClusters(clusterSetNames []string) ([]*clusterapiv1.ManagedCluster, error) {
 	if len(clusterSetNames) == 0 {
 		return nil, nil
 	}
-
-	// list clusters from particular clustersets
-	requirement, err := labels.NewRequirement(clusterSetLabel, selection.In, clusterSetNames.List())
+	// list clusters from those clustersets
+	requirement, err := labels.NewRequirement(clusterSetLabel, selection.In, clusterSetNames)
 	if err != nil {
 		return nil, err
 	}
@@ -242,15 +248,26 @@ func (c *schedulingController) getAvailableClusters(placement *clusterapiv1alpha
 	return c.clusterLister.List(labelSelector)
 }
 
-// updateStatus updates the status of the placement according to schedule result.
-func (c *schedulingController) updateStatus(ctx context.Context, placement *clusterapiv1alpha1.Placement, bindings bool, numOfScheduledDecisions, numOfUnscheduledDecisions int) error {
+// updateStatus updates the status of the placement according to intermediate scheduling data.
+func (c *schedulingController) updateStatus(
+	ctx context.Context,
+	placement *clusterapiv1alpha1.Placement,
+	eligibleClusterSetNames []string,
+	numOfBindings,
+	numOfAvailableClusters int,
+	scheduleResult *scheduleResult,
+) error {
 	newPlacement := placement.DeepCopy()
-	newPlacement.Status.NumberOfSelectedClusters = int32(numOfScheduledDecisions)
-	satisfiedCondition := newSatisfiedCondition(numOfUnscheduledDecisions)
+	newPlacement.Status.NumberOfSelectedClusters = int32(scheduleResult.scheduledDecisions)
 
-	if !bindings {
-		satisfiedCondition = noBindingCondition
-	}
+	satisfiedCondition := newSatisfiedCondition(
+		placement.Spec.ClusterSets,
+		eligibleClusterSetNames,
+		numOfBindings,
+		numOfAvailableClusters,
+		scheduleResult.feasibleClusters,
+		scheduleResult.unscheduledDecisions,
+	)
 
 	meta.SetStatusCondition(&newPlacement.Status.Conditions, satisfiedCondition)
 	if reflect.DeepEqual(newPlacement.Status, placement.Status) {
@@ -261,11 +278,34 @@ func (c *schedulingController) updateStatus(ctx context.Context, placement *clus
 }
 
 // newSatisfiedCondition returns a new condition with type PlacementConditionSatisfied
-func newSatisfiedCondition(numOfUnscheduledDecisions int) metav1.Condition {
+func newSatisfiedCondition(
+	clusterSetsInSpec []string,
+	eligibleClusterSets []string,
+	numOfBindings,
+	numOfAvailableClusters,
+	numOfFeasibleClusters,
+	numOfUnscheduledDecisions int,
+) metav1.Condition {
 	condition := metav1.Condition{
 		Type: clusterapiv1alpha1.PlacementConditionSatisfied,
 	}
 	switch {
+	case numOfBindings == 0:
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = "NoManagedClusterSetBindings"
+		condition.Message = "No valid ManagedClusterSetBindings found in placement namespace"
+	case len(eligibleClusterSets) == 0:
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = "NoIntersection"
+		condition.Message = fmt.Sprintf("None of ManagedClusterSets [%s] is bound to placement namespace", strings.Join(clusterSetsInSpec, ","))
+	case numOfAvailableClusters == 0:
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = "AllManagedClusterSetsEmpty"
+		condition.Message = fmt.Sprintf("All ManagedClusterSets [%s] have no member ManagedCluster", strings.Join(eligibleClusterSets, ","))
+	case numOfFeasibleClusters == 0:
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = "NoManagedClusterMatched"
+		condition.Message = "No ManagedCluster matches any of the cluster predicate"
 	case numOfUnscheduledDecisions == 0:
 		condition.Status = metav1.ConditionTrue
 		condition.Reason = "AllDecisionsScheduled"

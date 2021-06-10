@@ -25,8 +25,9 @@ type scheduleFunc func(
 ) (*scheduleResult, error)
 
 type scheduleResult struct {
-	scheduled   int
-	unscheduled int
+	feasibleClusters     int
+	scheduledDecisions   int
+	unscheduledDecisions int
 }
 
 func schedule(
@@ -57,8 +58,9 @@ func schedule(
 	}
 
 	return &scheduleResult{
-		scheduled:   scheduled,
-		unscheduled: unscheduled,
+		feasibleClusters:     len(feasibleClusters),
+		scheduledDecisions:   scheduled,
+		unscheduledDecisions: unscheduled,
 	}, nil
 }
 
