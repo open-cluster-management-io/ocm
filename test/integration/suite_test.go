@@ -50,6 +50,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	testEnv = &envtest.Environment{
 		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths: []string{
+			filepath.Join(".", "deploy", "webhook"),
 			filepath.Join(".", "deploy", "spoke"),
 		},
 	}

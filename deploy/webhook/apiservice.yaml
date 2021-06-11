@@ -6,7 +6,7 @@ spec:
   group: admission.work.open-cluster-management.io
   version: v1
   service:
-    name: manifestwork-admission
+    name: work-webhook
     namespace: open-cluster-management-hub
   insecureSkipTLSVerify: true
   groupPriorityMinimum: 10000

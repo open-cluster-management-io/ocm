@@ -1,12 +1,12 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: open-cluster-management:manifestwork-admission
+  name: open-cluster-management:work-webhook
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: open-cluster-management:manifestwork-admission
+  name: open-cluster-management:work-webhook
 subjects:
   - kind: ServiceAccount
-    name: manifestwork-admission-sa
+    name: work-webhook-sa
     namespace: open-cluster-management-hub

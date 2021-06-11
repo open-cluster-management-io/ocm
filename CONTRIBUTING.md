@@ -28,9 +28,9 @@ contribution. See the [DCO](DCO) file for details.
 ## Contributing A Patch
 
 1. Submit an issue describing your proposed change to the repo in question.
-1. The [repo owners](OWNERS) will respond to your issue promptly.
-1. Fork the desired repo, develop and test your code changes.
-1. Submit a pull request.
+2. The [repo owners](OWNERS) will respond to your issue promptly.
+3. Fork the desired repo, develop and test your code changes.
+4. Submit a pull request.
 
 ## Issue and Pull Request Management
 
@@ -47,7 +47,22 @@ After your PR is ready to commit, please run following commands to check your co
 
 ```shell
 make verify
-make test
+```
+
+Run unit testing
+```shell
+make test-unit
+```
+
+Run integration testing
+```shell
+make test-integration
+```
+
+Run e2e testing. During e2e testing, hub and managed cluster share the same Kubernetes cluster.
+```shell
+export KUBECONFIG=</path/to/kubeconfig>
+make test-e2e
 ```
 
 ## Build images
@@ -55,8 +70,7 @@ make test
 Make sure your code build passed.
 
 ```shell
-export BUILD_LOCALLY=1
-make
+make images
 ```
 
-Now, you can follow the [getting started guide](./README.md#getting-started) to work with the open-cluster-management work repository.
+Now, you can follow the [getting started guide](./README.md#getting-started) to work with this repository.
