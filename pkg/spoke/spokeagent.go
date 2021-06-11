@@ -26,11 +26,16 @@ import (
 type WorkloadAgentOptions struct {
 	HubKubeconfigFile string
 	SpokeClusterName  string
+	QPS               float32
+	Burst             int
 }
 
 // NewWorkloadAgentOptions returns the flags with default value set
 func NewWorkloadAgentOptions() *WorkloadAgentOptions {
-	return &WorkloadAgentOptions{}
+	return &WorkloadAgentOptions{
+		QPS:   50,
+		Burst: 100,
+	}
 }
 
 // AddFlags register and binds the default flags
@@ -39,6 +44,8 @@ func (o *WorkloadAgentOptions) AddFlags(cmd *cobra.Command) {
 	// This command only supports reading from config
 	flags.StringVar(&o.HubKubeconfigFile, "hub-kubeconfig", o.HubKubeconfigFile, "Location of kubeconfig file to connect to hub cluster.")
 	flags.StringVar(&o.SpokeClusterName, "spoke-cluster-name", o.SpokeClusterName, "Name of spoke cluster.")
+	flags.Float32Var(&o.QPS, "spoke-kube-api-qps", o.QPS, "QPS to use while talking with apiserver on spoke cluster.")
+	flags.IntVar(&o.Burst, "spoke-kube-api-burst", o.Burst, "Burst to use while talking with apiserver on spoke cluster.")
 }
 
 // RunWorkloadAgent starts the controllers on agent to process work from hub.
@@ -59,6 +66,8 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 
 	// Build dynamic client and informer for spoke cluster
 	spokeRestConfig := controllerContext.KubeConfig
+	spokeRestConfig.QPS = o.QPS
+	spokeRestConfig.Burst = o.Burst
 	spokeDynamicClient, err := dynamic.NewForConfig(spokeRestConfig)
 	if err != nil {
 		return err
