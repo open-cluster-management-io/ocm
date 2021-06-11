@@ -61,15 +61,17 @@ deploy-webhook: ensure-kustomize
 
 cluster-ip: 
   CLUSTER_IP?=$(shell $(KUBECTL) get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}")
+  CLUSTER_CONTEXT?=$(shell $(KUBECTL) config current-context)
 
 bootstrap-secret: cluster-ip
 	cp $(KUBECONFIG) dev-kubeconfig
-	$(KUBECTL) config set clusters.kind-kind.server https://$(CLUSTER_IP) --kubeconfig dev-kubeconfig
+	$(KUBECTL) config set clusters.$(CLUSTER_CONTEXT).server https://$(CLUSTER_IP) --kubeconfig dev-kubeconfig
+	$(KUBECTL) delete secret bootstrap-secret -n open-cluster-management --ignore-not-found
 	$(KUBECTL) create secret generic bootstrap-secret --from-file=kubeconfig=dev-kubeconfig -n open-cluster-management
 
 e2e-bootstrap-secret: cluster-ip
 	cp $(KUBECONFIG) e2e-kubeconfig
-	$(KUBECTL) config set clusters.kind-kind.server https://$(CLUSTER_IP) --kubeconfig e2e-kubeconfig
+	$(KUBECTL) config set clusters.$(CLUSTER_CONTEXT).server https://$(CLUSTER_IP) --kubeconfig e2e-kubeconfig
 	$(KUBECTL) delete secret e2e-bootstrap-secret -n open-cluster-management --ignore-not-found
 	$(KUBECTL) create secret generic e2e-bootstrap-secret --from-file=kubeconfig=e2e-kubeconfig -n open-cluster-management
 
