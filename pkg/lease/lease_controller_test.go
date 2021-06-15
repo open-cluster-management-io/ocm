@@ -2,12 +2,16 @@ package lease
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
+	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 )
 
@@ -29,11 +33,58 @@ func TestReconcile(t *testing.T) {
 	//create lease
 	leaseReconciler.reconcile(context.TODO())
 	addontesting.AssertActions(t, kubeClient.Actions(), "get", "create")
+	lease := kubeClient.Actions()[1].(clienttesting.CreateActionImpl).Object.(*coordinationv1.Lease)
+	if lease.ObjectMeta.Namespace != agentNs {
+		t.Errorf(
+			"The namespace of lease is not correct, expected %s, actual %s",
+			lease.ObjectMeta.Namespace, agentNs)
+	}
 
 	//update lease
 	kubeClient.ClearActions()
 	leaseReconciler.reconcile(context.TODO())
 	addontesting.AssertActions(t, kubeClient.Actions(), "get", "update")
+}
+
+func TestReconcileWithInvalidLease(t *testing.T) {
+	kubeClient := kubefake.NewSimpleClientset()
+	hubClient := kubefake.NewSimpleClientset()
+
+	leaseReconciler := &leaseUpdater{
+		kubeClient:           kubeClient,
+		hubKubeClient:        hubClient,
+		leaseName:            leaseName,
+		clusterName:          "cluster1",
+		leaseDurationSeconds: 1,
+		leaseNamespace:       agentNs,
+	}
+
+	// Add a reactor on fake client to throw error when get lease
+	kubeClient.PrependReactor("create", "leases", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		if action.GetVerb() != "create" {
+			return false, nil, nil
+		}
+
+		return true, &coordinationv1.Lease{}, &errors.StatusError{
+			ErrStatus: metav1.Status{
+				Status:  metav1.StatusFailure,
+				Code:    http.StatusNotFound,
+				Reason:  metav1.StatusReasonNotFound,
+				Message: "Fake test error",
+			},
+		}
+	})
+
+	//create lease
+	leaseReconciler.reconcile(context.TODO())
+	addontesting.AssertActions(t, hubClient.Actions(), "get", "create")
+
+	lease := hubClient.Actions()[1].(clienttesting.CreateActionImpl).Object.(*coordinationv1.Lease)
+	if lease.ObjectMeta.Namespace != "cluster1" {
+		t.Errorf(
+			"The namespace of lease is not correct, expected %s, actual cluster1",
+			lease.ObjectMeta.Namespace)
+	}
 }
 
 func TestReconcileWithHealthCheck(t *testing.T) {
