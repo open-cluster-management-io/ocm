@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/open-cluster-management/work/pkg/helper"
-	"github.com/open-cluster-management/work/pkg/spoke/controllers/appliedmanifestcontroller"
-	"github.com/open-cluster-management/work/pkg/spoke/controllers/finalizercontroller"
-	"github.com/open-cluster-management/work/pkg/spoke/controllers/manifestcontroller"
-	"github.com/open-cluster-management/work/pkg/spoke/controllers/statuscontroller"
+	"open-cluster-management.io/work/pkg/helper"
+	"open-cluster-management.io/work/pkg/spoke/controllers/appliedmanifestcontroller"
+	"open-cluster-management.io/work/pkg/spoke/controllers/finalizercontroller"
+	"open-cluster-management.io/work/pkg/spoke/controllers/manifestcontroller"
+	"open-cluster-management.io/work/pkg/spoke/controllers/statuscontroller"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -18,8 +18,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
-	workclientset "github.com/open-cluster-management/api/client/work/clientset/versioned"
-	workinformers "github.com/open-cluster-management/api/client/work/informers/externalversions"
+	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 )
 
 // WorkloadAgentOptions defines the flags for workload agent

@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned/typed/work/v1"
-	workapiv1 "github.com/open-cluster-management/api/work/v1"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
@@ -24,6 +22,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
+	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
 const (

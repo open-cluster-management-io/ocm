@@ -13,9 +13,9 @@ import (
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 
-	"github.com/open-cluster-management/work/pkg/cmd/spoke"
-	"github.com/open-cluster-management/work/pkg/cmd/webhook"
-	"github.com/open-cluster-management/work/pkg/version"
+	"open-cluster-management.io/work/pkg/cmd/spoke"
+	"open-cluster-management.io/work/pkg/cmd/webhook"
+	"open-cluster-management.io/work/pkg/version"
 )
 
 func main() {

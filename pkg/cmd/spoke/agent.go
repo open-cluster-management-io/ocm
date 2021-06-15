@@ -5,8 +5,8 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
-	"github.com/open-cluster-management/work/pkg/spoke"
-	"github.com/open-cluster-management/work/pkg/version"
+	"open-cluster-management.io/work/pkg/spoke"
+	"open-cluster-management.io/work/pkg/version"
 )
 
 // NewWorkloadAgent generates a command to start workload agent

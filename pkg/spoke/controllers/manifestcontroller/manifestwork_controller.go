@@ -21,16 +21,16 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
-	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned/typed/work/v1"
-	workinformer "github.com/open-cluster-management/api/client/work/informers/externalversions/work/v1"
-	worklister "github.com/open-cluster-management/api/client/work/listers/work/v1"
-	workapiv1 "github.com/open-cluster-management/api/work/v1"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
+	workinformer "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
+	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 
-	"github.com/open-cluster-management/work/pkg/helper"
-	"github.com/open-cluster-management/work/pkg/spoke/controllers"
+	"open-cluster-management.io/work/pkg/helper"
+	"open-cluster-management.io/work/pkg/spoke/controllers"
 )
 
 var ResyncInterval = 5 * time.Minute

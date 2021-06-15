@@ -5,11 +5,6 @@ import (
 	"testing"
 	"time"
 
-	fakeworkclient "github.com/open-cluster-management/api/client/work/clientset/versioned/fake"
-	workinformers "github.com/open-cluster-management/api/client/work/informers/externalversions"
-	workapiv1 "github.com/open-cluster-management/api/work/v1"
-	"github.com/open-cluster-management/work/pkg/spoke/controllers"
-	"github.com/open-cluster-management/work/pkg/spoke/spoketesting"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -20,6 +15,11 @@ import (
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
+	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
+	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/work/pkg/spoke/controllers"
+	"open-cluster-management.io/work/pkg/spoke/spoketesting"
 )
 
 type testController struct {

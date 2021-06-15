@@ -17,10 +17,10 @@ import (
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/dynamic"
 
-	workapiv1 "github.com/open-cluster-management/api/work/v1"
-	"github.com/open-cluster-management/work/pkg/spoke"
-	"github.com/open-cluster-management/work/pkg/spoke/controllers/statuscontroller"
-	"github.com/open-cluster-management/work/test/integration/util"
+	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/work/pkg/spoke"
+	"open-cluster-management.io/work/pkg/spoke/controllers/statuscontroller"
+	"open-cluster-management.io/work/test/integration/util"
 )
 
 func startWorkAgent(ctx context.Context, o *spoke.WorkloadAgentOptions) {

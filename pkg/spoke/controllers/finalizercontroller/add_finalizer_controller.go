@@ -3,7 +3,7 @@ package finalizercontroller
 import (
 	"context"
 
-	workapiv1 "github.com/open-cluster-management/api/work/v1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -11,12 +11,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 
-	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned/typed/work/v1"
-	workinformer "github.com/open-cluster-management/api/client/work/informers/externalversions/work/v1"
-	worklister "github.com/open-cluster-management/api/client/work/listers/work/v1"
-	"github.com/open-cluster-management/work/pkg/spoke/controllers"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
+	workinformer "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
+	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
+	"open-cluster-management.io/work/pkg/spoke/controllers"
 )
 
 // AddFinalizerController is to add the cluster.open-cluster-management.io/manifest-work-cleanup finalizer to manifestworks.
