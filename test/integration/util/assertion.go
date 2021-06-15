@@ -17,8 +17,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 
-	workclientset "github.com/open-cluster-management/api/client/work/clientset/versioned"
-	workapiv1 "github.com/open-cluster-management/api/work/v1"
+	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
 func AssertWorkCondition(namespace, name string, workClient workclientset.Interface, expectedType string, expectedWorkStatus metav1.ConditionStatus,

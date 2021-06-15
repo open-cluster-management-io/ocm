@@ -14,7 +14,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
-	workapiv1 "github.com/open-cluster-management/api/work/v1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
 func HaveManifestCondition(conditions []workapiv1.ManifestCondition, expectedType string, expectedStatuses []metav1.ConditionStatus) bool {

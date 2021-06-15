@@ -9,8 +9,6 @@ import (
 	"reflect"
 	"time"
 
-	workclientset "github.com/open-cluster-management/api/client/work/clientset/versioned"
-	"github.com/open-cluster-management/work/test/e2e/bindata"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	"open-cluster-management.io/work/test/e2e/bindata"
 )
 
 var (

@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/open-cluster-management/work/pkg/spoke/spoketesting"
+	"open-cluster-management.io/work/pkg/spoke/spoketesting"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	authenticationv1 "k8s.io/api/authentication/v1"

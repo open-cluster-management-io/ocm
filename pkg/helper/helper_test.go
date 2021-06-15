@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	fakeworkclient "github.com/open-cluster-management/api/client/work/clientset/versioned/fake"
-	workapiv1 "github.com/open-cluster-management/api/work/v1"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -16,6 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
+	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
 func newCondition(name, status, reason, message string, lastTransition *metav1.Time) metav1.Condition {

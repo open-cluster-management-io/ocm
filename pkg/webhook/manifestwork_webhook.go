@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	workv1 "github.com/open-cluster-management/api/work/v1"
+	workv1 "open-cluster-management.io/api/work/v1"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -7,16 +7,16 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	fakeworkclient "github.com/open-cluster-management/api/client/work/clientset/versioned/fake"
-	workapiv1 "github.com/open-cluster-management/api/work/v1"
-	"github.com/open-cluster-management/work/pkg/spoke/controllers"
-	"github.com/open-cluster-management/work/pkg/spoke/spoketesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
+	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
+	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/work/pkg/spoke/controllers"
+	"open-cluster-management.io/work/pkg/spoke/spoketesting"
 )
 
 func TestFinalize(t *testing.T) {

@@ -17,10 +17,10 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	workclientset "github.com/open-cluster-management/api/client/work/clientset/versioned"
-	workapiv1 "github.com/open-cluster-management/api/work/v1"
-	"github.com/open-cluster-management/work/pkg/helper"
-	"github.com/open-cluster-management/work/test/integration/util"
+	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/work/pkg/helper"
+	"open-cluster-management.io/work/test/integration/util"
 )
 
 const (

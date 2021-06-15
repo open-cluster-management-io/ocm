@@ -3,10 +3,10 @@ package webhook
 import (
 	"os"
 
-	"github.com/open-cluster-management/work/pkg/webhook"
 	admissionserver "github.com/openshift/generic-admission-server/pkg/cmd/server"
 	"github.com/spf13/cobra"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"open-cluster-management.io/work/pkg/webhook"
 )
 
 func NewAdmissionHook() *cobra.Command {

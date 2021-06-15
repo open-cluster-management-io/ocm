@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	workapiv1 "github.com/open-cluster-management/api/work/v1"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	corev1 "k8s.io/api/core/v1"
@@ -15,6 +14,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
 type FakeSyncContext struct {
