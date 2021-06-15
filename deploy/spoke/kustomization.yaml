@@ -5,7 +5,6 @@ namespace: open-cluster-management-agent
 resources:
 - ./appliedmanifestworks.crd.yaml
 - ./component_namespace.yaml
-- ./cluster_namespace.yaml
 - ./service_account.yaml
 - ./clusterrole.yaml
 - ./clusterrole_binding.yaml

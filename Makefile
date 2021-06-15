@@ -11,11 +11,15 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	lib/tmp.mk \
 )
 
+KUBECTL?=kubectl
 IMAGE_REGISTRY?=quay.io/open-cluster-management
 IMAGE_TAG?=latest
 IMAGE_NAME?=$(IMAGE_REGISTRY)/work:$(IMAGE_TAG)
-KUBECONFIG ?= ./.kubeconfig
-KUBECTL?=kubectl
+KUBECONFIG?=./.kubeconfig
+HUB_KUBECONFIG?=$(KUBECONFIG)
+HUB_KUBECONFIG_CONTEXT?=$(shell $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) config current-context)
+SPOKE_KUBECONFIG?=$(KUBECONFIG)
+SPOKE_KUBECONFIG_CONTEXT?=$(shell $(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) config current-context)
 KUSTOMIZE?=$(PERMANENT_TMP_GOPATH)/bin/kustomize
 KUSTOMIZE_VERSION?=v3.5.4
 KUSTOMIZE_ARCHIVE_NAME?=kustomize_$(KUSTOMIZE_VERSION)_$(GOHOSTOS)_$(GOHOSTARCH).tar.gz
@@ -36,44 +40,62 @@ clean:
 .PHONY: clean
 
 cluster-ip:
-  CLUSTER_IP?=$(shell $(KUBECTL) get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}")
+	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
+  	CLUSTER_IP?=$(shell $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}")
 
 hub-kubeconfig-secret: cluster-ip
-	cp $(KUBECONFIG) hub-kubeconfig
-	$(KUBECTL) apply -f deploy/spoke/component_namespace.yaml
-	$(KUBECTL) config set clusters.kind-kind.server https://$(CLUSTER_IP) --kubeconfig hub-kubeconfig
-	$(KUBECTL) delete secret hub-kubeconfig-secret -n open-cluster-management-agent --ignore-not-found
-	$(KUBECTL) create secret generic hub-kubeconfig-secret --from-file=kubeconfig=hub-kubeconfig -n open-cluster-management-agent
+	$(KUBECTL) config use-context $(SPOKE_KUBECONFIG_CONTEXT) --kubeconfig $(SPOKE_KUBECONFIG)
+	$(KUBECTL) apply -f deploy/spoke/component_namespace.yaml --kubeconfig $(SPOKE_KUBECONFIG)
+	$(KUBECTL) delete secret hub-kubeconfig-secret -n open-cluster-management-agent --ignore-not-found --kubeconfig $(SPOKE_KUBECONFIG)
+	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
+	$(KUBECTL) config view --flatten --minify --kubeconfig $(HUB_KUBECONFIG) > hub-kubeconfig
+ifeq ($(HUB_KUBECONFIG), $(SPOKE_KUBECONFIG)) && ($(HUB_KUBECONFIG_CONTEXT), $(SPOKE_KUBECONFIG_CONTEXT))
+	$(KUBECTL) config set clusters.$(HUB_KUBECONFIG_CONTEXT).server https://$(CLUSTER_IP) --kubeconfig hub-kubeconfig
+endif
+	$(KUBECTL) config use-context $(SPOKE_KUBECONFIG_CONTEXT) --kubeconfig $(SPOKE_KUBECONFIG)
+	$(KUBECTL) create secret generic hub-kubeconfig-secret --from-file=kubeconfig=hub-kubeconfig -n open-cluster-management-agent --kubeconfig $(SPOKE_KUBECONFIG)
 	$(RM) ./hub-kubeconfig
 
 e2e-hub-kubeconfig-secret: cluster-ip
-	cp $(KUBECONFIG) e2e-hub-kubeconfig
-	$(KUBECTL) apply -f deploy/spoke/component_namespace.yaml
+	cp $(HUB_KUBECONFIG) e2e-hub-kubeconfig
+	$(KUBECTL) apply -f deploy/spoke/component_namespace.yaml --kubeconfig $(SPOKE_KUBECONFIG)
 	$(KUBECTL) config set clusters.kind-kind.server https://$(CLUSTER_IP) --kubeconfig e2e-hub-kubeconfig
-	$(KUBECTL) delete secret e2e-hub-kubeconfig-secret -n open-cluster-management-agent --ignore-not-found
-	$(KUBECTL) create secret generic e2e-hub-kubeconfig-secret --from-file=kubeconfig=e2e-hub-kubeconfig -n open-cluster-management-agent
+	$(KUBECTL) delete secret e2e-hub-kubeconfig-secret -n open-cluster-management-agent --ignore-not-found --kubeconfig $(SPOKE_KUBECONFIG)
+	$(KUBECTL) create secret generic e2e-hub-kubeconfig-secret --from-file=kubeconfig=e2e-hub-kubeconfig -n open-cluster-management-agent --kubeconfig $(SPOKE_KUBECONFIG)
 	$(RM) ./e2e-hub-kubeconfig
 
-install-crd:
-	$(KUBECTL) apply -f deploy/spoke/manifestworks.crd.yaml
+create-cluster-ns:
+	$(KUSTOMIZE) build deploy/hub | $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) apply -f -
 
-deploy-work-agent: ensure-kustomize hub-kubeconfig-secret install-crd
+deploy-work-agent: ensure-kustomize create-cluster-ns hub-kubeconfig-secret
 	cp deploy/spoke/kustomization.yaml deploy/spoke/kustomization.yaml.tmp
 	cd deploy/spoke && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/work:latest=$(IMAGE_NAME)
-	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) apply -f -
+	$(KUBECTL) config use-context $(SPOKE_KUBECONFIG_CONTEXT) --kubeconfig $(SPOKE_KUBECONFIG)
+	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) apply -f -
 	mv deploy/spoke/kustomization.yaml.tmp deploy/spoke/kustomization.yaml
 
 deploy-webhook: ensure-kustomize
 	cp deploy/webhook/kustomization.yaml deploy/webhook/kustomization.yaml.tmp
 	cd deploy/webhook && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/work:latest=$(IMAGE_NAME)
-	$(KUSTOMIZE) build deploy/webhook | $(KUBECTL) apply -f -
+	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
+	$(KUSTOMIZE) build deploy/webhook | $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) apply -f -
 	mv deploy/webhook/kustomization.yaml.tmp deploy/webhook/kustomization.yaml
 
-uninstall-crd:
-	$(KUBECTL) delete -f deploy/spoke/manifestworks.crd.yaml --ignore-not-found
+clean-work-agent:
+	$(KUBECTL) config use-context $(SPOKE_KUBECONFIG_CONTEXT) --kubeconfig $(SPOKE_KUBECONFIG)
+	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) delete --ignore-not-found -f -
 
-clean-work-agent: uninstall-crd
-	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) delete --ignore-not-found -f -
+clean-webhook:
+	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
+	$(KUSTOMIZE) build deploy/webhook | $(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) delete --ignore-not-found -f -
+
+remove-cluster-ns:
+	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
+	$(KUSTOMIZE) build deploy/hub | $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) delete --ignore-not-found -f -
+
+deploy: deploy-webhook deploy-work-agent
+
+undeploy: remove-cluster-ns clean-work-agent clean-webhook
 
 ensure-kustomize:
 ifeq "" "$(wildcard $(KUSTOMIZE))"
@@ -89,7 +111,7 @@ endif
 build-e2e:
 	go test -c ./test/e2e -mod=vendor
 
-test-e2e: build-e2e install-crd deploy-webhook e2e-hub-kubeconfig-secret
+test-e2e: build-e2e deploy-webhook e2e-hub-kubeconfig-secret
 	./e2e.test -test.v -ginkgo.v
 
 clean-e2e:
