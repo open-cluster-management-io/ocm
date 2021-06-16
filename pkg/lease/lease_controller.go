@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 )
 
@@ -31,6 +32,8 @@ type leaseUpdater struct {
 	leaseName            string
 	leaseNamespace       string
 	leaseDurationSeconds int32
+	clusterName          string
+	hubKubeClient        kubernetes.Interface
 	healthCheckFuncs     []func() bool
 }
 
@@ -52,21 +55,26 @@ func (r *leaseUpdater) Start(ctx context.Context) {
 	wait.JitterUntilWithContext(context.TODO(), r.reconcile, time.Duration(r.leaseDurationSeconds)*time.Second, leaseUpdateJitterFactor, true)
 }
 
-func (r *leaseUpdater) reconcile(ctx context.Context) {
-	for _, f := range r.healthCheckFuncs {
-		if !f() {
-			// IF a healthy check fails, do not update lease.
-			return
-		}
+func (r *leaseUpdater) WithHubLeaseConfig(config *rest.Config, clusterName string) {
+	hubClient, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		klog.Errorf("Failed to build hub kube client %v", err)
+	} else {
+		r.hubKubeClient = hubClient
 	}
-	lease, err := r.kubeClient.CoordinationV1().Leases(r.leaseNamespace).Get(context.TODO(), r.leaseName, metav1.GetOptions{})
+
+	return
+}
+
+func (r *leaseUpdater) updateLease(ctx context.Context, namespace string, client kubernetes.Interface) error {
+	lease, err := client.CoordinationV1().Leases(namespace).Get(ctx, r.leaseName, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		//create lease
 		lease := &coordinationv1.Lease{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      r.leaseName,
-				Namespace: r.leaseNamespace,
+				Namespace: namespace,
 			},
 			Spec: coordinationv1.LeaseSpec{
 				LeaseDurationSeconds: &r.leaseDurationSeconds,
@@ -75,21 +83,42 @@ func (r *leaseUpdater) reconcile(ctx context.Context) {
 				},
 			},
 		}
-		if _, err := r.kubeClient.CoordinationV1().Leases(r.leaseNamespace).Create(context.TODO(), lease, metav1.CreateOptions{}); err != nil {
-			klog.Errorf("unable to create addon lease %q/%q on hub cluster. error:%v", r.leaseNamespace, r.leaseName, err)
+		if _, err := client.CoordinationV1().Leases(namespace).Create(ctx, lease, metav1.CreateOptions{}); err != nil {
+			return err
 		}
-		return
 	case err != nil:
-		klog.Errorf("unable to get addon lease %q/%q on hub cluster. error:%v", r.leaseNamespace, r.leaseName, err)
-		return
+		return err
 	default:
 		//update lease
 		lease.Spec.RenewTime = &metav1.MicroTime{Time: time.Now()}
-		if _, err = r.kubeClient.CoordinationV1().Leases(r.leaseNamespace).Update(context.TODO(), lease, metav1.UpdateOptions{}); err != nil {
-			klog.Errorf("unable to update cluster lease %q/%q on hub cluster. error:%v", r.leaseNamespace, r.leaseName, err)
+		if _, err = client.CoordinationV1().Leases(namespace).Update(context.TODO(), lease, metav1.UpdateOptions{}); err != nil {
+			return err
 		}
-		return
 	}
+
+	return nil
+}
+
+func (r *leaseUpdater) reconcile(ctx context.Context) {
+	for _, f := range r.healthCheckFuncs {
+		if !f() {
+			// IF a healthy check fails, do not update lease.
+			return
+		}
+	}
+	// Update lease on managed cluster at first, it returns in valid, it means lease is not supported yet
+	// and fallback to use hub lease.
+	err := r.updateLease(ctx, r.leaseNamespace, r.kubeClient)
+	if err != nil {
+		klog.Errorf("Failed to update lease %s/%s: %v on managed cluster", r.leaseName, r.leaseNamespace, err)
+	}
+
+	if errors.IsNotFound(err) && r.hubKubeClient != nil {
+		if err := r.updateLease(ctx, r.clusterName, r.hubKubeClient); err != nil {
+			klog.Errorf("Failed to update lease %s/%s: %v on hub", r.clusterName, r.leaseNamespace, err)
+		}
+	}
+	return
 }
 
 // CheckAddonPodFunc checks whether the agent pod is running
