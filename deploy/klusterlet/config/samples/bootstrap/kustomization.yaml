@@ -1,0 +1,9 @@
+secretGenerator:
+  - name: bootstrap-hub-kubeconfig
+    namespace: open-cluster-management-agent
+    files:
+      - kubeconfig=hub-kubeconfig
+    type: "Opaque"
+
+generatorOptions:
+  disableNameSuffixHash: true

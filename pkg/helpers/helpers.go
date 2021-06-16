@@ -35,6 +35,11 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 )
 
+const (
+	defaultReplica = 3
+	singleReplica  = 1
+)
+
 var (
 	genericScheme = runtime.NewScheme()
 	genericCodecs = serializer.NewCodecFactory(genericScheme)
@@ -452,4 +457,20 @@ func LoadClientConfigFromSecret(secret *corev1.Secret) (*restclient.Config, erro
 	}
 
 	return clientcmd.NewDefaultClientConfig(*config, nil).ClientConfig()
+}
+
+// DetermineReplicaByNodes determines the replica of deployment based on:
+// list master nodes in the cluster and return 1 if
+// the number of master nodes is equal or less than 1. Return 3 otherwise.
+func DetermineReplicaByNodes(ctx context.Context, kubeClient kubernetes.Interface) int32 {
+	nodes, err := kubeClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{LabelSelector: "node-role.kubernetes.io/master="})
+	if err != nil {
+		return defaultReplica
+	}
+
+	if len(nodes.Items) <= 1 {
+		return singleReplica
+	}
+
+	return defaultReplica
 }
