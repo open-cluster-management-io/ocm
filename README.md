@@ -62,7 +62,7 @@ kubectl get csr
 kubectl get managedcluster
 ```
 
-Next approve the csr and set managecluster to be accepcted by hub with the following command
+Next approve the csr and set managedCluster to be accepted by hub with the following command
 
 ```
 kubectl certificate approve {csr name}
