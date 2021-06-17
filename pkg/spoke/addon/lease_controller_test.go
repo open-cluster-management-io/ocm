@@ -14,7 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
-	kubeinformers "k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 )
@@ -305,11 +304,6 @@ func TestSync(t *testing.T) {
 			hubClient := kubefake.NewSimpleClientset(c.hubLeases...)
 
 			leaseClient := kubefake.NewSimpleClientset(c.leases...)
-			leaseInformerFactory := kubeinformers.NewSharedInformerFactory(leaseClient, time.Minute*10)
-			leaseStore := leaseInformerFactory.Coordination().V1().Leases().Informer().GetStore()
-			for _, lease := range c.leases {
-				leaseStore.Add(lease)
-			}
 
 			ctrl := &managedClusterAddOnLeaseController{
 				clusterName:    testinghelpers.TestManagedClusterName,
@@ -317,7 +311,7 @@ func TestSync(t *testing.T) {
 				hubLeaseClient: hubClient.CoordinationV1(),
 				addOnClient:    addOnClient,
 				addOnLister:    addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				leaseLister:    leaseInformerFactory.Coordination().V1().Leases().Lister(),
+				leaseClient:    leaseClient.CoordinationV1(),
 			}
 			syncCtx := testinghelpers.NewFakeSyncContext(t, c.queueKey)
 			syncErr := ctrl.sync(context.TODO(), syncCtx)
