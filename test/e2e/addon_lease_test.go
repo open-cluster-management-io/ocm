@@ -71,7 +71,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 			}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
+			err = wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 				found, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(context.TODO(), addOn.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
@@ -98,7 +98,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 			}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
+			err = wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 				found, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(context.TODO(), addOn.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
@@ -118,7 +118,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 			_, err = hubClient.CoordinationV1().Leases(addOn.Name).Update(context.TODO(), lease, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
+			err = wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 				found, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(context.TODO(), addOn.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
@@ -145,7 +145,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 			}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
+			err = wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 				found, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(context.TODO(), addOn.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
@@ -162,7 +162,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 			err = hubClient.CoordinationV1().Leases(addOn.Name).Delete(context.TODO(), addOn.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
+			err = wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 				found, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(context.TODO(), addOn.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
@@ -223,7 +223,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 			}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
+			err = wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 				found, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(context.TODO(), addOn.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
@@ -259,7 +259,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 			_, err = clusterClient.ClusterV1().ManagedClusters().UpdateStatus(context.TODO(), found, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
+			err = wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 				found, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(context.TODO(), addOn.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err

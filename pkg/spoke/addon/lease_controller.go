@@ -20,9 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
-	coordinformers "k8s.io/client-go/informers/coordination/v1"
 	coordv1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
-	coordlisters "k8s.io/client-go/listers/coordination/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -40,7 +38,7 @@ type managedClusterAddOnLeaseController struct {
 	addOnClient    addonclient.Interface
 	addOnLister    addonlisterv1alpha1.ManagedClusterAddOnLister
 	hubLeaseClient coordv1client.CoordinationV1Interface
-	leaseLister    coordlisters.LeaseLister
+	leaseClient    coordv1client.CoordinationV1Interface
 }
 
 // NewManagedClusterAddOnLeaseController returns an instance of managedClusterAddOnLeaseController
@@ -48,7 +46,7 @@ func NewManagedClusterAddOnLeaseController(clusterName string,
 	addOnClient addonclient.Interface,
 	addOnInformer addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	hubLeaseClient coordv1client.CoordinationV1Interface,
-	leaseInformer coordinformers.LeaseInformer,
+	leaseClient coordv1client.CoordinationV1Interface,
 	resyncInterval time.Duration,
 	recorder events.Recorder) factory.Controller {
 	c := &managedClusterAddOnLeaseController{
@@ -57,10 +55,14 @@ func NewManagedClusterAddOnLeaseController(clusterName string,
 		addOnClient:    addOnClient,
 		addOnLister:    addOnInformer.Lister(),
 		hubLeaseClient: hubLeaseClient,
-		leaseLister:    leaseInformer.Lister(),
+		leaseClient:    leaseClient,
 	}
+
+	// TODO We do not add leaser informer to support kubernetes version lower than 1.17. Lease v1 api
+	// is introduced in v1.17, hence adding lease informer in this controller will cause the hang of
+	// informer cache sync and result in fatal exit of this controller. The code will be factored
+	// when we no longer support kubernetes version lower than 1.17.
 	return factory.New().
-		WithInformersQueueKeyFunc(c.queueKeyFunc, leaseInformer.Informer()).
 		WithSync(c.sync).
 		ResyncEvery(resyncInterval).
 		ToController("ManagedClusterAddOnLeaseController", recorder)
@@ -105,7 +107,7 @@ func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
 	now := c.clock.Now()
 	gracePeriod := time.Duration(leaseDurationTimes*AddOnLeaseControllerLeaseDurationSeconds) * time.Second
 	// addon lease name should be same with the addon name.
-	observedLease, err := c.leaseLister.Leases(leaseNamespace).Get(addOn.Name)
+	observedLease, err := c.leaseClient.Leases(leaseNamespace).Get(ctx, addOn.Name, metav1.GetOptions{})
 
 	var condition metav1.Condition
 	switch {

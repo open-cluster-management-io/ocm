@@ -46,7 +46,8 @@ const (
 )
 
 // AddOnLeaseControllerSyncInterval is exposed so that integration tests can crank up the constroller sync speed.
-var AddOnLeaseControllerSyncInterval = 5 * time.Minute
+// TODO if we register the lease informer to the lease controller, we need to increase this time
+var AddOnLeaseControllerSyncInterval = 30 * time.Second
 
 // SpokeAgentOptions holds configuration for spoke cluster agent
 type SpokeAgentOptions struct {
@@ -312,7 +313,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			addOnClient,
 			addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
 			hubKubeClient.CoordinationV1(),
-			spokeKubeInformerFactory.Coordination().V1().Leases(),
+			spokeKubeClient.CoordinationV1(),
 			AddOnLeaseControllerSyncInterval, //TODO: this interval time should be allowed to change from outside
 			controllerContext.EventRecorder,
 		)
