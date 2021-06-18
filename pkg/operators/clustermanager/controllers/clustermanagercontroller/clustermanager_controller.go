@@ -145,6 +145,7 @@ type hubConfig struct {
 	WorkImage                      string
 	WorkAPIServiceCABundle         string
 	PlacementImage                 string
+	Replica                        int32
 }
 
 func (n *clusterManagerController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
@@ -166,6 +167,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		RegistrationImage:  clusterManager.Spec.RegistrationImagePullSpec,
 		WorkImage:          clusterManager.Spec.WorkImagePullSpec,
 		PlacementImage:     clusterManager.Spec.PlacementImagePullSpec,
+		Replica:            helpers.DetermineReplicaByNodes(ctx, n.kubeClient),
 	}
 
 	// Update finalizer at first

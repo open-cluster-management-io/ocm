@@ -35,8 +35,6 @@ import (
 	"github.com/open-cluster-management/registration-operator/pkg/helpers"
 	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/bindata"
 	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/kube111bindata"
-	configv1 "github.com/openshift/api/config/v1"
-	configv1client "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 )
 
 const (
@@ -81,7 +79,6 @@ type klusterletController struct {
 	klusterletClient          operatorv1client.KlusterletInterface
 	klusterletLister          operatorlister.KlusterletLister
 	kubeClient                kubernetes.Interface
-	configClient              configv1client.InfrastructureInterface
 	apiExtensionClient        apiextensionsclient.Interface
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
 	kubeVersion               *version.Version
@@ -93,7 +90,6 @@ func NewKlusterletController(
 	kubeClient kubernetes.Interface,
 	apiExtensionClient apiextensionsclient.Interface,
 	klusterletClient operatorv1client.KlusterletInterface,
-	configClient configv1client.InfrastructureInterface,
 	klusterletInformer operatorinformer.KlusterletInformer,
 	secretInformer coreinformer.SecretInformer,
 	deploymentInformer appsinformer.DeploymentInformer,
@@ -105,7 +101,6 @@ func NewKlusterletController(
 		kubeClient:                kubeClient,
 		apiExtensionClient:        apiExtensionClient,
 		klusterletClient:          klusterletClient,
-		configClient:              configClient,
 		klusterletLister:          klusterletInformer.Lister(),
 		appliedManifestWorkClient: appliedManifestWorkClient,
 		kubeVersion:               kubeVersion,
@@ -158,7 +153,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		HubKubeConfigSecret:       helpers.HubKubeConfig,
 		ExternalServerURL:         getServersFromKlusterlet(klusterlet),
 		OperatorNamespace:         n.operatorNamespace,
-		Replica:                   n.determineReplica(ctx),
+		Replica:                   helpers.DetermineReplicaByNodes(ctx, n.kubeClient),
 	}
 	// If namespace is not set, use the default namespace
 	if config.KlusterletNamespace == "" {
@@ -537,36 +532,6 @@ func (n *klusterletController) cleanUpAppliedManifestWorks(ctx context.Context, 
 		}
 	}
 	return operatorhelpers.NewMultiLineAggregate(errs)
-}
-
-// determineReplica determines the replica of deployment based on:
-// 1. Read ControlPlaneTopology from infrastructure API. Return 1 if it is SingleReplicaTopologyMode, otherwise return 3.
-// 2. If infrastructure API does not exist, list master nodes in the cluster and return 1 if
-// the number of master nodes is equal or less than 1. Return 3 otherwise.
-func (n *klusterletController) determineReplica(ctx context.Context) int32 {
-	config, err := n.configClient.Get(ctx, "cluster", metav1.GetOptions{})
-	if err != nil {
-		return n.determineReplicaByNodes(ctx)
-	}
-
-	if config.Status.ControlPlaneTopology == configv1.SingleReplicaTopologyMode {
-		return singleReplica
-	}
-
-	return defaultReplica
-}
-
-func (n *klusterletController) determineReplicaByNodes(ctx context.Context) int32 {
-	nodes, err := n.kubeClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{LabelSelector: "node-role.kubernetes.io/master="})
-	if err != nil {
-		return singleReplica
-	}
-
-	if len(nodes.Items) <= 1 {
-		return singleReplica
-	}
-
-	return defaultReplica
 }
 
 // removeFinalizer removes a finalizer from the list. It mutates its input.

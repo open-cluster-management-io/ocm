@@ -643,3 +643,43 @@ func newKubeConfigSecret(namespace, name string, kubeConfigData, certData, keyDa
 		Data: data,
 	}
 }
+
+func TestDeterminReplica(t *testing.T) {
+	cases := []struct {
+		name            string
+		existingNodes   []runtime.Object
+		expectedReplica int32
+	}{
+		{
+			name:            "single node",
+			existingNodes:   []runtime.Object{newNode("node1")},
+			expectedReplica: singleReplica,
+		},
+		{
+			name:            "multiple node",
+			existingNodes:   []runtime.Object{newNode("node1"), newNode("node2"), newNode("node3")},
+			expectedReplica: defaultReplica,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fakeKubeClient := fakekube.NewSimpleClientset(c.existingNodes...)
+			replica := DetermineReplicaByNodes(context.Background(), fakeKubeClient)
+			if replica != c.expectedReplica {
+				t.Errorf("Unexpected replica, actual: %d, expected: %d", replica, c.expectedReplica)
+			}
+		})
+	}
+}
+
+func newNode(name string) *corev1.Node {
+	return &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"node-role.kubernetes.io/master": "",
+			},
+		},
+	}
+}

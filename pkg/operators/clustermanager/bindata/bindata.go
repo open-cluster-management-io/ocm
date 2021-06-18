@@ -1738,7 +1738,7 @@ metadata:
   labels:
     app: clustermanager-controller
 spec:
-  replicas: 3
+  replicas: {{ .Replica }}
   selector:
     matchLabels:
       app: clustermanager-placement-controller
@@ -1962,7 +1962,7 @@ metadata:
   labels:
     app: clustermanager-controller
 spec:
-  replicas: 3
+  replicas: {{ .Replica }}
   selector:
     matchLabels:
       app: clustermanager-registration-controller
@@ -2202,7 +2202,7 @@ metadata:
   labels:
     app: {{ .ClusterManagerName }}-registration-webhook
 spec:
-  replicas: 3
+  replicas: {{ .Replica }}
   selector:
     matchLabels:
       app: {{ .ClusterManagerName }}-registration-webhook
@@ -2525,7 +2525,7 @@ metadata:
   labels:
     app: {{ .ClusterManagerName }}-work-webhook
 spec:
-  replicas: 3
+  replicas: {{ .Replica }}
   selector:
     matchLabels:
       app: {{ .ClusterManagerName }}-work-webhook
