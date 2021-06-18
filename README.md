@@ -33,9 +33,15 @@ Set environment variables.
 export KUBECONFIG=</path/to/hub_cluster/kubeconfig>
 ```
 
-Override the docker image (optional)
+Build the docker image to run the sample addon.
 ```sh
-export EXAMPLE_IMAGE_NAME=<your_own_image_name> # export EXAMPLE_IMAGE_NAME=quay.io/open-cluster-management-io/helloworld-addon:latest
+make images
+export EXAMPLE_IMAGE_NAME=<helloworld_addon_image_name> # export EXAMPLE_IMAGE_NAME=quay.io/open-cluster-management-io/helloworld-addon:latest
+```
+
+If your are using kind, load image into kind cluster.
+```sh
+kind load docker-image <helloworld_addon_image_name> # kind load docker-image quay.io/open-cluster-management-io/helloworld-addon:latest
 ```
 
 And then deploy helloworld addon contoller on hub cluster
