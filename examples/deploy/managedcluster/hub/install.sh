@@ -5,16 +5,10 @@ set -o pipefail
 
 KUBECTL=${KUBECTL:-kubectl}
 
-# On openshift, OLM is installed into openshift-operator-lifecycle-manager
-$KUBECTL get namespace openshift-operator-lifecycle-manager 1>/dev/null 2>&1
-if [ $? -eq 0 ]; then
-  export OLM_NAMESPACE=openshift-operator-lifecycle-manager
-fi
-
 rm -rf registration-operator
 
 echo "############  Cloning registration-operator"
-git clone https://github.com/open-cluster-management/registration-operator.git
+git clone https://github.com/open-cluster-management-io/registration-operator.git
 
 cd registration-operator || {
   printf "cd failed, registration-operator does not exist"
@@ -31,7 +25,7 @@ fi
 for i in {1..7}; do
   echo "############$i  Checking cluster-manager-registration-controller"
   RUNNING_POD=$($KUBECTL -n open-cluster-management-hub get pods | grep cluster-manager-registration-controller | grep -c "Running")
-  if [ "${RUNNING_POD}" -eq 3 ]; then
+  if [ "${RUNNING_POD}" -ge 1 ]; then
     break
   fi
 
@@ -47,7 +41,7 @@ done
 for i in {1..7}; do
   echo "############$i  Checking cluster-manager-registration-webhook"
   RUNNING_POD=$($KUBECTL -n open-cluster-management-hub get pods | grep cluster-manager-registration-webhook | grep -c "Running")
-  if [ "${RUNNING_POD}" -eq 3 ]; then
+  if [ "${RUNNING_POD}" -ge 1 ]; then
     break
   fi
 
