@@ -1,7 +1,6 @@
 package clientcert
 
 import (
-	"crypto/x509"
 	"crypto/x509/pkix"
 	"testing"
 	"time"
@@ -161,15 +160,21 @@ func TestIsCertificateValid(t *testing.T) {
 
 func TestGetCertValidityPeriod(t *testing.T) {
 	certs := []byte{}
-	certs = append(certs, testinghelpers.NewTestCert("cluster0", 10*time.Second).Cert...)
-	secondCert := testinghelpers.NewTestCert("cluster0", 5*time.Second).Cert
+	firstCert := testinghelpers.NewTestCert("cluster0", 5*time.Second).Cert
+	certs = append(certs, firstCert...)
+	secondCert := testinghelpers.NewTestCert("cluster0", 10*time.Second).Cert
 	certs = append(certs, secondCert...)
-	expectedCerts, _ := certutil.ParseCertsPEM(secondCert)
+	firstCerts, _ := certutil.ParseCertsPEM(firstCert)
+	secondCerts, _ := certutil.ParseCertsPEM(secondCert)
+	notBefore := secondCerts[0].NotBefore
+	notAfter := firstCerts[0].NotAfter
+
 	cases := []struct {
-		name         string
-		secret       *corev1.Secret
-		expectedCert *x509.Certificate
-		expectedErr  string
+		name        string
+		secret      *corev1.Secret
+		expectedErr string
+		notBefore   time.Time
+		notAfter    time.Time
 	}{
 		{
 			name:        "no data",
@@ -187,23 +192,24 @@ func TestGetCertValidityPeriod(t *testing.T) {
 			expectedErr: "unable to parse TLS certificates: data does not contain any valid RSA or ECDSA certificates",
 		},
 		{
-			name:         "valid cert",
-			secret:       testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "", &testinghelpers.TestCert{Cert: certs}, map[string][]byte{}),
-			expectedCert: expectedCerts[0],
+			name:      "valid cert",
+			secret:    testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "", &testinghelpers.TestCert{Cert: certs}, map[string][]byte{}),
+			notBefore: notBefore,
+			notAfter:  notAfter,
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			notBefore, notAfter, err := getCertValidityPeriod(c.secret)
 			testinghelpers.AssertError(t, err, c.expectedErr)
-			if c.expectedCert == nil {
+			if err != nil {
 				return
 			}
-			if !c.expectedCert.NotBefore.Equal(*notBefore) {
-				t.Errorf("expect %v, but got %v", expectedCerts[0].NotBefore, *notBefore)
+			if !c.notBefore.Equal(*notBefore) {
+				t.Errorf("expect %v, but got %v", c.notBefore, *notBefore)
 			}
-			if !c.expectedCert.NotAfter.Equal(*notAfter) {
-				t.Errorf("expect %v, but got %v", expectedCerts[0].NotAfter, *notAfter)
+			if !c.notAfter.Equal(*notAfter) {
+				t.Errorf("expect %v, but got %v", c.notAfter, *notAfter)
 			}
 		})
 	}
