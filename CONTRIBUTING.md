@@ -3,12 +3,12 @@
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
 - [Contributing guidelines](#contributing-guidelines)
-    - [Contributions](#contributions)
-    - [Certificate of Origin](#certificate-of-origin)
-    - [Contributing A Patch](#contributing-a-patch)
-    - [Issue and Pull Request Management](#issue-and-pull-request-management)
-    - [Pre-check before submitting a PR](#pre-check-before-submitting-a-pr)
-    - [Build images](#build-images)
+  - [Contributions](#contributions)
+  - [Certificate of Origin](#certificate-of-origin)
+  - [Contributing A Patch](#contributing-a-patch)
+  - [Issue and Pull Request Management](#issue-and-pull-request-management)
+  - [Pre-check before submitting a PR](#pre-check-before-submitting-a-pr)
+  - [Build images](#build-images)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -62,7 +62,12 @@ make test-integration
 Run e2e testing. During e2e testing, hub and managed cluster share the same Kubernetes cluster.
 ```shell
 export KUBECONFIG=</path/to/kubeconfig>
-make test-integration
+
+make images
+
+kind load docker-image quay.io/open-cluster-management-io/helloworld-addon:latest --name {your cluster name}
+
+make test-e2e
 ```
 
 ## Build images
