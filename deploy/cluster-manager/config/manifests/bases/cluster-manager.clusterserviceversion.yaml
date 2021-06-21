@@ -9,7 +9,7 @@ metadata:
     containerImage: quay.io/open-cluster-management/registration-operator:latest
     createdAt: "2020-10-15T20:00:31Z"
     description: Manages the installation and upgrade of the ClusterManager.
-    repository: https://github.com/open-cluster-management/registration-operator
+    repository: https://github.com/open-cluster-management-io/registration-operator
     support: Red Hat, Inc.
   name: cluster-manager.vX.Y.Z
   namespace: placeholder
@@ -74,7 +74,7 @@ spec:
   - ClusterManager
   links:
   - name: Registration Operator
-    url: https://github.com/open-cluster-management/registration-operator
+    url: https://github.com/open-cluster-management-io/registration-operator
   maintainers:
   - email: pmorie@redhat.com
     name: Paul Morie

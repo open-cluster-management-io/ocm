@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
-	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -28,6 +26,8 @@ import (
 	"k8s.io/client-go/util/retry"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
+	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"github.com/openshift/api"
 	"github.com/openshift/library-go/pkg/operator/events"
