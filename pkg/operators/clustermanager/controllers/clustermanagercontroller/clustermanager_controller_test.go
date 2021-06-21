@@ -5,9 +5,6 @@ import (
 	"testing"
 	"time"
 
-	fakeoperatorlient "github.com/open-cluster-management/api/client/operator/clientset/versioned/fake"
-	operatorinformers "github.com/open-cluster-management/api/client/operator/informers/externalversions"
-	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -20,9 +17,12 @@ import (
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	fakeapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
+	fakeoperatorlient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
+	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
-	"github.com/open-cluster-management/registration-operator/pkg/helpers"
-	testinghelper "github.com/open-cluster-management/registration-operator/pkg/helpers/testing"
+	"open-cluster-management.io/registration-operator/pkg/helpers"
+	testinghelper "open-cluster-management.io/registration-operator/pkg/helpers/testing"
 )
 
 type testController struct {

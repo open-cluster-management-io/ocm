@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	operatorv1client "github.com/open-cluster-management/api/client/operator/clientset/versioned/typed/operator/v1"
-	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
+	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"

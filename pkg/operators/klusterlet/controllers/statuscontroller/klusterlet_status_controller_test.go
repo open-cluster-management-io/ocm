@@ -20,11 +20,11 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 
-	fakeoperatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned/fake"
-	operatorinformers "github.com/open-cluster-management/api/client/operator/informers/externalversions"
-	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
-	"github.com/open-cluster-management/registration-operator/pkg/helpers"
-	testinghelper "github.com/open-cluster-management/registration-operator/pkg/helpers/testing"
+	fakeoperatorclient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
+	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/registration-operator/pkg/helpers"
+	testinghelper "open-cluster-management.io/registration-operator/pkg/helpers/testing"
 )
 
 type testController struct {

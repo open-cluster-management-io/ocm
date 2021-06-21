@@ -27,14 +27,14 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 
-	operatorv1client "github.com/open-cluster-management/api/client/operator/clientset/versioned/typed/operator/v1"
-	operatorinformer "github.com/open-cluster-management/api/client/operator/informers/externalversions/operator/v1"
-	operatorlister "github.com/open-cluster-management/api/client/operator/listers/operator/v1"
-	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned/typed/work/v1"
-	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
-	"github.com/open-cluster-management/registration-operator/pkg/helpers"
-	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/bindata"
-	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/kube111bindata"
+	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
+	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
+	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
+	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/registration-operator/pkg/helpers"
+	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/bindata"
+	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/kube111bindata"
 )
 
 const (

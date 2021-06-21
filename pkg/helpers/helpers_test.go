@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	opereatorfake "github.com/open-cluster-management/api/client/operator/clientset/versioned/fake"
-	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	fakeapiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
+	opereatorfake "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/equality"

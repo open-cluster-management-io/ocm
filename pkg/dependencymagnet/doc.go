@@ -6,9 +6,9 @@ package dependencymagnet
 
 import (
 	_ "github.com/go-bindata/go-bindata/go-bindata"
-	_ "github.com/open-cluster-management/api/addon/v1alpha1"
-	_ "github.com/open-cluster-management/api/cluster/v1"
-	_ "github.com/open-cluster-management/api/cluster/v1alpha1"
-	_ "github.com/open-cluster-management/api/work/v1"
 	_ "github.com/openshift/build-machinery-go"
+	_ "open-cluster-management.io/api/addon/v1alpha1"
+	_ "open-cluster-management.io/api/cluster/v1"
+	_ "open-cluster-management.io/api/cluster/v1alpha1"
+	_ "open-cluster-management.io/api/work/v1"
 )

@@ -24,12 +24,12 @@ import (
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 
-	operatorv1client "github.com/open-cluster-management/api/client/operator/clientset/versioned/typed/operator/v1"
-	operatorinformer "github.com/open-cluster-management/api/client/operator/informers/externalversions/operator/v1"
-	operatorlister "github.com/open-cluster-management/api/client/operator/listers/operator/v1"
-	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
-	"github.com/open-cluster-management/registration-operator/pkg/helpers"
-	"github.com/open-cluster-management/registration-operator/pkg/operators/clustermanager/bindata"
+	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
+	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
+	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/registration-operator/pkg/helpers"
+	"open-cluster-management.io/registration-operator/pkg/operators/clustermanager/bindata"
 )
 
 var (

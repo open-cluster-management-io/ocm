@@ -8,9 +8,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	fakeoperatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned/fake"
-	operatorinformers "github.com/open-cluster-management/api/client/operator/informers/externalversions"
-	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
+	fakeoperatorclient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
+	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
 
 func newSecret(name, namespace string) *corev1.Secret {

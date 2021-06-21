@@ -15,10 +15,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
-	operatorinformer "github.com/open-cluster-management/api/client/operator/informers/externalversions/operator/v1"
-	operatorlister "github.com/open-cluster-management/api/client/operator/listers/operator/v1"
-	"github.com/open-cluster-management/registration-operator/pkg/certrotation"
-	"github.com/open-cluster-management/registration-operator/pkg/helpers"
+	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
+	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
+	"open-cluster-management.io/registration-operator/pkg/certrotation"
+	"open-cluster-management.io/registration-operator/pkg/helpers"
 )
 
 const (

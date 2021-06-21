@@ -13,8 +13,8 @@ import (
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 
-	"github.com/open-cluster-management/registration-operator/pkg/cmd/operator"
-	"github.com/open-cluster-management/registration-operator/pkg/version"
+	"open-cluster-management.io/registration-operator/pkg/cmd/operator"
+	"open-cluster-management.io/registration-operator/pkg/version"
 )
 
 func main() {
