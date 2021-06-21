@@ -1,3 +1,5 @@
+SHELL :=/bin/bash
+
 all: build
 .PHONY: all
 
@@ -20,7 +22,7 @@ KUSTOMIZE_VERSION?=v3.5.4
 KUSTOMIZE_ARCHIVE_NAME?=kustomize_$(KUSTOMIZE_VERSION)_$(GOHOSTOS)_$(GOHOSTARCH).tar.gz
 kustomize_dir:=$(dir $(KUSTOMIZE))
 
-GIT_HOST ?= github.com/open-cluster-management
+GIT_HOST ?= open-cluster-management.io
 BASE_DIR := $(shell basename $(PWD))
 DEST := $(GOPATH)/src/$(GIT_HOST)/$(BASE_DIR)
 

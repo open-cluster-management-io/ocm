@@ -10,12 +10,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clienttesting "k8s.io/client-go/testing"
 
-	clusterclient "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
-	clusterfake "github.com/open-cluster-management/api/client/cluster/clientset/versioned/fake"
-	clusterlisterv1alpha1 "github.com/open-cluster-management/api/client/cluster/listers/cluster/v1alpha1"
-	clusterapiv1 "github.com/open-cluster-management/api/cluster/v1"
-	clusterapiv1alpha1 "github.com/open-cluster-management/api/cluster/v1alpha1"
-	testinghelpers "github.com/open-cluster-management/placement/pkg/helpers/testing"
+	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	clusterlisterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
+	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
+	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	testinghelpers "open-cluster-management.io/placement/pkg/helpers/testing"
 )
 
 func TestSchedulingController_sync(t *testing.T) {

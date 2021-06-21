@@ -10,9 +10,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 
-	clusterapiv1 "github.com/open-cluster-management/api/cluster/v1"
-	clusterapiv1alpha1 "github.com/open-cluster-management/api/cluster/v1alpha1"
-	"github.com/open-cluster-management/placement/test/integration/util"
+	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
+	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	"open-cluster-management.io/placement/test/integration/util"
 )
 
 const (

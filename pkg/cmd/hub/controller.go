@@ -5,8 +5,8 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
-	controllers "github.com/open-cluster-management/placement/pkg/controllers"
-	"github.com/open-cluster-management/placement/pkg/version"
+	controllers "open-cluster-management.io/placement/pkg/controllers"
+	"open-cluster-management.io/placement/pkg/version"
 )
 
 func NewController() *cobra.Command {

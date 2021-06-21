@@ -13,10 +13,10 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	clusterclient "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
-	clusterlisterv1alpha1 "github.com/open-cluster-management/api/client/cluster/listers/cluster/v1alpha1"
-	clusterapiv1 "github.com/open-cluster-management/api/cluster/v1"
-	clusterapiv1alpha1 "github.com/open-cluster-management/api/cluster/v1alpha1"
+	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	clusterlisterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
+	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
+	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 )
 
 const (
