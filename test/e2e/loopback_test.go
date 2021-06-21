@@ -307,6 +307,9 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
 			var err error
 			managedCluster, err = managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return false, nil
+			}
 			if err != nil {
 				return false, err
 			}
