@@ -24,6 +24,10 @@ const (
 type LeaseUpdater interface {
 	// Start starts a goroutine to update lease
 	Start(ctx context.Context)
+
+	// WithHubLeaseConfig sets the lease config on hub cluster. It allows LeaseUpdater to create/update
+	// addon lease on hub cluster when resource 'Lease' is not available on managed cluster.
+	WithHubLeaseConfig(config *rest.Config, clusterName string) LeaseUpdater
 }
 
 // leaseUpdater update lease of with given name and namespace
@@ -55,7 +59,7 @@ func (r *leaseUpdater) Start(ctx context.Context) {
 	wait.JitterUntilWithContext(context.TODO(), r.reconcile, time.Duration(r.leaseDurationSeconds)*time.Second, leaseUpdateJitterFactor, true)
 }
 
-func (r *leaseUpdater) WithHubLeaseConfig(config *rest.Config, clusterName string) {
+func (r *leaseUpdater) WithHubLeaseConfig(config *rest.Config, clusterName string) LeaseUpdater {
 	hubClient, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		klog.Errorf("Failed to build hub kube client %v", err)
@@ -63,7 +67,7 @@ func (r *leaseUpdater) WithHubLeaseConfig(config *rest.Config, clusterName strin
 		r.hubKubeClient = hubClient
 	}
 
-	return
+	return r
 }
 
 func (r *leaseUpdater) updateLease(ctx context.Context, namespace string, client kubernetes.Interface) error {
