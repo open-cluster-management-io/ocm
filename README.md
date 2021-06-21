@@ -175,8 +175,8 @@ status:
           ordinal: 0
           resource: deployments
           version: v1
-
 ```
+
 As shown above, the status of the `ManifestWork` includes the conditions for both the whole `ManifestWork` and each of the manifest it contains. And there are two condition types:
 - **Applied**. If true, it indicates the whole `ManifestWork` (or a particular manifest) has been applied on the managed cluster; otherwise `reason`/`message` of the condition will show more information for troubleshooting.
 - **Available**. If true, it indicates the coressponding Kubernetes resources of the the whole `ManifestWork` (or a particular manifest) are available on the managed cluster; otherwise `reason`/`message` of the condition will show more information for troubleshooting
