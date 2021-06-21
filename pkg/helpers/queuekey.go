@@ -9,8 +9,8 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 
-	operatorlister "github.com/open-cluster-management/api/client/operator/listers/operator/v1"
-	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
+	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
 
 const (

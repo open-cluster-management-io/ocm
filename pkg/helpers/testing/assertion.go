@@ -11,8 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clienttesting "k8s.io/client-go/testing"
 
-	opratorapiv1 "github.com/open-cluster-management/api/operator/v1"
-	"github.com/open-cluster-management/registration-operator/pkg/helpers"
+	opratorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/registration-operator/pkg/helpers"
 )
 
 func AssertAction(t *testing.T, actual clienttesting.Action, expected string) {

@@ -18,9 +18,9 @@ import (
 
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
-	operatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned"
-	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
-	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/controllers/bootstrapcontroller"
+	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/controllers/bootstrapcontroller"
 )
 
 func TestIntegration(t *testing.T) {

@@ -7,13 +7,6 @@ import (
 	"testing"
 	"time"
 
-	fakeoperatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned/fake"
-	operatorinformers "github.com/open-cluster-management/api/client/operator/informers/externalversions"
-	fakeworkclient "github.com/open-cluster-management/api/client/work/clientset/versioned/fake"
-	opratorapiv1 "github.com/open-cluster-management/api/operator/v1"
-	workapiv1 "github.com/open-cluster-management/api/work/v1"
-	"github.com/open-cluster-management/registration-operator/pkg/helpers"
-	testinghelper "github.com/open-cluster-management/registration-operator/pkg/helpers/testing"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	fakeapiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
@@ -28,6 +21,13 @@ import (
 	"k8s.io/client-go/tools/cache"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
+	fakeoperatorclient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
+	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
+	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
+	opratorapiv1 "open-cluster-management.io/api/operator/v1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/registration-operator/pkg/helpers"
+	testinghelper "open-cluster-management.io/registration-operator/pkg/helpers/testing"
 )
 
 type testController struct {

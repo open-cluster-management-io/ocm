@@ -13,15 +13,6 @@ import (
 
 	"github.com/onsi/gomega"
 
-	addonv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
-	addonclient "github.com/open-cluster-management/api/client/addon/clientset/versioned"
-	clusterclient "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
-	operatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned"
-	workv1client "github.com/open-cluster-management/api/client/work/clientset/versioned"
-	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
-	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
-	workapiv1 "github.com/open-cluster-management/api/work/v1"
-	"github.com/open-cluster-management/registration-operator/pkg/helpers"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +24,15 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
+	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
+	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/registration-operator/pkg/helpers"
 )
 
 type Tester struct {

@@ -7,7 +7,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	operatorclientset "github.com/open-cluster-management/api/client/operator/clientset/versioned"
+	operatorclientset "open-cluster-management.io/api/client/operator/clientset/versioned"
 )
 
 const (

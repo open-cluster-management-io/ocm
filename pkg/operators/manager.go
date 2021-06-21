@@ -13,16 +13,16 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
-	operatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned"
-	operatorinformer "github.com/open-cluster-management/api/client/operator/informers/externalversions"
-	workclientset "github.com/open-cluster-management/api/client/work/clientset/versioned"
-	"github.com/open-cluster-management/registration-operator/pkg/helpers"
-	certrotationcontroller "github.com/open-cluster-management/registration-operator/pkg/operators/clustermanager/controllers/certrotationcontroller"
-	"github.com/open-cluster-management/registration-operator/pkg/operators/clustermanager/controllers/clustermanagercontroller"
-	clustermanagerstatuscontroller "github.com/open-cluster-management/registration-operator/pkg/operators/clustermanager/controllers/statuscontroller"
-	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/controllers/bootstrapcontroller"
-	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/controllers/klusterletcontroller"
-	"github.com/open-cluster-management/registration-operator/pkg/operators/klusterlet/controllers/statuscontroller"
+	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
+	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
+	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	"open-cluster-management.io/registration-operator/pkg/helpers"
+	certrotationcontroller "open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/certrotationcontroller"
+	"open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/clustermanagercontroller"
+	clustermanagerstatuscontroller "open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/statuscontroller"
+	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/controllers/bootstrapcontroller"
+	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/controllers/klusterletcontroller"
+	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/controllers/statuscontroller"
 )
 
 // defaultSpokeComponentNamespace is the default namespace in which the operator is deployed

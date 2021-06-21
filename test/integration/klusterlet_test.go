@@ -16,10 +16,10 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
-	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
-	"github.com/open-cluster-management/registration-operator/pkg/helpers"
-	"github.com/open-cluster-management/registration-operator/pkg/operators"
-	"github.com/open-cluster-management/registration-operator/test/integration/util"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/registration-operator/pkg/helpers"
+	"open-cluster-management.io/registration-operator/pkg/operators"
+	"open-cluster-management.io/registration-operator/test/integration/util"
 )
 
 func startKlusterletOperator(ctx context.Context) {

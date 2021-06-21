@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	fakeoperatorclient "github.com/open-cluster-management/api/client/operator/clientset/versioned/fake"
-	operatorinformers "github.com/open-cluster-management/api/client/operator/informers/externalversions"
-	operatorapiv1 "github.com/open-cluster-management/api/operator/v1"
-	testinghelper "github.com/open-cluster-management/registration-operator/pkg/helpers/testing"
+	fakeoperatorclient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
+	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	testinghelper "open-cluster-management.io/registration-operator/pkg/helpers/testing"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
