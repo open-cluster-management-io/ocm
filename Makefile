@@ -16,7 +16,8 @@ IMAGE_TAG?=latest
 IMAGE_NAME?=$(IMAGE_REGISTRY)/registration:$(IMAGE_TAG)
 KUBECONFIG ?= ./.kubeconfig
 KUBECTL?=kubectl
-KUSTOMIZE?=$(PERMANENT_TMP_GOPATH)/bin/kustomize
+PWD=$(shell pwd)
+KUSTOMIZE?=$(PWD)/$(PERMANENT_TMP_GOPATH)/bin/kustomize
 KUSTOMIZE_VERSION?=v3.5.4
 KUSTOMIZE_ARCHIVE_NAME?=kustomize_$(KUSTOMIZE_VERSION)_$(GOHOSTOS)_$(GOHOSTARCH).tar.gz
 kustomize_dir:=$(dir $(KUSTOMIZE))
@@ -49,13 +50,13 @@ verify: verify-crds
 
 deploy-hub: ensure-kustomize
 	cp deploy/hub/kustomization.yaml deploy/hub/kustomization.yaml.tmp
-	cd deploy/hub && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/registration:latest=$(IMAGE_NAME)
+	cd deploy/hub && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/registration:latest=$(IMAGE_NAME)
 	$(KUSTOMIZE) build deploy/hub | $(KUBECTL) apply -f -
 	mv deploy/hub/kustomization.yaml.tmp deploy/hub/kustomization.yaml
 
 deploy-webhook: ensure-kustomize
 	cp deploy/webhook/kustomization.yaml deploy/webhook/kustomization.yaml.tmp
-	cd deploy/webhook && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/registration:latest=$(IMAGE_NAME)
+	cd deploy/webhook && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/registration:latest=$(IMAGE_NAME)
 	$(KUSTOMIZE) build deploy/webhook | $(KUBECTL) apply -f -
 	mv deploy/webhook/kustomization.yaml.tmp deploy/webhook/kustomization.yaml
 
@@ -77,7 +78,7 @@ e2e-bootstrap-secret: cluster-ip
 
 deploy-spoke: ensure-kustomize
 	cp deploy/spoke/kustomization.yaml deploy/spoke/kustomization.yaml.tmp
-	cd deploy/spoke && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/registration:latest=$(IMAGE_NAME)
+	cd deploy/spoke && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/registration:latest=$(IMAGE_NAME)
 	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) apply -f -
 	mv deploy/spoke/kustomization.yaml.tmp deploy/spoke/kustomization.yaml
 
