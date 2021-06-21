@@ -16,6 +16,7 @@ cd registration-operator || {
 }
 
 echo "############  Deploying klusterlet"
+make cluster-ip
 make deploy-spoke
 if [ $? -ne 0 ]; then
  echo "############  Failed to deploy klusterlet"

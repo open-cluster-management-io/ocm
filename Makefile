@@ -15,7 +15,8 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 # Tools for deploy
 KUBECONFIG ?= ./.kubeconfig
 KUBECTL?=kubectl
-KUSTOMIZE?=$(PERMANENT_TMP_GOPATH)/bin/kustomize
+PWD=$(shell pwd)
+KUSTOMIZE?=$(PWD)/$(PERMANENT_TMP_GOPATH)/bin/kustomize
 KUSTOMIZE_VERSION?=v3.5.4
 KUSTOMIZE_ARCHIVE_NAME?=kustomize_$(KUSTOMIZE_VERSION)_$(GOHOSTOS)_$(GOHOSTARCH).tar.gz
 kustomize_dir:=$(dir $(KUSTOMIZE))
@@ -52,7 +53,7 @@ deploy-klusterlet:
 
 deploy-example: ensure-kustomize
 	cp examples/deploy/addon/kustomization.yaml examples/deploy/addon/kustomization.yaml.tmp
-	cd examples/deploy/addon && ../../../$(KUSTOMIZE) edit set image helloworld-controller=$(EXAMPLE_IMAGE_NAME) && ../../../$(KUSTOMIZE) edit add configmap image-config --from-literal=EXAMPLE_IMAGE_NAME=$(EXAMPLE_IMAGE_NAME)
+	cd examples/deploy/addon && $(KUSTOMIZE) edit set image helloworld-controller=$(EXAMPLE_IMAGE_NAME) && $(KUSTOMIZE) edit add configmap image-config --from-literal=EXAMPLE_IMAGE_NAME=$(EXAMPLE_IMAGE_NAME)
 	$(KUSTOMIZE) build examples/deploy/addon | $(KUBECTL) apply -f -
 	mv examples/deploy/addon/kustomization.yaml.tmp examples/deploy/addon/kustomization.yaml
 
