@@ -21,7 +21,8 @@ HUB_KUBECONFIG?=$(KUBECONFIG)
 HUB_KUBECONFIG_CONTEXT?=$(shell $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) config current-context)
 SPOKE_KUBECONFIG?=$(KUBECONFIG)
 SPOKE_KUBECONFIG_CONTEXT?=$(shell $(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) config current-context)
-KUSTOMIZE?=$(PERMANENT_TMP_GOPATH)/bin/kustomize
+PWD=$(shell pwd)
+KUSTOMIZE?=$(PWD)/$(PERMANENT_TMP_GOPATH)/bin/kustomize
 KUSTOMIZE_VERSION?=v3.5.4
 KUSTOMIZE_ARCHIVE_NAME?=kustomize_$(KUSTOMIZE_VERSION)_$(GOHOSTOS)_$(GOHOSTARCH).tar.gz
 kustomize_dir:=$(dir $(KUSTOMIZE))
@@ -70,14 +71,14 @@ create-cluster-ns:
 
 deploy-work-agent: ensure-kustomize create-cluster-ns hub-kubeconfig-secret
 	cp deploy/spoke/kustomization.yaml deploy/spoke/kustomization.yaml.tmp
-	cd deploy/spoke && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/work:latest=$(IMAGE_NAME)
+	cd deploy/spoke && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/work:latest=$(IMAGE_NAME)
 	$(KUBECTL) config use-context $(SPOKE_KUBECONFIG_CONTEXT) --kubeconfig $(SPOKE_KUBECONFIG)
 	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) apply -f -
 	mv deploy/spoke/kustomization.yaml.tmp deploy/spoke/kustomization.yaml
 
 deploy-webhook: ensure-kustomize
 	cp deploy/webhook/kustomization.yaml deploy/webhook/kustomization.yaml.tmp
-	cd deploy/webhook && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/work:latest=$(IMAGE_NAME)
+	cd deploy/webhook && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/work:latest=$(IMAGE_NAME)
 	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
 	$(KUSTOMIZE) build deploy/webhook | $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) apply -f -
 	mv deploy/webhook/kustomization.yaml.tmp deploy/webhook/kustomization.yaml
