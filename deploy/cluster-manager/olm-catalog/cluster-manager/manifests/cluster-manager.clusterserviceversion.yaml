@@ -25,7 +25,7 @@ metadata:
     description: Manages the installation and upgrade of the ClusterManager.
     operators.operatorframework.io/builder: operator-sdk-v1.1.0
     operators.operatorframework.io/project_layout: go
-    repository: https://github.com/open-cluster-management/registration-operator
+    repository: https://github.com/open-cluster-management-io/registration-operator
     support: Red Hat, Inc.
   name: cluster-manager.v0.4.0
   namespace: placeholder
@@ -290,7 +290,7 @@ spec:
   - ClusterManager
   links:
   - name: Registration Operator
-    url: https://github.com/open-cluster-management/registration-operator
+    url: https://github.com/open-cluster-management-io/registration-operator
   maintainers:
   - email: pmorie@redhat.com
     name: Paul Morie
