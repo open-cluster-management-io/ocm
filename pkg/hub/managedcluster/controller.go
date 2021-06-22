@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	clientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
-	informerv1 "github.com/open-cluster-management/api/client/cluster/informers/externalversions/cluster/v1"
-	listerv1 "github.com/open-cluster-management/api/client/cluster/listers/cluster/v1"
-	v1 "github.com/open-cluster-management/api/cluster/v1"
-	"github.com/open-cluster-management/registration/pkg/helpers"
+	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	informerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
+	listerv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	v1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/registration/pkg/helpers"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -129,8 +129,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 
 	// TODO: we will add the managedcluster-namespace.yaml back to staticFiles
 	// in next release, currently, we need keep the namespace after the managed
-	// cluster is deleted, see the issue
-	// https://github.com/open-cluster-management/backlog/issues/2648
+	// cluster is deleted.
 	applyFiles := []string{"manifests/managedcluster-namespace.yaml"}
 	applyFiles = append(applyFiles, staticFiles...)
 

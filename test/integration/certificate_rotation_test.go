@@ -8,8 +8,8 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
-	"github.com/open-cluster-management/registration/pkg/spoke"
-	"github.com/open-cluster-management/registration/test/integration/util"
+	"open-cluster-management.io/registration/pkg/spoke"
+	"open-cluster-management.io/registration/test/integration/util"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 )

@@ -15,12 +15,12 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 
-	addonv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
-	addonfake "github.com/open-cluster-management/api/client/addon/clientset/versioned/fake"
-	addoninformers "github.com/open-cluster-management/api/client/addon/informers/externalversions"
-	"github.com/open-cluster-management/registration/pkg/clientcert"
-	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
+	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
+	"open-cluster-management.io/registration/pkg/clientcert"
+	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 )
 
 func TestFilterCSREvents(t *testing.T) {

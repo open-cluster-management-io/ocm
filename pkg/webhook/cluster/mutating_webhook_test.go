@@ -5,10 +5,10 @@ import (
 	"reflect"
 	"testing"
 
-	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 )
 
 func TestManagedClusterMutate(t *testing.T) {

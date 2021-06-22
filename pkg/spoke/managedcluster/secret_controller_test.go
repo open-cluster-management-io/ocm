@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/open-cluster-management/registration/pkg/clientcert"
-	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	"open-cluster-management.io/registration/pkg/clientcert"
+	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/rand"

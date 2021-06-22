@@ -13,10 +13,10 @@ import (
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 
-	"github.com/open-cluster-management/registration/pkg/cmd/hub"
-	"github.com/open-cluster-management/registration/pkg/cmd/spoke"
-	"github.com/open-cluster-management/registration/pkg/cmd/webhook"
-	"github.com/open-cluster-management/registration/pkg/version"
+	"open-cluster-management.io/registration/pkg/cmd/hub"
+	"open-cluster-management.io/registration/pkg/cmd/spoke"
+	"open-cluster-management.io/registration/pkg/cmd/webhook"
+	"open-cluster-management.io/registration/pkg/version"
 )
 
 // The registration binary contains both the hub-side controllers for the

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
+	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 )
 
 func TestGetClusterAgentNamesFromCertificate(t *testing.T) {

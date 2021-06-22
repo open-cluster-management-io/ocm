@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	clusterfake "github.com/open-cluster-management/api/client/cluster/clientset/versioned/fake"
-	clusterinformers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
-	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
+	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 

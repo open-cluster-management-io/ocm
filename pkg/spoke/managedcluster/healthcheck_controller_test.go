@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	clusterfake "github.com/open-cluster-management/api/client/cluster/clientset/versioned/fake"
-	clusterinformers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
-	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
-	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
+	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

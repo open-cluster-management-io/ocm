@@ -17,8 +17,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	addonclient "github.com/open-cluster-management/api/client/addon/clientset/versioned"
-	clusterclient "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
+	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 )
 
 func TestE2E(t *testing.T) {

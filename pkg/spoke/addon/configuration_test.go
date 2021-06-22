@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"testing"
 
-	addonv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
-	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

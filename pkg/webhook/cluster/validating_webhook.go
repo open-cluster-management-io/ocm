@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net/http"
 
-	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
-	"github.com/open-cluster-management/registration/pkg/helpers"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/registration/pkg/helpers"
 
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 

@@ -22,8 +22,8 @@ import (
 	certificateslisters "k8s.io/client-go/listers/certificates/v1"
 	"k8s.io/klog/v2"
 
-	"github.com/open-cluster-management/registration/pkg/helpers"
-	"github.com/open-cluster-management/registration/pkg/hub/user"
+	"open-cluster-management.io/registration/pkg/helpers"
+	"open-cluster-management.io/registration/pkg/hub/user"
 )
 
 const (
