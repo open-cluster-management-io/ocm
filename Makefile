@@ -122,14 +122,15 @@ apply-spoke-cr: bootstrap-secret
 	$(KUSTOMIZE) build deploy/klusterlet/config/samples | $(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," | $(KUBECTL) apply -f -
 
 clean-hub-cr:
-	$(KUBECTL) delete -k deploy/cluster-manager/config/samples --ignore-not-found
+	$(KUSTOMIZE) build deploy/cluster-manager/config/samples | $(KUBECTL) delete --ignore-not-found -f -
 
 clean-hub-operator:
 	$(KUSTOMIZE) build deploy/cluster-manager/config | $(KUBECTL) delete --ignore-not-found -f -
 
 clean-spoke-cr:
 	$(KUBECTL) delete managedcluster --all --ignore-not-found
-	$(KUBECTL) delete -k deploy/klusterlet/config/samples --ignore-not-found
+	$(KUSTOMIZE) build deploy/klusterlet/config/samples | $(KUBECTL) delete --ignore-not-found -f -
+	$(KUSTOMIZE) build deploy/klusterlet/config/samples/bootstrap | $(KUBECTL) delete --ignore-not-found -f -
 
 clean-spoke-operator:
 	$(KUSTOMIZE) build deploy/klusterlet/config | $(KUBECTL) delete --ignore-not-found -f -
