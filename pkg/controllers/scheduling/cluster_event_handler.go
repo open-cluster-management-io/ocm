@@ -3,13 +3,13 @@ package scheduling
 import (
 	"fmt"
 
-	clusterlisterv1alpha1 "github.com/open-cluster-management/api/client/cluster/listers/cluster/v1alpha1"
-	clusterapiv1 "github.com/open-cluster-management/api/cluster/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	cache "k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	clusterlisterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
+	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 type clusterEventHandler struct {

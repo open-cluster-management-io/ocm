@@ -3,11 +3,11 @@ package testing
 import (
 	"time"
 
-	clusterclient "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
-	clusterinformers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
-	clusterapiv1 "github.com/open-cluster-management/api/cluster/v1"
-	clusterapiv1alpha1 "github.com/open-cluster-management/api/cluster/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
+	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
+	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 )
 
 func NewClusterInformerFactory(clusterClient clusterclient.Interface, objects ...runtime.Object) clusterinformers.SharedInformerFactory {

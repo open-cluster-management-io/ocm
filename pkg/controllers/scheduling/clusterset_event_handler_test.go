@@ -9,8 +9,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	cache "k8s.io/client-go/tools/cache"
 
-	clusterfake "github.com/open-cluster-management/api/client/cluster/clientset/versioned/fake"
-	testinghelpers "github.com/open-cluster-management/placement/pkg/helpers/testing"
+	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	testinghelpers "open-cluster-management.io/placement/pkg/helpers/testing"
 )
 
 func TestEnqueuePlacementsByClusterSet(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
-	clusterv1client "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
+	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 )
 
 const (
@@ -36,8 +36,8 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	testEnv = &envtest.Environment{
 		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths: []string{
-			filepath.Join(".", "vendor", "github.com", "open-cluster-management", "api", "cluster", "v1"),
-			filepath.Join(".", "vendor", "github.com", "open-cluster-management", "api", "cluster", "v1alpha1"),
+			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "cluster", "v1"),
+			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "cluster", "v1alpha1"),
 		},
 	}
 

@@ -12,10 +12,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clienttesting "k8s.io/client-go/testing"
 
-	clusterfake "github.com/open-cluster-management/api/client/cluster/clientset/versioned/fake"
-	clusterapiv1 "github.com/open-cluster-management/api/cluster/v1"
-	clusterapiv1alpha1 "github.com/open-cluster-management/api/cluster/v1alpha1"
-	testinghelpers "github.com/open-cluster-management/placement/pkg/helpers/testing"
+	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
+	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	testinghelpers "open-cluster-management.io/placement/pkg/helpers/testing"
 )
 
 func TestSchedule(t *testing.T) {

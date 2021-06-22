@@ -9,9 +9,9 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
-	clusterlisterv1alpha1 "github.com/open-cluster-management/api/client/cluster/listers/cluster/v1alpha1"
-	clusterapiv1alpha1 "github.com/open-cluster-management/api/cluster/v1alpha1"
 	errorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+	clusterlisterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
+	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 )
 
 type clusterSetEventHandler struct {

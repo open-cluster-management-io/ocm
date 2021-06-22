@@ -6,9 +6,9 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
-	clusterclient "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
-	clusterinformers "github.com/open-cluster-management/api/client/cluster/informers/externalversions"
-	scheduling "github.com/open-cluster-management/placement/pkg/controllers/scheduling"
+	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	scheduling "open-cluster-management.io/placement/pkg/controllers/scheduling"
 )
 
 // RunControllerManager starts the controllers on hub to make placement decisions.

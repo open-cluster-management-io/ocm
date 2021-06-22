@@ -133,24 +133,6 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/open-cluster-management/api v0.0.0-20210506014040-cc5aa104d1e1
-## explicit
-github.com/open-cluster-management/api/client/cluster/clientset/versioned
-github.com/open-cluster-management/api/client/cluster/clientset/versioned/fake
-github.com/open-cluster-management/api/client/cluster/clientset/versioned/scheme
-github.com/open-cluster-management/api/client/cluster/clientset/versioned/typed/cluster/v1
-github.com/open-cluster-management/api/client/cluster/clientset/versioned/typed/cluster/v1/fake
-github.com/open-cluster-management/api/client/cluster/clientset/versioned/typed/cluster/v1alpha1
-github.com/open-cluster-management/api/client/cluster/clientset/versioned/typed/cluster/v1alpha1/fake
-github.com/open-cluster-management/api/client/cluster/informers/externalversions
-github.com/open-cluster-management/api/client/cluster/informers/externalversions/cluster
-github.com/open-cluster-management/api/client/cluster/informers/externalversions/cluster/v1
-github.com/open-cluster-management/api/client/cluster/informers/externalversions/cluster/v1alpha1
-github.com/open-cluster-management/api/client/cluster/informers/externalversions/internalinterfaces
-github.com/open-cluster-management/api/client/cluster/listers/cluster/v1
-github.com/open-cluster-management/api/client/cluster/listers/cluster/v1alpha1
-github.com/open-cluster-management/api/cluster/v1
-github.com/open-cluster-management/api/cluster/v1alpha1
 # github.com/openshift/api v0.0.0-20210331193751-3acddb19d360
 github.com/openshift/api/config/v1
 github.com/openshift/api/operator/v1
@@ -393,7 +375,7 @@ gopkg.in/natefinch/lumberjack.v2
 gopkg.in/tomb.v1
 # gopkg.in/yaml.v2 v2.4.0
 gopkg.in/yaml.v2
-# k8s.io/api v0.21.0
+# k8s.io/api v0.21.1
 ## explicit
 k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
@@ -448,7 +430,7 @@ k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1
-# k8s.io/apimachinery v0.21.0
+# k8s.io/apimachinery v0.21.1
 ## explicit
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/api/errors
@@ -627,7 +609,7 @@ k8s.io/apiserver/plugin/pkg/audit/truncate
 k8s.io/apiserver/plugin/pkg/audit/webhook
 k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 k8s.io/apiserver/plugin/pkg/authorizer/webhook
-# k8s.io/client-go v0.21.0
+# k8s.io/client-go v0.21.1
 ## explicit
 k8s.io/client-go/applyconfigurations/admissionregistration/v1
 k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1
@@ -877,6 +859,24 @@ k8s.io/utils/net
 k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/trace
+# open-cluster-management.io/api v0.0.0-20210610125115-f57c747b84aa
+## explicit
+open-cluster-management.io/api/client/cluster/clientset/versioned
+open-cluster-management.io/api/client/cluster/clientset/versioned/fake
+open-cluster-management.io/api/client/cluster/clientset/versioned/scheme
+open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1
+open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1/fake
+open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1alpha1
+open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1alpha1/fake
+open-cluster-management.io/api/client/cluster/informers/externalversions
+open-cluster-management.io/api/client/cluster/informers/externalversions/cluster
+open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1
+open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1alpha1
+open-cluster-management.io/api/client/cluster/informers/externalversions/internalinterfaces
+open-cluster-management.io/api/client/cluster/listers/cluster/v1
+open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1
+open-cluster-management.io/api/cluster/v1
+open-cluster-management.io/api/cluster/v1alpha1
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.15
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
