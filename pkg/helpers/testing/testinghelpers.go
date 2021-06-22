@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
-	workapiv1 "github.com/open-cluster-management/api/work/v1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"

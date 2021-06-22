@@ -6,11 +6,11 @@ import (
 	"net/url"
 	"path/filepath"
 
-	addonv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
-	addonv1alpha1client "github.com/open-cluster-management/api/client/addon/clientset/versioned"
-	clusterclientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
-	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
-	"github.com/open-cluster-management/registration/pkg/hub/managedcluster/bindata"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/registration/pkg/hub/managedcluster/bindata"
 
 	"github.com/openshift/api"
 	"github.com/openshift/library-go/pkg/assets"

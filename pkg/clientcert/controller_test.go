@@ -15,8 +15,8 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 
-	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
-	"github.com/open-cluster-management/registration/pkg/hub/user"
+	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
+	"open-cluster-management.io/registration/pkg/hub/user"
 )
 
 const (

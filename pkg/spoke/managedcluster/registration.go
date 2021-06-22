@@ -16,8 +16,8 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	certutil "k8s.io/client-go/util/cert"
 
-	"github.com/open-cluster-management/registration/pkg/clientcert"
-	"github.com/open-cluster-management/registration/pkg/hub/user"
+	"open-cluster-management.io/registration/pkg/clientcert"
+	"open-cluster-management.io/registration/pkg/hub/user"
 )
 
 // NewClientCertForHubController returns a controller to

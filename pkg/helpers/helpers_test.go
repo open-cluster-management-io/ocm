@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	addonv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
-	addonfake "github.com/open-cluster-management/api/client/addon/clientset/versioned/fake"
-	clusterfake "github.com/open-cluster-management/api/client/cluster/clientset/versioned/fake"
-	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
-	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
+	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 

@@ -7,12 +7,12 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
-	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
-	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 )
 
 var _ = ginkgo.Describe("Cluster deleting", func() {

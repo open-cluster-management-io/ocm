@@ -6,9 +6,9 @@ import (
 	"reflect"
 	"testing"
 
-	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
-	clusterv1alpha1 "github.com/open-cluster-management/api/cluster/v1alpha1"
-	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	authenticationv1 "k8s.io/api/authentication/v1"

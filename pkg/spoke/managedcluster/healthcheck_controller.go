@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"time"
 
-	clientset "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
-	clusterv1informer "github.com/open-cluster-management/api/client/cluster/informers/externalversions/cluster/v1"
-	clusterv1listers "github.com/open-cluster-management/api/client/cluster/listers/cluster/v1"
-	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
-	"github.com/open-cluster-management/registration/pkg/helpers"
+	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
+	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/registration/pkg/helpers"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"

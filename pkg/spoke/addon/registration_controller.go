@@ -19,9 +19,9 @@ import (
 	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1"
 	"k8s.io/klog/v2"
 
-	addoninformerv1alpha1 "github.com/open-cluster-management/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "github.com/open-cluster-management/api/client/addon/listers/addon/v1alpha1"
-	"github.com/open-cluster-management/registration/pkg/clientcert"
+	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
+	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	"open-cluster-management.io/registration/pkg/clientcert"
 )
 
 // addOnRegistrationController monitors ManagedClusterAddOns on hub and starts addOn registration

@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	addonv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
-	addonfake "github.com/open-cluster-management/api/client/addon/clientset/versioned/fake"
-	addoninformers "github.com/open-cluster-management/api/client/addon/informers/externalversions"
-	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
+	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
+	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

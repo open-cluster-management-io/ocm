@@ -9,7 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	certutil "k8s.io/client-go/util/cert"
 
-	testinghelpers "github.com/open-cluster-management/registration/pkg/helpers/testing"
+	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 )
 
 func TestIsCSRApproved(t *testing.T) {

@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	addonv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
 	certificatesv1 "k8s.io/api/certificates/v1"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
 const defaultAddOnInstallationNamespace = "open-cluster-management-agent-addon"

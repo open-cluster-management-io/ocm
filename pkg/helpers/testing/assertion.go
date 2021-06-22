@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	certv1 "k8s.io/api/certificates/v1"

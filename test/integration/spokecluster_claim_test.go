@@ -12,11 +12,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/rand"
 
-	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
-	clusterv1alpha1 "github.com/open-cluster-management/api/cluster/v1alpha1"
-	"github.com/open-cluster-management/registration/pkg/spoke"
-	"github.com/open-cluster-management/registration/test/integration/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	"open-cluster-management.io/registration/pkg/spoke"
+	"open-cluster-management.io/registration/test/integration/util"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 )

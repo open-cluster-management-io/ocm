@@ -11,9 +11,9 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
-	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
-	"github.com/open-cluster-management/registration/pkg/spoke"
-	"github.com/open-cluster-management/registration/test/integration/util"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/registration/pkg/spoke"
+	"open-cluster-management.io/registration/test/integration/util"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

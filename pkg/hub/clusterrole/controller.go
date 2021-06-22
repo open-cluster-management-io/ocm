@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"path/filepath"
 
-	clusterv1informer "github.com/open-cluster-management/api/client/cluster/informers/externalversions/cluster/v1"
-	clusterv1listers "github.com/open-cluster-management/api/client/cluster/listers/cluster/v1"
-	"github.com/open-cluster-management/registration/pkg/helpers"
-	"github.com/open-cluster-management/registration/pkg/hub/clusterrole/bindata"
+	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
+	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	"open-cluster-management.io/registration/pkg/helpers"
+	"open-cluster-management.io/registration/pkg/hub/clusterrole/bindata"
 
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/controller/factory"

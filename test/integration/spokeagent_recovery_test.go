@@ -9,9 +9,9 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
-	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
-	"github.com/open-cluster-management/registration/pkg/spoke"
-	"github.com/open-cluster-management/registration/test/integration/util"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/registration/pkg/spoke"
+	"open-cluster-management.io/registration/test/integration/util"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
