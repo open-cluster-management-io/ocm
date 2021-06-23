@@ -45,18 +45,27 @@ Repo maintainers can assign you an issue or pull request by leaving a
 
 After your PR is ready to commit, please run following commands to check your code.
 
-```shell
-make verify
-make test
-```
+- verify your code
+  ```shell
+  make verify
+  ```
+- run the unit test
+  ```shell
+  make test
+  ```
+- run the integration test
+  ```shell
+  make test-integration
+  ```
+- run the end-to-end test, prepare a kind cluster and run the following command. Make sure [imagebuilder](https://github.com/openshift/imagebuilder) is installed.
+  ```shell
+  go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.1
+  
+  export KUBECONFIG={the kubeconfig of your kind cluster that will run the e2e test}
 
-## Build images
+  make images
 
-Make sure your code build passed.
+  kind load docker-image quay.io/open-cluster-management/registration-operator --name {your kind cluster name}
 
-```shell
-export BUILD_LOCALLY=1
-make
-```
-
-Now, you can follow the [getting started guide](./README.md#getting-started) to work with this repository.
+  make test-e2e
+  ```
