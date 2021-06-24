@@ -45,11 +45,8 @@ $(call add-bindata,foundation-agent,./examples/helloworld/manifests/...,bindata,
 # It will generate target "image-$(1)" for building the image and binding it as a prerequisite to target "images".
 $(call build-image,$(IMAGE),$(IMAGE_REGISTRY)/$(IMAGE),./Dockerfile,.)
 
-deploy-hub:
-	examples/deploy/managedcluster/hub/install.sh
-
-deploy-klusterlet:
-	examples/deploy/managedcluster/klusterlet/install.sh
+deploy-ocm:
+	examples/deploy/ocm/install.sh
 
 deploy-example: ensure-kustomize
 	cp examples/deploy/addon/kustomization.yaml examples/deploy/addon/kustomization.yaml.tmp
@@ -63,7 +60,7 @@ undeploy-example: ensure-kustomize
 build-e2e:
 	go test -c ./test/e2e
 
-test-e2e: build-e2e deploy-hub deploy-klusterlet deploy-example
+test-e2e: build-e2e deploy-ocm deploy-example
 	./e2e.test -test.v -ginkgo.v
 
 # Ensure kustomize

@@ -15,10 +15,10 @@ cd registration-operator || {
   return 1
 }
 
-echo "############  Deploying hub"
-make deploy-hub
+echo "############  Deploying"
+make deploy
 if [ $? -ne 0 ]; then
- echo "############  Failed to deploy hub"
+ echo "############  Failed to deploy"
  exit 1
 fi
 
@@ -50,10 +50,25 @@ for i in {1..7}; do
     $KUBECTL -n open-cluster-management-hub get pods
     exit 1
   fi
+  sleep 30s
+done
+
+for i in {1..7}; do
+  echo "############$i  Checking klusterlet-registration-agent"
+  RUNNING_POD=$($KUBECTL -n open-cluster-management-agent get pods | grep klusterlet-registration-agent | grep -c "Running")
+  if [ ${RUNNING_POD} -ge 1 ]; then
+    break
+  fi
+
+  if [ $i -eq 7 ]; then
+    echo "!!!!!!!!!!  the klusterlet-registration-agent is not ready within 3 minutes"
+    $KUBECTL -n open-cluster-management-agent get pods
+    exit 1
+  fi
   sleep 30
 done
 
-echo "############  ManagedCluster hub is installed successfully!!"
+echo "############  All-in-one env is installed successfully!!"
 
 echo "############  Cleanup"
 cd ../ || exist
