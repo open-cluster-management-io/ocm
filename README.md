@@ -21,36 +21,70 @@ The Klusterlet requires a secret named of _bootstrap-hub-kubeconfig_ in the same
 
 The controllers are all deployed in _open-cluster-management-agent_ namespace by default. The namespace can be specified in Klusterlet CR.
 
-## Guides
+## Get started with [Kind](https://kind.sigs.k8s.io/)
 
-## Deploy all-in-one deployment on kind
+1. Create a cluster with kind
+   ```shell
+   kind create cluster 
+   ```
 
-1. Create a kind cluster
-    ```
-    kind create cluster --name cluster1
-    kind get kubeconfig --name cluster1 > ./.kubeconfig
-    ```
-2. Deploy all components on the kind cluster
-    ```
-    export MANAGED_CLUSTER=cluster1
-    make deploy
-    ```
+2. Deploy
+   ```shell
+   export KUBECONFIG=$HOME/.kube/config
+   make deploy
+   ```
+
+## More details about deployment
+
+We mainly provide deployment in two scenarios:
+1. All-in-one: using one cluster as hub and spoke at the same time.
+2. Hub-spoke: using one cluster as hub and another cluster as spoke.
+
+### Deploy all-in-on deployment
+
+1. Set a env variable `KUBECONFIG` to kubeconfig file path. 
+   ```shell
+   export KUBECONFIG=$HOME/.kube/config
+   ```
+2. Deploy all components on the cluster.
+   ```shell
+   make deploy
+   ```
 3. To clean the environment, run `make clean-deploy`
 
-## Deploy on OCP
+### Deploy hub-spoke deployment
 
-1. Deploy hub component
+1. Set env variables.
+   ```shell
+   export KUBECONFIG=$HOME/.kube/config
+   ```
+2. Switch to hub context and deploy hub components.
+   ```
+   kubectl config use-context {hub-context}
+   make deploy-hub
+   ```
+   **PLEASE NOTE**: If you're running kubernetes in docker, the `server` address in kubeconfig may not be accessible for other clusters. In this case, you need to set `HUB_KUBECONFIG` explicitly.
+
+   For example, if your clusters are created by kind, you need to use kind's command to export a kubeconfig of hub with an accessible `server` address. ([The related issue](https://github.com/kubernetes-sigs/kind/issues/1305))
+
+   ```shell
+   kind get kubeconfig --name {your kind cluster name} --internal > ./.hub-kubeconfig # ./.hub-kubeconfig is default value of HUB_KUBECONFIG 
+   ```
+3. Switch to spoke context and deploy agent components.
     ```
-    export OLM_NAMESPACE=openshift-operator-lifecycle-manager
-    make deploy-hub
-    ```
-2. Deploy agent component
-    ```
-    export KLUSTERLET_KUBECONFIG_CONTEXT={kube config context of managed cluster}
-    export OLM_NAMESPACE=openshift-operator-lifecycle-manager
+    kubectl config use-context {spoke context}
     make deploy-spoke
     ```
-3. To clean the environment, run `make clean-hub` and `make clean-spoke`
+4. To clean the hub environment.
+   ```shell
+   kubectl config use-context {hub-context} 
+   make clean-hub
+   ```
+5. To clean the spoke environment.
+   ```shell
+   kubectl config use-context {spoke context} 
+   make clean-spoke
+   ``` 
 
 ## What is next
 

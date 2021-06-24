@@ -8,6 +8,7 @@ registration-operator
 !vendor/**
 dev-kubeconfig
 e2e-kubeconfig
+hub-kubeconfig
 munge-csv
 
 # Test binary, build with `go test -c`
@@ -18,4 +19,5 @@ munge-csv
 _output/
 
 .kubeconfig
+.hub-kubeconfig
 .idea

@@ -46,10 +46,7 @@ kustomize_dir:=$(dir $(KUSTOMIZE))
 
 KUBECTL?=kubectl
 KUBECONFIG?=./.kubeconfig
-KLUSTERLET_KUBECONFIG?=$(HOME)/cluster1-kubeconfig
-HUB_KUBECONFIG_CONTEXT?=$(shell $(KUBECTL) config current-context)
-HUB_KUBECONFIG?=$(HOME)/hub-kubeconfig
-MANAGED_CLUSTER?=cluster1
+HUB_KUBECONFIG=./.hub-kubeconfig
 
 OPERATOR_SDK_ARCHOS:=x86_64-linux-gnu
 ifeq ($(GOHOSTOS),darwin)
@@ -87,11 +84,14 @@ update-csv: ensure-operator-sdk
 	rm ./deploy/cluster-manager/olm-catalog/cluster-manager/manifests/cluster-manager_v1_serviceaccount.yaml
 	rm ./deploy/klusterlet/olm-catalog/klusterlet/manifests/klusterlet_v1_serviceaccount.yaml
 
-deploy: deploy-hub deploy-spoke
+deploy: deploy-hub cluster-ip deploy-spoke
+
+hub-kubeconfig:
+	$(KUBECTL) config view --minify --flatten > $(HUB_KUBECONFIG)
 
 clean-deploy: clean-spoke-cr clean-hub-cr clean-spoke-operator clean-hub-operator
 
-deploy-hub: deploy-hub-operator apply-hub-cr
+deploy-hub: deploy-hub-operator apply-hub-cr hub-kubeconfig
 
 deploy-spoke: deploy-spoke-operator apply-spoke-cr
 
@@ -101,14 +101,14 @@ deploy-hub-operator: ensure-kustomize
 apply-hub-cr:
 	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/placement,$(PLACEMENT_IMAGE)," deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers.cr.yaml | $(KUBECTL) apply -f -
 
-clean-hub: ensure-operator-sdk
-	$(KUBECTL) delete -f deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers.cr.yaml --ignore-not-found
-	$(OPERATOR_SDK) cleanup cluster-manager --namespace open-cluster-management --timeout 10m
+clean-hub: clean-hub-cr clean-hub-operator
+
+clean-spoke: clean-spoke-cr clean-spoke-operator
 
 cluster-ip:
-	cp $(KUBECONFIG) $(HUB_KUBECONFIG)
-	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
-	$(KUBECTL) config set clusters.$(HUB_KUBECONFIG_CONTEXT).server https://$(shell $(KUBECTL) get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}") --kubeconfig $(HUB_KUBECONFIG)
+	$(eval HUB_CONTEXT := $(shell $(KUBECTL) config current-context --kubeconfig $(HUB_KUBECONFIG)))
+	$(eval HUB_CLUSTER_IP := $(shell $(KUBECTL) get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}" --kubeconfig $(HUB_KUBECONFIG)))
+	$(KUBECTL) config set clusters.$(HUB_CONTEXT).server https://$(HUB_CLUSTER_IP) --kubeconfig $(HUB_KUBECONFIG)
 
 bootstrap-secret:
 	cp $(HUB_KUBECONFIG) deploy/klusterlet/config/samples/bootstrap/hub-kubeconfig
@@ -122,13 +122,13 @@ apply-spoke-cr: bootstrap-secret
 	$(KUSTOMIZE) build deploy/klusterlet/config/samples | $(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," | $(KUBECTL) apply -f -
 
 clean-hub-cr:
+	$(KUBECTL) delete managedcluster --all --ignore-not-found
 	$(KUSTOMIZE) build deploy/cluster-manager/config/samples | $(KUBECTL) delete --ignore-not-found -f -
 
 clean-hub-operator:
 	$(KUSTOMIZE) build deploy/cluster-manager/config | $(KUBECTL) delete --ignore-not-found -f -
 
 clean-spoke-cr:
-	$(KUBECTL) delete managedcluster --all --ignore-not-found
 	$(KUSTOMIZE) build deploy/klusterlet/config/samples | $(KUBECTL) delete --ignore-not-found -f -
 	$(KUSTOMIZE) build deploy/klusterlet/config/samples/bootstrap | $(KUBECTL) delete --ignore-not-found -f -
 
