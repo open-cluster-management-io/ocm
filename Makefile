@@ -17,7 +17,7 @@ IMAGE_TAG?=latest
 IMAGE_REGISTRY ?= quay.io/open-cluster-management
 IMAGE_NAME?=$(IMAGE_REGISTRY)/$(IMAGE):$(IMAGE_TAG)
 KUBECTL?=kubectl
-KUSTOMIZE?=$(PERMANENT_TMP_GOPATH)/bin/kustomize
+KUSTOMIZE?=$(PWD)/$(PERMANENT_TMP_GOPATH)/bin/kustomize
 KUSTOMIZE_VERSION?=v3.5.4
 KUSTOMIZE_ARCHIVE_NAME?=kustomize_$(KUSTOMIZE_VERSION)_$(GOHOSTOS)_$(GOHOSTARCH).tar.gz
 kustomize_dir:=$(dir $(KUSTOMIZE))
@@ -39,9 +39,12 @@ $(call build-image,$(IMAGE),$(IMAGE_REGISTRY)/$(IMAGE),./Dockerfile,.)
 
 deploy-hub: ensure-kustomize
 	cp deploy/hub/kustomization.yaml deploy/hub/kustomization.yaml.tmp
-	cd deploy/hub && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/placement:latest=$(IMAGE_NAME)
+	cd deploy/hub && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/placement:latest=$(IMAGE_NAME)
 	$(KUSTOMIZE) build deploy/hub | $(KUBECTL) apply -f -
 	mv deploy/hub/kustomization.yaml.tmp deploy/hub/kustomization.yaml
+
+undeploy-hub:
+	$(KUSTOMIZE) build deploy/hub | $(KUBECTL) delete --ignore-not-found -f -
 
 build-e2e:
 	go test -c ./test/e2e -mod=vendor

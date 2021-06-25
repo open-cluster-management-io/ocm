@@ -11,10 +11,10 @@ env:
   # Common versions
   GO_VERSION: '1.16'
   GO_REQUIRED_MIN_VERSION: ''
-  GOPATH: '/home/runner/work/registration-operator/registration-operator/go'
+  GOPATH: '/home/runner/work/placement/placement/go'
 defaults:
   run:
-    working-directory: go/src/open-cluster-management.io/registration-operator
+    working-directory: go/src/open-cluster-management.io/placement
 
 jobs:
   verify:
@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/registration-operator
+          path: go/src/open-cluster-management.io/placement
       - name: install Go
         uses: actions/setup-go@v2
         with:
@@ -41,7 +41,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/registration-operator
+          path: go/src/open-cluster-management.io/placement
       - name: install Go
         uses: actions/setup-go@v2
         with:
@@ -57,7 +57,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/registration-operator
+          path: go/src/open-cluster-management.io/placement
       - name: install Go
         uses: actions/setup-go@v2
         with:
@@ -73,7 +73,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/registration-operator
+          path: go/src/open-cluster-management.io/placement
       - name: install Go
         uses: actions/setup-go@v2
         with:
@@ -89,7 +89,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/registration-operator
+          path: go/src/open-cluster-management.io/placement
       - name: install Go
         uses: actions/setup-go@v2
         with:
@@ -105,7 +105,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/registration-operator
+          path: go/src/open-cluster-management.io/placement
       - name: install Go
         uses: actions/setup-go@v2
         with:
@@ -121,7 +121,7 @@ jobs:
           name: cluster1
       - name: Load image on the nodes of the cluster
         run: |
-          kind load docker-image --name=cluster1 quay.io/open-cluster-management/registration-operator:latest
+          kind load docker-image --name=cluster1 quay.io/open-cluster-management/placement:latest
       - name: Run e2e test
         run: |
           make test-e2e
