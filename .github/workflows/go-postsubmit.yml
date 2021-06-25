@@ -17,7 +17,7 @@ defaults:
     working-directory: go/src/open-cluster-management.io/registration-operator
 
 jobs:
-  verify:
+  images:
     name: images
     runs-on: ubuntu-latest
     steps:
