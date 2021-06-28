@@ -61,7 +61,14 @@ make test-integration
 
 Run e2e testing. During e2e testing, hub and managed cluster share the same Kubernetes cluster.
 ```shell
+go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.1
+
 export KUBECONFIG=</path/to/kubeconfig>
+
+make images
+
+kind load docker-image quay.io/open-cluster-management/work --name {your kind cluster name}
+
 make test-e2e
 ```
 
