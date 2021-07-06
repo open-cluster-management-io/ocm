@@ -8,7 +8,6 @@ import (
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
-	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
@@ -35,13 +34,18 @@ func init() {
 const manifestDir = "examples/helloworld/manifests"
 
 var manifestFiles = []string{
-	"clusterrolebinding.yaml",
-	"deployment.yaml",
+	// serviceaccount to run addon-agent
 	"serviceaccount.yaml",
+	// clusterrolebinding to bind appropriate clusterrole to the serviceaccount
+	"clusterrolebinding.yaml",
+	// deployment to deploy addon-agent
+	"deployment.yaml",
 }
 
 var agentPermissionFiles = []string{
+	// role with RBAC rules to access resources on hub
 	"role.yaml",
+	// rolebinding to bind the above role to a certain user group
 	"rolebinding.yaml",
 }
 
@@ -58,7 +62,43 @@ func init() {
 
 func (h *helloWorldAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	objects := []runtime.Object{}
+	for _, file := range manifestFiles {
+		object, err := loadManifestFromFile(file, cluster, addon)
+		if err != nil {
+			return nil, err
+		}
+		objects = append(objects, object)
+	}
+	return objects, nil
+}
 
+func (h *helloWorldAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
+	return agent.AgentAddonOptions{
+		AddonName: "helloworld",
+		Registration: &agent.RegistrationOption{
+			CSRConfigurations: agent.KubeClientSignerConfigurations("helloworld", h.agentName),
+			CSRApproveCheck:   agent.ApprovalAllCSRs,
+			PermissionConfig:  h.setupAgentPermissions,
+		},
+	}
+}
+
+func (h *helloWorldAgent) setupAgentPermissions(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	kubeclient, err := kubernetes.NewForConfig(h.kubeConfig)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range agentPermissionFiles {
+		if err := applyManifestFromFile(file, cluster.Name, addon.Name, kubeclient, h.recorder); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func loadManifestFromFile(file string, cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (runtime.Object, error) {
 	installNamespace := addon.Spec.InstallNamespace
 	if len(installNamespace) == 0 {
 		installNamespace = "default"
@@ -75,64 +115,43 @@ func (h *helloWorldAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *ad
 		AddonInstallNamespace string
 		Image                 string
 	}{
-		KubeConfigSecret:      fmt.Sprintf("%s-hub-kubeconfig", h.GetAgentAddonOptions().AddonName),
+		KubeConfigSecret:      fmt.Sprintf("%s-hub-kubeconfig", addon.Name),
 		AddonInstallNamespace: installNamespace,
 		ClusterName:           cluster.Name,
 		Image:                 image,
 	}
-
-	for _, file := range manifestFiles {
-		raw := assets.MustCreateAssetFromTemplate(file, bindata.MustAsset(filepath.Join(manifestDir, file)), &manifestConfig).Data
-		object, _, err := genericCodec.Decode(raw, nil, nil)
-		if err != nil {
-			return nil, err
-		}
-		objects = append(objects, object)
+	raw := assets.MustCreateAssetFromTemplate(file, bindata.MustAsset(filepath.Join(manifestDir, file)), &manifestConfig).Data
+	object, _, err := genericCodec.Decode(raw, nil, nil)
+	if err != nil {
+		return nil, err
 	}
-	return objects, nil
+	return object, nil
 }
 
-func (h *helloWorldAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
-	return agent.AgentAddonOptions{
-		AddonName: "helloworld",
-		Registration: &agent.RegistrationOption{
-			CSRConfigurations: agent.KubeClientSignerConfigurations("helloworld", h.agentName),
-			CSRApproveCheck: func(
-				cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
-				return true
-			},
-			PermissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
-				groups := agent.DefaultGroups(cluster.Name, addon.Name)
-				config := struct {
-					ClusterName string
-					Group       string
-				}{
-					ClusterName: cluster.Name,
-					Group:       groups[0],
-				}
-
-				kubeclient, err := kubernetes.NewForConfig(h.kubeConfig)
-				if err != nil {
-					return err
-				}
-
-				results := resourceapply.ApplyDirectly(
-					resourceapply.NewKubeClientHolder(kubeclient),
-					h.recorder,
-					func(name string) ([]byte, error) {
-						return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join(manifestDir, name)), config).Data, nil
-					},
-					agentPermissionFiles...,
-				)
-
-				for _, result := range results {
-					if result.Error != nil {
-						return result.Error
-					}
-				}
-
-				return nil
-			},
-		},
+func applyManifestFromFile(file, clusterName, addonName string, kubeclient *kubernetes.Clientset, recorder events.Recorder) error {
+	groups := agent.DefaultGroups(clusterName, addonName)
+	config := struct {
+		ClusterName string
+		Group       string
+	}{
+		ClusterName: clusterName,
+		Group:       groups[0],
 	}
+
+	results := resourceapply.ApplyDirectly(
+		resourceapply.NewKubeClientHolder(kubeclient),
+		recorder,
+		func(name string) ([]byte, error) {
+			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join(manifestDir, name)), config).Data, nil
+		},
+		file,
+	)
+
+	for _, result := range results {
+		if result.Error != nil {
+			return result.Error
+		}
+	}
+
+	return nil
 }

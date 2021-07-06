@@ -74,3 +74,8 @@ func DefaultGroups(clusterName, addonName string) []string {
 		"system:authenticated",
 	}
 }
+
+// ApprovalAllCSRs returns true for all csrs.
+func ApprovalAllCSRs(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
+	return true
+}
