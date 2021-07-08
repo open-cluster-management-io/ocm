@@ -60,28 +60,31 @@ func (o *AgentOptions) AddFlags(cmd *cobra.Command) {
 
 // RunAgent starts the controllers on agent to process work from hub.
 func (o *AgentOptions) RunAgent(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
-	hubRestConfig, err := clientcmd.BuildConfigFromFlags("" /* leave masterurl as empty */, o.HubKubeconfigFile)
-	if err != nil {
-		return err
-	}
-
-	hubKubeClient, err := kubernetes.NewForConfig(hubRestConfig)
-	if err != nil {
-		return err
-	}
+	// build kubeclient of managed cluster
 	spokeKubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
 
+	// build kubeinformerfactory of hub cluster
+	hubRestConfig, err := clientcmd.BuildConfigFromFlags("" /* leave masterurl as empty */, o.HubKubeconfigFile)
+	if err != nil {
+		return err
+	}
+	hubKubeClient, err := kubernetes.NewForConfig(hubRestConfig)
+	if err != nil {
+		return err
+	}
 	hubKubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(hubKubeClient, 10*time.Minute, informers.WithNamespace(o.SpokeClusterName))
 
+	// create an agent contoller
 	agent := newAgentController(
 		spokeKubeClient,
 		hubKubeInformerFactory.Core().V1().ConfigMaps(),
 		o.SpokeClusterName,
 		controllerContext.EventRecorder,
 	)
+	// create a lease updater
 	leaseUpdater := lease.NewLeaseUpdater(
 		spokeKubeClient,
 		"helloworld",
