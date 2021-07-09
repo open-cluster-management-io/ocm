@@ -17,6 +17,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cache "k8s.io/client-go/tools/cache"
+	kevents "k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
@@ -45,7 +46,13 @@ type schedulingController struct {
 	placementLister         clusterlisterv1alpha1.PlacementLister
 	placementDecisionLister clusterlisterv1alpha1.PlacementDecisionLister
 	enqueuePlacementFunc    enqueuePlacementFunc
-	scheduleFunc            scheduleFunc
+	scheduler               Scheduler
+}
+
+type schedulerHandler struct {
+	recorder                kevents.EventRecorder
+	placementDecisionLister clusterlisterv1alpha1.PlacementDecisionLister
+	clusterClient           clusterclient.Interface
 }
 
 // NewDecisionSchedulingController return an instance of schedulingController
@@ -56,11 +63,17 @@ func NewSchedulingController(
 	clusterSetBindingInformer clusterinformerv1alpha1.ManagedClusterSetBindingInformer,
 	placementInformer clusterinformerv1alpha1.PlacementInformer,
 	placementDecisionInformer clusterinformerv1alpha1.PlacementDecisionInformer,
-	recorder events.Recorder,
+	recorder events.Recorder, krecorder kevents.EventRecorder,
 ) factory.Controller {
 	syncCtx := factory.NewSyncContext(schedulingControllerName, recorder)
 	enqueuePlacementFunc := func(namespace, name string) {
 		syncCtx.Queue().Add(fmt.Sprintf("%s/%s", namespace, name))
+	}
+
+	sHandler := &schedulerHandler{
+		recorder:                krecorder,
+		placementDecisionLister: placementDecisionInformer.Lister(),
+		clusterClient:           clusterClient,
 	}
 
 	// build controller
@@ -71,7 +84,7 @@ func NewSchedulingController(
 		clusterSetBindingLister: clusterSetBindingInformer.Lister(),
 		placementLister:         placementInformer.Lister(),
 		placementDecisionLister: placementDecisionInformer.Lister(),
-		scheduleFunc:            schedule,
+		scheduler:               newPluginScheduler(sHandler),
 		enqueuePlacementFunc:    enqueuePlacementFunc,
 	}
 
@@ -179,7 +192,7 @@ func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncCon
 	}
 
 	// schedule placement with scheduler
-	scheduleResult, err := c.scheduleFunc(ctx, placement, clusters, c.clusterClient, c.placementDecisionLister)
+	scheduleResult, err := c.scheduler.schedule(ctx, placement, clusters)
 	if err != nil {
 		return err
 	}
@@ -316,4 +329,16 @@ func newSatisfiedCondition(
 		condition.Message = fmt.Sprintf("%d cluster decisions unscheduled", numOfUnscheduledDecisions)
 	}
 	return condition
+}
+
+func (s *schedulerHandler) EventRecorder() kevents.EventRecorder {
+	return s.recorder
+}
+
+func (s *schedulerHandler) DecisionLister() clusterlisterv1alpha1.PlacementDecisionLister {
+	return s.placementDecisionLister
+}
+
+func (s *schedulerHandler) ClusterClient() clusterclient.Interface {
+	return s.clusterClient
 }

@@ -10,13 +10,22 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clienttesting "k8s.io/client-go/testing"
 
-	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
-	clusterlisterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	testinghelpers "open-cluster-management.io/placement/pkg/helpers/testing"
 )
+
+type testScheduler struct {
+	result *scheduleResult
+}
+
+func (s *testScheduler) schedule(ctx context.Context,
+	placement *clusterapiv1alpha1.Placement,
+	clusters []*clusterapiv1.ManagedCluster,
+) (*scheduleResult, error) {
+	return s.result, nil
+}
 
 func TestSchedulingController_sync(t *testing.T) {
 	placementNamespace := "ns1"
@@ -144,6 +153,7 @@ func TestSchedulingController_sync(t *testing.T) {
 			c.initObjs = append(c.initObjs, c.placement)
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
 			clusterInformerFactory := testinghelpers.NewClusterInformerFactory(clusterClient, c.initObjs...)
+			s := &testScheduler{result: c.scheduleResult}
 
 			ctrl := schedulingController{
 				clusterClient:           clusterClient,
@@ -152,15 +162,7 @@ func TestSchedulingController_sync(t *testing.T) {
 				clusterSetBindingLister: clusterInformerFactory.Cluster().V1alpha1().ManagedClusterSetBindings().Lister(),
 				placementLister:         clusterInformerFactory.Cluster().V1alpha1().Placements().Lister(),
 				placementDecisionLister: clusterInformerFactory.Cluster().V1alpha1().PlacementDecisions().Lister(),
-				scheduleFunc: func(
-					ctx context.Context,
-					placement *clusterapiv1alpha1.Placement,
-					clusters []*clusterapiv1.ManagedCluster,
-					clusterClient clusterclient.Interface,
-					placementDecisionLister clusterlisterv1alpha1.PlacementDecisionLister,
-				) (*scheduleResult, error) {
-					return c.scheduleResult, nil
-				},
+				scheduler:               s,
 			}
 
 			sysCtx := testinghelpers.NewFakeSyncContext(t, c.placement.Namespace+"/"+c.placement.Name)

@@ -5,8 +5,10 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
-
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/events"
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	scheduling "open-cluster-management.io/placement/pkg/controllers/scheduling"
 )
@@ -17,7 +19,17 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	if err != nil {
 		return err
 	}
+
+	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
+	if err != nil {
+		return err
+	}
+
 	clusterInformers := clusterinformers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
+
+	broadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: kubeClient.EventsV1()})
+
+	broadcaster.StartRecordingToSink(ctx.Done())
 
 	schedulingController := scheduling.NewSchedulingController(
 		clusterClient,
@@ -27,6 +39,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		clusterInformers.Cluster().V1alpha1().Placements(),
 		clusterInformers.Cluster().V1alpha1().PlacementDecisions(),
 		controllerContext.EventRecorder,
+		broadcaster.NewRecorder(clusterscheme.Scheme, "placementController"),
 	)
 
 	go clusterInformers.Start(ctx.Done())

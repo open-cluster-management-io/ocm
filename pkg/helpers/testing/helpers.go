@@ -6,8 +6,13 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
+	kevents "k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
+	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	clusterlisterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
 )
 
 type FakeSyncContext struct {
@@ -25,6 +30,30 @@ func NewFakeSyncContext(t *testing.T, queueKey string) *FakeSyncContext {
 		queueKey: queueKey,
 		queue:    workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 		recorder: eventstesting.NewTestingEventRecorder(t),
+	}
+}
+
+type FakePluginHandle struct {
+	recorder kevents.EventRecorder
+	lister   clusterlisterv1alpha1.PlacementDecisionLister
+	client   clusterclient.Interface
+}
+
+func (f *FakePluginHandle) EventRecorder() kevents.EventRecorder { return f.recorder }
+func (f *FakePluginHandle) DecisionLister() clusterlisterv1alpha1.PlacementDecisionLister {
+	return f.lister
+}
+func (f *FakePluginHandle) ClusterClient() clusterclient.Interface {
+	return f.client
+}
+
+func NewFakePluginHandle(
+	t *testing.T, client *clusterfake.Clientset, objects ...runtime.Object) *FakePluginHandle {
+	informers := NewClusterInformerFactory(client, objects...)
+	return &FakePluginHandle{
+		recorder: kevents.NewFakeRecorder(100),
+		client:   client,
+		lister:   informers.Cluster().V1alpha1().PlacementDecisions().Lister(),
 	}
 }
 

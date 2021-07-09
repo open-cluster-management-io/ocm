@@ -1,6 +1,7 @@
-package scheduling
+package predicate
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -15,19 +16,17 @@ import (
 func TestMatchWithClusterPredicates(t *testing.T) {
 	cases := []struct {
 		name                 string
-		predicates           []clusterapiv1alpha1.ClusterPredicate
+		placement            *clusterapiv1alpha1.Placement
 		clusters             []*clusterapiv1.ManagedCluster
 		expectedClusterNames []string
 	}{
 		{
 			name: "match with label",
-			predicates: []clusterapiv1alpha1.ClusterPredicate{
-				testinghelpers.NewClusterPredicate(&metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"cloud": "Amazon",
-					},
-				}, nil),
-			},
+			placement: testinghelpers.NewPlacement("test", "test").AddPredicate(&metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"cloud": "Amazon",
+				},
+			}, nil).Build(),
 			clusters: []*clusterapiv1.ManagedCluster{
 				testinghelpers.NewManagedCluster("cluster1").WithLabel("cloud", "Amazon").Build(),
 				testinghelpers.NewManagedCluster("cluster2").WithLabel("cloud", "Google").Build(),
@@ -36,18 +35,17 @@ func TestMatchWithClusterPredicates(t *testing.T) {
 		},
 		{
 			name: "match with claim",
-			predicates: []clusterapiv1alpha1.ClusterPredicate{
-				testinghelpers.NewClusterPredicate(nil,
-					&clusterapiv1alpha1.ClusterClaimSelector{
-						MatchExpressions: []metav1.LabelSelectorRequirement{
-							{
-								Key:      "cloud",
-								Operator: metav1.LabelSelectorOpIn,
-								Values:   []string{"Amazon"},
-							},
+			placement: testinghelpers.NewPlacement("test", "test").AddPredicate(
+				nil,
+				&clusterapiv1alpha1.ClusterClaimSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "cloud",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{"Amazon"},
 						},
-					}),
-			},
+					},
+				}).Build(),
 			clusters: []*clusterapiv1.ManagedCluster{
 				testinghelpers.NewManagedCluster("cluster1").WithClaim("cloud", "Amazon").Build(),
 				testinghelpers.NewManagedCluster("cluster2").WithClaim("cloud", "Google").Build(),
@@ -56,12 +54,13 @@ func TestMatchWithClusterPredicates(t *testing.T) {
 		},
 		{
 			name: "match with both label and claim",
-			predicates: []clusterapiv1alpha1.ClusterPredicate{
-				testinghelpers.NewClusterPredicate(&metav1.LabelSelector{
+			placement: testinghelpers.NewPlacement("test", "test").AddPredicate(
+				&metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"cloud": "Amazon",
 					},
-				}, &clusterapiv1alpha1.ClusterClaimSelector{
+				},
+				&clusterapiv1alpha1.ClusterClaimSelector{
 					MatchExpressions: []metav1.LabelSelectorRequirement{
 						{
 							Key:      "region",
@@ -69,8 +68,8 @@ func TestMatchWithClusterPredicates(t *testing.T) {
 							Values:   []string{"us-east-1"},
 						},
 					},
-				}),
-			},
+				},
+			).Build(),
 			clusters: []*clusterapiv1.ManagedCluster{
 				testinghelpers.NewManagedCluster("cluster1").
 					WithLabel("cloud", "Amazon").
@@ -83,13 +82,12 @@ func TestMatchWithClusterPredicates(t *testing.T) {
 		},
 		{
 			name: "match with multiple predicates",
-			predicates: []clusterapiv1alpha1.ClusterPredicate{
-				testinghelpers.NewClusterPredicate(&metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"cloud": "Amazon",
-					},
-				}, nil),
-				testinghelpers.NewClusterPredicate(nil, &clusterapiv1alpha1.ClusterClaimSelector{
+			placement: testinghelpers.NewPlacement("test", "test").AddPredicate(&metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"cloud": "Amazon",
+				},
+			}, nil).AddPredicate(
+				nil, &clusterapiv1alpha1.ClusterClaimSelector{
 					MatchExpressions: []metav1.LabelSelectorRequirement{
 						{
 							Key:      "region",
@@ -97,8 +95,8 @@ func TestMatchWithClusterPredicates(t *testing.T) {
 							Values:   []string{"us-east-1"},
 						},
 					},
-				}),
-			},
+				},
+			).Build(),
 			clusters: []*clusterapiv1.ManagedCluster{
 				testinghelpers.NewManagedCluster("cluster1").WithLabel("cloud", "Amazon").Build(),
 				testinghelpers.NewManagedCluster("cluster2").WithClaim("region", "us-east-1").Build(),
@@ -110,7 +108,8 @@ func TestMatchWithClusterPredicates(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			clusters, err := matchWithClusterPredicates(c.predicates, c.clusters)
+			p := &Predicate{}
+			clusters, err := p.Filter(context.TODO(), c.placement, c.clusters)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}
