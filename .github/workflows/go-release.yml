@@ -47,7 +47,7 @@ jobs:
       - name: generate changelog
         run: |
           echo "# Registration Operator $RELEASE_VERSION" > /home/runner/work/changelog.txt
-          echo "- See the [CHANGELOG](https://github.com/open-cluster-management.io/registration-operator/blob/main/CHANGELOG/CHANGELOG-${MAJOR_RELEASE_VERSION}.md) for more details." >> /home/runner/work/changelog.txt
+          echo "- See the [CHANGELOG](https://github.com/open-cluster-management-io/registration-operator/blob/main/CHANGELOG/CHANGELOG-${MAJOR_RELEASE_VERSION}.md) for more details." >> /home/runner/work/changelog.txt
           echo "- The released image is quay.io/open-cluster-management/registration-operator:$RELEASE_VERSION" >> /home/runner/work/changelog.txt
       - name: publish release
         uses: softprops/action-gh-release@v0.1.5

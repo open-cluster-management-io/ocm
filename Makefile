@@ -18,7 +18,7 @@ IMAGE_TAG?=latest
 IMAGE_NAME?=$(IMAGE_REGISTRY)/registration-operator:$(IMAGE_TAG)
 
 # CSV_VERSION is used to generate new CSV manifests
-CSV_VERSION?=0.4.0
+CSV_VERSION?=0.5.0
 
 # WORK_IMAGE can be set in the env to override calculated value
 WORK_TAG?=latest
