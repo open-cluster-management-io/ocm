@@ -21,13 +21,13 @@ metadata:
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
     containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2020-10-15T20:00:31Z"
+    createdAt: "2021-07-13T20:00:31Z"
     description: Manages the installation and upgrade of the ClusterManager.
     operators.operatorframework.io/builder: operator-sdk-v1.1.0
     operators.operatorframework.io/project_layout: go
     repository: https://github.com/open-cluster-management-io/registration-operator
     support: Red Hat, Inc.
-  name: cluster-manager.v0.4.0
+  name: cluster-manager.v0.5.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -49,15 +49,18 @@ spec:
     ```
     $ kubectl get pods -n open-cluster-management-hub
     NAME                                                       READY   STATUS    RESTARTS   AGE
-    cluster-manager-registration-controller-566b5cd967-65s8g   1/1     Running   0          68s
-    cluster-manager-registration-controller-566b5cd967-98hbb   1/1     Running   0          68s
-    cluster-manager-registration-controller-566b5cd967-tdl9f   1/1     Running   0          68s
-    cluster-manager-registration-webhook-5649df75cf-69l6j      1/1     Running   0          68s
-    cluster-manager-registration-webhook-5649df75cf-plmrk      1/1     Running   0          68s
-    cluster-manager-registration-webhook-5649df75cf-s7tjs      1/1     Running   0          68s
-    cluster-manager-work-webhook-776d978d64-cwljs              1/1     Running   0          68s
-    cluster-manager-work-webhook-776d978d64-m62wd              1/1     Running   0          68s
-    cluster-manager-work-webhook-776d978d64-prswn              1/1     Running   0          68s
+    cluster-manager-placement-controller-d76cffb7c-fvzjh       1/1     Running   0          22h
+    cluster-manager-placement-controller-d76cffb7c-qnpjl       1/1     Running   0          22h
+    cluster-manager-placement-controller-d76cffb7c-tt4h6       1/1     Running   0          22h
+    cluster-manager-registration-controller-66b7c65849-btmpp   1/1     Running   0          22h
+    cluster-manager-registration-controller-66b7c65849-gt6fv   1/1     Running   0          22h
+    cluster-manager-registration-controller-66b7c65849-pl46k   1/1     Running   0          22h
+    cluster-manager-registration-webhook-5f5499fccf-crr69      1/1     Running   0          22h
+    cluster-manager-registration-webhook-5f5499fccf-s2dkb      1/1     Running   0          22h
+    cluster-manager-registration-webhook-5f5499fccf-s7lp5      1/1     Running   0          22h
+    cluster-manager-work-webhook-b68fc9b84-ddz2d               1/1     Running   0          22h
+    cluster-manager-work-webhook-b68fc9b84-kd92j               1/1     Running   0          22h
+    cluster-manager-work-webhook-b68fc9b84-vdbkl               1/1     Running   0          22h
     ```
 
     There is a ManagedCluster created in the Hub cluster when the managed cluster is registered to the Hub cluster.
@@ -292,8 +295,8 @@ spec:
   - name: Registration Operator
     url: https://github.com/open-cluster-management-io/registration-operator
   maintainers:
-  - email: pmorie@redhat.com
-    name: Paul Morie
+  - email: zyin@redhat.com
+    name: Zhiwei Yin
   - email: deads@redhat.com
     name: David Eads
   - email: jqiu@redhat.com
@@ -301,8 +304,8 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc.
-  replaces: cluster-manager.v0.3.0
+  replaces: cluster-manager.v0.4.0
   selector:
     matchLabels:
       app: cluster-manager
-  version: 0.4.0
+  version: 0.5.0
