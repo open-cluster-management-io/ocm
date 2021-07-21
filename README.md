@@ -30,12 +30,12 @@ export KUBECONFIG=</path/to/kubeconfig>
 Build the docker image to run the placement controller.
 ```sh
 make images
-export IMAGE_NAME=<placement_image_name> # export IMAGE_NAME=quay.io/open-cluster-management-io/placement:latest
+export IMAGE_NAME=<placement_image_name> # export IMAGE_NAME=quay.io/open-cluster-management/placement:latest
 ```
 
 If your are using kind, load image into kind cluster.
 ```sh
-kind load docker-image <placement_image_name> # kind load docker-image quay.io/open-cluster-management-io/placement:latest
+kind load docker-image <placement_image_name> # kind load docker-image quay.io/open-cluster-management/placement:latest
 ```
 
 And then deploy placement manager on cluster
