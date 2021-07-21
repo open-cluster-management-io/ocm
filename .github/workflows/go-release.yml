@@ -1,0 +1,57 @@
+name: GoRelease
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+env:
+  # Common versions
+  GO_VERSION: '1.16'
+  GO_REQUIRED_MIN_VERSION: ''
+  GOPATH: '/home/runner/work/placement/placement/go'
+  GITHUB_REF: ${{ github.ref }}
+
+defaults:
+  run:
+    working-directory: go/src/open-cluster-management.io/placement
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+          path: go/src/open-cluster-management.io/placement
+      - name: install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: install imagebuilder
+        run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.1
+      - name: images
+        run:  make images
+      - name: get release version
+        run: |
+          echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+      - name: get major release version
+        run: |
+          echo "MAJOR_RELEASE_VERSION=${RELEASE_VERSION%.*}" >> $GITHUB_ENV
+      - name: push image
+        run: |
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login quay.io --username ${{ secrets.DOCKER_USER }} --password-stdin
+          docker tag quay.io/open-cluster-management/placement:latest quay.io/open-cluster-management/placement:$RELEASE_VERSION
+          docker push quay.io/open-cluster-management/placement:$RELEASE_VERSION
+      - name: generate changelog
+        run: |
+          echo "# Placement $RELEASE_VERSION" > /home/runner/work/changelog.txt
+          echo "- See the [CHANGELOG](https://github.com/open-cluster-management-io/placement/blob/main/CHANGELOG/CHANGELOG-${MAJOR_RELEASE_VERSION}.md) for more details." >> /home/runner/work/changelog.txt
+          echo "- The released image is quay.io/open-cluster-management/placement:$RELEASE_VERSION" >> /home/runner/work/changelog.txt
+      - name: publish release
+        uses: softprops/action-gh-release@v0.1.5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          body_path: /home/runner/work/changelog.txt
