@@ -2105,6 +2105,10 @@ rules:
 - apiGroups: ["authorization.k8s.io"]
   resources: ["subjectaccessreviews"]
   verbs: ["create"]
+# API priority and fairness
+- apiGroups: ["flowcontrol.apiserver.k8s.io"]
+  resources: ["prioritylevelconfigurations", "flowschemas"]
+  verbs: ["get", "list", "watch"]
 `)
 
 func manifestsClusterManagerClusterManagerRegistrationWebhookClusterroleYamlBytes() ([]byte, error) {
@@ -2471,6 +2475,10 @@ rules:
 - apiGroups: ["authorization.k8s.io"]
   resources: ["subjectaccessreviews"]
   verbs: ["create"]
+# API priority and fairness
+- apiGroups: ["flowcontrol.apiserver.k8s.io"]
+  resources: ["prioritylevelconfigurations", "flowschemas"]
+  verbs: ["get", "list", "watch"]
 `)
 
 func manifestsClusterManagerClusterManagerWorkWebhookClusterroleYamlBytes() ([]byte, error) {
