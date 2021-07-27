@@ -60,6 +60,11 @@ func HasCondition(conditions []metav1.Condition, expectedType, expectedReason st
 			return false
 		}
 
+		// skip checking reason
+		if len(expectedReason) == 0 {
+			return true
+		}
+
 		if condition.Reason != expectedReason {
 			return false
 		}
