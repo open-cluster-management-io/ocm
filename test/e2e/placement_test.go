@@ -78,9 +78,6 @@ var _ = ginkgo.Describe("Placement", func() {
 			if err != nil {
 				return false
 			}
-			if len(pdl.Items) == 0 {
-				return false
-			}
 			actualNOD := 0
 			for _, pd := range pdl.Items {
 				actualNOD += len(pd.Status.Decisions)
@@ -96,19 +93,15 @@ var _ = ginkgo.Describe("Placement", func() {
 			if err != nil {
 				return false
 			}
-			if satisfied && !util.HasCondition(
-				placement.Status.Conditions,
-				clusterapiv1alpha1.PlacementConditionSatisfied,
-				"AllDecisionsScheduled",
-				metav1.ConditionTrue,
-			) {
-				return false
+			status := metav1.ConditionFalse
+			if satisfied {
+				status = metav1.ConditionTrue
 			}
-			if !satisfied && !util.HasCondition(
+			if !util.HasCondition(
 				placement.Status.Conditions,
 				clusterapiv1alpha1.PlacementConditionSatisfied,
-				"NotAllDecisionsScheduled",
-				metav1.ConditionFalse,
+				"",
+				status,
 			) {
 				return false
 			}
@@ -212,6 +205,48 @@ var _ = ginkgo.Describe("Placement", func() {
 
 			return len(placementDecisions.Items) == 0
 		}, eventuallyTimeout*5, eventuallyInterval*5).Should(gomega.BeTrue())
+	})
+
+	ginkgo.It("Should delete placementdecision successfully", func() {
+		assertBindingClusterSet(clusterSet1Name)
+		assertCreatingClusters(clusterSet1Name, 1)
+		assertCreatingPlacement(placementName, nil, 1)
+
+		ginkgo.By("Add cluster predicate")
+		placement, err := clusterClient.ClusterV1alpha1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		placement.Spec.Predicates = []clusterapiv1alpha1.ClusterPredicate{
+			{
+				RequiredClusterSelector: clusterapiv1alpha1.ClusterSelector{
+					LabelSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"a": "b",
+						},
+					},
+				},
+			},
+		}
+		placement, err = clusterClient.ClusterV1alpha1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		assertNumberOfDecisions(placementName, 0)
+		assertPlacementStatus(placementName, 0, false)
+
+		ginkgo.By("Check if placementdecisions are deleted as well")
+		gomega.Eventually(func() bool {
+			placementDecisions, err := clusterClient.ClusterV1alpha1().PlacementDecisions(namespace).List(context.TODO(), metav1.ListOptions{
+				LabelSelector: fmt.Sprintf("%s=%s", placementLabel, placementName),
+			})
+			if err != nil {
+				return false
+			}
+
+			return len(placementDecisions.Items) == 0
+		}, eventuallyTimeout*5, eventuallyInterval*5).Should(gomega.BeTrue())
+
+		ginkgo.By("Delete placement")
+		err = clusterClient.ClusterV1alpha1().Placements(namespace).Delete(context.TODO(), placementName, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 })
 
