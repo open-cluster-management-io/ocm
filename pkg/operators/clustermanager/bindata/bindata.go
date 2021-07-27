@@ -1676,8 +1676,11 @@ rules:
   verbs: ["get", "list", "watch"]
 # Allow controller to manage placements/placementdecisions
 - apiGroups: ["cluster.open-cluster-management.io"]
-  resources: ["placements", "placementdecisions"]
-  verbs: ["get", "list", "watch", "create", "update", "patch"]
+  resources: ["placements"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["placementdecisions"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["placements/status", "placementdecisions/status"]
   verbs: ["update", "patch"]
