@@ -4,10 +4,14 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	errorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,7 +23,6 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 	kevents "k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
-
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterinformerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterinformerv1alpha1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1alpha1"
@@ -33,6 +36,7 @@ const (
 	clusterSetLabel          = "cluster.open-cluster-management.io/clusterset"
 	placementLabel           = "cluster.open-cluster-management.io/placement"
 	schedulingControllerName = "SchedulingController"
+	maxNumOfClusterDecisions = 100
 )
 
 type enqueuePlacementFunc func(namespace, name string)
@@ -47,12 +51,7 @@ type schedulingController struct {
 	placementDecisionLister clusterlisterv1alpha1.PlacementDecisionLister
 	enqueuePlacementFunc    enqueuePlacementFunc
 	scheduler               Scheduler
-}
-
-type schedulerHandler struct {
 	recorder                kevents.EventRecorder
-	placementDecisionLister clusterlisterv1alpha1.PlacementDecisionLister
-	clusterClient           clusterclient.Interface
 }
 
 // NewDecisionSchedulingController return an instance of schedulingController
@@ -63,6 +62,7 @@ func NewSchedulingController(
 	clusterSetBindingInformer clusterinformerv1alpha1.ManagedClusterSetBindingInformer,
 	placementInformer clusterinformerv1alpha1.PlacementInformer,
 	placementDecisionInformer clusterinformerv1alpha1.PlacementDecisionInformer,
+	scheduler Scheduler,
 	recorder events.Recorder, krecorder kevents.EventRecorder,
 ) factory.Controller {
 	syncCtx := factory.NewSyncContext(schedulingControllerName, recorder)
@@ -70,22 +70,17 @@ func NewSchedulingController(
 		syncCtx.Queue().Add(fmt.Sprintf("%s/%s", namespace, name))
 	}
 
-	sHandler := &schedulerHandler{
-		recorder:                krecorder,
-		placementDecisionLister: placementDecisionInformer.Lister(),
-		clusterClient:           clusterClient,
-	}
-
 	// build controller
-	c := schedulingController{
+	c := &schedulingController{
 		clusterClient:           clusterClient,
 		clusterLister:           clusterInformer.Lister(),
 		clusterSetLister:        clusterSetInformer.Lister(),
 		clusterSetBindingLister: clusterSetBindingInformer.Lister(),
 		placementLister:         placementInformer.Lister(),
 		placementDecisionLister: placementDecisionInformer.Lister(),
-		scheduler:               newPluginScheduler(sHandler),
 		enqueuePlacementFunc:    enqueuePlacementFunc,
+		recorder:                krecorder,
+		scheduler:               scheduler,
 	}
 
 	// setup event handler for cluster informer.
@@ -192,7 +187,12 @@ func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncCon
 	}
 
 	// schedule placement with scheduler
-	scheduleResult, err := c.scheduler.schedule(ctx, placement, clusters)
+	scheduleResult, err := c.scheduler.Schedule(ctx, placement, clusters)
+	if err != nil {
+		return err
+	}
+
+	err = c.bind(ctx, placement, scheduleResult.Decisions())
 	if err != nil {
 		return err
 	}
@@ -268,18 +268,18 @@ func (c *schedulingController) updateStatus(
 	eligibleClusterSetNames []string,
 	numOfBindings,
 	numOfAvailableClusters int,
-	scheduleResult *scheduleResult,
+	scheduleResult ScheduleResult,
 ) error {
 	newPlacement := placement.DeepCopy()
-	newPlacement.Status.NumberOfSelectedClusters = int32(scheduleResult.scheduledDecisions)
+	newPlacement.Status.NumberOfSelectedClusters = int32(len(scheduleResult.Decisions()))
 
 	satisfiedCondition := newSatisfiedCondition(
 		placement.Spec.ClusterSets,
 		eligibleClusterSetNames,
 		numOfBindings,
 		numOfAvailableClusters,
-		scheduleResult.feasibleClusters,
-		scheduleResult.unscheduledDecisions,
+		len(scheduleResult.Decisions()),
+		scheduleResult.NumOfUnscheduled(),
 	)
 
 	meta.SetStatusCondition(&newPlacement.Status.Conditions, satisfiedCondition)
@@ -331,14 +331,144 @@ func newSatisfiedCondition(
 	return condition
 }
 
-func (s *schedulerHandler) EventRecorder() kevents.EventRecorder {
-	return s.recorder
+// bind updates the cluster decisions in the status of the placementdecisions with the given
+// cluster decision slice. New placementdecisions will be created if no one exists.
+func (c *schedulingController) bind(
+	ctx context.Context,
+	placement *clusterapiv1alpha1.Placement,
+	clusterDecisions []clusterapiv1alpha1.ClusterDecision,
+) error {
+	// sort clusterdecisions by cluster name
+	sort.SliceStable(clusterDecisions, func(i, j int) bool {
+		return clusterDecisions[i].ClusterName < clusterDecisions[j].ClusterName
+	})
+
+	// split the cluster decisions into slices, the size of each slice cannot exceed
+	// maxNumOfClusterDecisions.
+	decisionSlices := [][]clusterapiv1alpha1.ClusterDecision{}
+	remainingDecisions := clusterDecisions
+	for index := 0; len(remainingDecisions) > 0; index++ {
+		var decisionSlice []clusterapiv1alpha1.ClusterDecision
+		switch {
+		case len(remainingDecisions) > maxNumOfClusterDecisions:
+			decisionSlice = remainingDecisions[0:maxNumOfClusterDecisions]
+			remainingDecisions = remainingDecisions[maxNumOfClusterDecisions:]
+		default:
+			decisionSlice = remainingDecisions
+			remainingDecisions = nil
+		}
+		decisionSlices = append(decisionSlices, decisionSlice)
+	}
+
+	// bind cluster decision slices to placementdecisions.
+	errs := []error{}
+
+	placementDecisionNames := sets.NewString()
+	for index, decisionSlice := range decisionSlices {
+		placementDecisionName := fmt.Sprintf("%s-decision-%d", placement.Name, index+1)
+		placementDecisionNames.Insert(placementDecisionName)
+		err := c.createOrUpdatePlacementDecision(
+			ctx, placement, placementDecisionName, decisionSlice)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) != 0 {
+		return errorhelpers.NewMultiLineAggregate(errs)
+	}
+
+	// query all placementdecisions of the placement
+	requirement, err := labels.NewRequirement(placementLabel, selection.Equals, []string{placement.Name})
+	if err != nil {
+		return err
+	}
+	labelSelector := labels.NewSelector().Add(*requirement)
+	placementDecisions, err := c.placementDecisionLister.PlacementDecisions(placement.Namespace).List(labelSelector)
+	if err != nil {
+		return err
+	}
+
+	// delete redundant placementdecisions
+	errs = []error{}
+	for _, placementDecision := range placementDecisions {
+		if placementDecisionNames.Has(placementDecision.Name) {
+			continue
+		}
+		err := c.clusterClient.ClusterV1alpha1().PlacementDecisions(
+			placementDecision.Namespace).Delete(ctx, placementDecision.Name, metav1.DeleteOptions{})
+		if errors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			errs = append(errs, err)
+		}
+		c.recorder.Eventf(
+			placement, placementDecision, corev1.EventTypeNormal,
+			"DecisionDelete", "DecisionDeleted",
+			"Decision %s is deleted with placement %s in namespace %s", placementDecision.Name, placement.Name, placement.Namespace)
+	}
+	return errorhelpers.NewMultiLineAggregate(errs)
 }
 
-func (s *schedulerHandler) DecisionLister() clusterlisterv1alpha1.PlacementDecisionLister {
-	return s.placementDecisionLister
-}
+// createOrUpdatePlacementDecision creates a new PlacementDecision if it does not exist and
+// then updates the status with the given ClusterDecision slice if necessary
+func (c *schedulingController) createOrUpdatePlacementDecision(
+	ctx context.Context,
+	placement *clusterapiv1alpha1.Placement,
+	placementDecisionName string,
+	clusterDecisions []clusterapiv1alpha1.ClusterDecision,
+) error {
+	if len(clusterDecisions) > maxNumOfClusterDecisions {
+		return fmt.Errorf("the number of clusterdecisions %q exceeds the max limitation %q", len(clusterDecisions), maxNumOfClusterDecisions)
+	}
 
-func (s *schedulerHandler) ClusterClient() clusterclient.Interface {
-	return s.clusterClient
+	placementDecision, err := c.placementDecisionLister.PlacementDecisions(placement.Namespace).Get(placementDecisionName)
+	switch {
+	case errors.IsNotFound(err):
+		// create the placementdecision if not exists
+		owner := metav1.NewControllerRef(placement, clusterapiv1alpha1.GroupVersion.WithKind("Placement"))
+		placementDecision = &clusterapiv1alpha1.PlacementDecision{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      placementDecisionName,
+				Namespace: placement.Namespace,
+				Labels: map[string]string{
+					placementLabel: placement.Name,
+				},
+				OwnerReferences: []metav1.OwnerReference{*owner},
+			},
+		}
+		var err error
+		placementDecision, err = c.clusterClient.ClusterV1alpha1().PlacementDecisions(
+			placement.Namespace).Create(ctx, placementDecision, metav1.CreateOptions{})
+		if err != nil {
+			return err
+		}
+		c.recorder.Eventf(
+			placement, placementDecision, corev1.EventTypeNormal,
+			"DecisionCreate", "DecisionCreated",
+			"Decision %s is created with placement %s in namespace %s", placementDecision.Name, placement.Name, placement.Namespace)
+	case err != nil:
+		return err
+	}
+
+	// update the status of the placementdecision if decisions change
+	if apiequality.Semantic.DeepEqual(placementDecision.Status.Decisions, clusterDecisions) {
+		return nil
+	}
+
+	newPlacementDecision := placementDecision.DeepCopy()
+	newPlacementDecision.Status.Decisions = clusterDecisions
+	newPlacementDecision, err = c.clusterClient.ClusterV1alpha1().PlacementDecisions(newPlacementDecision.Namespace).
+		UpdateStatus(ctx, newPlacementDecision, metav1.UpdateOptions{})
+
+	if err != nil {
+		return err
+	}
+
+	c.recorder.Eventf(
+		placement, placementDecision, corev1.EventTypeNormal,
+		"DecisionUpdate", "DecisionUpdated",
+		"Decision %s is updated with placement %s in namespace %s", placementDecision.Name, placement.Name, placement.Namespace)
+
+	return nil
 }
