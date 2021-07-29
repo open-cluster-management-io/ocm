@@ -29,6 +29,7 @@ export KUBECONFIG=</path/to/kubeconfig>
 
 Build the docker image to run the placement controller.
 ```sh
+go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.1
 make images
 export IMAGE_NAME=<placement_image_name> # export IMAGE_NAME=quay.io/open-cluster-management/placement:latest
 ```
@@ -51,23 +52,21 @@ NAME                                                  READY   STATUS    RESTARTS
 cluster-manager-placement-controller-cf9bbd6c-x9dnd   1/1     Running   0          2m16s
 ```
 
-Create a clusterset.yaml as shown in this example:
+Here is an example.
 
-```yaml
+Create a `ManagedClusterSet`.
+```
+cat <<EOF | kubectl apply -f -
 apiVersion: cluster.open-cluster-management.io/v1alpha1
 kind: ManagedClusterSet
 metadata:
   name: clusterset1
+EOF
 ```
 
-Apply the yaml file to the cluster to create a `ManagedClusterSet`.
+Create a `ManagedCluster` and assign it to clusterset `clusterset1`.
 ```
-kubectl apply -f clusterset.yaml
-```
-
-Create a cluster.yaml:
-
-```yaml
+cat <<EOF | kubectl apply -f -
 apiVersion: cluster.open-cluster-management.io/v1
 kind: ManagedCluster
 metadata:
@@ -77,16 +76,12 @@ metadata:
     vendor: OpenShift
 spec:
   hubAcceptsClient: true
+EOF
 ```
 
-Apply the yaml file to create a cluster and assign it to clusterset `clusterset1`.
+Create a `ManagedClusterSetBinding` to bind the `ManagedClusterSet` to the default namespace.
 ```
-kubectl apply -f cluster.yaml
-```
-
-And then create a binding.yaml:
-
-```yaml
+cat <<EOF | kubectl apply -f -
 apiVersion: cluster.open-cluster-management.io/v1alpha1
 kind: ManagedClusterSetBinding
 metadata:
@@ -94,15 +89,12 @@ metadata:
   namespace: default
 spec:
   clusterSet: clusterset1
+EOF
 ```
 
-Apply the yaml file to bind the `ManagedClusterSet` to the default namespace.
+Now create a `Placement`:
 ```
-kubectl apply -f binding.yaml
-```
-
-Now create a placement.yaml:
-```yaml
+cat <<EOF | kubectl apply -f -
 apiVersion: cluster.open-cluster-management.io/v1alpha1
 kind: Placement
 metadata:
@@ -114,11 +106,7 @@ spec:
         labelSelector:
           matchLabels:
             vendor: OpenShift
-```
-Apply the yaml file to create the placement.
-
-```
-kubectl apply -f placement.yaml
+EOF
 ```
 
 Check the 'PlacementDecision'created for this placement. It contains all selected clusters in status.
