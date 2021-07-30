@@ -30,6 +30,11 @@ type ManifestWork struct {
 type ManifestWorkSpec struct {
 	// Workload represents the manifest workload to be deployed on a managed cluster.
 	Workload ManifestsTemplate `json:"workload,omitempty"`
+
+	// DeleteOption represents deletion strategy when the manifestwork is deleted.
+	// Foreground deletion strategy is applied to all the resource in this manifestwork if it is not set.
+	// +optional
+	DeleteOption *DeleteOption `json:"deleteOption,omitempty"`
 }
 
 // Manifest represents a resource to be deployed on managed cluster.
@@ -44,6 +49,59 @@ type ManifestsTemplate struct {
 	// Manifests represents a list of kuberenetes resources to be deployed on a managed cluster.
 	// +optional
 	Manifests []Manifest `json:"manifests,omitempty"`
+}
+
+type DeleteOption struct {
+	// propagationPolicy can be Foreground, Orphan or SelectivelyOrphan
+	// SelectivelyOrphan should be rarely used.  It is provided for cases where particular resources is transfering
+	// ownership from one ManifestWork to another or another management unit.
+	// Setting this value will allow a flow like
+	// 1. create manifestwork/2 to manage foo
+	// 2. update manifestwork/1 to selectively orphan foo
+	// 3. remove foo from manifestwork/1 without impacting continuity because manifestwork/2 adopts it.
+	// +kubebuilder:default=ForeGround
+	PropagationPolicy DeletePropagationPolicyType `json:"propagationPolicy"`
+
+	// selectivelyOrphan represents a list of resources following orphan deletion stratecy
+	SelectivelyOrphan *SelectivelyOrphan `json:"selectivelyOrphans,omitempty"`
+}
+
+type DeletePropagationPolicyType string
+
+const (
+	// DeletePropagationPolicyTypeForeground represents that all the resources in the manifestwork is should
+	// be fourground deleted.
+	DeletePropagationPolicyTypeForeground DeletePropagationPolicyType = "Foreground"
+	// DeletePropagationPolicyTypeOrphan represents that all the resources in the manifestwork is orphaned
+	// when the manifestwork is deleted.
+	DeletePropagationPolicyTypeOrphan DeletePropagationPolicyType = "Orphan"
+	// DeletePropagationPolicyTypeSelectivelyOrphan represents that only selected resources in the manifestwork
+	// is orphaned when the manifestwork is deleted.
+	DeletePropagationPolicyTypeSelectivelyOrphan DeletePropagationPolicyType = "SelectivelyOrphan"
+)
+
+// SelectivelyOrphan represents a list of resources following orphan deletion stratecy
+type SelectivelyOrphan struct {
+	// orphaningRules defines a slice of orphaningrule.
+	// Each orphaningrule identifies a single resource included in this manifestwork
+	// +optional
+	OrphaningRules []OrphaningRule `json:"orphaningRules,omitempty"`
+}
+
+// OrphaningRule identifies a single resource included in this manifestwork
+type OrphaningRule struct {
+	// Group is the api group of the resources in the workload that the strategy is applied
+	// +required
+	Group string `json:"group"`
+	// Resource is the resources in the workload that the strategy is applied
+	// +required
+	Resource string `json:"resource"`
+	// Namespace is the namespaces of the resources in the workload that the strategy is applied
+	// +optional
+	Namespace string `json:"Namespace"`
+	// Name is the names of the resources in the workload that the strategy is applied
+	// +required
+	Name string `json:"Name"`
 }
 
 // ManifestResourceMeta represents the group, version, kind, as well as the group, version, resource, name and namespace of a resoure.

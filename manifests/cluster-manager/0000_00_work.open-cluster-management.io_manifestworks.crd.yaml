@@ -39,6 +39,54 @@ spec:
               on the managed cluster.
             type: object
             properties:
+              deleteOption:
+                description: DeleteOption represents deletion strategy when the manifestwork
+                  is deleted. Foreground deletion strategy is applied to all the resource
+                  in this manifestwork if it is not set.
+                type: object
+                properties:
+                  propagationPolicy:
+                    description: propagationPolicy can be Foreground, Orphan or SelectivelyOrphan
+                      SelectivelyOrphan should be rarely used.  It is provided for
+                      cases where particular resources is transfering ownership from
+                      one ManifestWork to another or another management unit. Setting
+                      this value will allow a flow like 1. create manifestwork/2 to
+                      manage foo 2. update manifestwork/1 to selectively orphan foo
+                      3. remove foo from manifestwork/1 without impacting continuity
+                      because manifestwork/2 adopts it.
+                    type: string
+                    default: ForeGround
+                  selectivelyOrphans:
+                    description: selectivelyOrphan represents a list of resources
+                      following orphan deletion stratecy
+                    type: object
+                    properties:
+                      orphaningRules:
+                        description: orphaningRules defines a slice of orphaningrule.
+                          Each orphaningrule identifies a single resource included
+                          in this manifestwork
+                        type: array
+                        items:
+                          description: OrphaningRule identifies a single resource
+                            included in this manifestwork
+                          type: object
+                          properties:
+                            Name:
+                              description: Name is the names of the resources in the
+                                workload that the strategy is applied
+                              type: string
+                            Namespace:
+                              description: Namespace is the namespaces of the resources
+                                in the workload that the strategy is applied
+                              type: string
+                            group:
+                              description: Group is the api group of the resources
+                                in the workload that the strategy is applied
+                              type: string
+                            resource:
+                              description: Resource is the resources in the workload
+                                that the strategy is applied
+                              type: string
               workload:
                 description: Workload represents the manifest workload to be deployed
                   on a managed cluster.
