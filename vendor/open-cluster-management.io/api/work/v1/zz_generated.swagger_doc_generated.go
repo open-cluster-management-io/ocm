@@ -64,6 +64,15 @@ func (AppliedManifestWorkStatus) SwaggerDoc() map[string]string {
 	return map_AppliedManifestWorkStatus
 }
 
+var map_DeleteOption = map[string]string{
+	"propagationPolicy":  "propagationPolicy can be Foreground, Orphan or SelectivelyOrphan SelectivelyOrphan should be rarely used.  It is provided for cases where particular resources is transfering ownership from one ManifestWork to another or another management unit. Setting this value will allow a flow like 1. create manifestwork/2 to manage foo 2. update manifestwork/1 to selectively orphan foo 3. remove foo from manifestwork/1 without impacting continuity because manifestwork/2 adopts it.",
+	"selectivelyOrphans": "selectivelyOrphan represents a list of resources following orphan deletion stratecy",
+}
+
+func (DeleteOption) SwaggerDoc() map[string]string {
+	return map_DeleteOption
+}
+
 var map_Manifest = map[string]string{
 	"": "Manifest represents a resource to be deployed on managed cluster.",
 }
@@ -127,8 +136,9 @@ func (ManifestWorkList) SwaggerDoc() map[string]string {
 }
 
 var map_ManifestWorkSpec = map[string]string{
-	"":         "ManifestWorkSpec represents a desired configuration of manifests to be deployed on the managed cluster.",
-	"workload": "Workload represents the manifest workload to be deployed on a managed cluster.",
+	"":             "ManifestWorkSpec represents a desired configuration of manifests to be deployed on the managed cluster.",
+	"workload":     "Workload represents the manifest workload to be deployed on a managed cluster.",
+	"deleteOption": "DeleteOption represents deletion strategy when the manifestwork is deleted. Foreground deletion strategy is applied to all the resource in this manifestwork if it is not set.",
 }
 
 func (ManifestWorkSpec) SwaggerDoc() map[string]string {
@@ -152,6 +162,27 @@ var map_ManifestsTemplate = map[string]string{
 
 func (ManifestsTemplate) SwaggerDoc() map[string]string {
 	return map_ManifestsTemplate
+}
+
+var map_OrphaningRule = map[string]string{
+	"":          "OrphaningRule identifies a single resource included in this manifestwork",
+	"group":     "Group is the api group of the resources in the workload that the strategy is applied",
+	"resource":  "Resource is the resources in the workload that the strategy is applied",
+	"Namespace": "Namespace is the namespaces of the resources in the workload that the strategy is applied",
+	"Name":      "Name is the names of the resources in the workload that the strategy is applied",
+}
+
+func (OrphaningRule) SwaggerDoc() map[string]string {
+	return map_OrphaningRule
+}
+
+var map_SelectivelyOrphan = map[string]string{
+	"":               "SelectivelyOrphan represents a list of resources following orphan deletion stratecy",
+	"orphaningRules": "orphaningRules defines a slice of orphaningrule. Each orphaningrule identifies a single resource included in this manifestwork",
+}
+
+func (SelectivelyOrphan) SwaggerDoc() map[string]string {
+	return map_SelectivelyOrphan
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE
