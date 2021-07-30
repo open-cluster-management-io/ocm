@@ -114,21 +114,21 @@ func AssertFinalizerAdded(namespace, name string, workClient workclientset.Inter
 
 // check if all manifests are applied
 func AssertExistenceOfConfigMaps(manifests []workapiv1.Manifest, kubeClient kubernetes.Interface, eventuallyTimeout, eventuallyInterval int) {
-	gomega.Eventually(func() bool {
+	gomega.Eventually(func() error {
 		for _, manifest := range manifests {
 			expected := manifest.Object.(*corev1.ConfigMap)
 			actual, err := kubeClient.CoreV1().ConfigMaps(expected.Namespace).Get(context.Background(), expected.Name, metav1.GetOptions{})
 			if err != nil {
-				return false
+				return err
 			}
 
 			if !reflect.DeepEqual(actual.Data, expected.Data) {
-				return false
+				return fmt.Errorf("configmap should be equal to %v, but got %v", expected.Data, actual.Data)
 			}
 		}
 
-		return true
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
 // check the existence of resource with GVR, namespace and name

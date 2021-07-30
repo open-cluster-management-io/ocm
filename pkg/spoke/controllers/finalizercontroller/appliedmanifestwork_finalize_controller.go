@@ -93,11 +93,15 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 
 	var err error
 
+	owner := helper.NewAppliedManifestWorkOwner(appliedManifestWork)
+
 	// Work is deleting, we remove its related resources on spoke cluster
 	// We still need to run delete for every resource even with ownerref on it, since ownerref does not handle cluster
 	// scoped resource correctly.
 	reason := fmt.Sprintf("manifestwork %s is terminating", appliedManifestWork.Spec.ManifestWorkName)
-	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(appliedManifestWork.Status.AppliedResources, reason, m.spokeDynamicClient, controllerContext.Recorder())
+	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(
+		appliedManifestWork.Status.AppliedResources, reason, m.spokeDynamicClient, controllerContext.Recorder(), *owner)
+
 	updatedAppliedManifestWork := false
 	if len(appliedManifestWork.Status.AppliedResources) != len(resourcesPendingFinalization) {
 		// update the status of the manifest work accordingly

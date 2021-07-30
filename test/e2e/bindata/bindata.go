@@ -196,7 +196,7 @@ rules:
 # Allow agent to create/delete namespaces, get/list are contained in admin role already
 - apiGroups: [""]
   resources: ["namespaces"]
-  verbs: ["create", "delete"]
+  verbs: ["create", "delete", "update"]
 # Allow agent to manage role/rolebinding/clusterrole/clusterrolebinding
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterrolebindings", "rolebindings"]

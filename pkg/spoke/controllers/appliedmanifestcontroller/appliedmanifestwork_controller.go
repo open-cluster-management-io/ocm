@@ -153,10 +153,15 @@ func (m *AppliedManifestWorkController) syncManifestWork(
 		return utilerrors.NewAggregate(errs)
 	}
 
+	owner := helper.NewAppliedManifestWorkOwner(appliedManifestWork)
+
 	// delete applied resources which are no longer maintained by manifest work
 	noLongerMaintainedResources := findUntrackedResources(appliedManifestWork.Status.AppliedResources, appliedResources)
+
 	reason := fmt.Sprintf("it is no longer maintained by manifestwork %s", manifestWork.Name)
-	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(noLongerMaintainedResources, reason, m.spokeDynamicClient, controllerContext.Recorder())
+
+	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(
+		noLongerMaintainedResources, reason, m.spokeDynamicClient, controllerContext.Recorder(), *owner)
 	if len(errs) != 0 {
 		return utilerrors.NewAggregate(errs)
 	}

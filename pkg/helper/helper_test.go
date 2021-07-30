@@ -45,15 +45,16 @@ func newManifestCondition(ordinal int32, resource string, conds ...metav1.Condit
 	}
 }
 
-func newSecret(namespace, name string, terminated bool, uid string) *corev1.Secret {
+func newSecret(namespace, name string, terminated bool, uid string, owner ...metav1.OwnerReference) *corev1.Secret {
 	secret := &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:            name,
+			Namespace:       namespace,
+			OwnerReferences: owner,
 		},
 	}
 
@@ -333,29 +334,47 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 		existingResources                    []runtime.Object
 		resourcesToRemove                    []workapiv1.AppliedManifestResourceMeta
 		expectedResourcesPendingFinalization []workapiv1.AppliedManifestResourceMeta
+		owner                                metav1.OwnerReference
 	}{
 		{
 			name: "skip if resource does not exist",
 			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1"},
 			},
+			owner: metav1.OwnerReference{Name: "n1", UID: "a"},
 		},
 		{
 			name: "skip if resource have different uid",
 			existingResources: []runtime.Object{
-				newSecret("ns1", "n1", false, "ns1-n1-xxx"),
-				newSecret("ns2", "n2", true, "ns2-n2-xxx"),
+				newSecret("ns1", "n1", false, "ns1-n1-xxx", metav1.OwnerReference{Name: "n1", UID: "a"}),
+				newSecret("ns2", "n2", true, "ns2-n2-xxx", metav1.OwnerReference{Name: "n1", UID: "a"}),
 			},
 			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
 				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
 			},
+			owner: metav1.OwnerReference{Name: "n1", UID: "a"},
 		},
 		{
 			name: "delete resources",
 			existingResources: []runtime.Object{
-				newSecret("ns1", "n1", false, "ns1-n1"),
-				newSecret("ns2", "n2", true, "ns2-n2"),
+				newSecret("ns1", "n1", false, "ns1-n1", metav1.OwnerReference{Name: "n1", UID: "a"}),
+				newSecret("ns2", "n2", false, "ns2-n2", metav1.OwnerReference{Name: "n2", UID: "b"}),
+			},
+			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
+				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
+			},
+			expectedResourcesPendingFinalization: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
+			},
+			owner: metav1.OwnerReference{Name: "n1", UID: "a"},
+		},
+		{
+			name: "skip without uid",
+			existingResources: []runtime.Object{
+				newSecret("ns1", "n1", false, "ns1-n1", metav1.OwnerReference{Name: "n1", UID: "a"}),
+				newSecret("ns2", "n2", true, "ns2-n2", metav1.OwnerReference{Name: "n1", UID: "a"}),
 			},
 			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1"},
@@ -364,6 +383,30 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 			expectedResourcesPendingFinalization: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
 			},
+			owner: metav1.OwnerReference{Name: "n1", UID: "a"},
+		},
+		{
+			name: "skip if it is now owned",
+			existingResources: []runtime.Object{
+				newSecret("ns1", "n1", false, "ns1-n1", metav1.OwnerReference{Name: "n2", UID: "b"}),
+			},
+			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
+			},
+			expectedResourcesPendingFinalization: []workapiv1.AppliedManifestResourceMeta{},
+			owner:                                metav1.OwnerReference{Name: "n1", UID: "a"},
+		},
+		{
+			name: "skip with multiple owners",
+			existingResources: []runtime.Object{
+				newSecret("ns1", "n1", false, "ns1-n1", metav1.OwnerReference{Name: "n1", UID: "a"}, metav1.OwnerReference{Name: "n2", UID: "b"}),
+			},
+			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
+				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
+			},
+			expectedResourcesPendingFinalization: []workapiv1.AppliedManifestResourceMeta{},
+			owner:                                metav1.OwnerReference{Name: "n1", UID: "a"},
 		},
 	}
 
@@ -373,7 +416,7 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(scheme, c.existingResources...)
-			actual, err := DeleteAppliedResources(c.resourcesToRemove, "testing", fakeDynamicClient, eventstesting.NewTestingEventRecorder(t))
+			actual, err := DeleteAppliedResources(c.resourcesToRemove, "testing", fakeDynamicClient, eventstesting.NewTestingEventRecorder(t), c.owner)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}

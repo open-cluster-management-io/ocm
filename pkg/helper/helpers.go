@@ -10,6 +10,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
+	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -176,9 +177,18 @@ func UpdateManifestWorkStatus(
 
 // DeleteAppliedResources deletes all given applied resources and returns those pending for finalization
 // If the uid recorded in resources is different from what we get by client, ignore the deletion.
-func DeleteAppliedResources(resources []workapiv1.AppliedManifestResourceMeta, reason string, dynamicClient dynamic.Interface, recorder events.Recorder) ([]workapiv1.AppliedManifestResourceMeta, []error) {
+func DeleteAppliedResources(
+	resources []workapiv1.AppliedManifestResourceMeta,
+	reason string,
+	dynamicClient dynamic.Interface,
+	recorder events.Recorder,
+	owner metav1.OwnerReference) ([]workapiv1.AppliedManifestResourceMeta, []error) {
 	var resourcesPendingFinalization []workapiv1.AppliedManifestResourceMeta
 	var errs []error
+
+	// set owner to be removed
+	ownerCopy := owner.DeepCopy()
+	ownerCopy.UID = types.UID(fmt.Sprintf("%s-", owner.UID))
 
 	for _, resource := range resources {
 		gvr := schema.GroupVersionResource{Group: resource.Group, Version: resource.Version, Resource: resource.Resource}
@@ -195,6 +205,34 @@ func DeleteAppliedResources(resources []workapiv1.AppliedManifestResourceMeta, r
 			errs = append(errs, fmt.Errorf(
 				"Failed to get resource %v with key %s/%s: %w",
 				gvr, resource.Namespace, resource.Name, err))
+			continue
+		}
+
+		existingOwner := u.GetOwnerReferences()
+
+		// If it is not owned by us, skip
+		if !IsOwnedBy(owner, existingOwner) {
+			continue
+		}
+
+		// Merge with the existing owners to move the owner.
+		modified := resourcemerge.BoolPtr(false)
+		resourcemerge.MergeOwnerRefs(modified, &existingOwner, []metav1.OwnerReference{*ownerCopy})
+
+		// If there are still any other existing owners (not only ManifestWorks), update ownerrefs only.
+		if len(existingOwner) > 0 {
+			if !*modified {
+				continue
+			}
+
+			u.SetOwnerReferences(existingOwner)
+			_, err = dynamicClient.Resource(gvr).Namespace(resource.Namespace).Update(context.TODO(), u, metav1.UpdateOptions{})
+			if err != nil {
+				errs = append(errs, fmt.Errorf(
+					"Failed to remove owner from resource %v with key %s/%s: %w",
+					gvr, resource.Namespace, resource.Name, err))
+			}
+
 			continue
 		}
 
@@ -284,6 +322,16 @@ func AppliedManifestworkQueueKeyFunc(hubhash string) factory.ObjectQueueKeyFunc 
 // NOTE: the length of hash string is 64, meaning the length of manifestwork name should be less than 189
 func HubHash(hubServer string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(hubServer)))
+}
+
+// IsOwnedBy check if owner exists in the ownerrefs.
+func IsOwnedBy(myOwner metav1.OwnerReference, existingOwners []metav1.OwnerReference) bool {
+	for _, owner := range existingOwners {
+		if myOwner.UID == owner.UID {
+			return true
+		}
+	}
+	return false
 }
 
 func NewAppliedManifestWorkOwner(appliedWork *workapiv1.AppliedManifestWork) *metav1.OwnerReference {

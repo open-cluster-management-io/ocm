@@ -9,6 +9,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
@@ -16,6 +17,7 @@ import (
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/work/pkg/helper"
 	"open-cluster-management.io/work/pkg/spoke/spoketesting"
 )
 
@@ -32,6 +34,10 @@ func newManifest(group, version, resource, namespace, name string) workapiv1.Man
 }
 
 func TestSyncManifestWork(t *testing.T) {
+	uid := types.UID("test")
+	appliedWork := spoketesting.NewAppliedManifestWork("test", 0, uid)
+	owner := helper.NewAppliedManifestWorkOwner(appliedWork)
+
 	cases := []struct {
 		name                               string
 		existingResources                  []runtime.Object
@@ -44,7 +50,7 @@ func TestSyncManifestWork(t *testing.T) {
 		{
 			name: "skip when no applied resource changed",
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
+				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
 			},
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
@@ -60,12 +66,12 @@ func TestSyncManifestWork(t *testing.T) {
 		{
 			name: "delete untracked resources",
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
-				spoketesting.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2"),
-				spoketesting.NewUnstructuredSecret("ns3", "n3", false, "ns3-n3"),
-				spoketesting.NewUnstructuredSecret("ns4", "n4", false, "ns4-n4"),
-				spoketesting.NewUnstructuredSecret("ns5", "n5", false, "ns5-n5"),
-				spoketesting.NewUnstructuredSecret("ns6", "n6", false, "ns6-n6"),
+				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
+				spoketesting.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2", *owner),
+				spoketesting.NewUnstructuredSecret("ns3", "n3", false, "ns3-n3", *owner),
+				spoketesting.NewUnstructuredSecret("ns4", "n4", false, "ns4-n4", *owner),
+				spoketesting.NewUnstructuredSecret("ns5", "n5", false, "ns5-n5", *owner),
+				spoketesting.NewUnstructuredSecret("ns6", "n6", false, "ns6-n6", *owner),
 			},
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
 				{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
@@ -103,9 +109,9 @@ func TestSyncManifestWork(t *testing.T) {
 		{
 			name: "requeue work when applied resource for stale manifest is deleting",
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
-				spoketesting.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2"),
-				spoketesting.NewUnstructuredSecret("ns3", "n3", true, "ns3-n3"),
+				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
+				spoketesting.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2", *owner),
+				spoketesting.NewUnstructuredSecret("ns3", "n3", true, "ns3-n3", *owner),
 			},
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
@@ -127,9 +133,9 @@ func TestSyncManifestWork(t *testing.T) {
 		{
 			name: "ignore re-created resource",
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns3", "n3", false, "ns3-n3-recreated"),
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
-				spoketesting.NewUnstructuredSecret("ns5", "n5", false, "ns5-n5"),
+				spoketesting.NewUnstructuredSecret("ns3", "n3", false, "ns3-n3-recreated", *owner),
+				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
+				spoketesting.NewUnstructuredSecret("ns5", "n5", false, "ns5-n5", *owner),
 			},
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", Resource: "secrets", Namespace: "ns3", Name: "n3", UID: "ns3-n3"},
@@ -156,8 +162,8 @@ func TestSyncManifestWork(t *testing.T) {
 		{
 			name: "update resource uid",
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
-				spoketesting.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2-updated"),
+				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
+				spoketesting.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2-updated", *owner),
 			},
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
@@ -186,7 +192,7 @@ func TestSyncManifestWork(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			testingWork, _ := spoketesting.NewManifestWork(0)
-			testingAppliedWork := spoketesting.NewAppliedManifestWork("test", 0)
+			testingAppliedWork := appliedWork.DeepCopy()
 			testingAppliedWork.Status.AppliedResources = c.appliedResources
 			testingWork.Status.ResourceStatus.Manifests = c.manifests
 
