@@ -22,7 +22,7 @@ spec:
         args:
           - "/registration"
           - "agent"
-          - "--cluster-name=local-development"
+          - "--cluster-name=cluster1"
           - "--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig"
         securityContext:
           allowPrivilegeEscalation: false
