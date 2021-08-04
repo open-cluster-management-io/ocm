@@ -2,10 +2,6 @@
 
 Support a primitive that enables resources to be applied to a managed cluster.
 
-## Community, discussion, contribution, and support
-
-Check the [CONTRIBUTING Doc](CONTRIBUTING.md) for how to contribute to the repo.
-
 <!--
 
 You can reach the maintainers of this project at:
@@ -193,6 +189,19 @@ To clean the environment
 ```
 make undeploy
 ```
+
+## Community, discussion, contribution, and support
+
+Check the [CONTRIBUTING Doc](CONTRIBUTING.md) for how to contribute to the repo.
+
+### Communication channels
+
+Slack channel: [#open-cluster-mgmt](http://slack.k8s.io/#open-cluster-mgmt)
+
+## License
+
+This code is released under the Apache 2.0 license. See the file LICENSE for more information.
+
 
 <!--
 ## XXX References
