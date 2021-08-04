@@ -1,6 +1,6 @@
 module open-cluster-management.io/placement
 
-go 1.15
+go 1.16
 
 replace github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1 // ensure compatible between controller-runtime and kube-openapi
 
@@ -13,6 +13,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	k8s.io/api v0.21.1
 	k8s.io/apimachinery v0.21.1
+	k8s.io/apiserver v0.21.0-rc.0
 	k8s.io/client-go v0.21.1
 	k8s.io/component-base v0.21.0
 	k8s.io/klog/v2 v2.8.0
