@@ -64,12 +64,12 @@ Next you need to approve your cluster like this:
 
 1. Approve the managed cluster
   ```
-  kubectl patch managedcluster local-development -p='{"spec":{"hubAcceptsClient":true}}' --type=merge
+  kubectl patch managedcluster cluster1 -p='{"spec":{"hubAcceptsClient":true}}' --type=merge
   ```
 
 2. Apporve the CSR of the managed clsuter
   ```
-  kubectl get csr -l open-cluster-management.io/cluster-name=local-development | grep Pending | awk '{print $1}' | xargs kubectl certificate approve
+  kubectl get csr -l open-cluster-management.io/cluster-name=cluster1 | grep Pending | awk '{print $1}' | xargs kubectl certificate approve
   ```
 
 3. Finally, you can find the managed cluster is joined and available
@@ -77,7 +77,7 @@ Next you need to approve your cluster like this:
   kubectl get managedcluster
 
   NAME                HUB ACCEPTED   MANAGED CLUSTER URLS   JOINED   AVAILABLE   AGE
-  local-development   true                                  True     True        2m21s
+  cluster1            true                                  True     True        2m21s
   ```
 
 You can find more details for cluster join process from this [design doc](https://github.com/open-cluster-management-io/api/blob/main/docs/clusterjoinprocess.md), and after the registration is deployed, you can try the following features
@@ -95,7 +95,7 @@ You can find more details for cluster join process from this [design doc](https:
   ```
 2. Add your cluster to the created cluster
   ```
-  kubectl label managedclusters local-development "cluster.open-cluster-management.io/clusterset=clusterset1" --overwrite
+  kubectl label managedclusters cluster1 "cluster.open-cluster-management.io/clusterset=clusterset1" --overwrite
   ```
 
 3. Then, you can find there is one managed cluster is selected from the managed cluster set status, like:
@@ -117,15 +117,15 @@ You can find more details from the [managed cluster set design doc](https://gith
   metadata:
     name: id.k8s.io
   spec:
-    value: local-development
+    value: cluster1
   EOF
   ```
 
 2. Then, you can find the claim from the managed cluster status, like:
   ```
-  kubectl get managedcluster local-development -o jsonpath='{.status.clusterClaims}'
+  kubectl get managedcluster cluster1 -o jsonpath='{.status.clusterClaims}'
 
-  [{"name":"id.k8s.io","value":"local-development"}]
+  [{"name":"id.k8s.io","value":"cluster1"}]
   ```
 
 You can find more details from the [cluster claim design doc](https://github.com/open-cluster-management-io/enhancements/tree/main/enhancements/sig-architecture/4-cluster-claims)
