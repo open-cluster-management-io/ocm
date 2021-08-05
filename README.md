@@ -13,19 +13,6 @@ Contains controllers that support:
 - the management of [managed cluster add-ons](https://github.com/open-cluster-management-io/api/blob/main/addon/v1alpha1/types_managedclusteraddon.go)
   (see [managed cluster addons management](https://github.com/open-cluster-management-io/enhancements/tree/main/enhancements/sig-architecture/12-addon-manager) for design deatails)
 
-## Community, discussion, contribution, development and support
-
-Check the [CONTRIBUTING Doc](CONTRIBUTING.md) for how to contribute to the repo.
-
-<!--
-
-You can reach the maintainers of this project at:
-
-- [#xxx on Slack](https://slack.com/signin?redir=%2Fmessages%2Fxxx)
-
--->
-
-------
 
 ## Quickstart
 
@@ -140,6 +127,19 @@ registration for all managed cluster addons, you can find more details from the
 
 > Note: The addon-management is in alpha stage, it is not enabled by default, it is controlled by
 > feature gate `AddonManagement`
+
+## Community, discussion, contribution, and support
+
+Check the [CONTRIBUTING Doc](CONTRIBUTING.md) for how to contribute to the repo.
+
+### Communication channels
+
+Slack channel: [#open-cluster-mgmt](http://slack.k8s.io/#open-cluster-mgmt)
+
+## License
+
+This code is released under the Apache 2.0 license. See the file LICENSE for more information.
+
 
 <!--
 ## XXX References
