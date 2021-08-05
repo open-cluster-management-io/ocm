@@ -21,6 +21,12 @@ You can reach the maintainers of this project at:
 
 You have at least one running kubernetes cluster;
 
+### Clone this repo
+```sh
+git clone https://github.com/open-cluster-management-io/placement.git
+cd placement
+```
+
 ### Deploy the placement controller
 Set environment variables.
 ```sh
