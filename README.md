@@ -42,7 +42,7 @@ We mainly provide deployment in two scenarios:
 
 ### Deploy all-in-on deployment
 
-1. Set a env variable `KUBECONFIG` to kubeconfig file path. 
+1. Set an env variable `KUBECONFIG` to kubeconfig file path. 
    ```shell
    export KUBECONFIG=$HOME/.kube/config
    ```
