@@ -52,7 +52,14 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		if !errors.IsNotFound(err) {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		}
-		_, err = hubDynamicClient.Resource(gvr).Create(context.TODO(), claimCrd, metav1.CreateOptions{})
+		err = wait.Poll(1*time.Second, 5*time.Second, func() (done bool, err error) {
+			_, err = hubDynamicClient.Resource(gvr).Create(context.TODO(), claimCrd, metav1.CreateOptions{})
+			if err != nil {
+				return false, err
+			}
+
+			return true, nil
+		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		// create ClusterClaim cr
