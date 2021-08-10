@@ -14,10 +14,10 @@ You can reach the maintainers of this project at:
 ## Description
 
 ### Work agent
-Work agent is a controller running on the managed cluster. It watches the `ManifestWorks` CRs in a certian namespace on hub cluster and applies the manifests included in those CRs on the managed clusters.
+Work agent is a controller running on the managed cluster. It watches the `ManifestWorks` CRs in a certain namespace on hub cluster and applies the manifests included in those CRs on the managed clusters.
 
 ### Work webhook
-Work webhook is an addmission webhook running on hub cluster to ensure the content of `ManifestWorks` created/updated are valid.
+Work webhook is an admission webhook running on hub cluster to ensure the content of `ManifestWorks` created/updated are valid.
 
 ## Getting Started
 
@@ -175,7 +175,7 @@ status:
 
 As shown above, the status of the `ManifestWork` includes the conditions for both the whole `ManifestWork` and each of the manifest it contains. And there are two condition types:
 - **Applied**. If true, it indicates the whole `ManifestWork` (or a particular manifest) has been applied on the managed cluster; otherwise `reason`/`message` of the condition will show more information for troubleshooting.
-- **Available**. If true, it indicates the coressponding Kubernetes resources of the the whole `ManifestWork` (or a particular manifest) are available on the managed cluster; otherwise `reason`/`message` of the condition will show more information for troubleshooting
+- **Available**. If true, it indicates the corresponding Kubernetes resources of the  whole `ManifestWork` (or a particular manifest) are available on the managed cluster; otherwise `reason`/`message` of the condition will show more information for troubleshooting
 
 Check on the managed cluster and see the `Pod` has been deployed from the hub cluster.
 ```
