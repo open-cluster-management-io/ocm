@@ -212,7 +212,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		return err
 	}
 
-	// Symc pull secret
+	// Sync pull secret
 	_, _, err = resourceapply.SyncSecret(
 		n.kubeClient.CoreV1(),
 		controllerContext.Recorder(),
