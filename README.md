@@ -115,11 +115,20 @@ spec:
 EOF
 ```
 
-Check the 'PlacementDecision'created for this placement. It contains all selected clusters in status.
-```
+Check the 'PlacementDecision' created for this placement. It contains all selected clusters in status.
+
+```txt
 kubectl get placementdecisions
 NAME                    AGE
-placement1-decision-1   14s
+placement1-decision-1   2m27s
+
+kubectl describe placementdecisions placement1-decision-1
+......
+Status:
+  Decisions:
+    Cluster Name:  cluster1
+    Reason:
+Events:            <none>
 ```
 
 ### Clean up
