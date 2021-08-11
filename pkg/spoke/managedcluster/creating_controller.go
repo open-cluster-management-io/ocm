@@ -20,7 +20,7 @@ import (
 // well-known anonymous user
 const anonymous = "system:anonymous"
 
-// CreatingControllerSyncInterval is exposed so that integration tests can crank up the constroller sync speed.
+// CreatingControllerSyncInterval is exposed so that integration tests can crank up the controller sync speed.
 var CreatingControllerSyncInterval = 60 * time.Minute
 
 // managedClusterCreatingController creates a ManagedCluster on hub cluster during the spoke agent bootstrap phase
