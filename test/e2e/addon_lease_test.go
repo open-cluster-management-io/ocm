@@ -15,6 +15,7 @@ import (
 	certificatesv1 "k8s.io/api/certificates/v1"
 	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -55,6 +56,18 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 					Name: addOn.Name,
 				},
 			}, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.AfterEach(func() {
+			clusterName := fmt.Sprintf("loopback-e2e-%v", suffix)
+			ginkgo.By(fmt.Sprintf("Cleaning managed cluster %q", clusterName))
+			err = cleanupManagedCluster(clusterName, suffix)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			addOnName := fmt.Sprintf("addon-%s", suffix)
+			ginkgo.By(fmt.Sprintf("Cleaning managed cluster addon installation namespace %q", addOnName))
+			err = hubClient.CoreV1().Namespaces().Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 
@@ -207,6 +220,18 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 					Name: addOn.Name,
 				},
 			}, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.AfterEach(func() {
+			clusterName := fmt.Sprintf("loopback-e2e-%v", suffix)
+			ginkgo.By(fmt.Sprintf("Cleaning managed cluster %q", clusterName))
+			err = cleanupManagedCluster(clusterName, suffix)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			addOnName := fmt.Sprintf("addon-%s", suffix)
+			ginkgo.By(fmt.Sprintf("Cleaning managed cluster addon installation namespace %q", addOnName))
+			err = hubClient.CoreV1().Namespaces().Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 
@@ -626,4 +651,106 @@ func createManagedClusterAddOn(managedCluster *clusterv1.ManagedCluster, addOnNa
 		},
 	}
 	return hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Create(context.TODO(), addOn, metav1.CreateOptions{})
+}
+
+// cleanupManagedCluster deletes the managed cluster related resources, including the namespace
+func cleanupManagedCluster(clusterName, suffix string) error {
+	nsName := fmt.Sprintf("loopback-spoke-%v", suffix)
+
+	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
+		var err error
+		err = hubClient.CoreV1().Namespaces().Delete(context.TODO(), nsName, metav1.DeleteOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		return true, nil
+	}); err != nil {
+		return fmt.Errorf("delete ns %q failed: %v", nsName, err)
+	}
+
+	if err := deleteManageClusterAndRelatedNamespace(clusterName); err != nil {
+		return fmt.Errorf("delete manage cluster and related namespace for cluster %q failed: %v", clusterName, err)
+	}
+
+	var (
+		err        error
+		cr         *unstructured.Unstructured
+		crResource = schema.GroupVersionResource{
+			Group:    "rbac.authorization.k8s.io",
+			Version:  "v1",
+			Resource: "clusterroles",
+		}
+	)
+	cr, err = spokeCR(suffix)
+	if err != nil {
+		return err
+	}
+	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
+		var err error
+		err = hubDynamicClient.Resource(crResource).Delete(context.TODO(), cr.GetName(), metav1.DeleteOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		return true, nil
+	}); err != nil {
+		return fmt.Errorf("delete cr %q failed: %v", cr.GetName(), err)
+	}
+
+	var (
+		crb         *unstructured.Unstructured
+		crbResource = schema.GroupVersionResource{
+			Group:    "rbac.authorization.k8s.io",
+			Version:  "v1",
+			Resource: "clusterrolebindings",
+		}
+	)
+	crb, err = spokeCRB(nsName, suffix)
+	if err != nil {
+		return err
+	}
+	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
+		var err error
+		err = hubDynamicClient.Resource(crbResource).Delete(context.TODO(), crb.GetName(), metav1.DeleteOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		return true, nil
+	}); err != nil {
+		return fmt.Errorf("delete crb %q failed: %v", crb.GetName(), err)
+	}
+
+	return nil
+}
+
+func deleteManageClusterAndRelatedNamespace(clusterName string) error {
+	if err := wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
+		var err error
+		err = clusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			return false, err
+		}
+		return true, nil
+	}); err != nil {
+		return fmt.Errorf("delete managed cluster %q failed: %v", clusterName, err)
+	}
+
+	// delete namespace created by hub automaticly
+	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
+		var err error
+		err = hubClient.CoreV1().Namespaces().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
+		// some managed cluster just created, but the csr is not approved,
+		// so there is not a related namespace
+		if err != nil && !errors.IsNotFound(err) {
+			return false, err
+		}
+
+		return true, nil
+	}); err != nil {
+		return fmt.Errorf("delete related namespace %q failed: %v", clusterName, err)
+	}
+
+	return nil
 }

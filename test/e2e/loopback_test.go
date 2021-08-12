@@ -551,6 +551,18 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 
 			return false
 		}, 90*time.Second, 1*time.Second).Should(gomega.BeTrue())
+
+		ginkgo.By(fmt.Sprintf("Cleaning managed cluster %q", clusterName))
+		err = cleanupManagedCluster(clusterName, suffix)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ginkgo.By(fmt.Sprintf("Cleaning managed cluster addon installation namespace %q", addOnName))
+		err = hubClient.CoreV1().Namespaces().Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ginkgo.By(fmt.Sprintf("Cleaning managed cluster spoken namespace %q", nsName))
+		err = hubClient.CoreV1().Namespaces().Delete(context.TODO(), nsName, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 })
 

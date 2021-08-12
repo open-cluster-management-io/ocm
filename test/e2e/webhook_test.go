@@ -78,6 +78,8 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				gomega.Expect(managedCluster.Spec.LeaseDurationSeconds).To(gomega.Equal(int32(60)))
+
+				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 			})
 
 			ginkgo.It("Should respond bad request when creating a managed cluster with invalid external server URLs", func() {
@@ -94,6 +96,8 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					admissionName,
 					invalidURL,
 				)))
+
+				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 			})
 
 			ginkgo.It("Should forbid the request when creating an accepted managed cluster by unauthorized user", func() {
@@ -124,6 +128,9 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					saNamespace,
 					sa,
 				)))
+
+				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
 			})
 
 			ginkgo.It("Should accept the request when creating an accepted managed cluster by authorized user", func() {
@@ -149,6 +156,9 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				managedCluster := newManagedCluster(clusterName, true, validURL)
 				_, err = authorizedClient.ClusterV1().ManagedClusters().Create(context.TODO(), managedCluster, metav1.CreateOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
 			})
 
 			ginkgo.It("Should accept the request when creating a managed cluster with clusterset specified by authorized user", func() {
@@ -189,6 +199,9 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				}
 				_, err = authorizedClient.ClusterV1().ManagedClusters().Create(context.TODO(), managedCluster, metav1.CreateOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
 			})
 
 			ginkgo.It("Should forbid the request when creating a managed cluster with clusterset specified by unauthorized user", func() {
@@ -234,17 +247,25 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					sa,
 					clusterSetName,
 				)))
+
+				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
 			})
 		})
 
 		ginkgo.Context("Updating a managed cluster", func() {
 			var clusterName string
-
 			ginkgo.BeforeEach(func() {
+				ginkgo.By(fmt.Sprintf("Creating managed cluster %q", clusterName))
 				clusterName = fmt.Sprintf("webhook-spoke-%s", rand.String(6))
 				managedCluster := newManagedCluster(clusterName, false, validURL)
 				_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.TODO(), managedCluster, metav1.CreateOptions{})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			})
+
+			ginkgo.AfterEach(func() {
+				ginkgo.By(fmt.Sprintf("Cleaning managed cluster %q", clusterName))
+				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 			})
 
 			ginkgo.It("Should not update the LeaseDurationSeconds to zero", func() {
@@ -315,6 +336,8 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					saNamespace,
 					sa,
 				)))
+
+				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
 			})
 
 			ginkgo.It("Should accept the request when updating the clusterset of a managed cluster by authorized user", func() {
@@ -358,6 +381,8 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					return err
 				})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
 			})
 
 			ginkgo.It("Should forbid the request when updating the clusterset of a managed cluster by unauthorized user", func() {
@@ -406,6 +431,8 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					sa,
 					clusterSetName,
 				)))
+
+				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
 			})
 		})
 	})
@@ -479,6 +506,8 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				managedClusterSetBinding := newManagedClusterSetBinding(namespace, clusterSetName, clusterSetName)
 				_, err = authorizedClient.ClusterV1alpha1().ManagedClusterSetBindings(namespace).Create(context.TODO(), managedClusterSetBinding, metav1.CreateOptions{})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				gomega.Expect(cleanupClusterClient(namespace, sa)).ToNot(gomega.HaveOccurred())
 			})
 
 			ginkgo.It("should forbid the request when creating a ManagedClusterSetBinding by unauthorized user", func() {
@@ -507,6 +536,8 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					sa,
 					clusterSetName,
 				)))
+
+				gomega.Expect(cleanupClusterClient(namespace, sa)).ToNot(gomega.HaveOccurred())
 			})
 		})
 
@@ -554,6 +585,8 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				}
 				_, err = unauthorizedClient.ClusterV1alpha1().ManagedClusterSetBindings(namespace).Update(context.TODO(), managedClusterSetBinding, metav1.UpdateOptions{})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				gomega.Expect(cleanupClusterClient(namespace, sa)).ToNot(gomega.HaveOccurred())
 			})
 		})
 	})
@@ -714,4 +747,28 @@ func buildClusterClient(saNamespace, saName string, clusterPolicyRules, policyRu
 		BearerToken: string(tokenSecret.Data["token"]),
 	})
 	return unauthorizedClusterClient, err
+}
+
+// cleanupClusterClient delete cluster-scope resource created by func "buildClusterClient",
+// the namespace-scope resources should be deleted by an additional namespace deleting func.
+// It is recommended be invoked as a pair with the func "buildClusterClient"
+func cleanupClusterClient(saNamespace, saName string) error {
+	err := hubClient.CoreV1().ServiceAccounts(saNamespace).Delete(context.TODO(), saName, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("delete sa %q/%q failed: %v", saNamespace, saName, err)
+	}
+
+	// delete cluster role and cluster role binding if exists
+	clusterRoleName := fmt.Sprintf("%s-clusterrole", saName)
+	err = hubClient.RbacV1().ClusterRoles().Delete(context.TODO(), clusterRoleName, metav1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("delete cluster role %q failed: %v", clusterRoleName, err)
+	}
+	clusterRoleBindingName := fmt.Sprintf("%s-clusterrolebinding", saName)
+	err = hubClient.RbacV1().ClusterRoleBindings().Delete(context.TODO(), clusterRoleBindingName, metav1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("delete cluster role binding %q failed: %v", clusterRoleBindingName, err)
+	}
+
+	return nil
 }
