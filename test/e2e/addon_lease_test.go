@@ -96,6 +96,20 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 				return cond.Status == metav1.ConditionTrue, nil
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// check if the cluster has a label for addon with expected value
+			err = wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
+				cluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), managedCluster.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				if len(cluster.Labels) == 0 {
+					return false, nil
+				}
+				key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addOn.Name)
+				return cluster.Labels[key] == "available", nil
+			})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 
 		ginkgo.It("Should update addon status to unavailable if addon stops to update its lease", func() {
@@ -124,6 +138,20 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+			// check if the cluster has a label for addon with expected value
+			err = wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
+				cluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), managedCluster.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				if len(cluster.Labels) == 0 {
+					return false, nil
+				}
+				key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addOn.Name)
+				return cluster.Labels[key] == "available", nil
+			})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 			ginkgo.By(fmt.Sprintf("Updating lease %q with a past time", addOn.Name))
 			lease, err := hubClient.CoordinationV1().Leases(addOn.Name).Get(context.TODO(), addOn.Name, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -141,6 +169,20 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 				}
 				cond := meta.FindStatusCondition(found.Status.Conditions, "Available")
 				return cond.Status == metav1.ConditionFalse, nil
+			})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// check if the cluster has a label for addon with expected value
+			err = wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
+				cluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), managedCluster.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				if len(cluster.Labels) == 0 {
+					return false, nil
+				}
+				key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addOn.Name)
+				return cluster.Labels[key] == "unhealthy", nil
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
@@ -171,6 +213,20 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+			// check if the cluster has a label for addon with expected value
+			err = wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
+				cluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), managedCluster.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				if len(cluster.Labels) == 0 {
+					return false, nil
+				}
+				key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addOn.Name)
+				return cluster.Labels[key] == "available", nil
+			})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 			ginkgo.By(fmt.Sprintf("Deleting lease %q", addOn.Name))
 			err = hubClient.CoordinationV1().Leases(addOn.Name).Delete(context.TODO(), addOn.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -185,6 +241,20 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 				}
 				cond := meta.FindStatusCondition(found.Status.Conditions, "Available")
 				return cond.Status == metav1.ConditionUnknown, nil
+			})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// check if the cluster has a label for addon with expected value
+			err = wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
+				cluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), managedCluster.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				if len(cluster.Labels) == 0 {
+					return false, nil
+				}
+				key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addOn.Name)
+				return cluster.Labels[key] == "unreachable", nil
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})

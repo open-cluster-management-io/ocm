@@ -114,6 +114,13 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		controllerContext.EventRecorder,
 	)
 
+	addOnFeatureDiscoveryController := addon.NewAddOnFeatureDiscoveryController(
+		clusterClient,
+		clusterInformers.Cluster().V1().ManagedClusters(),
+		addOnInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		controllerContext.EventRecorder,
+	)
+
 	go clusterInformers.Start(ctx.Done())
 	go workInformers.Start(ctx.Done())
 	go kubeInfomers.Start(ctx.Done())
@@ -126,6 +133,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	go managedClusterSetController.Run(ctx, 1)
 	go clusterroleController.Run(ctx, 1)
 	go addOnHealthCheckController.Run(ctx, 1)
+	go addOnFeatureDiscoveryController.Run(ctx, 1)
 
 	<-ctx.Done()
 	return nil

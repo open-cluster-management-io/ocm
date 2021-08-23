@@ -112,6 +112,21 @@ var _ = ginkgo.Describe("Addon Lease Resync", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	}
 
+	assertAddonLabel := func(clusterName, addonName, status string) {
+		ginkgo.By("Check addon status label on managed cluster")
+		gomega.Eventually(func() bool {
+			cluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
+			if err != nil {
+				return false
+			}
+			if len(cluster.Labels) == 0 {
+				return false
+			}
+			key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addonName)
+			return cluster.Labels[key] == status
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+	}
+
 	assertAddOn := func() {
 		ginkgo.By(fmt.Sprintf("Create addon %q on managed cluster namespace %q", addOnName, managedClusterName))
 		// create addon on managed cluster namespace
@@ -126,6 +141,7 @@ var _ = ginkgo.Describe("Addon Lease Resync", func() {
 		}
 		_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.TODO(), addOn, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		assertAddonLabel(managedClusterName, addOnName, "unreachable")
 
 		// create addon namespace
 		ns := &corev1.Namespace{
@@ -186,6 +202,8 @@ var _ = ginkgo.Describe("Addon Lease Resync", func() {
 			return meta.IsStatusConditionTrue(addOn.Status.Conditions, "Available")
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
+		assertAddonLabel(managedClusterName, addOnName, "available")
+
 		// do not update addon lease, wait resync once, the addon status should be unavailable
 		gomega.Eventually(func() bool {
 			addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
@@ -194,5 +212,7 @@ var _ = ginkgo.Describe("Addon Lease Resync", func() {
 			}
 			return meta.IsStatusConditionFalse(addOn.Status.Conditions, "Available")
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+		assertAddonLabel(managedClusterName, addOnName, "unhealthy")
 	})
 })
