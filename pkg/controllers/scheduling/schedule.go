@@ -135,7 +135,6 @@ func (s *pluginScheduler) Schedule(
 	}
 
 	// score clusters
-	// Score the cluster
 	scoreSum := PrioritizeSore{}
 	for _, cluster := range filtered {
 		scoreSum[cluster.Name] = 0
@@ -158,9 +157,13 @@ func (s *pluginScheduler) Schedule(
 		}
 	}
 
-	// Sort cluster by score
+	// Sort cluster by score, if score is equal, sort by name
 	sort.SliceStable(filtered, func(i, j int) bool {
-		return scoreSum[clusters[i].Name] > scoreSum[clusters[j].Name]
+		if scoreSum[filtered[i].Name] == scoreSum[filtered[j].Name] {
+			return filtered[i].Name < filtered[j].Name
+		} else {
+			return scoreSum[filtered[i].Name] > scoreSum[filtered[j].Name]
+		}
 	})
 
 	results.feasibleClusters = filtered
