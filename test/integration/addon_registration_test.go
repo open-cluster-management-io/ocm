@@ -183,6 +183,37 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	}
 
+	assertAddonLabel := func(clusterName, addonName, status string) {
+		ginkgo.By("Check addon status label on managed cluster")
+		gomega.Eventually(func() bool {
+			cluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
+			if err != nil {
+				return false
+			}
+			if len(cluster.Labels) == 0 {
+				return false
+			}
+			key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addonName)
+			return cluster.Labels[key] == status
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+	}
+
+	assertHasNoAddonLabel := func(clusterName, addonName string) {
+		ginkgo.By("Check if addon status label on managed cluster deleted")
+		gomega.Eventually(func() bool {
+			cluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
+			if err != nil {
+				return false
+			}
+			if len(cluster.Labels) == 0 {
+				return true
+			}
+			key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addonName)
+			_, ok := cluster.Labels[key]
+			return !ok
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+	}
+
 	assertSuccessAddOnBootstrap := func(signerName string) {
 		ginkgo.By("Create ManagedClusterAddOn cr with required annotations")
 		// create addon namespace
@@ -221,6 +252,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 
 		assertSuccessCSRApproval()
 		assertValidClientCertificate(addOnName, getSecretName(addOnName, signerName), signerName)
+		assertAddonLabel(managedClusterName, addOnName, "unreachable")
 	}
 
 	assertSecretGone := func(secretNamespace, secretName string) {
@@ -243,6 +275,8 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		assertSecretGone(addOnName, getSecretName(addOnName, signerName))
+
+		assertHasNoAddonLabel(managedClusterName, addOnName)
 	})
 
 	ginkgo.It("should register addon successfully even when the install namespace is not available at the beginning", func() {
