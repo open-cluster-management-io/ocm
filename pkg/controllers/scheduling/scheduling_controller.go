@@ -192,7 +192,7 @@ func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncCon
 		return err
 	}
 
-	err = c.bind(ctx, placement, scheduleResult.Decisions())
+	err = c.bind(ctx, placement, scheduleResult.Decisions(), scheduleResult.PrioritizerScores())
 	if err != nil {
 		return err
 	}
@@ -337,6 +337,7 @@ func (c *schedulingController) bind(
 	ctx context.Context,
 	placement *clusterapiv1alpha1.Placement,
 	clusterDecisions []clusterapiv1alpha1.ClusterDecision,
+	clusterScores PrioritizerScore,
 ) error {
 	// sort clusterdecisions by cluster name
 	sort.SliceStable(clusterDecisions, func(i, j int) bool {
@@ -368,7 +369,7 @@ func (c *schedulingController) bind(
 		placementDecisionName := fmt.Sprintf("%s-decision-%d", placement.Name, index+1)
 		placementDecisionNames.Insert(placementDecisionName)
 		err := c.createOrUpdatePlacementDecision(
-			ctx, placement, placementDecisionName, decisionSlice)
+			ctx, placement, placementDecisionName, decisionSlice, clusterScores)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -417,6 +418,7 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 	placement *clusterapiv1alpha1.Placement,
 	placementDecisionName string,
 	clusterDecisions []clusterapiv1alpha1.ClusterDecision,
+	clusterScores PrioritizerScore,
 ) error {
 	if len(clusterDecisions) > maxNumOfClusterDecisions {
 		return fmt.Errorf("the number of clusterdecisions %q exceeds the max limitation %q", len(clusterDecisions), maxNumOfClusterDecisions)
@@ -469,6 +471,16 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 		placement, placementDecision, corev1.EventTypeNormal,
 		"DecisionUpdate", "DecisionUpdated",
 		"Decision %s is updated with placement %s in namespace %s", placementDecision.Name, placement.Name, placement.Namespace)
+
+	// update the event with prioritizer score.
+	scoreStr := ""
+	for k, v := range clusterScores {
+		scoreStr += fmt.Sprintf("%s:%d ", k, v)
+	}
+	c.recorder.Eventf(
+		placement, placementDecision, corev1.EventTypeNormal,
+		"ScoreUpdate", "ScoreUpdated",
+		scoreStr)
 
 	return nil
 }

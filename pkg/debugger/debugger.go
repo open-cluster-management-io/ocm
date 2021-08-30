@@ -25,9 +25,9 @@ type Debugger struct {
 
 // DebugResult is the result returned by debugger
 type DebugResult struct {
-	FilterResults     []scheduling.FilterResult   `json:"filteredPiplieResults,omitempty"`
-	PrioritizeResults []scheduling.PriorizeResult `json:"prioritizeResults,omitempty"`
-	Error             string                      `json:"error,omitempty"`
+	FilterResults     []scheduling.FilterResult      `json:"filteredPiplieResults,omitempty"`
+	PrioritizeResults []scheduling.PrioritizerResult `json:"prioritizeResults,omitempty"`
+	Error             string                         `json:"error,omitempty"`
 }
 
 func NewDebugger(
@@ -62,7 +62,7 @@ func (d *Debugger) Handler(w http.ResponseWriter, r *http.Request) {
 
 	scheduleResults, _ := d.scheduler.Schedule(r.Context(), placement, clusters)
 
-	result := DebugResult{FilterResults: scheduleResults.FilterResults(), PrioritizeResults: scheduleResults.PriorizeResults()}
+	result := DebugResult{FilterResults: scheduleResults.FilterResults(), PrioritizeResults: scheduleResults.PrioritizerResults()}
 
 	resultByte, _ := json.Marshal(result)
 

@@ -190,10 +190,11 @@ func (PlacementList) SwaggerDoc() map[string]string {
 }
 
 var map_PlacementSpec = map[string]string{
-	"":                 "PlacementSpec defines the attributes of Placement. An empty PlacementSpec selects all ManagedClusters from the ManagedClusterSets bound to the placement namespace. The containing fields are ANDed.",
-	"clusterSets":      "ClusterSets represent the ManagedClusterSets from which the ManagedClusters are selected. If the slice is empty, ManagedClusters will be selected from the ManagedClusterSets bound to the placement namespace, otherwise ManagedClusters will be selected from the intersection of this slice and the ManagedClusterSets bound to the placement namespace.",
-	"numberOfClusters": "NumberOfClusters represents the desired number of ManagedClusters to be selected which meet the placement requirements. 1) If not specified, all ManagedClusters which meet the placement requirements (including ClusterSets,\n   and Predicates) will be selected;\n2) Otherwise if the nubmer of ManagedClusters meet the placement requirements is larger than\n   NumberOfClusters, a random subset with desired number of ManagedClusters will be selected;\n3) If the nubmer of ManagedClusters meet the placement requirements is equal to NumberOfClusters,\n   all of them will be selected;\n4) If the nubmer of ManagedClusters meet the placement requirements is less than NumberOfClusters,\n   all of them will be selected, and the status of condition `PlacementConditionSatisfied` will be\n   set to false;",
-	"predicates":       "Predicates represent a slice of predicates to select ManagedClusters. The predicates are ORed.",
+	"":                  "PlacementSpec defines the attributes of Placement. An empty PlacementSpec selects all ManagedClusters from the ManagedClusterSets bound to the placement namespace. The containing fields are ANDed.",
+	"clusterSets":       "ClusterSets represent the ManagedClusterSets from which the ManagedClusters are selected. If the slice is empty, ManagedClusters will be selected from the ManagedClusterSets bound to the placement namespace, otherwise ManagedClusters will be selected from the intersection of this slice and the ManagedClusterSets bound to the placement namespace.",
+	"numberOfClusters":  "NumberOfClusters represents the desired number of ManagedClusters to be selected which meet the placement requirements. 1) If not specified, all ManagedClusters which meet the placement requirements (including ClusterSets,\n   and Predicates) will be selected;\n2) Otherwise if the nubmer of ManagedClusters meet the placement requirements is larger than\n   NumberOfClusters, a random subset with desired number of ManagedClusters will be selected;\n3) If the nubmer of ManagedClusters meet the placement requirements is equal to NumberOfClusters,\n   all of them will be selected;\n4) If the nubmer of ManagedClusters meet the placement requirements is less than NumberOfClusters,\n   all of them will be selected, and the status of condition `PlacementConditionSatisfied` will be\n   set to false;",
+	"predicates":        "Predicates represent a slice of predicates to select ManagedClusters. The predicates are ORed.",
+	"prioritizerPolicy": "PrioritizerPolicy defines the policy of the prioritizers. If this field is unset, then default prioritizer mode and configurations are used. Referring to PrioritizerPolicy to see more description about Mode and Configurations.",
 }
 
 func (PlacementSpec) SwaggerDoc() map[string]string {
@@ -207,6 +208,25 @@ var map_PlacementStatus = map[string]string{
 
 func (PlacementStatus) SwaggerDoc() map[string]string {
 	return map_PlacementStatus
+}
+
+var map_PrioritizerConfig = map[string]string{
+	"":       "PrioritizerConfig represents the configuration of prioritizer",
+	"name":   "Name is the name of a prioritizer. Below are the valid names: 1) Balance: balance the decisions among the clusters. 2) Steady: ensure the existing decision is stabilized. 3) ResourceRatioCPU & ResourceRatioMemory: sort clusters based on the allocatable to capacity ratio. 4) ResourceAllocatableCPU & ResourceAllocatableMemory: sort clusters based on the allocatable.",
+	"weight": "Weight defines the weight of prioritizer. The value must be ranged in [0,10]. Each prioritizer will calculate an integer score of a cluster in the range of [-100, 100]. The final score of a cluster will be sum(weight * prioritizer_score). A higher weight indicates that the prioritizer weights more in the cluster selection, while 0 weight indicate thats the prioritizer is disabled.",
+}
+
+func (PrioritizerConfig) SwaggerDoc() map[string]string {
+	return map_PrioritizerConfig
+}
+
+var map_PrioritizerPolicy = map[string]string{
+	"":     "PrioritizerPolicy represents the policy of prioritizer",
+	"mode": "Mode is either Exact, Additive, \"\" where \"\" is Additive by default. In Additive mode, any prioritizer not explicitly enumerated is enabled in its default Configurations, in which Steady and Balance prioritizers have the weight of 1 while other prioritizers have the weight of 0. Additive doesn't require configuring all prioritizers. The default Configurations may change in the future, and additional prioritization will happen. In Exact mode, any prioritizer not explicitly enumerated is weighted as zero. Exact requires knowing the full set of prioritizers you want, but avoids behavior changes between releases.",
+}
+
+func (PrioritizerPolicy) SwaggerDoc() map[string]string {
+	return map_PrioritizerPolicy
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

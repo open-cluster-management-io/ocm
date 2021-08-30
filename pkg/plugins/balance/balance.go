@@ -2,6 +2,7 @@ package balance
 
 import (
 	"context"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/labels"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
@@ -25,11 +26,13 @@ type Balance struct {
 }
 
 func New(handle plugins.Handle) *Balance {
-	return &Balance{handle: handle}
+	return &Balance{
+		handle: handle,
+	}
 }
 
 func (b *Balance) Name() string {
-	return "balance"
+	return reflect.TypeOf(*b).Name()
 }
 
 func (b *Balance) Description() string {

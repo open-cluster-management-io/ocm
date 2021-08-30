@@ -27,7 +27,7 @@ func TestSchedule(t *testing.T) {
 		clusters             []*clusterapiv1.ManagedCluster
 		decisions            []runtime.Object
 		expectedFilterResult []FilterResult
-		expectedScoreResult  []PriorizeResult
+		expectedScoreResult  []PrioritizerResult
 		expectedDecisions    []clusterapiv1alpha1.ClusterDecision
 		expectedUnScheduled  int
 	}{
@@ -44,18 +44,20 @@ func TestSchedule(t *testing.T) {
 			},
 			expectedFilterResult: []FilterResult{
 				{
-					Name:             "predicate",
+					Name:             "Predicate",
 					FilteredClusters: []string{"cluster1"},
 				},
 			},
-			expectedScoreResult: []PriorizeResult{
+			expectedScoreResult: []PrioritizerResult{
 				{
-					Name:   "balance",
-					Scores: PrioritizeSore{"cluster1": 100},
+					Name:   "Balance",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 100},
 				},
 				{
-					Name:   "steady",
-					Scores: PrioritizeSore{"cluster1": 0},
+					Name:   "Steady",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 0},
 				},
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
@@ -79,18 +81,20 @@ func TestSchedule(t *testing.T) {
 			},
 			expectedFilterResult: []FilterResult{
 				{
-					Name:             "predicate",
+					Name:             "Predicate",
 					FilteredClusters: []string{"cluster1"},
 				},
 			},
-			expectedScoreResult: []PriorizeResult{
+			expectedScoreResult: []PrioritizerResult{
 				{
-					Name:   "balance",
-					Scores: PrioritizeSore{"cluster1": 100},
+					Name:   "Balance",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 100},
 				},
 				{
-					Name:   "steady",
-					Scores: PrioritizeSore{"cluster1": 0},
+					Name:   "Steady",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 0},
 				},
 			},
 			expectedUnScheduled: 2,
@@ -121,19 +125,123 @@ func TestSchedule(t *testing.T) {
 			},
 			expectedFilterResult: []FilterResult{
 				{
-					Name:             "predicate",
+					Name:             "Predicate",
 					FilteredClusters: []string{"cluster1", "cluster2", "cluster3"},
 				},
 			},
-			expectedScoreResult: []PriorizeResult{
+			expectedScoreResult: []PrioritizerResult{
 				{
-					Name:   "balance",
-					Scores: PrioritizeSore{"cluster1": 100, "cluster2": 100, "cluster3": 100},
+					Name:   "Balance",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 100, "cluster2": 100, "cluster3": 100},
 				},
 				{
-					Name:   "steady",
-					Scores: PrioritizeSore{"cluster1": 100, "cluster2": 100, "cluster3": 0},
+					Name:   "Steady",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 100, "cluster2": 100, "cluster3": 0},
 				},
+			},
+			expectedUnScheduled: 0,
+		},
+		{
+			name:      "placement with empty Prioritizer Policy",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithPrioritizerPolicy("").Build(),
+			initObjs: []runtime.Object{
+				testinghelpers.NewClusterSet(clusterSetName),
+				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
+			},
+			decisions: []runtime.Object{},
+			expectedDecisions: []clusterapiv1alpha1.ClusterDecision{
+				{ClusterName: "cluster1"},
+			},
+			expectedFilterResult: []FilterResult{
+				{
+					Name:             "Predicate",
+					FilteredClusters: []string{"cluster1"},
+				},
+			},
+			expectedScoreResult: []PrioritizerResult{
+				{
+					Name:   "Balance",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 100},
+				},
+				{
+					Name:   "Steady",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 0},
+				},
+			},
+			clusters: []*clusterapiv1.ManagedCluster{
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
+			},
+			expectedUnScheduled: 0,
+		},
+		{
+			name:      "placement with additive Prioritizer Policy",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithPrioritizerPolicy("Additive").WithPrioritizerConfig("Steady", 3).Build(),
+			initObjs: []runtime.Object{
+				testinghelpers.NewClusterSet(clusterSetName),
+				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
+			},
+			decisions: []runtime.Object{},
+			expectedDecisions: []clusterapiv1alpha1.ClusterDecision{
+				{ClusterName: "cluster1"},
+			},
+			expectedFilterResult: []FilterResult{
+				{
+					Name:             "Predicate",
+					FilteredClusters: []string{"cluster1"},
+				},
+			},
+			expectedScoreResult: []PrioritizerResult{
+				{
+					Name:   "Balance",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 100},
+				},
+				{
+					Name:   "Steady",
+					Weight: 3,
+					Scores: PrioritizerScore{"cluster1": 0},
+				},
+			},
+			clusters: []*clusterapiv1.ManagedCluster{
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
+			},
+			expectedUnScheduled: 0,
+		},
+		{
+			name:      "placement with exact Prioritizer Policy",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithPrioritizerPolicy("Exact").WithPrioritizerConfig("Steady", 3).Build(),
+			initObjs: []runtime.Object{
+				testinghelpers.NewClusterSet(clusterSetName),
+				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
+			},
+			decisions: []runtime.Object{},
+			expectedDecisions: []clusterapiv1alpha1.ClusterDecision{
+				{ClusterName: "cluster1"},
+			},
+			expectedFilterResult: []FilterResult{
+				{
+					Name:             "Predicate",
+					FilteredClusters: []string{"cluster1"},
+				},
+			},
+			expectedScoreResult: []PrioritizerResult{
+				{
+					Name:   "Balance",
+					Weight: 0,
+					Scores: nil,
+				},
+				{
+					Name:   "Steady",
+					Weight: 3,
+					Scores: PrioritizerScore{"cluster1": 0},
+				},
+			},
+			clusters: []*clusterapiv1.ManagedCluster{
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
 			},
 			expectedUnScheduled: 0,
 		},
@@ -162,18 +270,20 @@ func TestSchedule(t *testing.T) {
 			},
 			expectedFilterResult: []FilterResult{
 				{
-					Name:             "predicate",
+					Name:             "Predicate",
 					FilteredClusters: []string{"cluster1", "cluster2"},
 				},
 			},
-			expectedScoreResult: []PriorizeResult{
+			expectedScoreResult: []PrioritizerResult{
 				{
-					Name:   "balance",
-					Scores: PrioritizeSore{"cluster1": 100, "cluster2": 100},
+					Name:   "Balance",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 100, "cluster2": 100},
 				},
 				{
-					Name:   "steady",
-					Scores: PrioritizeSore{"cluster1": 100, "cluster2": 0},
+					Name:   "Steady",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 100, "cluster2": 0},
 				},
 			},
 			expectedUnScheduled: 2,
@@ -201,18 +311,20 @@ func TestSchedule(t *testing.T) {
 			},
 			expectedFilterResult: []FilterResult{
 				{
-					Name:             "predicate",
+					Name:             "Predicate",
 					FilteredClusters: []string{"cluster3", "cluster1", "cluster2"},
 				},
 			},
-			expectedScoreResult: []PriorizeResult{
+			expectedScoreResult: []PrioritizerResult{
 				{
-					Name:   "balance",
-					Scores: PrioritizeSore{"cluster1": -100, "cluster2": -100, "cluster3": 100},
+					Name:   "Balance",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": -100, "cluster2": -100, "cluster3": 100},
 				},
 				{
-					Name:   "steady",
-					Scores: PrioritizeSore{"cluster1": 0, "cluster2": 0, "cluster3": 0},
+					Name:   "Steady",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 0, "cluster2": 0, "cluster3": 0},
 				},
 			},
 			expectedUnScheduled: 0,
@@ -250,18 +362,20 @@ func TestSchedule(t *testing.T) {
 			},
 			expectedFilterResult: []FilterResult{
 				{
-					Name:             "predicate",
+					Name:             "Predicate",
 					FilteredClusters: []string{"cluster3", "cluster1", "cluster2"},
 				},
 			},
-			expectedScoreResult: []PriorizeResult{
+			expectedScoreResult: []PrioritizerResult{
 				{
-					Name:   "balance",
-					Scores: PrioritizeSore{"cluster1": 0, "cluster2": -100, "cluster3": 0},
+					Name:   "Balance",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 0, "cluster2": -100, "cluster3": 0},
 				},
 				{
-					Name:   "steady",
-					Scores: PrioritizeSore{"cluster1": 0, "cluster2": 0, "cluster3": 100},
+					Name:   "Steady",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 0, "cluster2": 0, "cluster3": 100},
 				},
 			},
 			expectedUnScheduled: 0,
@@ -294,7 +408,7 @@ func TestSchedule(t *testing.T) {
 				t.Errorf("expected filter results %v, but got %v", string(expected), string(actual))
 			}
 
-			actual, _ = json.Marshal(result.PriorizeResults())
+			actual, _ = json.Marshal(result.PrioritizerResults())
 			expected, _ = json.Marshal(c.expectedScoreResult)
 			if !reflect.DeepEqual(actual, expected) {
 				t.Errorf("expected score results %v, but got %v", string(expected), string(actual))

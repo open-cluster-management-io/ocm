@@ -36,6 +36,23 @@ func (b *placementBuilder) WithNOC(noc int32) *placementBuilder {
 	return b
 }
 
+func (b *placementBuilder) WithPrioritizerPolicy(mode clusterapiv1alpha1.PrioritizerPolicyModeType) *placementBuilder {
+	b.placement.Spec.PrioritizerPolicy = clusterapiv1alpha1.PrioritizerPolicy{
+		Mode: mode,
+	}
+	return b
+}
+
+func (b *placementBuilder) WithPrioritizerConfig(name string, weight int32) *placementBuilder {
+	if b.placement.Spec.PrioritizerPolicy.Configurations == nil {
+		b.placement.Spec.PrioritizerPolicy.Configurations = []clusterapiv1alpha1.PrioritizerConfig{}
+	}
+	if len(name) > 0 {
+		b.placement.Spec.PrioritizerPolicy.Configurations = append(b.placement.Spec.PrioritizerPolicy.Configurations, clusterapiv1alpha1.PrioritizerConfig{Name: name, Weight: weight})
+	}
+	return b
+}
+
 func (b *placementBuilder) WithClusterSets(clusterSets ...string) *placementBuilder {
 	b.placement.Spec.ClusterSets = clusterSets
 	return b

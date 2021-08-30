@@ -2,6 +2,7 @@ package predicate
 
 import (
 	"context"
+	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -27,7 +28,7 @@ func New(handle plugins.Handle) *Predicate {
 }
 
 func (p *Predicate) Name() string {
-	return "predicate"
+	return reflect.TypeOf(*p).Name()
 }
 
 func (p *Predicate) Description() string {
