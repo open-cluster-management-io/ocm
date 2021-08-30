@@ -353,6 +353,9 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue},
 				eventuallyTimeout, eventuallyInterval)
 
+			util.AssertWorkGeneration(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkGeneration(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), eventuallyTimeout, eventuallyInterval)
+
 			ginkgo.By("check existence of all maintained resources")
 			var namespaces, names []string
 			for _, obj := range objects {
@@ -442,6 +445,9 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			util.AssertWorkGeneration(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkGeneration(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), eventuallyTimeout, eventuallyInterval)
 
 			ginkgo.By("check if applied resources in status are updated")
 			util.AssertAppliedResources(hubHash, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)

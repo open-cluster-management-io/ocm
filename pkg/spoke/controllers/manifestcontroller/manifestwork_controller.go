@@ -175,14 +175,14 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 		}
 
 		// Add applied status condition
-		manifestCondition.Conditions = append(manifestCondition.Conditions, buildAppliedStatusCondition(result.Error))
+		manifestCondition.Conditions = append(manifestCondition.Conditions, buildAppliedStatusCondition(result))
 
 		newManifestConditions = append(newManifestConditions, manifestCondition)
 	}
 
 	// Update work status
 	_, _, err = helper.UpdateManifestWorkStatus(
-		ctx, m.manifestWorkClient, manifestWork.Name, m.generateUpdateStatusFunc(newManifestConditions))
+		ctx, m.manifestWorkClient, manifestWork.Name, m.generateUpdateStatusFunc(manifestWork.Generation, newManifestConditions))
 	if err != nil {
 		errs = append(errs, fmt.Errorf("Failed to update work status with err %w", err))
 	}
@@ -290,7 +290,7 @@ func (m *ManifestWorkController) applyUnstructrued(data []byte, owner metav1.Own
 // Rules to generate work status conditions from manifest conditions
 // #1: Applied - work status condition (with type Applied) is applied if all manifest conditions (with type Applied) are applied
 // TODO: add rules for other condition types, like Progressing, Available, Degraded
-func (m *ManifestWorkController) generateUpdateStatusFunc(newManifestConditions []workapiv1.ManifestCondition) helper.UpdateManifestWorkStatusFunc {
+func (m *ManifestWorkController) generateUpdateStatusFunc(generation int64, newManifestConditions []workapiv1.ManifestCondition) helper.UpdateManifestWorkStatusFunc {
 	return func(oldStatus *workapiv1.ManifestWorkStatus) error {
 		// merge the new manifest conditions with the existing manifest conditions
 		oldStatus.ResourceStatus.Manifests = helper.MergeManifestConditions(oldStatus.ResourceStatus.Manifests, newManifestConditions)
@@ -301,7 +301,8 @@ func (m *ManifestWorkController) generateUpdateStatusFunc(newManifestConditions 
 		// handle condition type Applied
 		if inCondition, exists := allInCondition(string(workapiv1.ManifestApplied), newManifestConditions); exists {
 			appliedCondition := metav1.Condition{
-				Type: workapiv1.WorkApplied,
+				Type:               workapiv1.WorkApplied,
+				ObservedGeneration: generation,
 			}
 			if inCondition {
 				appliedCondition.Status = metav1.ConditionTrue
@@ -390,13 +391,13 @@ func allInCondition(conditionType string, manifests []workapiv1.ManifestConditio
 	return exists, exists
 }
 
-func buildAppliedStatusCondition(err error) metav1.Condition {
-	if err != nil {
+func buildAppliedStatusCondition(result resourceapply.ApplyResult) metav1.Condition {
+	if result.Error != nil {
 		return metav1.Condition{
 			Type:    string(workapiv1.ManifestApplied),
 			Status:  metav1.ConditionFalse,
 			Reason:  "AppliedManifestFailed",
-			Message: fmt.Sprintf("Failed to apply manifest: %v", err),
+			Message: fmt.Sprintf("Failed to apply manifest: %v", result.Error),
 		}
 	}
 
