@@ -18,7 +18,7 @@ Contains controllers that support:
 
 1. Clone this repo:
   ```
-  git clone https://github.com/open-cluster-management-io/registration.git
+  git clone https://github.com/open-cluster-management-io/registration.git && cd registration
   ```
 
 2. Prepare a [kind](https://kind.sigs.k8s.io/) cluster, like:
@@ -85,11 +85,11 @@ You can find more details for cluster join process from this [design doc](https:
   kubectl label managedclusters cluster1 "cluster.open-cluster-management.io/clusterset=clusterset1" --overwrite
   ```
 
-3. Then, you can find there is one managed cluster is selected from the managed cluster set status, like:
+3. Then, you can find there is one managed cluster is selected from the managed cluster set status, e.g:
   ```
   kubectl get managedclustersets clusterset1 -o jsonpath='{.status.conditions[?(@.type=="ClusterSetEmpty")]}'
 
-  {"message":"1 ManagedClusters selected","reason":"ClustersSelected"}
+  {"lastTransitionTime":"2021-08-17T06:18:26Z","message":"1 ManagedClusters selected","reason":"ClustersSelected","status":"False","type":"ClusterSetEmpty"}
   ```
 
 You can find more details from the [managed cluster set design doc](https://github.com/open-cluster-management-io/api/blob/main/docs/clusterset.md)
