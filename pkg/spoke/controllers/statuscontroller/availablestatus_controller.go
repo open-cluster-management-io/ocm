@@ -123,7 +123,7 @@ func (c *AvailableStatusController) syncManifestWork(ctx context.Context, origin
 		}
 	default:
 		// aggregate ManifestConditions and update work status condition
-		workAvailableStatusCondition := aggregateManifestConditions(manifestWork.Status.ResourceStatus.Manifests)
+		workAvailableStatusCondition := aggregateManifestConditions(manifestWork.Generation, manifestWork.Status.ResourceStatus.Manifests)
 		workStatusConditions = helper.MergeStatusConditions(manifestWork.Status.Conditions, []metav1.Condition{workAvailableStatusCondition})
 	}
 	manifestWork.Status.Conditions = workStatusConditions
@@ -140,7 +140,7 @@ func (c *AvailableStatusController) syncManifestWork(ctx context.Context, origin
 
 // aggregateManifestConditions aggregates status conditions of manifests and returns a status
 // condition for manifestwork
-func aggregateManifestConditions(manifests []workapiv1.ManifestCondition) metav1.Condition {
+func aggregateManifestConditions(generation int64, manifests []workapiv1.ManifestCondition) metav1.Condition {
 	available, unavailable, unknown := 0, 0, 0
 	for _, manifest := range manifests {
 		for _, condition := range manifest.Conditions {
@@ -162,24 +162,27 @@ func aggregateManifestConditions(manifests []workapiv1.ManifestCondition) metav1
 	switch {
 	case unavailable > 0:
 		return metav1.Condition{
-			Type:    string(workapiv1.WorkAvailable),
-			Status:  metav1.ConditionFalse,
-			Reason:  "ResourcesNotAvailable",
-			Message: fmt.Sprintf("%d of %d resources are not available", unavailable, len(manifests)),
+			Type:               string(workapiv1.WorkAvailable),
+			Status:             metav1.ConditionFalse,
+			Reason:             "ResourcesNotAvailable",
+			ObservedGeneration: generation,
+			Message:            fmt.Sprintf("%d of %d resources are not available", unavailable, len(manifests)),
 		}
 	case unknown > 0:
 		return metav1.Condition{
-			Type:    string(workapiv1.WorkAvailable),
-			Status:  metav1.ConditionUnknown,
-			Reason:  "ResourcesStatusUnknown",
-			Message: fmt.Sprintf("%d of %d resources have unknown status", unknown, len(manifests)),
+			Type:               string(workapiv1.WorkAvailable),
+			Status:             metav1.ConditionUnknown,
+			Reason:             "ResourcesStatusUnknown",
+			ObservedGeneration: generation,
+			Message:            fmt.Sprintf("%d of %d resources have unknown status", unknown, len(manifests)),
 		}
 	default:
 		return metav1.Condition{
-			Type:    string(workapiv1.WorkAvailable),
-			Status:  metav1.ConditionTrue,
-			Reason:  "ResourcesAvailable",
-			Message: "All resources are available",
+			Type:               string(workapiv1.WorkAvailable),
+			Status:             metav1.ConditionTrue,
+			Reason:             "ResourcesAvailable",
+			ObservedGeneration: generation,
+			Message:            "All resources are available",
 		}
 	}
 }

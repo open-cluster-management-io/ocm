@@ -39,6 +39,27 @@ func AssertWorkCondition(namespace, name string, workClient workclientset.Interf
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }
 
+func AssertWorkGeneration(namespace, name string, workClient workclientset.Interface, expectedType string, eventuallyTimeout, eventuallyInterval int) {
+	gomega.Eventually(func() bool {
+		work, err := workClient.WorkV1().ManifestWorks(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		if err != nil {
+			return false
+		}
+
+		// check manifest status conditions
+		condition := meta.FindStatusCondition(work.Status.Conditions, expectedType)
+		if condition == nil {
+			return false
+		}
+
+		if condition.ObservedGeneration != work.Generation {
+			return false
+		}
+
+		return true
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+}
+
 // check if work is deleted
 func AssertWorkDeleted(namespace, name, hubhash string, manifests []workapiv1.Manifest, workClient workclientset.Interface, kubeClient kubernetes.Interface, eventuallyTimeout, eventuallyInterval int) {
 	// wait for deletion of manifest work
