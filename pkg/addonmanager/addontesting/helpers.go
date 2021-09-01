@@ -57,6 +57,20 @@ func NewAddon(name, namespace string) *addonapiv1alpha1.ManagedClusterAddOn {
 	}
 }
 
+func NewClusterManagementAddon(name, crd, cr string) *addonapiv1alpha1.ClusterManagementAddOn {
+	return &addonapiv1alpha1.ClusterManagementAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
+			AddOnConfiguration: addonapiv1alpha1.ConfigCoordinates{
+				CRDName: crd,
+				CRName:  cr,
+			},
+		},
+	}
+}
+
 func NewManifestWork(name, namespace string, objects ...*unstructured.Unstructured) *workapiv1.ManifestWork {
 	work := &workapiv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{

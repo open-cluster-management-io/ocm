@@ -8,7 +8,6 @@ import (
 	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
 
-	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,7 +15,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
-var _ = ginkgo.Describe("Addon Registration", func() {
+var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 	var managedClusterName string
 	var err error
 
@@ -48,13 +47,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		delete(testAddonImpl.registrations, managedClusterName)
 	})
 
-	ginkgo.It("Should setup registration successfully", func() {
-		testAddonImpl.registrations[managedClusterName] = []addonapiv1alpha1.RegistrationConfig{
-			{
-				SignerName: certificatesv1.KubeAPIServerClientSignerName,
-			},
-		}
-
+	ginkgo.It("Should update config coordinate successfully", func() {
 		addon := &addonapiv1alpha1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
@@ -66,63 +59,28 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		gomega.Eventually(func() error {
-			actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			if !apiequality.Semantic.DeepEqual(testAddonImpl.registrations[managedClusterName], actual.Status.Registrations) {
-				return fmt.Errorf("Expected registration is not correct, actual: %v", actual.Status.Registrations)
-			}
-			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
-	})
-
-	ginkgo.It("Should update registration successfully", func() {
-		testAddonImpl.registrations[managedClusterName] = []addonapiv1alpha1.RegistrationConfig{
-			{
-				SignerName: certificatesv1.KubeAPIServerClientSignerName,
-			},
-			{
-				SignerName: "open-cluster-management.io/test-signer",
-			},
-		}
-
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		// Create clustermanagement addon
+		clusterManagementAddon := &addonapiv1alpha1.ClusterManagementAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
-				InstallNamespace: "test",
-			},
-		}
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		gomega.Eventually(func() error {
-			actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			actual.Status = addonapiv1alpha1.ManagedClusterAddOnStatus{
-				Registrations: []addonapiv1alpha1.RegistrationConfig{
-					{
-						SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					},
+			Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
+				AddOnConfiguration: addonapiv1alpha1.ConfigCoordinates{
+					CRDName: "testcrd",
+					CRName:  "testcr",
 				},
-				Conditions: []metav1.Condition{},
-			}
-			_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.Background(), actual, metav1.UpdateOptions{})
-			return err
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+			},
+		}
+		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(), clusterManagementAddon, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
 			actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
-			if !apiequality.Semantic.DeepEqual(testAddonImpl.registrations[managedClusterName], actual.Status.Registrations) {
-				return fmt.Errorf("Exected registration is not correct, actual: %v", actual.Status.Registrations)
+			if !apiequality.Semantic.DeepEqual(clusterManagementAddon.Spec.AddOnConfiguration, actual.Status.AddOnConfiguration) {
+				return fmt.Errorf("Expected config coordinate is not correct, actual: %v", actual.Status.AddOnConfiguration)
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())

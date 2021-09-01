@@ -21,7 +21,7 @@ import (
 	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 )
 
-// managedClusterController reconciles instances of ManagedCluster on the hub.
+// addonConfigurationController reconciles instances of ManagedClusterAddon on the hub.
 type addonConfigurationController struct {
 	addonClient               addonv1alpha1client.Interface
 	managedClusterLister      clusterlister.ManagedClusterLister
@@ -45,17 +45,26 @@ func NewAddonConfigurationController(
 		eventRecorder:             recorder.WithComponentSuffix(fmt.Sprintf("addon-registration-controller")),
 	}
 
-	return factory.New().WithInformersQueueKeyFunc(
+	return factory.New().WithFilteredEventsInformersQueueKeyFunc(
 		func(obj runtime.Object) string {
 			key, _ := cache.MetaNamespaceKeyFunc(obj)
 			return key
-		}, addonInformers.Informer()).
+		},
+		func(obj interface{}) bool {
+			accessor, _ := meta.Accessor(obj)
+			if _, ok := c.agentAddons[accessor.GetName()]; !ok {
+				return false
+			}
+
+			return true
+		},
+		addonInformers.Informer()).
 		WithSync(c.sync).ToController(fmt.Sprintf("addon-registration-controller"), recorder)
 }
 
 func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	key := syncCtx.QueueKey()
-	klog.V(4).Infof("Reconciling addon deploy %q", key)
+	klog.V(4).Infof("Reconciling addon registration %q", key)
 
 	clusterName, addonName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
