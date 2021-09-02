@@ -1,11 +1,16 @@
-self_dir :=$(dir $(lastword $(MAKEFILE_LIST)))
+include $(addprefix $(dir $(lastword $(MAKEFILE_LIST))), \
+	../../../lib/tmp.mk \
+	../yq.mk \
+	../yaml-patch.mk \
+)
 
 # Merge yaml patch using mikefarah/yq
 # $1 - patch file
 # $2 - manifest file
 # $3 - output file
 define patch-manifest-yq
-	$(YQ) m -x '$(2)' '$(1)' > '$(3)'
+	( echo '# *** AUTOMATICALLY GENERATED FILE - DO NOT EDIT ***'; \
+		$(YQ) m -x '$(2)' '$(1)' ) > '$(3)'
 
 endef
 
@@ -14,7 +19,8 @@ endef
 # $2 - manifest file
 # $3 - output file
 define patch-manifest-yaml-patch
-	$(YAML_PATCH) -o '$(1)' < '$(2)' > '$(3)'
+	( echo '# *** AUTOMATICALLY GENERATED FILE - DO NOT EDIT ***'; \
+		$(YAML_PATCH) -o '$(1)' < '$(2)' ) > '$(3)'
 
 endef
 
@@ -72,13 +78,3 @@ endef
 define add-profile-manifests
 $(eval $(call add-profile-manifests-internal,$(1),$(2),$(3)))
 endef
-
-
-# We need to be careful to expand all the paths before any include is done
-# or self_dir could be modified for the next include by the included file.
-# Also doing this at the end of the file allows us to use self_dir before it could be modified.
-include $(addprefix $(self_dir), \
-	../../../lib/tmp.mk \
-	../yq.mk \
-	../yaml-patch.mk \
-)
