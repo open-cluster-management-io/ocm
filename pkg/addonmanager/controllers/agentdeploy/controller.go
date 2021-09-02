@@ -58,11 +58,20 @@ func NewAddonDeployController(
 		eventRecorder:             recorder.WithComponentSuffix(fmt.Sprintf("addon-deploy-controller")),
 	}
 
-	return factory.New().WithInformersQueueKeyFunc(
+	return factory.New().WithFilteredEventsInformersQueueKeyFunc(
 		func(obj runtime.Object) string {
 			key, _ := cache.MetaNamespaceKeyFunc(obj)
 			return key
-		}, addonInformers.Informer()).
+		},
+		func(obj interface{}) bool {
+			accessor, _ := meta.Accessor(obj)
+			if _, ok := c.agentAddons[accessor.GetName()]; !ok {
+				return false
+			}
+
+			return true
+		},
+		addonInformers.Informer()).
 		WithFilteredEventsInformersQueueKeyFunc(
 			func(obj runtime.Object) string {
 				accessor, _ := meta.Accessor(obj)
@@ -73,8 +82,16 @@ func NewAddonDeployController(
 				if accessor.GetLabels() == nil {
 					return false
 				}
-				_, ok := accessor.GetLabels()[constants.AddonLabel]
-				return ok
+
+				addonName, ok := accessor.GetLabels()[constants.AddonLabel]
+				if !ok {
+					return false
+				}
+
+				if _, ok := c.agentAddons[addonName]; !ok {
+					return false
+				}
+				return true
 			},
 			workInformers.Informer(),
 		).
