@@ -285,3 +285,12 @@ func AppliedManifestworkQueueKeyFunc(hubhash string) factory.ObjectQueueKeyFunc 
 func HubHash(hubServer string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(hubServer)))
 }
+
+func NewAppliedManifestWorkOwner(appliedWork *workapiv1.AppliedManifestWork) *metav1.OwnerReference {
+	return &metav1.OwnerReference{
+		APIVersion: workapiv1.GroupVersion.WithKind("AppliedManifestWork").GroupVersion().String(),
+		Kind:       workapiv1.GroupVersion.WithKind("AppliedManifestWork").Kind,
+		Name:       appliedWork.Name,
+		UID:        appliedWork.UID,
+	}
+}

@@ -88,6 +88,7 @@ func (d *defaultWorkAgentDeployer) Deploy() error {
 	// Apply static files
 	clientHolder := resourceapply.NewKubeClientHolder(d.spokeKubeClient).WithAPIExtensionsClient(d.spokeApiExtensionsClient)
 	applyResults := resourceapply.ApplyDirectly(
+		context.Background(),
 		clientHolder,
 		events.NewInMemoryRecorder(""),
 		func(name string) ([]byte, error) {

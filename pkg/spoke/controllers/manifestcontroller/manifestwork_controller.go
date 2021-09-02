@@ -141,13 +141,15 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	case err != nil:
 		return err
 	}
-	owner := metav1.NewControllerRef(appliedManifestWork, workapiv1.GroupVersion.WithKind("AppliedManifestWork"))
+
+	// We creat a ownerref instead of controller ref since multiple controller can declare the ownership of a manifests
+	owner := helper.NewAppliedManifestWorkOwner(appliedManifestWork)
 
 	errs := []error{}
 	// Apply resources on spoke cluster.
 	resourceResults := make([]resourceapply.ApplyResult, len(manifestWork.Spec.Workload.Manifests))
 	retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		resourceResults = m.applyManifests(manifestWork.Spec.Workload.Manifests, controllerContext.Recorder(), *owner, resourceResults)
+		resourceResults = m.applyManifests(ctx, manifestWork.Spec.Workload.Manifests, controllerContext.Recorder(), *owner, resourceResults)
 
 		for _, result := range resourceResults {
 			if errors.IsConflict(result.Error) {
@@ -194,15 +196,15 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 }
 
 func (m *ManifestWorkController) applyManifests(
-	manifests []workapiv1.Manifest, recorder events.Recorder, owner metav1.OwnerReference, existingResults []resourceapply.ApplyResult) []resourceapply.ApplyResult {
+	ctx context.Context, manifests []workapiv1.Manifest, recorder events.Recorder, owner metav1.OwnerReference, existingResults []resourceapply.ApplyResult) []resourceapply.ApplyResult {
 	for index, manifest := range manifests {
 		switch {
 		case existingResults[index].Result == nil:
 			// Apply if there is not result.
-			existingResults[index] = m.applyOneManifest(manifest, recorder, owner)
+			existingResults[index] = m.applyOneManifest(ctx, manifest, recorder, owner)
 		case errors.IsConflict(existingResults[index].Error):
 			// Apply if there is a resource confilct error.
-			existingResults[index] = m.applyOneManifest(manifest, recorder, owner)
+			existingResults[index] = m.applyOneManifest(ctx, manifest, recorder, owner)
 		}
 	}
 
@@ -210,13 +212,13 @@ func (m *ManifestWorkController) applyManifests(
 }
 
 func (m *ManifestWorkController) applyOneManifest(
-	manifest workapiv1.Manifest, recorder events.Recorder, owner metav1.OwnerReference) resourceapply.ApplyResult {
+	ctx context.Context, manifest workapiv1.Manifest, recorder events.Recorder, owner metav1.OwnerReference) resourceapply.ApplyResult {
 	clientHolder := resourceapply.NewClientHolder().
 		WithAPIExtensionsClient(m.spokeAPIExtensionClient).
 		WithKubernetes(m.spokeKubeclient).
 		WithDynamicClient(m.spokeDynamicClient)
 
-	results := resourceapply.ApplyDirectly(clientHolder, recorder, func(name string) ([]byte, error) {
+	results := resourceapply.ApplyDirectly(ctx, clientHolder, recorder, func(name string) ([]byte, error) {
 		unstructuredObj := &unstructured.Unstructured{}
 		err := unstructuredObj.UnmarshalJSON(manifest.Raw)
 		if err != nil {
@@ -232,7 +234,7 @@ func (m *ManifestWorkController) applyOneManifest(
 	result := results[0]
 
 	if isDecodeError(result.Error) || isUnhandledError(result.Error) || isUnsupportedError(result.Error) {
-		result.Result, result.Changed, result.Error = m.applyUnstructrued(manifest.Raw, owner, recorder)
+		result.Result, result.Changed, result.Error = m.applyUnstructrued(ctx, manifest.Raw, owner, recorder)
 	}
 
 	return result
@@ -252,7 +254,7 @@ func (m *ManifestWorkController) decodeUnstructured(data []byte) (schema.GroupVe
 	return mapping.Resource, unstructuredObj, nil
 }
 
-func (m *ManifestWorkController) applyUnstructrued(data []byte, owner metav1.OwnerReference, recorder events.Recorder) (*unstructured.Unstructured, bool, error) {
+func (m *ManifestWorkController) applyUnstructrued(ctx context.Context, data []byte, owner metav1.OwnerReference, recorder events.Recorder) (*unstructured.Unstructured, bool, error) {
 	gvr, required, err := m.decodeUnstructured(data)
 	if err != nil {
 		return nil, false, err
@@ -262,10 +264,10 @@ func (m *ManifestWorkController) applyUnstructrued(data []byte, owner metav1.Own
 	existing, err := m.spokeDynamicClient.
 		Resource(gvr).
 		Namespace(required.GetNamespace()).
-		Get(context.TODO(), required.GetName(), metav1.GetOptions{})
+		Get(ctx, required.GetName(), metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		actual, err := m.spokeDynamicClient.Resource(gvr).Namespace(required.GetNamespace()).Create(
-			context.TODO(), required, metav1.CreateOptions{})
+			ctx, required, metav1.CreateOptions{})
 		recorder.Eventf(fmt.Sprintf(
 			"%s Created", required.GetKind()), "Created %s/%s because it was missing", required.GetNamespace(), required.GetName())
 		return actual, true, err
