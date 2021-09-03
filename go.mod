@@ -24,3 +24,5 @@ require (
 	open-cluster-management.io/api v0.0.0-20210823013037-9667ae902e4b
 	sigs.k8s.io/controller-runtime v0.9.6
 )
+
+replace github.com/openshift/library-go => github.com/qiujian16/library-go v0.0.0-20210830020149-91704dd0762a

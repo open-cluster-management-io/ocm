@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -24,6 +25,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	workinformer "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
@@ -47,6 +49,12 @@ type ManifestWorkController struct {
 	spokeAPIExtensionClient   apiextensionsclient.Interface
 	hubHash                   string
 	restMapper                meta.RESTMapper
+}
+
+type applyResult struct {
+	resourceapply.ApplyResult
+
+	resourceMeta workapiv1.ManifestResourceMeta
 }
 
 // NewManifestWorkController returns a ManifestWorkController
@@ -147,9 +155,10 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 
 	errs := []error{}
 	// Apply resources on spoke cluster.
-	resourceResults := make([]resourceapply.ApplyResult, len(manifestWork.Spec.Workload.Manifests))
+	resourceResults := make([]applyResult, len(manifestWork.Spec.Workload.Manifests))
 	retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		resourceResults = m.applyManifests(ctx, manifestWork.Spec.Workload.Manifests, controllerContext.Recorder(), *owner, resourceResults)
+		resourceResults = m.applyManifests(
+			ctx, manifestWork.Spec.Workload.Manifests, manifestWork.Spec.DeleteOption, controllerContext.Recorder(), *owner, resourceResults)
 
 		for _, result := range resourceResults {
 			if errors.IsConflict(result.Error) {
@@ -161,18 +170,13 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	})
 
 	newManifestConditions := []workapiv1.ManifestCondition{}
-	for index, result := range resourceResults {
+	for _, result := range resourceResults {
 		if result.Error != nil {
 			errs = append(errs, result.Error)
 		}
 
-		resourceMeta, err := buildManifestResourceMeta(index, result.Result, manifestWork.Spec.Workload.Manifests[index], m.restMapper)
-		if err != nil {
-			errs = append(errs, err)
-		}
-
 		manifestCondition := workapiv1.ManifestCondition{
-			ResourceMeta: resourceMeta,
+			ResourceMeta: result.resourceMeta,
 			Conditions:   []metav1.Condition{},
 		}
 
@@ -196,15 +200,21 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 }
 
 func (m *ManifestWorkController) applyManifests(
-	ctx context.Context, manifests []workapiv1.Manifest, recorder events.Recorder, owner metav1.OwnerReference, existingResults []resourceapply.ApplyResult) []resourceapply.ApplyResult {
+	ctx context.Context,
+	manifests []workapiv1.Manifest,
+	deleteOption *workapiv1.DeleteOption,
+	recorder events.Recorder,
+	owner metav1.OwnerReference,
+	existingResults []applyResult) []applyResult {
+
 	for index, manifest := range manifests {
 		switch {
 		case existingResults[index].Result == nil:
 			// Apply if there is not result.
-			existingResults[index] = m.applyOneManifest(ctx, manifest, recorder, owner)
+			existingResults[index] = m.applyOneManifest(ctx, index, manifest, deleteOption, recorder, owner)
 		case errors.IsConflict(existingResults[index].Error):
 			// Apply if there is a resource confilct error.
-			existingResults[index] = m.applyOneManifest(ctx, manifest, recorder, owner)
+			existingResults[index] = m.applyOneManifest(ctx, index, manifest, deleteOption, recorder, owner)
 		}
 	}
 
@@ -212,11 +222,28 @@ func (m *ManifestWorkController) applyManifests(
 }
 
 func (m *ManifestWorkController) applyOneManifest(
-	ctx context.Context, manifest workapiv1.Manifest, recorder events.Recorder, owner metav1.OwnerReference) resourceapply.ApplyResult {
+	ctx context.Context,
+	index int,
+	manifest workapiv1.Manifest,
+	deleteOption *workapiv1.DeleteOption,
+	recorder events.Recorder,
+	owner metav1.OwnerReference) applyResult {
+
 	clientHolder := resourceapply.NewClientHolder().
 		WithAPIExtensionsClient(m.spokeAPIExtensionClient).
 		WithKubernetes(m.spokeKubeclient).
 		WithDynamicClient(m.spokeDynamicClient)
+
+	result := applyResult{}
+
+	resMeta, gvr, err := buildManifestResourceMeta(index, manifest, m.restMapper)
+	result.resourceMeta = resMeta
+	if err != nil {
+		result.Error = err
+		return result
+	}
+
+	owner = manageOwnerRef(gvr, resMeta.Namespace, resMeta.Name, deleteOption, owner)
 
 	results := resourceapply.ApplyDirectly(ctx, clientHolder, recorder, func(name string) ([]byte, error) {
 		unstructuredObj := &unstructured.Unstructured{}
@@ -224,56 +251,77 @@ func (m *ManifestWorkController) applyOneManifest(
 		if err != nil {
 			return nil, err
 		}
+
 		unstructuredObj.SetOwnerReferences([]metav1.OwnerReference{owner})
 		return unstructuredObj.MarshalJSON()
 	}, "manifest")
 
+	result.Result = results[0].Result
+	result.Changed = results[0].Changed
+	result.Error = results[0].Error
+
 	// Try apply with dynamic client if the manifest cannot be decoded by scheme or typed client is not found
 	// TODO we should check the certain error.
 	// Use dynamic client when scheme cannot decode manifest or typed client cannot handle the object
-	result := results[0]
-
 	if isDecodeError(result.Error) || isUnhandledError(result.Error) || isUnsupportedError(result.Error) {
-		result.Result, result.Changed, result.Error = m.applyUnstructrued(ctx, manifest.Raw, owner, recorder)
+		result.Result, result.Changed, result.Error = m.applyUnstructured(ctx, manifest.Raw, owner, deleteOption, gvr, recorder)
 	}
 
 	return result
 }
 
-func (m *ManifestWorkController) decodeUnstructured(data []byte) (schema.GroupVersionResource, *unstructured.Unstructured, error) {
+func (m *ManifestWorkController) decodeUnstructured(data []byte) (*unstructured.Unstructured, error) {
 	unstructuredObj := &unstructured.Unstructured{}
 	err := unstructuredObj.UnmarshalJSON(data)
 	if err != nil {
-		return schema.GroupVersionResource{}, nil, fmt.Errorf("Failed to decode object: %w", err)
-	}
-	mapping, err := m.restMapper.RESTMapping(unstructuredObj.GroupVersionKind().GroupKind(), unstructuredObj.GroupVersionKind().Version)
-	if err != nil {
-		return schema.GroupVersionResource{}, nil, fmt.Errorf("Failed to find gvr from restmapping: %w", err)
+		return nil, fmt.Errorf("Failed to decode object: %w", err)
 	}
 
-	return mapping.Resource, unstructuredObj, nil
+	if err != nil {
+		return nil, fmt.Errorf("Failed to find gvr from restmapping: %w", err)
+	}
+
+	return unstructuredObj, nil
 }
 
-func (m *ManifestWorkController) applyUnstructrued(ctx context.Context, data []byte, owner metav1.OwnerReference, recorder events.Recorder) (*unstructured.Unstructured, bool, error) {
-	gvr, required, err := m.decodeUnstructured(data)
+func (m *ManifestWorkController) applyUnstructured(
+	ctx context.Context,
+	data []byte,
+	owner metav1.OwnerReference,
+	deleteOption *workapiv1.DeleteOption,
+	gvr schema.GroupVersionResource,
+	recorder events.Recorder) (*unstructured.Unstructured, bool, error) {
+
+	required, err := m.decodeUnstructured(data)
 	if err != nil {
 		return nil, false, err
 	}
 
-	required.SetOwnerReferences([]metav1.OwnerReference{owner})
 	existing, err := m.spokeDynamicClient.
 		Resource(gvr).
 		Namespace(required.GetNamespace()).
 		Get(ctx, required.GetName(), metav1.GetOptions{})
-	if errors.IsNotFound(err) {
+
+	switch {
+	case errors.IsNotFound(err):
 		actual, err := m.spokeDynamicClient.Resource(gvr).Namespace(required.GetNamespace()).Create(
-			ctx, required, metav1.CreateOptions{})
+			ctx, resourcemerge.WithCleanLabelsAndAnnotations(required).(*unstructured.Unstructured), metav1.CreateOptions{})
 		recorder.Eventf(fmt.Sprintf(
 			"%s Created", required.GetKind()), "Created %s/%s because it was missing", required.GetNamespace(), required.GetName())
 		return actual, true, err
-	}
-	if err != nil {
+	case err != nil:
 		return nil, false, err
+	}
+
+	// Merge OwnerRefs.
+	required.SetOwnerReferences([]metav1.OwnerReference{owner})
+	existingOwners := existing.GetOwnerReferences()
+	modified := resourcemerge.BoolPtr(false)
+
+	resourcemerge.MergeOwnerRefs(modified, &existingOwners, required.GetOwnerReferences())
+
+	if *modified {
+		required.SetOwnerReferences(existingOwners)
 	}
 
 	// Compare and update the unstrcuctured.
@@ -282,10 +330,63 @@ func (m *ManifestWorkController) applyUnstructrued(ctx context.Context, data []b
 	}
 	required.SetResourceVersion(existing.GetResourceVersion())
 	actual, err := m.spokeDynamicClient.Resource(gvr).Namespace(required.GetNamespace()).Update(
-		context.TODO(), required, metav1.UpdateOptions{})
+		ctx, required, metav1.UpdateOptions{})
 	recorder.Eventf(fmt.Sprintf(
 		"%s Updated", required.GetKind()), "Updated %s/%s", required.GetNamespace(), required.GetName())
 	return actual, true, err
+}
+
+// manageOwnerRef return a ownerref based on the resource and the deleteOption indicating whether the owneref
+// should be removed or added. If the resource is orphaned, the owner's UID is updated for removal.
+func manageOwnerRef(
+	gvr schema.GroupVersionResource,
+	namespace, name string,
+	deleteOption *workapiv1.DeleteOption,
+	myOwner metav1.OwnerReference) metav1.OwnerReference {
+
+	// Be default, it is forgound deletion.
+	if deleteOption == nil {
+		return myOwner
+	}
+
+	removalKey := fmt.Sprintf("%s-", myOwner.UID)
+	ownerCopy := myOwner.DeepCopy()
+
+	switch deleteOption.PropagationPolicy {
+	case workapiv1.DeletePropagationPolicyTypeForeground:
+		return myOwner
+	case workapiv1.DeletePropagationPolicyTypeOrphan:
+		ownerCopy.UID = types.UID(removalKey)
+		return *ownerCopy
+	}
+
+	// If there is none specified selectivelyOrphan, none of the manifests should be orphaned
+	if deleteOption.SelectivelyOrphan == nil {
+		return myOwner
+	}
+
+	for _, o := range deleteOption.SelectivelyOrphan.OrphaningRules {
+		if o.Group != gvr.Group {
+			continue
+		}
+
+		if o.Resource != gvr.Resource {
+			continue
+		}
+
+		if o.Name != name {
+			continue
+		}
+
+		if o.Namespace != namespace {
+			continue
+		}
+
+		ownerCopy.UID = types.UID(removalKey)
+		return *ownerCopy
+	}
+
+	return myOwner
 }
 
 // generateUpdateStatusFunc returns a function which aggregates manifest conditions and generates work conditions.
@@ -365,6 +466,9 @@ func isSameUnstructured(obj1, obj2 *unstructured.Unstructured) bool {
 	if !equality.Semantic.DeepEqual(obj1Copy.GetAnnotations(), obj2Copy.GetAnnotations()) {
 		return false
 	}
+	if !equality.Semantic.DeepEqual(obj1Copy.GetOwnerReferences(), obj2Copy.GetOwnerReferences()) {
+		return false
+	}
 
 	// Compare semantically after removing metadata and status field
 	delete(obj1Copy.Object, "metadata")
@@ -393,7 +497,7 @@ func allInCondition(conditionType string, manifests []workapiv1.ManifestConditio
 	return exists, exists
 }
 
-func buildAppliedStatusCondition(result resourceapply.ApplyResult) metav1.Condition {
+func buildAppliedStatusCondition(result applyResult) metav1.Condition {
 	if result.Error != nil {
 		return metav1.Condition{
 			Type:    string(workapiv1.ManifestApplied),
@@ -414,15 +518,13 @@ func buildAppliedStatusCondition(result resourceapply.ApplyResult) metav1.Condit
 // buildManifestResourceMeta returns resource meta for manifest. It tries to get the resource
 // meta from the result object in ApplyResult struct. If the resource meta is incompleted, fall
 // back to manifest template for the meta info.
-func buildManifestResourceMeta(index int, object runtime.Object, manifest workapiv1.Manifest, restMapper meta.RESTMapper) (resourceMeta workapiv1.ManifestResourceMeta, err error) {
+func buildManifestResourceMeta(
+	index int,
+	manifest workapiv1.Manifest,
+	restMapper meta.RESTMapper) (resourceMeta workapiv1.ManifestResourceMeta, gvr schema.GroupVersionResource, err error) {
 	errs := []error{}
 
-	resourceMeta, err = buildResourceMeta(index, object, restMapper)
-	if err != nil {
-		errs = append(errs, err)
-	} else if len(resourceMeta.Kind) > 0 && len(resourceMeta.Version) > 0 && len(resourceMeta.Name) > 0 {
-		return resourceMeta, nil
-	}
+	var object runtime.Object
 
 	// try to get resource meta from manifest if the one got from apply result is incompleted
 	switch {
@@ -432,31 +534,34 @@ func buildManifestResourceMeta(index int, object runtime.Object, manifest workap
 		unstructuredObj := &unstructured.Unstructured{}
 		if err = unstructuredObj.UnmarshalJSON(manifest.Raw); err != nil {
 			errs = append(errs, err)
-			return resourceMeta, utilerrors.NewAggregate(errs)
+			return resourceMeta, gvr, utilerrors.NewAggregate(errs)
 		}
 		object = unstructuredObj
 	}
-	resourceMeta, err = buildResourceMeta(index, object, restMapper)
+	resourceMeta, gvr, err = buildResourceMeta(index, object, restMapper)
 	if err == nil {
-		return resourceMeta, nil
+		return resourceMeta, gvr, nil
 	}
 
-	return resourceMeta, utilerrors.NewAggregate(errs)
+	return resourceMeta, gvr, utilerrors.NewAggregate(errs)
 }
 
-func buildResourceMeta(index int, object runtime.Object, restMapper meta.RESTMapper) (resourceMeta workapiv1.ManifestResourceMeta, err error) {
-	resourceMeta = workapiv1.ManifestResourceMeta{
+func buildResourceMeta(
+	index int,
+	object runtime.Object,
+	restMapper meta.RESTMapper) (workapiv1.ManifestResourceMeta, schema.GroupVersionResource, error) {
+	resourceMeta := workapiv1.ManifestResourceMeta{
 		Ordinal: int32(index),
 	}
 
 	if object == nil || reflect.ValueOf(object).IsNil() {
-		return resourceMeta, err
+		return resourceMeta, schema.GroupVersionResource{}, nil
 	}
 
 	// set gvk
 	gvk, err := helper.GuessObjectGroupVersionKind(object)
 	if err != nil {
-		return resourceMeta, err
+		return resourceMeta, schema.GroupVersionResource{}, err
 	}
 	resourceMeta.Group = gvk.Group
 	resourceMeta.Version = gvk.Version
@@ -472,13 +577,13 @@ func buildResourceMeta(index int, object runtime.Object, restMapper meta.RESTMap
 
 	// set resource
 	if restMapper == nil {
-		return resourceMeta, err
+		return resourceMeta, schema.GroupVersionResource{}, err
 	}
 	mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
-		return resourceMeta, fmt.Errorf("the server doesn't have a resource type %q", gvk.Kind)
+		return resourceMeta, schema.GroupVersionResource{}, fmt.Errorf("the server doesn't have a resource type %q", gvk.Kind)
 	}
 
 	resourceMeta.Resource = mapping.Resource.Resource
-	return resourceMeta, err
+	return resourceMeta, mapping.Resource, err
 }

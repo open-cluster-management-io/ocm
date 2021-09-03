@@ -572,21 +572,20 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		})
 
 		ginkgo.JustBeforeEach(func() {
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
 			// Create another manifestworks with one shared resource.
-			// TODO We might not want the sharing in this cases, since the content of a resource in two manifestworks
-			// can be different.
 			anotherWork = util.NewManifestWork(o.SpokeClusterName, "sharing-resource-work", []workapiv1.Manifest{manifests[0]})
 			anotherWork, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Create(context.Background(), anotherWork, metav1.CreateOptions{})
 			anotherAppliedManifestWorkName = fmt.Sprintf("%s-%s", hubHash, anotherWork.Name)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 
-		ginkgo.It("shared resource between the manifestwork should be recreated when one manifestwork is deleted", func() {
+		ginkgo.It("shared resource between the manifestwork should be kept when one manifestwork is deleted", func() {
 			// Ensure two manifestworks are all applied
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
-				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
-				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 			util.AssertWorkCondition(anotherWork.Namespace, anotherWork.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 			util.AssertWorkCondition(anotherWork.Namespace, anotherWork.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
@@ -615,12 +614,12 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			gomega.Eventually(func() error {
-				anotherappliedmanifestwork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), anotherAppliedManifestWorkName, metav1.GetOptions{})
+				anotherAppliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), anotherAppliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
-				for _, appliedResource := range anotherappliedmanifestwork.Status.AppliedResources {
+				for _, appliedResource := range anotherAppliedManifestWork.Status.AppliedResources {
 					if appliedResource.Name == "cm1" && appliedResource.UID == string(currentUID) {
 						return nil
 					}
@@ -633,15 +632,24 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			// Ensure the configmap is recreated and tracked by anotherappliedmanifestwork.
+			// Ensure the appliedmanifestwork of deleted manifestwork is removed so it won't try to delete shared resource
+			gomega.Eventually(func() bool {
+				_, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
+				if errors.IsNotFound(err) {
+					return true
+				}
+				return false
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Ensure the configmap is kept and tracked by anotherappliedmanifestwork.
 			gomega.Eventually(func() error {
-				recreatedConfigMap, err := spokeKubeClient.CoreV1().ConfigMaps(o.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+				configMap, err := spokeKubeClient.CoreV1().ConfigMaps(o.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
-				if currentUID == recreatedConfigMap.UID {
-					return fmt.Errorf("UID should not be equal")
+				if currentUID != configMap.UID {
+					return fmt.Errorf("UID should be equal")
 				}
 
 				anotherappliedmanifestwork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), anotherAppliedManifestWorkName, metav1.GetOptions{})
@@ -654,31 +662,16 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 						return fmt.Errorf("Resource Name should be cm1")
 					}
 
-					if appliedResource.UID == string(currentUID) {
-						return fmt.Errorf("UID should not be equal")
+					if appliedResource.UID != string(currentUID) {
+						return fmt.Errorf("UID should be equal")
 					}
 				}
 
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
-
-			// Ensure the appliedmanifestwork of deleted manifestwork is removed so it won't try to delete shared resource
-			gomega.Eventually(func() bool {
-				_, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
-				if errors.IsNotFound(err) {
-					return true
-				}
-				return false
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
 		})
 
-		ginkgo.It("shared resource between the manifestwork should be recreated when the shared resource is removed from one manifestwork", func() {
-			// Ensure two manifestworks are all applied
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
-				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
-				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+		ginkgo.It("shared resource between the manifestwork should be kept when the shared resource is removed from one manifestwork", func() {
 			util.AssertWorkCondition(anotherWork.Namespace, anotherWork.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 			util.AssertWorkCondition(anotherWork.Namespace, anotherWork.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
@@ -728,36 +721,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			_, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			// Ensure the configmap is recreated and tracked by anotherappliedmanifestwork
-			gomega.Eventually(func() error {
-				recreatedConfigMap, err := spokeKubeClient.CoreV1().ConfigMaps(o.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-
-				if currentUID == recreatedConfigMap.UID {
-					return fmt.Errorf("UID should not be equal")
-				}
-
-				anotherAppliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), anotherAppliedManifestWorkName, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-
-				for _, appliedResource := range anotherAppliedManifestWork.Status.AppliedResources {
-					if appliedResource.Name != "cm1" {
-						return fmt.Errorf("Resource Name should be cm1")
-					}
-
-					if appliedResource.UID == string(currentUID) {
-						return fmt.Errorf("UID should not be equal")
-					}
-				}
-
-				return nil
-			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
-
-			// ensure the resource is not tracked by the appliedmanifestwork.
+			// Ensure the resource is not tracked by the appliedmanifestwork.
 			gomega.Eventually(func() bool {
 				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
@@ -772,6 +736,264 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Ensure the configmap is kept and tracked by anotherappliedmanifestwork
+			gomega.Eventually(func() error {
+				configMap, err := spokeKubeClient.CoreV1().ConfigMaps(o.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if currentUID != configMap.UID {
+					return fmt.Errorf("UID should be equal")
+				}
+
+				anotherAppliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), anotherAppliedManifestWorkName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				for _, appliedResource := range anotherAppliedManifestWork.Status.AppliedResources {
+					if appliedResource.Name != "cm1" {
+						return fmt.Errorf("Resource Name should be cm1")
+					}
+
+					if appliedResource.UID != string(currentUID) {
+						return fmt.Errorf("UID should be equal")
+					}
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+
+	})
+
+	ginkgo.Context("Delete options", func() {
+		ginkgo.BeforeEach(func() {
+			manifests = []workapiv1.Manifest{
+				util.ToManifest(util.NewConfigmap(o.SpokeClusterName, "cm1", map[string]string{"a": "b"}, []string{})),
+				util.ToManifest(util.NewConfigmap(o.SpokeClusterName, "cm2", map[string]string{"c": "d"}, []string{})),
+			}
+		})
+
+		ginkgo.JustBeforeEach(func() {
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+		})
+
+		ginkgo.It("Orphan deletion of the whole manifestwork", func() {
+			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			work.Spec.DeleteOption = &workapiv1.DeleteOption{
+				PropagationPolicy: workapiv1.DeletePropagationPolicyTypeOrphan,
+			}
+
+			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Ensure configmap exists
+			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
+
+			// Ensure ownership of configmap is updated
+			gomega.Eventually(func() error {
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(o.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+
+				if err != nil {
+					return err
+				}
+
+				if len(cm.OwnerReferences) != 0 {
+					return fmt.Errorf("Owner reference are not correctly updated, current ownerrefs are %v", cm.OwnerReferences)
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			gomega.Eventually(func() error {
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(o.SpokeClusterName).Get(context.Background(), "cm2", metav1.GetOptions{})
+
+				if err != nil {
+					return err
+				}
+
+				if len(cm.OwnerReferences) != 0 {
+					return fmt.Errorf("Owner reference are not correctly updated, current ownerrefs are %v", cm.OwnerReferences)
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			// Delete the work
+			err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Wait for deletion of manifest work
+			gomega.Eventually(func() bool {
+				_, err := hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if !errors.IsNotFound(err) {
+					return false
+				}
+
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Ensure configmap exists
+			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
+		})
+
+		ginkgo.It("Selectively Orphan deletion of the manifestwork", func() {
+			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			work.Spec.DeleteOption = &workapiv1.DeleteOption{
+				PropagationPolicy: workapiv1.DeletePropagationPolicyTypeSelectivelyOrphan,
+				SelectivelyOrphan: &workapiv1.SelectivelyOrphan{
+					OrphaningRules: []workapiv1.OrphaningRule{
+						{
+							Group:     "",
+							Resource:  "configmaps",
+							Namespace: o.SpokeClusterName,
+							Name:      "cm1",
+						},
+					},
+				},
+			}
+
+			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Ensure configmap exists
+			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
+
+			// Ensure ownership of configmap is updated
+			gomega.Eventually(func() error {
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(o.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+
+				if err != nil {
+					return err
+				}
+
+				if len(cm.OwnerReferences) != 0 {
+					return fmt.Errorf("Owner reference are not correctly updated, current ownerrefs are %v", cm.OwnerReferences)
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			// Delete the work
+			err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Wait for deletion of manifest work
+			gomega.Eventually(func() bool {
+				_, err := hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if !errors.IsNotFound(err) {
+					return false
+				}
+
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// One of the resource should be deleted.
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(o.SpokeClusterName).Get(context.Background(), "cm2", metav1.GetOptions{})
+			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+
+			// One of the resource should be kept
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(o.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("Clean the resource when orphan deletion option is removed", func() {
+			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			work.Spec.DeleteOption = &workapiv1.DeleteOption{
+				PropagationPolicy: workapiv1.DeletePropagationPolicyTypeSelectivelyOrphan,
+				SelectivelyOrphan: &workapiv1.SelectivelyOrphan{
+					OrphaningRules: []workapiv1.OrphaningRule{
+						{
+							Group:     "",
+							Resource:  "configmaps",
+							Namespace: o.SpokeClusterName,
+							Name:      "cm1",
+						},
+					},
+				},
+			}
+
+			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Ensure configmap exists
+			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
+
+			// Ensure ownership of configmap is updated
+			gomega.Eventually(func() error {
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(o.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+
+				if err != nil {
+					return err
+				}
+
+				if len(cm.OwnerReferences) != 0 {
+					return fmt.Errorf("Owner reference are not correctly updated, current ownerrefs are %v", cm.OwnerReferences)
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			// Remove the delete option
+			gomega.Eventually(func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+
+				if err != nil {
+					return err
+				}
+
+				work.Spec.DeleteOption = nil
+				work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
+
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			// Ensure ownership of configmap is updated
+			gomega.Eventually(func() error {
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(o.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+
+				if err != nil {
+					return err
+				}
+
+				if len(cm.OwnerReferences) != 1 {
+					return fmt.Errorf("Owner reference are not correctly updated, current ownerrefs are %v", cm.OwnerReferences)
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			// Delete the work
+			err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Wait for deletion of manifest work
+			gomega.Eventually(func() bool {
+				_, err := hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if !errors.IsNotFound(err) {
+					return false
+				}
+
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// All of the resource should be deleted.
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(o.SpokeClusterName).Get(context.Background(), "cm2", metav1.GetOptions{})
+			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(o.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
 		})
 	})
 })

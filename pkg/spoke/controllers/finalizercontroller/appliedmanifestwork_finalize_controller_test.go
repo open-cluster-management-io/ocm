@@ -10,16 +10,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/work/pkg/helper"
 	"open-cluster-management.io/work/pkg/spoke/controllers"
 	"open-cluster-management.io/work/pkg/spoke/spoketesting"
 )
 
 func TestFinalize(t *testing.T) {
+	uid := types.UID("test")
+	appliedWork := spoketesting.NewAppliedManifestWork("test", 0, uid)
+	owner := helper.NewAppliedManifestWorkOwner(appliedWork)
+
 	cases := []struct {
 		name                               string
 		existingFinalizers                 []string
@@ -99,8 +105,8 @@ func TestFinalize(t *testing.T) {
 			terminated:         true,
 			existingFinalizers: []string{controllers.AppliedManifestWorkFinalizer},
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", true, "ns1-n1"),
-				spoketesting.NewUnstructuredSecret("ns2", "n2", true, "ns2-n2"),
+				spoketesting.NewUnstructuredSecret("ns1", "n1", true, "ns1-n1", *owner),
+				spoketesting.NewUnstructuredSecret("ns2", "n2", true, "ns2-n2", *owner),
 			},
 			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
@@ -130,7 +136,7 @@ func TestFinalize(t *testing.T) {
 			terminated:         true,
 			existingFinalizers: []string{controllers.AppliedManifestWorkFinalizer},
 			existingResources: []runtime.Object{
-				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
+				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
 			},
 			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "n1"},
@@ -173,7 +179,7 @@ func TestFinalize(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			testingWork := spoketesting.NewAppliedManifestWork("test", 0)
+			testingWork := appliedWork.DeepCopy()
 			testingWork.Finalizers = c.existingFinalizers
 			if c.terminated {
 				now := metav1.Now()

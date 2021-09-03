@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	fakekube "k8s.io/client-go/kubernetes/fake"
@@ -606,7 +607,7 @@ func TestBuildResourceMeta(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			actual, err := buildResourceMeta(0, c.object, c.restMapper)
+			actual, _, err := buildResourceMeta(0, c.object, c.restMapper)
 			if err != nil {
 				t.Errorf("Should be success with no err: %v", err)
 			}
@@ -628,12 +629,6 @@ func TestBuildManifestResourceMeta(t *testing.T) {
 		expected       workapiv1.ManifestResourceMeta
 	}{
 		{
-			name:        "extract meta from apply result",
-			applyResult: spoketesting.NewSecret("test1", "ns1", "value1"),
-			restMapper:  spoketesting.NewFakeRestMapper(),
-			expected:    workapiv1.ManifestResourceMeta{Version: "v1", Kind: "Secret", Resource: "secrets", Namespace: "ns1", Name: "test1"},
-		},
-		{
 			name:           "fall back to manifest",
 			manifestObject: spoketesting.NewSecret("test2", "ns2", "value2"),
 			restMapper:     spoketesting.NewFakeRestMapper(),
@@ -647,7 +642,7 @@ func TestBuildManifestResourceMeta(t *testing.T) {
 			if c.manifestObject != nil {
 				manifest.Object = c.manifestObject
 			}
-			actual, err := buildManifestResourceMeta(0, c.applyResult, manifest, c.restMapper)
+			actual, _, err := buildManifestResourceMeta(0, manifest, c.restMapper)
 			if err != nil {
 				t.Errorf("Should be success with no err: %v", err)
 			}
@@ -655,6 +650,85 @@ func TestBuildManifestResourceMeta(t *testing.T) {
 			actual.Ordinal = c.expected.Ordinal
 			if !equality.Semantic.DeepEqual(actual, c.expected) {
 				t.Errorf(diff.ObjectDiff(actual, c.expected))
+			}
+		})
+	}
+}
+
+func TestManageOwner(t *testing.T) {
+	testGVR := schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
+
+	namespace := "testns"
+
+	name := "test"
+
+	cases := []struct {
+		name         string
+		deleteOption *workapiv1.DeleteOption
+		owner        metav1.OwnerReference
+		expectOwner  metav1.OwnerReference
+	}{
+		{
+			name:        "foreground by default",
+			owner:       metav1.OwnerReference{UID: "testowner"},
+			expectOwner: metav1.OwnerReference{UID: "testowner"},
+		},
+		{
+			name:         "orphan the resource",
+			owner:        metav1.OwnerReference{UID: "testowner"},
+			deleteOption: &workapiv1.DeleteOption{PropagationPolicy: workapiv1.DeletePropagationPolicyTypeOrphan},
+			expectOwner:  metav1.OwnerReference{UID: "testowner-"},
+		},
+		{
+			name:         "add owner if no orphan rule with selectively orphan",
+			owner:        metav1.OwnerReference{UID: "testowner"},
+			deleteOption: &workapiv1.DeleteOption{PropagationPolicy: workapiv1.DeletePropagationPolicyTypeSelectivelyOrphan},
+			expectOwner:  metav1.OwnerReference{UID: "testowner"},
+		},
+		{
+			name:  "orphan the resource with selectively orphan",
+			owner: metav1.OwnerReference{UID: "testowner"},
+			deleteOption: &workapiv1.DeleteOption{
+				PropagationPolicy: workapiv1.DeletePropagationPolicyTypeSelectivelyOrphan,
+				SelectivelyOrphan: &workapiv1.SelectivelyOrphan{
+					OrphaningRules: []workapiv1.OrphaningRule{
+						{
+							Group:     "",
+							Resource:  "secrets",
+							Namespace: namespace,
+							Name:      name,
+						},
+					},
+				},
+			},
+			expectOwner: metav1.OwnerReference{UID: "testowner-"},
+		},
+		{
+			name:  "add owner if resourcec is not matched in orphan rule with selectively orphan",
+			owner: metav1.OwnerReference{UID: "testowner"},
+			deleteOption: &workapiv1.DeleteOption{
+				PropagationPolicy: workapiv1.DeletePropagationPolicyTypeSelectivelyOrphan,
+				SelectivelyOrphan: &workapiv1.SelectivelyOrphan{
+					OrphaningRules: []workapiv1.OrphaningRule{
+						{
+							Group:     "",
+							Resource:  "secrets",
+							Namespace: "testns1",
+							Name:      name,
+						},
+					},
+				},
+			},
+			expectOwner: metav1.OwnerReference{UID: "testowner"},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			owner := manageOwnerRef(testGVR, namespace, name, c.deleteOption, c.owner)
+
+			if !equality.Semantic.DeepEqual(owner, c.expectOwner) {
+				t.Errorf("Expect owner is %v, but got %v", c.expectOwner, owner)
 			}
 		})
 	}

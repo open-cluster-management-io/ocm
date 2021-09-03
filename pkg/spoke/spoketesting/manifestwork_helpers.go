@@ -70,8 +70,8 @@ func NewUnstructuredSecretBySize(namespace, name string, size int32) *unstructur
 	}
 }
 
-func NewUnstructuredSecret(namespace, name string, terminated bool, uid string) *unstructured.Unstructured {
-	u := NewUnstructured("v1", "Secret", namespace, name)
+func NewUnstructuredSecret(namespace, name string, terminated bool, uid string, owners ...metav1.OwnerReference) *unstructured.Unstructured {
+	u := NewUnstructured("v1", "Secret", namespace, name, owners...)
 	if terminated {
 		now := metav1.Now()
 		u.SetDeletionTimestamp(&now)
@@ -82,8 +82,8 @@ func NewUnstructuredSecret(namespace, name string, terminated bool, uid string) 
 	return u
 }
 
-func NewUnstructured(apiVersion, kind, namespace, name string) *unstructured.Unstructured {
-	return &unstructured.Unstructured{
+func NewUnstructured(apiVersion, kind, namespace, name string, owners ...metav1.OwnerReference) *unstructured.Unstructured {
+	u := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": apiVersion,
 			"kind":       kind,
@@ -93,6 +93,10 @@ func NewUnstructured(apiVersion, kind, namespace, name string) *unstructured.Uns
 			},
 		},
 	}
+
+	u.SetOwnerReferences(owners)
+
+	return u
 }
 
 func NewUnstructuredWithContent(
@@ -128,11 +132,12 @@ func NewManifestWork(index int, objects ...*unstructured.Unstructured) (*workapi
 	return work, fmt.Sprintf("%s", work.Name)
 }
 
-func NewAppliedManifestWork(hash string, index int) *workapiv1.AppliedManifestWork {
+func NewAppliedManifestWork(hash string, index int, uid types.UID) *workapiv1.AppliedManifestWork {
 	workName := fmt.Sprintf("work-%d", index)
 	return &workapiv1.AppliedManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("%s-%s", hash, workName),
+			UID:  uid,
 		},
 		Spec: workapiv1.AppliedManifestWorkSpec{
 			HubHash:          hash,
