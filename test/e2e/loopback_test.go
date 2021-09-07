@@ -425,6 +425,34 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+		// make sure the cpu and memory are still in the status, for compatibility
+		ginkgo.By("Make sure cpu and memory exist in status")
+		err = wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+			managedCluster, err := managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+
+			if _, exist := managedCluster.Status.Allocatable[clusterv1.ResourceCPU]; !exist {
+				return false, fmt.Errorf("Resource %v doesn't exist in Allocatable", clusterv1.ResourceCPU)
+			}
+
+			if _, exist := managedCluster.Status.Allocatable[clusterv1.ResourceMemory]; !exist {
+				return false, fmt.Errorf("Resource %v doesn't exist in Allocatable", clusterv1.ResourceMemory)
+			}
+
+			if _, exist := managedCluster.Status.Capacity[clusterv1.ResourceCPU]; !exist {
+				return false, fmt.Errorf("Resource %v doesn't exist in Capacity", clusterv1.ResourceCPU)
+			}
+
+			if _, exist := managedCluster.Status.Capacity[clusterv1.ResourceMemory]; !exist {
+				return false, fmt.Errorf("Resource %v doesn't exist in Capacity", clusterv1.ResourceMemory)
+			}
+
+			return true, nil
+		})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 		ginkgo.By("Make sure ClusterClaims are synced")
 		clusterClaims := []clusterv1.ManagedClusterClaim{
 			{
