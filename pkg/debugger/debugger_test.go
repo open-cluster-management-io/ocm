@@ -24,15 +24,20 @@ type testScheduler struct {
 
 type testResult struct {
 	filterResults     []scheduling.FilterResult
-	prioritizeResults []scheduling.PriorizeResult
+	prioritizeResults []scheduling.PrioritizerResult
+	scoreSum          scheduling.PrioritizerScore
 }
 
 func (r *testResult) FilterResults() []scheduling.FilterResult {
 	return r.filterResults
 }
 
-func (r *testResult) PriorizeResults() []scheduling.PriorizeResult {
+func (r *testResult) PrioritizerResults() []scheduling.PrioritizerResult {
 	return r.prioritizeResults
+}
+
+func (r *testResult) PrioritizerScores() scheduling.PrioritizerScore {
+	return r.scoreSum
 }
 
 func (r *testResult) Decisions() []clusterapiv1alpha1.ClusterDecision {
@@ -59,7 +64,7 @@ func TestDebugger(t *testing.T) {
 		name              string
 		initObjs          []runtime.Object
 		filterResults     []scheduling.FilterResult
-		prioritizeResults []scheduling.PriorizeResult
+		prioritizeResults []scheduling.PrioritizerResult
 		key               string
 	}{
 		{
@@ -70,7 +75,7 @@ func TestDebugger(t *testing.T) {
 				testinghelpers.NewManagedCluster("cluster2").Build(),
 			},
 			filterResults:     []scheduling.FilterResult{{Name: "filter1", FilteredClusters: []string{"cluster1", "cluster2"}}},
-			prioritizeResults: []scheduling.PriorizeResult{{Name: "prioritize1", Scores: map[string]int64{"cluster1": 100, "cluster2": 0}}},
+			prioritizeResults: []scheduling.PrioritizerResult{{Name: "prioritize1", Scores: map[string]int64{"cluster1": 100, "cluster2": 0}}},
 			key:               placementNamespace + "/" + placementName,
 		},
 	}

@@ -2,6 +2,7 @@ package scheduling
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -16,7 +17,8 @@ import (
 	"open-cluster-management.io/placement/pkg/plugins/steady"
 )
 
-type PrioritizeSore map[string]int64
+// PrioritizerScore defines the score for each cluster
+type PrioritizerScore map[string]int64
 
 // Scheduler is an interface for scheduler, it returs the scheduler results
 type Scheduler interface {
@@ -31,8 +33,11 @@ type ScheduleResult interface {
 	// FilterResults returns results for each filter
 	FilterResults() []FilterResult
 
-	// PriorizeResults returns results for each prioritizer
-	PriorizeResults() []PriorizeResult
+	// PrioritizerResults returns results for each prioritizer
+	PrioritizerResults() []PrioritizerResult
+
+	// PrioritizerScores returns total score for each cluster
+	PrioritizerScores() PrioritizerScore
 
 	// Decisions returns the decisions of the schedule
 	Decisions() []clusterapiv1alpha1.ClusterDecision
@@ -46,9 +51,12 @@ type FilterResult struct {
 	FilteredClusters []string `json:"filteredClusters"`
 }
 
-type PriorizeResult struct {
-	Name   string         `json:"name"`
-	Scores PrioritizeSore `json:"scores"`
+// PrioritizerResult defines the result of one prioritizer,
+// include name, weight, and score of each cluster.
+type PrioritizerResult struct {
+	Name   string           `json:"name"`
+	Weight int32            `json:"weight"`
+	Scores PrioritizerScore `json:"scores"`
 }
 
 // ScheduleResult is the result for a certain schedule.
@@ -58,7 +66,8 @@ type scheduleResult struct {
 	unscheduledDecisions int
 
 	filteredRecords map[string][]*clusterapiv1.ManagedCluster
-	scoreRecords    []PriorizeResult
+	scoreRecords    []PrioritizerResult
+	scoreSum        PrioritizerScore
 }
 
 type schedulerHandler struct {
@@ -89,9 +98,18 @@ func (s *schedulerHandler) ClusterClient() clusterclient.Interface {
 	return s.clusterClient
 }
 
+// Initialize the default prioritizer weight.
+// Balane and Steady weight 1, others weight 0.
+// The default weight can be replaced by each placement's PrioritizerConfigs.
+var defaultPrioritizerConfig = map[string]int32{
+	"Balance": 1,
+	"Steady":  1,
+}
+
 type pluginScheduler struct {
-	filters      []plugins.Filter
-	prioritizers []plugins.Prioritizer
+	filters            []plugins.Filter
+	prioritizers       []plugins.Prioritizer
+	prioritizerWeights map[string]int32
 }
 
 func NewPluginScheduler(handle plugins.Handle) *pluginScheduler {
@@ -103,6 +121,7 @@ func NewPluginScheduler(handle plugins.Handle) *pluginScheduler {
 			balance.New(handle),
 			steady.New(handle),
 		},
+		prioritizerWeights: defaultPrioritizerConfig,
 	}
 }
 
@@ -116,7 +135,7 @@ func (s *pluginScheduler) Schedule(
 
 	results := &scheduleResult{
 		filteredRecords: map[string][]*clusterapiv1.ManagedCluster{},
-		scoreRecords:    []PriorizeResult{},
+		scoreRecords:    []PrioritizerResult{},
 	}
 
 	// filter clusters
@@ -134,27 +153,38 @@ func (s *pluginScheduler) Schedule(
 		results.filteredRecords[strings.Join(filterPipline, ",")] = filtered
 	}
 
+	// get weight for each prioritizers
+	weights, err := getWeights(s.prioritizerWeights, placement)
+	if err != nil {
+		return nil, err
+	}
 	// score clusters
-	scoreSum := PrioritizeSore{}
+	scoreSum := PrioritizerScore{}
 	for _, cluster := range filtered {
 		scoreSum[cluster.Name] = 0
 	}
 	for _, p := range s.prioritizers {
+		// If weight is 0 (set to 0 or not defined in map), skip Score().
+		weight := weights[p.Name()]
+		if weight == 0 {
+			results.scoreRecords = append(results.scoreRecords, PrioritizerResult{Name: p.Name(), Weight: weight, Scores: nil})
+			continue
+		}
+
 		score, err := p.Score(ctx, placement, filtered)
 		if err != nil {
 			return nil, err
 		}
 
-		results.scoreRecords = append(results.scoreRecords, PriorizeResult{Name: p.Name(), Scores: score})
+		results.scoreRecords = append(results.scoreRecords, PrioritizerResult{Name: p.Name(), Weight: weight, Scores: score})
 
-		// TODO we currently weigh each prioritizer as equal. We should consider
-		// importance factor for each priotizer when caculating the final score.
-		// Since currently balance plugin has a score range of +/- 100 while the score range of
-		// balacne is 0/100, the balance plugin will trigger the reschedule for rebalancing when
-		// a cluster's decision count is larger than average.
+		// The final score is a sum of each prioritizer score * weight.
+		// A higher weight indicates that the prioritizer weights more in the cluster selection,
+		// while 0 weight indicate thats the prioritizer is disabled.
 		for name, val := range score {
-			scoreSum[name] = scoreSum[name] + val
+			scoreSum[name] = scoreSum[name] + val*int64(weight)
 		}
+
 	}
 
 	// Sort cluster by score, if score is equal, sort by name
@@ -167,6 +197,7 @@ func (s *pluginScheduler) Schedule(
 	})
 
 	results.feasibleClusters = filtered
+	results.scoreSum = scoreSum
 
 	// select clusters and generate cluster decisions
 	// TODO: sort the feasible clusters and make sure the selection stable
@@ -204,6 +235,34 @@ func selectClusters(placement *clusterapiv1alpha1.Placement, clusters []*cluster
 	return decisions
 }
 
+// Get prioritizer weight for the placement.
+// In Additive and "" mode, will override defaultWeight with what placement has defined and return.
+// In Exact mode, will return the name and weight defined in placement.
+func getWeights(defaultWeight map[string]int32, placement *clusterapiv1alpha1.Placement) (map[string]int32, error) {
+	mode := placement.Spec.PrioritizerPolicy.Mode
+	switch {
+	case mode == clusterapiv1alpha1.PrioritizerPolicyModeExact:
+		return mergeWeights(nil, placement.Spec.PrioritizerPolicy.Configurations), nil
+	case mode == clusterapiv1alpha1.PrioritizerPolicyModeAdditive || mode == "":
+		return mergeWeights(defaultWeight, placement.Spec.PrioritizerPolicy.Configurations), nil
+	default:
+		return nil, fmt.Errorf("incorrect prioritizer policy mode: %s", mode)
+	}
+}
+
+func mergeWeights(defaultWeight map[string]int32, customizedWeight []clusterapiv1alpha1.PrioritizerConfig) map[string]int32 {
+	weights := make(map[string]int32)
+	// copy the default weight
+	for k, v := range defaultWeight {
+		weights[k] = v
+	}
+	// override the default weight
+	for _, c := range customizedWeight {
+		weights[c.Name] = c.Weight
+	}
+	return weights
+}
+
 func (r *scheduleResult) FilterResults() []FilterResult {
 	results := []FilterResult{}
 	for name, r := range r.filteredRecords {
@@ -217,8 +276,12 @@ func (r *scheduleResult) FilterResults() []FilterResult {
 	return results
 }
 
-func (r *scheduleResult) PriorizeResults() []PriorizeResult {
+func (r *scheduleResult) PrioritizerResults() []PrioritizerResult {
 	return r.scoreRecords
+}
+
+func (r *scheduleResult) PrioritizerScores() PrioritizerScore {
+	return r.scoreSum
 }
 
 func (r *scheduleResult) Decisions() []clusterapiv1alpha1.ClusterDecision {

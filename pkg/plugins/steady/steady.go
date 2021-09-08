@@ -2,6 +2,7 @@ package steady
 
 import (
 	"context"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -27,11 +28,13 @@ type Steady struct {
 }
 
 func New(handle plugins.Handle) *Steady {
-	return &Steady{handle: handle}
+	return &Steady{
+		handle: handle,
+	}
 }
 
 func (s *Steady) Name() string {
-	return "steady"
+	return reflect.TypeOf(*s).Name()
 }
 
 func (s *Steady) Description() string {

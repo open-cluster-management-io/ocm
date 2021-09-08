@@ -560,6 +560,7 @@ func TestBind(t *testing.T) {
 				context.TODO(),
 				testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
 				c.clusterDecisions,
+				nil,
 			)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
