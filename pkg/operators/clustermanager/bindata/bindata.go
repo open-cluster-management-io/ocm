@@ -1193,6 +1193,9 @@ spec:
                     name:
                       description: name of the referent.
                       type: string
+                    namespace:
+                      description: namespace of the referent.
+                      type: string
                     resource:
                       description: resource of the referent.
                       type: string

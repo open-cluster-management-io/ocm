@@ -316,6 +316,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	registrationGeneration, err := helpers.ApplyDeployment(
 		n.kubeClient,
 		klusterlet.Status.Generations,
+		klusterlet.Spec.NodePlacement,
 		func(name string) ([]byte, error) {
 			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
 		},
@@ -341,6 +342,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	workGeneration, err := helpers.ApplyDeployment(
 		n.kubeClient,
 		klusterlet.Status.Generations,
+		klusterlet.Spec.NodePlacement,
 		func(name string) ([]byte, error) {
 			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
 		},

@@ -36,6 +36,7 @@ var map_ClusterManagerSpec = map[string]string{
 	"registrationImagePullSpec": "RegistrationImagePullSpec represents the desired image of registration controller/webhook installed on hub.",
 	"workImagePullSpec":         "WorkImagePullSpec represents the desired image configuration of work controller/webhook installed on hub.",
 	"placementImagePullSpec":    "PlacementImagePullSpec represents the desired image configuration of placement controller/webhook installed on hub.",
+	"nodePlacement":             "NodePlacement enables explicit control over the scheduling of the deployed pods.",
 }
 
 func (ClusterManagerSpec) SwaggerDoc() map[string]string {
@@ -95,6 +96,7 @@ var map_KlusterletSpec = map[string]string{
 	"workImagePullSpec":         "WorkImagePullSpec represents the desired image configuration of work agent.",
 	"clusterName":               "ClusterName is the name of the managed cluster to be created on hub. The Klusterlet agent generates a random name if it is not set, or discovers the appropriate cluster name on OpenShift.",
 	"externalServerURLs":        "ExternalServerURLs represents the a list of apiserver urls and ca bundles that is accessible externally If it is set empty, managed cluster has no externally accessible url that hub cluster can visit.",
+	"nodePlacement":             "NodePlacement enables explicit control over the scheduling of the deployed pods.",
 }
 
 func (KlusterletSpec) SwaggerDoc() map[string]string {
@@ -111,6 +113,16 @@ var map_KlusterletStatus = map[string]string{
 
 func (KlusterletStatus) SwaggerDoc() map[string]string {
 	return map_KlusterletStatus
+}
+
+var map_NodePlacement = map[string]string{
+	"":             "NodePlacement describes node scheduling configuration for the pods.",
+	"nodeSelector": "NodeSelector defines which Nodes the Pods are scheduled on. The default is an empty list.",
+	"tolerations":  "Tolerations is attached by pods to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>. The default is an empty list.",
+}
+
+func (NodePlacement) SwaggerDoc() map[string]string {
+	return map_NodePlacement
 }
 
 var map_RelatedResourceMeta = map[string]string{
