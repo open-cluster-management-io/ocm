@@ -1,6 +1,7 @@
 package v1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -40,6 +41,10 @@ type ClusterManagerSpec struct {
 	// +optional
 	// +kubebuilder:default=quay.io/open-cluster-management/placement
 	PlacementImagePullSpec string `json:"placementImagePullSpec,omitempty"`
+
+	// NodePlacement enables explicit control over the scheduling of the deployed pods.
+	// +optional
+	NodePlacement NodePlacement `json:"nodePlacement,omitempty"`
 }
 
 // ClusterManagerStatus represents the current status of the registration and work distribution controllers running on the hub.
@@ -176,6 +181,10 @@ type KlusterletSpec struct {
 	// If it is set empty, managed cluster has no externally accessible url that hub cluster can visit.
 	// +optional
 	ExternalServerURLs []ServerURL `json:"externalServerURLs,omitempty"`
+
+	// NodePlacement enables explicit control over the scheduling of the deployed pods.
+	// +optional
+	NodePlacement NodePlacement `json:"nodePlacement,omitempty"`
 }
 
 // ServerURL represents the apiserver url and ca bundle that is accessible externally
@@ -188,6 +197,19 @@ type ServerURL struct {
 	// System certs are used if it is not set.
 	// +optional
 	CABundle []byte `json:"caBundle,omitempty"`
+}
+
+// NodePlacement describes node scheduling configuration for the pods.
+type NodePlacement struct {
+	// NodeSelector defines which Nodes the Pods are scheduled on. The default is an empty list.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Tolerations is attached by pods to tolerate any taint that matches
+	// the triple <key,value,effect> using the matching operator <operator>.
+	// The default is an empty list.
+	// +optional
+	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
 }
 
 // KlusterletStatus represents the current status of Klusterlet agent.

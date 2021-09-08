@@ -164,6 +164,9 @@ var ReservedClusterClaimNames = [...]string{
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope="Namespaced"
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Succeeded",type="string",JSONPath=".status.conditions[?(@.type==\"PlacementSatisfied\")].status"
+// +kubebuilder:printcolumn:name="Reason",type="string",JSONPath=".status.conditions[?(@.type==\"PlacementSatisfied\")].reason"
+// +kubebuilder:printcolumn:name="SelectedClusters",type="integer",JSONPath=".status.numberOfSelectedClusters"
 
 // Placement defines a rule to select a set of ManagedClusters from the ManagedClusterSets bound
 // to the placement namespace.
@@ -318,6 +321,11 @@ type PlacementDecision struct {
 	// +optional
 	Status PlacementDecisionStatus `json:"status,omitempty"`
 }
+
+//The placementDecsion label name holding the placement name
+const (
+	PlacementLabel string = "cluster.open-cluster-management.io/placement"
+)
 
 // PlacementDecisionStatus represents the current status of the PlacementDecision.
 type PlacementDecisionStatus struct {

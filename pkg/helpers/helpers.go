@@ -264,6 +264,7 @@ func ApplyMutatingWebhookConfiguration(
 func ApplyDeployment(
 	client kubernetes.Interface,
 	generationStatuses []operatorapiv1.GenerationStatus,
+	nodePlacement operatorapiv1.NodePlacement,
 	manifests resourceapply.AssetFunc,
 	recorder events.Recorder, file string) (operatorapiv1.GenerationStatus, error) {
 	deploymentBytes, err := manifests(file)
@@ -280,6 +281,10 @@ func ApplyDeployment(
 	if currentGenerationStatus != nil {
 		generationStatus.LastGeneration = currentGenerationStatus.LastGeneration
 	}
+
+	deployment.(*appsv1.Deployment).Spec.Template.Spec.NodeSelector = nodePlacement.NodeSelector
+	deployment.(*appsv1.Deployment).Spec.Template.Spec.Tolerations = nodePlacement.Tolerations
+
 	updatedDeployment, updated, err := resourceapply.ApplyDeployment(
 		client.AppsV1(),
 		recorder,

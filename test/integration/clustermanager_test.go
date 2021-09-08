@@ -7,6 +7,8 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	v1 "open-cluster-management.io/api/operator/v1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -261,6 +263,46 @@ var _ = ginkgo.Describe("ClusterManager", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 		})
 
+		ginkgo.It("Deployment should be added nodeSelector and toleration when add nodePlacement into clustermanager", func() {
+			clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			clusterManager.Spec.NodePlacement = v1.NodePlacement{
+				NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
+				Tolerations: []corev1.Toleration{
+					{
+						Key:      "node-role.kubernetes.io/infra",
+						Operator: corev1.TolerationOpExists,
+						Effect:   corev1.TaintEffectNoSchedule,
+					},
+				},
+			}
+			_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			gomega.Eventually(func() bool {
+				actual, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
+				if len(actual.Spec.Template.Spec.NodeSelector) == 0 {
+					return false
+				}
+				if _, ok := actual.Spec.Template.Spec.NodeSelector["node-role.kubernetes.io/infra"]; !ok {
+					return false
+				}
+				if len(actual.Spec.Template.Spec.Tolerations) == 0 {
+					return false
+				}
+				for _, toleration := range actual.Spec.Template.Spec.Tolerations {
+					if toleration.Key == "node-role.kubernetes.io/infra" {
+						return true
+					}
+				}
+
+				return false
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		})
 		ginkgo.It("Deployment should be reconciled when manually updated", func() {
 			gomega.Eventually(func() bool {
 				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{}); err != nil {

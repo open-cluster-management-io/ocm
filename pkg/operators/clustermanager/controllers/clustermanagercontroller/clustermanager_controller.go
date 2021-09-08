@@ -235,6 +235,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		currentGeneration, err := helpers.ApplyDeployment(
 			n.kubeClient,
 			clusterManager.Status.Generations,
+			clusterManager.Spec.NodePlacement,
 			func(name string) ([]byte, error) {
 				return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
 			},

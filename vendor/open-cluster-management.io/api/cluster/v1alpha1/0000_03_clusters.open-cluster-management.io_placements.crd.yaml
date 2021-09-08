@@ -262,6 +262,16 @@ spec:
                   ManagedClusters
                 type: integer
                 format: int32
+    additionalPrinterColumns:
+    - name: Succeeded
+      type: string
+      jsonPath: ".status.conditions[?(@.type==\"PlacementSatisfied\")].status"
+    - name: Reason
+      type: string
+      jsonPath: ".status.conditions[?(@.type==\"PlacementSatisfied\")].reason"
+    - name: SelectedClusters
+      type: integer
+      jsonPath: ".status.numberOfSelectedClusters"
     served: true
     storage: true
     subresources:

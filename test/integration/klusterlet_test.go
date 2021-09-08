@@ -8,7 +8,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -170,6 +169,66 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "Applied", "KlusterletApplied", metav1.ConditionTrue)
+		})
+
+		ginkgo.It("Deployment should be added nodeSelector and toleration when add nodePlacement into klusterlet", func() {
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// Check deployment without nodeSelector and toleration
+			gomega.Eventually(func() bool {
+				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				if len(deployment.Spec.Template.Spec.NodeSelector) != 0 {
+					return false
+				}
+
+				if len(deployment.Spec.Template.Spec.Tolerations) != 0 {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			KlusterletObj, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			KlusterletObj.Spec.NodePlacement = operatorapiv1.NodePlacement{
+				NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
+				Tolerations: []corev1.Toleration{
+					{
+						Key:      "node-role.kubernetes.io/infra",
+						Operator: corev1.TolerationOpExists,
+						Effect:   corev1.TaintEffectNoSchedule,
+					},
+				},
+			}
+			_, err = operatorClient.OperatorV1().Klusterlets().Update(context.Background(), KlusterletObj, metav1.UpdateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// Check deployment with nodeSelector and toleration
+			gomega.Eventually(func() bool {
+				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				if len(deployment.Spec.Template.Spec.NodeSelector) == 0 {
+					return false
+				}
+				if _, ok := deployment.Spec.Template.Spec.NodeSelector["node-role.kubernetes.io/infra"]; !ok {
+					return false
+				}
+				if len(deployment.Spec.Template.Spec.Tolerations) == 0 {
+					return false
+				}
+				for _, toleration := range deployment.Spec.Template.Spec.Tolerations {
+					if toleration.Key == "node-role.kubernetes.io/infra" {
+						return true
+					}
+				}
+				return false
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 		})
 
 		ginkgo.It("should have correct registration deployment when server url is empty", func() {

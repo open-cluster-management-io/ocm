@@ -683,3 +683,81 @@ func newNode(name string) *corev1.Node {
 		},
 	}
 }
+
+func newDeploymentUnstructured(name, namespace string) *unstructured.Unstructured {
+	spec := map[string]interface{}{
+		"spec": map[string]interface{}{
+			"template": map[string]interface{}{
+				"spec": map[string]interface{}{
+					"containers": []map[string]interface{}{
+						{
+							"name":  "hub-registration-controller",
+							"image": "quay.io/open-cluster-management/registration:latest",
+						},
+					},
+				}}}}
+
+	return newUnstructured("apps/v1", "Deployment", namespace, name, spec)
+}
+
+func TestApplyDeployment(t *testing.T) {
+	testcases := []struct {
+		name                string
+		deploymentName      string
+		deploymentNamespace string
+		nodePlacement       operatorapiv1.NodePlacement
+		expectErr           bool
+	}{
+		{
+			name:                "Apply a deployment without nodePlacement",
+			deploymentName:      "cluster-manager-registration-controller",
+			deploymentNamespace: "open-cluster-management-hub",
+			expectErr:           false,
+		},
+		{
+			name:                "Apply a deployment with nodePlacement",
+			deploymentName:      "cluster-manager-registration-controller",
+			deploymentNamespace: "open-cluster-management-hub",
+			nodePlacement: operatorapiv1.NodePlacement{
+				NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
+				Tolerations: []corev1.Toleration{
+					{
+						Key:      "node-role.kubernetes.io/infra",
+						Operator: corev1.TolerationOpExists,
+						Effect:   corev1.TaintEffectNoSchedule,
+					},
+				},
+			},
+			expectErr: false,
+		},
+	}
+
+	for _, c := range testcases {
+		t.Run(c.name, func(t *testing.T) {
+			fakeKubeClient := fakekube.NewSimpleClientset()
+			_, err := ApplyDeployment(
+				fakeKubeClient, []operatorapiv1.GenerationStatus{}, c.nodePlacement,
+				func(name string) ([]byte, error) {
+					return json.Marshal(newDeploymentUnstructured(c.deploymentName, c.deploymentNamespace))
+				},
+				eventstesting.NewTestingEventRecorder(t),
+				c.deploymentName,
+			)
+			if err != nil && !c.expectErr {
+				t.Errorf("Expect an apply error")
+			}
+
+			deployment, err := fakeKubeClient.AppsV1().Deployments(c.deploymentNamespace).Get(context.TODO(), c.deploymentName, metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("Expect an get error")
+			}
+
+			if !reflect.DeepEqual(deployment.Spec.Template.Spec.NodeSelector, c.nodePlacement.NodeSelector) {
+				t.Errorf("Expect nodeSelector %v, got %v", c.nodePlacement.NodeSelector, deployment.Spec.Template.Spec.NodeSelector)
+			}
+			if !reflect.DeepEqual(deployment.Spec.Template.Spec.Tolerations, c.nodePlacement.Tolerations) {
+				t.Errorf("Expect Tolerations %v, got %v", c.nodePlacement.Tolerations, deployment.Spec.Template.Spec.Tolerations)
+			}
+		})
+	}
+}
