@@ -30,9 +30,9 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 
+	"open-cluster-management.io/registration/deploy"
 	"open-cluster-management.io/registration/pkg/clientcert"
 	"open-cluster-management.io/registration/pkg/helpers"
-	"open-cluster-management.io/registration/test/e2e/bindata"
 )
 
 var spokeNamespace string = ""
@@ -568,7 +568,11 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 
 func assetToUnstructured(name string) (*unstructured.Unstructured, error) {
 	yamlDecoder := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
-	raw := bindata.MustAsset(name)
+	raw, err := deploy.SpokeManifestFiles.ReadFile(name)
+	if err != nil {
+		return nil, err
+	}
+
 	reader := json.YAMLFramer.NewFrameReader(ioutil.NopCloser(bytes.NewReader(raw)))
 	d := streaming.NewDecoder(reader, yamlDecoder)
 	obj, _, err := d.Decode(nil, nil)
@@ -585,7 +589,7 @@ func assetToUnstructured(name string) (*unstructured.Unstructured, error) {
 }
 
 func claimCrd() (*unstructured.Unstructured, error) {
-	crd, err := assetToUnstructured("deploy/spoke/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml")
+	crd, err := assetToUnstructured("spoke/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml")
 	if err != nil {
 		return nil, err
 	}
@@ -593,7 +597,7 @@ func claimCrd() (*unstructured.Unstructured, error) {
 }
 
 func spokeCR(suffix string) (*unstructured.Unstructured, error) {
-	cr, err := assetToUnstructured("deploy/spoke/clusterrole.yaml")
+	cr, err := assetToUnstructured("spoke/clusterrole.yaml")
 	if err != nil {
 		return nil, err
 	}
@@ -604,7 +608,7 @@ func spokeCR(suffix string) (*unstructured.Unstructured, error) {
 }
 
 func spokeCRB(nsName, suffix string) (*unstructured.Unstructured, error) {
-	crb, err := assetToUnstructured("deploy/spoke/clusterrole_binding.yaml")
+	crb, err := assetToUnstructured("spoke/clusterrole_binding.yaml")
 	if err != nil {
 		return nil, err
 	}
@@ -648,7 +652,7 @@ func spokeCRB(nsName, suffix string) (*unstructured.Unstructured, error) {
 }
 
 func spokeRole(nsName, suffix string) (*unstructured.Unstructured, error) {
-	r, err := assetToUnstructured("deploy/spoke/role.yaml")
+	r, err := assetToUnstructured("spoke/role.yaml")
 	if err != nil {
 		return nil, err
 	}
@@ -660,7 +664,7 @@ func spokeRole(nsName, suffix string) (*unstructured.Unstructured, error) {
 }
 
 func spokeRoleBinding(nsName, suffix string) (*unstructured.Unstructured, error) {
-	rb, err := assetToUnstructured("deploy/spoke/role_binding.yaml")
+	rb, err := assetToUnstructured("spoke/role_binding.yaml")
 	if err != nil {
 		return nil, err
 	}
@@ -705,7 +709,7 @@ func spokeRoleBinding(nsName, suffix string) (*unstructured.Unstructured, error)
 }
 
 func spokeDeployment(nsName, clusterName, image string) (*unstructured.Unstructured, error) {
-	deployment, err := assetToUnstructured("deploy/spoke/deployment.yaml")
+	deployment, err := assetToUnstructured("spoke/deployment.yaml")
 	if err != nil {
 		return nil, err
 	}

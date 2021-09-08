@@ -2,15 +2,14 @@ package helpers
 
 import (
 	"context"
+	"embed"
 	"fmt"
 	"net/url"
-	"path/filepath"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	"open-cluster-management.io/registration/pkg/hub/managedcluster/bindata"
 
 	"github.com/openshift/api"
 	"github.com/openshift/library-go/pkg/assets"
@@ -307,13 +306,18 @@ func CleanUpGroupFromRoleBindings(
 	return nil
 }
 
-func ManagedClusterAssetFn(manifestDir, managedClusterName string) resourceapply.AssetFunc {
+func ManagedClusterAssetFn(fs embed.FS, managedClusterName string) resourceapply.AssetFunc {
 	return func(name string) ([]byte, error) {
 		config := struct {
 			ManagedClusterName string
 		}{
 			ManagedClusterName: managedClusterName,
 		}
-		return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join(manifestDir, name)), config).Data, nil
+
+		template, err := fs.ReadFile(name)
+		if err != nil {
+			return nil, err
+		}
+		return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
 	}
 }
