@@ -139,40 +139,52 @@ type UpdateManifestWorkStatusFunc func(status *workapiv1.ManifestWorkStatus) err
 func UpdateManifestWorkStatus(
 	ctx context.Context,
 	client workv1client.ManifestWorkInterface,
-	workName string,
+	manifestWork *workapiv1.ManifestWork,
 	updateFuncs ...UpdateManifestWorkStatusFunc) (*workapiv1.ManifestWorkStatus, bool, error) {
-	updated := false
-	var updatedWorkStatus *workapiv1.ManifestWorkStatus
-	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		manifestWork, err := client.Get(ctx, workName, metav1.GetOptions{})
+	// in order to reduce the number of GET requests to hub apiserver, try to update the manifestwork
+	// fetched from informer cache (with lister).
+	updatedWorkStatus, updated, err := updateManifestWorkStatus(ctx, client, manifestWork, updateFuncs...)
+	if err == nil {
+		return updatedWorkStatus, updated, nil
+	}
+
+	// if the update failed, retry with the manifestwork resource fetched with work client.
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		manifestWork, err := client.Get(ctx, manifestWork.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		oldStatus := &manifestWork.Status
-
-		newStatus := oldStatus.DeepCopy()
-		for _, update := range updateFuncs {
-			if err := update(newStatus); err != nil {
-				return err
-			}
-		}
-		if equality.Semantic.DeepEqual(oldStatus, newStatus) {
-			// We return the newStatus which is a deep copy of oldStatus but with all update funcs applied.
-			updatedWorkStatus = newStatus
-			return nil
-		}
-
-		manifestWork.Status = *newStatus
-		updatedManifestWork, err := client.UpdateStatus(ctx, manifestWork, metav1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
-		updatedWorkStatus = &updatedManifestWork.Status
-		updated = err == nil
+		updatedWorkStatus, updated, err = updateManifestWorkStatus(ctx, client, manifestWork, updateFuncs...)
 		return err
 	})
 
 	return updatedWorkStatus, updated, err
+}
+
+// updateManifestWorkStatus updates the status of the given manifestWork. The manifestWork is mutated.
+func updateManifestWorkStatus(
+	ctx context.Context,
+	client workv1client.ManifestWorkInterface,
+	manifestWork *workapiv1.ManifestWork,
+	updateFuncs ...UpdateManifestWorkStatusFunc) (*workapiv1.ManifestWorkStatus, bool, error) {
+	oldStatus := &manifestWork.Status
+	newStatus := oldStatus.DeepCopy()
+	for _, update := range updateFuncs {
+		if err := update(newStatus); err != nil {
+			return nil, false, err
+		}
+	}
+	if equality.Semantic.DeepEqual(oldStatus, newStatus) {
+		// We return the newStatus which is a deep copy of oldStatus but with all update funcs applied.
+		return newStatus, false, nil
+	}
+
+	manifestWork.Status = *newStatus
+	updatedManifestWork, err := client.UpdateStatus(ctx, manifestWork, metav1.UpdateOptions{})
+	if err != nil {
+		return nil, false, err
+	}
+	return &updatedManifestWork.Status, true, nil
 }
 
 // DeleteAppliedResources deletes all given applied resources and returns those pending for finalization
@@ -314,6 +326,7 @@ func AppliedManifestworkQueueKeyFunc(hubhash string) factory.ObjectQueueKeyFunc 
 		if !strings.HasPrefix(accessor.GetName(), hubhash) {
 			return ""
 		}
+
 		return strings.TrimPrefix(accessor.GetName(), hubhash+"-")
 	}
 }

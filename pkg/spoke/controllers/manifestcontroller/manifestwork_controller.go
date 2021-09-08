@@ -188,7 +188,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 
 	// Update work status
 	_, _, err = helper.UpdateManifestWorkStatus(
-		ctx, m.manifestWorkClient, manifestWork.Name, m.generateUpdateStatusFunc(manifestWork.Generation, newManifestConditions))
+		ctx, m.manifestWorkClient, manifestWork, m.generateUpdateStatusFunc(manifestWork.Generation, newManifestConditions))
 	if err != nil {
 		errs = append(errs, fmt.Errorf("Failed to update work status with err %w", err))
 	}
