@@ -131,17 +131,18 @@ func TestUpdateStatusCondition(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			fakeWorkClient := fakeworkclient.NewSimpleClientset(&workapiv1.ManifestWork{
+			manifestWork := &workapiv1.ManifestWork{
 				ObjectMeta: metav1.ObjectMeta{Name: "work1", Namespace: "cluster1"},
 				Status: workapiv1.ManifestWorkStatus{
 					Conditions: c.startingConditions,
 				},
-			})
+			}
+			fakeWorkClient := fakeworkclient.NewSimpleClientset(manifestWork)
 
 			status, updated, err := UpdateManifestWorkStatus(
 				context.TODO(),
 				fakeWorkClient.WorkV1().ManifestWorks("cluster1"),
-				"work1",
+				manifestWork,
 				updateSpokeClusterConditionFn(c.newCondition),
 			)
 			if err != nil {
