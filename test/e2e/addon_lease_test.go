@@ -672,7 +672,7 @@ func createManagedCluster(clusterName, suffix string) (*clusterv1.ManagedCluster
 }
 
 func spokeDeploymentWithAddonManagement(nsName, clusterName, image string) (*unstructured.Unstructured, error) {
-	deployment, err := assetToUnstructured("deploy/spoke/deployment.yaml")
+	deployment, err := assetToUnstructured("spoke/deployment.yaml")
 	if err != nil {
 		return nil, err
 	}

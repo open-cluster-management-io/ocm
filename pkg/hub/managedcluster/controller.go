@@ -2,6 +2,7 @@ package managedcluster
 
 import (
 	"context"
+	"embed"
 	"fmt"
 
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
@@ -27,6 +28,9 @@ const (
 	manifestDir             = "pkg/hub/managedcluster"
 	managedClusterFinalizer = "cluster.open-cluster-management.io/api-resource-cleanup"
 )
+
+//go:embed manifests
+var manifestFiles embed.FS
 
 var staticFiles = []string{
 	"manifests/managedcluster-clusterrole.yaml",
@@ -140,7 +144,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	resourceResults := resourceapply.ApplyDirectly(
 		resourceapply.NewKubeClientHolder(c.kubeClient),
 		syncCtx.Recorder(),
-		helpers.ManagedClusterAssetFn(manifestDir, managedClusterName),
+		helpers.ManagedClusterAssetFn(manifestFiles, managedClusterName),
 		applyFiles...,
 	)
 	errs := []error{}
@@ -182,7 +186,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 func (c *managedClusterController) removeManagedClusterResources(ctx context.Context, managedClusterName string) error {
 	errs := []error{}
 	// Clean up managed cluster manifests
-	assetFn := helpers.ManagedClusterAssetFn(manifestDir, managedClusterName)
+	assetFn := helpers.ManagedClusterAssetFn(manifestFiles, managedClusterName)
 	if err := helpers.CleanUpManagedClusterManifests(ctx, c.kubeClient, c.eventRecorder, assetFn, staticFiles...); err != nil {
 		errs = append(errs, err)
 	}
