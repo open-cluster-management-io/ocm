@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"path/filepath"
 	"time"
 
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -28,8 +27,8 @@ import (
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/registration-operator/manifests"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
-	"open-cluster-management.io/registration-operator/pkg/operators/clustermanager/bindata"
 )
 
 var (
@@ -38,42 +37,42 @@ var (
 		"managedclusters.cluster.open-cluster-management.io",
 	}
 	staticResourceFiles = []string{
-		"manifests/cluster-manager/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml",
-		"manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml",
-		"manifests/cluster-manager/0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml",
-		"manifests/cluster-manager/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml",
-		"manifests/cluster-manager/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml",
-		"manifests/cluster-manager/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml",
-		"manifests/cluster-manager/0000_03_clusters.open-cluster-management.io_placements.crd.yaml",
-		"manifests/cluster-manager/0000_04_clusters.open-cluster-management.io_placementdecisions.crd.yaml",
-		"manifests/cluster-manager/cluster-manager-registration-clusterrole.yaml",
-		"manifests/cluster-manager/cluster-manager-registration-clusterrolebinding.yaml",
-		"manifests/cluster-manager/cluster-manager-namespace.yaml",
-		"manifests/cluster-manager/cluster-manager-registration-serviceaccount.yaml",
-		"manifests/cluster-manager/cluster-manager-registration-webhook-clusterrole.yaml",
-		"manifests/cluster-manager/cluster-manager-registration-webhook-clusterrolebinding.yaml",
-		"manifests/cluster-manager/cluster-manager-registration-webhook-service.yaml",
-		"manifests/cluster-manager/cluster-manager-registration-webhook-serviceaccount.yaml",
-		"manifests/cluster-manager/cluster-manager-registration-webhook-apiservice.yaml",
-		"manifests/cluster-manager/cluster-manager-registration-webhook-clustersetbinding-validatingconfiguration.yaml",
-		"manifests/cluster-manager/cluster-manager-registration-webhook-validatingconfiguration.yaml",
-		"manifests/cluster-manager/cluster-manager-registration-webhook-mutatingconfiguration.yaml",
-		"manifests/cluster-manager/cluster-manager-work-webhook-clusterrole.yaml",
-		"manifests/cluster-manager/cluster-manager-work-webhook-clusterrolebinding.yaml",
-		"manifests/cluster-manager/cluster-manager-work-webhook-service.yaml",
-		"manifests/cluster-manager/cluster-manager-work-webhook-serviceaccount.yaml",
-		"manifests/cluster-manager/cluster-manager-work-webhook-apiservice.yaml",
-		"manifests/cluster-manager/cluster-manager-work-webhook-validatingconfiguration.yaml",
-		"manifests/cluster-manager/cluster-manager-placement-clusterrole.yaml",
-		"manifests/cluster-manager/cluster-manager-placement-clusterrolebinding.yaml",
-		"manifests/cluster-manager/cluster-manager-placement-serviceaccount.yaml",
+		"cluster-manager/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml",
+		"cluster-manager/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml",
+		"cluster-manager/0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml",
+		"cluster-manager/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml",
+		"cluster-manager/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml",
+		"cluster-manager/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml",
+		"cluster-manager/0000_03_clusters.open-cluster-management.io_placements.crd.yaml",
+		"cluster-manager/0000_04_clusters.open-cluster-management.io_placementdecisions.crd.yaml",
+		"cluster-manager/cluster-manager-registration-clusterrole.yaml",
+		"cluster-manager/cluster-manager-registration-clusterrolebinding.yaml",
+		"cluster-manager/cluster-manager-namespace.yaml",
+		"cluster-manager/cluster-manager-registration-serviceaccount.yaml",
+		"cluster-manager/cluster-manager-registration-webhook-clusterrole.yaml",
+		"cluster-manager/cluster-manager-registration-webhook-clusterrolebinding.yaml",
+		"cluster-manager/cluster-manager-registration-webhook-service.yaml",
+		"cluster-manager/cluster-manager-registration-webhook-serviceaccount.yaml",
+		"cluster-manager/cluster-manager-registration-webhook-apiservice.yaml",
+		"cluster-manager/cluster-manager-registration-webhook-clustersetbinding-validatingconfiguration.yaml",
+		"cluster-manager/cluster-manager-registration-webhook-validatingconfiguration.yaml",
+		"cluster-manager/cluster-manager-registration-webhook-mutatingconfiguration.yaml",
+		"cluster-manager/cluster-manager-work-webhook-clusterrole.yaml",
+		"cluster-manager/cluster-manager-work-webhook-clusterrolebinding.yaml",
+		"cluster-manager/cluster-manager-work-webhook-service.yaml",
+		"cluster-manager/cluster-manager-work-webhook-serviceaccount.yaml",
+		"cluster-manager/cluster-manager-work-webhook-apiservice.yaml",
+		"cluster-manager/cluster-manager-work-webhook-validatingconfiguration.yaml",
+		"cluster-manager/cluster-manager-placement-clusterrole.yaml",
+		"cluster-manager/cluster-manager-placement-clusterrolebinding.yaml",
+		"cluster-manager/cluster-manager-placement-serviceaccount.yaml",
 	}
 
 	deploymentFiles = []string{
-		"manifests/cluster-manager/cluster-manager-registration-deployment.yaml",
-		"manifests/cluster-manager/cluster-manager-registration-webhook-deployment.yaml",
-		"manifests/cluster-manager/cluster-manager-work-webhook-deployment.yaml",
-		"manifests/cluster-manager/cluster-manager-placement-deployment.yaml",
+		"cluster-manager/cluster-manager-registration-deployment.yaml",
+		"cluster-manager/cluster-manager-registration-webhook-deployment.yaml",
+		"cluster-manager/cluster-manager-work-webhook-deployment.yaml",
+		"cluster-manager/cluster-manager-placement-deployment.yaml",
 	}
 )
 
@@ -218,7 +217,11 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		n.apiRegistrationClient,
 		controllerContext.Recorder(),
 		func(name string) ([]byte, error) {
-			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
+			template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
+			if err != nil {
+				return nil, err
+			}
+			return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
 		},
 		staticResourceFiles...,
 	)
@@ -237,7 +240,11 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 			clusterManager.Status.Generations,
 			clusterManager.Spec.NodePlacement,
 			func(name string) ([]byte, error) {
-				return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
+				template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
+				if err != nil {
+					return nil, err
+				}
+				return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
 			},
 			controllerContext.Recorder(),
 			file)
@@ -343,7 +350,11 @@ func (n *clusterManagerController) cleanUp(
 			n.apiExtensionClient,
 			n.apiRegistrationClient,
 			func(name string) ([]byte, error) {
-				return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
+				template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
+				if err != nil {
+					return nil, err
+				}
+				return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
 			},
 			file,
 		)

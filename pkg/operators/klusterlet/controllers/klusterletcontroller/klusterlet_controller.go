@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"path/filepath"
 	"reflect"
 	"strings"
 
@@ -32,9 +31,8 @@ import (
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/registration-operator/manifests"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
-	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/bindata"
-	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/kube111bindata"
 )
 
 const (
@@ -48,30 +46,30 @@ const (
 
 var (
 	crdV1StaticFiles = []string{
-		"manifests/klusterlet/0000_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml",
-		"manifests/klusterlet/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml",
+		"klusterlet/0000_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml",
+		"klusterlet/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml",
 	}
 
 	crdV1beta1StaticFiles = []string{
-		"manifests/klusterlet/0001_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml",
-		"manifests/klusterlet/0001_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml",
+		"klusterlet/0001_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml",
+		"klusterlet/0001_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml",
 	}
 
 	staticResourceFiles = []string{
-		"manifests/klusterlet/klusterlet-registration-serviceaccount.yaml",
-		"manifests/klusterlet/klusterlet-registration-clusterrole.yaml",
-		"manifests/klusterlet/klusterlet-registration-clusterrolebinding.yaml",
-		"manifests/klusterlet/klusterlet-registration-role.yaml",
-		"manifests/klusterlet/klusterlet-registration-rolebinding.yaml",
-		"manifests/klusterlet/klusterlet-work-serviceaccount.yaml",
-		"manifests/klusterlet/klusterlet-work-clusterrole.yaml",
-		"manifests/klusterlet/klusterlet-work-clusterrolebinding.yaml",
-		"manifests/klusterlet/klusterlet-work-clusterrolebinding-addition.yaml",
+		"klusterlet/klusterlet-registration-serviceaccount.yaml",
+		"klusterlet/klusterlet-registration-clusterrole.yaml",
+		"klusterlet/klusterlet-registration-clusterrolebinding.yaml",
+		"klusterlet/klusterlet-registration-role.yaml",
+		"klusterlet/klusterlet-registration-rolebinding.yaml",
+		"klusterlet/klusterlet-work-serviceaccount.yaml",
+		"klusterlet/klusterlet-work-clusterrole.yaml",
+		"klusterlet/klusterlet-work-clusterrolebinding.yaml",
+		"klusterlet/klusterlet-work-clusterrolebinding-addition.yaml",
 	}
 
 	kube111StaticResourceFiles = []string{
-		"manifests/klusterletkube111/klusterlet-registration-operator-clusterrolebinding.yaml",
-		"manifests/klusterletkube111/klusterlet-work-clusterrolebinding.yaml",
+		"klusterletkube111/klusterlet-registration-operator-clusterrolebinding.yaml",
+		"klusterletkube111/klusterlet-work-clusterrolebinding.yaml",
 	}
 )
 
@@ -240,7 +238,11 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			resourceapply.NewKubeClientHolder(n.kubeClient),
 			controllerContext.Recorder(),
 			func(name string) ([]byte, error) {
-				return assets.MustCreateAssetFromTemplate(name, kube111bindata.MustAsset(filepath.Join("", name)), config).Data, nil
+				template, err := manifests.Klusterlet111ManifestFiles.ReadFile(name)
+				if err != nil {
+					return nil, err
+				}
+				return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
 			},
 			kube111StaticResourceFiles...,
 		)
@@ -264,7 +266,11 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		resourceapply.NewKubeClientHolder(n.kubeClient).WithAPIExtensionsClient(n.apiExtensionClient),
 		controllerContext.Recorder(),
 		func(name string) ([]byte, error) {
-			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
+			template, err := manifests.KlusterletManifestFiles.ReadFile(name)
+			if err != nil {
+				return nil, err
+			}
+			return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
 		},
 		appliedStaticFiles...,
 	)
@@ -318,10 +324,14 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		klusterlet.Status.Generations,
 		klusterlet.Spec.NodePlacement,
 		func(name string) ([]byte, error) {
-			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
+			template, err := manifests.KlusterletManifestFiles.ReadFile(name)
+			if err != nil {
+				return nil, err
+			}
+			return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
 		},
 		controllerContext.Recorder(),
-		"manifests/klusterlet/klusterlet-registration-deployment.yaml")
+		"klusterlet/klusterlet-registration-deployment.yaml")
 	if err != nil {
 		_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
 			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
@@ -344,10 +354,14 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		klusterlet.Status.Generations,
 		klusterlet.Spec.NodePlacement,
 		func(name string) ([]byte, error) {
-			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
+			template, err := manifests.KlusterletManifestFiles.ReadFile(name)
+			if err != nil {
+				return nil, err
+			}
+			return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
 		},
 		controllerContext.Recorder(),
-		"manifests/klusterlet/klusterlet-work-deployment.yaml")
+		"klusterlet/klusterlet-work-deployment.yaml")
 	if err != nil {
 		_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
 			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
@@ -414,7 +428,11 @@ func (n *klusterletController) cleanUp(ctx context.Context, controllerContext fa
 			n.apiExtensionClient,
 			nil,
 			func(name string) ([]byte, error) {
-				return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
+				template, err := manifests.KlusterletManifestFiles.ReadFile(name)
+				if err != nil {
+					return nil, err
+				}
+				return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
 			},
 			file,
 		)
@@ -434,7 +452,11 @@ func (n *klusterletController) cleanUp(ctx context.Context, controllerContext fa
 				nil,
 				nil,
 				func(name string) ([]byte, error) {
-					return assets.MustCreateAssetFromTemplate(name, kube111bindata.MustAsset(filepath.Join("", name)), config).Data, nil
+					template, err := manifests.Klusterlet111ManifestFiles.ReadFile(name)
+					if err != nil {
+						return nil, err
+					}
+					return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
 				},
 				file,
 			)
@@ -472,7 +494,11 @@ func (n *klusterletController) cleanUp(ctx context.Context, controllerContext fa
 			n.apiExtensionClient,
 			nil,
 			func(name string) ([]byte, error) {
-				return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
+				template, err := manifests.KlusterletManifestFiles.ReadFile(name)
+				if err != nil {
+					return nil, err
+				}
+				return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
 			},
 			file,
 		)
