@@ -128,25 +128,30 @@ func (c *managedClusterJoiningController) getClusterResources() (capacity, alloc
 		return nil, nil, err
 	}
 
-	cpuCapacity := *resource.NewQuantity(int64(0), resource.DecimalSI)
-	memoryCapacity := *resource.NewQuantity(int64(0), resource.BinarySI)
-	cpuAllocatable := *resource.NewQuantity(int64(0), resource.DecimalSI)
-	memoryAllocatable := *resource.NewQuantity(int64(0), resource.BinarySI)
+	capacityList := make(map[clusterv1.ResourceName]resource.Quantity)
+	allocatableList := make(map[clusterv1.ResourceName]resource.Quantity)
+
 	for _, node := range nodes {
-		cpuCapacity.Add(*node.Status.Capacity.Cpu())
-		memoryCapacity.Add(*node.Status.Capacity.Memory())
-		cpuAllocatable.Add(*node.Status.Allocatable.Cpu())
-		memoryAllocatable.Add(*node.Status.Allocatable.Memory())
+		for key, value := range node.Status.Capacity {
+			if capacity, exist := capacityList[clusterv1.ResourceName(key)]; exist {
+				capacity.Add(value)
+				capacityList[clusterv1.ResourceName(key)] = capacity
+			} else {
+				capacityList[clusterv1.ResourceName(key)] = value
+			}
+		}
+
+		for key, value := range node.Status.Allocatable {
+			if allocatable, exist := allocatableList[clusterv1.ResourceName(key)]; exist {
+				allocatable.Add(value)
+				allocatableList[clusterv1.ResourceName(key)] = allocatable
+			} else {
+				allocatableList[clusterv1.ResourceName(key)] = value
+			}
+		}
 	}
 
-	return clusterv1.ResourceList{
-			clusterv1.ResourceCPU:    cpuCapacity,
-			clusterv1.ResourceMemory: formatQuantityToMi(memoryCapacity),
-		},
-		clusterv1.ResourceList{
-			clusterv1.ResourceCPU:    cpuAllocatable,
-			clusterv1.ResourceMemory: formatQuantityToMi(memoryAllocatable),
-		}, nil
+	return capacityList, allocatableList, nil
 }
 
 func formatQuantityToMi(q resource.Quantity) resource.Quantity {
