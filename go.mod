@@ -6,7 +6,6 @@ replace github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1 //
 
 require (
 	github.com/davecgh/go-spew v1.1.1
-	github.com/go-bindata/go-bindata v3.1.2+incompatible
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/openshift/api v0.0.0-20210331193751-3acddb19d360
@@ -21,6 +20,6 @@ require (
 	k8s.io/component-base v0.21.0-rc.0
 	k8s.io/klog/v2 v2.8.0
 	k8s.io/kube-aggregator v0.21.0-rc.0
-	open-cluster-management.io/api v0.0.0-20210907134339-b1a83afc26a3
+	open-cluster-management.io/api v0.0.0-20210908005819-815ac23c7308
 	sigs.k8s.io/controller-runtime v0.6.1-0.20200829232221-efc74d056b24
 )

@@ -12,7 +12,17 @@ spec:
   scope: Namespaced
   preserveUnknownFields: false
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="PlacementSatisfied")].status
+      name: Succeeded
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="PlacementSatisfied")].reason
+      name: Reason
+      type: string
+    - jsonPath: .status.numberOfSelectedClusters
+      name: SelectedClusters
+      type: integer
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: "Placement defines a rule to select a set of ManagedClusters
@@ -182,6 +192,57 @@ spec:
                               type: object
                               additionalProperties:
                                 type: string
+              prioritizerPolicy:
+                description: PrioritizerPolicy defines the policy of the prioritizers.
+                  If this field is unset, then default prioritizer mode and configurations
+                  are used. Referring to PrioritizerPolicy to see more description
+                  about Mode and Configurations.
+                type: object
+                properties:
+                  configurations:
+                    type: array
+                    items:
+                      description: PrioritizerConfig represents the configuration
+                        of prioritizer
+                      type: object
+                      required:
+                      - name
+                      properties:
+                        name:
+                          description: 'Name is the name of a prioritizer. Below are
+                            the valid names: 1) Balance: balance the decisions among
+                            the clusters. 2) Steady: ensure the existing decision
+                            is stabilized. 3) ResourceRatioCPU & ResourceRatioMemory:
+                            sort clusters based on the allocatable to capacity ratio.
+                            4) ResourceAllocatableCPU & ResourceAllocatableMemory:
+                            sort clusters based on the allocatable.'
+                          type: string
+                        weight:
+                          description: Weight defines the weight of prioritizer. The
+                            value must be ranged in [0,10]. Each prioritizer will
+                            calculate an integer score of a cluster in the range of
+                            [-100, 100]. The final score of a cluster will be sum(weight
+                            * prioritizer_score). A higher weight indicates that the
+                            prioritizer weights more in the cluster selection, while
+                            0 weight indicate thats the prioritizer is disabled.
+                          type: integer
+                          format: int32
+                          default: 1
+                          maximum: 10
+                          minimum: 0
+                  mode:
+                    description: Mode is either Exact, Additive, "" where "" is Additive
+                      by default. In Additive mode, any prioritizer not explicitly
+                      enumerated is enabled in its default Configurations, in which
+                      Steady and Balance prioritizers have the weight of 1 while other
+                      prioritizers have the weight of 0. Additive doesn't require
+                      configuring all prioritizers. The default Configurations may
+                      change in the future, and additional prioritization will happen.
+                      In Exact mode, any prioritizer not explicitly enumerated is
+                      weighted as zero. Exact requires knowing the full set of prioritizers
+                      you want, but avoids behavior changes between releases.
+                    type: string
+                    default: Additive
           status:
             description: Status represents the current status of the Placement
             type: object
@@ -262,16 +323,6 @@ spec:
                   ManagedClusters
                 type: integer
                 format: int32
-    additionalPrinterColumns:
-    - name: Succeeded
-      type: string
-      jsonPath: ".status.conditions[?(@.type==\"PlacementSatisfied\")].status"
-    - name: Reason
-      type: string
-      jsonPath: ".status.conditions[?(@.type==\"PlacementSatisfied\")].reason"
-    - name: SelectedClusters
-      type: integer
-      jsonPath: ".status.numberOfSelectedClusters"
     served: true
     storage: true
     subresources:

@@ -8,7 +8,6 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
 	targets/openshift/deps.mk \
 	targets/openshift/images.mk \
-	targets/openshift/bindata.mk \
 	lib/tmp.mk\
 )
 
@@ -62,14 +61,10 @@ ifeq ($(GOHOSTOS),darwin)
 	endif
 endif
 
-$(call add-bindata,cluster-manager,./manifests/cluster-manager/...,bindata,bindata,./pkg/operators/clustermanager/bindata/bindata.go)
-$(call add-bindata,klusterlet,./manifests/klusterlet/...,bindata,bindata,./pkg/operators/klusterlet/bindata/bindata.go)
-$(call add-bindata,klusterletkube111,./manifests/klusterletkube111/...,kube111bindata,kube111bindata,./pkg/operators/klusterlet/kube111bindata/bindata.go)
-
 copy-crd:
 	bash -x hack/copy-crds.sh
 
-update-all: copy-crd update-bindata-cluster-manager update-bindata-klusterlet update-bindata-klusterletkube111 update-csv
+update: copy-crd
 
 verify-crds:
 	bash -x hack/verify-crds.sh
