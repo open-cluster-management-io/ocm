@@ -14,6 +14,7 @@ import (
 	"open-cluster-management.io/placement/pkg/plugins"
 	"open-cluster-management.io/placement/pkg/plugins/balance"
 	"open-cluster-management.io/placement/pkg/plugins/predicate"
+	"open-cluster-management.io/placement/pkg/plugins/resource"
 	"open-cluster-management.io/placement/pkg/plugins/steady"
 )
 
@@ -120,6 +121,10 @@ func NewPluginScheduler(handle plugins.Handle) *pluginScheduler {
 		prioritizers: []plugins.Prioritizer{
 			balance.New(handle),
 			steady.New(handle),
+			resource.NewResourcePrioritizerBuilder(handle).WithPrioritizerName("ResourceAllocatableCPU").Build(),
+			resource.NewResourcePrioritizerBuilder(handle).WithPrioritizerName("ResourceAllocatableMemory").Build(),
+			resource.NewResourcePrioritizerBuilder(handle).WithPrioritizerName("ResourceRatioCPU").Build(),
+			resource.NewResourcePrioritizerBuilder(handle).WithPrioritizerName("ResourceRatioMemory").Build(),
 		},
 		prioritizerWeights: defaultPrioritizerConfig,
 	}

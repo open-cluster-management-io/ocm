@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -92,6 +93,14 @@ func (b *placementBuilder) WithSatisfiedCondition(numbOfScheduledDecisions, numb
 		condition.Message = fmt.Sprintf("%d cluster decisions unscheduled", numbOfUnscheduledDecisions)
 	}
 	meta.SetStatusCondition(&b.placement.Status.Conditions, condition)
+	return b
+}
+
+func (b *placementBuilder) WithPrioritizerConfigs(name string, weight int32) *placementBuilder {
+	if b.placement.Spec.PrioritizerPolicy.Configurations == nil {
+		b.placement.Spec.PrioritizerPolicy.Configurations = []clusterapiv1alpha1.PrioritizerConfig{}
+	}
+	b.placement.Spec.PrioritizerPolicy.Configurations = append(b.placement.Spec.PrioritizerPolicy.Configurations, clusterapiv1alpha1.PrioritizerConfig{Name: name, Weight: weight})
 	return b
 }
 
@@ -206,6 +215,19 @@ func (b *managedClusterBuilder) WithClaim(name, value string) *managedClusterBui
 	}
 
 	b.cluster.Status.ClusterClaims = clusterClaims
+	return b
+}
+
+func (b *managedClusterBuilder) WithResource(resourceName clusterapiv1.ResourceName, allocatable, capacity string) *managedClusterBuilder {
+	if b.cluster.Status.Allocatable == nil {
+		b.cluster.Status.Allocatable = make(map[clusterapiv1.ResourceName]resource.Quantity)
+	}
+	if b.cluster.Status.Capacity == nil {
+		b.cluster.Status.Capacity = make(map[clusterapiv1.ResourceName]resource.Quantity)
+	}
+
+	b.cluster.Status.Allocatable[resourceName], _ = resource.ParseQuantity(allocatable)
+	b.cluster.Status.Capacity[resourceName], _ = resource.ParseQuantity(capacity)
 	return b
 }
 
