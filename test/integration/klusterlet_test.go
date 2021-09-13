@@ -168,6 +168,15 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
+			// Check addon namespace
+			addonNamespace := fmt.Sprintf("%s-addon", klusterletNamespace)
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.CoreV1().Namespaces().Get(context.Background(), addonNamespace, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "Applied", "KlusterletApplied", metav1.ConditionTrue)
 		})
 
