@@ -277,8 +277,8 @@ func TestSyncDeploy(t *testing.T) {
 	}
 
 	// Check if resources are created as expected
-	if len(createObjects) != 11 {
-		t.Errorf("Expect 11 objects created in the sync loop, actual %d", len(createObjects))
+	if len(createObjects) != 12 {
+		t.Errorf("Expect 12 objects created in the sync loop, actual %d", len(createObjects))
 	}
 	for _, object := range createObjects {
 		ensureObject(t, object, klusterlet)
@@ -338,8 +338,8 @@ func TestSyncDelete(t *testing.T) {
 		}
 	}
 
-	if len(deleteActions) != 13 {
-		t.Errorf("Expected 13 delete actions, but got %d", len(deleteActions))
+	if len(deleteActions) != 14 {
+		t.Errorf("Expected 14 delete actions, but got %d", len(deleteActions))
 	}
 
 	deleteCRDActions := []clienttesting.DeleteActionImpl{}
@@ -551,8 +551,8 @@ func TestDeployOnKube111(t *testing.T) {
 	}
 
 	// Check if resources are created as expected
-	if len(createObjects) != 13 {
-		t.Errorf("Expect 13 objects created in the sync loop, actual %d", len(createObjects))
+	if len(createObjects) != 14 {
+		t.Errorf("Expect 14 objects created in the sync loop, actual %d", len(createObjects))
 	}
 	for _, object := range createObjects {
 		ensureObject(t, object, klusterlet)
@@ -588,8 +588,8 @@ func TestDeployOnKube111(t *testing.T) {
 		}
 	}
 
-	if len(deleteActions) != 15 {
-		t.Errorf("Expected 15 delete actions, but got %d", len(kubeActions))
+	if len(deleteActions) != 16 {
+		t.Errorf("Expected 16 delete actions, but got %d", len(kubeActions))
 	}
 }
 

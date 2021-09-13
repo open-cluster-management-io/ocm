@@ -183,43 +183,30 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 
 	// Start deploy klusterlet components
-	// Check if namespace exists
-	_, err = n.kubeClient.CoreV1().Namespaces().Get(ctx, config.KlusterletNamespace, metav1.GetOptions{})
-	switch {
-	case errors.IsNotFound(err):
-		_, createErr := n.kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: config.KlusterletNamespace,
-				Annotations: map[string]string{
-					"workload.openshift.io/allowed": "management",
-				},
-			},
-		}, metav1.CreateOptions{})
-		if createErr != nil {
-			_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
-				Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
-				Message: fmt.Sprintf("Failed to create namespace %q: %v", config.KlusterletNamespace, createErr),
-			}))
-			return createErr
+	// Ensure the existence namespaces for klusterlet and klusterlet addon
+	// Sync pull secret to each namespace
+	namespaces := []string{config.KlusterletNamespace, fmt.Sprintf("%s-addon", config.KlusterletNamespace)}
+	for _, namespace := range namespaces {
+		err := n.ensureNamespace(ctx, klusterlet.Name, namespace)
+		if err != nil {
+			return err
 		}
-	case err != nil:
-		_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
-			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
-			Message: fmt.Sprintf("Failed to get namespace %q: %v", config.KlusterletNamespace, err),
-		}))
-		return err
-	}
 
-	// Sync pull secret
-	_, _, err = resourceapply.SyncSecret(
-		n.kubeClient.CoreV1(),
-		controllerContext.Recorder(),
-		n.operatorNamespace,
-		imagePullSecret,
-		config.KlusterletNamespace,
-		imagePullSecret,
-		[]metav1.OwnerReference{},
-	)
+		// Sync pull secret
+		_, _, err = resourceapply.SyncSecret(
+			n.kubeClient.CoreV1(),
+			controllerContext.Recorder(),
+			n.operatorNamespace,
+			imagePullSecret,
+			namespace,
+			imagePullSecret,
+			[]metav1.OwnerReference{},
+		)
+
+		if err != nil {
+			return err
+		}
+	}
 
 	if err != nil {
 		_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
@@ -385,6 +372,36 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	return nil
 }
 
+func (n *klusterletController) ensureNamespace(ctx context.Context, klusterletName, namespace string) error {
+	_, err := n.kubeClient.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+	switch {
+	case errors.IsNotFound(err):
+		_, createErr := n.kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespace,
+				Annotations: map[string]string{
+					"workload.openshift.io/allowed": "management",
+				},
+			},
+		}, metav1.CreateOptions{})
+		if createErr != nil {
+			_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
+				Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
+				Message: fmt.Sprintf("Failed to create namespace %q: %v", namespace, createErr),
+			}))
+			return createErr
+		}
+	case err != nil:
+		_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
+			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
+			Message: fmt.Sprintf("Failed to get namespace %q: %v", namespace, err),
+		}))
+		return err
+	}
+
+	return nil
+}
+
 func (n *klusterletController) cleanUp(ctx context.Context, controllerContext factory.SyncContext, config klusterletConfig) error {
 	// Remove deployment
 	registrationDeployment := fmt.Sprintf("%s-registration-agent", config.KlusterletName)
@@ -466,10 +483,13 @@ func (n *klusterletController) cleanUp(ctx context.Context, controllerContext fa
 		}
 	}
 
-	// remove the klusterlet namespace
-	err = n.kubeClient.CoreV1().Namespaces().Delete(ctx, config.KlusterletNamespace, metav1.DeleteOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return err
+	// remove the klusterlet namespace and klusterlet addon namespace
+	namespaces := []string{config.KlusterletNamespace, fmt.Sprintf("%s-addon", config.KlusterletNamespace)}
+	for _, namespace := range namespaces {
+		err = n.kubeClient.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
 	}
 
 	// remove AppliedManifestWorks
