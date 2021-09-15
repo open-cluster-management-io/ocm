@@ -115,7 +115,7 @@ spec:
 EOF
 ```
 
-Check the 'PlacementDecision' created for this placement. It contains all selected clusters in status.
+Check the `PlacementDecision` created for this placement. It contains all selected clusters in status.
 
 ```txt
 kubectl get placementdecisions
