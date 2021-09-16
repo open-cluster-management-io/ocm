@@ -1075,7 +1075,7 @@ k8s.io/utils/net
 k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/trace
-# open-cluster-management.io/api v0.0.0-20210823013037-9667ae902e4b
+# open-cluster-management.io/api v0.0.0-20210916013819-2e58cdb938f9
 ## explicit
 open-cluster-management.io/api/client/work/clientset/versioned
 open-cluster-management.io/api/client/work/clientset/versioned/fake

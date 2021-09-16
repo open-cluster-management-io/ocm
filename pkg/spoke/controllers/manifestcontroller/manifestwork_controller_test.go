@@ -1,6 +1,8 @@
 package manifestcontroller
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -730,6 +732,147 @@ func TestManageOwner(t *testing.T) {
 			if !equality.Semantic.DeepEqual(owner, c.expectOwner) {
 				t.Errorf("Expect owner is %v, but got %v", c.expectOwner, owner)
 			}
+		})
+	}
+}
+
+func TestApplyUnstructred(t *testing.T) {
+	cases := []struct {
+		name            string
+		owner           metav1.OwnerReference
+		existingObject  []runtime.Object
+		required        *unstructured.Unstructured
+		gvr             schema.GroupVersionResource
+		validateActions func(t *testing.T, actions []clienttesting.Action)
+	}{
+		{
+			name:           "create a new object with owner",
+			existingObject: []runtime.Object{},
+			owner:          metav1.OwnerReference{Name: "test", UID: "testowner"},
+			required:       spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			gvr:            schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 2 {
+					t.Errorf("Expect 2 actions, but have %d", len(actions))
+				}
+
+				spoketesting.AssertAction(t, actions[0], "get")
+				spoketesting.AssertAction(t, actions[1], "create")
+
+				obj := actions[1].(clienttesting.CreateActionImpl).Object.(*unstructured.Unstructured)
+				owners := obj.GetOwnerReferences()
+				if len(owners) != 1 {
+					t.Errorf("Expect 2 owners, but have %d", len(owners))
+				}
+
+				if owners[0].UID != "testowner" {
+					t.Errorf("Owner UId is not correct, got %s", owners[0].UID)
+				}
+			},
+		},
+		{
+			name:           "create a new object without owner",
+			existingObject: []runtime.Object{},
+			owner:          metav1.OwnerReference{Name: "test", UID: "testowner-"},
+			required:       spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			gvr:            schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 2 {
+					t.Errorf("Expect 2 actions, but have %d", len(actions))
+				}
+
+				spoketesting.AssertAction(t, actions[0], "get")
+				spoketesting.AssertAction(t, actions[1], "create")
+
+				obj := actions[1].(clienttesting.CreateActionImpl).Object.(*unstructured.Unstructured)
+				owners := obj.GetOwnerReferences()
+				if len(owners) != 0 {
+					t.Errorf("Expect 1 owners, but have %d", len(owners))
+				}
+			},
+		},
+		{
+			name:           "update an object owner",
+			existingObject: []runtime.Object{spoketesting.NewUnstructured("v1", "Secret", "ns1", "test", metav1.OwnerReference{Name: "test1", UID: "testowner1"})},
+			owner:          metav1.OwnerReference{Name: "test", UID: "testowner"},
+			required:       spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			gvr:            schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 2 {
+					t.Errorf("Expect 2 actions, but have %d", len(actions))
+				}
+
+				spoketesting.AssertAction(t, actions[0], "get")
+				spoketesting.AssertAction(t, actions[1], "update")
+
+				obj := actions[1].(clienttesting.UpdateActionImpl).Object.(*unstructured.Unstructured)
+				owners := obj.GetOwnerReferences()
+				if len(owners) != 2 {
+					t.Errorf("Expect 2 owners, but have %d", len(owners))
+				}
+
+				if owners[0].UID != "testowner1" {
+					t.Errorf("Owner UId is not correct, got %s", owners[0].UID)
+				}
+				if owners[1].UID != "testowner" {
+					t.Errorf("Owner UId is not correct, got %s", owners[1].UID)
+				}
+			},
+		},
+		{
+			name:           "update an object without owner",
+			existingObject: []runtime.Object{spoketesting.NewUnstructured("v1", "Secret", "ns1", "test", metav1.OwnerReference{Name: "test1", UID: "testowner1"})},
+			owner:          metav1.OwnerReference{Name: "test", UID: "testowner-"},
+			required:       spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			gvr:            schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 1 {
+					t.Errorf("Expect 1 actions, but have %d", len(actions))
+				}
+
+				spoketesting.AssertAction(t, actions[0], "get")
+			},
+		},
+		{
+			name:           "remove an object owner",
+			existingObject: []runtime.Object{spoketesting.NewUnstructured("v1", "Secret", "ns1", "test", metav1.OwnerReference{Name: "test", UID: "testowner"})},
+			owner:          metav1.OwnerReference{Name: "test", UID: "testowner-"},
+			required:       spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			gvr:            schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 2 {
+					t.Errorf("Expect 2 actions, but have %d", len(actions))
+				}
+
+				spoketesting.AssertAction(t, actions[0], "get")
+				spoketesting.AssertAction(t, actions[1], "update")
+
+				obj := actions[1].(clienttesting.UpdateActionImpl).Object.(*unstructured.Unstructured)
+				owners := obj.GetOwnerReferences()
+				if len(owners) != 0 {
+					t.Errorf("Expect 0 owner, but have %d", len(owners))
+				}
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			work, workKey := spoketesting.NewManifestWork(0)
+			work.Finalizers = []string{controllers.ManifestWorkFinalizer}
+			controller := newController(work, nil, spoketesting.NewFakeRestMapper()).
+				withUnstructuredObject(c.existingObject...)
+			syncContext := spoketesting.NewFakeSyncContext(t, workKey)
+
+			data, _ := json.Marshal(c.required)
+			_, _, err := controller.controller.applyUnstructured(
+				context.TODO(), data, c.owner, c.gvr, syncContext.Recorder())
+
+			if err != nil {
+				t.Errorf("expect no error, but got %v", err)
+			}
+
+			c.validateActions(t, controller.dynamicClient.Actions())
 		})
 	}
 }
