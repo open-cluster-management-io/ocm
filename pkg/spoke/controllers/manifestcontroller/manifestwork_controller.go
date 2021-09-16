@@ -264,7 +264,7 @@ func (m *ManifestWorkController) applyOneManifest(
 	// TODO we should check the certain error.
 	// Use dynamic client when scheme cannot decode manifest or typed client cannot handle the object
 	if isDecodeError(result.Error) || isUnhandledError(result.Error) || isUnsupportedError(result.Error) {
-		result.Result, result.Changed, result.Error = m.applyUnstructured(ctx, manifest.Raw, owner, deleteOption, gvr, recorder)
+		result.Result, result.Changed, result.Error = m.applyUnstructured(ctx, manifest.Raw, owner, gvr, recorder)
 	}
 
 	return result
@@ -288,7 +288,6 @@ func (m *ManifestWorkController) applyUnstructured(
 	ctx context.Context,
 	data []byte,
 	owner metav1.OwnerReference,
-	deleteOption *workapiv1.DeleteOption,
 	gvr schema.GroupVersionResource,
 	recorder events.Recorder) (*unstructured.Unstructured, bool, error) {
 
@@ -296,6 +295,8 @@ func (m *ManifestWorkController) applyUnstructured(
 	if err != nil {
 		return nil, false, err
 	}
+
+	required.SetOwnerReferences([]metav1.OwnerReference{owner})
 
 	existing, err := m.spokeDynamicClient.
 		Resource(gvr).
@@ -314,15 +315,13 @@ func (m *ManifestWorkController) applyUnstructured(
 	}
 
 	// Merge OwnerRefs.
-	required.SetOwnerReferences([]metav1.OwnerReference{owner})
 	existingOwners := existing.GetOwnerReferences()
 	modified := resourcemerge.BoolPtr(false)
 
 	resourcemerge.MergeOwnerRefs(modified, &existingOwners, required.GetOwnerReferences())
 
-	if *modified {
-		required.SetOwnerReferences(existingOwners)
-	}
+	// Always overwrite required ownerrefs from existing, since ownerrefs of required has been merged to existing
+	required.SetOwnerReferences(existingOwners)
 
 	// Compare and update the unstrcuctured.
 	if isSameUnstructured(required, existing) {
