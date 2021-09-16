@@ -25,8 +25,17 @@ type AgentAddonOptions struct {
 
 	// Registration is the registration config for the addon
 	Registration *RegistrationOption
+
+	// InstallStrategy defines that addon should be created in which clusters.
+	// Addon will not be installed automatically in any cluster if InstallStrategy is nil.
+	InstallStrategy *InstallStrategy
 }
 
+// RegistrationOption defines how agent is registered to the hub cluster. It needs to define:
+// 1. csr with what subject/signer should be created
+// 2. how csr is approved
+// 3. the RBAC setting of agent on the hub
+// 4. how csr is signed if the customized signer is used.
 type RegistrationOption struct {
 	// CSRConfigurations returns a list of csr configuration for the adddon agent in a managed cluster.
 	// A csr will be created from the managed cluster for addon agent with each CSRConfiguration.
@@ -45,6 +54,15 @@ type RegistrationOption struct {
 	// CSRSign signs a csr and returns a certificate. It is used when the addon has its own customized signer.
 	// +optional
 	CSRSign func(csr *certificatesv1.CertificateSigningRequest) []byte
+}
+
+type StrategyType string
+
+const InstallAll StrategyType = "*"
+
+type InstallStrategy struct {
+	Type             StrategyType
+	InstallNamespace string
 }
 
 func KubeClientSignerConfigurations(addonName, agentName string) func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
@@ -72,6 +90,13 @@ func DefaultGroups(clusterName, addonName string) []string {
 		fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", clusterName, addonName),
 		fmt.Sprintf("system:open-cluster-management:addon:%s", addonName),
 		"system:authenticated",
+	}
+}
+
+func InstallAllStrategy(installNamespace string) *InstallStrategy {
+	return &InstallStrategy{
+		Type:             InstallAll,
+		InstallNamespace: installNamespace,
 	}
 }
 
