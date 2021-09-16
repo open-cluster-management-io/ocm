@@ -17,7 +17,7 @@ rules:
 # Allow hub to record events
 - apiGroups: ["", "events.k8s.io"]
   resources: ["events"]
-  verbs: ["get", "create", "delete", "update"]
+  verbs: ["get", "create", "delete", "update", "patch"]
 # Allow hub to manage clusterrole/clusterrolebinding/role/rolebinding
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterroles", "clusterrolebindings", "roles", "rolebindings"]
