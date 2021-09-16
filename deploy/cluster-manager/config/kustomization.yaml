@@ -17,3 +17,11 @@ images:
   - name: quay.io/open-cluster-management/registration-operator
     newName: quay.io/open-cluster-management/registration-operator
     newTag: latest
+
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: replace
+        path: "/spec/template/spec/containers/0/imagePullPolicy"
+        value: IfNotPresent

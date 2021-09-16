@@ -98,10 +98,10 @@ type OrphaningRule struct {
 	Resource string `json:"resource"`
 	// Namespace is the namespaces of the resources in the workload that the strategy is applied
 	// +optional
-	Namespace string `json:"Namespace"`
+	Namespace string `json:"namespace"`
 	// Name is the names of the resources in the workload that the strategy is applied
 	// +required
-	Name string `json:"Name"`
+	Name string `json:"name"`
 }
 
 // ManifestResourceMeta represents the group, version, kind, as well as the group, version, resource, name and namespace of a resoure.

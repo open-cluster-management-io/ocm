@@ -13,6 +13,7 @@ import (
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
 const (
@@ -60,30 +61,30 @@ var _ = Describe("Placement", func() {
 		}
 
 		// delete clusterset created
-		err = t.ClusterClient.ClusterV1alpha1().ManagedClusterSets().Delete(context.Background(), clusterSetName, metav1.DeleteOptions{})
+		err = t.ClusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.Background(), clusterSetName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("Should schedule placement successfully", func() {
 		By("Create clusterset/clustersetbinding")
-		clusterset := &clusterapiv1alpha1.ManagedClusterSet{
+		clusterset := &clusterapiv1beta1.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: clusterSetName,
 			},
 		}
-		_, err := t.ClusterClient.ClusterV1alpha1().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
+		_, err := t.ClusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		csb := &clusterapiv1alpha1.ManagedClusterSetBinding{
+		csb := &clusterapiv1beta1.ManagedClusterSetBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: placementNamespace,
 				Name:      clusterSetName,
 			},
-			Spec: clusterapiv1alpha1.ManagedClusterSetBindingSpec{
+			Spec: clusterapiv1beta1.ManagedClusterSetBindingSpec{
 				ClusterSet: clusterSetName,
 			},
 		}
-		_, err = t.ClusterClient.ClusterV1alpha1().ManagedClusterSetBindings(placementNamespace).Create(context.Background(), csb, metav1.CreateOptions{})
+		_, err = t.ClusterClient.ClusterV1beta1().ManagedClusterSetBindings(placementNamespace).Create(context.Background(), csb, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		numOfClusters := 5
