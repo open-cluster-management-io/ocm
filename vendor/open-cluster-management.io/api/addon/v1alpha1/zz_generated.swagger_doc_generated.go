@@ -110,10 +110,11 @@ func (ManagedClusterAddOnStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ObjectReference = map[string]string{
-	"":         "ObjectReference contains enough information to let you inspect or modify the referred object.",
-	"group":    "group of the referent.",
-	"resource": "resource of the referent.",
-	"name":     "name of the referent.",
+	"":          "ObjectReference contains enough information to let you inspect or modify the referred object.",
+	"group":     "group of the referent.",
+	"resource":  "resource of the referent.",
+	"namespace": "namespace of the referent.",
+	"name":      "name of the referent.",
 }
 
 func (ObjectReference) SwaggerDoc() map[string]string {

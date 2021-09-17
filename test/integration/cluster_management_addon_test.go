@@ -82,6 +82,16 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 			if !apiequality.Semantic.DeepEqual(clusterManagementAddon.Spec.AddOnConfiguration, actual.Status.AddOnConfiguration) {
 				return fmt.Errorf("Expected config coordinate is not correct, actual: %v", actual.Status.AddOnConfiguration)
 			}
+			relatedObjects := []addonapiv1alpha1.ObjectReference{
+				{
+					Name:     clusterManagementAddon.Name,
+					Group:    "addon.open-cluster-management.io",
+					Resource: "clustermanagementaddons",
+				},
+			}
+			if !apiequality.Semantic.DeepEqual(relatedObjects, actual.Status.RelatedObjects) {
+				return fmt.Errorf("Expected related object is not correct, actual: %v", actual.Status.RelatedObjects)
+			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})

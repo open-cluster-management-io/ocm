@@ -152,6 +152,6 @@ func (c *agentController) sync(ctx context.Context, syncCtx factory.SyncContext)
 		Data: cm.Data,
 	}
 
-	_, _, err = resourceapply.ApplyConfigMap(c.spokeKubeClient.CoreV1(), c.recorder, configmap)
+	_, _, err = resourceapply.ApplyConfigMap(ctx, c.spokeKubeClient.CoreV1(), c.recorder, configmap)
 	return err
 }

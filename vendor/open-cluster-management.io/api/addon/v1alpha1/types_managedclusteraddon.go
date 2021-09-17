@@ -133,6 +133,9 @@ type ObjectReference struct {
 	// +kubebuilder:validation:Required
 	// +required
 	Resource string `json:"resource"`
+	// namespace of the referent.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 	// name of the referent.
 	// +kubebuilder:validation:Required
 	// +required

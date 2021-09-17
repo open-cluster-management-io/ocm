@@ -15,6 +15,9 @@ import (
 
 // Build encapsulates the inputs needed to produce a new deployable image, as well as
 // the status of the execution and a reference to the Pod which executed the build.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type Build struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -730,6 +733,8 @@ type DockerBuildStrategy struct {
 
 	// buildArgs contains build arguments that will be resolved in the Dockerfile.  See
 	// https://docs.docker.com/engine/reference/builder/#/arg for more details.
+	// NOTE: Only the 'name' and 'value' fields are supported. Any settings on the 'valueFrom' field
+	// are ignored.
 	BuildArgs []corev1.EnvVar `json:"buildArgs,omitempty" protobuf:"bytes,7,rep,name=buildArgs"`
 
 	// imageOptimizationPolicy describes what optimizations the system can use when building images
@@ -740,6 +745,15 @@ type DockerBuildStrategy struct {
 	// policy. An additional experimental policy 'SkipLayersAndWarn' is the same as
 	// 'SkipLayers' but simply warns if compatibility cannot be preserved.
 	ImageOptimizationPolicy *ImageOptimizationPolicy `json:"imageOptimizationPolicy,omitempty" protobuf:"bytes,8,opt,name=imageOptimizationPolicy,casttype=ImageOptimizationPolicy"`
+
+	// volumes is a list of input volumes that can be mounted into the builds runtime environment.
+	// Only a subset of Kubernetes Volume sources are supported by builds.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes
+	// +listType=map
+	// +listMapKey=name
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Volumes []BuildVolume `json:"volumes,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,9,opt,name=volumes"`
 }
 
 // SourceBuildStrategy defines input parameters specific to an Source build.
@@ -771,6 +785,14 @@ type SourceBuildStrategy struct {
 	// deprecated json field, do not reuse: runtimeArtifacts
 	// +k8s:protobuf-deprecated=runtimeArtifacts,8
 
+	// volumes is a list of input volumes that can be mounted into the builds runtime environment.
+	// Only a subset of Kubernetes Volume sources are supported by builds.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes
+	// +listType=map
+	// +listMapKey=name
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Volumes []BuildVolume `json:"volumes,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,9,opt,name=volumes"`
 }
 
 // JenkinsPipelineBuildStrategy holds parameters specific to a Jenkins Pipeline build.
@@ -912,6 +934,9 @@ type ImageLabel struct {
 // Build configurations define a build process for new container images. There are three types of builds possible - a container image build using a Dockerfile, a Source-to-Image build that uses a specially prepared base image that accepts source code that it can make runnable, and a custom build that can run // arbitrary container images as a base and accept the build parameters. Builds run on the cluster and on completion are pushed to the container image registry specified in the "output" section. A build can be triggered via a webhook, when the base image changes, or when a user manually requests a new build be // created.
 //
 // Each build created by a build configuration is numbered and refers back to its parent configuration. Multiple builds can be triggered at once. Builds that do not have "output" set can be used to test code or run a verification build.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type BuildConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -1128,6 +1153,9 @@ const (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // BuildList is a collection of Builds.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type BuildList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -1139,6 +1167,9 @@ type BuildList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // BuildConfigList is a collection of BuildConfigs.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type BuildConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -1184,6 +1215,9 @@ type GitRefInfo struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // BuildLog is the (unused) resource associated with the build log redirector
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type BuildLog struct {
 	metav1.TypeMeta `json:",inline"`
 }
@@ -1207,6 +1241,9 @@ type SourceStrategyOptions struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // BuildRequest is the resource used to pass parameters to build generator
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type BuildRequest struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -1245,6 +1282,9 @@ type BuildRequest struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // BinaryBuildRequestOptions are the options required to fully speficy a binary build request
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type BinaryBuildRequestOptions struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -1276,6 +1316,9 @@ type BinaryBuildRequestOptions struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // BuildLogOptions is the REST options for a build log
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type BuildLogOptions struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -1332,4 +1375,70 @@ type SecretSpec struct {
 
 	// mountPath is the path at which to mount the secret
 	MountPath string `json:"mountPath" protobuf:"bytes,2,opt,name=mountPath"`
+}
+
+// BuildVolume describes a volume that is made available to build pods,
+// such that it can be mounted into buildah's runtime environment.
+// Only a subset of Kubernetes Volume sources are supported.
+type BuildVolume struct {
+	// name is a unique identifier for this BuildVolume.
+	// It must conform to the Kubernetes DNS label standard and be unique within the pod.
+	// Names that collide with those added by the build controller will result in a
+	// failed build with an error message detailing which name caused the error.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// source represents the location and type of the mounted volume.
+	// +required
+	Source BuildVolumeSource `json:"source" protobuf:"bytes,2,opt,name=source"`
+
+	// mounts represents the location of the volume in the image build container
+	// +required
+	// +listType=map
+	// +listMapKey=destinationPath
+	// +patchMergeKey=destinationPath
+	// +patchStrategy=merge
+	Mounts []BuildVolumeMount `json:"mounts" patchStrategy:"merge" patchMergeKey:"destinationPath" protobuf:"bytes,3,opt,name=mounts"`
+}
+
+// BuildVolumeSourceType represents a build volume source type
+type BuildVolumeSourceType string
+
+const (
+	// BuildVolumeSourceTypeSecret is the Secret build source volume type
+	BuildVolumeSourceTypeSecret BuildVolumeSourceType = "Secret"
+
+	// BuildVolumeSourceTypeConfigmap is the ConfigMap build source volume type
+	BuildVolumeSourceTypeConfigMap BuildVolumeSourceType = "ConfigMap"
+)
+
+// BuildVolumeSource represents the source of a volume to mount
+// Only one of its supported types may be specified at any given time.
+type BuildVolumeSource struct {
+
+	// type is the BuildVolumeSourceType for the volume source.
+	// Type must match the populated volume source.
+	// Valid types are: Secret, ConfigMap
+	Type BuildVolumeSourceType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=BuildVolumeSourceType"`
+
+	// secret represents a Secret that should populate this volume.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#secret
+	// +optional
+	Secret *corev1.SecretVolumeSource `json:"secret,omitempty" protobuf:"bytes,2,opt,name=secret"`
+
+	// configMap represents a ConfigMap that should populate this volume
+	// +optional
+	ConfigMap *corev1.ConfigMapVolumeSource `json:"configMap,omitempty" protobuf:"bytes,3,opt,name=configMap"`
+}
+
+// BuildVolumeMount describes the mounting of a Volume within buildah's runtime environment.
+type BuildVolumeMount struct {
+	// destinationPath is the path within the buildah runtime environment at which the volume should be mounted.
+	// The transient mount within the build image and the backing volume will both be mounted read only.
+	// Must be an absolute path, must not contain '..' or ':', and must not collide with a destination path generated
+	// by the builder process
+	// Paths that collide with those added by the build controller will result in a
+	// failed build with an error message detailing which path caused the error.
+	DestinationPath string `json:"destinationPath" protobuf:"bytes,1,opt,name=destinationPath"`
 }

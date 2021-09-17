@@ -15,10 +15,12 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 )
 
-func ApplyPodDisruptionBudget(client policyclientv1.PodDisruptionBudgetsGetter, recorder events.Recorder, required *policyv1.PodDisruptionBudget) (*policyv1.PodDisruptionBudget, bool, error) {
-	existing, err := client.PodDisruptionBudgets(required.Namespace).Get(context.TODO(), required.Name, metav1.GetOptions{})
+func ApplyPodDisruptionBudget(ctx context.Context, client policyclientv1.PodDisruptionBudgetsGetter, recorder events.Recorder, required *policyv1.PodDisruptionBudget) (*policyv1.PodDisruptionBudget, bool, error) {
+	existing, err := client.PodDisruptionBudgets(required.Namespace).Get(ctx, required.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
-		actual, err := client.PodDisruptionBudgets(required.Namespace).Create(context.TODO(), required, metav1.CreateOptions{})
+		requiredCopy := required.DeepCopy()
+		actual, err := client.PodDisruptionBudgets(required.Namespace).Create(
+			ctx, resourcemerge.WithCleanLabelsAndAnnotations(requiredCopy).(*policyv1.PodDisruptionBudget), metav1.CreateOptions{})
 		reportCreateEvent(recorder, required, err)
 		return actual, true, err
 	}
@@ -41,7 +43,7 @@ func ApplyPodDisruptionBudget(client policyclientv1.PodDisruptionBudgetsGetter, 
 		klog.Infof("PodDisruptionBudget %q changes: %v", required.Name, JSONPatchNoError(existing, existingCopy))
 	}
 
-	actual, err := client.PodDisruptionBudgets(required.Namespace).Update(context.TODO(), existingCopy, metav1.UpdateOptions{})
+	actual, err := client.PodDisruptionBudgets(required.Namespace).Update(ctx, existingCopy, metav1.UpdateOptions{})
 	reportUpdateEvent(recorder, required, err)
 	return actual, true, err
 }

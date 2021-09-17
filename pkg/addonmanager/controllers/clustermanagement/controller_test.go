@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
@@ -32,6 +33,11 @@ func (t *testAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	}
 }
 
+func newClusterManagementOwner(name string) metav1.OwnerReference {
+	clusterManagementAddon := addontesting.NewClusterManagementAddon(name, "testcrd", "testcr")
+	return *metav1.NewControllerRef(clusterManagementAddon, addonapiv1alpha1.GroupVersion.WithKind("ClusterManagementAddOn"))
+}
+
 func TestReconcile(t *testing.T) {
 	cases := []struct {
 		name                   string
@@ -53,13 +59,14 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions:   addontesting.AssertNoActions,
 		},
 		{
-			name:                   "no cluster",
-			syncKey:                "test",
-			managedClusteraddon:    []runtime.Object{},
-			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr")},
-			cluster:                []runtime.Object{},
-			testaddon:              &testAgent{name: "test"},
-			validateAddonActions:   addontesting.AssertNoActions,
+			name:                "no cluster",
+			syncKey:             "test",
+			managedClusteraddon: []runtime.Object{},
+			clusterManagementAddon: []runtime.Object{
+				addontesting.NewClusterManagementAddon("test", "testcrd", "testcr")},
+			cluster:              []runtime.Object{},
+			testaddon:            &testAgent{name: "test"},
+			validateAddonActions: addontesting.AssertNoActions,
 		},
 		{
 			name:                   "no managedclusteraddon",
@@ -74,8 +81,8 @@ func TestReconcile(t *testing.T) {
 			name:    "queue managedclusteraddon",
 			syncKey: "test",
 			managedClusteraddon: []runtime.Object{
-				addontesting.NewAddon("test", "cluster1"),
-				addontesting.NewAddon("test", "cluster2"),
+				addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test")),
+				addontesting.NewAddon("test", "cluster2", newClusterManagementOwner("test")),
 			},
 			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr")},
 			cluster: []runtime.Object{
@@ -99,9 +106,31 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: addontesting.AssertNoActions,
 		},
 		{
-			name:                   "update managedclusteraddon",
-			syncKey:                "cluster1/test",
-			managedClusteraddon:    []runtime.Object{addontesting.NewAddon("test", "cluster1")},
+			name:    "update managedclusteraddon owner",
+			syncKey: "cluster1/test",
+			managedClusteraddon: []runtime.Object{
+				addontesting.NewAddon("test", "cluster1"),
+			},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr")},
+			cluster: []runtime.Object{
+				addontesting.NewManagedCluster("cluster1"),
+			},
+			testaddon: &testAgent{name: "test"},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "update")
+				actual := actions[0].(clienttesting.UpdateActionImpl).Object
+				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+				if len(addOn.OwnerReferences) != 1 {
+					t.Errorf("Owner not updated")
+				}
+			},
+		},
+		{
+			name:    "update managedclusteraddon",
+			syncKey: "cluster1/test",
+			managedClusteraddon: []runtime.Object{
+				addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test")),
+			},
 			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr")},
 			cluster: []runtime.Object{
 				addontesting.NewManagedCluster("cluster1"),
@@ -117,15 +146,57 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name:                   "no need to update managedclusteraddon",
-			syncKey:                "cluster1/test",
-			managedClusteraddon:    []runtime.Object{addontesting.NewAddon("test", "cluster1")},
+			name:    "no need to update managedclusteraddon",
+			syncKey: "cluster1/test",
+			managedClusteraddon: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test"))
+					addon.Status.RelatedObjects = []addonapiv1alpha1.ObjectReference{
+						{
+							Name:     "test",
+							Group:    "addon.open-cluster-management.io",
+							Resource: "clustermanagementaddons",
+						},
+					}
+					return addon
+				}(),
+			},
 			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "", "")},
 			cluster: []runtime.Object{
 				addontesting.NewManagedCluster("cluster1"),
 			},
 			testaddon:            &testAgent{name: "test"},
 			validateAddonActions: addontesting.AssertNoActions,
+		},
+		{
+			name:    "update related objects",
+			syncKey: "cluster1/test",
+			managedClusteraddon: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test"))
+					addon.Status.RelatedObjects = []addonapiv1alpha1.ObjectReference{
+						{
+							Name:     "other",
+							Group:    "otherGroupd",
+							Resource: "otherresources",
+						},
+					}
+					return addon
+				}(),
+			},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "", "")},
+			cluster: []runtime.Object{
+				addontesting.NewManagedCluster("cluster1"),
+			},
+			testaddon: &testAgent{name: "test"},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "update")
+				actual := actions[0].(clienttesting.UpdateActionImpl).Object
+				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+				if len(addOn.Status.RelatedObjects) != 2 {
+					t.Errorf("Related object is not updated, %v", addOn.Status.RelatedObjects)
+				}
+			},
 		},
 	}
 
