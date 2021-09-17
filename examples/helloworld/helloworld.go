@@ -80,6 +80,7 @@ func (h *helloWorldAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 			CSRApproveCheck:   agent.ApprovalAllCSRs,
 			PermissionConfig:  h.setupAgentPermissions,
 		},
+		InstallStrategy: agent.InstallAllStrategy("default"),
 	}
 }
 

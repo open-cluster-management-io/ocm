@@ -11,7 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
 const (
@@ -37,19 +36,6 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 	})
 
 	ginkgo.It("Install/uninstall addon and make sure it is available", func() {
-		addon := &addonv1alpha1.ManagedClusterAddOn{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      addonName,
-				Namespace: managedClusterName,
-			},
-			Spec: addonv1alpha1.ManagedClusterAddOnSpec{
-				InstallNamespace: "default",
-			},
-		}
-
-		_, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
 		gomega.Eventually(func() error {
 			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
 			if err != nil {
@@ -78,7 +64,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 			},
 		}
 
-		_, err = hubKubeClient.CoreV1().ConfigMaps(managedClusterName).Create(context.Background(), configmap, metav1.CreateOptions{})
+		_, err := hubKubeClient.CoreV1().ConfigMaps(managedClusterName).Create(context.Background(), configmap, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {

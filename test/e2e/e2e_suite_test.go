@@ -18,6 +18,7 @@ import (
 
 	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -119,6 +120,9 @@ var _ = ginkgo.BeforeSuite(func() {
 	err = wait.Poll(1*time.Second, 120*time.Second, func() (bool, error) {
 		var err error
 		managedCluster, err = hubClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), managedClusterName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
 		if err != nil {
 			return false, err
 		}
