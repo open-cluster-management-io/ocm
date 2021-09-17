@@ -44,6 +44,14 @@ var _ = ginkgo.Describe("Placement", func() {
 	})
 
 	ginkgo.AfterEach(func() {
+		ginkgo.By("Delete managedclusterset")
+		clusterClient.ClusterV1alpha1().ManagedClusterSets().Delete(context.Background(), clusterSet1Name, metav1.DeleteOptions{})
+
+		ginkgo.By("Delete managedclusters")
+		clusterClient.ClusterV1().ManagedClusters().DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{
+			LabelSelector: clusterSetLabel + "=" + clusterSet1Name,
+		})
+
 		err := kubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
