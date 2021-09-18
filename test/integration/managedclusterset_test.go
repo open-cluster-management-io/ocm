@@ -10,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
 const (
@@ -21,23 +21,23 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 	ginkgo.It("should create cluster set and keep it synced successfully ", func() {
 		ginkgo.By("Create a ManagedClusterSet")
 		managedClusterSetName := "cs1"
-		managedClusterSet := &clusterv1alpha1.ManagedClusterSet{
+		managedClusterSet := &clusterv1beta1.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: managedClusterSetName,
 			},
 		}
 
-		_, err := clusterClient.ClusterV1alpha1().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
+		_, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ginkgo.By("Check if ManagedClusterSet is reconciled")
 		gomega.Eventually(func() bool {
-			managedClusterSet, err = clusterClient.ClusterV1alpha1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+			managedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
 			for _, condition := range managedClusterSet.Status.Conditions {
-				if condition.Type != clusterv1alpha1.ManagedClusterSetConditionEmpty {
+				if condition.Type != clusterv1beta1.ManagedClusterSetConditionEmpty {
 					continue
 				}
 				if condition.Status != metav1.ConditionTrue {
@@ -70,12 +70,12 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 
 		ginkgo.By("Check if ManagedClusterSet is reconciled again")
 		gomega.Eventually(func() bool {
-			managedClusterSet, err = clusterClient.ClusterV1alpha1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+			managedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
 			for _, condition := range managedClusterSet.Status.Conditions {
-				if condition.Type != clusterv1alpha1.ManagedClusterSetConditionEmpty {
+				if condition.Type != clusterv1beta1.ManagedClusterSetConditionEmpty {
 					continue
 				}
 				if condition.Status != metav1.ConditionFalse {

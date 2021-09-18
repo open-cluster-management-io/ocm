@@ -13,7 +13,7 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 )
 
@@ -21,7 +21,7 @@ func TestSyncClusterSet(t *testing.T) {
 	cases := []struct {
 		name                   string
 		clusterSetName         string
-		existingClusterSet     *clusterv1alpha1.ManagedClusterSet
+		existingClusterSet     *clusterv1beta1.ManagedClusterSet
 		existingClusters       []*clusterv1.ManagedCluster
 		expectedClusterSetsMap map[string]string
 		validateActions        func(t *testing.T, actions []clienttesting.Action)
@@ -47,10 +47,10 @@ func TestSyncClusterSet(t *testing.T) {
 			existingClusterSet: newManagedClusterSet("mcs1", false),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, actions, "update")
-				clusterSet := actions[0].(clienttesting.UpdateAction).GetObject().(*clusterv1alpha1.ManagedClusterSet)
+				clusterSet := actions[0].(clienttesting.UpdateAction).GetObject().(*clusterv1beta1.ManagedClusterSet)
 				if !hasCondition(
 					clusterSet.Status.Conditions,
-					clusterv1alpha1.ManagedClusterSetConditionEmpty,
+					clusterv1beta1.ManagedClusterSetConditionEmpty,
 					metav1.ConditionTrue,
 					"NoClusterMatched",
 					"No ManagedCluster selected") {
@@ -73,10 +73,10 @@ func TestSyncClusterSet(t *testing.T) {
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, actions, "update")
-				clusterSet := actions[0].(clienttesting.UpdateAction).GetObject().(*clusterv1alpha1.ManagedClusterSet)
+				clusterSet := actions[0].(clienttesting.UpdateAction).GetObject().(*clusterv1beta1.ManagedClusterSet)
 				if !hasCondition(
 					clusterSet.Status.Conditions,
-					clusterv1alpha1.ManagedClusterSetConditionEmpty,
+					clusterv1beta1.ManagedClusterSetConditionEmpty,
 					metav1.ConditionFalse,
 					"ClustersSelected",
 					"2 ManagedClusters selected") {
@@ -103,13 +103,13 @@ func TestSyncClusterSet(t *testing.T) {
 				informerFactory.Cluster().V1().ManagedClusters().Informer().GetStore().Add(cluster)
 			}
 			if c.existingClusterSet != nil {
-				informerFactory.Cluster().V1alpha1().ManagedClusterSets().Informer().GetStore().Add(c.existingClusterSet)
+				informerFactory.Cluster().V1beta1().ManagedClusterSets().Informer().GetStore().Add(c.existingClusterSet)
 			}
 
 			ctrl := managedClusterSetController{
 				clusterClient:    clusterClient,
 				clusterLister:    informerFactory.Cluster().V1().ManagedClusters().Lister(),
-				clusterSetLister: informerFactory.Cluster().V1alpha1().ManagedClusterSets().Lister(),
+				clusterSetLister: informerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
 				eventRecorder:    eventstesting.NewTestingEventRecorder(t),
 				clusterSetsMap:   map[string]string{},
 			}
@@ -148,8 +148,8 @@ func newManagedCluster(name, clusterSet string) *clusterv1.ManagedCluster {
 	return cluster
 }
 
-func newManagedClusterSet(name string, terminating bool) *clusterv1alpha1.ManagedClusterSet {
-	clusterSet := &clusterv1alpha1.ManagedClusterSet{
+func newManagedClusterSet(name string, terminating bool) *clusterv1beta1.ManagedClusterSet {
+	clusterSet := &clusterv1beta1.ManagedClusterSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},

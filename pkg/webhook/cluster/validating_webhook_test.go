@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
@@ -325,8 +325,8 @@ func newManagedClusterObjWithClientSet(clusterSetName string) runtime.RawExtensi
 	}
 }
 
-func newManagedClusterSet(name string) *clusterv1alpha1.ManagedClusterSet {
-	return &clusterv1alpha1.ManagedClusterSet{
+func newManagedClusterSet(name string) *clusterv1beta1.ManagedClusterSet {
+	return &clusterv1beta1.ManagedClusterSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},

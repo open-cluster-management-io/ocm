@@ -17,11 +17,11 @@ import (
 	"k8s.io/klog/v2"
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterinformerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
-	clusterinformerv1alpha1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1alpha1"
+	clusterinformerv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
-	clusterlisterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
+	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
 const (
@@ -32,7 +32,7 @@ const (
 type managedClusterSetController struct {
 	clusterClient    clientset.Interface
 	clusterLister    clusterlisterv1.ManagedClusterLister
-	clusterSetLister clusterlisterv1alpha1.ManagedClusterSetLister
+	clusterSetLister clusterlisterv1beta1.ManagedClusterSetLister
 	eventRecorder    events.Recorder
 
 	// clusterSetsMap caches the mappings between clusters and clustersets.
@@ -48,7 +48,7 @@ type managedClusterSetController struct {
 func NewManagedClusterSetController(
 	clusterClient clientset.Interface,
 	clusterInformer clusterinformerv1.ManagedClusterInformer,
-	clusterSetInformer clusterinformerv1alpha1.ManagedClusterSetInformer,
+	clusterSetInformer clusterinformerv1beta1.ManagedClusterSetInformer,
 	recorder events.Recorder) factory.Controller {
 	c := &managedClusterSetController{
 		clusterClient:    clusterClient,
@@ -142,7 +142,7 @@ func (c *managedClusterSetController) sync(ctx context.Context, syncCtx factory.
 }
 
 // syncClusterSet syncs a particular cluster set
-func (c *managedClusterSetController) syncClusterSet(ctx context.Context, originalClusterSet *clusterv1alpha1.ManagedClusterSet) error {
+func (c *managedClusterSetController) syncClusterSet(ctx context.Context, originalClusterSet *clusterv1beta1.ManagedClusterSet) error {
 	clusterSet := originalClusterSet.DeepCopy()
 
 	// find out the containing clusters of clusterset
@@ -159,7 +159,7 @@ func (c *managedClusterSetController) syncClusterSet(ctx context.Context, origin
 
 	// update clusterset status
 	emptyCondition := metav1.Condition{
-		Type: clusterv1alpha1.ManagedClusterSetConditionEmpty,
+		Type: clusterv1beta1.ManagedClusterSetConditionEmpty,
 	}
 	if count := len(clusters); count == 0 {
 		emptyCondition.Status = metav1.ConditionTrue
@@ -177,7 +177,7 @@ func (c *managedClusterSetController) syncClusterSet(ctx context.Context, origin
 		return nil
 	}
 
-	_, err = c.clusterClient.ClusterV1alpha1().ManagedClusterSets().UpdateStatus(ctx, clusterSet, metav1.UpdateOptions{})
+	_, err = c.clusterClient.ClusterV1beta1().ManagedClusterSets().UpdateStatus(ctx, clusterSet, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update status of ManagedClusterSet %q: %w", clusterSet.Name, err)
 	}

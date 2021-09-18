@@ -96,7 +96,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	managedClusterSetController := managedclusterset.NewManagedClusterSetController(
 		clusterClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
-		clusterInformers.Cluster().V1alpha1().ManagedClusterSets(),
+		clusterInformers.Cluster().V1beta1().ManagedClusterSets(),
 		controllerContext.EventRecorder,
 	)
 
