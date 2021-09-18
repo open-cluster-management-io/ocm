@@ -10,6 +10,7 @@ import (
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
 type placementBuilder struct {
@@ -235,21 +236,21 @@ func (b *managedClusterBuilder) Build() *clusterapiv1.ManagedCluster {
 	return b.cluster
 }
 
-func NewClusterSet(clusterSetName string) *clusterapiv1alpha1.ManagedClusterSet {
-	return &clusterapiv1alpha1.ManagedClusterSet{
+func NewClusterSet(clusterSetName string) *clusterapiv1beta1.ManagedClusterSet {
+	return &clusterapiv1beta1.ManagedClusterSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterSetName,
 		},
 	}
 }
 
-func NewClusterSetBinding(namespace, clusterSetName string) *clusterapiv1alpha1.ManagedClusterSetBinding {
-	return &clusterapiv1alpha1.ManagedClusterSetBinding{
+func NewClusterSetBinding(namespace, clusterSetName string) *clusterapiv1beta1.ManagedClusterSetBinding {
+	return &clusterapiv1beta1.ManagedClusterSetBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      clusterSetName,
 		},
-		Spec: clusterapiv1alpha1.ManagedClusterSetBindingSpec{
+		Spec: clusterapiv1beta1.ManagedClusterSetBindingSpec{
 			ClusterSet: clusterSetName,
 		},
 	}

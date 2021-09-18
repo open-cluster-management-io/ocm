@@ -10,12 +10,14 @@ import (
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
 	clusterv1 "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1alpha1"
+	clusterv1beta1 "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta1"
 )
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	ClusterV1() clusterv1.ClusterV1Interface
 	ClusterV1alpha1() clusterv1alpha1.ClusterV1alpha1Interface
+	ClusterV1beta1() clusterv1beta1.ClusterV1beta1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -24,6 +26,7 @@ type Clientset struct {
 	*discovery.DiscoveryClient
 	clusterV1       *clusterv1.ClusterV1Client
 	clusterV1alpha1 *clusterv1alpha1.ClusterV1alpha1Client
+	clusterV1beta1  *clusterv1beta1.ClusterV1beta1Client
 }
 
 // ClusterV1 retrieves the ClusterV1Client
@@ -34,6 +37,11 @@ func (c *Clientset) ClusterV1() clusterv1.ClusterV1Interface {
 // ClusterV1alpha1 retrieves the ClusterV1alpha1Client
 func (c *Clientset) ClusterV1alpha1() clusterv1alpha1.ClusterV1alpha1Interface {
 	return c.clusterV1alpha1
+}
+
+// ClusterV1beta1 retrieves the ClusterV1beta1Client
+func (c *Clientset) ClusterV1beta1() clusterv1beta1.ClusterV1beta1Interface {
+	return c.clusterV1beta1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -65,6 +73,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.clusterV1beta1, err = clusterv1beta1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -79,6 +91,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.clusterV1 = clusterv1.NewForConfigOrDie(c)
 	cs.clusterV1alpha1 = clusterv1alpha1.NewForConfigOrDie(c)
+	cs.clusterV1beta1 = clusterv1beta1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -89,6 +102,7 @@ func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.clusterV1 = clusterv1.New(c)
 	cs.clusterV1alpha1 = clusterv1alpha1.New(c)
+	cs.clusterV1beta1 = clusterv1beta1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

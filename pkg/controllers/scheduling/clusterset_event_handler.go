@@ -11,11 +11,12 @@ import (
 
 	errorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	clusterlisterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
-	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
+	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
 type clusterSetEventHandler struct {
-	clusterSetBindingLister clusterlisterv1alpha1.ManagedClusterSetBindingLister
+	clusterSetBindingLister clusterlisterv1beta1.ManagedClusterSetBindingLister
 	placementLister         clusterlisterv1alpha1.PlacementLister
 	enqueuePlacementFunc    enqueuePlacementFunc
 }
@@ -31,7 +32,7 @@ func (h *clusterSetEventHandler) OnUpdate(oldObj, newObj interface{}) {
 func (h *clusterSetEventHandler) OnDelete(obj interface{}) {
 	var clusterSetName string
 	switch t := obj.(type) {
-	case *clusterapiv1alpha1.ManagedClusterSet:
+	case *clusterapiv1beta1.ManagedClusterSet:
 		clusterSetName = t.Name
 	case cache.DeletedFinalStateUnknown:
 		clusterSet, ok := t.Obj.(metav1.Object)
@@ -56,7 +57,7 @@ func (h *clusterSetEventHandler) OnDelete(obj interface{}) {
 // controller queue for further reconciliation
 func enqueuePlacementsByClusterSet(
 	clusterSetName string,
-	clusterSetBindingLister clusterlisterv1alpha1.ManagedClusterSetBindingLister,
+	clusterSetBindingLister clusterlisterv1beta1.ManagedClusterSetBindingLister,
 	placementLister clusterlisterv1alpha1.PlacementLister,
 	enqueuePlacementFunc enqueuePlacementFunc,
 ) error {

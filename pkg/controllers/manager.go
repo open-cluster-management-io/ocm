@@ -56,8 +56,8 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	schedulingController := scheduling.NewSchedulingController(
 		clusterClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
-		clusterInformers.Cluster().V1alpha1().ManagedClusterSets(),
-		clusterInformers.Cluster().V1alpha1().ManagedClusterSetBindings(),
+		clusterInformers.Cluster().V1beta1().ManagedClusterSets(),
+		clusterInformers.Cluster().V1beta1().ManagedClusterSetBindings(),
 		clusterInformers.Cluster().V1alpha1().Placements(),
 		clusterInformers.Cluster().V1alpha1().PlacementDecisions(),
 		scheduler,
