@@ -45,7 +45,7 @@ func TestEnqueuePlacementsByClusterSet(t *testing.T) {
 			queuedKeys := sets.NewString()
 			err := enqueuePlacementsByClusterSet(
 				c.clusterSetName,
-				clusterInformerFactory.Cluster().V1alpha1().ManagedClusterSetBindings().Lister(),
+				clusterInformerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Lister(),
 				clusterInformerFactory.Cluster().V1alpha1().Placements().Lister(),
 				func(namespace, name string) {
 					queuedKeys.Insert(fmt.Sprintf("%s/%s", namespace, name))
@@ -117,7 +117,7 @@ func TestOnClusterSetDelete(t *testing.T) {
 
 			queuedKeys := sets.NewString()
 			handler := &clusterSetEventHandler{
-				clusterSetBindingLister: clusterInformerFactory.Cluster().V1alpha1().ManagedClusterSetBindings().Lister(),
+				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Lister(),
 				placementLister:         clusterInformerFactory.Cluster().V1alpha1().Placements().Lister(),
 				enqueuePlacementFunc: func(namespace, name string) {
 					queuedKeys.Insert(fmt.Sprintf("%s/%s", namespace, name))

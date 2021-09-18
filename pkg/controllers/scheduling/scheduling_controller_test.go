@@ -188,8 +188,8 @@ func TestSchedulingController_sync(t *testing.T) {
 			ctrl := schedulingController{
 				clusterClient:           clusterClient,
 				clusterLister:           clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				clusterSetLister:        clusterInformerFactory.Cluster().V1alpha1().ManagedClusterSets().Lister(),
-				clusterSetBindingLister: clusterInformerFactory.Cluster().V1alpha1().ManagedClusterSetBindings().Lister(),
+				clusterSetLister:        clusterInformerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
+				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Lister(),
 				placementLister:         clusterInformerFactory.Cluster().V1alpha1().Placements().Lister(),
 				placementDecisionLister: clusterInformerFactory.Cluster().V1alpha1().PlacementDecisions().Lister(),
 				scheduler:               s,
@@ -242,8 +242,8 @@ func TestGetValidManagedClusterSetBindings(t *testing.T) {
 			clusterInformerFactory := testinghelpers.NewClusterInformerFactory(clusterClient, c.initObjs...)
 
 			ctrl := &schedulingController{
-				clusterSetLister:        clusterInformerFactory.Cluster().V1alpha1().ManagedClusterSets().Lister(),
-				clusterSetBindingLister: clusterInformerFactory.Cluster().V1alpha1().ManagedClusterSetBindings().Lister(),
+				clusterSetLister:        clusterInformerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
+				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Lister(),
 			}
 			bindings, err := ctrl.getValidManagedClusterSetBindings(placementNamespace)
 			if err != nil {
@@ -548,8 +548,8 @@ func TestBind(t *testing.T) {
 			ctrl := schedulingController{
 				clusterClient:           clusterClient,
 				clusterLister:           clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				clusterSetLister:        clusterInformerFactory.Cluster().V1alpha1().ManagedClusterSets().Lister(),
-				clusterSetBindingLister: clusterInformerFactory.Cluster().V1alpha1().ManagedClusterSetBindings().Lister(),
+				clusterSetLister:        clusterInformerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
+				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Lister(),
 				placementLister:         clusterInformerFactory.Cluster().V1alpha1().Placements().Lister(),
 				placementDecisionLister: clusterInformerFactory.Cluster().V1alpha1().PlacementDecisions().Lister(),
 				scheduler:               s,

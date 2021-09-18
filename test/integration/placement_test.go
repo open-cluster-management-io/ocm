@@ -16,6 +16,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	controllers "open-cluster-management.io/placement/pkg/controllers"
 	"open-cluster-management.io/placement/test/integration/util"
 )
@@ -199,24 +200,24 @@ var _ = ginkgo.Describe("Placement", func() {
 
 	assertBindingClusterSet := func(clusterSetName string) {
 		ginkgo.By("Create clusterset/clustersetbinding")
-		clusterset := &clusterapiv1alpha1.ManagedClusterSet{
+		clusterset := &clusterapiv1beta1.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: clusterSetName,
 			},
 		}
-		_, err = clusterClient.ClusterV1alpha1().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		csb := &clusterapiv1alpha1.ManagedClusterSetBinding{
+		csb := &clusterapiv1beta1.ManagedClusterSetBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      clusterSetName,
 			},
-			Spec: clusterapiv1alpha1.ManagedClusterSetBindingSpec{
+			Spec: clusterapiv1beta1.ManagedClusterSetBindingSpec{
 				ClusterSet: clusterSetName,
 			},
 		}
-		_, err = clusterClient.ClusterV1alpha1().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 
