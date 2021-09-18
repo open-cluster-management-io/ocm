@@ -71,16 +71,16 @@ spec:
                             included in this manifestwork
                           type: object
                           properties:
-                            Name:
+                            group:
+                              description: Group is the api group of the resources
+                                in the workload that the strategy is applied
+                              type: string
+                            name:
                               description: Name is the names of the resources in the
                                 workload that the strategy is applied
                               type: string
-                            Namespace:
+                            namespace:
                               description: Namespace is the namespaces of the resources
-                                in the workload that the strategy is applied
-                              type: string
-                            group:
-                              description: Group is the api group of the resources
                                 in the workload that the strategy is applied
                               type: string
                             resource:

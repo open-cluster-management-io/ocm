@@ -168,8 +168,8 @@ var map_OrphaningRule = map[string]string{
 	"":          "OrphaningRule identifies a single resource included in this manifestwork",
 	"group":     "Group is the api group of the resources in the workload that the strategy is applied",
 	"resource":  "Resource is the resources in the workload that the strategy is applied",
-	"Namespace": "Namespace is the namespaces of the resources in the workload that the strategy is applied",
-	"Name":      "Name is the names of the resources in the workload that the strategy is applied",
+	"namespace": "Namespace is the namespaces of the resources in the workload that the strategy is applied",
+	"name":      "Name is the names of the resources in the workload that the strategy is applied",
 }
 
 func (OrphaningRule) SwaggerDoc() map[string]string {
