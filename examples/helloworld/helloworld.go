@@ -56,10 +56,6 @@ type helloWorldAgent struct {
 	agentName  string
 }
 
-func init() {
-	scheme.AddToScheme(genericScheme)
-}
-
 func (h *helloWorldAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	objects := []runtime.Object{}
 	for _, file := range manifestFiles {
