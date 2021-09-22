@@ -1025,6 +1025,14 @@ sigs.k8s.io/controller-runtime/pkg/internal/testing/integration/addr
 sigs.k8s.io/controller-runtime/pkg/internal/testing/integration/internal
 sigs.k8s.io/controller-runtime/pkg/log
 sigs.k8s.io/controller-runtime/pkg/log/zap
+# sigs.k8s.io/kube-storage-version-migrator v0.0.3
+## explicit
+sigs.k8s.io/kube-storage-version-migrator/pkg/apis/migration/v1alpha1
+sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset
+sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/fake
+sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/scheme
+sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/typed/migration/v1alpha1
+sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/typed/migration/v1alpha1/fake
 # sigs.k8s.io/structured-merge-diff/v4 v4.1.0
 sigs.k8s.io/structured-merge-diff/v4/fieldpath
 sigs.k8s.io/structured-merge-diff/v4/merge

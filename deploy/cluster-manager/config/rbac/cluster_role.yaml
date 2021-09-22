@@ -44,3 +44,7 @@ rules:
 - apiGroups: ["operator.open-cluster-management.io"]
   resources: ["clustermanagers/status"]
   verbs: ["update", "patch"]
+# Allow the registration-operator to create storageversionmigration
+- apiGroups: ["migration.k8s.io"]
+  resources: ["storageversionmigrations"]
+  verbs: ["create", "get", "list", "update", "watch", "patch", "delete"]

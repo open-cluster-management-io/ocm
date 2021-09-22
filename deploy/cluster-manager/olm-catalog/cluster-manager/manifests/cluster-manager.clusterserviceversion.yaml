@@ -212,6 +212,18 @@ spec:
           verbs:
           - update
           - patch
+        - apiGroups:
+          - migration.k8s.io
+          resources:
+          - storageversionmigrations
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+          - patch
+          - delete
         serviceAccountName: cluster-manager
       deployments:
       - name: cluster-manager

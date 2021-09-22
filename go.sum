@@ -975,6 +975,7 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.15/go.mod h1:LEScyz
 sigs.k8s.io/controller-runtime v0.6.1-0.20200829232221-efc74d056b24 h1:X8MP3ikt7leHqbSGyhcTV90nOx4aKU8Q/29PU7SIJOY=
 sigs.k8s.io/controller-runtime v0.6.1-0.20200829232221-efc74d056b24/go.mod h1:KbYIf6EpZz2+osbp4K0KGKhr5SyMJ8ZOBhjcv7MNqxI=
 sigs.k8s.io/controller-tools v0.2.8/go.mod h1:9VKHPszmf2DHz/QmHkcfZoewO6BL7pPs9uAiBVsaJSE=
+sigs.k8s.io/kube-storage-version-migrator v0.0.3 h1:IclhkKtl1zwS7awsqsQuxrvXrP2VamhcWeZDzsEz6/Q=
 sigs.k8s.io/kube-storage-version-migrator v0.0.3/go.mod h1:mXfSLkx9xbJHQsgNDDUZK/iQTs2tMbx/hsJlWe6Fthw=
 sigs.k8s.io/structured-merge-diff v0.0.0-20190525122527-15d366b2352e/go.mod h1:wWxsB5ozmmv/SG7nM11ayaAW51xMvak/t1r0CSlcokI=
 sigs.k8s.io/structured-merge-diff v1.0.1-0.20191108220359-b1b620dd3f06 h1:zD2IemQ4LmOcAumeiyDWXKUI2SO0NYDe3H6QGvPOVgU=
