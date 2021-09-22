@@ -10,6 +10,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
+	migrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
@@ -19,6 +20,7 @@ import (
 	"open-cluster-management.io/registration-operator/pkg/helpers"
 	certrotationcontroller "open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/certrotationcontroller"
 	"open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/clustermanagercontroller"
+	"open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/migrationcontroller"
 	clustermanagerstatuscontroller "open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/statuscontroller"
 	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/controllers/bootstrapcontroller"
 	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/controllers/klusterletcontroller"
@@ -40,6 +42,10 @@ func RunClusterManagerOperator(ctx context.Context, controllerContext *controlle
 		return err
 	}
 	apiRegistrationClient, err := apiregistrationclient.NewForConfig(controllerContext.KubeConfig)
+	if err != nil {
+		return err
+	}
+	migrationClient, err := migrationclient.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
@@ -76,11 +82,18 @@ func RunClusterManagerOperator(ctx context.Context, controllerContext *controlle
 		operatorInformer.Operator().V1().ClusterManagers(),
 		controllerContext.EventRecorder)
 
+	crdMigrationController := migrationcontroller.NewCRDMigrationController(
+		apiExtensionClient,
+		migrationClient.MigrationV1alpha1(),
+		operatorInformer.Operator().V1().ClusterManagers(),
+		controllerContext.EventRecorder)
+
 	go operatorInformer.Start(ctx.Done())
 	go kubeInformer.Start(ctx.Done())
 	go clusterManagerController.Run(ctx, 1)
 	go statusController.Run(ctx, 1)
 	go certRotationController.Run(ctx, 1)
+	go crdMigrationController.Run(ctx, 1)
 
 	<-ctx.Done()
 	return nil
