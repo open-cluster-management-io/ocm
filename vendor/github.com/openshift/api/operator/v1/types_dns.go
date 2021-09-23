@@ -20,6 +20,9 @@ import (
 // https://github.com/kubernetes/dns/blob/master/docs/specification.md
 //
 // More details: https://kubernetes.io/docs/tasks/administer-cluster/coredns
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type DNS struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -62,6 +65,11 @@ type DNSSpec struct {
 	//
 	// +optional
 	NodePlacement DNSNodePlacement `json:"nodePlacement,omitempty"`
+
+	// managementState indicates whether the DNS operator should manage cluster
+	// DNS
+	// +optional
+	ManagementState ManagementState `json:"managementState,omitempty"`
 }
 
 // Server defines the schema for a server that runs per instance of CoreDNS.
@@ -110,9 +118,14 @@ type DNSNodePlacement struct {
 
 	// tolerations is a list of tolerations applied to DNS pods.
 	//
-	// The default is an empty list.  This default is subject to change.
+	// If empty, the DNS operator sets a toleration for the
+	// "node-role.kubernetes.io/master" taint.  This default is subject to
+	// change.  Specifying tolerations without including a toleration for
+	// the "node-role.kubernetes.io/master" taint may be risky as it could
+	// lead to an outage if all worker nodes become unavailable.
 	//
-	// See https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+	// Note that the daemon controller adds some tolerations as well.  See
+	// https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
 	//
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
@@ -170,6 +183,9 @@ type DNSStatus struct {
 // +kubebuilder:object:root=true
 
 // DNSList contains a list of DNS
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type DNSList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

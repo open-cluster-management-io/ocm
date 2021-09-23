@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -135,7 +136,7 @@ func applyManifestFromFile(file, clusterName, addonName string, kubeclient *kube
 		Group:       groups[0],
 	}
 
-	results := resourceapply.ApplyDirectly(
+	results := resourceapply.ApplyDirectly(context.Background(),
 		resourceapply.NewKubeClientHolder(kubeclient),
 		recorder,
 		func(name string) ([]byte, error) {

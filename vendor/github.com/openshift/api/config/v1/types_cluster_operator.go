@@ -12,6 +12,9 @@ import (
 // ClusterOperator is the Custom Resource object which holds the current state
 // of an operator. This object is used by operators to convey their state to
 // the rest of the cluster.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type ClusterOperator struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -149,7 +152,10 @@ const (
 	// Progressing indicates that the operator is actively rolling out new code,
 	// propagating config changes, or otherwise moving from one steady state to
 	// another.  Operators should not report progressing when they are reconciling
-	// a previously known state.
+	// (without action) a previously known state.  If the observed cluster state
+	// has changed and the operator/operand is reacting to it (scaling up for instance),
+	// Progressing should become true since it is moving from one steady state to
+	// another.
 	OperatorProgressing ClusterStatusConditionType = "Progressing"
 
 	// Degraded indicates that the operator's current state does not match its
@@ -170,15 +176,24 @@ const (
 	// unexpected errors are handled as operators mature.
 	OperatorDegraded ClusterStatusConditionType = "Degraded"
 
-	// Upgradeable indicates whether the operator is in a state that is safe to upgrade. When status is `False`
-	// administrators should not upgrade their cluster and the message field should contain a human readable description
-	// of what the administrator should do to allow the operator to successfully update.  A missing condition, True,
-	// and Unknown are all treated by the CVO as allowing an upgrade.
+	// Upgradeable indicates whether the operator is safe to upgrade based on the
+	// current cluster state. When status is False, the cluster-version operator
+	// will prevent the cluster from performing impacted updates unless forced.
+	// When set on ClusterVersion, the message will explain which updates (minor
+	// or patch) are impacted. When set on ClusterOperator, False will block
+	// minor OpenShift updates. The message field should contain a human
+	// readable description of what the administrator should do to allow the
+	// cluster or operator to successfully update. The cluster-version operator
+	// will allow updates when this condition is not False, including when it is
+	// missing, True, or Unknown.
 	OperatorUpgradeable ClusterStatusConditionType = "Upgradeable"
 )
 
 // ClusterOperatorList is a list of OperatorStatus resources.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +openshift:compatibility-gen:level=1
 type ClusterOperatorList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`

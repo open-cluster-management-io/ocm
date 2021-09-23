@@ -6,6 +6,7 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -15,6 +16,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
@@ -90,10 +92,7 @@ func (c *clusterManagementController) sync(ctx context.Context, syncCtx factory.
 		return c.syncAllAddon(syncCtx, addonName)
 	}
 
-	coordinate := addonapiv1alpha1.ConfigCoordinates{
-		CRDName: clusterManagementAddon.Spec.AddOnConfiguration.CRDName,
-		CRName:  clusterManagementAddon.Spec.AddOnConfiguration.CRName,
-	}
+	owner := metav1.NewControllerRef(clusterManagementAddon, addonapiv1alpha1.GroupVersion.WithKind("ClusterManagementAddOn"))
 
 	addon, err := c.managedClusterAddonLister.ManagedClusterAddOns(namespace).Get(addonName)
 	switch {
@@ -104,11 +103,35 @@ func (c *clusterManagementController) sync(ctx context.Context, syncCtx factory.
 	}
 
 	addon = addon.DeepCopy()
-	if equality.Semantic.DeepEqual(coordinate, addon.Status.AddOnConfiguration) {
+
+	// AddOwner if it does not exist
+	modified := resourcemerge.BoolPtr(false)
+	resourcemerge.MergeOwnerRefs(modified, &addon.OwnerReferences, []metav1.OwnerReference{*owner})
+	if *modified {
+		_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Update(ctx, addon, metav1.UpdateOptions{})
+		return err
+	}
+
+	coordinate := addonapiv1alpha1.ConfigCoordinates{
+		CRDName: clusterManagementAddon.Spec.AddOnConfiguration.CRDName,
+		CRName:  clusterManagementAddon.Spec.AddOnConfiguration.CRName,
+	}
+
+	if !equality.Semantic.DeepEqual(coordinate, addon.Status.AddOnConfiguration) {
+		addon.Status.AddOnConfiguration = coordinate
+		*modified = true
+	}
+
+	utils.MergeRelatedObjects(modified, &addon.Status.RelatedObjects, addonapiv1alpha1.ObjectReference{
+		Name:     clusterManagementAddon.Name,
+		Resource: "clustermanagementaddons",
+		Group:    addonapiv1alpha1.GroupVersion.Group,
+	})
+
+	if !*modified {
 		return nil
 	}
 
-	addon.Status.AddOnConfiguration = coordinate
 	_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).UpdateStatus(ctx, addon, metav1.UpdateOptions{})
 
 	return err

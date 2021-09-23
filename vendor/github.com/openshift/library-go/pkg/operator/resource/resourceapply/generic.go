@@ -1,8 +1,10 @@
 package resourceapply
 
 import (
+	"context"
 	"fmt"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -22,6 +24,7 @@ import (
 	migrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset"
 
 	"github.com/openshift/api"
+
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 )
@@ -37,6 +40,7 @@ func init() {
 	utilruntime.Must(apiextensionsv1beta1.AddToScheme(genericScheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(genericScheme))
 	utilruntime.Must(migrationv1alpha1.AddToScheme(genericScheme))
+	utilruntime.Must(admissionregistrationv1.AddToScheme(genericScheme))
 	// TODO: remove once openshift/api/pull/929 is merged
 	utilruntime.Must(policyv1.AddToScheme(genericScheme))
 }
@@ -93,7 +97,7 @@ func (c *ClientHolder) WithMigrationClient(client migrationclient.Interface) *Cl
 }
 
 // ApplyDirectly applies the given manifest files to API server.
-func ApplyDirectly(clients *ClientHolder, recorder events.Recorder, manifests AssetFunc, files ...string) []ApplyResult {
+func ApplyDirectly(ctx context.Context, clients *ClientHolder, recorder events.Recorder, manifests AssetFunc, files ...string) []ApplyResult {
 	ret := []ApplyResult{}
 
 	for _, file := range files {
@@ -118,105 +122,111 @@ func ApplyDirectly(clients *ClientHolder, recorder events.Recorder, manifests As
 			if clients.kubeClient == nil {
 				result.Error = fmt.Errorf("missing kubeClient")
 			} else {
-				result.Result, result.Changed, result.Error = ApplyNamespace(clients.kubeClient.CoreV1(), recorder, t)
+				result.Result, result.Changed, result.Error = ApplyNamespace(ctx, clients.kubeClient.CoreV1(), recorder, t)
 			}
 		case *corev1.Service:
 			if clients.kubeClient == nil {
 				result.Error = fmt.Errorf("missing kubeClient")
 			} else {
-				result.Result, result.Changed, result.Error = ApplyService(clients.kubeClient.CoreV1(), recorder, t)
+				result.Result, result.Changed, result.Error = ApplyService(ctx, clients.kubeClient.CoreV1(), recorder, t)
 			}
 		case *corev1.Pod:
 			if clients.kubeClient == nil {
 				result.Error = fmt.Errorf("missing kubeClient")
 			} else {
-				result.Result, result.Changed, result.Error = ApplyPod(clients.kubeClient.CoreV1(), recorder, t)
+				result.Result, result.Changed, result.Error = ApplyPod(ctx, clients.kubeClient.CoreV1(), recorder, t)
 			}
 		case *corev1.ServiceAccount:
 			if clients.kubeClient == nil {
 				result.Error = fmt.Errorf("missing kubeClient")
 			} else {
-				result.Result, result.Changed, result.Error = ApplyServiceAccount(clients.kubeClient.CoreV1(), recorder, t)
+				result.Result, result.Changed, result.Error = ApplyServiceAccount(ctx, clients.kubeClient.CoreV1(), recorder, t)
 			}
 		case *corev1.ConfigMap:
 			client := clients.configMapsGetter()
 			if client == nil {
 				result.Error = fmt.Errorf("missing kubeClient")
 			} else {
-				result.Result, result.Changed, result.Error = ApplyConfigMap(client, recorder, t)
+				result.Result, result.Changed, result.Error = ApplyConfigMap(ctx, client, recorder, t)
 			}
 		case *corev1.Secret:
 			client := clients.secretsGetter()
 			if client == nil {
 				result.Error = fmt.Errorf("missing kubeClient")
 			} else {
-				result.Result, result.Changed, result.Error = ApplySecret(client, recorder, t)
+				result.Result, result.Changed, result.Error = ApplySecret(ctx, client, recorder, t)
 			}
 		case *rbacv1.ClusterRole:
 			if clients.kubeClient == nil {
 				result.Error = fmt.Errorf("missing kubeClient")
 			} else {
-				result.Result, result.Changed, result.Error = ApplyClusterRole(clients.kubeClient.RbacV1(), recorder, t)
+				result.Result, result.Changed, result.Error = ApplyClusterRole(ctx, clients.kubeClient.RbacV1(), recorder, t)
 			}
 		case *rbacv1.ClusterRoleBinding:
 			if clients.kubeClient == nil {
 				result.Error = fmt.Errorf("missing kubeClient")
 			} else {
-				result.Result, result.Changed, result.Error = ApplyClusterRoleBinding(clients.kubeClient.RbacV1(), recorder, t)
+				result.Result, result.Changed, result.Error = ApplyClusterRoleBinding(ctx, clients.kubeClient.RbacV1(), recorder, t)
 			}
 		case *rbacv1.Role:
 			if clients.kubeClient == nil {
 				result.Error = fmt.Errorf("missing kubeClient")
 			} else {
-				result.Result, result.Changed, result.Error = ApplyRole(clients.kubeClient.RbacV1(), recorder, t)
+				result.Result, result.Changed, result.Error = ApplyRole(ctx, clients.kubeClient.RbacV1(), recorder, t)
 			}
 		case *rbacv1.RoleBinding:
 			if clients.kubeClient == nil {
 				result.Error = fmt.Errorf("missing kubeClient")
 			} else {
-				result.Result, result.Changed, result.Error = ApplyRoleBinding(clients.kubeClient.RbacV1(), recorder, t)
+				result.Result, result.Changed, result.Error = ApplyRoleBinding(ctx, clients.kubeClient.RbacV1(), recorder, t)
 			}
 		case *policyv1.PodDisruptionBudget:
 			if clients.kubeClient == nil {
 				result.Error = fmt.Errorf("missing kubeClient")
 			} else {
-				result.Result, result.Changed, result.Error = ApplyPodDisruptionBudget(clients.kubeClient.PolicyV1(), recorder, t)
-			}
-		case *apiextensionsv1beta1.CustomResourceDefinition:
-			if clients.apiExtensionsClient == nil {
-				result.Error = fmt.Errorf("missing apiExtensionsClient")
-			} else {
-				result.Result, result.Changed, result.Error = ApplyCustomResourceDefinitionV1Beta1(clients.apiExtensionsClient.ApiextensionsV1beta1(), recorder, t)
+				result.Result, result.Changed, result.Error = ApplyPodDisruptionBudget(ctx, clients.kubeClient.PolicyV1(), recorder, t)
 			}
 		case *apiextensionsv1.CustomResourceDefinition:
 			if clients.apiExtensionsClient == nil {
 				result.Error = fmt.Errorf("missing apiExtensionsClient")
 			} else {
-				result.Result, result.Changed, result.Error = ApplyCustomResourceDefinitionV1(clients.apiExtensionsClient.ApiextensionsV1(), recorder, t)
+				result.Result, result.Changed, result.Error = ApplyCustomResourceDefinitionV1(ctx, clients.apiExtensionsClient.ApiextensionsV1(), recorder, t)
 			}
 		case *storagev1.StorageClass:
 			if clients.kubeClient == nil {
 				result.Error = fmt.Errorf("missing kubeClient")
 			} else {
-				result.Result, result.Changed, result.Error = ApplyStorageClass(clients.kubeClient.StorageV1(), recorder, t)
+				result.Result, result.Changed, result.Error = ApplyStorageClass(ctx, clients.kubeClient.StorageV1(), recorder, t)
+			}
+		case *admissionregistrationv1.ValidatingWebhookConfiguration:
+			if clients.kubeClient == nil {
+				result.Error = fmt.Errorf("missing kubeClient")
+			} else {
+				result.Result, result.Changed, result.Error = ApplyValidatingWebhookConfiguration(ctx, clients.kubeClient.AdmissionregistrationV1(), recorder, t, -1)
+			}
+		case *admissionregistrationv1.MutatingWebhookConfiguration:
+			if clients.kubeClient == nil {
+				result.Error = fmt.Errorf("missing kubeClient")
+			} else {
+				result.Result, result.Changed, result.Error = ApplyMutatingWebhookConfiguration(ctx, clients.kubeClient.AdmissionregistrationV1(), recorder, t, -1)
 			}
 		case *storagev1.CSIDriver:
 			if clients.kubeClient == nil {
 				result.Error = fmt.Errorf("missing kubeClient")
 			} else {
-				result.Result, result.Changed, result.Error = ApplyCSIDriver(clients.kubeClient.StorageV1(), recorder, t)
+				result.Result, result.Changed, result.Error = ApplyCSIDriver(ctx, clients.kubeClient.StorageV1(), recorder, t)
 			}
 		case *migrationv1alpha1.StorageVersionMigration:
 			if clients.migrationClient == nil {
 				result.Error = fmt.Errorf("missing migrationClient")
 			} else {
-				result.Result, result.Changed, result.Error = ApplyStorageVersionMigration(clients.migrationClient, recorder, t)
+				result.Result, result.Changed, result.Error = ApplyStorageVersionMigration(ctx, clients.migrationClient, recorder, t)
 			}
 		case *unstructured.Unstructured:
 			if clients.dynamicClient == nil {
 				result.Error = fmt.Errorf("missing dynamicClient")
 			} else {
-				result.Result, result.Changed, result.Error = ApplyKnownUnstructured(clients.dynamicClient, recorder, t)
+				result.Result, result.Changed, result.Error = ApplyKnownUnstructured(ctx, clients.dynamicClient, recorder, t)
 			}
 		default:
 			result.Error = fmt.Errorf("unhandled type %T", requiredObj)

@@ -164,6 +164,9 @@ var ReservedClusterClaimNames = [...]string{
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope="Namespaced"
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Succeeded",type="string",JSONPath=".status.conditions[?(@.type==\"PlacementSatisfied\")].status"
+// +kubebuilder:printcolumn:name="Reason",type="string",JSONPath=".status.conditions[?(@.type==\"PlacementSatisfied\")].reason"
+// +kubebuilder:printcolumn:name="SelectedClusters",type="integer",JSONPath=".status.numberOfSelectedClusters"
 
 // Placement defines a rule to select a set of ManagedClusters from the ManagedClusterSets bound
 // to the placement namespace.
@@ -230,6 +233,12 @@ type PlacementSpec struct {
 	// Predicates represent a slice of predicates to select ManagedClusters. The predicates are ORed.
 	// +optional
 	Predicates []ClusterPredicate `json:"predicates,omitempty"`
+
+	// PrioritizerPolicy defines the policy of the prioritizers.
+	// If this field is unset, then default prioritizer mode and configurations are used.
+	// Referring to PrioritizerPolicy to see more description about Mode and Configurations.
+	// +optional
+	PrioritizerPolicy PrioritizerPolicy `json:"prioritizerPolicy"`
 }
 
 // ClusterPredicate represents a predicate to select ManagedClusters.
@@ -262,6 +271,55 @@ type ClusterClaimSelector struct {
 	// matchExpressions is a list of cluster claim selector requirements. The requirements are ANDed.
 	// +optional
 	MatchExpressions []metav1.LabelSelectorRequirement `json:"matchExpressions,omitempty"`
+}
+
+// PrioritizerPolicy represents the policy of prioritizer
+type PrioritizerPolicy struct {
+	// Mode is either Exact, Additive, "" where "" is Additive by default.
+	// In Additive mode, any prioritizer not explicitly enumerated is enabled in its default Configurations,
+	// in which Steady and Balance prioritizers have the weight of 1 while other prioritizers have the weight of 0.
+	// Additive doesn't require configuring all prioritizers. The default Configurations may change in the future,
+	// and additional prioritization will happen.
+	// In Exact mode, any prioritizer not explicitly enumerated is weighted as zero.
+	// Exact requires knowing the full set of prioritizers you want, but avoids behavior changes between releases.
+	// +kubebuilder:default:=Additive
+	// +optional
+	Mode PrioritizerPolicyModeType `json:"mode,omitempty"`
+
+	// +optional
+	Configurations []PrioritizerConfig `json:"configurations,omitempty"`
+}
+
+// PrioritizerPolicyModeType represents the type of PrioritizerPolicy.Mode
+type PrioritizerPolicyModeType string
+
+const (
+	// Valid PrioritizerPolicyModeType value is Exact, Additive.
+	PrioritizerPolicyModeAdditive PrioritizerPolicyModeType = "Additive"
+	PrioritizerPolicyModeExact    PrioritizerPolicyModeType = "Exact"
+)
+
+// PrioritizerConfig represents the configuration of prioritizer
+type PrioritizerConfig struct {
+	// Name is the name of a prioritizer. Below are the valid names:
+	// 1) Balance: balance the decisions among the clusters.
+	// 2) Steady: ensure the existing decision is stabilized.
+	// 3) ResourceRatioCPU & ResourceRatioMemory: sort clusters based on the allocatable to capacity ratio.
+	// 4) ResourceAllocatableCPU & ResourceAllocatableMemory: sort clusters based on the allocatable.
+	// +kubebuilder:validation:Required
+	// +required
+	Name string `json:"name"`
+
+	// Weight defines the weight of prioritizer. The value must be ranged in [0,10].
+	// Each prioritizer will calculate an integer score of a cluster in the range of [-100, 100].
+	// The final score of a cluster will be sum(weight * prioritizer_score).
+	// A higher weight indicates that the prioritizer weights more in the cluster selection,
+	// while 0 weight indicate thats the prioritizer is disabled.
+	// +kubebuilder:validation:Minimum:=0
+	// +kubebuilder:validation:Maximum:=10
+	// +kubebuilder:default:=1
+	// +optional
+	Weight int32 `json:"weight,omitempty"`
 }
 
 type PlacementStatus struct {
@@ -318,6 +376,11 @@ type PlacementDecision struct {
 	// +optional
 	Status PlacementDecisionStatus `json:"status,omitempty"`
 }
+
+//The placementDecsion label name holding the placement name
+const (
+	PlacementLabel string = "cluster.open-cluster-management.io/placement"
+)
 
 // PlacementDecisionStatus represents the current status of the PlacementDecision.
 type PlacementDecisionStatus struct {

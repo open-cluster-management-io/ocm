@@ -48,11 +48,12 @@ func NewUnstructured(apiVersion, kind, namespace, name string) *unstructured.Uns
 	}
 }
 
-func NewAddon(name, namespace string) *addonapiv1alpha1.ManagedClusterAddOn {
+func NewAddon(name, namespace string, owners ...metav1.OwnerReference) *addonapiv1alpha1.ManagedClusterAddOn {
 	return &addonapiv1alpha1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:            name,
+			Namespace:       namespace,
+			OwnerReferences: owners,
 		},
 	}
 }
