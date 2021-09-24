@@ -109,7 +109,7 @@ func (m *finalizeController) syncRoleAndRoleBinding(ctx context.Context, control
 		return nil
 	}
 
-	// There are twp possible cases that we need to remove finalizers on role/rolebindings based on
+	// There are two possible cases that we need to remove finalizers on role/rolebindings based on
 	// clean of manifestworks.
 	// 1. The namespace is finalizing.
 	// 2. The cluster is finalizing but namespace fails to be deleted.
