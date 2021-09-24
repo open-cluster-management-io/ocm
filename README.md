@@ -40,13 +40,13 @@ make images
 export IMAGE_NAME=<placement_image_name> # export IMAGE_NAME=quay.io/open-cluster-management/placement:latest
 ```
 
-If your are using kind, load image into kind cluster.
+If your are using kind, load image into the kind cluster.
 ```sh
 kind load docker-image <placement_image_name> # kind load docker-image quay.io/open-cluster-management/placement:latest
 ```
 
-And then deploy placement manager on cluster
-```
+And then deploy placement manager on the cluster.
+```sh
 make deploy-hub
 ```
 
@@ -61,7 +61,7 @@ cluster-manager-placement-controller-cf9bbd6c-x9dnd   1/1     Running   0       
 Here is an example.
 
 Create a `ManagedClusterSet`.
-```
+```sh
 cat <<EOF | kubectl apply -f -
 apiVersion: cluster.open-cluster-management.io/v1alpha1
 kind: ManagedClusterSet
@@ -71,7 +71,7 @@ EOF
 ```
 
 Create a `ManagedCluster` and assign it to clusterset `clusterset1`.
-```
+```sh
 cat <<EOF | kubectl apply -f -
 apiVersion: cluster.open-cluster-management.io/v1
 kind: ManagedCluster
@@ -86,7 +86,7 @@ EOF
 ```
 
 Create a `ManagedClusterSetBinding` to bind the `ManagedClusterSet` to the default namespace.
-```
+```sh
 cat <<EOF | kubectl apply -f -
 apiVersion: cluster.open-cluster-management.io/v1alpha1
 kind: ManagedClusterSetBinding
@@ -99,7 +99,7 @@ EOF
 ```
 
 Now create a `Placement`:
-```
+```sh
 cat <<EOF | kubectl apply -f -
 apiVersion: cluster.open-cluster-management.io/v1alpha1
 kind: Placement
@@ -133,7 +133,7 @@ Events:            <none>
 
 ### Clean up
 Undeploy placement controller from the cluster.
-```
+```sh
 make undeploy-hub
 ```
 
