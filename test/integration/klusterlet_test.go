@@ -543,6 +543,46 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "KlusterletRegistrationDegraded", "RegistrationFunctional", metav1.ConditionFalse)
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "KlusterletWorkDegraded", "WorkFunctional", metav1.ConditionFalse)
 		})
+
+		ginkgo.It("should have correct available conditions", func() {
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			registrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "Available", "NoAvailablePods", metav1.ConditionFalse)
+
+			// Update replica of deployment, more than 0 AvailableReplicas makes the Available=true
+			registrationDeployment.Status.AvailableReplicas = 1
+			registrationDeployment.Status.Replicas = 3
+			registrationDeployment.Status.ReadyReplicas = 3
+			_, err = kubeClient.AppsV1().Deployments(klusterletNamespace).UpdateStatus(context.Background(), registrationDeployment, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			workDeployment.Status.AvailableReplicas = 1
+			workDeployment.Status.Replicas = 3
+			workDeployment.Status.ReadyReplicas = 3
+			_, err = kubeClient.AppsV1().Deployments(klusterletNamespace).UpdateStatus(context.Background(), workDeployment, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "Available", "klusterletAvailable", metav1.ConditionTrue)
+		})
 	})
 
 	ginkgo.Context("bootstrap reconciliation", func() {
