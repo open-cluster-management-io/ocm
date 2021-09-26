@@ -41,6 +41,7 @@ const (
 	klusterletWork                 = "Work"
 	klusterletRegistrationDegraded = "KlusterletRegistrationDegraded"
 	klusterletWorKDegraded         = "KlusterletWorkDegraded"
+	klusterletAvailable            = "Available"
 )
 
 // NewKlusterletStatusController returns a klusterletStatusController
@@ -112,9 +113,28 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 		[]degradedCheckFunc{checkHubConfigSecret, checkAgentDeployment},
 	)
 
+	availableCondition := checkAgentsDeployment(
+		ctx, k.kubeClient,
+		[]klusterletAgent{
+			{
+				clusterName:    klusterlet.Spec.ClusterName,
+				deploymentName: fmt.Sprintf("%s-registration-agent", klusterlet.Name),
+				namespace:      klusterletNS,
+				getSSARFunc:    getWorkSelfSubjectAccessReviews,
+			},
+			{
+				clusterName:    klusterlet.Spec.ClusterName,
+				deploymentName: fmt.Sprintf("%s-work-agent", klusterlet.Name),
+				namespace:      klusterletNS,
+				getSSARFunc:    getWorkSelfSubjectAccessReviews,
+			},
+		},
+	)
+
 	_, _, err = helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
 		helpers.UpdateKlusterletConditionFn(registrationDegradedCondition),
 		helpers.UpdateKlusterletConditionFn(workDegradedCondition),
+		helpers.UpdateKlusterletConditionFn(availableCondition),
 	)
 	return err
 }
@@ -124,6 +144,39 @@ type klusterletAgent struct {
 	deploymentName string
 	namespace      string
 	getSSARFunc    getSelfSubjectAccessReviewsFunc
+}
+
+// Check agent deployments, if both of them have at least 1 available replicas, return available condition
+func checkAgentsDeployment(ctx context.Context, kubeClient kubernetes.Interface, agents []klusterletAgent) metav1.Condition {
+	availableMessages := []string{}
+	for _, agent := range agents {
+		deployment, err := kubeClient.AppsV1().Deployments(agent.namespace).Get(ctx, agent.deploymentName, metav1.GetOptions{})
+		if err != nil {
+			return metav1.Condition{
+				Type:    klusterletAvailable,
+				Status:  metav1.ConditionFalse,
+				Reason:  "GetDeploymentFailed",
+				Message: fmt.Sprintf("Failed to get deployment %q %q: %v", agent.namespace, agent.deploymentName, err),
+			}
+		}
+		if deployment.Status.AvailableReplicas <= 0 {
+			return metav1.Condition{
+				Type:   klusterletAvailable,
+				Status: metav1.ConditionFalse,
+				Reason: "NoAvailablePods",
+				Message: fmt.Sprintf("%v of requested instances are available of deployment %q %q",
+					deployment.Status.AvailableReplicas, agent.namespace, agent.deploymentName),
+			}
+		}
+		availableMessages = append(availableMessages, agent.deploymentName)
+	}
+
+	return metav1.Condition{
+		Type:    klusterletAvailable,
+		Status:  metav1.ConditionTrue,
+		Reason:  "klusterletAvailable",
+		Message: fmt.Sprintf("deployments are ready: %s", strings.Join(availableMessages, ",")),
+	}
 }
 
 func checkAgentDegradedCondition(
