@@ -69,16 +69,6 @@ func TestSchedule(t *testing.T) {
 					Weight: 0,
 					Scores: nil,
 				},
-				{
-					Name:   "ResourceRatioCPU",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceRatioMemory",
-					Weight: 0,
-					Scores: nil,
-				},
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
@@ -123,16 +113,6 @@ func TestSchedule(t *testing.T) {
 				},
 				{
 					Name:   "ResourceAllocatableMemory",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceRatioCPU",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceRatioMemory",
 					Weight: 0,
 					Scores: nil,
 				},
@@ -190,16 +170,6 @@ func TestSchedule(t *testing.T) {
 					Weight: 0,
 					Scores: nil,
 				},
-				{
-					Name:   "ResourceRatioCPU",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceRatioMemory",
-					Weight: 0,
-					Scores: nil,
-				},
 			},
 			expectedUnScheduled: 0,
 		},
@@ -241,16 +211,6 @@ func TestSchedule(t *testing.T) {
 					Weight: 0,
 					Scores: nil,
 				},
-				{
-					Name:   "ResourceRatioCPU",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceRatioMemory",
-					Weight: 0,
-					Scores: nil,
-				},
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
@@ -259,15 +219,15 @@ func TestSchedule(t *testing.T) {
 		},
 		{
 			name:      "placement with additive Prioritizer Policy",
-			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithNOC(2).WithPrioritizerPolicy("Additive").WithPrioritizerConfig("Balance", 3).WithPrioritizerConfig("ResourceRatioCPU", 1).Build(),
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithNOC(2).WithPrioritizerPolicy("Additive").WithPrioritizerConfig("Balance", 3).WithPrioritizerConfig("ResourceAllocatableMemory", 1).Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet(clusterSetName),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
-				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceCPU, "10", "10").Build(),
-				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceCPU, "5", "10").Build(),
-				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceCPU, "0", "10").Build(),
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "100", "100").Build(),
+				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "50", "100").Build(),
+				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "0", "100").Build(),
 			},
 			decisions: []runtime.Object{},
 			expectedDecisions: []clusterapiv1alpha1.ClusterDecision{
@@ -298,33 +258,23 @@ func TestSchedule(t *testing.T) {
 				},
 				{
 					Name:   "ResourceAllocatableMemory",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceRatioCPU",
 					Weight: 1,
 					Scores: PrioritizerScore{"cluster1": 100, "cluster2": 0, "cluster3": -100},
-				},
-				{
-					Name:   "ResourceRatioMemory",
-					Weight: 0,
-					Scores: nil,
 				},
 			},
 			expectedUnScheduled: 0,
 		},
 		{
 			name:      "placement with exact Prioritizer Policy",
-			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithNOC(2).WithPrioritizerPolicy("Exact").WithPrioritizerConfig("Balance", 3).WithPrioritizerConfig("ResourceRatioCPU", 1).Build(),
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithNOC(2).WithPrioritizerPolicy("Exact").WithPrioritizerConfig("Balance", 3).WithPrioritizerConfig("ResourceAllocatableMemory", 1).Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet(clusterSetName),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
-				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceCPU, "10", "10").Build(),
-				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceCPU, "5", "10").Build(),
-				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceCPU, "0", "10").Build(),
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "100", "100").Build(),
+				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "50", "100").Build(),
+				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "0", "100").Build(),
 			},
 			decisions: []runtime.Object{},
 			expectedDecisions: []clusterapiv1alpha1.ClusterDecision{
@@ -355,18 +305,8 @@ func TestSchedule(t *testing.T) {
 				},
 				{
 					Name:   "ResourceAllocatableMemory",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceRatioCPU",
 					Weight: 1,
 					Scores: PrioritizerScore{"cluster1": 100, "cluster2": 0, "cluster3": -100},
-				},
-				{
-					Name:   "ResourceRatioMemory",
-					Weight: 0,
-					Scores: nil,
 				},
 			},
 			expectedUnScheduled: 0,
@@ -421,16 +361,6 @@ func TestSchedule(t *testing.T) {
 					Weight: 0,
 					Scores: nil,
 				},
-				{
-					Name:   "ResourceRatioCPU",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceRatioMemory",
-					Weight: 0,
-					Scores: nil,
-				},
 			},
 			expectedUnScheduled: 2,
 		},
@@ -479,16 +409,6 @@ func TestSchedule(t *testing.T) {
 				},
 				{
 					Name:   "ResourceAllocatableMemory",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceRatioCPU",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceRatioMemory",
 					Weight: 0,
 					Scores: nil,
 				},
@@ -550,16 +470,6 @@ func TestSchedule(t *testing.T) {
 				},
 				{
 					Name:   "ResourceAllocatableMemory",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceRatioCPU",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceRatioMemory",
 					Weight: 0,
 					Scores: nil,
 				},

@@ -304,8 +304,7 @@ type PrioritizerConfig struct {
 	// Name is the name of a prioritizer. Below are the valid names:
 	// 1) Balance: balance the decisions among the clusters.
 	// 2) Steady: ensure the existing decision is stabilized.
-	// 3) ResourceRatioCPU & ResourceRatioMemory: sort clusters based on the allocatable to capacity ratio.
-	// 4) ResourceAllocatableCPU & ResourceAllocatableMemory: sort clusters based on the allocatable.
+	// 3) ResourceAllocatableCPU & ResourceAllocatableMemory: sort clusters based on the allocatable.
 	// +kubebuilder:validation:Required
 	// +required
 	Name string `json:"name"`

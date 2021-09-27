@@ -123,8 +123,6 @@ func NewPluginScheduler(handle plugins.Handle) *pluginScheduler {
 			steady.New(handle),
 			resource.NewResourcePrioritizerBuilder(handle).WithPrioritizerName("ResourceAllocatableCPU").Build(),
 			resource.NewResourcePrioritizerBuilder(handle).WithPrioritizerName("ResourceAllocatableMemory").Build(),
-			resource.NewResourcePrioritizerBuilder(handle).WithPrioritizerName("ResourceRatioCPU").Build(),
-			resource.NewResourcePrioritizerBuilder(handle).WithPrioritizerName("ResourceRatioMemory").Build(),
 		},
 		prioritizerWeights: defaultPrioritizerConfig,
 	}
