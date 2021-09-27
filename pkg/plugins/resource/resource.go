@@ -14,10 +14,9 @@ import (
 const (
 	placementLabel = clusterapiv1alpha1.PlacementLabel
 	description    = `
-	ResourceRatio[ResourceType] and ResourceAllocatable[ResourceType] prioritizer makes the scheduling 
-	decisions based on the resource allocatable to capacity ratio or allocatable of managed clusters. 
-	The [ResourceType] could be CPU or Memory.
-	The clusters that has the most allocatable to capacity ratio or allocatable are given the highest score, 
+	ResourceAllocatableCPU and ResourceAllocatableMemory prioritizer makes the scheduling 
+	decisions based on the resource allocatable of managed clusters. 
+	The clusters that has the most allocatable are given the highest score, 
 	while the least is given the lowest score.
 	`
 )
@@ -79,36 +78,10 @@ func (r *ResourcePrioritizer) Description() string {
 }
 
 func (r *ResourcePrioritizer) Score(ctx context.Context, placement *clusterapiv1alpha1.Placement, clusters []*clusterapiv1.ManagedCluster) (map[string]int64, error) {
-	switch r.algorithm {
-	case "Ratio":
-		return mostResourceRatioScores(r.resource, clusters)
-	case "Allocatable":
+	if r.algorithm == "Allocatable" {
 		return mostResourceAllocatableScores(r.resource, clusters)
 	}
 	return nil, nil
-}
-
-// Calculate clusters scores based on the resource allocatable to capacity ratio.
-// The clusters that has the most allocatable to capacity ratio are given the highest score, while the least is given the lowest score.
-// The score range is from -100 to 100.
-func mostResourceRatioScores(resourceName clusterapiv1.ResourceName, clusters []*clusterapiv1.ManagedCluster) (map[string]int64, error) {
-	scores := map[string]int64{}
-
-	for _, cluster := range clusters {
-		// get cluster resourceName's allocatable and capacity
-		allocatable, capacity, err := getClusterResource(cluster, resourceName)
-		if err != nil {
-			continue
-		}
-
-		// score = (resource_x_allocatable / resource_x_capacity - 0.5) * 2 * 100
-		if capacity != 0 {
-			ratio := float64(allocatable) / float64(capacity)
-			scores[cluster.Name] = int64((ratio - 0.5) * 2.0 * 100.0)
-		}
-	}
-
-	return scores, nil
 }
 
 // Calculate clusters scores based on the resource allocatable.

@@ -480,47 +480,7 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertClusterNamesOfDecisions(placementName, []string{clusterNames[0], clusterNames[1]})
 		})
 
-		ginkgo.It("Should schedule successfully based on SchedulePolicy ResourceRatioCPU and ResourceRatioCPU", func() {
-			// cluster settings
-			clusterNames := []string{
-				clusterName + "-1",
-				clusterName + "-2",
-				clusterName + "-3",
-			}
-			clusterResources := make([][]string, len(clusterNames))
-			clusterResources[0] = []string{"10", "10", "50", "100"}
-			clusterResources[1] = []string{"7", "10", "90", "100"}
-			clusterResources[2] = []string{"9", "10", "80", "100"}
-
-			// placement settings
-			prioritizerPolicy := clusterapiv1alpha1.PrioritizerPolicy{
-				Mode: clusterapiv1alpha1.PrioritizerPolicyModeExact,
-				Configurations: []clusterapiv1alpha1.PrioritizerConfig{
-					{
-						Name:   "ResourceRatioCPU",
-						Weight: 1,
-					},
-					{
-						Name:   "ResourceRatioMemory",
-						Weight: 1,
-					},
-				},
-			}
-
-			//Creating the clusters with resources
-			assertBindingClusterSet(clusterSet1Name)
-			assertCreatingClustersWithNames(clusterSet1Name, clusterNames)
-			for i, name := range clusterNames {
-				assertUpdatingClusterWithClusterResources(name, clusterResources[i])
-			}
-
-			//Checking the result of the placement
-			assertCreatingPlacement(placementName, noc(2), 2, prioritizerPolicy)
-			assertClusterNamesOfDecisions(placementName, []string{clusterNames[1], clusterNames[2]})
-
-		})
-
-		ginkgo.It("Should schedule successfully based on default SchedulePolicy ResourceAllocatableCPU & ResourceAllocatableMemory", func() {
+		ginkgo.It("Should schedule successfully based on SchedulePolicy ResourceAllocatableCPU & ResourceAllocatableMemory", func() {
 			// cluster settings
 			clusterNames := []string{
 				clusterName + "-1",
@@ -577,11 +537,11 @@ var _ = ginkgo.Describe("Placement", func() {
 				Mode: clusterapiv1alpha1.PrioritizerPolicyModeExact,
 				Configurations: []clusterapiv1alpha1.PrioritizerConfig{
 					{
-						Name:   "ResourceRatioCPU",
+						Name:   "ResourceAllocatableCPU",
 						Weight: 1,
 					},
 					{
-						Name:   "ResourceRatioMemory",
+						Name:   "ResourceAllocatableMemory",
 						Weight: 1,
 					},
 				},
@@ -596,7 +556,7 @@ var _ = ginkgo.Describe("Placement", func() {
 
 			//Checking the result of the placement
 			assertCreatingPlacement(placementName, noc(2), 2, prioritizerPolicy)
-			assertClusterNamesOfDecisions(placementName, []string{clusterNames[1], clusterNames[2]})
+			assertClusterNamesOfDecisions(placementName, []string{clusterNames[0], clusterNames[2]})
 
 			ginkgo.By("Adding a new cluster with resources")
 			clusterNames = append(clusterNames, clusterName+"-4")
@@ -609,7 +569,7 @@ var _ = ginkgo.Describe("Placement", func() {
 
 		})
 
-		ginkgo.It("Should keep steady successfully even placementdecisions' balance and cluster resource changes", func() {
+		ginkgo.It("Should keep steady successfully even placementdecisions' balance and cluster situation changes", func() {
 			// cluster settings
 			clusterNames := []string{
 				clusterName + "-1",
@@ -630,11 +590,11 @@ var _ = ginkgo.Describe("Placement", func() {
 						Weight: 3,
 					},
 					{
-						Name:   "ResourceRatioCPU",
+						Name:   "ResourceAllocatableCPU",
 						Weight: 1,
 					},
 					{
-						Name:   "ResourceRatioMemory",
+						Name:   "ResourceAllocatableMemory",
 						Weight: 1,
 					},
 				},
@@ -648,14 +608,18 @@ var _ = ginkgo.Describe("Placement", func() {
 
 			//Checking the result of the placement
 			assertCreatingPlacement(placementName, noc(2), 2, prioritizerPolicy)
-			assertClusterNamesOfDecisions(placementName, []string{clusterNames[1], clusterNames[2]})
+			assertClusterNamesOfDecisions(placementName, []string{clusterNames[0], clusterNames[2]})
 
-			ginkgo.By("Adding fake placement decisions and update cluster resources")
+			ginkgo.By("Adding fake placement decisions")
 			assertCreatingPlacementDecision(placementName+"-1", []string{clusterNames[1]})
-			assertUpdatingClusterWithClusterResources(clusterNames[0], []string{"10", "10", "10", "100"})
+			ginkgo.By("Adding a new cluster with resources")
+			clusterNames = append(clusterNames, clusterName+"-4")
+			newClusterResources := []string{"10", "10", "100", "100"}
+			assertCreatingClustersWithNames(clusterSet1Name, clusterNames[3:4])
+			assertUpdatingClusterWithClusterResources(clusterNames[3], newClusterResources)
 
 			//Checking the result of the placement
-			assertClusterNamesOfDecisions(placementName, []string{clusterNames[1], clusterNames[2]})
+			assertClusterNamesOfDecisions(placementName, []string{clusterNames[0], clusterNames[2]})
 		})
 	})
 })

@@ -17,6 +17,6 @@ require (
 	k8s.io/client-go v0.21.1
 	k8s.io/component-base v0.21.0
 	k8s.io/klog/v2 v2.8.0
-	open-cluster-management.io/api v0.0.0-20210916013819-2e58cdb938f9
+	open-cluster-management.io/api v0.0.0-20210927063308-2c6896161c48
 	sigs.k8s.io/controller-runtime v0.8.3
 )
