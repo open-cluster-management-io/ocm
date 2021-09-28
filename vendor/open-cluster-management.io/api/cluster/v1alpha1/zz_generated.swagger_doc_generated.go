@@ -212,7 +212,7 @@ func (PlacementStatus) SwaggerDoc() map[string]string {
 
 var map_PrioritizerConfig = map[string]string{
 	"":       "PrioritizerConfig represents the configuration of prioritizer",
-	"name":   "Name is the name of a prioritizer. Below are the valid names: 1) Balance: balance the decisions among the clusters. 2) Steady: ensure the existing decision is stabilized. 3) ResourceRatioCPU & ResourceRatioMemory: sort clusters based on the allocatable to capacity ratio. 4) ResourceAllocatableCPU & ResourceAllocatableMemory: sort clusters based on the allocatable.",
+	"name":   "Name is the name of a prioritizer. Below are the valid names: 1) Balance: balance the decisions among the clusters. 2) Steady: ensure the existing decision is stabilized. 3) ResourceAllocatableCPU & ResourceAllocatableMemory: sort clusters based on the allocatable.",
 	"weight": "Weight defines the weight of prioritizer. The value must be ranged in [0,10]. Each prioritizer will calculate an integer score of a cluster in the range of [-100, 100]. The final score of a cluster will be sum(weight * prioritizer_score). A higher weight indicates that the prioritizer weights more in the cluster selection, while 0 weight indicate thats the prioritizer is disabled.",
 }
 
