@@ -144,7 +144,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/openshift/api v0.0.0-20210730095913-85e1d547cdee
+# github.com/openshift/api v0.0.0-20210831091943-07e756545ac1
 github.com/openshift/api
 github.com/openshift/api/apiserver
 github.com/openshift/api/apiserver/v1
@@ -216,7 +216,7 @@ github.com/openshift/build-machinery-go/scripts
 github.com/openshift/generic-admission-server/pkg/apiserver
 github.com/openshift/generic-admission-server/pkg/cmd/server
 github.com/openshift/generic-admission-server/pkg/registry/admissionreview
-# github.com/openshift/library-go v0.0.0-20210902020120-5ddb355aea6f => github.com/qiujian16/library-go v0.0.0-20210830020149-91704dd0762a
+# github.com/openshift/library-go v0.0.0-20210902020120-5ddb355aea6f
 ## explicit
 github.com/openshift/library-go/pkg/authorization/hardcodedauthorizer
 github.com/openshift/library-go/pkg/config/client
@@ -1120,4 +1120,3 @@ sigs.k8s.io/structured-merge-diff/v4/typed
 sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.2.0
 sigs.k8s.io/yaml
-# github.com/openshift/library-go => github.com/qiujian16/library-go v0.0.0-20210830020149-91704dd0762a
