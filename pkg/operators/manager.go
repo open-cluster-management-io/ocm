@@ -24,6 +24,7 @@ import (
 	clustermanagerstatuscontroller "open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/statuscontroller"
 	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/controllers/bootstrapcontroller"
 	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/controllers/klusterletcontroller"
+	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/controllers/ssarcontroller"
 	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/controllers/statuscontroller"
 )
 
@@ -152,11 +153,18 @@ func RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd
 		operatorNamespace,
 		controllerContext.EventRecorder)
 
-	statusController := statuscontroller.NewKlusterletStatusController(
+	ssarController := ssarcontroller.NewKlustrletSSARController(
 		kubeClient,
 		operatorClient.OperatorV1().Klusterlets(),
 		operatorInformer.Operator().V1().Klusterlets(),
 		kubeInformer.Core().V1().Secrets(),
+		controllerContext.EventRecorder,
+	)
+
+	statusController := statuscontroller.NewKlusterletStatusController(
+		kubeClient,
+		operatorClient.OperatorV1().Klusterlets(),
+		operatorInformer.Operator().V1().Klusterlets(),
 		kubeInformer.Apps().V1().Deployments(),
 		controllerContext.EventRecorder,
 	)
@@ -172,6 +180,7 @@ func RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd
 	go kubeInformer.Start(ctx.Done())
 	go klusterletController.Run(ctx, 1)
 	go statusController.Run(ctx, 1)
+	go ssarController.Run(ctx, 1)
 	go bootstrapController.Run(ctx, 1)
 
 	<-ctx.Done()
