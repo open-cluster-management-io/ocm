@@ -2,8 +2,9 @@
 
 Welcome! The open-cluster-management.io project is focused on enabling end-to-end visibility and control across your Kubernetes clusters.
 
-The open-cluster-management architecture uses a hub - agent model. The hub centralizes control of all the managed clusters. An agent, which we call the klusterlet, resides on each managed cluster to manage registration to the hub and run instructions from the hub.
+The Open Cluster Management (OCM) architecture uses a hub - agent model. The hub centralizes control of all the managed clusters. An agent, which we call the klusterlet, resides on each managed cluster to manage registration to the hub and run instructions from the hub.
 
+You can use the [clusteradm CLI](https://github.com/open-cluster-management-io/clusteradm) to bootstrap a control plane for multicluster management. The following diagram illustrates the deployment architecture for OCM:
 
 ![image](assets/ocm-arch.png)
 
@@ -11,26 +12,19 @@ There are a number of key use cases that are enabled by this project, and are ca
 
 ### Cluster Lifecycle: Cluster registration and management
 
-The API and controllers provide the function for cluster registration, manifests delivery, cluster scheduling and addon management. Simple core functions connect clusters, such as the klusterlet, to the hub. Other components run on this base. The following repositories describe the API and controllers:
+OCM has a group of [APIs](https://github.com/open-cluster-management-io/api) to provide the foundational functions
+in multiple cluster management. 
 
-* https://github.com/open-cluster-management-io/api
-* https://github.com/open-cluster-management-io/registration
-* https://github.com/open-cluster-management-io/work
-* https://github.com/open-cluster-management-io/placement
-* https://github.com/open-cluster-management-io/registration-operator
-* https://github.com/open-cluster-management-io/addon-framework
+The journey of cluster management starts with [Cluster Registration](https://github.com/open-cluster-management-io/registration) which follows a `double opt-in` protocol to establish a MTLS connection from the agent on the managed cluster (Klusterlet) to the hub (Cluster Manager). After this, users or operands on the hub can declare [ManifestWorks](https://github.com/open-cluster-management-io/work) which contains a slice of Kubernetes resource manifests to be distributed and applied to a certain managed cluster. To schedule workloads to a certain set of clusters, users can also declare a [Placement](https://github.com/open-cluster-management-io/placement) on the hub to dynamically select a set of clusters with certain criteria.
+
+In addition, developers can leverage [Addon framework](https://github.com/open-cluster-management-io/addon-framework) to build their own management tools or integrate with other open source projects to extend the multicluster management capability. OCM has maintained two built-in addons for application lifecycle and security governance.
 
 ### Application Lifecycle: Delivery, upgrade, and configuration of applications on Kubernetes clusters
 
 * Centrally create, update, and delete Kubernetes clusters across multiple private and public clouds.
 * Automatically deploy applications to specific clusters by subscribing to different workload (resource) channels, such as GitHub, Helm repository, ObjectStore, and resource templates.
 
-The application model defines a Kubernetes-first way of describing the application. Your existing Kubernetes apps or `kustomized` apps can be adapted with the addition of a few new objects: `Channel`, and `Subscription`. Changes made to the app are then easily delivered to managed clusters based on the dynamic placement engine.
-
-The following repositories describe the underlying API and controllers for the app model:
-
-* https://github.com/open-cluster-management-io/multicloud-operators-subscription
-* https://github.com/open-cluster-management-io/multicloud-operators-channel
+The application model defines a Kubernetes-first way of describing the application. Your existing Kubernetes apps or `kustomized` apps can be adapted with the addition of a few new objects: [Channel](https://github.com/open-cluster-management-io/multicloud-operators-channel), and [Subscription](https://github.com/open-cluster-management-io/multicloud-operators-subscription). Changes made to the app are then easily delivered to managed clusters based on the dynamic placement engine.
 
 ### GRC: Governance, Risk and Compliance across Kubernetes clusters
 
