@@ -72,8 +72,8 @@ func NewManagedClusterSetController(
 		// TODO, create a PR for library-go to accept a queue key function, which
 		// is able to produce a []string instead of string based on one object, when
 		// registering event handler. And then refactor the logic here.
-		WithInformersQueueKeyFunc(c.currentClusterSetQueueKeyFunc, clusterInformer.Informer()).
 		WithInformersQueueKeyFunc(c.originalClusterSetQueueKeyFunc, clusterInformer.Informer()).
+		WithInformersQueueKeyFunc(c.currentClusterSetQueueKeyFunc, clusterInformer.Informer()).
 		WithSync(c.sync).
 		ToController("ManagedClusterSetController", recorder)
 }

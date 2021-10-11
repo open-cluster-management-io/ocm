@@ -88,5 +88,66 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 			}
 			return false
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+		ginkgo.By("Move the cluster to another ManagedClusterSet and check if the original one is empty again")
+		// create another clusterset
+		managedClusterSet = &clusterv1beta1.ManagedClusterSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cs2",
+			},
+		}
+		_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		// move the cluster to the new clusterset
+		managedCluster, err = clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedCluster.Name, metav1.GetOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		managedCluster.Labels = map[string]string{
+			clusterSetLabel: "cs2",
+		}
+		_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.Background(), managedCluster, metav1.UpdateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		// check if the new clusterset synced
+		gomega.Eventually(func() bool {
+			managedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), "cs2", metav1.GetOptions{})
+			if err != nil {
+				return false
+			}
+			for _, condition := range managedClusterSet.Status.Conditions {
+				if condition.Type != clusterv1beta1.ManagedClusterSetConditionEmpty {
+					continue
+				}
+				if condition.Status != metav1.ConditionFalse {
+					return false
+				}
+				if condition.Reason != "ClustersSelected" {
+					return false
+				}
+				return true
+			}
+			return false
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+		// check if the original clusterset synced
+		gomega.Eventually(func() bool {
+			managedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+			if err != nil {
+				return false
+			}
+			for _, condition := range managedClusterSet.Status.Conditions {
+				if condition.Type != clusterv1beta1.ManagedClusterSetConditionEmpty {
+					continue
+				}
+				if condition.Status != metav1.ConditionTrue {
+					return false
+				}
+				if condition.Reason != "NoClusterMatched" {
+					return false
+				}
+				return true
+			}
+			return false
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	})
 })
