@@ -3,6 +3,7 @@ package scheduling
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -22,7 +23,7 @@ type clusterSetEventHandler struct {
 }
 
 func (h *clusterSetEventHandler) OnAdd(obj interface{}) {
-	// ignore Add event
+	h.onChange(obj)
 }
 
 func (h *clusterSetEventHandler) OnUpdate(oldObj, newObj interface{}) {
@@ -47,6 +48,21 @@ func (h *clusterSetEventHandler) OnDelete(obj interface{}) {
 	}
 
 	err := enqueuePlacementsByClusterSet(clusterSetName, h.clusterSetBindingLister,
+		h.placementLister, h.enqueuePlacementFunc)
+	if err != nil {
+		klog.Errorf("Unable to enqueue placements by clusterset %q: %v", clusterSetName, err)
+	}
+}
+
+func (h *clusterSetEventHandler) onChange(obj interface{}) {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("error accessing metadata: %w", err))
+		return
+	}
+
+	clusterSetName := accessor.GetName()
+	err = enqueuePlacementsByClusterSet(clusterSetName, h.clusterSetBindingLister,
 		h.placementLister, h.enqueuePlacementFunc)
 	if err != nil {
 		klog.Errorf("Unable to enqueue placements by clusterset %q: %v", clusterSetName, err)

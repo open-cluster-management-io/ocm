@@ -63,6 +63,53 @@ func TestEnqueuePlacementsByClusterSet(t *testing.T) {
 	}
 }
 
+func TestOnClusterSetAdd(t *testing.T) {
+	cases := []struct {
+		name       string
+		obj        interface{}
+		initObjs   []runtime.Object
+		queuedKeys []string
+	}{
+		{
+			name: "invalid object type",
+			obj:  "invalid object type",
+		},
+		{
+			name: "clusterset",
+			obj:  testinghelpers.NewClusterSet("clusterset1"),
+			initObjs: []runtime.Object{
+				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
+				testinghelpers.NewPlacement("ns1", "placement1").Build(),
+			},
+			queuedKeys: []string{
+				"ns1/placement1",
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
+			clusterInformerFactory := testinghelpers.NewClusterInformerFactory(clusterClient, c.initObjs...)
+
+			queuedKeys := sets.NewString()
+			handler := &clusterSetEventHandler{
+				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Lister(),
+				placementLister:         clusterInformerFactory.Cluster().V1alpha1().Placements().Lister(),
+				enqueuePlacementFunc: func(namespace, name string) {
+					queuedKeys.Insert(fmt.Sprintf("%s/%s", namespace, name))
+				},
+			}
+
+			handler.OnAdd(c.obj)
+			expectedQueuedKeys := sets.NewString(c.queuedKeys...)
+			if !queuedKeys.Equal(expectedQueuedKeys) {
+				t.Errorf("expected queued placements %q, but got %s", strings.Join(expectedQueuedKeys.List(), ","), strings.Join(queuedKeys.List(), ","))
+			}
+		})
+	}
+}
+
 func TestOnClusterSetDelete(t *testing.T) {
 	cases := []struct {
 		name       string

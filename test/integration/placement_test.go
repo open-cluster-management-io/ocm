@@ -221,6 +221,62 @@ var _ = ginkgo.Describe("Placement", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 
+	assertCreatingClusterSet := func(clusterSetName string) {
+		ginkgo.By(fmt.Sprintf("Create clusterset %s", clusterSetName))
+		clusterset := &clusterapiv1beta1.ManagedClusterSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: clusterSetName,
+			},
+		}
+		_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	}
+
+	assertDeletingClusterSet := func(clusterSetName string) {
+		ginkgo.By(fmt.Sprintf("Delete clusterset %s", clusterSetName))
+		err = clusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.Background(), clusterSetName, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ginkgo.By("Check if clusterset is gone")
+		gomega.Eventually(func() bool {
+			_, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), clusterSetName, metav1.GetOptions{})
+			if err == nil {
+				return false
+			}
+			return errors.IsNotFound(err)
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+	}
+
+	assertCreatingClusterSetBinding := func(clusterSetName string) {
+		ginkgo.By(fmt.Sprintf("Create clustersetbinding %s", clusterSetName))
+		csb := &clusterapiv1beta1.ManagedClusterSetBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      clusterSetName,
+			},
+			Spec: clusterapiv1beta1.ManagedClusterSetBindingSpec{
+				ClusterSet: clusterSetName,
+			},
+		}
+		_, err = clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	}
+
+	assertDeletingClusterSetBinding := func(clusterSetName string) {
+		ginkgo.By(fmt.Sprintf("Delete clustersetbinding %s", clusterSetName))
+		err = clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Delete(context.Background(), clusterSetName, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ginkgo.By("Check if clustersetbinding is gone")
+		gomega.Eventually(func() bool {
+			_, err := clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Get(context.Background(), clusterSetName, metav1.GetOptions{})
+			if err == nil {
+				return false
+			}
+			return errors.IsNotFound(err)
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+	}
+
 	assertCreatingClusters := func(clusterSetName string, num int, labels ...string) {
 		ginkgo.By(fmt.Sprintf("Create %d clusters", num))
 		for i := 0; i < num; i++ {
@@ -283,6 +339,21 @@ var _ = ginkgo.Describe("Placement", func() {
 		}
 		_, err = clusterClient.ClusterV1().ManagedClusters().UpdateStatus(context.Background(), mc, metav1.UpdateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	}
+
+	assertDeletingCluster := func(clusterName string) {
+		ginkgo.By(fmt.Sprintf("Delete cluster %s", clusterName))
+		err = clusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), clusterName, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ginkgo.By("Check if cluster is gone")
+		gomega.Eventually(func() bool {
+			_, err := clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), clusterName, metav1.GetOptions{})
+			if err == nil {
+				return false
+			}
+			return errors.IsNotFound(err)
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	}
 
 	assertCreatingPlacement := func(name string, noc *int32, nod int, prioritizerPolicy clusterapiv1alpha1.PrioritizerPolicy) {
@@ -520,55 +591,6 @@ var _ = ginkgo.Describe("Placement", func() {
 
 		})
 
-		ginkgo.It("Should re-schedule successfully successfully once a new cluster added", func() {
-			// cluster settings
-			clusterNames := []string{
-				clusterName + "-1",
-				clusterName + "-2",
-				clusterName + "-3",
-			}
-			clusterResources := make([][]string, len(clusterNames))
-			clusterResources[0] = []string{"10", "10", "50", "100"}
-			clusterResources[1] = []string{"7", "10", "90", "100"}
-			clusterResources[2] = []string{"9", "10", "80", "100"}
-
-			// placement settings
-			prioritizerPolicy := clusterapiv1alpha1.PrioritizerPolicy{
-				Mode: clusterapiv1alpha1.PrioritizerPolicyModeExact,
-				Configurations: []clusterapiv1alpha1.PrioritizerConfig{
-					{
-						Name:   "ResourceAllocatableCPU",
-						Weight: 1,
-					},
-					{
-						Name:   "ResourceAllocatableMemory",
-						Weight: 1,
-					},
-				},
-			}
-
-			//Creating the clusters with resources
-			assertBindingClusterSet(clusterSet1Name)
-			assertCreatingClustersWithNames(clusterSet1Name, clusterNames)
-			for i, name := range clusterNames {
-				assertUpdatingClusterWithClusterResources(name, clusterResources[i])
-			}
-
-			//Checking the result of the placement
-			assertCreatingPlacement(placementName, noc(2), 2, prioritizerPolicy)
-			assertClusterNamesOfDecisions(placementName, []string{clusterNames[0], clusterNames[2]})
-
-			ginkgo.By("Adding a new cluster with resources")
-			clusterNames = append(clusterNames, clusterName+"-4")
-			newClusterResources := []string{"10", "10", "100", "100"}
-			assertCreatingClustersWithNames(clusterSet1Name, clusterNames[3:4])
-			assertUpdatingClusterWithClusterResources(clusterNames[3], newClusterResources)
-
-			//Checking the result of the placement
-			assertClusterNamesOfDecisions(placementName, []string{clusterNames[2], clusterNames[3]})
-
-		})
-
 		ginkgo.It("Should keep steady successfully even placementdecisions' balance and cluster situation changes", func() {
 			// cluster settings
 			clusterNames := []string{
@@ -620,6 +642,100 @@ var _ = ginkgo.Describe("Placement", func() {
 
 			//Checking the result of the placement
 			assertClusterNamesOfDecisions(placementName, []string{clusterNames[0], clusterNames[2]})
+		})
+
+		ginkgo.It("Should re-schedule successfully once a new cluster added/deleted", func() {
+			// cluster settings
+			clusterNames := []string{
+				clusterName + "-1",
+				clusterName + "-2",
+				clusterName + "-3",
+			}
+			clusterResources := make([][]string, len(clusterNames))
+			clusterResources[0] = []string{"10", "10", "50", "100"}
+			clusterResources[1] = []string{"7", "10", "90", "100"}
+			clusterResources[2] = []string{"9", "10", "80", "100"}
+
+			// placement settings
+			prioritizerPolicy := clusterapiv1alpha1.PrioritizerPolicy{
+				Mode: clusterapiv1alpha1.PrioritizerPolicyModeExact,
+				Configurations: []clusterapiv1alpha1.PrioritizerConfig{
+					{
+						Name:   "ResourceAllocatableCPU",
+						Weight: 1,
+					},
+					{
+						Name:   "ResourceAllocatableMemory",
+						Weight: 1,
+					},
+				},
+			}
+
+			//Creating the clusters with resources
+			assertBindingClusterSet(clusterSet1Name)
+			assertCreatingClustersWithNames(clusterSet1Name, clusterNames)
+			for i, name := range clusterNames {
+				assertUpdatingClusterWithClusterResources(name, clusterResources[i])
+			}
+
+			//Checking the result of the placement
+			assertCreatingPlacement(placementName, noc(2), 2, prioritizerPolicy)
+			assertClusterNamesOfDecisions(placementName, []string{clusterNames[0], clusterNames[2]})
+
+			ginkgo.By("Adding a new cluster with resources")
+			clusterNames = append(clusterNames, clusterName+"-4")
+			newClusterResources := []string{"10", "10", "100", "100"}
+			assertCreatingClustersWithNames(clusterSet1Name, clusterNames[3:4])
+			assertUpdatingClusterWithClusterResources(clusterNames[3], newClusterResources)
+
+			//Checking the result of the placement
+			assertClusterNamesOfDecisions(placementName, []string{clusterNames[2], clusterNames[3]})
+
+			ginkgo.By("Deleting the cluster")
+			assertDeletingCluster(clusterName + "-4")
+
+			//Checking the result of the placement
+			assertClusterNamesOfDecisions(placementName, []string{clusterNames[0], clusterNames[2]})
+		})
+
+		ginkgo.It("Should re-schedule successfully once a clusterset deleted/added", func() {
+			assertBindingClusterSet(clusterSet1Name)
+			assertCreatingClusters(clusterSet1Name, 5)
+			assertCreatingPlacement(placementName, noc(10), 5, clusterapiv1alpha1.PrioritizerPolicy{})
+
+			assertNumberOfDecisions(placementName, 5)
+			assertPlacementStatus(placementName, 5, false)
+
+			ginkgo.By("Delete the clusterset")
+			assertDeletingClusterSet(clusterSet1Name)
+
+			assertNumberOfDecisions(placementName, 0)
+
+			ginkgo.By("Add the clusterset back")
+			assertCreatingClusterSet(clusterSet1Name)
+
+			assertNumberOfDecisions(placementName, 5)
+			assertPlacementStatus(placementName, 5, false)
+		})
+
+		ginkgo.It("Should re-schedule successfully once a clustersetbinding deleted/added", func() {
+			assertBindingClusterSet(clusterSet1Name)
+			assertCreatingClusters(clusterSet1Name, 5)
+			assertCreatingPlacement(placementName, noc(10), 5, clusterapiv1alpha1.PrioritizerPolicy{})
+
+			assertNumberOfDecisions(placementName, 5)
+			assertPlacementStatus(placementName, 5, false)
+
+			ginkgo.By("Delete the clustersetbinding")
+			assertDeletingClusterSetBinding(clusterSet1Name)
+
+			assertNumberOfDecisions(placementName, 0)
+
+			ginkgo.By("Add the clustersetbinding back")
+			assertCreatingClusterSetBinding(clusterSet1Name)
+
+			assertNumberOfDecisions(placementName, 5)
+			assertPlacementStatus(placementName, 5, false)
 		})
 	})
 })
