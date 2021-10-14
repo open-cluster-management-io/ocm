@@ -17,7 +17,7 @@ func TestConfigChecker(t *testing.T) {
 var cc *configChecker
 var fileAName, fileBName string
 
-var _ = Describe("Config Watcher", func() {
+var _ = Describe("Config Checker With Reload", func() {
 	BeforeEach(func() {
 		// create file in tmp directory
 		fileA, err := ioutil.TempFile("", "fileA")
@@ -37,6 +37,7 @@ var _ = Describe("Config Watcher", func() {
 		// update checksum in checker in every cases
 		cc, err = NewConfigChecker("test", fileAName, fileBName)
 		Expect(err).To(BeNil())
+		cc.SetReload(true)
 	})
 
 	Context("No files Changed", func() {

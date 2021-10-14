@@ -17,6 +17,7 @@ type configChecker struct {
 	name        string
 	configfiles []string
 	checksum    [16]byte
+	reload      bool
 	sync.Mutex
 }
 
@@ -55,7 +56,15 @@ func NewConfigChecker(name string, configfiles ...string) (*configChecker, error
 		name:        name,
 		configfiles: configfiles,
 		checksum:    checksum,
+		reload:      false,
 	}, nil
+}
+
+// SetReload can update the ‘reload’ fields of config checker
+// If reload equals to false, config checker won't update the checksum value in the cache, and function Check would return error forever if config files are modified.
+// but if reload equals to true, config checker only returns err once, and it updates the cache with the latest checksum of config files.
+func (c *configChecker) SetReload(reload bool) {
+	c.reload = reload
 }
 
 // Name return the name fo the configChecker
@@ -73,7 +82,9 @@ func (cc *configChecker) Check(_ *http.Request) error {
 	}
 	if newChecksum != cc.checksum {
 		cc.Lock()
-		cc.checksum = newChecksum // update checksum
+		if cc.reload {
+			cc.checksum = newChecksum // update checksum
+		}
 		cc.Unlock()
 		return fmt.Errorf("checksum not equal")
 	}
