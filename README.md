@@ -13,11 +13,11 @@ There are a number of key use cases that are enabled by this project, and are ca
 ### Cluster Lifecycle: Cluster registration and management
 
 OCM has a group of [APIs](https://github.com/open-cluster-management-io/api) to provide the foundational functions
-in multiple cluster management. 
+in multiple cluster management.
 
 The journey of cluster management starts with [Cluster Registration](https://github.com/open-cluster-management-io/registration) which follows a `double opt-in` protocol to establish a MTLS connection from the agent on the managed cluster (Klusterlet) to the hub (Cluster Manager). After this, users or operands on the hub can declare [ManifestWorks](https://github.com/open-cluster-management-io/work) which contains a slice of Kubernetes resource manifests to be distributed and applied to a certain managed cluster. To schedule workloads to a certain set of clusters, users can also declare a [Placement](https://github.com/open-cluster-management-io/placement) on the hub to dynamically select a set of clusters with certain criteria.
 
-In addition, developers can leverage [Addon framework](https://github.com/open-cluster-management-io/addon-framework) to build their own management tools or integrate with other open source projects to extend the multicluster management capability. OCM has maintained two built-in addons for application lifecycle and security governance.
+In addition, developers can leverage [Addon framework](https://github.com/open-cluster-management-io/addon-framework) to build their own management tools or integrate with other open source projects to extend the multicluster management capability. OCM maintaines two built-in addons for application lifecycle and security governance. Users can also benefit from a [Submariner](https://submariner.io/) addon, which automates the deployment and management of multi-cluster networking.   
 
 ### Application Lifecycle: Delivery, upgrade, and configuration of applications on Kubernetes clusters
 
