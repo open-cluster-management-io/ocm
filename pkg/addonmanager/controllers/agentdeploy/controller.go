@@ -122,6 +122,11 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return err
 	}
 
+	if !managedCluster.DeletionTimestamp.IsZero() {
+		// managed cluster is deleting, do nothing
+		return nil
+	}
+
 	managedClusterAddon, err := c.managedClusterAddonLister.ManagedClusterAddOns(clusterName).Get(addonName)
 	if errors.IsNotFound(err) {
 		return nil
