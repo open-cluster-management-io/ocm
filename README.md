@@ -17,7 +17,7 @@ in multiple cluster management.
 
 The journey of cluster management starts with [Cluster Registration](https://github.com/open-cluster-management-io/registration) which follows a `double opt-in` protocol to establish a MTLS connection from the agent on the managed cluster (Klusterlet) to the hub (Cluster Manager). After this, users or operands on the hub can declare [ManifestWorks](https://github.com/open-cluster-management-io/work) which contains a slice of Kubernetes resource manifests to be distributed and applied to a certain managed cluster. To schedule workloads to a certain set of clusters, users can also declare a [Placement](https://github.com/open-cluster-management-io/placement) on the hub to dynamically select a set of clusters with certain criteria.
 
-In addition, developers can leverage [Addon framework](https://github.com/open-cluster-management-io/addon-framework) to build their own management tools or integrate with other open source projects to extend the multicluster management capability. OCM maintaines two built-in addons for application lifecycle and security governance. Users can also benefit from a [Submariner](https://submariner.io/) addon, which automates the deployment and management of multi-cluster networking.   
+In addition, developers can leverage [Addon framework](https://github.com/open-cluster-management-io/addon-framework) to build their own management tools or integrate with other open source projects to extend the multicluster management capability. OCM maintaines two built-in addons for application lifecycle and security governance.
 
 ### Application Lifecycle: Delivery, upgrade, and configuration of applications on Kubernetes clusters
 
@@ -28,7 +28,7 @@ The application model defines a Kubernetes-first way of describing the applicati
 
 ### GRC: Governance, Risk and Compliance across Kubernetes clusters
 
-* Use prebuilt security and configuration controllers toto enforce policies on Kubernetes configuration across your clusters.
+* Use prebuilt security and configuration controllers to enforce policies on Kubernetes configuration across your clusters.
 
 Policy controllers allow the declarative expression of a desired condition that can be audited or enforced against a set of managed clusters. _Policies_ allow you to drive cross-cluster configuration or validate that a certain configuration explicitly does not exist.
 
@@ -40,6 +40,13 @@ The following repositories describe the underlying API and controllers for the G
 * https://github.com/open-cluster-management-io/governance-policy-spec-sync
 * https://github.com/open-cluster-management-io/governance-policy-template-sync
 * https://github.com/open-cluster-management-io/governance-policy-propagator
+
+### More external integrations
+
+We are constantly working with other open source projects to make multicluster management easier.
+
+- [Submariner](https://submariner.io/) is a project that provides multicluster networking connectivity. Users can benefit from a [Submariner](https://submariner.io/) addon, which automates the deployment and management of multicluster networking.
+- [Clusternet](http://github.com/clusternet/clusternet) is another project that provides multicluster orchestration, which can be easily plug into OCM with [clusternet addon](https://github.com/skeeey/clusternet-addon)
 
 ### Get connected
 
