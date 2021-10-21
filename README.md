@@ -8,6 +8,8 @@ You can use the [clusteradm CLI](https://github.com/open-cluster-management-io/c
 
 ![image](assets/ocm-arch.png)
 
+To setup a multicluster environment with OCM enabled on your local machine, follow the instructions in [setup dev environment](solutions/setup-dev-environment).
+
 There are a number of key use cases that are enabled by this project, and are categorized to 3 sub projects.
 
 ### Cluster Lifecycle: Cluster registration and management
