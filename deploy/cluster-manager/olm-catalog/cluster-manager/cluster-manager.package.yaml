@@ -1,5 +1,5 @@
 channels:
   - name: stable
-    currentCSV: cluster-manager.v0.5.0
+    currentCSV: cluster-manager.v0.6.0
 defaultChannel: stable
 packageName: cluster-manager

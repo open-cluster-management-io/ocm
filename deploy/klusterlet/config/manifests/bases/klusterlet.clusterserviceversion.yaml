@@ -7,7 +7,7 @@ metadata:
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
     containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2021-07-13T20:00:31Z"
+    createdAt: "2021-10-20T20:00:31Z"
     description: Manages the installation and upgrade of the Klusterlet.
     repository: https://github.com/open-cluster-management-io/registration-operator
     support: Red Hat, Inc.
@@ -92,8 +92,8 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc.
-  replaces: klusterlet.v0.4.0
+  replaces: klusterlet.v0.5.0
   selector:
     matchLabels:
       app: klusterlet
-  version: 0.5.0
+  version: 0.6.0
