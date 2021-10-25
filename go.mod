@@ -4,7 +4,6 @@ go 1.16
 
 require (
 	github.com/davecgh/go-spew v1.1.1
-	github.com/go-bindata/go-bindata v3.1.2+incompatible
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.14.0
 	github.com/openshift/build-machinery-go v0.0.0-20210806203541-4ea9b6da3a37

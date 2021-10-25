@@ -8,7 +8,6 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
 	targets/openshift/deps.mk \
 	targets/openshift/images.mk \
-	targets/openshift/bindata.mk \
 	lib/tmp.mk \
 )
 
@@ -26,8 +25,6 @@ KUSTOMIZE?=$(PWD)/$(PERMANENT_TMP_GOPATH)/bin/kustomize
 KUSTOMIZE_VERSION?=v3.5.4
 KUSTOMIZE_ARCHIVE_NAME?=kustomize_$(KUSTOMIZE_VERSION)_$(GOHOSTOS)_$(GOHOSTARCH).tar.gz
 kustomize_dir:=$(dir $(KUSTOMIZE))
-
-$(call add-bindata,e2e,./deploy/spoke/...,bindata,bindata,./test/e2e/bindata/bindata.go)
 
 # This will call a macro called "build-image" which will generate image specific targets based on the parameters:
 # $0 - macro name

@@ -10,6 +10,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -146,15 +147,6 @@ var _ = ginkgo.Describe("Work agent", func() {
 		var err error
 
 		ginkgo.BeforeEach(func() {
-			ns1 = fmt.Sprintf("ns1-%s", nameSuffix)
-			ns2 = fmt.Sprintf("ns2-%s", nameSuffix)
-
-			// create ns2
-			ns := &corev1.Namespace{}
-			ns.Name = ns2
-			_, err = spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
 			// make sure the api service v1.admission.cluster.open-cluster-management.io is available
 			gomega.Eventually(func() bool {
 				apiService, err := hubAPIServiceClient.APIServices().Get(context.TODO(), apiserviceName, metav1.GetOptions{})
@@ -169,14 +161,17 @@ var _ = ginkgo.Describe("Work agent", func() {
 			}, 60*time.Second, 1*time.Second).Should(gomega.BeTrue())
 		})
 
-		ginkgo.AfterEach(func() {
-			// delete ns2
-			err = spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), ns2, metav1.DeleteOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		})
-
 		ginkgo.It("Should create, update and delete manifestwork successfully", func() {
 			ginkgo.By("create manifestwork")
+			ns1 = fmt.Sprintf("ns1-%s", nameSuffix)
+			ns2 = fmt.Sprintf("ns2-%s", nameSuffix)
+
+			// create ns2
+			ns := &corev1.Namespace{}
+			ns.Name = ns2
+			_, err = spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 			cmFinalizers := []string{"cluster.open-cluster-management.io/testing"}
 			objects := []runtime.Object{
 				newConfigmap(ns1, "cm1", nil, nil),
@@ -230,8 +225,8 @@ var _ = ginkgo.Describe("Work agent", func() {
 				}
 
 				// check work status condition
-				return meta.IsStatusConditionPresentAndEqual(work.Status.Conditions, workapiv1.WorkApplied, metav1.ConditionTrue) &&
-					meta.IsStatusConditionPresentAndEqual(work.Status.Conditions, workapiv1.WorkAvailable, metav1.ConditionTrue)
+				return meta.IsStatusConditionTrue(work.Status.Conditions, workapiv1.WorkApplied) &&
+					meta.IsStatusConditionTrue(work.Status.Conditions, workapiv1.WorkAvailable)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// get the corresponding AppliedManifestWork
@@ -378,6 +373,65 @@ var _ = ginkgo.Describe("Work agent", func() {
 
 			_, err = spokeKubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
 			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+
+			err = spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), ns2, metav1.DeleteOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("Should create, delete job in manifestwork successfully", func() {
+			ginkgo.By("create manifestwork")
+			objects := []runtime.Object{
+				newJob("job1"),
+			}
+			work := newManifestWork(clusterName, fmt.Sprintf("wjob2-%s", nameSuffix), objects...)
+			work, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// check status conditions in manifestwork status
+			gomega.Eventually(func() bool {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+
+				fmt.Printf("work status %v", work.Status.ResourceStatus)
+
+				// check work status condition
+				return meta.IsStatusConditionTrue(work.Status.Conditions, workapiv1.WorkApplied) &&
+					meta.IsStatusConditionTrue(work.Status.Conditions, workapiv1.WorkAvailable)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Ensure pod is created
+			gomega.Eventually(func() bool {
+				pods, err := spokeKubeClient.CoreV1().Pods("default").List(context.Background(), metav1.ListOptions{})
+				if err != nil {
+					return false
+				}
+
+				if len(pods.Items) == 0 {
+					return false
+				}
+
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			ginkgo.By("delete manifestwork")
+			err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// pods should be all cleaned.
+			gomega.Eventually(func() bool {
+				pods, err := spokeKubeClient.CoreV1().Pods("default").List(context.Background(), metav1.ListOptions{})
+				if err != nil {
+					return false
+				}
+
+				if len(pods.Items) > 0 {
+					return false
+				}
+
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 		})
 	})
 
@@ -441,8 +495,8 @@ var _ = ginkgo.Describe("Work agent", func() {
 				}
 
 				// check work status condition
-				return meta.IsStatusConditionPresentAndEqual(work.Status.Conditions, workapiv1.WorkApplied, metav1.ConditionTrue) &&
-					meta.IsStatusConditionPresentAndEqual(work.Status.Conditions, workapiv1.WorkAvailable, metav1.ConditionTrue)
+				return meta.IsStatusConditionTrue(work.Status.Conditions, workapiv1.WorkApplied) &&
+					meta.IsStatusConditionTrue(work.Status.Conditions, workapiv1.WorkAvailable)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Upgrade crd/cr and check if cr resource is recreated.
@@ -539,6 +593,43 @@ func newConfigmap(namespace, name string, data map[string]string, finalizers []s
 		Data: data,
 	}
 	return cm
+}
+
+func newJob(name string) *batchv1.Job {
+	maunualSelector := true
+	job := &batchv1.Job{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Job",
+			APIVersion: "batch/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      name,
+		},
+		Spec: batchv1.JobSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"job": name},
+			},
+			ManualSelector: &maunualSelector,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"job": name},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:    "pi",
+							Image:   "perl",
+							Command: []string{"perl", "-Mbignum=bpi", "-wle", "print bpi(2000)"},
+						},
+					},
+					RestartPolicy: corev1.RestartPolicyNever,
+				},
+			},
+		},
+	}
+
+	return job
 }
 
 func newSecretBySize(namespace, name string, size int32) *corev1.Secret {

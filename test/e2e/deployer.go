@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
 	"reflect"
 	"time"
 
@@ -29,19 +28,19 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
-	"open-cluster-management.io/work/test/e2e/bindata"
+	"open-cluster-management.io/work/deploy"
 )
 
 var (
 	staticResourceFiles = []string{
-		"deploy/spoke/appliedmanifestworks.crd.yaml",
-		"deploy/spoke/clusterrole.yaml",
-		"deploy/spoke/component_namespace.yaml",
-		"deploy/spoke/service_account.yaml",
-		"deploy/spoke/clusterrole_binding.yaml",
-		"deploy/spoke/clusterrole_binding_addition.yaml",
+		"spoke/appliedmanifestworks.crd.yaml",
+		"spoke/clusterrole.yaml",
+		"spoke/component_namespace.yaml",
+		"spoke/service_account.yaml",
+		"spoke/clusterrole_binding.yaml",
+		"spoke/clusterrole_binding_addition.yaml",
 	}
-	deploymentFile            = "deploy/spoke/deployment.yaml"
+	deploymentFile            = "spoke/deployment.yaml"
 	hubKubeconfigSecret       = "hub-kubeconfig-secret"
 	defaultComponentNamespace = "open-cluster-management-agent"
 )
@@ -92,7 +91,7 @@ func (d *defaultWorkAgentDeployer) Deploy() error {
 		clientHolder,
 		events.NewInMemoryRecorder(""),
 		func(name string) ([]byte, error) {
-			return bindata.MustAsset(filepath.Join("", name)), nil
+			return deploy.SpokeManifestFiles.ReadFile(name)
 		},
 		staticResourceFiles...,
 	)
@@ -239,7 +238,11 @@ func (d *defaultWorkAgentDeployer) getHubKubeconfigSecretData() (map[string][]by
 
 func assetToUnstructured(name string) (*unstructured.Unstructured, error) {
 	yamlDecoder := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
-	raw := bindata.MustAsset(name)
+	raw, err := deploy.SpokeManifestFiles.ReadFile(name)
+	if err != nil {
+		return nil, err
+	}
+
 	reader := json.YAMLFramer.NewFrameReader(ioutil.NopCloser(bytes.NewReader(raw)))
 	d := streaming.NewDecoder(reader, yamlDecoder)
 	obj, _, err := d.Decode(nil, nil)

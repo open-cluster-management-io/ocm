@@ -202,6 +202,11 @@ func DeleteAppliedResources(
 	ownerCopy := owner.DeepCopy()
 	ownerCopy.UID = types.UID(fmt.Sprintf("%s-", owner.UID))
 
+	// We hard coded the delete policy to Background
+	// TODO: reivist if user needs to set other options. Setting to Orphan may not make sense, since when
+	// the manifestwork is removed, there is no way to track the orphaned resource any more.
+	deletePolicy := metav1.DeletePropagationBackground
+
 	for _, resource := range resources {
 		gvr := schema.GroupVersionResource{Group: resource.Group, Version: resource.Version, Resource: resource.Resource}
 		u, err := dynamicClient.
@@ -267,6 +272,7 @@ func DeleteAppliedResources(
 				Preconditions: &metav1.Preconditions{
 					UID: &uid,
 				},
+				PropagationPolicy: &deletePolicy,
 			})
 		if errors.IsNotFound(err) {
 			continue
