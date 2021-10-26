@@ -55,6 +55,15 @@ test-e2e: build-e2e ensure-kustomize deploy-hub
 clean-e2e:
 	$(RM) ./e2e.test
 
+build-scalability:
+	go test -c ./test/scalability -mod=vendor
+
+test-scalability: build-scalability ensure-kustomize deploy-hub
+	./scalability.test -test.v -ginkgo.v
+
+clean-scalability:
+	$(RM) ./scalability.test
+
 ensure-kustomize:
 ifeq "" "$(wildcard $(KUSTOMIZE))"
 	$(info Installing kustomize into '$(KUSTOMIZE)')
