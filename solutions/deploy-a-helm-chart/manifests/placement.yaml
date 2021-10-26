@@ -1,0 +1,14 @@
+apiVersion: cluster.open-cluster-management.io/v1alpha1
+kind: Placement
+metadata:
+  name: demo-placement
+  namespace: default
+spec:
+  numberOfClusters: 1
+  clusterSets:
+    - app-demo
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchLabels:
+            purpose: test
