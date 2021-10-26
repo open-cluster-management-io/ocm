@@ -40,6 +40,7 @@ const (
 	placementLabel           = "cluster.open-cluster-management.io/placement"
 	schedulingControllerName = "SchedulingController"
 	maxNumOfClusterDecisions = 100
+	maxEventMessageLength    = 1000 //the event message can have at most 1024 characters, use 1000 as limitation here to keep some buffer
 )
 
 type enqueuePlacementFunc func(namespace, name string)
@@ -478,8 +479,15 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 	// update the event with prioritizer score.
 	scoreStr := ""
 	for k, v := range clusterScores {
-		scoreStr += fmt.Sprintf("%s:%d ", k, v)
+		tmpScore := fmt.Sprintf("%s:%d ", k, v)
+		if len(scoreStr)+len(tmpScore) > maxEventMessageLength {
+			scoreStr += "......"
+			break
+		} else {
+			scoreStr += tmpScore
+		}
 	}
+
 	c.recorder.Eventf(
 		placement, placementDecision, corev1.EventTypeNormal,
 		"ScoreUpdate", "ScoreUpdated",
