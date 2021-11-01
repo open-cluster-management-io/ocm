@@ -72,6 +72,15 @@ kind load docker-image quay.io/open-cluster-management/placement:latest --name {
 make test-e2e
 ```
 
+Run scalability testing if your PR has impact on the scalability
+
+```shell
+Deploy the placement controller with corresponding steps from [PLACEMENT Doc](https://github.com/open-cluster-management-io/placement#deploy-the-placement-controller)
+
+
+make test-scalability
+```
+
 ## Build images
 
 Make sure your code build passed.
