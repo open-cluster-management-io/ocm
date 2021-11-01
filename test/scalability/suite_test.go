@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	eventuallyTimeout  = 30 // seconds
-	eventuallyInterval = 1  // seconds
+	eventuallyTimeout  = 120 // seconds
+	eventuallyInterval = 3   // seconds
 )
 
 func TestScalability(t *testing.T) {
