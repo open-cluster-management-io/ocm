@@ -33,7 +33,7 @@ type TargetRotation struct {
 	EventRecorder events.Recorder
 }
 
-func (c TargetRotation) EnsureTargetCertKeyPair(signingCertKeyPair *crypto.CA, caBundleCerts []*x509.Certificate) error {
+func (c TargetRotation) EnsureTargetCertKeyPair(signingCertKeyPair *crypto.CA, caBundleCerts []*x509.Certificate, fns ...crypto.CertificateExtensionFunc) error {
 	originalTargetCertKeyPairSecret, err := c.Lister.Secrets(c.Namespace).Get(c.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
@@ -51,7 +51,7 @@ func (c TargetRotation) EnsureTargetCertKeyPair(signingCertKeyPair *crypto.CA, c
 	}
 
 	c.EventRecorder.Eventf("TargetUpdateRequired", "%q in %q requires a new target cert/key pair: %v", c.Name, c.Namespace, reason)
-	if err := c.setTargetCertKeyPairSecret(targetCertKeyPairSecret, c.Validity, signingCertKeyPair); err != nil {
+	if err := c.setTargetCertKeyPairSecret(targetCertKeyPairSecret, c.Validity, signingCertKeyPair, fns...); err != nil {
 		return err
 	}
 
@@ -105,7 +105,7 @@ func needNewTargetCertKeyPair(secret *corev1.Secret, caBundleCerts []*x509.Certi
 }
 
 // setTargetCertKeyPairSecret creates a new cert/key pair and sets them in the secret.
-func (c TargetRotation) setTargetCertKeyPairSecret(targetCertKeyPairSecret *corev1.Secret, validity time.Duration, signer *crypto.CA) error {
+func (c TargetRotation) setTargetCertKeyPairSecret(targetCertKeyPairSecret *corev1.Secret, validity time.Duration, signer *crypto.CA, fns ...crypto.CertificateExtensionFunc) error {
 	if targetCertKeyPairSecret.Data == nil {
 		targetCertKeyPairSecret.Data = map[string][]byte{}
 	}
@@ -121,7 +121,7 @@ func (c TargetRotation) setTargetCertKeyPairSecret(targetCertKeyPairSecret *core
 	if remainingSignerValidity < validity {
 		targetValidity = remainingSignerValidity
 	}
-	certKeyPair, err := c.NewCertificate(signer, targetValidity)
+	certKeyPair, err := c.NewCertificate(signer, targetValidity, fns...)
 	if err != nil {
 		return err
 	}
@@ -133,9 +133,9 @@ func (c TargetRotation) setTargetCertKeyPairSecret(targetCertKeyPairSecret *core
 	return nil
 }
 
-func (c TargetRotation) NewCertificate(signer *crypto.CA, validity time.Duration) (*crypto.TLSCertificateConfig, error) {
+func (c TargetRotation) NewCertificate(signer *crypto.CA, validity time.Duration, fns ...crypto.CertificateExtensionFunc) (*crypto.TLSCertificateConfig, error) {
 	if len(c.HostNames) == 0 {
 		return nil, fmt.Errorf("no hostnames set")
 	}
-	return signer.MakeServerCertForDuration(sets.NewString(c.HostNames...), validity)
+	return signer.MakeServerCertForDuration(sets.NewString(c.HostNames...), validity, fns...)
 }
