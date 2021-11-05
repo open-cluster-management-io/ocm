@@ -264,8 +264,6 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		o.ClusterName,
 		hubClusterClient,
 		hubClusterInformerFactory.Cluster().V1().ManagedClusters(),
-		spokeKubeClient.Discovery(),
-		spokeKubeInformerFactory.Core().V1().Nodes(),
 		controllerContext.EventRecorder,
 	)
 
@@ -277,12 +275,13 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		controllerContext.EventRecorder,
 	)
 
-	// create ManagedClusterHealthCheckController to check the spoke cluster health
-	managedClusterHealthCheckController := managedcluster.NewManagedClusterHealthCheckController(
+	// create NewManagedClusterStatusController to update the spoke cluster status
+	managedClusterHealthCheckController := managedcluster.NewManagedClusterStatusController(
 		o.ClusterName,
 		hubClusterClient,
 		hubClusterInformerFactory.Cluster().V1().ManagedClusters(),
 		spokeKubeClient.Discovery(),
+		spokeKubeInformerFactory.Core().V1().Nodes(),
 		o.ClusterHealthCheckPeriod,
 		controllerContext.EventRecorder,
 	)

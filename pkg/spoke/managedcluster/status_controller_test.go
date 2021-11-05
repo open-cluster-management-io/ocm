@@ -2,6 +2,7 @@ package managedcluster
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,9 +13,14 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/version"
 	discovery "k8s.io/client-go/discovery"
+	kubeinformers "k8s.io/client-go/informers"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
 )
@@ -31,6 +37,21 @@ func TestHealthCheck(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
+
+		if req.URL.Path == "/version" {
+			output, err := json.Marshal(version.Info{
+				GitVersion: "test-version",
+			})
+			if err != nil {
+				t.Errorf("unexpected encoding error: %v", err)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write(output)
+			return
+		}
+
 		w.WriteHeader(serverResponse.httpStatus)
 		w.Write([]byte(serverResponse.responseMsg))
 	}))
@@ -41,6 +62,7 @@ func TestHealthCheck(t *testing.T) {
 	cases := []struct {
 		name            string
 		clusters        []runtime.Object
+		nodes           []runtime.Object
 		httpStatus      int
 		responseMsg     string
 		validateActions func(t *testing.T, actions []clienttesting.Action)
@@ -70,8 +92,11 @@ func TestHealthCheck(t *testing.T) {
 			},
 		},
 		{
-			name:       "kube-apiserver is ok",
-			clusters:   []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
+			name:     "kube-apiserver is ok",
+			clusters: []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
+			nodes: []runtime.Object{
+				testinghelpers.NewNode("testnode1", testinghelpers.NewResourceList(32, 64), testinghelpers.NewResourceList(16, 32)),
+			},
 			httpStatus: http.StatusOK,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				expectedCondition := metav1.Condition{
@@ -80,14 +105,29 @@ func TestHealthCheck(t *testing.T) {
 					Reason:  "ManagedClusterAvailable",
 					Message: "Managed cluster is available",
 				}
+				expectedStatus := clusterv1.ManagedClusterStatus{
+					Version: clusterv1.ManagedClusterVersion{
+						Kubernetes: "test-version",
+					},
+					Capacity: clusterv1.ResourceList{
+						clusterv1.ResourceCPU:    *resource.NewQuantity(int64(32), resource.DecimalExponent),
+						clusterv1.ResourceMemory: *resource.NewQuantity(int64(1024*1024*64), resource.BinarySI),
+					},
+					Allocatable: clusterv1.ResourceList{
+						clusterv1.ResourceCPU:    *resource.NewQuantity(int64(16), resource.DecimalExponent),
+						clusterv1.ResourceMemory: *resource.NewQuantity(int64(1024*1024*32), resource.BinarySI),
+					},
+				}
 				testinghelpers.AssertActions(t, actions, "get", "update")
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				testinghelpers.AssertManagedClusterCondition(t, actual.(*clusterv1.ManagedCluster).Status.Conditions, expectedCondition)
+				testinghelpers.AssertManagedClusterStatus(t, actual.(*clusterv1.ManagedCluster).Status, expectedStatus)
 			},
 		},
 		{
 			name:       "there is no livez endpoint",
 			clusters:   []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
+			nodes:      []runtime.Object{},
 			httpStatus: http.StatusNotFound,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				expectedCondition := metav1.Condition{
@@ -104,6 +144,7 @@ func TestHealthCheck(t *testing.T) {
 		{
 			name:       "livez is forbidden",
 			clusters:   []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
+			nodes:      []runtime.Object{},
 			httpStatus: http.StatusForbidden,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				expectedCondition := metav1.Condition{
@@ -117,6 +158,49 @@ func TestHealthCheck(t *testing.T) {
 				testinghelpers.AssertManagedClusterCondition(t, actual.(*clusterv1.ManagedCluster).Status.Conditions, expectedCondition)
 			},
 		},
+		{
+			name: "merge managed cluster status",
+			clusters: []runtime.Object{
+				testinghelpers.NewManagedClusterWithStatus(
+					corev1.ResourceList{
+						"sockets": *resource.NewQuantity(int64(1200), resource.DecimalExponent),
+						"cores":   *resource.NewQuantity(int64(128), resource.DecimalExponent),
+					},
+					testinghelpers.NewResourceList(16, 32)),
+			},
+			nodes: []runtime.Object{
+				testinghelpers.NewNode("testnode1", testinghelpers.NewResourceList(32, 64), testinghelpers.NewResourceList(16, 32)),
+				testinghelpers.NewNode("testnode2", testinghelpers.NewResourceList(32, 64), testinghelpers.NewResourceList(16, 32)),
+			},
+			httpStatus: http.StatusOK,
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				expectedCondition := metav1.Condition{
+					Type:    clusterv1.ManagedClusterConditionJoined,
+					Status:  metav1.ConditionTrue,
+					Reason:  "ManagedClusterJoined",
+					Message: "Managed cluster joined",
+				}
+				expectedStatus := clusterv1.ManagedClusterStatus{
+					Version: clusterv1.ManagedClusterVersion{
+						Kubernetes: "test-version",
+					},
+					Capacity: clusterv1.ResourceList{
+						"sockets":                *resource.NewQuantity(int64(1200), resource.DecimalExponent),
+						"cores":                  *resource.NewQuantity(int64(128), resource.DecimalExponent),
+						clusterv1.ResourceCPU:    *resource.NewQuantity(int64(64), resource.DecimalExponent),
+						clusterv1.ResourceMemory: *resource.NewQuantity(int64(1024*1024*128), resource.BinarySI),
+					},
+					Allocatable: clusterv1.ResourceList{
+						clusterv1.ResourceCPU:    *resource.NewQuantity(int64(32), resource.DecimalExponent),
+						clusterv1.ResourceMemory: *resource.NewQuantity(int64(1024*1024*64), resource.BinarySI),
+					},
+				}
+				testinghelpers.AssertActions(t, actions, "get", "update")
+				actual := actions[1].(clienttesting.UpdateActionImpl).Object
+				testinghelpers.AssertManagedClusterCondition(t, actual.(*clusterv1.ManagedCluster).Status.Conditions, expectedCondition)
+				testinghelpers.AssertManagedClusterStatus(t, actual.(*clusterv1.ManagedCluster).Status, expectedStatus)
+			},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -127,14 +211,22 @@ func TestHealthCheck(t *testing.T) {
 				clusterStore.Add(cluster)
 			}
 
+			kubeClient := kubefake.NewSimpleClientset(c.nodes...)
+			kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Minute*10)
+			nodeStore := kubeInformerFactory.Core().V1().Nodes().Informer().GetStore()
+			for _, node := range c.nodes {
+				nodeStore.Add(node)
+			}
+
 			serverResponse.httpStatus = c.httpStatus
 			serverResponse.responseMsg = c.responseMsg
 
-			ctrl := &managedClusterHealthCheckController{
+			ctrl := &managedClusterStatusController{
 				clusterName:                   testinghelpers.TestManagedClusterName,
 				hubClusterClient:              clusterClient,
 				hubClusterLister:              clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				managedClusterDiscoveryClient: discoveryClient,
+				nodeLister:                    kubeInformerFactory.Core().V1().Nodes().Lister(),
 			}
 			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, ""))
 			testinghelpers.AssertError(t, syncErr, c.expectedErr)
