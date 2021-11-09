@@ -1,4 +1,1 @@
-# Security Response
-
-If you've found a security issue that you'd like to disclose confidentially please contact Red Hat's Product Security team. 
-Details at https://access.redhat.com/security/team/contact
+Refer to our [Community Security Response](https://github.com/open-cluster-management-io/community/blob/main/SECURITY.md).
