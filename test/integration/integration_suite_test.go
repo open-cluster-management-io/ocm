@@ -21,6 +21,7 @@ import (
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/controllers/bootstrapcontroller"
+	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/controllers/ssarcontroller"
 )
 
 func TestIntegration(t *testing.T) {
@@ -51,6 +52,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 
 	// crank up the sync speed
 	bootstrapcontroller.BootstrapControllerSyncInterval = 2 * time.Second
+	ssarcontroller.SSARReSyncTime = 1 * time.Second
 
 	var err error
 

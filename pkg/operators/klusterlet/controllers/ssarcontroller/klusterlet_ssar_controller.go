@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -26,6 +27,9 @@ import (
 	"open-cluster-management.io/registration-operator/pkg/helpers"
 )
 
+// SSARReSyncTime is exposed so that integration tests can crank up the controller sync speed.
+var SSARReSyncTime = 30 * time.Second
+
 type ssarController struct {
 	kubeClient       kubernetes.Interface
 	secretLister     corelister.SecretLister
@@ -45,6 +49,7 @@ const (
 	bootstrapSecretDegraded = "BootstrapSecretDegraded"
 	hubConfigSecret         = "HubConfigSecret"
 	hubConfigSecretDegraded = "HubConfigSecretDegraded"
+	hubConnectionDegraded   = "HubConnectionDegraded"
 )
 
 func NewKlustrletSSARController(
@@ -106,9 +111,10 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 	}
 	klusterlet = klusterlet.DeepCopy()
 
-	// if the ssar checking is already processing, ignore reconciling this turn.
+	// if the ssar checking is already processing, requeue it after 30s.
 	if c.inSSARChecking(klusterletName) {
-		klog.V(4).Info("Reconciling Klusterlet %q is already processing now", klusterletName)
+		klog.V(4).Infof("Reconciling Klusterlet %q is already processing now", klusterletName)
+		controllerContext.Queue().AddAfter(klusterletName, SSARReSyncTime)
 		return nil
 	}
 
@@ -122,16 +128,6 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 			klusterletNS = klusterletNamespace
 		}
 
-		bootstrapDegradedCondition := checkAgentDegradedCondition(
-			ctx, c.kubeClient,
-			bootstrapSecret, bootstrapSecretDegraded,
-			klusterletAgent{
-				clusterName: klusterlet.Spec.ClusterName,
-				namespace:   klusterletNS,
-			},
-			[]degradedCheckFunc{checkBootstrapSecret},
-		)
-
 		hubConfigDegradedCondition := checkAgentDegradedCondition(
 			ctx, c.kubeClient,
 			hubConfigSecret, hubConfigSecretDegraded,
@@ -142,12 +138,54 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 			[]degradedCheckFunc{checkHubConfigSecret},
 		)
 
-		_, _, err = helpers.UpdateKlusterletStatus(ctx, c.klusterletClient, klusterletName,
-			helpers.UpdateKlusterletConditionFn(bootstrapDegradedCondition),
-			helpers.UpdateKlusterletConditionFn(hubConfigDegradedCondition))
+		// the hub kubeconfig is functional, the bootstrap kubeconfig check is not needed,
+		// ignore it to reduce to send the sar requests
+		if hubConfigDegradedCondition.Status == metav1.ConditionFalse {
+			_, _, err := helpers.UpdateKlusterletStatus(
+				ctx,
+				c.klusterletClient,
+				klusterletName,
+				helpers.UpdateKlusterletConditionFn(metav1.Condition{
+					Type:    hubConnectionDegraded,
+					Status:  metav1.ConditionFalse,
+					Reason:  fmt.Sprintf("HubConnectionFunctional"),
+					Message: fmt.Sprintf("Hub connection is functioning correctly"),
+				}),
+			)
 
+			if err != nil {
+				klog.Errorf("Update Klusterlet Status Failed: %v", err)
+				controllerContext.Queue().AddAfter(klusterletName, SSARReSyncTime)
+			}
+
+			return
+		}
+
+		bootstrapDegradedCondition := checkAgentDegradedCondition(
+			ctx, c.kubeClient,
+			bootstrapSecret, bootstrapSecretDegraded,
+			klusterletAgent{
+				clusterName: klusterlet.Spec.ClusterName,
+				namespace:   klusterletNS,
+			},
+			[]degradedCheckFunc{checkBootstrapSecret},
+		)
+
+		// merge the bootstrap and hubconfig degraded conditions to hub connection degraged condition
+		_, _, err := helpers.UpdateKlusterletStatus(
+			ctx,
+			c.klusterletClient,
+			klusterletName,
+			helpers.UpdateKlusterletConditionFn(metav1.Condition{
+				Type:    hubConnectionDegraded,
+				Status:  metav1.ConditionTrue,
+				Reason:  bootstrapDegradedCondition.Reason + "," + hubConfigDegradedCondition.Reason,
+				Message: bootstrapDegradedCondition.Message + "\n" + hubConfigDegradedCondition.Message,
+			}),
+		)
 		if err != nil {
 			klog.Errorf("Update Klusterlet Status Failed: %v", err)
+			controllerContext.Queue().AddAfter(klusterletName, SSARReSyncTime)
 		}
 	}()
 

@@ -157,12 +157,11 @@ func TestSync(t *testing.T) {
 				newSecretWithKubeConfig(helpers.HubKubeConfig, "test", newKubeConfig(apiServerHost)),
 			},
 			klusterlet:                         newKlusterlet("testklusterlet", "test", "cluster1"),
-			allowToOperateManagedClusters:      true,
-			allowToOperateManagedClusterStatus: true,
-			allowToOperateManifestWorks:        true,
+			allowToOperateManagedClusters:      false,
+			allowToOperateManagedClusterStatus: false,
+			allowToOperateManifestWorks:        false,
 			expectedConditions: []metav1.Condition{
-				testinghelper.NamedCondition(bootstrapSecretDegraded, "BootstrapSecretMissing", metav1.ConditionTrue),
-				testinghelper.NamedCondition(hubConfigSecretDegraded, "HubConfigSecretFunctional", metav1.ConditionFalse),
+				testinghelper.NamedCondition(hubConnectionDegraded, "BootstrapSecretMissing,HubKubeConfigUnauthorized", metav1.ConditionTrue),
 			},
 		},
 		{
@@ -175,8 +174,7 @@ func TestSync(t *testing.T) {
 			allowToOperateManagedClusterStatus: true,
 			allowToOperateManifestWorks:        true,
 			expectedConditions: []metav1.Condition{
-				testinghelper.NamedCondition(bootstrapSecretDegraded, "BootstrapSecretFunctional", metav1.ConditionFalse),
-				testinghelper.NamedCondition(hubConfigSecretDegraded, "HubKubeConfigSecretMissing", metav1.ConditionTrue),
+				testinghelper.NamedCondition(hubConnectionDegraded, "BootstrapSecretFunctional,HubKubeConfigSecretMissing", metav1.ConditionTrue),
 			},
 		},
 		{
@@ -185,13 +183,12 @@ func TestSync(t *testing.T) {
 				newSecretWithKubeConfig(helpers.BootstrapHubKubeConfig, "test", []byte("badsecret")),
 				newSecretWithKubeConfig(helpers.HubKubeConfig, "test", newKubeConfig(apiServerHost)),
 			},
-			allowToOperateManagedClusters:      true,
-			allowToOperateManagedClusterStatus: true,
-			allowToOperateManifestWorks:        true,
+			allowToOperateManagedClusters:      false,
+			allowToOperateManagedClusterStatus: false,
+			allowToOperateManifestWorks:        false,
 			klusterlet:                         newKlusterlet("testklusterlet", "test", "cluster1"),
 			expectedConditions: []metav1.Condition{
-				testinghelper.NamedCondition(bootstrapSecretDegraded, "BootstrapSecretError", metav1.ConditionTrue),
-				testinghelper.NamedCondition(hubConfigSecretDegraded, "HubConfigSecretFunctional", metav1.ConditionFalse),
+				testinghelper.NamedCondition(hubConnectionDegraded, "BootstrapSecretError,HubKubeConfigUnauthorized", metav1.ConditionTrue),
 			},
 		},
 		{
@@ -205,8 +202,7 @@ func TestSync(t *testing.T) {
 			allowToOperateManifestWorks:        true,
 			klusterlet:                         newKlusterlet("testklusterlet", "test", "cluster1"),
 			expectedConditions: []metav1.Condition{
-				testinghelper.NamedCondition(bootstrapSecretDegraded, "BootstrapSecretFunctional", metav1.ConditionFalse),
-				testinghelper.NamedCondition(hubConfigSecretDegraded, "HubKubeConfigError", metav1.ConditionTrue),
+				testinghelper.NamedCondition(hubConnectionDegraded, "BootstrapSecretFunctional,HubKubeConfigError", metav1.ConditionTrue),
 			},
 		},
 		{
@@ -220,8 +216,7 @@ func TestSync(t *testing.T) {
 			allowToOperateManifestWorks:        false,
 			klusterlet:                         newKlusterlet("testklusterlet", "test", "cluster1"),
 			expectedConditions: []metav1.Condition{
-				testinghelper.NamedCondition(bootstrapSecretDegraded, "BootstrapSecretUnauthorized", metav1.ConditionTrue),
-				testinghelper.NamedCondition(hubConfigSecretDegraded, "HubKubeConfigUnauthorized", metav1.ConditionTrue),
+				testinghelper.NamedCondition(hubConnectionDegraded, "BootstrapSecretUnauthorized,HubKubeConfigUnauthorized", metav1.ConditionTrue),
 			},
 		},
 		{
@@ -235,8 +230,7 @@ func TestSync(t *testing.T) {
 			allowToOperateManifestWorks:        true,
 			klusterlet:                         newKlusterlet("testklusterlet", "test", "cluster1"),
 			expectedConditions: []metav1.Condition{
-				testinghelper.NamedCondition(bootstrapSecretDegraded, "BootstrapSecretFunctional", metav1.ConditionFalse),
-				testinghelper.NamedCondition(hubConfigSecretDegraded, "HubConfigSecretFunctional", metav1.ConditionFalse),
+				testinghelper.NamedCondition(hubConnectionDegraded, "HubConnectionFunctional", metav1.ConditionFalse),
 			},
 		},
 	}

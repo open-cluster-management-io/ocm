@@ -493,8 +493,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "BootstrapSecretDegraded", "BootstrapSecretMissing", metav1.ConditionTrue)
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "HubConfigSecretDegraded", "HubKubeConfigMissing", metav1.ConditionTrue)
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "HubConnectionDegraded", "BootstrapSecretMissing,HubKubeConfigMissing", metav1.ConditionTrue)
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "RegistrationDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "WorkDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
 
@@ -511,8 +510,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(), bootStrapSecret, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "BootstrapSecretDegraded", "BootstrapSecretFunctional", metav1.ConditionFalse)
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "HubConfigSecretDegraded", "HubKubeConfigMissing", metav1.ConditionTrue)
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "HubConnectionDegraded", "BootstrapSecretFunctional,HubKubeConfigMissing", metav1.ConditionTrue)
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "RegistrationDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "WorkDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
 
@@ -520,19 +518,20 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// Update hub secret and make sure the kubeconfig can work
+			hubSecret = hubSecret.DeepCopy()
 			hubSecret.Data["cluster-name"] = []byte("testcluster")
 			hubSecret.Data["kubeconfig"] = util.NewKubeConfig(restConfig.Host)
 			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(), hubSecret, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "BootstrapSecretDegraded", "BootstrapSecretFunctional", metav1.ConditionFalse)
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "HubConfigSecretDegraded", "HubConfigSecretFunctional", metav1.ConditionFalse)
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "RegistrationDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "WorkDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
 
 			// Update replica of deployment
 			registrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			registrationDeployment = registrationDeployment.DeepCopy()
 			registrationDeployment.Status.AvailableReplicas = 3
 			registrationDeployment.Status.Replicas = 3
 			registrationDeployment.Status.ReadyReplicas = 3
@@ -540,14 +539,14 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			workDeployment = workDeployment.DeepCopy()
 			workDeployment.Status.AvailableReplicas = 3
 			workDeployment.Status.Replicas = 3
 			workDeployment.Status.ReadyReplicas = 3
 			_, err = kubeClient.AppsV1().Deployments(klusterletNamespace).UpdateStatus(context.Background(), workDeployment, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "BootstrapSecretDegraded", "BootstrapSecretFunctional", metav1.ConditionFalse)
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "HubConfigSecretDegraded", "HubConfigSecretFunctional", metav1.ConditionFalse)
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "RegistrationDesiredDegraded", "DeploymentsFunctional", metav1.ConditionFalse)
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "WorkDesiredDegraded", "DeploymentsFunctional", metav1.ConditionFalse)
 		})
