@@ -91,16 +91,16 @@ We mainly provide deployment in two scenarios:
 After a successful deployment, a `certificatesigningrequest` and a `managedcluster` will
 be created on the hub.
 
+Switch to hub context and deploy hub components.
 ```
+kubectl config use-context {hub-context}
 kubectl get csr
-kubectl get managedcluster
 ```
-
 Next approve the csr and set managedCluster to be accepted by hub with the following command
-
 ```
 kubectl certificate approve {csr name}
 kubectl patch managedcluster {cluster name} -p='{"spec":{"hubAcceptsClient":true}}' --type=merge
+kubectl get managedcluster
 ```
 
 ## Community, discussion, contribution, and support
