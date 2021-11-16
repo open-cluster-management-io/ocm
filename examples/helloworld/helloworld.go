@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
+	"embed"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -14,7 +14,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"open-cluster-management.io/addon-framework/examples/helloworld/bindata"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -32,22 +31,23 @@ func init() {
 	scheme.AddToScheme(genericScheme)
 }
 
-const manifestDir = "examples/helloworld/manifests"
+//go:embed manifests
+var fs embed.FS
 
 var manifestFiles = []string{
 	// serviceaccount to run addon-agent
-	"serviceaccount.yaml",
+	"manifests/serviceaccount.yaml",
 	// clusterrolebinding to bind appropriate clusterrole to the serviceaccount
-	"clusterrolebinding.yaml",
+	"manifests/clusterrolebinding.yaml",
 	// deployment to deploy addon-agent
-	"deployment.yaml",
+	"manifests/deployment.yaml",
 }
 
 var agentPermissionFiles = []string{
 	// role with RBAC rules to access resources on hub
-	"role.yaml",
+	"manifests/role.yaml",
 	// rolebinding to bind the above role to a certain user group
-	"rolebinding.yaml",
+	"manifests/rolebinding.yaml",
 }
 
 // Another agent with registration enabled.
@@ -118,7 +118,13 @@ func loadManifestFromFile(file string, cluster *clusterv1.ManagedCluster, addon 
 		ClusterName:           cluster.Name,
 		Image:                 image,
 	}
-	raw := assets.MustCreateAssetFromTemplate(file, bindata.MustAsset(filepath.Join(manifestDir, file)), &manifestConfig).Data
+
+	template, err := fs.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+
+	raw := assets.MustCreateAssetFromTemplate(file, template, &manifestConfig).Data
 	object, _, err := genericCodec.Decode(raw, nil, nil)
 	if err != nil {
 		return nil, err
@@ -140,7 +146,11 @@ func applyManifestFromFile(file, clusterName, addonName string, kubeclient *kube
 		resourceapply.NewKubeClientHolder(kubeclient),
 		recorder,
 		func(name string) ([]byte, error) {
-			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join(manifestDir, name)), config).Data, nil
+			template, err := fs.ReadFile(file)
+			if err != nil {
+				return nil, err
+			}
+			return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
 		},
 		file,
 	)

@@ -8,7 +8,6 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
 	targets/openshift/deps.mk \
 	targets/openshift/images.mk \
-	targets/openshift/bindata.mk \
 	lib/tmp.mk \
 )
 
@@ -34,8 +33,6 @@ DEST := $(GOPATH)/src/$(GIT_HOST)/$(BASE_DIR)
 
 # Add packages to do unit test
 GO_TEST_PACKAGES :=./pkg/...
-
-$(call add-bindata,foundation-agent,./examples/helloworld/manifests/...,bindata,bindata,./examples/helloworld/bindata/bindata.go)
 
 # This will call a macro called "build-image" which will generate image specific targets based on the parameters:
 # $0 - macro name

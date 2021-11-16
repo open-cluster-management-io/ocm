@@ -28,10 +28,6 @@ github.com/felixge/httpsnoop
 github.com/fsnotify/fsnotify
 # github.com/ghodss/yaml v1.0.0
 github.com/ghodss/yaml
-# github.com/go-bindata/go-bindata v3.1.2+incompatible
-## explicit
-github.com/go-bindata/go-bindata
-github.com/go-bindata/go-bindata/go-bindata
 # github.com/go-logr/logr v0.4.0
 github.com/go-logr/logr
 # github.com/go-openapi/jsonpointer v0.19.5
@@ -1066,7 +1062,7 @@ k8s.io/utils/net
 k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/trace
-# open-cluster-management.io/api v0.0.0-20210916013819-2e58cdb938f9
+# open-cluster-management.io/api v0.5.0
 ## explicit
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/client/addon/clientset/versioned
