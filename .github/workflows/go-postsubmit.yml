@@ -34,3 +34,7 @@ jobs:
         run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.1
       - name: images
         run: make images
+      - name: push
+        run: |
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login quay.io --username ${{ secrets.DOCKER_USER }} --password-stdin
+          docker push quay.io/open-cluster-management/registration:latest
