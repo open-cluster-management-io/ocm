@@ -2,15 +2,13 @@ package clusterrole
 
 import (
 	"context"
+	"embed"
 	"fmt"
-	"path/filepath"
 
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	"open-cluster-management.io/registration/pkg/helpers"
-	"open-cluster-management.io/registration/pkg/hub/clusterrole/bindata"
 
-	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -26,13 +24,15 @@ import (
 const (
 	registrationClusterRole = "open-cluster-management:managedcluster:registration"
 	workClusterRole         = "open-cluster-management:managedcluster:work"
-	manifestDir             = "pkg/hub/clusterrole"
 )
 
 var clusterRoleFiles = []string{
 	"manifests/managedcluster-registration-clusterrole.yaml",
 	"manifests/managedcluster-work-clusterrole.yaml",
 }
+
+//go:embed manifests
+var manifestFiles embed.FS
 
 // clusterroleController maintains the necessary clusterroles for registraion and work agent on hub cluster.
 type clusterroleController struct {
@@ -79,9 +79,7 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 			ctx,
 			c.kubeClient,
 			c.eventRecorder,
-			func(name string) ([]byte, error) {
-				return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join(manifestDir, name)), nil).Data, nil
-			},
+			manifestFiles.ReadFile,
 			clusterRoleFiles...,
 		)
 	}
@@ -90,9 +88,7 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 	results := resourceapply.ApplyDirectly(
 		resourceapply.NewKubeClientHolder(c.kubeClient),
 		syncCtx.Recorder(),
-		func(name string) ([]byte, error) {
-			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join(manifestDir, name)), nil).Data, nil
-		},
+		manifestFiles.ReadFile,
 		clusterRoleFiles...,
 	)
 
