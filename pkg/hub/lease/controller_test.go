@@ -73,14 +73,18 @@ func TestSync(t *testing.T) {
 			},
 		},
 		{
-			name:     "managed cluster is available (backward compatible)",
-			clusters: []runtime.Object{testinghelpers.NewAvailableManagedCluster()},
-			clusterLeases: []runtime.Object{
-				testinghelpers.NewManagedClusterLease("managed-cluster-lease", now.Add(-5*time.Minute)),
-				testinghelpers.NewManagedClusterLease(fmt.Sprintf("cluster-lease-%s", testinghelpers.TestManagedClusterName), now),
-			},
+			name:     "managed cluster is deleting",
+			clusters: []runtime.Object{newDeletingManagedCluster()},
 			validateActions: func(t *testing.T, leaseActions, clusterActions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, clusterActions)
+				expected := metav1.Condition{
+					Type:    clusterv1.ManagedClusterConditionAvailable,
+					Status:  metav1.ConditionUnknown,
+					Reason:  "ManagedClusterLeaseUpdateStopped",
+					Message: "Registration agent stopped updating its lease.",
+				}
+				testinghelpers.AssertActions(t, clusterActions, "get", "update")
+				actual := clusterActions[1].(clienttesting.UpdateActionImpl).Object
+				testinghelpers.AssertManagedClusterCondition(t, actual.(*clusterv1.ManagedCluster).Status.Conditions, expected)
 			},
 		},
 	}
@@ -114,4 +118,11 @@ func TestSync(t *testing.T) {
 			c.validateActions(t, leaseClient.Actions(), clusterClient.Actions())
 		})
 	}
+}
+
+func newDeletingManagedCluster() *clusterv1.ManagedCluster {
+	now := metav1.Now()
+	cluster := testinghelpers.NewAcceptedManagedCluster()
+	cluster.DeletionTimestamp = &now
+	return cluster
 }
