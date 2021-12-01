@@ -45,7 +45,7 @@ kustomize_dir:=$(dir $(KUSTOMIZE))
 
 KUBECTL?=kubectl
 KUBECONFIG?=./.kubeconfig
-HUB_KUBECONFIG=./.hub-kubeconfig
+HUB_KUBECONFIG?=./.hub-kubeconfig
 
 OPERATOR_SDK_ARCHOS:=x86_64-linux-gnu
 ifeq ($(GOHOSTOS),darwin)
