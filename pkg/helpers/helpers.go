@@ -3,6 +3,7 @@ package helpers
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -24,6 +25,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/klog/v2"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
@@ -478,4 +480,116 @@ func DetermineReplicaByNodes(ctx context.Context, kubeClient kubernetes.Interfac
 	}
 
 	return defaultReplica
+}
+
+func GenerateRelatedResource(objBytes []byte) (operatorapiv1.RelatedResourceMeta, error) {
+	var relatedResource operatorapiv1.RelatedResourceMeta
+	requiredObj, _, err := genericCodec.Decode(objBytes, nil, nil)
+	if err != nil {
+		return relatedResource, err
+	}
+
+	switch requiredObj.(type) {
+	case *admissionv1.ValidatingWebhookConfiguration:
+		relatedResource = newRelatedResource(admissionv1.SchemeGroupVersion.WithResource("validatingwebhookconfigurations"), requiredObj)
+	case *admissionv1.MutatingWebhookConfiguration:
+		relatedResource = newRelatedResource(admissionv1.SchemeGroupVersion.WithResource("mutatingwebhookconfigurations"), requiredObj)
+	case *apiregistrationv1.APIService:
+		relatedResource = newRelatedResource(apiregistrationv1.SchemeGroupVersion.WithResource("apiservices"), requiredObj)
+	case *appsv1.Deployment:
+		relatedResource = newRelatedResource(appsv1.SchemeGroupVersion.WithResource("deployments"), requiredObj)
+	case *corev1.Namespace:
+		relatedResource = newRelatedResource(corev1.SchemeGroupVersion.WithResource("namespaces"), requiredObj)
+	case *corev1.Service:
+		relatedResource = newRelatedResource(corev1.SchemeGroupVersion.WithResource("services"), requiredObj)
+	case *corev1.Pod:
+		relatedResource = newRelatedResource(corev1.SchemeGroupVersion.WithResource("pods"), requiredObj)
+	case *corev1.ServiceAccount:
+		relatedResource = newRelatedResource(corev1.SchemeGroupVersion.WithResource("serviceaccounts"), requiredObj)
+	case *corev1.ConfigMap:
+		relatedResource = newRelatedResource(corev1.SchemeGroupVersion.WithResource("configmaps"), requiredObj)
+	case *corev1.Secret:
+		relatedResource = newRelatedResource(corev1.SchemeGroupVersion.WithResource("secrets"), requiredObj)
+	case *rbacv1.ClusterRole:
+		relatedResource = newRelatedResource(rbacv1.SchemeGroupVersion.WithResource("clusterroles"), requiredObj)
+	case *rbacv1.ClusterRoleBinding:
+		relatedResource = newRelatedResource(rbacv1.SchemeGroupVersion.WithResource("clusterrolebindings"), requiredObj)
+	case *rbacv1.Role:
+		relatedResource = newRelatedResource(rbacv1.SchemeGroupVersion.WithResource("roles"), requiredObj)
+	case *rbacv1.RoleBinding:
+		relatedResource = newRelatedResource(rbacv1.SchemeGroupVersion.WithResource("rolebindings"), requiredObj)
+	case *apiextensionsv1beta1.CustomResourceDefinition:
+		relatedResource = newRelatedResource(apiextensionsv1beta1.SchemeGroupVersion.WithResource("customresourcedefinitions"), requiredObj)
+	case *apiextensionsv1.CustomResourceDefinition:
+		relatedResource = newRelatedResource(apiextensionsv1.SchemeGroupVersion.WithResource("customresourcedefinitions"), requiredObj)
+	default:
+		return relatedResource, fmt.Errorf("unhandled type %T", requiredObj)
+	}
+
+	return relatedResource, nil
+}
+
+func newRelatedResource(gvr schema.GroupVersionResource, obj runtime.Object) operatorapiv1.RelatedResourceMeta {
+	accessor, _ := meta.Accessor(obj)
+	return operatorapiv1.RelatedResourceMeta{
+		Group:     gvr.Group,
+		Version:   gvr.Version,
+		Resource:  gvr.Resource,
+		Namespace: accessor.GetNamespace(),
+		Name:      accessor.GetName(),
+	}
+}
+
+func SetRelatedResourcesStatuses(
+	relatedResourcesStatuses *[]operatorapiv1.RelatedResourceMeta,
+	newRelatedResourcesStatus operatorapiv1.RelatedResourceMeta) {
+	if relatedResourcesStatuses == nil {
+		relatedResourcesStatuses = &[]operatorapiv1.RelatedResourceMeta{}
+	}
+
+	existingRelatedResource := FindRelatedResourcesStatus(*relatedResourcesStatuses, newRelatedResourcesStatus)
+	if existingRelatedResource == nil {
+		*relatedResourcesStatuses = append(*relatedResourcesStatuses, newRelatedResourcesStatus)
+		return
+	}
+}
+
+func FindRelatedResourcesStatus(
+	relatedResourcesStatuses []operatorapiv1.RelatedResourceMeta,
+	relatedResource operatorapiv1.RelatedResourceMeta) *operatorapiv1.RelatedResourceMeta {
+	for i := range relatedResourcesStatuses {
+		if reflect.DeepEqual(relatedResourcesStatuses[i], relatedResource) {
+			return &relatedResourcesStatuses[i]
+		}
+	}
+	return nil
+}
+
+func SetRelatedResourcesStatusesWithObj(
+	relatedResourcesStatuses *[]operatorapiv1.RelatedResourceMeta, objData []byte) {
+	res, err := GenerateRelatedResource(objData)
+	if err != nil {
+		klog.Errorf("failed to generate relatedResource %v, and skip to set into status. %v", objData, err)
+		return
+	}
+	SetRelatedResourcesStatuses(relatedResourcesStatuses, res)
+	return
+}
+
+func UpdateClusterManagerRelatedResourcesFn(relatedResources ...operatorapiv1.RelatedResourceMeta) UpdateClusterManagerStatusFunc {
+	return func(oldStatus *operatorapiv1.ClusterManagerStatus) error {
+		if !reflect.DeepEqual(oldStatus.RelatedResources, relatedResources) {
+			oldStatus.RelatedResources = relatedResources
+		}
+		return nil
+	}
+}
+
+func UpdateKlusterletRelatedResourcesFn(relatedResources ...operatorapiv1.RelatedResourceMeta) UpdateKlusterletStatusFunc {
+	return func(oldStatus *operatorapiv1.KlusterletStatus) error {
+		if !reflect.DeepEqual(oldStatus.RelatedResources, relatedResources) {
+			oldStatus.RelatedResources = relatedResources
+		}
+		return nil
+	}
 }

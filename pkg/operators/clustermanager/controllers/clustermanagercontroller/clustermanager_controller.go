@@ -210,6 +210,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	config.RegistrationAPIServiceCABundle = encodedCaBundle
 	config.WorkAPIServiceCABundle = encodedCaBundle
 
+	var relatedResources []operatorapiv1.RelatedResourceMeta
 	// Apply static files
 	resourceResults := helpers.ApplyDirectly(
 		n.kubeClient,
@@ -221,7 +222,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 			if err != nil {
 				return nil, err
 			}
-			return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
+			objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
+			helpers.SetRelatedResourcesStatusesWithObj(&relatedResources, objData)
+			return objData, nil
 		},
 		staticResourceFiles...,
 	)
@@ -244,7 +247,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 				if err != nil {
 					return nil, err
 				}
-				return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
+				objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
+				helpers.SetRelatedResourcesStatusesWithObj(&relatedResources, objData)
+				return objData, nil
 			},
 			controllerContext.Recorder(),
 			file)
@@ -278,6 +283,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		ctx, n.clusterManagerClient, clusterManager.Name,
 		helpers.UpdateClusterManagerConditionFn(*conditions...),
 		helpers.UpdateClusterManagerGenerationsFn(currentGenerations...),
+		helpers.UpdateClusterManagerRelatedResourcesFn(relatedResources...),
 		func(oldStatus *operatorapiv1.ClusterManagerStatus) error {
 			oldStatus.ObservedGeneration = observedKlusterletGeneration
 			return nil

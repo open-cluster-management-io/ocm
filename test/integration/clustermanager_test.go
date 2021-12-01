@@ -261,6 +261,19 @@ var _ = ginkgo.Describe("ClusterManager", func() {
 
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Check if relatedResources are correct
+			gomega.Eventually(func() error {
+				actual, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if len(actual.Status.RelatedResources) != 33 {
+					return fmt.Errorf("should get 33 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
 		})
 
 		ginkgo.It("Deployment should be added nodeSelector and toleration when add nodePlacement into clustermanager", func() {

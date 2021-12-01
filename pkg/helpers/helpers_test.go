@@ -8,15 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	fakeapiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
-	opereatorfake "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
-	operatorapiv1 "open-cluster-management.io/api/operator/v1"
-
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -26,6 +24,9 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 	fakeapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
+	opereatorfake "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/registration-operator/manifests"
 )
 
 func TestUpdateStatusCondition(t *testing.T) {
@@ -757,6 +758,168 @@ func TestApplyDeployment(t *testing.T) {
 			}
 			if !reflect.DeepEqual(deployment.Spec.Template.Spec.Tolerations, c.nodePlacement.Tolerations) {
 				t.Errorf("Expect Tolerations %v, got %v", c.nodePlacement.Tolerations, deployment.Spec.Template.Spec.Tolerations)
+			}
+		})
+	}
+}
+
+type config struct {
+	ClusterManagerName             string
+	RegistrationImage              string
+	RegistrationAPIServiceCABundle string
+	WorkImage                      string
+	WorkAPIServiceCABundle         string
+	PlacementImage                 string
+	Replica                        int32
+}
+
+func TestGetRelatedResource(t *testing.T) {
+	cases := []struct {
+		name                    string
+		manifestFile            string
+		config                  config
+		expectedErr             error
+		expectedRelatedResource operatorapiv1.RelatedResourceMeta
+	}{
+		{
+			name:         "get correct crd relatedResources",
+			manifestFile: "cluster-manager/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml",
+
+			config:      config{ClusterManagerName: "test", Replica: 1},
+			expectedErr: nil,
+			expectedRelatedResource: operatorapiv1.RelatedResourceMeta{
+				Group:     "apiextensions.k8s.io",
+				Version:   "v1",
+				Resource:  "customresourcedefinitions",
+				Namespace: "",
+				Name:      "clustermanagementaddons.addon.open-cluster-management.io",
+			},
+		},
+		{
+			name:         "get correct clusterrole relatedResources",
+			manifestFile: "cluster-manager/cluster-manager-registration-clusterrole.yaml",
+			config:       config{ClusterManagerName: "test", Replica: 1},
+			expectedErr:  nil,
+			expectedRelatedResource: operatorapiv1.RelatedResourceMeta{
+				Group:     "rbac.authorization.k8s.io",
+				Version:   "v1",
+				Resource:  "clusterroles",
+				Namespace: "",
+				Name:      "open-cluster-management:test-registration:controller",
+			},
+		},
+		{
+			name:         "get correct deployment relatedResources",
+			manifestFile: "cluster-manager/cluster-manager-registration-deployment.yaml",
+			config:       config{ClusterManagerName: "test", Replica: 1},
+			expectedErr:  nil,
+			expectedRelatedResource: operatorapiv1.RelatedResourceMeta{
+				Group:     "apps",
+				Version:   "v1",
+				Resource:  "deployments",
+				Namespace: "open-cluster-management-hub",
+				Name:      "test-registration-controller",
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			template, err := manifests.ClusterManagerManifestFiles.ReadFile(c.manifestFile)
+			if err != nil {
+				t.Errorf("failed to read file %v", err)
+			}
+			objData := assets.MustCreateAssetFromTemplate(c.manifestFile, template, c.config).Data
+
+			relatedResource, err := GenerateRelatedResource(objData)
+			if !reflect.DeepEqual(err, c.expectedErr) {
+				t.Errorf(diff.ObjectDiff(err, c.expectedErr))
+			}
+			if !reflect.DeepEqual(relatedResource, c.expectedRelatedResource) {
+				t.Errorf(diff.ObjectDiff(err, c.expectedErr))
+			}
+		})
+
+	}
+}
+
+func TestUpdateRelatedResources(t *testing.T) {
+	gvrDeployment := appsv1.SchemeGroupVersion.WithResource("deployments")
+	gvrSecret := corev1.SchemeGroupVersion.WithResource("secrets")
+	cases := []struct {
+		name                string
+		oldRelatedResources []operatorapiv1.RelatedResourceMeta
+		newRelatedResources []operatorapiv1.RelatedResourceMeta
+		expectedUpdated     bool
+	}{
+		{
+			name:                "need update",
+			oldRelatedResources: []operatorapiv1.RelatedResourceMeta{},
+			newRelatedResources: []operatorapiv1.RelatedResourceMeta{newRelatedResource(gvrDeployment, newDeployment("test", "test", 1))},
+			expectedUpdated:     true,
+		},
+		{
+			name: "no update",
+			oldRelatedResources: []operatorapiv1.RelatedResourceMeta{
+				newRelatedResource(gvrDeployment, newDeployment("test1", "test1", 1)),
+				newRelatedResource(gvrSecret, newSecret("test2", "test2")),
+			},
+			newRelatedResources: []operatorapiv1.RelatedResourceMeta{
+				newRelatedResource(gvrDeployment, newDeployment("test1", "test1", 1)),
+				newRelatedResource(gvrSecret, newSecret("test2", "test2")),
+			},
+			expectedUpdated: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fakeOperatorClient := opereatorfake.NewSimpleClientset(
+				&operatorapiv1.ClusterManager{
+					ObjectMeta: metav1.ObjectMeta{Name: "clusterManager"},
+					Status: operatorapiv1.ClusterManagerStatus{
+						RelatedResources: c.oldRelatedResources,
+					},
+				},
+				&operatorapiv1.Klusterlet{
+					ObjectMeta: metav1.ObjectMeta{Name: "klusterlet"},
+					Status: operatorapiv1.KlusterletStatus{
+						RelatedResources: c.oldRelatedResources,
+					},
+				},
+			)
+
+			hubstatus, updated, err := UpdateClusterManagerStatus(
+				context.TODO(),
+				fakeOperatorClient.OperatorV1().ClusterManagers(),
+				"clusterManager",
+				UpdateClusterManagerRelatedResourcesFn(c.newRelatedResources...),
+			)
+			if err != nil {
+				t.Errorf("unexpected err: %v", err)
+			}
+			if updated != c.expectedUpdated {
+				t.Errorf("expected %t, but %t", c.expectedUpdated, updated)
+			}
+
+			klusterletstatus, updated, err := UpdateKlusterletStatus(
+				context.TODO(),
+				fakeOperatorClient.OperatorV1().Klusterlets(),
+				"klusterlet",
+				UpdateKlusterletRelatedResourcesFn(c.newRelatedResources...),
+			)
+			if err != nil {
+				t.Errorf("unexpected err: %v", err)
+			}
+			if updated != c.expectedUpdated {
+				t.Errorf("expected %t, but %t", c.expectedUpdated, updated)
+			}
+
+			if !equality.Semantic.DeepEqual(hubstatus.RelatedResources, c.newRelatedResources) {
+				t.Errorf(diff.ObjectDiff(hubstatus.RelatedResources, c.newRelatedResources))
+			}
+
+			if !equality.Semantic.DeepEqual(klusterletstatus.RelatedResources, c.newRelatedResources) {
+				t.Errorf(diff.ObjectDiff(klusterletstatus.RelatedResources, c.newRelatedResources))
 			}
 		})
 	}

@@ -217,6 +217,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		return err
 	}
 
+	var relatedResources []operatorapiv1.RelatedResourceMeta
 	errs := []error{}
 	// If kube version is less than 1.12, deploy static resource for kube 1.11 at first
 	// TODO remove this when we do not support kube 1.11 any longer
@@ -229,7 +230,9 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 				if err != nil {
 					return nil, err
 				}
-				return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
+				objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
+				helpers.SetRelatedResourcesStatusesWithObj(&relatedResources, objData)
+				return objData, nil
 			},
 			kube111StaticResourceFiles...,
 		)
@@ -257,7 +260,9 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			if err != nil {
 				return nil, err
 			}
-			return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
+			objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
+			helpers.SetRelatedResourcesStatusesWithObj(&relatedResources, objData)
+			return objData, nil
 		},
 		appliedStaticFiles...,
 	)
@@ -315,7 +320,9 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			if err != nil {
 				return nil, err
 			}
-			return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
+			objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
+			helpers.SetRelatedResourcesStatusesWithObj(&relatedResources, objData)
+			return objData, nil
 		},
 		controllerContext.Recorder(),
 		"klusterlet/klusterlet-registration-deployment.yaml")
@@ -345,7 +352,9 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			if err != nil {
 				return nil, err
 			}
-			return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
+			objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
+			helpers.SetRelatedResourcesStatusesWithObj(&relatedResources, objData)
+			return objData, nil
 		},
 		controllerContext.Recorder(),
 		"klusterlet/klusterlet-work-deployment.yaml")
@@ -364,6 +373,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			Type: klusterletApplied, Status: metav1.ConditionTrue, Reason: "KlusterletApplied",
 			Message: "Klusterlet Component Applied"}),
 		helpers.UpdateKlusterletGenerationsFn(registrationGeneration, workGeneration),
+		helpers.UpdateKlusterletRelatedResourcesFn(relatedResources...),
 		func(oldStatus *operatorapiv1.KlusterletStatus) error {
 			oldStatus.ObservedGeneration = observedKlusterletGeneration
 			return nil
