@@ -34,13 +34,14 @@ func TestSync(t *testing.T) {
 	}
 
 	cases := []struct {
-		name            string
-		queueKey        string
-		secrets         []runtime.Object
-		approvedCSRCert *testinghelpers.TestCert
-		keyDataExpected bool
-		csrNameExpected bool
-		validateActions func(t *testing.T, hubActions, agentActions []clienttesting.Action)
+		name                         string
+		queueKey                     string
+		secrets                      []runtime.Object
+		approvedCSRCert              *testinghelpers.TestCert
+		keyDataExpected              bool
+		csrNameExpected              bool
+		additonalSecretDataSensitive bool
+		validateActions              func(t *testing.T, hubActions, agentActions []clienttesting.Action)
 	}{
 		{
 			name:            "agent bootstrap",
@@ -58,7 +59,6 @@ func TestSync(t *testing.T) {
 				testinghelpers.AssertActions(t, agentActions, "get")
 			},
 		},
-
 		{
 			name:     "syc csr after bootstrap",
 			queueKey: testSecretName,
@@ -120,6 +120,27 @@ func TestSync(t *testing.T) {
 				testinghelpers.AssertActions(t, agentActions, "get")
 			},
 		},
+		{
+			name:     "sync when additional secret data changes",
+			queueKey: testSecretName,
+			secrets: []runtime.Object{
+				testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "1", testinghelpers.NewTestCert(commonName, 10000*time.Second), map[string][]byte{
+					ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
+					AgentNameFile:   []byte("invalid-name"),
+				}),
+			},
+			keyDataExpected:              true,
+			csrNameExpected:              true,
+			additonalSecretDataSensitive: true,
+			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
+				testinghelpers.AssertActions(t, hubActions, "create")
+				actual := hubActions[0].(clienttesting.CreateActionImpl).Object
+				if _, ok := actual.(*certificates.CertificateSigningRequest); !ok {
+					t.Errorf("expected csr was created, but failed")
+				}
+				testinghelpers.AssertActions(t, agentActions, "get")
+			},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -149,6 +170,7 @@ func TestSync(t *testing.T) {
 					ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
 					AgentNameFile:   []byte(testAgentName),
 				},
+				AdditonalSecretDataSensitive: c.additonalSecretDataSensitive,
 			}
 			csrOption := CSROption{
 				ObjectMeta: metav1.ObjectMeta{

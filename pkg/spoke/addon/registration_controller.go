@@ -180,9 +180,10 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 
 	// build and start a client cert controller
 	clientCertOption := clientcert.ClientCertOption{
-		SecretNamespace:     config.installationNamespace,
-		SecretName:          config.secretName,
-		AdditonalSecretData: additonalSecretData,
+		SecretNamespace:              config.installationNamespace,
+		SecretName:                   config.secretName,
+		AdditonalSecretData:          additonalSecretData,
+		AdditonalSecretDataSensitive: true,
 	}
 
 	csrOption := clientcert.CSROption{

@@ -6,6 +6,7 @@ import (
 	"crypto/x509/pkix"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -72,6 +73,9 @@ type ClientCertOption struct {
 	SecretName string
 	// AdditonalSecretData contains data that will be added into client certificate secret besides tls.key/tls.crt
 	AdditonalSecretData map[string][]byte
+	// AdditonalSecretDataSensitive is true indicates the client cert is sensitive to the AdditonalSecretData.
+	// That means once AdditonalSecretData changes, the client cert will be recreated.
+	AdditonalSecretDataSensitive bool
 }
 
 // clientCertificateController implements the common logic of hub client certification creation/rotation. It
@@ -185,9 +189,15 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 	}
 
 	// create a csr to request new client certificate if
-	// a. there is no valid client certificate issued for the current cluster/agent
-	// b. client certificate exists and has less than a random percentage range from 20% to 25% of its life remaining
-	if c.hasValidClientCertificate(secret) {
+	// a. there is no valid client certificate issued for the current cluster/agent;
+	// b. client certificate is sensitive to the additional secret data and the data changes;
+	// c. client certificate exists and has less than a random percentage range from 20% to 25% of its life remaining;
+	switch {
+	case !c.hasValidClientCertificate(secret):
+		syncCtx.Recorder().Eventf("NoValidCertificateFound", "No valid client certificate for %s is found. Bootstrap is required", c.controllerName)
+	case c.AdditonalSecretDataSensitive && !c.hasAdditonalSecretData(secret):
+		syncCtx.Recorder().Eventf("AdditonalSecretDataChanged", "The additonal secret data is changed. Re-create the client certificate for %s", c.controllerName)
+	default:
 		notBefore, notAfter, err := getCertValidityPeriod(secret)
 		if err != nil {
 			return err
@@ -203,8 +213,6 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 			return nil
 		}
 		syncCtx.Recorder().Eventf("CertificateRotationStarted", "The current client certificate for %s expires in %v. Start certificate rotation", c.controllerName, remaining.Round(time.Second))
-	} else {
-		syncCtx.Recorder().Eventf("NoValidCertificateFound", "No valid client certificate for %s is found. Bootstrap is required", c.controllerName)
 	}
 
 	// create a new private key
@@ -320,6 +328,21 @@ func (c *clientCertificateController) hasValidClientCertificate(secret *corev1.S
 		return valid
 	}
 	return false
+}
+
+// hasAdditonalSecretData checks if the secret includes the expected additional secret data.
+func (c *clientCertificateController) hasAdditonalSecretData(secret *corev1.Secret) bool {
+	for k, v := range c.AdditonalSecretData {
+		value, ok := secret.Data[k]
+		if !ok {
+			return false
+		}
+
+		if !reflect.DeepEqual(v, value) {
+			return false
+		}
+	}
+	return true
 }
 
 func jitter(percentage float64, maxFactor float64) float64 {
