@@ -22,10 +22,23 @@ type configChecker struct {
 }
 
 // NewConfigChecker
-// name could be any string.
-// configfiles should be the same as your target container are using now.
 //
-// Example:
+// Parameters:
+// * name could be any string.
+// * configfiles should be the same as your target container are using now.
+//
+// There is two use cases:
+// Case1: Embeding configchecker into the current server
+//
+// In this case, we simply initialize a configchecker and add it to the current in used healthz.Checkers.
+// You can check here for a reference: https://github.com/open-cluster-management/multicloud-operators-foundation/blob/56270b1520ec5896981db689b3afe0cd893cad8e/cmd/agent/agent.go#L148
+//
+// -----------------------------------------------------------------------------
+//
+// Case2: Using configchecker as an independent process to watch another service
+//
+// Example Code:
+// config_checker_server.go
 // type configCheckerServer struct {
 // 	checkers []heathz.HealthChecker
 // }
@@ -46,7 +59,17 @@ type configChecker struct {
 // 	}
 // }
 //
-// Containers in the same pod of configCheckServer can add liveness probe and be triggered restart as config files be modified.
+// main.go
+// ...
+// configchecker := utils.NewConfigChecker("checker", "/config/server-config.yaml")
+// configchecker.SetReload(true)
+// ccServer := NewConfigCheckerServer([]healthz.HealthChecker{configchecker})
+// ...
+//
+// There are some watch-outs for this case:
+// 1. One configchecker server for one target server, don't use one configchecker for multiple server.
+// 2. Set `reload` to `true` by invoke `SetReload` function.
+// 3. In deployment's livessProbe config, the `failureThreshold` must be `1`.
 func NewConfigChecker(name string, configfiles ...string) (*configChecker, error) {
 	checksum, err := load(configfiles)
 	if err != nil {
