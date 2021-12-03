@@ -40,7 +40,7 @@ clean:
 
 cluster-ip:
 	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
-  	CLUSTER_IP?=$(shell $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}")
+	$(eval CLUSTER_IP?=$(shell $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}"))
 
 hub-kubeconfig-secret: cluster-ip
 	$(KUBECTL) config use-context $(SPOKE_KUBECONFIG_CONTEXT) --kubeconfig $(SPOKE_KUBECONFIG)
@@ -48,8 +48,10 @@ hub-kubeconfig-secret: cluster-ip
 	$(KUBECTL) delete secret hub-kubeconfig-secret -n open-cluster-management-agent --ignore-not-found --kubeconfig $(SPOKE_KUBECONFIG)
 	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
 	$(KUBECTL) config view --flatten --minify --kubeconfig $(HUB_KUBECONFIG) > hub-kubeconfig
-ifeq ($(HUB_KUBECONFIG), $(SPOKE_KUBECONFIG)) && ($(HUB_KUBECONFIG_CONTEXT), $(SPOKE_KUBECONFIG_CONTEXT))
+ifeq ($(HUB_KUBECONFIG), $(SPOKE_KUBECONFIG))
+ifeq ($(HUB_KUBECONFIG_CONTEXT), $(SPOKE_KUBECONFIG_CONTEXT))
 	$(KUBECTL) config set clusters.$(HUB_KUBECONFIG_CONTEXT).server https://$(CLUSTER_IP) --kubeconfig hub-kubeconfig
+endif
 endif
 	$(KUBECTL) config use-context $(SPOKE_KUBECONFIG_CONTEXT) --kubeconfig $(SPOKE_KUBECONFIG)
 	$(KUBECTL) create secret generic hub-kubeconfig-secret --from-file=kubeconfig=hub-kubeconfig -n open-cluster-management-agent --kubeconfig $(SPOKE_KUBECONFIG)

@@ -1,6 +1,6 @@
 
 # Adds namespace to all resources.
-namespace: open-cluster-management
+namespace: open-cluster-management-hub
 
 # Value of this field is prepended to the
 # names of all resources, e.g. a deployment named
