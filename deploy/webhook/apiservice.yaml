@@ -7,7 +7,7 @@ spec:
   version: v1
   service:
     name: managedcluster-admission
-    namespace: open-cluster-management
+    namespace: open-cluster-management-hub
   insecureSkipTLSVerify: true
   groupPriorityMinimum: 10000
   versionPriority: 20

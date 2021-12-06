@@ -2,7 +2,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: open-cluster-management:registration-agent
-  namespace: open-cluster-management
+  namespace: open-cluster-management-agent
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -10,4 +10,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: spoke-agent-sa
-    namespace: open-cluster-management
+    namespace: open-cluster-management-agent

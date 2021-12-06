@@ -9,4 +9,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: managedcluster-admission-sa
-    namespace: open-cluster-management
+    namespace: open-cluster-management-hub

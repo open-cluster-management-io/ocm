@@ -113,8 +113,8 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		// This test expects a bootstrap secret to exist in open-cluster-management/e2e-bootstrap-secret
-		e2eBootstrapSecret, err := hubClient.CoreV1().Secrets("open-cluster-management").Get(context.TODO(), "e2e-bootstrap-secret", metav1.GetOptions{})
+		// This test expects a bootstrap secret to exist in open-cluster-management-agent/e2e-bootstrap-secret
+		e2eBootstrapSecret, err := hubClient.CoreV1().Secrets("open-cluster-management-agent").Get(context.TODO(), "e2e-bootstrap-secret", metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		bootstrapSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{

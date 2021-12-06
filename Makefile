@@ -16,6 +16,10 @@ IMAGE_TAG?=latest
 IMAGE_NAME?=$(IMAGE_REGISTRY)/registration:$(IMAGE_TAG)
 KUBECONFIG ?= ./.kubeconfig
 KUBECTL?=kubectl
+HUB_KUBECONFIG?=$(KUBECONFIG)
+HUB_KUBECONFIG_CONTEXT?=$(shell $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) config current-context)
+SPOKE_KUBECONFIG?=$(KUBECONFIG)
+SPOKE_KUBECONFIG_CONTEXT?=$(shell $(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) config current-context)
 PWD=$(shell pwd)
 KUSTOMIZE?=$(PWD)/$(PERMANENT_TMP_GOPATH)/bin/kustomize
 KUSTOMIZE_VERSION?=v3.5.4
@@ -47,38 +51,61 @@ verify: verify-crds
 deploy-hub: ensure-kustomize
 	cp deploy/hub/kustomization.yaml deploy/hub/kustomization.yaml.tmp
 	cd deploy/hub && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/registration:latest=$(IMAGE_NAME)
-	$(KUSTOMIZE) build deploy/hub | $(KUBECTL) apply -f -
+	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
+	$(KUSTOMIZE) build deploy/hub | $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) apply -f -
 	mv deploy/hub/kustomization.yaml.tmp deploy/hub/kustomization.yaml
 
 deploy-webhook: ensure-kustomize
 	cp deploy/webhook/kustomization.yaml deploy/webhook/kustomization.yaml.tmp
 	cd deploy/webhook && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/registration:latest=$(IMAGE_NAME)
-	$(KUSTOMIZE) build deploy/webhook | $(KUBECTL) apply -f -
+	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
+	$(KUSTOMIZE) build deploy/webhook | $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) apply -f -
 	mv deploy/webhook/kustomization.yaml.tmp deploy/webhook/kustomization.yaml
 
-cluster-ip: 
-  CLUSTER_IP?=$(shell $(KUBECTL) get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}")
-  CLUSTER_CONTEXT?=$(shell $(KUBECTL) config current-context)
+cluster-ip:
+	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
+	$(eval CLUSTER_IP?=$(shell $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}"))
 
 bootstrap-secret: cluster-ip
 	cp $(KUBECONFIG) dev-kubeconfig
-	$(KUBECTL) config set clusters.$(CLUSTER_CONTEXT).server https://$(CLUSTER_IP) --kubeconfig dev-kubeconfig
-	$(KUBECTL) delete secret bootstrap-secret -n open-cluster-management --ignore-not-found
-	$(KUBECTL) create secret generic bootstrap-secret --from-file=kubeconfig=dev-kubeconfig -n open-cluster-management
+	$(KUBECTL) config set clusters.$(HUB_KUBECONFIG_CONTEXT).server https://$(CLUSTER_IP) --kubeconfig dev-kubeconfig
+	$(KUBECTL) config use-context $(SPOKE_KUBECONFIG_CONTEXT) --kubeconfig $(SPOKE_KUBECONFIG)
+	$(KUBECTL) get ns open-cluster-management-agent --kubeconfig $(SPOKE_KUBECONFIG); if [ $$? -ne 0 ] ; then $(KUBECTL) create ns open-cluster-management-agent --kubeconfig $(SPOKE_KUBECONFIG); fi
+	$(KUBECTL) delete secret bootstrap-secret -n open-cluster-management-agent --ignore-not-found --kubeconfig $(SPOKE_KUBECONFIG)
+	$(KUBECTL) create secret generic bootstrap-secret --from-file=kubeconfig=dev-kubeconfig -n open-cluster-management-agent --kubeconfig $(SPOKE_KUBECONFIG)
 
 e2e-bootstrap-secret: cluster-ip
 	cp $(KUBECONFIG) e2e-kubeconfig
-	$(KUBECTL) config set clusters.$(CLUSTER_CONTEXT).server https://$(CLUSTER_IP) --kubeconfig e2e-kubeconfig
-	$(KUBECTL) delete secret e2e-bootstrap-secret -n open-cluster-management --ignore-not-found
-	$(KUBECTL) create secret generic e2e-bootstrap-secret --from-file=kubeconfig=e2e-kubeconfig -n open-cluster-management
+	$(KUBECTL) config set clusters.$(HUB_KUBECONFIG_CONTEXT).server https://$(CLUSTER_IP) --kubeconfig e2e-kubeconfig
+	$(KUBECTL) config use-context $(SPOKE_KUBECONFIG_CONTEXT) --kubeconfig $(SPOKE_KUBECONFIG)
+	$(KUBECTL) get ns open-cluster-management-agent --kubeconfig $(SPOKE_KUBECONFIG); if [ $$? -ne 0 ] ; then $(KUBECTL) create ns open-cluster-management-agent --kubeconfig $(SPOKE_KUBECONFIG); fi
+	$(KUBECTL) delete secret e2e-bootstrap-secret -n open-cluster-management-agent --ignore-not-found --kubeconfig $(SPOKE_KUBECONFIG)
+	$(KUBECTL) create secret generic e2e-bootstrap-secret --from-file=kubeconfig=e2e-kubeconfig -n open-cluster-management-agent --kubeconfig $(SPOKE_KUBECONFIG)
 
 deploy-spoke: ensure-kustomize
 	cp deploy/spoke/kustomization.yaml deploy/spoke/kustomization.yaml.tmp
 	cd deploy/spoke && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/registration:latest=$(IMAGE_NAME)
-	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) apply -f -
+	$(KUBECTL) config use-context $(SPOKE_KUBECONFIG_CONTEXT) --kubeconfig $(SPOKE_KUBECONFIG)
+	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) apply -f -
 	mv deploy/spoke/kustomization.yaml.tmp deploy/spoke/kustomization.yaml
 
-deploy-all: deploy-hub deploy-webhook bootstrap-secret deploy-spoke
+clean-hub:
+	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
+	$(KUSTOMIZE) build deploy/hub | $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) delete --ignore-not-found -f -
+
+clean-webhook:
+	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
+	$(KUSTOMIZE) build deploy/webhook | $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) delete --ignore-not-found -f -
+
+clean-spoke: ensure-kustomize
+	$(KUBECTL) config use-context $(SPOKE_KUBECONFIG_CONTEXT) --kubeconfig $(SPOKE_KUBECONFIG)
+	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) delete --ignore-not-found -f -
+
+.PHONY: deploy
+deploy: deploy-hub deploy-webhook bootstrap-secret deploy-spoke
+
+.PHONY: undeploy
+undeploy: clean-spoke clean-webhook clean-hub
 
 build-e2e:
 	go test -c ./test/e2e -mod=vendor

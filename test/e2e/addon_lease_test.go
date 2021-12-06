@@ -390,8 +390,8 @@ func createManagedCluster(clusterName, suffix string) (*clusterv1.ManagedCluster
 		return nil, err
 	}
 
-	// This test expects a bootstrap secret to exist in open-cluster-management/e2e-bootstrap-secret
-	e2eBootstrapSecret, err := hubClient.CoreV1().Secrets("open-cluster-management").Get(context.TODO(), "e2e-bootstrap-secret", metav1.GetOptions{})
+	// This test expects a bootstrap secret to exist in open-cluster-management-agent/e2e-bootstrap-secret
+	e2eBootstrapSecret, err := hubClient.CoreV1().Secrets("open-cluster-management-agent").Get(context.TODO(), "e2e-bootstrap-secret", metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

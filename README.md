@@ -16,6 +16,8 @@ Contains controllers that support:
 
 ## Quickstart
 
+### Prepare
+
 1. Clone this repo:
   ```
   git clone https://github.com/open-cluster-management-io/registration.git && cd registration
@@ -23,34 +25,74 @@ Contains controllers that support:
 
 2. Prepare a [kind](https://kind.sigs.k8s.io/) cluster, like:
   ```
-  kind create cluster
+  kind create cluster # if you want to deploy on two clusters, you can exec `kind create cluster name=<cluster-name> to prepare another cluster`
   ```
 
   > Note: The Kubernetes cluster needs v1.19 or greater
 
-3. Export your kind cluster config, like:
+### Deploy
+
+#### Deploy on one single cluster
+
+1. Export your kind cluster config, like:
   ```
   export KUBECONFIG=$HOME/.kube/config
   ```
 
-4. Deploy the hub control plane:
+2. Override the docker image (optional)
+```sh
+export IMAGE_NAME=<your_own_image_name> # export IMAGE_NAME=quay.io/open-cluster-management/registration:latest
+```
+
+3. Deploy the hub control plane and the registration agent:
   ```
-  make deploy-hub
-  make deploy-webhook
+  make deploy
   ```
 
-5. Deploy the registraion agent:
-  ```
-  make bootstrap-secret
-  make deploy-spoke
-  ```
+#### Deploy on two clusters
 
-You now have a cluster with registraion up and running. The cluster has been registered to itself.
+1. Set environment variables.
+
+- Hub and managed cluster share a kubeconfig file
+    ```sh
+    export KUBECONFIG=</path/to/kubeconfig>
+    export HUB_KUBECONFIG_CONTEXT=<hub-context-name>
+    export SPOKE_KUBECONFIG_CONTEXT=<spoke-context-name>
+    ```
+- Hub and managed cluster use different kubeconfig files.
+    ```sh
+    export HUB_KUBECONFIG=</path/to/hub_cluster/kubeconfig>
+    export SPOKE_KUBECONFIG=</path/to/managed_cluster/kubeconfig>
+    ```
+
+2. Set cluster ip if you are deploying on KIND clusters.
+```sh
+export CLUSTER_IP=<host_name/ip_address>:<port> # export CLUSTER_IP=hub-control-plane:6443
+```
+If you are not using KIND, you can get the above information with command below.
+```sh
+kubectl --kubeconfig </path/to/hub_cluster/kubeconfig> -n kube-public get configmap cluster-info -o yaml
+```
+
+3. Override the docker image (optional)
+```sh
+export IMAGE_NAME=<your_own_image_name> # export IMAGE_NAME=quay.io/open-cluster-management/registration:latest
+```
+
+4. Deploy the hub control plane and the registration agent
+```
+make deploy
+```
+
+### Approve your cluster
+
+You now have a cluster with registration up and running. The cluster has been registered to the hub.
 
 Next you need to approve your cluster like this:
 
 1. Approve the managed cluster
   ```
+  kubectl config use-context <hub-context-name>
   kubectl patch managedcluster cluster1 -p='{"spec":{"hubAcceptsClient":true}}' --type=merge
   ```
 
@@ -74,7 +116,7 @@ You can find more details for cluster join process from this [design doc](https:
 1. Create a cluster set by `ManagedClusterSet` API
   ```
   cat << EOF | kubectl apply -f -
-  apiVersion: cluster.open-cluster-management.io/v1alpha1
+  apiVersion: cluster.open-cluster-management.io/v1beta1
   kind: ManagedClusterSet
   metadata:
     name: clusterset1
@@ -98,6 +140,8 @@ You can find more details from the [managed cluster set design doc](https://gith
 
 1. Create a `ClusterClaim` to claim the ID of this cluster
   ```
+  kubectl config use-context <spoke-context-name>
+
   cat << EOF | kubectl apply -f -
   apiVersion: cluster.open-cluster-management.io/v1alpha1
   kind: ClusterClaim
@@ -110,6 +154,8 @@ You can find more details from the [managed cluster set design doc](https://gith
 
 2. Then, you can find the claim from the managed cluster status, like:
   ```
+  kubectl config use-context <hub-context-name>
+
   kubectl get managedcluster cluster1 -o jsonpath='{.status.clusterClaims}'
 
   [{"name":"id.k8s.io","value":"cluster1"}]

@@ -136,7 +136,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	// prepare test namespace
 	nsBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err != nil {
-		testNamespace = "open-cluster-management"
+		testNamespace = "open-cluster-management-agent"
 	} else {
 		testNamespace = string(nsBytes)
 	}

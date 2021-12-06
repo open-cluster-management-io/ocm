@@ -42,7 +42,7 @@ const (
 	// spokeAgentNameLength is the length of the spoke agent name which is generated automatically
 	spokeAgentNameLength = 5
 	// defaultSpokeComponentNamespace is the default namespace in which the spoke agent is deployed
-	defaultSpokeComponentNamespace = "open-cluster-management"
+	defaultSpokeComponentNamespace = "open-cluster-management-agent"
 )
 
 // AddOnLeaseControllerSyncInterval is exposed so that integration tests can crank up the constroller sync speed.
