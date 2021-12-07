@@ -20,6 +20,9 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 )
 
+// addOnAgentInstallationNamespace is the namespace on the managed cluster to install the helloworld addon agent.
+const addOnAgentInstallationNamespace = "default"
+
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 

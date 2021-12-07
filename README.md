@@ -25,7 +25,7 @@ These instructions assume:
 
 - You have at least one running kubernetes cluster;
 - You have already followed instructions from [registration-operator](https://github.com/open-cluster-management-io/registration-operator) and installed OCM successfully;
-- A managed cluster with name `cluster1` has been imported and accepted;
+- At least one managed cluster has been imported and accepted;
 
 ### Deploy the helloworld addon
 Set environment variables.
@@ -44,29 +44,14 @@ If your are using kind, load image into kind cluster.
 kind load docker-image <helloworld_addon_image_name> # kind load docker-image quay.io/open-cluster-management/helloworld-addon:latest
 ```
 
-And then deploy helloworld addon contoller on hub cluster
+And then deploy helloworld addon controller on hub cluster
 ```
 make deploy-example
 ```
-
-Create a addon-cr.yaml as shown in this example:
-```yaml
-apiVersion: addon.open-cluster-management.io/v1alpha1
-kind: ManagedClusterAddOn
-metadata:
-  name: helloworld
-  namespace: cluster1
-spec:
-  installNamespace: default
-```
-Apply the yaml file to the hub cluster.
-
-```
-kubectl apply -f addon-cr.yaml
-```
+The helloworld addon controller will create one `ManagedClusterAddOn` for each managed cluster automatically to install the helloworld agent on the managed cluster.
 
 ### What is next
-After a successful deployment, check on the managed cluster `cluster1` and see the helloworld addon agent has been deployed from the hub cluster.
+After a successful deployment, check on the managed cluster and see the helloworld addon agent has been deployed from the hub cluster.
 ```
 kubectl --kubeconfig </path/to/managed_cluster/kubeconfig> -n default get pods
 NAME                               READY   STATUS    RESTARTS   AGE
@@ -74,14 +59,14 @@ helloworld-agent-b99d47f76-v2j6h   1/1     Running   0          53s
 ```
 
 ### Clean up
-Remove the addon CR from hub cluster. It will undeploy the helloworld addon agent from the managed cluster `cluster1` as well.
-```
-kubectl delete --ignore-not-found -f addon-cr.yaml
-```
-
-Undeploy helloworld addon contoller from hub cluster.
+Undeploy helloworld addon controller from hub cluster.
 ```
 make undeploy-example
+```
+
+Remove the addon CR from hub cluster. It will undeploy the helloworld addon agent from the managed cluster as well.
+```
+kubectl --kubeconfig </path/to/hub_cluster/kubeconfig> delete managedclusteraddons -n <managed_cluster_name> helloworld
 ```
 
 Follow instructions from [registration-operator](https://github.com/open-cluster-management-io/registration-operator) to uninstall OCM if necessary;

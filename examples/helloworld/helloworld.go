@@ -77,7 +77,7 @@ func (h *helloWorldAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 			CSRApproveCheck:   agent.ApprovalAllCSRs,
 			PermissionConfig:  h.setupAgentPermissions,
 		},
-		InstallStrategy: agent.InstallAllStrategy("default"),
+		InstallStrategy: agent.InstallAllStrategy(addOnAgentInstallationNamespace),
 	}
 }
 
@@ -99,7 +99,7 @@ func (h *helloWorldAgent) setupAgentPermissions(cluster *clusterv1.ManagedCluste
 func loadManifestFromFile(file string, cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (runtime.Object, error) {
 	installNamespace := addon.Spec.InstallNamespace
 	if len(installNamespace) == 0 {
-		installNamespace = "default"
+		installNamespace = addOnAgentInstallationNamespace
 	}
 
 	image := os.Getenv("EXAMPLE_IMAGE_NAME")

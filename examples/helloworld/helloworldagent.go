@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -88,7 +87,7 @@ func (o *AgentOptions) RunAgent(ctx context.Context, controllerContext *controll
 	leaseUpdater := lease.NewLeaseUpdater(
 		spokeKubeClient,
 		"helloworld",
-		"default",
+		addOnAgentInstallationNamespace,
 	)
 
 	go hubKubeInformerFactory.Start(ctx.Done())
@@ -123,7 +122,7 @@ func newAgentController(
 			key, _ := cache.MetaNamespaceKeyFunc(obj)
 			return key
 		}, configmapInformers.Informer()).
-		WithSync(c.sync).ToController(fmt.Sprintf("helloworld-agent-controller"), recorder)
+		WithSync(c.sync).ToController("helloworld-agent-controller", recorder)
 }
 
 func (c *agentController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
@@ -147,7 +146,7 @@ func (c *agentController) sync(ctx context.Context, syncCtx factory.SyncContext)
 	configmap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cm.Name,
-			Namespace: "default",
+			Namespace: addOnAgentInstallationNamespace,
 		},
 		Data: cm.Data,
 	}
