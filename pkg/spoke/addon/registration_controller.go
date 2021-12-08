@@ -132,7 +132,7 @@ func (c *addOnRegistrationController) syncAddOn(ctx context.Context, syncCtx fac
 		return err
 	}
 
-	// stop registraton for the stale registration configs
+	// stop registration for the stale registration configs
 	errs := []error{}
 	for hash, cachedConfig := range cachedConfigs {
 		if _, ok := configs[hash]; ok {

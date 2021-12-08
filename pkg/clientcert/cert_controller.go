@@ -166,7 +166,7 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 
 	// reconcile pending csr if exists
 	if len(c.csrName) > 0 {
-		newSecretConfig, err := c.syncCSR(secret)
+		newSecretConfig, err := c.syncCSR()
 		if err != nil {
 			c.reset()
 			return err
@@ -231,7 +231,7 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 	return nil
 }
 
-func (c *clientCertificateController) syncCSR(secret *corev1.Secret) (map[string][]byte, error) {
+func (c *clientCertificateController) syncCSR() (map[string][]byte, error) {
 	// skip if there is no ongoing csr
 	if len(c.csrName) == 0 {
 		return nil, fmt.Errorf("no ongoing csr")

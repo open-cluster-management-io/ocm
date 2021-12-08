@@ -30,9 +30,9 @@ func NewClientCertForHubController(
 	clientCertSecretName string,
 	kubeconfigData []byte,
 	spokeCoreClient corev1client.CoreV1Interface,
+	spokeSecretInformer corev1informers.SecretInformer,
 	hubCSRClient csrclient.CertificateSigningRequestInterface,
 	hubCSRInformer certificatesinformers.CertificateSigningRequestInformer,
-	spokeSecretInformer corev1informers.SecretInformer,
 	recorder events.Recorder,
 	controllerName string,
 ) factory.Controller {
