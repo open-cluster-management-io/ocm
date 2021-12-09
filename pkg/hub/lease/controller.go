@@ -26,6 +26,11 @@ import (
 
 const leaseDurationTimes = 5
 
+var (
+	// LeaseDurationSeconds is lease update time interval
+	LeaseDurationSeconds = 60
+)
+
 // leaseController checks the lease of managed clusters on hub cluster to determine whether a managed cluster is available.
 type leaseController struct {
 	kubeClient    kubernetes.Interface
@@ -95,6 +100,10 @@ func (c *leaseController) sync(ctx context.Context, syncCtx factory.SyncContext)
 			return err
 		case err == nil:
 			gracePeriod := time.Duration(leaseDurationTimes*cluster.Spec.LeaseDurationSeconds) * time.Second
+			// FIX: #183 avoid gracePeriod is zero, will non-stop update ManagedClusterLeaseUpdateStopped condition.
+			if gracePeriod == 0 {
+				gracePeriod = time.Duration(leaseDurationTimes*LeaseDurationSeconds) * time.Second
+			}
 			// the lease is constantly updated, do nothing
 			now := time.Now()
 			if now.Before(observedLease.Spec.RenewTime.Add(gracePeriod)) {
