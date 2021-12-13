@@ -51,6 +51,7 @@ We are constantly working with other open source projects to make multicluster m
 
 - [Submariner](https://submariner.io/) is a project that provides multicluster networking connectivity. Users can benefit from a [Submariner](https://submariner.io/) addon, which automates the deployment and management of multicluster networking.
 - [Clusternet](http://github.com/clusternet/clusternet) is another project that provides multicluster orchestration, which can be easily plug into OCM with [clusternet addon](https://github.com/skeeey/clusternet-addon)
+- [KubeVela](https://kubevela.io/) is a modern application delivery platform that makes deploying and operating applications across today's hybrid, multi-cloud environments easier, faster and more reliable. Note that OCM is also available as an [vela addon](https://github.com/oam-dev/catalog/tree/master/addons/ocm-cluster-manager) in KubeVela.
 
 ### Get connected
 
