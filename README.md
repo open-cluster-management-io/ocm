@@ -7,6 +7,10 @@ Welcome! The open-cluster-management.io project is focused on enabling end-to-en
 
 The Open Cluster Management (OCM) architecture uses a hub - agent model. The hub centralizes control of all the managed clusters. An agent, which we call the klusterlet, resides on each managed cluster to manage registration to the hub and run instructions from the hub.
 
+![image](assets/cncf.png)
+
+OCM is a [Cloud Native Computing Foundation (CNCF) sandbox project](https://www.cncf.io/projects/open-cluster-management).
+
 You can use the [clusteradm CLI](https://github.com/open-cluster-management-io/clusteradm) to bootstrap a control plane for multicluster management. The following diagram illustrates the deployment architecture for OCM:
 
 ![image](assets/ocm-arch.png)
