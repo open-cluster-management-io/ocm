@@ -32,7 +32,7 @@ var _ = ginkgo.Describe("Placement scalability test", func() {
 	var sampleCount = 10
 	var err error
 
-	assertPlacementDecisionCreated := func(placement *clusterapiv1alpha1.Placement) error {
+	assertNumberOfDecisions := func(placement *clusterapiv1alpha1.Placement, desiredNOD int) error {
 		var localerr error
 		gomega.Eventually(func() bool {
 			localerr = nil
@@ -47,31 +47,13 @@ var _ = ginkgo.Describe("Placement scalability test", func() {
 				localerr = errors.New("No placementdecision found")
 				return false
 			}
+
+			actualNOD := 0
 			for _, pd := range pdl.Items {
 				if controlled := metav1.IsControlledBy(&pd.ObjectMeta, placement); !controlled {
 					localerr = errors.New("No controllerRef found for a placement")
 					return false
 				}
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
-		return localerr
-	}
-
-	assertNumberOfDecisions := func(placement *clusterapiv1alpha1.Placement, desiredNOD int) error {
-		var localerr error
-		gomega.Eventually(func() bool {
-			localerr = nil
-			pdl, err := clusterClient.ClusterV1alpha1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: placementLabel + "=" + placement.Name,
-			})
-			if err != nil {
-				localerr = err
-				return false
-			}
-			actualNOD := 0
-			for _, pd := range pdl.Items {
 				actualNOD += len(pd.Status.Decisions)
 			}
 			if actualNOD != desiredNOD {
@@ -170,9 +152,6 @@ var _ = ginkgo.Describe("Placement scalability test", func() {
 			},
 		}
 		pl, err := clusterClient.ClusterV1alpha1().Placements(namespace).Create(context.Background(), placement, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		err = assertPlacementDecisionCreated(pl)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		err = assertNumberOfDecisions(pl, nod)
