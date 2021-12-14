@@ -102,7 +102,7 @@ func TestSetTargetCertKeyPairSecret(t *testing.T) {
 type validateReasonFunc func(t *testing.T, actualReason string)
 
 func TestNeedNewTargetCertKeyPair(t *testing.T) {
-	certData1, keyData1, _, err := newServingCertKeyPair("service1.ns1.svc", "signer1", time.Hour*-1)
+	certData1, keyData1, caData1, err := newServingCertKeyPair("service1.ns1.svc", "signer1", time.Hour*-1)
 	if err != nil {
 		t.Fatalf("Expected no error, but got: %v", err)
 	}
@@ -112,10 +112,28 @@ func TestNeedNewTargetCertKeyPair(t *testing.T) {
 		t.Fatalf("Expected no error, but got: %v", err)
 	}
 
+	_, _, caData3, err := newServingCertKeyPair("service1.ns1.svc", "signer2", time.Hour*1)
+	if err != nil {
+		t.Fatalf("Expected no error, but got: %v", err)
+	}
+
+	caCert1, err := cert.ParseCertsPEM(caData1)
+	if err != nil {
+		t.Fatalf("Expected no error, but got: %v", err)
+	}
+	caCert2, err := cert.ParseCertsPEM(caData2)
+	if err != nil {
+		t.Fatalf("Expected no error, but got: %v", err)
+	}
+	caCert3, err := cert.ParseCertsPEM(caData3)
+	if err != nil {
+		t.Fatalf("Expected no error, but got: %v", err)
+	}
+
 	cases := []struct {
 		name           string
 		secret         *corev1.Secret
-		caBundle       []byte
+		caBundle       []*x509.Certificate
 		validateReason validateReasonFunc
 	}{
 		{
@@ -150,11 +168,33 @@ func TestNeedNewTargetCertKeyPair(t *testing.T) {
 					"tls.key": keyData2,
 				},
 			},
-			caBundle:       caData2,
+			caBundle:       caCert2,
 			validateReason: expectReason(""),
 		},
 		{
-			name: "no issuer found",
+			name: "no new cert needed - mixed 1",
+			secret: &corev1.Secret{
+				Data: map[string][]byte{
+					"tls.crt": certData2,
+					"tls.key": keyData2,
+				},
+			},
+			caBundle:       append(caCert1, caCert2...),
+			validateReason: expectReason(""),
+		},
+		{
+			name: "no new cert needed - mixed 2",
+			secret: &corev1.Secret{
+				Data: map[string][]byte{
+					"tls.crt": certData2,
+					"tls.key": keyData2,
+				},
+			},
+			caBundle:       append(caCert2, caCert3...),
+			validateReason: expectReason(""),
+		},
+		{
+			name: "no issuer found - empty",
 			secret: &corev1.Secret{
 				Data: map[string][]byte{
 					"tls.crt": certData2,
@@ -163,19 +203,33 @@ func TestNeedNewTargetCertKeyPair(t *testing.T) {
 			},
 			validateReason: startsWith(fmt.Sprintf("issuer %q not in ca bundle:\n", "signer2")),
 		},
+		{
+			name: "no issuer found - cn mismatch",
+			secret: &corev1.Secret{
+				Data: map[string][]byte{
+					"tls.crt": certData2,
+					"tls.key": keyData2,
+				},
+			},
+			caBundle:       caCert1,
+			validateReason: startsWith(fmt.Sprintf("issuer %q not in ca bundle:\n", "signer2")),
+		},
+		{
+			name: "no issuer found - parent mismatch",
+			secret: &corev1.Secret{
+				Data: map[string][]byte{
+					"tls.crt": certData2,
+					"tls.key": keyData2,
+				},
+			},
+			caBundle:       caCert3,
+			validateReason: startsWith(fmt.Sprintf("issuer %q not in ca bundle:\n", "signer2")),
+		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			caBundleCerts := []*x509.Certificate{}
-			if len(c.caBundle) > 0 {
-				caBundleCerts, err = cert.ParseCertsPEM([]byte(c.caBundle))
-				if err != nil {
-					t.Fatalf("Expected no error, but got: %v", err)
-				}
-			}
-
-			actual := needNewTargetCertKeyPair(c.secret, caBundleCerts)
+			actual := needNewTargetCertKeyPair(c.secret, c.caBundle)
 			c.validateReason(t, actual)
 		})
 	}
@@ -220,7 +274,7 @@ func expectReason(expectedReason string) validateReasonFunc {
 
 func startsWith(suffix string) validateReasonFunc {
 	return func(t *testing.T, actualReason string) {
-		if !strings.HasSuffix(actualReason, suffix) {
+		if !strings.HasPrefix(actualReason, suffix) {
 			t.Fatalf("Expect reason start with %q, but got %q", suffix, actualReason)
 		}
 	}

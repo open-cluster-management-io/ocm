@@ -68,7 +68,8 @@ func (c TargetRotation) EnsureTargetCertKeyPair(signingCertKeyPair *crypto.CA, c
 //   1) no cert/key pair exits
 //   2) or the cert expired (then we are also pretty late)
 //   3) or we are over the renewal percentage of the validity
-//   4) or our old CA is gone from the bundle (then we are pretty late to the renewal party)
+//   4) or the CA bundle doesn't contain a CA cert that matches exiting secret's common name.
+//   5) or the CA bundle doesn't contain the parent CA cert of the exiting secret.
 func needNewTargetCertKeyPair(secret *corev1.Secret, caBundleCerts []*x509.Certificate) string {
 	certData := secret.Data["tls.crt"]
 	if len(certData) == 0 {
@@ -95,13 +96,21 @@ func needNewTargetCertKeyPair(secret *corev1.Secret, caBundleCerts []*x509.Certi
 	}
 
 	// check the signer common name against all the common names in our ca bundle so we don't refresh early
+	containsIssuer := false
 	for _, caCert := range caBundleCerts {
-		if cert.Issuer.CommonName == caCert.Subject.CommonName {
-			return ""
+		if cert.Issuer.CommonName != caCert.Subject.CommonName {
+			continue
 		}
+		if err := cert.CheckSignatureFrom(caCert); err != nil {
+			continue
+		}
+		containsIssuer = true
+	}
+	if !containsIssuer {
+		return fmt.Sprintf("issuer %q not in ca bundle:\n%s", cert.Issuer.CommonName, certs.CertificateBundleToString(caBundleCerts))
 	}
 
-	return fmt.Sprintf("issuer %q not in ca bundle:\n%s", cert.Issuer.CommonName, certs.CertificateBundleToString(caBundleCerts))
+	return ""
 }
 
 // setTargetCertKeyPairSecret creates a new cert/key pair and sets them in the secret.
