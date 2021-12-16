@@ -56,6 +56,7 @@ spec:
                   description: LeaseDurationSeconds is used to coordinate the lease update time of Klusterlet agents on the managed cluster. If its value is zero, the Klusterlet agent will update its lease every 60 seconds by default
                   type: integer
                   format: int32
+                  default: 60
                 managedClusterClientConfigs:
                   description: ManagedClusterClientConfigs represents a list of the apiserver address of the managed cluster. If it is empty, the managed cluster has no accessible address for the hub to connect with it.
                   type: array

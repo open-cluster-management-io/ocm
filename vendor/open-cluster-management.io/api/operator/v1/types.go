@@ -12,7 +12,8 @@ import (
 // +kubebuilder:resource:scope=Cluster
 
 // ClusterManager configures the controllers on the hub that govern registration and work distribution for attached Klusterlets.
-// ClusterManager will only be deployed in open-cluster-management-hub namespace.
+// In Default mode, ClusterManager will only be deployed in open-cluster-management-hub namespace.
+// In Detached mode, ClusterManager will be deployed in <cluster-manager's name>-open-cluster-management-hub namespace.
 type ClusterManager struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -45,7 +46,48 @@ type ClusterManagerSpec struct {
 	// NodePlacement enables explicit control over the scheduling of the deployed pods.
 	// +optional
 	NodePlacement NodePlacement `json:"nodePlacement,omitempty"`
+
+	// DeployOption contains the options of deploying a cluster-manager
+	// Default mode is used if DeployOption is not set.
+	// +optional
+	// +kubebuilder:default={mode: Default}
+	DeployOption DeployOption `json:"deployOption,omitempty"`
 }
+
+// DeployOption describes the deploy options for cluster-manager or klusterlet
+type DeployOption struct {
+	// Mode can be Default or Detached.
+	// For cluster-manager:
+	//   - In Default mode, the Hub is installed as a whole and all parts of Hub are deployed in the same cluster.
+	//   - In Detached mode, only crd and configurations are installed on one cluster(defined as hub-cluster). Controllers run in another cluster (defined as management-cluster) and connect to the hub with the kubeconfig in secret of "external-hub-kubeconfig"(a kubeconfig of hub-cluster with cluster-admin permission).
+	// For klusterlet:
+	//   - In Default mode, all klusterlet related resources are deployed on the managed cluster.
+	//   - In Detached mode, only crd and configurations are installed on the spoke/managed cluster. Controllers run in another cluster (defined as management-cluster) and connect to the mangaged cluster with the kubeconfig in secret of "external-managed-kubeconfig"(a kubeconfig of managed-cluster with cluster-admin permission).
+	// The purpose of Detached mode is to give it more flexibility, for example we can install a hub on a cluster with no worker nodes, meanwhile running all deployments on another more powerful cluster.
+	// And we can also register a managed cluster to the hub that has some firewall rules preventing access from the managed cluster.
+	//
+	// Note: Do not modify the Mode field once it's applied.
+	//
+	// +required
+	// +default=Default
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=Default
+	// +kubebuilder:validation:Enum=Default;Detached
+	Mode InstallMode `json:"mode"`
+}
+
+// InstallMode represents the mode of deploy cluster-manager or klusterlet
+type InstallMode string
+
+const (
+	// InstallModeDefault is the default deploy mode.
+	// The cluster-manager will be deployed in the hub-cluster, the klusterlet will be deployed in the managed-cluster.
+	InstallModeDefault InstallMode = "Default"
+
+	// InstallModeDetached means deploying components outside.
+	// The cluster-manager will be deployed outside of the hub-cluster, the klusterlet will be deployed outside of the managed-cluster.
+	InstallModeDetached InstallMode = "Detached"
+)
 
 // ClusterManagerStatus represents the current status of the registration and work distribution controllers running on the hub.
 type ClusterManagerStatus struct {
@@ -142,9 +184,11 @@ type ClusterManagerList struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 
-// Klusterlet represents controllers on the managed cluster. When configured,
-// the Klusterlet requires a secret named of bootstrap-hub-kubeconfig in the
-// same namespace to allow API requests to the hub for the registration protocol.
+// Klusterlet represents controllers to install the resources for a managed cluster.
+// When configured, the Klusterlet requires a secret named bootstrap-hub-kubeconfig in the
+// agent namespace to allow API requests to the hub for the registration protocol.
+// In Detached mode, the Klusterlet requires an additional secret named external-managed-kubeconfig
+// in the agent namespace to allow API requests to the managed cluster for resources installation.
 type Klusterlet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -161,15 +205,19 @@ type KlusterletSpec struct {
 	// Namespace is the namespace to deploy the agent.
 	// The namespace must have a prefix of "open-cluster-management-", and if it is not set,
 	// the namespace of "open-cluster-management-agent" is used to deploy agent.
+	// Note: in Detach mode, this field will be **ignored**, the agent will be deployed to the
+	// namespace named <klusterlet's name>-open-cluster-management-agent
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
 	// RegistrationImagePullSpec represents the desired image configuration of registration agent.
 	// +required
+	// +kubebuilder:default=quay.io/open-cluster-management/registration
 	RegistrationImagePullSpec string `json:"registrationImagePullSpec"`
 
 	// WorkImagePullSpec represents the desired image configuration of work agent.
 	// +required
+	// +kubebuilder:default=quay.io/open-cluster-management/work
 	WorkImagePullSpec string `json:"workImagePullSpec,omitempty"`
 
 	// ClusterName is the name of the managed cluster to be created on hub.
@@ -185,6 +233,11 @@ type KlusterletSpec struct {
 	// NodePlacement enables explicit control over the scheduling of the deployed pods.
 	// +optional
 	NodePlacement NodePlacement `json:"nodePlacement,omitempty"`
+
+	// DeployOption contains the options of deploying a klusterlet
+	// +optional
+	// +kubebuilder:default={mode: Default}
+	DeployOption DeployOption `json:"deployOption,omitempty"`
 }
 
 // ServerURL represents the apiserver url and ca bundle that is accessible externally

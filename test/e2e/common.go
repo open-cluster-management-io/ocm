@@ -160,6 +160,9 @@ func (t *Tester) CreateKlusterlet(name, clusterName, agentNamespace string) (*op
 			},
 			ClusterName: clusterName,
 			Namespace:   agentNamespace,
+			DeployOption: operatorapiv1.DeployOption{
+				Mode: operatorapiv1.InstallModeDefault,
+			},
 		},
 	}
 

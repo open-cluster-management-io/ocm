@@ -65,6 +65,7 @@ type ManagedClusterSpec struct {
 	// LeaseDurationSeconds is used to coordinate the lease update time of Klusterlet agents on the managed cluster.
 	// If its value is zero, the Klusterlet agent will update its lease every 60 seconds by default
 	// +optional
+	// +kubebuilder:default=60
 	LeaseDurationSeconds int32 `json:"leaseDurationSeconds,omitempty"`
 }
 

@@ -15,7 +15,7 @@ spec:
     status: {}
   validation:
     openAPIV3Schema:
-      description: Klusterlet represents controllers on the managed cluster. When configured, the Klusterlet requires a secret named of bootstrap-hub-kubeconfig in the same namespace to allow API requests to the hub for the registration protocol.
+      description: Klusterlet represents controllers to install the resources for a managed cluster. When configured, the Klusterlet requires a secret named bootstrap-hub-kubeconfig in the agent namespace to allow API requests to the hub for the registration protocol. In Detached mode, the Klusterlet requires an additional secret named external-managed-kubeconfig in the agent namespace to allow API requests to the managed cluster for resources installation.
       type: object
       properties:
         apiVersion:
@@ -33,6 +33,21 @@ spec:
             clusterName:
               description: ClusterName is the name of the managed cluster to be created on hub. The Klusterlet agent generates a random name if it is not set, or discovers the appropriate cluster name on OpenShift.
               type: string
+            deployOption:
+              description: DeployOption contains the options of deploying a klusterlet
+              type: object
+              default:
+                mode: Default
+              required:
+                - mode
+              properties:
+                mode:
+                  description: "Mode can be Default or Detached. For cluster-manager:   - In Default mode, the Hub is installed as a whole and all parts of Hub are deployed in the same cluster.   - In Detached mode, only crd and configurations are installed on one cluster(defined as hub-cluster). Controllers run in another cluster (defined as management-cluster) and connect to the hub with the kubeconfig in secret of \"external-hub-kubeconfig\"(a kubeconfig of hub-cluster with cluster-admin permission). For klusterlet:   - In Default mode, all klusterlet related resources are deployed on the managed cluster.   - In Detached mode, only crd and configurations are installed on the spoke/managed cluster. Controllers run in another cluster (defined as management-cluster) and connect to the mangaged cluster with the kubeconfig in secret of \"external-managed-kubeconfig\"(a kubeconfig of managed-cluster with cluster-admin permission). The purpose of Detached mode is to give it more flexibility, for example we can install a hub on a cluster with no worker nodes, meanwhile running all deployments on another more powerful cluster. And we can also register a managed cluster to the hub that has some firewall rules preventing access from the managed cluster. \n Note: Do not modify the Mode field once it's applied."
+                  type: string
+                  default: Default
+                  enum:
+                    - Default
+                    - Detached
             externalServerURLs:
               description: ExternalServerURLs represents the a list of apiserver urls and ca bundles that is accessible externally If it is set empty, managed cluster has no externally accessible url that hub cluster can visit.
               type: array
@@ -48,7 +63,7 @@ spec:
                     description: URL is the url of apiserver endpoint of the managed cluster.
                     type: string
             namespace:
-              description: Namespace is the namespace to deploy the agent. The namespace must have a prefix of "open-cluster-management-", and if it is not set, the namespace of "open-cluster-management-agent" is used to deploy agent.
+              description: 'Namespace is the namespace to deploy the agent. The namespace must have a prefix of "open-cluster-management-", and if it is not set, the namespace of "open-cluster-management-agent" is used to deploy agent. Note: in Detach mode, this field will be **ignored**, the agent will be deployed to the namespace named <klusterlet''s name>-open-cluster-management-agent'
               type: string
             nodePlacement:
               description: NodePlacement enables explicit control over the scheduling of the deployed pods.
@@ -85,9 +100,11 @@ spec:
             registrationImagePullSpec:
               description: RegistrationImagePullSpec represents the desired image configuration of registration agent.
               type: string
+              default: quay.io/open-cluster-management/registration
             workImagePullSpec:
               description: WorkImagePullSpec represents the desired image configuration of work agent.
               type: string
+              default: quay.io/open-cluster-management/work
         status:
           description: Status represents the current status of Klusterlet agent.
           type: object
