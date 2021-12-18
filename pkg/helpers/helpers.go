@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"reflect"
 
@@ -334,9 +335,15 @@ func ApplyDirectly(
 			result.Result, result.Changed, result.Error = ApplyMutatingWebhookConfiguration(
 				client.AdmissionregistrationV1(), t)
 		case *apiregistrationv1.APIService:
+			t.ObjectMeta.Annotations = make(map[string]string)
+			checksum := fmt.Sprintf("%x", sha256.Sum256(t.Spec.CABundle))
+			t.ObjectMeta.Annotations["caBundle-checksum"] = string(checksum[:]) // to trigger the update when caBundle changed
 			result.Result, result.Changed, result.Error = resourceapply.ApplyAPIService(apiRegistrationClient, recorder, t)
 		default:
 			genericApplyFiles = append(genericApplyFiles, file)
+		}
+		if result.Error != nil {
+			ret = append(ret, result)
 		}
 	}
 

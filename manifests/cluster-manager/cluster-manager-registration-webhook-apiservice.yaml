@@ -8,6 +8,7 @@ spec:
   service:
     name: cluster-manager-registration-webhook
     namespace: open-cluster-management-hub
+    port: 443
   caBundle: {{ .RegistrationAPIServiceCABundle }}
   groupPriorityMinimum: 10000
   versionPriority: 20

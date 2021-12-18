@@ -8,6 +8,7 @@ spec:
   service:
     name: cluster-manager-work-webhook
     namespace: open-cluster-management-hub
+    port: 443
   caBundle: {{ .WorkAPIServiceCABundle }}
   groupPriorityMinimum: 10000
   versionPriority: 20
