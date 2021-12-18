@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"crypto/md5"
+	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -16,7 +16,7 @@ var _ healthz.HealthChecker = &configChecker{}
 type configChecker struct {
 	name        string
 	configfiles []string
-	checksum    [16]byte
+	checksum    [32]byte
 	reload      bool
 	sync.Mutex
 }
@@ -115,14 +115,14 @@ func (cc *configChecker) Check(_ *http.Request) error {
 }
 
 // load generates a checksum of all config files' content
-func load(configfiles []string) ([16]byte, error) {
+func load(configfiles []string) ([32]byte, error) {
 	var allContent []byte
 	for _, c := range configfiles {
 		content, err := ioutil.ReadFile(c)
 		if err != nil {
-			return [16]byte{}, fmt.Errorf("read %s failed, %v", c, err)
+			return [32]byte{}, fmt.Errorf("read %s failed, %v", c, err)
 		}
 		allContent = append(allContent, content...)
 	}
-	return md5.Sum(allContent), nil
+	return sha256.Sum256(allContent), nil
 }
