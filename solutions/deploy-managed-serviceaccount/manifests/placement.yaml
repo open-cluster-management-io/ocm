@@ -1,0 +1,14 @@
+apiVersion: cluster.open-cluster-management.io/v1alpha1
+kind: Placement
+metadata:
+  name: managed-serviceaccount-placement
+  namespace: default
+spec:
+  numberOfClusters: 1
+  clusterSets:
+    - managed-serviceaccount-set
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchLabels:
+            purpose: test

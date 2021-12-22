@@ -1,0 +1,20 @@
+apiVersion: apps.open-cluster-management.io/v1
+kind: Subscription
+metadata:
+  name: managed-serviceaccount-subscription
+  namespace: default
+spec:
+  channel: default/managed-serviceaccount
+  name: managed-serviceaccount-ingress
+  placement:
+    placementRef:
+      name: managed-serviceaccount-placement
+      kind: Placement
+  packageOverrides:
+  - packageName: managed-serviceaccount-ingress
+    packageAlias: managed-serviceaccount-ingress-simple
+    packageOverrides:
+    - path: spec
+      value:
+        defaultBackend:
+          replicaCount: 2
