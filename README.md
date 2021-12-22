@@ -35,13 +35,17 @@ export KUBECONFIG=</path/to/hub_cluster/kubeconfig>
 
 Build the docker image to run the sample addon.
 ```sh
+# get imagebuilder first
+go get github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.1
+export PATH=$PATH:$(go env GOPATH)/bin
+# build image
 make images
 export EXAMPLE_IMAGE_NAME=<helloworld_addon_image_name> # export EXAMPLE_IMAGE_NAME=quay.io/open-cluster-management/helloworld-addon:latest
 ```
 
-If your are using kind, load image into kind cluster.
+If your are using kind, load image into kind hub cluster.
 ```sh
-kind load docker-image <helloworld_addon_image_name> # kind load docker-image quay.io/open-cluster-management/helloworld-addon:latest
+kind load docker-image $EXAMPLE_IMAGE_NAME --name <your-hub-cluster-name> # kind load docker-image  $EXAMPLE_IMAGE_NAME --name cluster1
 ```
 
 And then deploy helloworld addon controller on hub cluster
@@ -77,3 +81,4 @@ Follow instructions from [registration-operator](https://github.com/open-cluster
 If you have any further question about xxx, please refer to
 [XXX help documentation](docs/xxx_help.md) for further information.
 -->
+
