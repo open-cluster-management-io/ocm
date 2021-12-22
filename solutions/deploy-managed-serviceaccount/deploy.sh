@@ -12,4 +12,6 @@ helm repo add ocm https://open-cluster-management.oss-us-west-1.aliyuncs.com
 
 helm repo update
 
+echo "Start installing addon..."
+
 helm install -n open-cluster-management-addon --create-namespace managed-serviceaccount ocm/managed-serviceaccount
