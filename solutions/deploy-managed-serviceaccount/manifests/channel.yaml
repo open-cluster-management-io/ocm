@@ -1,9 +1,0 @@
-apiVersion: apps.open-cluster-management.io/v1
-kind: Channel
-metadata:
-  name: managed-serviceaccount
-  namespace: default
-spec:
-    type: HelmRepo
-    pathname: https://open-cluster-management.oss-us-west-1.aliyuncs.com
-    insecureSkipVerify: true

@@ -1,37 +1,59 @@
-# Deploy a Helm Chart
+# Install the Managed Service Account
 
 ## Prerequisite
 
 Set up the dev environment in your local machine following [setup dev environment](../setup-dev-environment).
 
+You have already installed [Helm](https://helm.sh/docs/intro/install/)
+
 ## Install application addon on OCM
 
-Install application manager addon on the hub cluster
+Run `./deploy.sh` to install addon
+
+To confirm the installation status
 
 ```
-kubectl config use kind-hub
-clusteradm install addons --names application-manager
+$ kubectl get managedclusteraddon -A | grep managed-serviceaccount
+NAMESPACE        NAME                     AVAILABLE   DEGRADED   PROGRESSING
+<your cluster>   managed-serviceaccount   True
 ```
 
-Install application manager agent on all the managed clusters
+## Usage
+
+Apply a sample "ManagedServiceAccount" resource to try the functionality:
 
 ```
-clusteradm enable addons --names application-manager --clusters cluster1,cluster2
+kubectl apply -f example/managedserviceaccount.yaml
 ```
 
-You will see that all agents is available after waiting a while
+
+Run the following command to check the status, the addon agent is supposed to process the "ManagedServiceAccount" and report the status:
+```
+$ kubectl describe ManagedServiceAccount my-sample -n <cluster-name>
+
+...
+status:
+    conditions:
+    - lastTransitionTime: "2021-12-09T09:08:15Z"
+      message: ""
+      reason: TokenReported
+      status: "True"
+      type: TokenReported
+    - lastTransitionTime: "2021-12-09T09:08:15Z"
+      message: ""
+      reason: SecretCreated
+      status: "True"
+      type: SecretCreated
+    expirationTimestamp: "2022-12-04T09:08:15Z"
+    tokenSecretRef:
+      lastRefreshTimestamp: "2021-12-09T09:08:15Z"
+      name: my-sample
+```
+
+Corresponding secret containing the service account token should be persisted under the same namespace where the "ManagedServiceAccount" resource at:
 
 ```
-$ kubectl get managedclusteraddon --all-namespaces
-NAMESPACE   NAME                  AVAILABLE   DEGRADED   PROGRESSING
-cluster1    application-manager   True
-cluster2    application-manager   True
+$ kubectl -n <your cluster> get secret my-sample  
+NAME        TYPE     DATA   AGE
+my-sample   Opaque   2      2m23s
 ```
-
-## Deploy a helm chart to cluster1
-
-Run `./deploy.sh` to deploy the helm chart on cluster1
-
-It will create a [channel](manifests/channel.yaml) which specifies a helm repo, a [placement](manifests/placement.yaml)
-to select one or multiple clusters, and a [subscription](manifests/subscription.yaml) to deploy the helm chart. Try
-update `placement` to see how the chart deployment is changed.

@@ -1,7 +1,0 @@
-apiVersion: cluster.open-cluster-management.io/v1beta1
-kind: ManagedClusterSetBinding
-metadata:
-  name: managed-serviceaccount-set
-  namespace: default
-spec:
-  clusterSet: managed-serviceaccount-set
