@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
@@ -74,7 +75,7 @@ func (h *helloWorldAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 		AddonName: "helloworld",
 		Registration: &agent.RegistrationOption{
 			CSRConfigurations: agent.KubeClientSignerConfigurations("helloworld", h.agentName),
-			CSRApproveCheck:   agent.ApprovalAllCSRs,
+			CSRApproveCheck:   utils.DefaultCSRApprover(h.agentName),
 			PermissionConfig:  h.setupAgentPermissions,
 		},
 		InstallStrategy: agent.InstallAllStrategy(addOnAgentInstallationNamespace),

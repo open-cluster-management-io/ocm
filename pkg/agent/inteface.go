@@ -51,6 +51,10 @@ type AgentAddonOptions struct {
 	InstallStrategy *InstallStrategy
 }
 
+type CSRSignerFunc func(csr *certificatesv1.CertificateSigningRequest) []byte
+
+type CSRApproveFunc func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool
+
 // RegistrationOption defines how agent is registered to the hub cluster. It needs to define:
 // 1. csr with what subject/signer should be created
 // 2. how csr is approved
@@ -74,7 +78,7 @@ type RegistrationOption struct {
 	// >>		"resources":["signers"],
 	// >>		"resourceNames":["kubernetes.io/kube-apiserver-client"]...}
 	// +optional
-	CSRApproveCheck func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool
+	CSRApproveCheck CSRApproveFunc
 
 	// PermissionConfig defines the function for an addon to setup rbac permission. This callback doesn't
 	// couple with any concrete RBAC Api so the implementation is expected to ensure the RBAC in the hub
@@ -86,7 +90,7 @@ type RegistrationOption struct {
 	// CSRSign signs a csr and returns a certificate. It is used when the addon has its own customized signer.
 	// The returned byte array shall be a valid non-nil PEM encoded x509 certificate.
 	// +optional
-	CSRSign func(csr *certificatesv1.CertificateSigningRequest) []byte
+	CSRSign CSRSignerFunc
 }
 
 type StrategyType string
