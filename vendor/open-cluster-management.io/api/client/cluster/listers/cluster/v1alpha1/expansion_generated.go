@@ -2,6 +2,14 @@
 
 package v1alpha1
 
+// AddOnPlacementScoreListerExpansion allows custom methods to be added to
+// AddOnPlacementScoreLister.
+type AddOnPlacementScoreListerExpansion interface{}
+
+// AddOnPlacementScoreNamespaceListerExpansion allows custom methods to be added to
+// AddOnPlacementScoreNamespaceLister.
+type AddOnPlacementScoreNamespaceListerExpansion interface{}
+
 // ClusterClaimListerExpansion allows custom methods to be added to
 // ClusterClaimLister.
 type ClusterClaimListerExpansion interface{}

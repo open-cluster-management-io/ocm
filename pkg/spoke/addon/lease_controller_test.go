@@ -290,6 +290,26 @@ func TestSync(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:     "addon has customized health check",
+			queueKey: "test/test",
+			addOns: []runtime.Object{&addonv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testinghelpers.TestManagedClusterName,
+					Name:      "test",
+				},
+				Status: addonv1alpha1.ManagedClusterAddOnStatus{
+					HealthCheck: addonv1alpha1.HealthCheck{
+						Mode: addonv1alpha1.HealthCheckModeCustomized,
+					},
+				},
+			}},
+			hubLeases: []runtime.Object{},
+			leases:    []runtime.Object{},
+			validateActions: func(t *testing.T, ctx *testinghelpers.FakeSyncContext, actions []clienttesting.Action) {
+				testinghelpers.AssertNoActions(t, actions)
+			},
+		},
 	}
 
 	for _, c := range cases {

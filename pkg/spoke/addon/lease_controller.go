@@ -97,6 +97,12 @@ func (c *managedClusterAddOnLeaseController) sync(ctx context.Context, syncCtx f
 		return err
 	}
 
+	// "Customized" mode health check is supposed to delegate the health checking
+	// to the addon manager.
+	if addOn.Status.HealthCheck.Mode == addonv1alpha1.HealthCheckModeCustomized {
+		return nil
+	}
+
 	return c.syncSingle(ctx, addOnNamespace, addOn, syncCtx.Recorder())
 }
 

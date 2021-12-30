@@ -45,10 +45,17 @@ var _ = ginkgo.Describe("Cluster deleting", func() {
 		_, err = workClient.WorkV1().ManifestWorks(managedCluster.Name).Create(context.Background(), manifestWork, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
+		roleBindingName := fmt.Sprintf("open-cluster-management:managedcluster:%s:work", managedCluster.Name)
+		gomega.Eventually(func() bool {
+			if _, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).Get(context.Background(), roleBindingName, metav1.GetOptions{}); err != nil {
+				return false
+			}
+			return true
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
 		err = clusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedCluster.Name, metav1.DeleteOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		roleBindingName := fmt.Sprintf("open-cluster-management:managedcluster:%s:work", managedCluster.Name)
 		err = kubeClient.RbacV1().RoleBindings(managedCluster.Name).Delete(context.Background(), roleBindingName, metav1.DeleteOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 

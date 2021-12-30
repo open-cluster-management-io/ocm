@@ -56,6 +56,7 @@ var map_ManagedClusterSpec = map[string]string{
 	"managedClusterClientConfigs": "ManagedClusterClientConfigs represents a list of the apiserver address of the managed cluster. If it is empty, the managed cluster has no accessible address for the hub to connect with it.",
 	"hubAcceptsClient":            "hubAcceptsClient represents that hub accepts the joining of Klusterlet agent on the managed cluster with the hub. The default value is false, and can only be set true when the user on hub has an RBAC rule to UPDATE on the virtual subresource of managedclusters/accept. When the value is set true, a namespace whose name is the same as the name of ManagedCluster is created on the hub. This namespace represents the managed cluster, also role/rolebinding is created on the namespace to grant the permision of access from the agent on the managed cluster. When the value is set to false, the namespace representing the managed cluster is deleted.",
 	"leaseDurationSeconds":        "LeaseDurationSeconds is used to coordinate the lease update time of Klusterlet agents on the managed cluster. If its value is zero, the Klusterlet agent will update its lease every 60 seconds by default",
+	"taints":                      "Taints is a property of managed cluster that allow the cluster to be repelled when scheduling. Taints, including 'ManagedClusterUnavailable' and 'ManagedClusterUnreachable', can not be added/removed by agent running on the managed cluster; while it's fine to add/remove other taints from either hub cluser or managed cluster.",
 }
 
 func (ManagedClusterSpec) SwaggerDoc() map[string]string {
@@ -82,6 +83,18 @@ var map_ManagedClusterVersion = map[string]string{
 
 func (ManagedClusterVersion) SwaggerDoc() map[string]string {
 	return map_ManagedClusterVersion
+}
+
+var map_Taint = map[string]string{
+	"":          "The managed cluster this Taint is attached to has the \"effect\" on any placement that does not tolerate the Taint.",
+	"key":       "Key is the taint key applied to a cluster. e.g. bar or foo.example.com/bar. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)",
+	"value":     "Value is the taint value corresponding to the taint key.",
+	"effect":    "Effect indicates the effect of the taint on placements that do not tolerate the taint. Valid effects are NoSelect, PreferNoSelect and NoSelectIfNew.",
+	"timeAdded": "TimeAdded represents the time at which the taint was added.",
+}
+
+func (Taint) SwaggerDoc() map[string]string {
+	return map_Taint
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE
