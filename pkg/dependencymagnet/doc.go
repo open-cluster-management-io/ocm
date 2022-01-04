@@ -1,3 +1,4 @@
+//go:build tools
 // +build tools
 
 // go mod won't pull in code that isn't depended upon, but we have some code we don't depend on from code that must be included

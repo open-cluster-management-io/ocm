@@ -6,6 +6,7 @@ replace github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1 //
 
 require (
 	github.com/davecgh/go-spew v1.1.1
+	github.com/google/go-cmp v0.5.2
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/openshift/api v0.0.0-20210331193751-3acddb19d360

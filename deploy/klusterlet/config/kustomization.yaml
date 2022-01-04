@@ -13,10 +13,18 @@ generatorOptions:
   disableNameSuffixHash: true
 
 replicas:
-- name: klusterlet
-  count: 1
+- count: 1
+  name: klusterlet
 
 images:
-  - name: quay.io/open-cluster-management/registration-operator
-    newName: quay.io/open-cluster-management/registration-operator
-    newTag: latest
+- name: quay.io/open-cluster-management/registration-operator:latest
+  newName: quay.io/open-cluster-management/registration-operator
+  newTag: latest
+
+patches:
+- patch: |-
+    - op: replace
+      path: "/spec/template/spec/containers/0/imagePullPolicy"
+      value: IfNotPresent
+  target:
+    kind: Deployment

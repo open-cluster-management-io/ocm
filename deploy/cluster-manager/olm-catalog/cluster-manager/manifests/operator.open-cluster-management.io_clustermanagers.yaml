@@ -15,7 +15,7 @@ spec:
   - name: v1
     schema:
       openAPIV3Schema:
-        description: ClusterManager configures the controllers on the hub that govern registration and work distribution for attached Klusterlets. ClusterManager will only be deployed in open-cluster-management-hub namespace.
+        description: ClusterManager configures the controllers on the hub that govern registration and work distribution for attached Klusterlets. In Default mode, ClusterManager will only be deployed in open-cluster-management-hub namespace. In Detached mode, ClusterManager will be deployed in <cluster-manager's name>-open-cluster-management-hub namespace.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
@@ -28,6 +28,21 @@ spec:
           spec:
             description: Spec represents a desired deployment configuration of controllers that govern registration and work distribution for attached Klusterlets.
             properties:
+              deployOption:
+                default:
+                  mode: Default
+                description: DeployOption contains the options of deploying a cluster-manager Default mode is used if DeployOption is not set.
+                properties:
+                  mode:
+                    default: Default
+                    description: "Mode can be Default or Detached. For cluster-manager:   - In Default mode, the Hub is installed as a whole and all parts of Hub are deployed in the same cluster.   - In Detached mode, only crd and configurations are installed on one cluster(defined as hub-cluster). Controllers run in another cluster (defined as management-cluster) and connect to the hub with the kubeconfig in secret of \"external-hub-kubeconfig\"(a kubeconfig of hub-cluster with cluster-admin permission). For klusterlet:   - In Default mode, all klusterlet related resources are deployed on the managed cluster.   - In Detached mode, only crd and configurations are installed on the spoke/managed cluster. Controllers run in another cluster (defined as management-cluster) and connect to the mangaged cluster with the kubeconfig in secret of \"external-managed-kubeconfig\"(a kubeconfig of managed-cluster with cluster-admin permission). The purpose of Detached mode is to give it more flexibility, for example we can install a hub on a cluster with no worker nodes, meanwhile running all deployments on another more powerful cluster. And we can also register a managed cluster to the hub that has some firewall rules preventing access from the managed cluster. \n Note: Do not modify the Mode field once it's applied."
+                    enum:
+                    - Default
+                    - Detached
+                    type: string
+                required:
+                - mode
+                type: object
               nodePlacement:
                 description: NodePlacement enables explicit control over the scheduling of the deployed pods.
                 properties:

@@ -102,7 +102,7 @@ func RunClusterManagerOperator(ctx context.Context, controllerContext *controlle
 
 // RunKlusterletOperator starts a new klusterlet operator
 func RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
-	// Build kubclient client and informer for managed cluster
+	// Build kube client and informer for managed cluster
 	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err

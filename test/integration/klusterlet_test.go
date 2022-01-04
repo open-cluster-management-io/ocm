@@ -33,10 +33,12 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 	var cancel context.CancelFunc
 	var klusterlet *operatorapiv1.Klusterlet
 	var klusterletNamespace string
-	var registrationRoleName string
+	var registrationManagementRoleName string
+	var registrationManagedRoleName string
 	var registrationDeploymentName string
 	var registrationSAName string
-	var workRoleName string
+	var workManagementRoleName string
+	var workManagedRoleName string
 	var workDeploymentName string
 	var workSAName string
 
@@ -66,6 +68,9 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				},
 				ClusterName: "testcluster",
 				Namespace:   klusterletNamespace,
+				DeployOption: operatorapiv1.DeployOption{
+					Mode: operatorapiv1.InstallModeDefault,
+				},
 			},
 		}
 
@@ -86,10 +91,13 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 		ginkgo.BeforeEach(func() {
 			registrationDeploymentName = fmt.Sprintf("%s-registration-agent", klusterlet.Name)
 			workDeploymentName = fmt.Sprintf("%s-work-agent", klusterlet.Name)
-			registrationRoleName = fmt.Sprintf("open-cluster-management:%s-registration:agent", klusterlet.Name)
-			workRoleName = fmt.Sprintf("open-cluster-management:%s-work:agent", klusterlet.Name)
+			registrationManagementRoleName = fmt.Sprintf("open-cluster-management:management:%s-registration:agent", klusterlet.Name)
+			workManagementRoleName = fmt.Sprintf("open-cluster-management:management:%s-work:agent", klusterlet.Name)
+			registrationManagedRoleName = fmt.Sprintf("open-cluster-management:%s-registration:agent", klusterlet.Name)
+			workManagedRoleName = fmt.Sprintf("open-cluster-management:%s-work:agent", klusterlet.Name)
 			registrationSAName = fmt.Sprintf("%s-registration-sa", klusterlet.Name)
 			workSAName = fmt.Sprintf("%s-work-sa", klusterlet.Name)
+
 		})
 
 		ginkgo.AfterEach(func() {
@@ -106,33 +114,49 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 13 {
-					return fmt.Errorf("should get 13 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+
+				// 7 managed static manifests + 8 management static manifests + 2CRDs + 2 deployments(2 duplicated CRDs, but status also recorded in the klusterlet's status)
+				if len(actual.Status.RelatedResources) != 19 {
+					return fmt.Errorf("should get 19 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
+			// Check CRDs
+			gomega.Eventually(func() bool {
+				if _, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), "appliedmanifestworks.work.open-cluster-management.io", metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), "clusterclaims.cluster.open-cluster-management.io", metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
 			// Check clusterrole/clusterrolebinding
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), registrationRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), registrationManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), workRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), workManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), registrationRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), registrationManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), workRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), workManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -140,13 +164,38 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 
 			// Check role/rolebinding
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().Roles(klusterletNamespace).Get(context.Background(), registrationRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().Roles(klusterletNamespace).Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().RoleBindings(klusterletNamespace).Get(context.Background(), registrationRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().Roles(klusterletNamespace).Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.RbacV1().RoleBindings(klusterletNamespace).Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.RbacV1().RoleBindings(klusterletNamespace).Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			// Check extension apiserver rolebinding
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.RbacV1().RoleBindings("kube-system").Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.RbacV1().RoleBindings("kube-system").Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -750,6 +799,245 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		})
+	})
+})
+
+var _ = ginkgo.Describe("Klusterlet Detached mode", func() {
+	var cancel context.CancelFunc
+	var klusterlet *operatorapiv1.Klusterlet
+	var klusterletNamespace string
+	var registrationManagementRoleName string
+	var registrationManagedRoleName string
+	var registrationDeploymentName string
+	var registrationSAName string
+	var workManagementRoleName string
+	var workManagedRoleName string
+	var workDeploymentName string
+	var workSAName string
+
+	ginkgo.BeforeEach(func() {
+		var ctx context.Context
+		klusterletName := fmt.Sprintf("klusterlet-%s", rand.String(6))
+		klusterletNamespace = helpers.KlusterletNamespace(operatorapiv1.InstallModeDetached, klusterletName, "test")
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: klusterletNamespace,
+			},
+		}
+		_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		// Create the external managed kubeconfig secret
+		managedKubeconfigSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      helpers.ExternalManagedKubeConfig,
+				Namespace: klusterletNamespace,
+			},
+			Data: map[string][]byte{
+				"kubeconfig": util.NewKubeConfig(detachedRestConfig.Host),
+			},
+		}
+		_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(), managedKubeconfigSecret, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		klusterlet = &operatorapiv1.Klusterlet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: klusterletName,
+			},
+			Spec: operatorapiv1.KlusterletSpec{
+				RegistrationImagePullSpec: "quay.io/open-cluster-management/registration",
+				WorkImagePullSpec:         "quay.io/open-cluster-management/work",
+				ExternalServerURLs: []operatorapiv1.ServerURL{
+					{
+						URL: "https://localhost",
+					},
+				},
+				ClusterName: "testcluster",
+				Namespace:   klusterletNamespace,
+				DeployOption: operatorapiv1.DeployOption{
+					Mode: operatorapiv1.InstallModeDetached,
+				},
+			},
+		}
+
+		ctx, cancel = context.WithCancel(context.Background())
+		go startKlusterletOperator(ctx)
+	})
+
+	ginkgo.AfterEach(func() {
+		err := kubeClient.CoreV1().Namespaces().Delete(context.Background(), klusterletNamespace, metav1.DeleteOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		if cancel != nil {
+			cancel()
+		}
+	})
+
+	ginkgo.Context("Deploy and clean klusterlet component", func() {
+		ginkgo.BeforeEach(func() {
+			registrationDeploymentName = fmt.Sprintf("%s-registration-agent", klusterlet.Name)
+			workDeploymentName = fmt.Sprintf("%s-work-agent", klusterlet.Name)
+			registrationManagementRoleName = fmt.Sprintf("open-cluster-management:management:%s-registration:agent", klusterlet.Name)
+			workManagementRoleName = fmt.Sprintf("open-cluster-management:management:%s-work:agent", klusterlet.Name)
+			registrationManagedRoleName = fmt.Sprintf("open-cluster-management:%s-registration:agent", klusterlet.Name)
+			workManagedRoleName = fmt.Sprintf("open-cluster-management:%s-work:agent", klusterlet.Name)
+			registrationSAName = fmt.Sprintf("%s-registration-sa", klusterlet.Name)
+			workSAName = fmt.Sprintf("%s-work-sa", klusterlet.Name)
+
+		})
+
+		ginkgo.AfterEach(func() {
+			operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})
+		})
+
+		ginkgo.It("should have expected resource created successfully", func() {
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// Check if relatedResources are correct
+			gomega.Eventually(func() error {
+				actual, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				// 7 managed static manifests + 8 management static manifests + 2CRDs + 2 deployments(2 duplicated CRDs, but status also recorded in the klusterlet's status)
+				if len(actual.Status.RelatedResources) != 19 {
+					return fmt.Errorf("should get 19 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			// Check CRDs
+			gomega.Eventually(func() bool {
+				if _, err := detachedAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), "appliedmanifestworks.work.open-cluster-management.io", metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := detachedAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), "clusterclaims.cluster.open-cluster-management.io", metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Check clusterrole/clusterrolebinding
+			gomega.Eventually(func() bool {
+				if _, err := detachedKubeClient.RbacV1().ClusterRoles().Get(context.Background(), registrationManagedRoleName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := detachedKubeClient.RbacV1().ClusterRoles().Get(context.Background(), workManagedRoleName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := detachedKubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), registrationManagedRoleName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := detachedKubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), workManagedRoleName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Check role/rolebinding
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.RbacV1().Roles(klusterletNamespace).Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.RbacV1().Roles(klusterletNamespace).Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.RbacV1().RoleBindings(klusterletNamespace).Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.RbacV1().RoleBindings(klusterletNamespace).Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			// Check extension apiserver rolebinding
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.RbacV1().RoleBindings("kube-system").Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.RbacV1().RoleBindings("kube-system").Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Check service account
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.CoreV1().ServiceAccounts(klusterletNamespace).Get(context.Background(), registrationSAName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.CoreV1().ServiceAccounts(klusterletNamespace).Get(context.Background(), workSAName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := detachedKubeClient.CoreV1().ServiceAccounts(klusterletNamespace).Get(context.Background(), registrationSAName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := detachedKubeClient.CoreV1().ServiceAccounts(klusterletNamespace).Get(context.Background(), workSAName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Check deployment
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Check addon namespace
+			addonNamespace := fmt.Sprintf("%s-addon", klusterletNamespace)
+			gomega.Eventually(func() bool {
+				if _, err := detachedKubeClient.CoreV1().Namespaces().Get(context.Background(), addonNamespace, metav1.GetOptions{}); err != nil {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "Applied", "KlusterletApplied", metav1.ConditionTrue)
 		})
 	})
 })

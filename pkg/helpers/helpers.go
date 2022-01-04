@@ -23,6 +23,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	admissionclient "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
+	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
@@ -598,5 +599,68 @@ func UpdateKlusterletRelatedResourcesFn(relatedResources ...operatorapiv1.Relate
 			oldStatus.RelatedResources = relatedResources
 		}
 		return nil
+	}
+}
+
+// KlusterletNamespace returns the klusterletNamespace to deploy the agents.
+// Note in Detached mode, the specNamespace will be ignored.
+func KlusterletNamespace(mode operatorapiv1.InstallMode, klusterletName, specNamespace string) string {
+	if mode == operatorapiv1.InstallModeDetached {
+		return klusterletName
+	}
+
+	if len(specNamespace) == 0 {
+		// If namespace is not set, use the default namespace
+		return KlusterletDefaultNamespace
+	}
+
+	return specNamespace
+}
+
+// SyncSecret forked from https://github.com/openshift/library-go/blob/d9cdfbd844ea08465b938c46a16bed2ea23207e4/pkg/operator/resource/resourceapply/core.go#L357,
+// add an addition targetClient parameter to support sync secret to another cluster.
+func SyncSecret(client, targetClient coreclientv1.SecretsGetter, recorder events.Recorder,
+	sourceNamespace, sourceName, targetNamespace, targetName string, ownerRefs []metav1.OwnerReference) (*corev1.Secret, bool, error) {
+	source, err := client.Secrets(sourceNamespace).Get(context.TODO(), sourceName, metav1.GetOptions{})
+	switch {
+	case errors.IsNotFound(err):
+		if _, getErr := targetClient.Secrets(targetNamespace).Get(context.TODO(), targetName, metav1.GetOptions{}); getErr != nil && errors.IsNotFound(getErr) {
+			return nil, true, nil
+		}
+		deleteErr := targetClient.Secrets(targetNamespace).Delete(context.TODO(), targetName, metav1.DeleteOptions{})
+		if errors.IsNotFound(deleteErr) {
+			return nil, false, nil
+		}
+		if deleteErr == nil {
+			recorder.Eventf("TargetSecretDeleted", "Deleted target secret %s/%s because source config does not exist", targetNamespace, targetName)
+			return nil, true, nil
+		}
+		return nil, false, deleteErr
+	case err != nil:
+		return nil, false, err
+	default:
+		if source.Type == corev1.SecretTypeServiceAccountToken {
+
+			// Make sure the token is already present, otherwise we have to wait before creating the target
+			if len(source.Data[corev1.ServiceAccountTokenKey]) == 0 {
+				return nil, false, fmt.Errorf("secret %s/%s doesn't have a token yet", source.Namespace, source.Name)
+			}
+
+			if source.Annotations != nil {
+				// When syncing a service account token we have to remove the SA annotation to disable injection into copies
+				delete(source.Annotations, corev1.ServiceAccountNameKey)
+				// To make it clean, remove the dormant annotations as well
+				delete(source.Annotations, corev1.ServiceAccountUIDKey)
+			}
+
+			// SecretTypeServiceAccountToken implies required fields and injection which we do not want in copies
+			source.Type = corev1.SecretTypeOpaque
+		}
+
+		source.Namespace = targetNamespace
+		source.Name = targetName
+		source.ResourceVersion = ""
+		source.OwnerReferences = ownerRefs
+		return resourceapply.ApplySecret(targetClient, recorder, source)
 	}
 }

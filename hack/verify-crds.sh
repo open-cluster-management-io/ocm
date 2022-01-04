@@ -9,7 +9,7 @@ done
 
 for f in $SPOKE_CRD_FILES
 do
-    diff -N $f ./manifests/klusterlet/$(basename $f) || ( echo 'crd content is incorrect' && false )
+    diff -N $f ./manifests/klusterlet/managed/$(basename $f) || ( echo 'crd content is incorrect' && false )
 done
 
 diff -N $CLUSTER_MANAGER_CRD_FILE ./deploy/cluster-manager/config/crds/$(basename $CLUSTER_MANAGER_CRD_FILE) || ( echo 'crd content is incorrect' && false )

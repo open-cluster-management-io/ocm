@@ -141,9 +141,12 @@ func (t *Tester) SetBootstrapHubSecret(bootstrapHubSecret string) error {
 	return nil
 }
 
-func (t *Tester) CreateKlusterlet(name, clusterName, agentNamespace string) (*operatorapiv1.Klusterlet, error) {
+func (t *Tester) CreateKlusterlet(name, clusterName, agentNamespace string, mode operatorapiv1.InstallMode) (*operatorapiv1.Klusterlet, error) {
 	if name == "" {
 		return nil, fmt.Errorf("the name should not be null")
+	}
+	if agentNamespace == "" {
+		agentNamespace = t.klusterletDefaultNamespace
 	}
 
 	var klusterlet = &operatorapiv1.Klusterlet{
@@ -161,14 +164,13 @@ func (t *Tester) CreateKlusterlet(name, clusterName, agentNamespace string) (*op
 			ClusterName: clusterName,
 			Namespace:   agentNamespace,
 			DeployOption: operatorapiv1.DeployOption{
-				Mode: operatorapiv1.InstallModeDefault,
+				Mode: mode,
 			},
 		},
 	}
 
-	if agentNamespace == "" {
-		agentNamespace = t.klusterletDefaultNamespace
-	}
+	agentNamespace = helpers.KlusterletNamespace(klusterlet.Spec.DeployOption.Mode, klusterlet.Name, klusterlet.Spec.Namespace)
+	klog.Infof("klusterlet: %s/%s, \t mode: %v, \t agent namespace: %s", klusterlet.Name, klusterlet.Namespace, mode, agentNamespace)
 
 	// create agentNamespace
 	namespace := &corev1.Namespace{
@@ -202,6 +204,22 @@ func (t *Tester) CreateKlusterlet(name, clusterName, agentNamespace string) (*op
 		if _, err = t.KubeClient.CoreV1().Secrets(agentNamespace).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
 			klog.Errorf("failed to create secret %v in ns %v. %v", secret, agentNamespace, err)
 			return nil, err
+		}
+	}
+
+	if mode == operatorapiv1.InstallModeDetached {
+		// create external-managed-kubeconfig, will use the same cluster to simulate the Detached mode.
+		secret.Namespace = agentNamespace
+		secret.Name = helpers.ExternalManagedKubeConfig
+		if _, err := t.KubeClient.CoreV1().Secrets(agentNamespace).Get(context.TODO(), secret.Name, metav1.GetOptions{}); err != nil {
+			if !errors.IsNotFound(err) {
+				klog.Errorf("failed to get secret %v in ns %v. %v", secret.Name, agentNamespace, err)
+				return nil, err
+			}
+			if _, err = t.KubeClient.CoreV1().Secrets(agentNamespace).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
+				klog.Errorf("failed to create secret %v in ns %v. %v", secret, agentNamespace, err)
+				return nil, err
+			}
 		}
 	}
 
@@ -312,7 +330,7 @@ func (t *Tester) CheckManagedClusterStatus(clusterName string) error {
 		return nil
 	}
 
-	return fmt.Errorf("condtions are not ready: %v", managedCluster.Status.Conditions)
+	return fmt.Errorf("cluster %s condtions are not ready: %v", clusterName, managedCluster.Status.Conditions)
 }
 
 func newConfigmap(namespace, name string, data map[string]string) *corev1.ConfigMap {
@@ -363,7 +381,11 @@ func (t *Tester) cleanKlusterletResources(klusterletName, clusterName string) er
 	gomega.Eventually(func() bool {
 		_, err := t.OperatorClient.OperatorV1().Klusterlets().Get(context.TODO(), klusterletName, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
+			klog.Infof("klusterlet %s deleted successfully", klusterletName)
 			return true
+		}
+		if err != nil {
+			klog.Infof("get klusterlet %s error: %v", klusterletName, err)
 		}
 		return false
 	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeTrue())
@@ -377,7 +399,11 @@ func (t *Tester) cleanKlusterletResources(klusterletName, clusterName string) er
 	gomega.Eventually(func() bool {
 		_, err := t.ClusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
+			klog.Infof("managed cluster %s deleted successfully", clusterName)
 			return true
+		}
+		if err != nil {
+			klog.Infof("get managed cluster %s error: %v", klusterletName, err)
 		}
 		return false
 	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeTrue())
@@ -405,6 +431,7 @@ func (t *Tester) CheckHubReady() error {
 
 	if _, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
 		Get(context.TODO(), t.hubWorkWebhookDeployment, metav1.GetOptions{}); err != nil {
+		return err
 	}
 
 	if _, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
@@ -489,7 +516,7 @@ func (t *Tester) OutputDebugLogs() {
 
 	agentPods := append(registrationPods.Items, manifestWorkPods.Items...)
 	for _, pod := range agentPods {
-		klog.Infof("klusterlet agent pod %v/%v : %#v \n", pod.Namespace, pod.Name, pod)
+		klog.Infof("klusterlet agent pod %v/%v\n", pod.Namespace, pod.Name)
 		logs, err := t.PodLog(pod.Name, pod.Namespace, int64(10))
 		if err != nil {
 			klog.Errorf("failed to get pod %v/%v log. error: %v", pod.Namespace, pod.Name, err)
@@ -581,7 +608,7 @@ func (t *Tester) CheckManagedClusterAddOnStatus(managedClusterNamespace, addOnNa
 	}
 
 	if !meta.IsStatusConditionTrue(addOn.Status.Conditions, "Available") {
-		return fmt.Errorf("The addon %v/%v available condition is not true", managedClusterNamespace, addOnName)
+		return fmt.Errorf("the addon %v/%v available condition is not true", managedClusterNamespace, addOnName)
 	}
 
 	return nil

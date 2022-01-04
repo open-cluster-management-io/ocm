@@ -20,6 +20,15 @@ const (
 	BootstrapHubKubeConfig = "bootstrap-hub-kubeconfig"
 	// HubKubeConfig is the secret name of kubeconfig secret to connect to hub with mtls
 	HubKubeConfig = "hub-kubeconfig-secret"
+	// ExternalManagedKubeConfig is the secret name of kubeconfig secret to connecting to the managed cluster
+	// Only applicable to Detached mode, klusterlet-operator uses it to install resources on the managed cluster.
+	ExternalManagedKubeConfig = "external-managed-kubeconfig"
+	// ExternalManagedKubeConfigRegistration is the secret name of kubeconfig secret to connecting to the managed cluster
+	// Only applicable to Detached mode, registration-agent uses it to connect to the managed cluster.
+	ExternalManagedKubeConfigRegistration = "external-managed-kubeconfig-registration"
+	// ExternalManagedKubeConfigWork is the secret name of kubeconfig secret to connecting to the managed cluster
+	// Only applicable to Detached mode, work-agent uses it to connect to the managed cluster.
+	ExternalManagedKubeConfigWork = "external-managed-kubeconfig-work"
 	// ClusterManagerNamespace is the namespace to deploy cluster manager components
 	ClusterManagerNamespace = "open-cluster-management-hub"
 
@@ -35,7 +44,7 @@ func KlusterletSecretQueueKeyFunc(klusterletLister operatorlister.KlusterletList
 		namespace := accessor.GetNamespace()
 		name := accessor.GetName()
 		interestedObjectFound := false
-		if name == HubKubeConfig || name == BootstrapHubKubeConfig {
+		if name == HubKubeConfig || name == BootstrapHubKubeConfig || name == ExternalManagedKubeConfig {
 			interestedObjectFound = true
 		}
 		if !interestedObjectFound {
@@ -127,10 +136,7 @@ func ClusterManagerConfigmapQueueKeyFunc(clusterManagerLister operatorlister.Clu
 
 func FindKlusterletByNamespace(klusterlets []*operatorapiv1.Klusterlet, namespace string) *operatorapiv1.Klusterlet {
 	for _, klusterlet := range klusterlets {
-		klusterletNS := klusterlet.Spec.Namespace
-		if klusterletNS == "" {
-			klusterletNS = KlusterletDefaultNamespace
-		}
+		klusterletNS := KlusterletNamespace(klusterlet.Spec.DeployOption.Mode, klusterlet.Name, klusterlet.Spec.Namespace)
 		if namespace == klusterletNS {
 			return klusterlet
 		}

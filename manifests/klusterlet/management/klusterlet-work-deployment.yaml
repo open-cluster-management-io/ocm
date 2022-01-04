@@ -1,21 +1,21 @@
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: {{ .KlusterletName }}-registration-agent
+  name: {{ .KlusterletName }}-work-agent
   namespace: {{ .KlusterletNamespace }}
   labels:
-    app: klusterlet-registration-agent
+    app: klusterlet-manifestwork-agent
 spec:
   replicas: {{ .Replica }}
   selector:
     matchLabels:
-      app: klusterlet-registration-agent
+      app: klusterlet-manifestwork-agent
   template:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
-        app: klusterlet-registration-agent
+        app: klusterlet-manifestwork-agent
     spec:
       affinity:
         podAntiAffinity:
@@ -28,7 +28,7 @@ spec:
                 - key: app
                   operator: In
                   values:
-                  - klusterlet-registration-agent
+                  - klusterlet-manifestwork-agent
           - weight: 30
             podAffinityTerm:
               topologyKey: kubernetes.io/hostname
@@ -37,19 +37,18 @@ spec:
                 - key: app
                   operator: In
                   values:
-                  - klusterlet-registration-agent
-      serviceAccountName: {{ .KlusterletName }}-registration-sa
+                  - klusterlet-manifestwork-agent
+      serviceAccountName: {{ .KlusterletName }}-work-sa
       containers:
-      - name: registration-controller
-        image: {{ .RegistrationImage }}
+      - name: klusterlet-manifestwork-agent
+        image: {{ .WorkImage }}
         args:
-          - "/registration"
+          - "/work"
           - "agent"
-          - "--cluster-name={{ .ClusterName }}"
-          - "--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig"
-          - "--feature-gates=AddonManagement=true"
-          {{if .ExternalServerURL}}
-          - "--spoke-external-server-urls={{ .ExternalServerURL }}"
+          - "--spoke-cluster-name={{ .ClusterName }}"
+          - "--hub-kubeconfig=/spoke/hub-kubeconfig/kubeconfig"
+          {{if eq .InstallMode "Detached"}}
+          - "--spoke-kubeconfig=/spoke/config/kubeconfig"
           {{end}}
         securityContext:
           allowPrivilegeEscalation: false
@@ -59,11 +58,14 @@ spec:
           privileged: false
           runAsNonRoot: true
         volumeMounts:
-        - name: bootstrap-secret
-          mountPath: "/spoke/bootstrap"
-          readOnly: true
-        - name: hub-kubeconfig
+        - name: hub-kubeconfig-secret
           mountPath: "/spoke/hub-kubeconfig"
+          readOnly: true
+        {{if eq .InstallMode "Detached"}}
+        - name: spoke-kubeconfig-secret
+          mountPath: "/spoke/config"
+          readOnly: true
+        {{end}}
         livenessProbe:
           httpGet:
             path: /healthz
@@ -82,9 +84,11 @@ spec:
             cpu: 100m
             memory: 128Mi
       volumes:
-      - name: bootstrap-secret
+      - name: hub-kubeconfig-secret
         secret:
-          secretName: {{ .BootStrapKubeConfigSecret }}
-      - name: hub-kubeconfig
-        emptyDir:
-          medium: Memory
+          secretName: {{ .HubKubeConfigSecret }}
+      {{if eq .InstallMode "Detached"}}
+      - name: spoke-kubeconfig-secret
+        secret:
+          secretName: {{ .ExternalManagedKubeConfigWorkSecret }}
+      {{end}}

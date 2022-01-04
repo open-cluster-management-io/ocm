@@ -23,10 +23,6 @@ rules:
 - apiGroups: ["authorization.k8s.io"]
   resources: ["subjectaccessreviews"]
   verbs: ["create"]
-# Allow agent to create events
-- apiGroups: ["", "events.k8s.io"]
-  resources: ["events"]
-  verbs: ["create", "patch", "update"]
 # Allow agent to managed appliedmanifestworks
 - apiGroups: ["work.open-cluster-management.io"]
   resources: ["appliedmanifestworks"]

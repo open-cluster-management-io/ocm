@@ -5,10 +5,13 @@ metadata:
   name: open-cluster-management:{{ .KlusterletName }}-registration:agent
 rules:
 # Allow agent to get/list/watch nodes and configmaps.
+# list nodes to calculates the capacity and allocatable resources of the managed cluster
 - apiGroups: [""]
-  resources: ["nodes", "configmaps"]
+  resources: ["nodes"]
   verbs: ["get", "list", "watch"]
+
 # Allow agent to get/list/watch/create/delete/update/patch secrets.
+# TODO(zhujian7): consider to delete when addon agents can be deployed on the management cluster.
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]

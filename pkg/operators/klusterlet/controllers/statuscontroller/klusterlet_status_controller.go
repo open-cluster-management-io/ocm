@@ -29,7 +29,6 @@ type klusterletStatusController struct {
 }
 
 const (
-	klusterletNamespace                   = "open-cluster-management-agent"
 	klusterletRegistrationDesiredDegraded = "RegistrationDesiredDegraded"
 	klusterletWorkDesiredDegraded         = "WorkDesiredDegraded"
 	klusterletAvailable                   = "Available"
@@ -69,11 +68,7 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 	}
 	klusterlet = klusterlet.DeepCopy()
 
-	klusterletNS := klusterlet.Spec.Namespace
-	if klusterletNS == "" {
-		klusterletNS = klusterletNamespace
-	}
-
+	klusterletNS := helpers.KlusterletNamespace(klusterlet.Spec.DeployOption.Mode, klusterletName, klusterlet.Spec.Namespace)
 	registrationDeploymentName := fmt.Sprintf("%s-registration-agent", klusterlet.Name)
 	workDeploymentName := fmt.Sprintf("%s-work-agent", klusterlet.Name)
 

@@ -3,6 +3,8 @@ kind: Klusterlet
 metadata:
   name: klusterlet
 spec:
+  deployOption:
+    mode: Default
   registrationImagePullSpec: quay.io/open-cluster-management/registration
   workImagePullSpec: quay.io/open-cluster-management/work
   clusterName: cluster1

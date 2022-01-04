@@ -39,3 +39,7 @@ rules:
 - apiGroups: ["operator.open-cluster-management.io"]
   resources: ["klusterlets/status"]
   verbs: ["update", "patch"]
+# Allow the registration-operator to update the appliedmanifestworks finalizer.
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["appliedmanifestworks"]
+  verbs: ["list", "update"]

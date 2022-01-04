@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/openshift/library-go/pkg/assets"
+	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
@@ -20,10 +22,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/client-go/kubernetes/fake"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 	fakeapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
+
 	opereatorfake "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/registration-operator/manifests"
@@ -920,6 +924,216 @@ func TestUpdateRelatedResources(t *testing.T) {
 
 			if !equality.Semantic.DeepEqual(klusterletstatus.RelatedResources, c.newRelatedResources) {
 				t.Errorf(diff.ObjectDiff(klusterletstatus.RelatedResources, c.newRelatedResources))
+			}
+		})
+	}
+}
+
+func TestKlusterletNamespace(t *testing.T) {
+	testcases := []struct {
+		name           string
+		klusterletName string
+		specNamespace  string
+		mode           operatorapiv1.InstallMode
+		expect         string
+	}{
+		{
+			name:          "Default mode without spec namespace",
+			specNamespace: "",
+			mode:          "",
+			expect:        KlusterletDefaultNamespace,
+		},
+		{
+			name:          "Default mode with spec namespace",
+			specNamespace: "open-cluster-management-test",
+			mode:          "",
+			expect:        "open-cluster-management-test",
+		},
+		{
+			name:           "Detached mode with spec namespace",
+			klusterletName: "klusterlet",
+			specNamespace:  "open-cluster-management-test",
+			mode:           operatorapiv1.InstallModeDetached,
+			expect:         "klusterlet",
+		},
+		{
+			name:           "Detached mode without spec namespace",
+			klusterletName: "klusterlet",
+			specNamespace:  "",
+			mode:           operatorapiv1.InstallModeDetached,
+			expect:         "klusterlet",
+		},
+	}
+
+	for _, c := range testcases {
+		t.Run(c.name, func(t *testing.T) {
+			namespace := KlusterletNamespace(c.mode, c.klusterletName, c.specNamespace)
+			if namespace != c.expect {
+				t.Errorf("Expect namespace %v, got %v", c.expect, namespace)
+			}
+		})
+	}
+}
+
+func TestSyncSecret(t *testing.T) {
+	tt := []struct {
+		name                        string
+		sourceNamespace, sourceName string
+		targetNamespace, targetName string
+		ownerRefs                   []metav1.OwnerReference
+		existingObjects             []runtime.Object
+		expectedSecret              *corev1.Secret
+		expectedChanged             bool
+		expectedErr                 error
+	}{
+		{
+			name:            "syncing existing secret succeeds when the target is missing",
+			sourceNamespace: "sourceNamespace",
+			sourceName:      "sourceName",
+			targetNamespace: "targetNamespace",
+			targetName:      "targetName",
+			ownerRefs:       nil,
+			existingObjects: []runtime.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "sourceNamespace",
+						Name:      "sourceName",
+					},
+					Type: corev1.SecretTypeOpaque,
+					Data: map[string][]byte{"foo": []byte("bar")},
+				},
+			},
+			expectedSecret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "targetNamespace",
+					Name:      "targetName",
+				},
+				Type: corev1.SecretTypeOpaque,
+				Data: map[string][]byte{"foo": []byte("bar")},
+			},
+			expectedChanged: true,
+			expectedErr:     nil,
+		},
+		{
+			name:            "syncing existing secret succeeds when the target is present and needs update",
+			sourceNamespace: "sourceNamespace",
+			sourceName:      "sourceName",
+			targetNamespace: "targetNamespace",
+			targetName:      "targetName",
+			ownerRefs:       nil,
+			existingObjects: []runtime.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "sourceNamespace",
+						Name:      "sourceName",
+					},
+					Type: corev1.SecretTypeOpaque,
+					Data: map[string][]byte{"foo": []byte("bar2")},
+				},
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "targetNamespace",
+						Name:      "targetName",
+					},
+					Type: corev1.SecretTypeOpaque,
+					Data: map[string][]byte{"foo": []byte("bar1")},
+				},
+			},
+			expectedSecret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "targetNamespace",
+					Name:      "targetName",
+				},
+				Type: corev1.SecretTypeOpaque,
+				Data: map[string][]byte{"foo": []byte("bar2")},
+			},
+			expectedChanged: true,
+			expectedErr:     nil,
+		},
+		{
+			name:            "syncing missing source secret doesn't fail",
+			sourceNamespace: "sourceNamespace",
+			sourceName:      "sourceName",
+			targetNamespace: "targetNamespace",
+			targetName:      "targetName",
+			ownerRefs:       nil,
+			existingObjects: []runtime.Object{},
+			expectedSecret:  nil,
+			expectedChanged: true,
+			expectedErr:     nil,
+		},
+		{
+			name:            "syncing service account token doesn't sync without the token being present",
+			sourceNamespace: "sourceNamespace",
+			sourceName:      "sourceName",
+			targetNamespace: "targetNamespace",
+			targetName:      "targetName",
+			ownerRefs:       nil,
+			existingObjects: []runtime.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "sourceNamespace",
+						Name:      "sourceName",
+					},
+					Type: corev1.SecretTypeServiceAccountToken,
+					Data: map[string][]byte{"foo": []byte("bar")},
+				},
+			},
+			expectedSecret:  nil,
+			expectedChanged: false,
+			expectedErr:     fmt.Errorf("secret sourceNamespace/sourceName doesn't have a token yet"),
+		},
+		{
+			name:            "syncing service account token strips \"managed\" annotations",
+			sourceNamespace: "sourceNamespace",
+			sourceName:      "sourceName",
+			targetNamespace: "targetNamespace",
+			targetName:      "targetName",
+			ownerRefs:       nil,
+			existingObjects: []runtime.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "sourceNamespace",
+						Name:      "sourceName",
+						Annotations: map[string]string{
+							corev1.ServiceAccountNameKey: "foo",
+							corev1.ServiceAccountUIDKey:  "bar",
+						},
+					},
+					Type: corev1.SecretTypeServiceAccountToken,
+					Data: map[string][]byte{"token": []byte("top-secret")},
+				},
+			},
+			expectedSecret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "targetNamespace",
+					Name:      "targetName",
+				},
+				Type: corev1.SecretTypeOpaque,
+				Data: map[string][]byte{"token": []byte("top-secret")},
+			},
+			expectedChanged: true,
+			expectedErr:     nil,
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			client := fake.NewSimpleClientset(tc.existingObjects...)
+			clientTarget := fake.NewSimpleClientset()
+			secret, changed, err := SyncSecret(client.CoreV1(), clientTarget.CoreV1(), events.NewInMemoryRecorder("test"), tc.sourceNamespace, tc.sourceName, tc.targetNamespace, tc.targetName, tc.ownerRefs)
+
+			if !reflect.DeepEqual(err, tc.expectedErr) {
+				t.Errorf("%s: expected error %v, got %v", tc.name, tc.expectedErr, err)
+				return
+			}
+
+			if !equality.Semantic.DeepEqual(secret, tc.expectedSecret) {
+				t.Errorf("%s: secrets differ: %s", tc.name, cmp.Diff(tc.expectedSecret, secret))
+			}
+
+			if changed != tc.expectedChanged {
+				t.Errorf("%s: expected changed %t, got %t", tc.name, tc.expectedChanged, changed)
 			}
 		})
 	}

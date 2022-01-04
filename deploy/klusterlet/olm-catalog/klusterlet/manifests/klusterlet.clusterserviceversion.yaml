@@ -12,6 +12,9 @@ metadata:
           },
           "spec": {
             "clusterName": "cluster1",
+            "deployOption": {
+              "mode": "Default"
+            },
             "externalServerURLs": [
               {
                 "url": "https://localhost"

@@ -9,7 +9,7 @@ done
 
 for f in $SPOKE_CRD_FILES
 do
-    cp $f ./manifests/klusterlet/
+    cp $f ./manifests/klusterlet/managed/
 done
 
 cp $CLUSTER_MANAGER_CRD_FILE ./deploy/cluster-manager/config/crds/
