@@ -49,6 +49,13 @@ type AgentAddonOptions struct {
 	// namespace if InstallStrategy is nil.
 	// +optional
 	InstallStrategy *InstallStrategy
+
+	// HealthProber defines how is the healthiness status of the ManagedClusterAddon probed.
+	// Note that the prescribed prober type here only applies to the automatically installed
+	// addons configured via InstallStrategy.
+	// If nil, will be defaulted to "Lease" type.
+	// +optional
+	HealthProber *HealthProber
 }
 
 type CSRSignerFunc func(csr *certificatesv1.CertificateSigningRequest) []byte
@@ -105,6 +112,29 @@ type InstallStrategy struct {
 	// InstallNamespace is target deploying namespace in the managed cluster upon automatic addon installation.
 	InstallNamespace string
 }
+
+type HealthProber struct {
+	Type HealthProberType
+}
+
+type HealthProberType string
+
+const (
+	// HealthProberTypeLease indicates the healthiness status will be refreshed, which is
+	// leaving the healthiness of ManagedClusterAddon to an empty string.
+	HealthProberTypeNone HealthProberType = "None"
+	// HealthProberTypeLease indicates the healthiness of the addon is connected with the
+	// corresponding lease resource in the cluster namespace with the same name as the addon.
+	// Note that the lease object is expected to periodically refresh by a local agent
+	// deployed in the managed cluster implementing lease.LeaseUpdater interface.
+	HealthProberTypeLease HealthProberType = "Lease"
+	// TODO(yue9944882): implement work api health checker
+	// HealthProberTypeWork indicates the healthiness of the addon is equal to the overall
+	// dispatching status of the corresponding ManifestWork resource.
+	// It's applicable to those addons that don't have a local agent instance in the managed
+	// clusters.
+	//HealthProberTypeWork HealthProberType = "Work"
+)
 
 func KubeClientSignerConfigurations(addonName, agentName string) func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
 	return func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {

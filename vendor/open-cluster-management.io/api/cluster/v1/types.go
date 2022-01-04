@@ -65,7 +65,14 @@ type ManagedClusterSpec struct {
 	// LeaseDurationSeconds is used to coordinate the lease update time of Klusterlet agents on the managed cluster.
 	// If its value is zero, the Klusterlet agent will update its lease every 60 seconds by default
 	// +optional
+	// +kubebuilder:default=60
 	LeaseDurationSeconds int32 `json:"leaseDurationSeconds,omitempty"`
+
+	// Taints is a property of managed cluster that allow the cluster to be repelled when scheduling.
+	// Taints, including 'ManagedClusterUnavailable' and 'ManagedClusterUnreachable', can not be added/removed by agent
+	// running on the managed cluster; while it's fine to add/remove other taints from either hub cluser or managed cluster.
+	// +optional
+	Taints []Taint `json:"taints,omitempty"`
 }
 
 // ClientConfig represents the apiserver address of the managed cluster.
@@ -80,6 +87,59 @@ type ClientConfig struct {
 	// +optional
 	CABundle []byte `json:"caBundle,omitempty"`
 }
+
+// The managed cluster this Taint is attached to has the "effect" on
+// any placement that does not tolerate the Taint.
+type Taint struct {
+	// Key is the taint key applied to a cluster. e.g. bar or foo.example.com/bar.
+	// The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
+	// +kubebuilder:validation:MaxLength=316
+	// +required
+	Key string `json:"key"`
+	// Value is the taint value corresponding to the taint key.
+	// +kubebuilder:validation:MaxLength=1024
+	// +optional
+	Value string `json:"value,omitempty"`
+	// Effect indicates the effect of the taint on placements that do not tolerate the taint.
+	// Valid effects are NoSelect, PreferNoSelect and NoSelectIfNew.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum:=NoSelect;PreferNoSelect;NoSelectIfNew
+	// +required
+	Effect TaintEffect `json:"effect"`
+	// TimeAdded represents the time at which the taint was added.
+	// +kubebuilder:validation:Required
+	// +required
+	TimeAdded metav1.Time `json:"timeAdded"`
+}
+
+type TaintEffect string
+
+const (
+	// TaintEffectNoSelect means placements are not allowed to select the cluster unless they tolerate the taint.
+	// The cluster will be removed from the placement cluster decisions if a placement has already selected
+	// this cluster.
+	TaintEffectNoSelect TaintEffect = "NoSelect"
+	// TaintEffectPreferNoSelect means the scheduler tries not to select the cluster, rather than prohibiting
+	// placements from selecting the cluster entirely.
+	TaintEffectPreferNoSelect TaintEffect = "PreferNoSelect"
+	// TaintEffectNoSelectIfNew means placements are not allowed to select the cluster unless
+	// 1) they tolerate the taint;
+	// 2) they have already had the cluster in their cluster decisions;
+	TaintEffectNoSelectIfNew TaintEffect = "NoSelectIfNew"
+)
+
+const (
+	// ManagedClusterTaintUnavailable is the key of the taint added to a managed cluster when it is not available.
+	// To be specific, the cluster has a condtion 'ManagedClusterConditionAvailable' with status of 'False';
+	ManagedClusterTaintUnavailable string = "cluster.open-cluster-management.io/unavailable"
+	// ManagedClusterTaintUnreachable is the key of the taint added to a managed cluster when it is not reachable.
+	// To be specific,
+	// 1) The cluster has no condition 'ManagedClusterConditionAvailable';
+	// 2) Or the status of condtion 'ManagedClusterConditionAvailable' is 'Unknown';
+	ManagedClusterTaintUnreachable string = "cluster.open-cluster-management.io/unreachable"
+)
 
 // ManagedClusterStatus represents the current status of joined managed cluster.
 type ManagedClusterStatus struct {
