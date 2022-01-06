@@ -6,9 +6,9 @@ Set up the dev environment in your local machine following [setup dev environmen
 
 You have already installed [Helm](https://helm.sh/docs/intro/install/)
 
-## Install application addon on OCM
+## Install managed-serviceaccount
 
-Run `./deploy.sh` to install addon
+Run `./deploy.sh` to install
 
 To confirm the installation status
 
