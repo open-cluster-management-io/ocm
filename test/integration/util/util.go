@@ -21,6 +21,7 @@ import (
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/events"
 
 	certificates "k8s.io/api/certificates/v1"
@@ -34,6 +35,8 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
+	"open-cluster-management.io/registration/pkg/spoke"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
 const (
@@ -42,105 +45,59 @@ const (
 )
 
 var (
-	CertDir        = path.Join(TestDir, "server-certs")
-	CAFile         = path.Join(CertDir, "ca.crt")
-	CAKeyFile      = path.Join(CertDir, "ca.key")
-	ServerCertFile = path.Join(CertDir, "apiserver.crt")
-	ServerKeyFile  = path.Join(CertDir, "apiserver.key")
+	CertDir          = path.Join(TestDir, "client-certs")
+	caFile           = path.Join(CertDir, "ca.crt")
+	caKeyFile        = path.Join(CertDir, "ca.key")
+	bootstrapUser    = "cluster-admin"
+	bootstrapGroups  = []string{"system:masters"}
+	DefaultTestAuthn = NewTestAuthn(caFile, caKeyFile)
 )
 
-func CreateBootstrapKubeConfig(configFileName string, securePort int) error {
-	caData, err := ioutil.ReadFile(CAFile)
+func createKubeConfig(context string, securePort string, serverCertFile, certFile, keyFile string) (*clientcmdapi.Config, error) {
+	caData, err := ioutil.ReadFile(serverCertFile)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	config := clientcmdapi.NewConfig()
 	config.Clusters["hub"] = &clientcmdapi.Cluster{
-		Server:                   fmt.Sprintf("https://127.0.0.1:%d", securePort),
+		Server:                   fmt.Sprintf("https://127.0.0.1:%s", securePort),
 		CertificateAuthorityData: caData,
 	}
-	config.AuthInfos["bootstrap"] = &clientcmdapi.AuthInfo{
-		ClientCertificate: ServerCertFile,
-		ClientKey:         ServerKeyFile,
+	config.AuthInfos["user"] = &clientcmdapi.AuthInfo{
+		ClientCertificate: certFile,
+		ClientKey:         keyFile,
 	}
-	config.Contexts["bootstrap"] = &clientcmdapi.Context{
+	config.Contexts[context] = &clientcmdapi.Context{
 		Cluster:  "hub",
-		AuthInfo: "bootstrap",
+		AuthInfo: "user",
 	}
-	config.CurrentContext = "bootstrap"
+	config.CurrentContext = context
 
-	return clientcmd.WriteToFile(*config, configFileName)
+	return config, nil
 }
 
-func CreateBootstrapKubeConfigWithCertAge(configFileName string, securePort int, certAge time.Duration) error {
-	caData, err := ioutil.ReadFile(CAFile)
-	if err != nil {
-		return err
-	}
-
-	certData, keyData, err := SignAPIServerCertKeyWithCA(certAge)
-	if err != nil {
-		return err
-	}
-
-	configDir := path.Dir(configFileName)
-	if _, err := os.Stat(configDir); os.IsNotExist(err) {
-		if err = os.MkdirAll(configDir, 0755); err != nil {
-			return err
-		}
-	}
-
-	if err := ioutil.WriteFile(path.Join(configDir, "bootstrap.crt"), certData, 0644); err != nil {
-		return err
-	}
-	if err := ioutil.WriteFile(path.Join(configDir, "bootstrap.key"), keyData, 0644); err != nil {
-		return err
-	}
-
-	config := clientcmdapi.NewConfig()
-	config.Clusters["hub"] = &clientcmdapi.Cluster{
-		Server:                   fmt.Sprintf("https://127.0.0.1:%d", securePort),
-		CertificateAuthorityData: caData,
-	}
-	config.AuthInfos["bootstrap"] = &clientcmdapi.AuthInfo{
-		ClientCertificate: path.Join(configDir, "bootstrap.crt"),
-		ClientKey:         path.Join(configDir, "bootstrap.key"),
-	}
-	config.Contexts["bootstrap"] = &clientcmdapi.Context{
-		Cluster:  "hub",
-		AuthInfo: "bootstrap",
-	}
-	config.CurrentContext = "bootstrap"
-
-	return clientcmd.WriteToFile(*config, configFileName)
+type TestAuthn struct {
+	caFile    string
+	caKeyFile string
 }
 
-func CreateSpokeKubeConfig(restConfig *rest.Config, securePort int) (*rest.Config, error) {
-	spokeConfig := rest.CopyConfig(restConfig)
-	spokeConfig.Host = fmt.Sprintf("127.0.0.1:%d", securePort)
-
-	caData, err := ioutil.ReadFile(CAFile)
-	if err != nil {
-		return nil, err
+func NewTestAuthn(caFile, caKeyFile string) *TestAuthn {
+	return &TestAuthn{
+		caFile:    caFile,
+		caKeyFile: caKeyFile,
 	}
-	spokeConfig.CAData = caData
-
-	certData, err := ioutil.ReadFile(ServerCertFile)
-	if err != nil {
-		return nil, err
-	}
-	spokeConfig.CertData = certData
-
-	keyData, err := ioutil.ReadFile(ServerKeyFile)
-	if err != nil {
-		return nil, err
-	}
-	spokeConfig.KeyData = keyData
-	return spokeConfig, nil
 }
 
-func GenerateSelfSignedCertKey() error {
+func (t *TestAuthn) Configure(workDir string, args *envtest.Arguments) error {
+	args.Set("client-ca-file", t.caFile)
+	return nil
+}
+
+// Start runs this authenticator.  Will be called just before API server start.
+//
+// Must be called after Configure.
+func (t *TestAuthn) Start() error {
 	if _, err := os.Stat(CertDir); os.IsNotExist(err) {
 		if err = os.MkdirAll(CertDir, 0755); err != nil {
 			return err
@@ -174,7 +131,7 @@ func GenerateSelfSignedCertKey() error {
 	if err := pem.Encode(&caCertBuffer, &pem.Block{Type: certutil.CertificateBlockType, Bytes: caDERBytes}); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(CAFile, caCertBuffer.Bytes(), 0644); err != nil {
+	if err := ioutil.WriteFile(t.caFile, caCertBuffer.Bytes(), 0644); err != nil {
 		return err
 	}
 
@@ -183,27 +140,66 @@ func GenerateSelfSignedCertKey() error {
 		&caKeyBuffer, &pem.Block{Type: keyutil.RSAPrivateKeyBlockType, Bytes: x509.MarshalPKCS1PrivateKey(caKey)}); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(CAKeyFile, caKeyBuffer.Bytes(), 0644); err != nil {
-		return err
-	}
-
-	serverCert, serverKey, err := SignAPIServerCertKeyWithCA(maxAge)
-	if err != nil {
-		return err
-	}
-	if err := ioutil.WriteFile(ServerCertFile, serverCert, 0644); err != nil {
-		return err
-	}
-	if err := ioutil.WriteFile(ServerKeyFile, serverKey, 0644); err != nil {
+	if err := ioutil.WriteFile(t.caKeyFile, caKeyBuffer.Bytes(), 0644); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func SignAPIServerCertKeyWithCA(maxAge time.Duration) ([]byte, []byte, error) {
+// AddUser provisions a user, returning a copy of the given base rest.Config
+// configured to authenticate as that users.
+//
+// May only be called while the authenticator is "running".
+func (t *TestAuthn) AddUser(user envtest.User, baseCfg *rest.Config) (*rest.Config, error) {
+	crt, key, err := t.signClientCertKeyWithCA(user.Name, user.Groups, time.Hour*24)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg := rest.CopyConfig(baseCfg)
+	cfg.CertData = crt
+	cfg.KeyData = key
+
+	return cfg, nil
+}
+
+// Stop shuts down this authenticator.
+func (t *TestAuthn) Stop() error {
+	return nil
+}
+
+func (t *TestAuthn) CreateBootstrapKubeConfigWithCertAge(configFileName, serverCertFile, securePort string, certAge time.Duration) error {
+	certData, keyData, err := t.signClientCertKeyWithCA(bootstrapUser, bootstrapGroups, certAge)
+	if err != nil {
+		return err
+	}
+
+	configDir := path.Dir(configFileName)
+	if _, err := os.Stat(configDir); os.IsNotExist(err) {
+		if err = os.MkdirAll(configDir, 0755); err != nil {
+			return err
+		}
+	}
+
+	if err := ioutil.WriteFile(path.Join(configDir, "bootstrap.crt"), certData, 0644); err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(path.Join(configDir, "bootstrap.key"), keyData, 0644); err != nil {
+		return err
+	}
+
+	config, err := createKubeConfig(configFileName, securePort, serverCertFile, path.Join(configDir, "bootstrap.crt"), path.Join(configDir, "bootstrap.key"))
+	if err != nil {
+		return err
+	}
+
+	return clientcmd.WriteToFile(*config, configFileName)
+}
+
+func (t *TestAuthn) signClientCertKeyWithCA(user string, groups []string, maxAge time.Duration) ([]byte, []byte, error) {
 	now := time.Now()
-	caData, err := ioutil.ReadFile(CAFile)
+	caData, err := ioutil.ReadFile(t.caFile)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -213,7 +209,7 @@ func SignAPIServerCertKeyWithCA(maxAge time.Duration) ([]byte, []byte, error) {
 		return nil, nil, err
 	}
 
-	caKeyData, err := ioutil.ReadFile(CAKeyFile)
+	caKeyData, err := ioutil.ReadFile(t.caKeyFile)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -232,7 +228,7 @@ func SignAPIServerCertKeyWithCA(maxAge time.Duration) ([]byte, []byte, error) {
 		rand.Reader,
 		&x509.Certificate{
 			SerialNumber:          big.NewInt(1),
-			Subject:               pkix.Name{Organization: []string{"registration.integration.test"}, CommonName: "127.0.0.1"},
+			Subject:               pkix.Name{Organization: groups, CommonName: user},
 			NotBefore:             now.UTC(),
 			NotAfter:              now.Add(maxAge).UTC(),
 			BasicConstraintsValid: false,
@@ -287,23 +283,23 @@ func GetFilledHubKubeConfigSecret(kubeClient kubernetes.Interface, secretNamespa
 		return nil, err
 	}
 	if _, existed := secret.Data["cluster-name"]; !existed {
-		return nil, fmt.Errorf("cluster-name is not found\n")
+		return nil, fmt.Errorf("cluster-name is not found")
 	}
 
 	if _, existed := secret.Data["agent-name"]; !existed {
-		return nil, fmt.Errorf("agent-name is not found\n")
+		return nil, fmt.Errorf("agent-name is not found")
 	}
 
 	if _, existed := secret.Data["kubeconfig"]; !existed {
-		return nil, fmt.Errorf("kubeconfig is not found\n")
+		return nil, fmt.Errorf("kubeconfig is not found")
 	}
 
 	if _, existed := secret.Data["tls.crt"]; !existed {
-		return nil, fmt.Errorf("tls.crt is not found\n")
+		return nil, fmt.Errorf("tls.crt is not found")
 	}
 
 	if _, existed := secret.Data["tls.key"]; !existed {
-		return nil, fmt.Errorf("tls.key is not found\n")
+		return nil, fmt.Errorf("tls.key is not found")
 	}
 	return secret, nil
 }
@@ -325,7 +321,7 @@ func FindUnapprovedSpokeCSR(kubeClient kubernetes.Interface, spokeClusterName st
 	}
 
 	if unapproved == nil {
-		return nil, fmt.Errorf("failed to find unapproved csr for spoke cluster %q\n", spokeClusterName)
+		return nil, fmt.Errorf("failed to find unapproved csr for spoke cluster %q", spokeClusterName)
 	}
 
 	return unapproved, nil
@@ -364,7 +360,7 @@ func FindUnapprovedAddOnCSR(kubeClient kubernetes.Interface, spokeClusterName, a
 	}
 
 	if unapproved == nil {
-		return nil, fmt.Errorf("failed to find unapproved csr for spoke cluster %q\n", spokeClusterName)
+		return nil, fmt.Errorf("failed to find unapproved csr for spoke cluster %q", spokeClusterName)
 	}
 
 	return unapproved, nil
@@ -392,13 +388,13 @@ func FindAutoApprovedSpokeCSR(kubeClient kubernetes.Interface, spokeClusterName 
 	}
 
 	if autoApproved == nil {
-		return nil, fmt.Errorf("failed to find autoapproved csr for spoke cluster %q\n", spokeClusterName)
+		return nil, fmt.Errorf("failed to find autoapproved csr for spoke cluster %q", spokeClusterName)
 	}
 
 	return autoApproved, nil
 }
 
-func ApproveSpokeClusterCSRWithExpiredCert(kubeClient kubernetes.Interface, spokeClusterName string) error {
+func (t *TestAuthn) ApproveSpokeClusterCSRWithExpiredCert(kubeClient kubernetes.Interface, spokeClusterName string) error {
 	now := time.Now()
 
 	csr, err := FindUnapprovedSpokeCSR(kubeClient, spokeClusterName)
@@ -406,10 +402,10 @@ func ApproveSpokeClusterCSRWithExpiredCert(kubeClient kubernetes.Interface, spok
 		return err
 	}
 
-	return ApproveCSR(kubeClient, csr, now.UTC(), now.Add(-1*time.Hour).UTC())
+	return t.ApproveCSR(kubeClient, csr, now.UTC(), now.Add(-1*time.Hour).UTC())
 }
 
-func ApproveSpokeClusterCSR(kubeClient kubernetes.Interface, spokeClusterName string, certAge time.Duration) error {
+func (t *TestAuthn) ApproveSpokeClusterCSR(kubeClient kubernetes.Interface, spokeClusterName string, certAge time.Duration) error {
 	now := time.Now()
 
 	csr, err := FindUnapprovedSpokeCSR(kubeClient, spokeClusterName)
@@ -417,17 +413,17 @@ func ApproveSpokeClusterCSR(kubeClient kubernetes.Interface, spokeClusterName st
 		return err
 	}
 
-	return ApproveCSR(kubeClient, csr, now.UTC(), now.Add(certAge).UTC())
+	return t.ApproveCSR(kubeClient, csr, now.UTC(), now.Add(certAge).UTC())
 }
 
-func ApproveCSR(kubeClient kubernetes.Interface, csr *certificates.CertificateSigningRequest, notBefore, notAfter time.Time) error {
+func (t *TestAuthn) ApproveCSR(kubeClient kubernetes.Interface, csr *certificates.CertificateSigningRequest, notBefore, notAfter time.Time) error {
 	block, _ := pem.Decode(csr.Spec.Request)
 	cr, err := x509.ParseCertificateRequest(block.Bytes)
 	if err != nil {
 		return err
 	}
 
-	caData, err := ioutil.ReadFile(CAFile)
+	caData, err := ioutil.ReadFile(t.caFile)
 	if err != nil {
 		return err
 	}
@@ -437,7 +433,7 @@ func ApproveCSR(kubeClient kubernetes.Interface, csr *certificates.CertificateSi
 		return err
 	}
 
-	caKeyData, err := ioutil.ReadFile(CAKeyFile)
+	caKeyData, err := ioutil.ReadFile(t.caKeyFile)
 	if err != nil {
 		return err
 	}
@@ -578,6 +574,10 @@ func (r *IntegrationTestEventRecorder) ForComponent(c string) events.Recorder {
 	return &IntegrationTestEventRecorder{component: c}
 }
 
+func (r *IntegrationTestEventRecorder) WithContext(ctx context.Context) events.Recorder {
+	return r
+}
+
 func (r *IntegrationTestEventRecorder) WithComponentSuffix(suffix string) events.Recorder {
 	return r.ForComponent(fmt.Sprintf("%s-%s", r.ComponentName(), suffix))
 }
@@ -598,6 +598,14 @@ func (r *IntegrationTestEventRecorder) Warningf(reason, messageFmt string, args 
 	r.Warning(reason, fmt.Sprintf(messageFmt, args...))
 }
 
-func (r *IntegrationTestEventRecorder) Shutdown() {
-	return
+func (r *IntegrationTestEventRecorder) Shutdown() {}
+
+func RunAgent(name string, opt spoke.SpokeAgentOptions, cfg *rest.Config) context.CancelFunc {
+	ctx, cancel := context.WithCancel(context.Background())
+	go opt.RunSpokeAgent(ctx, &controllercmd.ControllerContext{
+		KubeConfig:    cfg,
+		EventRecorder: NewIntegrationTestEventRecorder(name),
+	})
+
+	return cancel
 }

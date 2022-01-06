@@ -46,7 +46,8 @@ var spokeCfg *rest.Config
 var bootstrapKubeConfigFile string
 
 var testEnv *envtest.Environment
-var securePort int
+var securePort string
+var serverCertFile string
 
 var kubeClient kubernetes.Interface
 var clusterClient clusterclientset.Interface
@@ -54,6 +55,8 @@ var addOnClient addonclientset.Interface
 var workClient workclientset.Interface
 
 var testNamespace string
+
+var authn *util.TestAuthn
 
 func TestIntegration(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
@@ -77,24 +80,21 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	addon.AddOnLeaseControllerLeaseDurationSeconds = 1
 
 	// install cluster CRD and start a local kube-apiserver
-
-	err = util.GenerateSelfSignedCertKey()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-	apiServerFlags := append([]string{}, envtest.DefaultKubeAPIServerFlags...)
-	apiServerFlags = append(apiServerFlags,
-		fmt.Sprintf("--client-ca-file=%s", util.CAFile),
-		fmt.Sprintf("--tls-cert-file=%s", util.ServerCertFile),
-		fmt.Sprintf("--tls-private-key-file=%s", util.ServerKeyFile),
-	)
+	authn = util.DefaultTestAuthn
+	apiserver := &envtest.APIServer{}
+	apiserver.SecureServing.Authn = authn
 
 	testEnv = &envtest.Environment{
+		ControlPlane: envtest.ControlPlane{
+			APIServer: apiserver,
+		},
 		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths: []string{
 			filepath.Join(".", "deploy", "hub"),
 			filepath.Join(".", "deploy", "spoke"),
 		},
-		KubeAPIServerFlags: apiServerFlags,
 	}
 
 	cfg, err := testEnv.Start()
@@ -105,15 +105,16 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	// prepare configs
-	securePort = testEnv.ControlPlane.APIServer.SecurePort
-	gomega.Expect(securePort).ToNot(gomega.BeZero())
+	securePort = testEnv.ControlPlane.APIServer.SecureServing.Port
+	gomega.Expect(len(securePort)).ToNot(gomega.BeZero())
 
-	spokeCfg, err = util.CreateSpokeKubeConfig(cfg, securePort)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	serverCertFile = fmt.Sprintf("%s/apiserver.crt", testEnv.ControlPlane.APIServer.CertDir)
+
+	spokeCfg = cfg
 	gomega.Expect(spokeCfg).ToNot(gomega.BeNil())
 
 	bootstrapKubeConfigFile = path.Join(util.TestDir, "bootstrap", "kubeconfig")
-	err = util.CreateBootstrapKubeConfig(bootstrapKubeConfigFile, securePort)
+	err = authn.CreateBootstrapKubeConfigWithCertAge(bootstrapKubeConfigFile, serverCertFile, securePort, 24*time.Hour)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	// prepare clients

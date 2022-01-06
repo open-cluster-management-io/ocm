@@ -84,10 +84,14 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 		)
 	}
 
+	cache := resourceapply.NewResourceCache()
+
 	// Make sure the managedcluser cluserroles are existed if there are clusters
 	results := resourceapply.ApplyDirectly(
+		ctx,
 		resourceapply.NewKubeClientHolder(c.kubeClient),
 		syncCtx.Recorder(),
+		cache,
 		manifestFiles.ReadFile,
 		clusterRoleFiles...,
 	)

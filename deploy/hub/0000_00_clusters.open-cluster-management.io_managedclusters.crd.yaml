@@ -80,7 +80,6 @@ spec:
                     required:
                       - effect
                       - key
-                      - timeAdded
                     properties:
                       effect:
                         description: Effect indicates the effect of the taint on placements that do not tolerate the taint. Valid effects are NoSelect, PreferNoSelect and NoSelectIfNew.

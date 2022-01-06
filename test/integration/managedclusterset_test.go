@@ -7,6 +7,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -105,8 +106,11 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 		managedCluster.Labels = map[string]string{
 			clusterSetLabel: "cs2",
 		}
-		_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.Background(), managedCluster, metav1.UpdateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		gomega.Eventually(func() error {
+			_, err := clusterClient.ClusterV1().ManagedClusters().Update(context.Background(), managedCluster, metav1.UpdateOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		// check if the new clusterset synced
 		gomega.Eventually(func() bool {
@@ -130,24 +134,26 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 		// check if the original clusterset synced
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			managedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
-				return false
+				return err
 			}
-			for _, condition := range managedClusterSet.Status.Conditions {
-				if condition.Type != clusterv1beta1.ManagedClusterSetConditionEmpty {
-					continue
-				}
-				if condition.Status != metav1.ConditionTrue {
-					return false
-				}
-				if condition.Reason != "NoClusterMatched" {
-					return false
-				}
-				return true
+
+			cond := meta.FindStatusCondition(managedClusterSet.Status.Conditions, clusterv1beta1.ManagedClusterSetConditionEmpty)
+			if cond == nil {
+				return fmt.Errorf("clusterset empty condition is not found")
 			}
-			return false
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			if cond.Status != metav1.ConditionTrue {
+				return fmt.Errorf("clusterset should be empty")
+			}
+
+			if cond.Reason != "NoClusterMatched" {
+				return fmt.Errorf("clusterset condition reason not correct, got %q", cond.Reason)
+			}
+
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 })

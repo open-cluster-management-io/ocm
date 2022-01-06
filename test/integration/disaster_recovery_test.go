@@ -33,20 +33,19 @@ import (
 )
 
 var _ = ginkgo.Describe("Disaster Recovery", func() {
-	startHub := func(ctx context.Context) (string, kubernetes.Interface, clusterclientset.Interface, addonclientset.Interface, *envtest.Environment) {
-		apiServerFlags := append([]string{}, envtest.DefaultKubeAPIServerFlags...)
-		apiServerFlags = append(apiServerFlags,
-			fmt.Sprintf("--client-ca-file=%s", util.CAFile),
-			fmt.Sprintf("--tls-cert-file=%s", util.ServerCertFile),
-			fmt.Sprintf("--tls-private-key-file=%s", util.ServerKeyFile),
-		)
+	startHub := func(ctx context.Context) (string, kubernetes.Interface, clusterclientset.Interface, addonclientset.Interface, *envtest.Environment, *util.TestAuthn) {
+		apiserver := &envtest.APIServer{}
+		newAuthn := util.NewTestAuthn(path.Join(util.CertDir, "another-ca.crt"), path.Join(util.CertDir, "another-ca.key"))
+		apiserver.SecureServing.Authn = newAuthn
 
 		env := &envtest.Environment{
+			ControlPlane: envtest.ControlPlane{
+				APIServer: apiserver,
+			},
 			ErrorIfCRDPathMissing: true,
 			CRDDirectoryPaths: []string{
 				filepath.Join(".", "deploy", "hub"),
 			},
-			KubeAPIServerFlags: apiServerFlags,
 		}
 
 		cfg, err := env.Start()
@@ -57,11 +56,13 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// prepare configs
-		securePort := env.ControlPlane.APIServer.SecurePort
-		gomega.Expect(securePort).ToNot(gomega.BeZero())
+		newSecurePort := env.ControlPlane.APIServer.SecureServing.Port
+		gomega.Expect(len(newSecurePort)).ToNot(gomega.BeZero())
 
-		bootstrapKubeConfigFile := path.Join(util.TestDir, "bootstrap", "kubeconfig-hub-b")
-		err = util.CreateBootstrapKubeConfig(bootstrapKubeConfigFile, securePort)
+		anotherServerCertFile := fmt.Sprintf("%s/apiserver.crt", env.ControlPlane.APIServer.CertDir)
+
+		bootstrapKubeConfigFile := path.Join(util.TestDir, "recovery-test", "kubeconfig-hub-b")
+		err = newAuthn.CreateBootstrapKubeConfigWithCertAge(bootstrapKubeConfigFile, anotherServerCertFile, newSecurePort, 24*time.Hour)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// prepare clients
@@ -86,10 +87,10 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		}()
 
-		return bootstrapKubeConfigFile, kubeClient, clusterClient, addOnClient, env
+		return bootstrapKubeConfigFile, kubeClient, clusterClient, addOnClient, env, newAuthn
 	}
 
-	startRegistrationAgent := func(ctx context.Context, managedClusterName, bootstrapKubeConfigFile, hubKubeconfigSecret, hubKubeconfigDir string) {
+	startRegistrationAgent := func(managedClusterName, bootstrapKubeConfigFile, hubKubeconfigSecret, hubKubeconfigDir string) context.CancelFunc {
 		features.DefaultMutableFeatureGate.Set("AddonManagement=true")
 		agentOptions := spoke.SpokeAgentOptions{
 			ClusterName:              managedClusterName,
@@ -98,14 +99,10 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
-		err := agentOptions.RunSpokeAgent(ctx, &controllercmd.ControllerContext{
-			KubeConfig:    spokeCfg,
-			EventRecorder: util.NewIntegrationTestEventRecorder("addontest"),
-		})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		return util.RunAgent("addontest", agentOptions, spokeCfg)
 	}
 
-	assertSuccessClusterBootstrap := func(testNamespace, managedClusterName, hubKubeconfigSecret string, hubKubeClient, spokeKubeClient kubernetes.Interface, hubClusterClient clusterclientset.Interface) {
+	assertSuccessClusterBootstrap := func(testNamespace, managedClusterName, hubKubeconfigSecret string, hubKubeClient, spokeKubeClient kubernetes.Interface, hubClusterClient clusterclientset.Interface, auth *util.TestAuthn) {
 		// the spoke cluster and csr should be created after bootstrap
 		ginkgo.By("Check existence of ManagedCluster & CSR")
 		gomega.Eventually(func() bool {
@@ -115,12 +112,12 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 			return true
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			if _, err := util.FindUnapprovedSpokeCSR(hubKubeClient, managedClusterName); err != nil {
-				return false
+				return err
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		// the spoke cluster should has finalizer that is added by hub controller
 		gomega.Eventually(func() bool {
@@ -144,68 +141,67 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 		err := util.AcceptManagedCluster(hubClusterClient, managedClusterName)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		err = util.ApproveSpokeClusterCSR(hubKubeClient, managedClusterName, time.Hour*24)
+		err = auth.ApproveSpokeClusterCSR(hubKubeClient, managedClusterName, time.Hour*24)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// the managed cluster should have accepted condition after it is accepted
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			spokeCluster, err := util.GetManagedCluster(hubClusterClient, managedClusterName)
 			if err != nil {
-				return false
+				return err
 			}
-			accpeted := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
-			if accpeted == nil {
-				return false
+			if meta.IsStatusConditionFalse(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted) {
+				return fmt.Errorf("cluster should be accepted")
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		// the hub kubeconfig secret should be filled after the csr is approved
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			if _, err := util.GetFilledHubKubeConfigSecret(spokeKubeClient, testNamespace, hubKubeconfigSecret); err != nil {
-				return false
+				return err
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("ManagedCluster joins the hub")
 		// the spoke cluster should have joined condition finally
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			spokeCluster, err := util.GetManagedCluster(hubClusterClient, managedClusterName)
 			if err != nil {
-				return false
+				return err
 			}
 			joined := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
 			if joined == nil {
-				return false
+				return fmt.Errorf("cluster should be joined")
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		// ensure cluster namespace is in place
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			_, err := hubKubeClient.CoreV1().Namespaces().Get(context.TODO(), managedClusterName, metav1.GetOptions{})
 			if err != nil {
-				return false
+				return err
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	}
 
 	assertSuccessCSRApproval := func(managedClusterName, addOnName string, hubKubeClient kubernetes.Interface) {
 		ginkgo.By("Approve bootstrap csr")
 		var csr *certificates.CertificateSigningRequest
 		var err error
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			csr, err = util.FindUnapprovedAddOnCSR(hubKubeClient, managedClusterName, addOnName)
 			if err != nil {
-				return false
+				return err
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		now := time.Now()
-		err = util.ApproveCSR(hubKubeClient, csr, now.UTC(), now.Add(300*time.Second).UTC())
+		err = authn.ApproveCSR(hubKubeClient, csr, now.UTC(), now.Add(300*time.Second).UTC())
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	}
 
@@ -296,28 +292,22 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 	}
 
 	ginkgo.It("should register addon successfully", func() {
-		var testHubEnv *envtest.Environment
-
-		//var err error
-
 		suffix := rand.String(5)
 		managedClusterName := fmt.Sprintf("managedcluster-%s", suffix)
 		hubKubeconfigSecret := fmt.Sprintf("hub-kubeconfig-secret-%s", suffix)
-		hubKubeconfigDir := path.Join(util.TestDir, fmt.Sprintf("addontest-%s", suffix), "hub-kubeconfig")
+		hubKubeconfigDir := path.Join(util.TestDir, fmt.Sprintf("recoverytest-%s", suffix), "hub-kubeconfig")
 		addOnName := fmt.Sprintf("addon-%s", suffix)
 		signerName := "kubernetes.io/kube-apiserver-client"
 
-		hubBootstrapKubeConfigFile := bootstrapKubeConfigFile
 		hubKubeClient := kubeClient
 		hubClusterClient := clusterClient
 		hubAddOnClient := addOnClient
 		spokeKubeClient := kubeClient
 
 		ginkgo.By("start registation agent to connect to hub A")
-		ctx, stopAgent := context.WithCancel(context.Background())
-		go startRegistrationAgent(ctx, managedClusterName, hubBootstrapKubeConfigFile, hubKubeconfigSecret, hubKubeconfigDir)
+		stopAgent := startRegistrationAgent(managedClusterName, bootstrapKubeConfigFile, hubKubeconfigSecret, hubKubeconfigDir)
 
-		assertSuccessClusterBootstrap(testNamespace, managedClusterName, hubKubeconfigSecret, hubKubeClient, spokeKubeClient, hubClusterClient)
+		assertSuccessClusterBootstrap(testNamespace, managedClusterName, hubKubeconfigSecret, hubKubeClient, spokeKubeClient, hubClusterClient, authn)
 		assertSuccessAddOnBootstrap(managedClusterName, addOnName, signerName, hubKubeClient, spokeKubeClient, hubClusterClient, hubAddOnClient)
 
 		ginkgo.By("simulate klusterlet to stop registation agent and delete hub kubeconfig secret")
@@ -329,16 +319,15 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 
 		ginkgo.By("start hub B")
 		ctx, stopHub := context.WithCancel(context.Background())
-		hubBootstrapKubeConfigFile, hubKubeClient, hubClusterClient, hubAddOnClient, testHubEnv = startHub(ctx)
+		hubBootstrapKubeConfigFile, hubKubeClient, hubClusterClient, hubAddOnClient, testHubEnv, testAuthn := startHub(ctx)
 		defer testHubEnv.Stop()
 		defer stopHub()
 
 		ginkgo.By("simulate klusterlet to restart registation agent and connect to hub B")
-		ctx, stopAgent = context.WithCancel(context.Background())
-		go startRegistrationAgent(ctx, managedClusterName, hubBootstrapKubeConfigFile, hubKubeconfigSecret, hubKubeconfigDir)
+		stopAgent = startRegistrationAgent(managedClusterName, hubBootstrapKubeConfigFile, hubKubeconfigSecret, hubKubeconfigDir)
 		defer stopAgent()
 
-		assertSuccessClusterBootstrap(testNamespace, managedClusterName, hubKubeconfigSecret, hubKubeClient, spokeKubeClient, hubClusterClient)
+		assertSuccessClusterBootstrap(testNamespace, managedClusterName, hubKubeconfigSecret, hubKubeClient, spokeKubeClient, hubClusterClient, testAuthn)
 		assertSuccessAddOnBootstrap(managedClusterName, addOnName, signerName, hubKubeClient, spokeKubeClient, hubClusterClient, hubAddOnClient)
 	})
 })

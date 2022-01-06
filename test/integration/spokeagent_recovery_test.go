@@ -1,7 +1,7 @@
 package integration_test
 
 import (
-	"context"
+	"fmt"
 	"path"
 	"reflect"
 	"time"
@@ -12,8 +12,6 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/registration/pkg/spoke"
 	"open-cluster-management.io/registration/test/integration/util"
-
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -32,24 +30,20 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 
 		bootstrapFile := path.Join(util.TestDir, "bootstrap-recoverytest", "kubeconfig")
 		// create an INVALID bootstrap kubeconfig file with an expired cert
-		err = util.CreateBootstrapKubeConfigWithCertAge(bootstrapFile, securePort, -1*time.Hour)
+		err = authn.CreateBootstrapKubeConfigWithCertAge(bootstrapFile, serverCertFile, securePort, -1*time.Hour)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// run registration agent with an invalid bootstrap kubeconfig
-		go func() {
-			agentOptions := spoke.SpokeAgentOptions{
-				ClusterName:              managedClusterName,
-				BootstrapKubeconfig:      bootstrapFile,
-				HubKubeconfigSecret:      hubKubeconfigSecret,
-				HubKubeconfigDir:         hubKubeconfigDir,
-				ClusterHealthCheckPeriod: 1 * time.Minute,
-			}
-			err := agentOptions.RunSpokeAgent(context.Background(), &controllercmd.ControllerContext{
-				KubeConfig:    spokeCfg,
-				EventRecorder: util.NewIntegrationTestEventRecorder("bootstrap-recoverytest"),
-			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		}()
+		agentOptions := spoke.SpokeAgentOptions{
+			ClusterName:              managedClusterName,
+			BootstrapKubeconfig:      bootstrapFile,
+			HubKubeconfigSecret:      hubKubeconfigSecret,
+			HubKubeconfigDir:         hubKubeconfigDir,
+			ClusterHealthCheckPeriod: 1 * time.Minute,
+		}
+
+		cancel := util.RunAgent("bootstrap-recoverytest", agentOptions, spokeCfg)
+		defer cancel()
 
 		// the managedcluster should not be created
 		retryToGetSpokeClusterTimes := 0
@@ -71,16 +65,16 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNumerically(">=", 3))
 
 		// recover the invalid bootstrap kubeconfig file
-		err = util.CreateBootstrapKubeConfigWithCertAge(bootstrapFile, securePort, 24*time.Hour)
+		err = authn.CreateBootstrapKubeConfigWithCertAge(bootstrapFile, serverCertFile, securePort, 24*time.Hour)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// the csr should be created after the bootstrap kubeconfig was recovered
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			if _, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName); err != nil {
-				return false
+				return err
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		// the spoke cluster should be created after the bootstrap kubeconfig was recovered
 		gomega.Eventually(func() bool {
@@ -94,7 +88,7 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 		err = util.AcceptManagedCluster(clusterClient, managedClusterName)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		err = util.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
+		err = authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// the hub kubeconfig secret should be filled after the csr is approved
@@ -106,17 +100,16 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 		// the spoke cluster should have joined condition finally
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 			if err != nil {
-				return false
+				return err
 			}
-			joined := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
-			if joined == nil {
-				return false
+			if !meta.IsStatusConditionTrue(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined) {
+				return fmt.Errorf("cluster should be joined")
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("agent recovery from invalid hub kubeconfig", func() {
@@ -128,20 +121,16 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 		hubKubeconfigDir := path.Join(util.TestDir, "hubkubeconfig-recoverytest", "hub-kubeconfig")
 
 		// run registration agent
-		go func() {
-			agentOptions := spoke.SpokeAgentOptions{
-				ClusterName:              spokeClusterName,
-				BootstrapKubeconfig:      bootstrapKubeConfigFile,
-				HubKubeconfigSecret:      hubKubeconfigSecret,
-				HubKubeconfigDir:         hubKubeconfigDir,
-				ClusterHealthCheckPeriod: 1 * time.Minute,
-			}
-			err := agentOptions.RunSpokeAgent(context.Background(), &controllercmd.ControllerContext{
-				KubeConfig:    spokeCfg,
-				EventRecorder: util.NewIntegrationTestEventRecorder("hubkubeconfig-recoverytest"),
-			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		}()
+		agentOptions := spoke.SpokeAgentOptions{
+			ClusterName:              spokeClusterName,
+			BootstrapKubeconfig:      bootstrapKubeConfigFile,
+			HubKubeconfigSecret:      hubKubeconfigSecret,
+			HubKubeconfigDir:         hubKubeconfigDir,
+			ClusterHealthCheckPeriod: 1 * time.Minute,
+		}
+
+		cancel := util.RunAgent("hubkubeconfig-recoverytest", agentOptions, spokeCfg)
+		defer cancel()
 
 		// after bootstrap the spokecluster and csr should be created
 		gomega.Eventually(func() bool {
@@ -166,18 +155,15 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// simulate hub cluster admin approve the csr with an INVALID hub config
-		err = util.ApproveSpokeClusterCSRWithExpiredCert(kubeClient, spokeClusterName)
+		err = authn.ApproveSpokeClusterCSRWithExpiredCert(kubeClient, spokeClusterName)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		var firstHubKubeConfigSecret *corev1.Secret
 		// the hub kubeconfig secret should be filled after the csr is approved
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			firstHubKubeConfigSecret, err = util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret)
-			if err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		// agent should bootstrap again due to the invalid hub config
 		var secondCSRName string
@@ -194,7 +180,7 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 		gomega.Expect(firstCSRName).ShouldNot(gomega.BeEquivalentTo(secondCSRName))
 
 		// approve the new csr with a valid hub config
-		err = util.ApproveSpokeClusterCSR(kubeClient, spokeClusterName, time.Hour*24)
+		err = authn.ApproveSpokeClusterCSR(kubeClient, spokeClusterName, time.Hour*24)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// wait the hub kubeconfig secret is updated with the valid hub config
@@ -213,16 +199,15 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 		// the spoke cluster should have joined condition finally
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			spokeCluster, err := util.GetManagedCluster(clusterClient, spokeClusterName)
 			if err != nil {
-				return false
+				return err
 			}
-			joined := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
-			if joined == nil {
-				return false
+			if !meta.IsStatusConditionTrue(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined) {
+				return fmt.Errorf("cluster should be joined")
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 })

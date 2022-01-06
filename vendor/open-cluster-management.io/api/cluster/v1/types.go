@@ -109,7 +109,6 @@ type Taint struct {
 	// +required
 	Effect TaintEffect `json:"effect"`
 	// TimeAdded represents the time at which the taint was added.
-	// +kubebuilder:validation:Required
 	// +required
 	TimeAdded metav1.Time `json:"timeAdded"`
 }

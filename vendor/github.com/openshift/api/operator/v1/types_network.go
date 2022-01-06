@@ -10,7 +10,10 @@ import (
 
 // Network describes the cluster's desired network configuration. It is
 // consumed by the cluster-network-operator.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +k8s:openapi-gen=true
+// +openshift:compatibility-gen:level=1
 type Network struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -28,6 +31,9 @@ type NetworkStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // NetworkList contains a list of Network configurations
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type NetworkList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
@@ -95,8 +101,55 @@ type NetworkSpec struct {
 	// by using protocols NetFlow, SFlow or IPFIX. Currently only supported on OVN-Kubernetes plugin.
 	// If unset, flows will not be exported to any collector.
 	// +optional
-	// +kubebuilder:validation:MinProperties=1
 	ExportNetworkFlows *ExportNetworkFlows `json:"exportNetworkFlows,omitempty"`
+
+	// migration enables and configures the cluster network migration. The
+	// migration procedure allows to change the network type and the MTU.
+	// +optional
+	Migration *NetworkMigration `json:"migration,omitempty"`
+}
+
+// NetworkMigration represents the cluster network configuration.
+type NetworkMigration struct {
+	// networkType is the target type of network migration. Set this to the
+	// target network type to allow changing the default network. If unset, the
+	// operation of changing cluster default network plugin will be rejected.
+	// The supported values are OpenShiftSDN, OVNKubernetes
+	// +optional
+	NetworkType string `json:"networkType,omitempty"`
+
+	// mtu contains the MTU migration configuration. Set this to allow changing
+	// the MTU values for the default network. If unset, the operation of
+	// changing the MTU for the default network will be rejected.
+	// +optional
+	MTU *MTUMigration `json:"mtu,omitempty"`
+}
+
+// MTUMigration MTU contains infomation about MTU migration.
+type MTUMigration struct {
+	// network contains information about MTU migration for the default network.
+	// Migrations are only allowed to MTU values lower than the machine's uplink
+	// MTU by the minimum appropriate offset.
+	// +optional
+	Network *MTUMigrationValues `json:"network,omitempty"`
+
+	// machine contains MTU migration configuration for the machine's uplink.
+	// Needs to be migrated along with the default network MTU unless the
+	// current uplink MTU already accommodates the default network MTU.
+	// +optional
+	Machine *MTUMigrationValues `json:"machine,omitempty"`
+}
+
+// MTUMigrationValues contains the values for a MTU migration.
+type MTUMigrationValues struct {
+	// to is the MTU to migrate to.
+	// +kubebuilder:validation:Minimum=0
+	To *uint32 `json:"to"`
+
+	// from is the MTU to migrate from.
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	From *uint32 `json:"from,omitempty"`
 }
 
 // ClusterNetworkEntry is a subnet from which to allocate PodIPs. A network of size
@@ -121,8 +174,7 @@ type DefaultNetworkDefinition struct {
 	// +optional
 	OpenShiftSDNConfig *OpenShiftSDNConfig `json:"openshiftSDNConfig,omitempty"`
 
-	// oVNKubernetesConfig configures the ovn-kubernetes plugin. This is currently
-	// not implemented.
+	// ovnKubernetesConfig configures the ovn-kubernetes plugin.
 	// +optional
 	OVNKubernetesConfig *OVNKubernetesConfig `json:"ovnKubernetesConfig,omitempty"`
 
@@ -251,8 +303,10 @@ type OpenShiftSDNConfig struct {
 	// +optional
 	MTU *uint32 `json:"mtu,omitempty"`
 
-	// useExternalOpenvswitch tells the operator not to install openvswitch, because
-	// it will be provided separately. If set, you must provide it yourself.
+	// useExternalOpenvswitch used to control whether the operator would deploy an OVS
+	// DaemonSet itself or expect someone else to start OVS. As of 4.6, OVS is always
+	// run as a system service, and this flag is ignored.
+	// DEPRECATED: non-functional as of 4.6
 	// +optional
 	UseExternalOpenvswitch *bool `json:"useExternalOpenvswitch,omitempty"`
 
@@ -318,6 +372,14 @@ type KuryrConfig struct {
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	PoolBatchPorts *uint `json:"poolBatchPorts,omitempty"`
+
+	// mtu is the MTU that Kuryr should use when creating pod networks in Neutron.
+	// The value has to be lower or equal to the MTU of the nodes network and Neutron has
+	// to allow creation of tenant networks with such MTU. If unset Pod networks will be
+	// created with the same MTU as the nodes network has.
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	MTU *uint32 `json:"mtu,omitempty"`
 }
 
 // ovnKubernetesConfig contains the configuration parameters for networks
@@ -346,6 +408,9 @@ type OVNKubernetesConfig struct {
 	// reported defaults are used.
 	// +optional
 	PolicyAuditConfig *PolicyAuditConfig `json:"policyAuditConfig,omitempty"`
+	// gatewayConfig holds the configuration for node gateway options.
+	// +optional
+	GatewayConfig *GatewayConfig `json:"gatewayConfig,omitempty"`
 }
 
 type HybridOverlayConfig struct {
@@ -358,6 +423,17 @@ type HybridOverlayConfig struct {
 }
 
 type IPsecConfig struct {
+}
+
+// GatewayConfig holds node gateway-related parsed config file parameters and command-line overrides
+type GatewayConfig struct {
+	// RoutingViaHost allows pod egress traffic to exit via the ovn-k8s-mp0 management port
+	// into the host before sending it out. If this is not set, traffic will always egress directly
+	// from OVN to outside without touching the host stack. Setting this to true means hardware
+	// offload will not be supported. Default is false if GatewayConfig is specified.
+	// +kubebuilder:default:=false
+	// +optional
+	RoutingViaHost bool `json:"routingViaHost,omitempty"`
 }
 
 type ExportNetworkFlows struct {
@@ -374,24 +450,27 @@ type ExportNetworkFlows struct {
 
 type NetFlowConfig struct {
 	// netFlow defines the NetFlow collectors that will consume the flow data exported from OVS.
-	// It is a list of strings formatted as ip:port
+	// It is a list of strings formatted as ip:port with a maximum of ten items
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=10
 	Collectors []IPPort `json:"collectors,omitempty"`
 }
 
 type SFlowConfig struct {
-	// sFlowCollectors is list of strings formatted as ip:port
+	// sFlowCollectors is list of strings formatted as ip:port with a maximum of ten items
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=10
 	Collectors []IPPort `json:"collectors,omitempty"`
 }
 
 type IPFIXConfig struct {
-	// ipfixCollectors is list of strings formatted as ip:port
+	// ipfixCollectors is list of strings formatted as ip:port with a maximum of ten items
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=10
 	Collectors []IPPort `json:"collectors,omitempty"`
 }
 
-// +kubebuilder:validation:Pattern=`^(([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]):[0-9]+$`
+// +kubebuilder:validation:Pattern=`^(([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]):([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$`
 type IPPort string
 
 type PolicyAuditConfig struct {

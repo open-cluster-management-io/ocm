@@ -131,6 +131,8 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		return err
 	}
 
+	cache := resourceapply.NewResourceCache()
+
 	// TODO: we will add the managedcluster-namespace.yaml back to staticFiles
 	// in next release, currently, we need keep the namespace after the managed
 	// cluster is deleted.
@@ -142,8 +144,10 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	// 2. namespace for this spoke cluster.
 	// 3. role and rolebinding for this spoke cluster on its namespace.
 	resourceResults := resourceapply.ApplyDirectly(
+		ctx,
 		resourceapply.NewKubeClientHolder(c.kubeClient),
 		syncCtx.Recorder(),
+		cache,
 		helpers.ManagedClusterAssetFn(manifestFiles, managedClusterName),
 		applyFiles...,
 	)

@@ -84,14 +84,28 @@ func ToConfigMapLeaderElection(clientConfig *rest.Config, config configv1.Leader
 func LeaderElectionDefaulting(config configv1.LeaderElection, defaultNamespace, defaultName string) configv1.LeaderElection {
 	ret := *(&config).DeepCopy()
 
+	// We want to be able to tolerate 60s of kube-apiserver disruption without causing pod restarts.
+	// We want the graceful lease re-acquisition fairly quick to avoid waits on new deployments and other rollouts.
+	// We want a single set of guidance for nearly every lease in openshift.  If you're special, we'll let you know.
+	// 1. clock skew tolerance is leaseDuration-renewDeadline == 30s
+	// 2. kube-apiserver downtime tolerance is == 78s
+	//      lastRetry=floor(renewDeadline/retryPeriod)*retryPeriod == 104
+	//      downtimeTolerance = lastRetry-retryPeriod == 78s
+	// 3. worst non-graceful lease acquisition is leaseDuration+retryPeriod == 163s
+	// 4. worst graceful lease acquisition is retryPeriod == 26s
 	if ret.LeaseDuration.Duration == 0 {
-		ret.LeaseDuration.Duration = 60 * time.Second
+		ret.LeaseDuration.Duration = 137 * time.Second
 	}
+
 	if ret.RenewDeadline.Duration == 0 {
-		ret.RenewDeadline.Duration = 35 * time.Second
+		// this gives 107/26=4 retries and allows for 137-107=30 seconds of clock skew
+		// if the kube-apiserver is unavailable for 60s starting just before t=26 (the first renew),
+		// then we will retry on 26s intervals until t=104 (kube-apiserver came back up at 86), and there will
+		// be 33 seconds of extra time before the lease is lost.
+		ret.RenewDeadline.Duration = 107 * time.Second
 	}
 	if ret.RetryPeriod.Duration == 0 {
-		ret.RetryPeriod.Duration = 10 * time.Second
+		ret.RetryPeriod.Duration = 26 * time.Second
 	}
 	if len(ret.Namespace) == 0 {
 		if len(defaultNamespace) > 0 {
@@ -108,5 +122,33 @@ func LeaderElectionDefaulting(config configv1.LeaderElection, defaultNamespace, 
 	if len(ret.Name) == 0 {
 		ret.Name = defaultName
 	}
+	return ret
+}
+
+// LeaderElectionSNOConfig uses the formula derived in LeaderElectionDefaulting with increased
+// retry period and lease duration for SNO clusters that have limited resources.
+// This method does not respect the passed in LeaderElection config and the returned object will have values
+// that are overridden with SNO environments in mind.
+// This method should only be called when running in an SNO Cluster.
+func LeaderElectionSNOConfig(config configv1.LeaderElection) configv1.LeaderElection {
+
+	// We want to make sure we respect a 30s clock skew as well as a 4 retry attempt with out making
+	// leader election ineffectual while still having some small performance gain by limiting calls against
+	// the api server.
+
+	// 1. clock skew tolerance is leaseDuration-renewDeadline == 30s
+	// 2. kube-apiserver downtime tolerance is == 180s
+	//      lastRetry=floor(renewDeadline/retryPeriod)*retryPeriod == 240
+	//      downtimeTolerance = lastRetry-retryPeriod == 180s
+	// 3. worst non-graceful lease acquisition is leaseDuration+retryPeriod == 330s
+	// 4. worst graceful lease acquisition is retryPeriod == 60s
+
+	ret := *(&config).DeepCopy()
+	// 270-240 = 30s of clock skew tolerance
+	ret.LeaseDuration.Duration = 270 * time.Second
+	// 240/60 = 4 retries attempts before leader is lost.
+	ret.RenewDeadline.Duration = 240 * time.Second
+	// With 60s retry config we aim to maintain 30s of clock skew as well as 4 retry attempts.
+	ret.RetryPeriod.Duration = 60 * time.Second
 	return ret
 }

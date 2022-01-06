@@ -9,7 +9,6 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/registration/pkg/features"
@@ -26,6 +25,7 @@ import (
 var _ = ginkgo.Describe("Addon Lease Resync", func() {
 	var managedClusterName, hubKubeconfigSecret, hubKubeconfigDir, addOnName string
 	var err error
+	var cancel context.CancelFunc
 
 	assertSuccessClusterBootstrap := func() {
 		ginkgo.By(fmt.Sprintf("Register managed cluster %q", managedClusterName))
@@ -65,7 +65,7 @@ var _ = ginkgo.Describe("Addon Lease Resync", func() {
 		err = util.AcceptManagedCluster(clusterClient, managedClusterName)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		err = util.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
+		err = authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// the managed cluster should have accepted condition after it is accepted
@@ -173,45 +173,52 @@ var _ = ginkgo.Describe("Addon Lease Resync", func() {
 		hubKubeconfigDir = path.Join(util.TestDir, fmt.Sprintf("addontest-%s", suffix), "hub-kubeconfig")
 		addOnName = fmt.Sprintf("addon-%s", suffix)
 
-		// run registration agent
-		go func() {
-			features.DefaultMutableFeatureGate.Set("AddonManagement=true")
-			agentOptions := spoke.SpokeAgentOptions{
-				ClusterName:              managedClusterName,
-				BootstrapKubeconfig:      bootstrapKubeConfigFile,
-				HubKubeconfigSecret:      hubKubeconfigSecret,
-				HubKubeconfigDir:         hubKubeconfigDir,
-				ClusterHealthCheckPeriod: 1 * time.Minute,
-			}
-			err := agentOptions.RunSpokeAgent(context.Background(), &controllercmd.ControllerContext{
-				KubeConfig:    spokeCfg,
-				EventRecorder: util.NewIntegrationTestEventRecorder("addontest"),
-			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		}()
+		features.DefaultMutableFeatureGate.Set("AddonManagement=true")
+		agentOptions := spoke.SpokeAgentOptions{
+			ClusterName:              managedClusterName,
+			BootstrapKubeconfig:      bootstrapKubeConfigFile,
+			HubKubeconfigSecret:      hubKubeconfigSecret,
+			HubKubeconfigDir:         hubKubeconfigDir,
+			ClusterHealthCheckPeriod: 1 * time.Minute,
+		}
+
+		cancel = util.RunAgent("addontest", agentOptions, spokeCfg)
+	})
+
+	ginkgo.AfterEach(func() {
+		cancel()
 	})
 
 	ginkgo.It("should update addon status to unavailable after addon lease controller resync", func() {
 		assertSuccessClusterBootstrap()
 		assertAddOn()
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
-				return false
+				return err
 			}
-			return meta.IsStatusConditionTrue(addOn.Status.Conditions, "Available")
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			if meta.IsStatusConditionFalse(addOn.Status.Conditions, "Available") {
+				return fmt.Errorf("addon status should be available")
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		assertAddonLabel(managedClusterName, addOnName, "available")
 
 		// do not update addon lease, wait resync once, the addon status should be unavailable
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
 			if err != nil {
-				return false
+				return err
 			}
-			return meta.IsStatusConditionFalse(addOn.Status.Conditions, "Available")
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			if meta.IsStatusConditionTrue(addOn.Status.Conditions, "Available") {
+				return fmt.Errorf("addon status should be not available")
+			}
+
+			return nil
+		}, 2*eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		assertAddonLabel(managedClusterName, addOnName, "unhealthy")
 	})

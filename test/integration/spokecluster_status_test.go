@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"context"
 	"fmt"
 	"path"
 	"time"
@@ -13,8 +12,6 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/registration/pkg/spoke"
 	"open-cluster-management.io/registration/test/integration/util"
-
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
 )
 
 var _ = ginkgo.Describe("Collecting Node Resource", func() {
@@ -32,20 +29,16 @@ var _ = ginkgo.Describe("Collecting Node Resource", func() {
 		hubKubeconfigDir := path.Join(util.TestDir, "resorucetest", "hub-kubeconfig")
 
 		// run registration agent
-		go func() {
-			agentOptions := spoke.SpokeAgentOptions{
-				ClusterName:              managedClusterName,
-				BootstrapKubeconfig:      bootstrapKubeConfigFile,
-				HubKubeconfigSecret:      hubKubeconfigSecret,
-				HubKubeconfigDir:         hubKubeconfigDir,
-				ClusterHealthCheckPeriod: 1 * time.Minute,
-			}
-			err := agentOptions.RunSpokeAgent(context.Background(), &controllercmd.ControllerContext{
-				KubeConfig:    spokeCfg,
-				EventRecorder: util.NewIntegrationTestEventRecorder("resorucetest"),
-			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		}()
+		agentOptions := spoke.SpokeAgentOptions{
+			ClusterName:              managedClusterName,
+			BootstrapKubeconfig:      bootstrapKubeConfigFile,
+			HubKubeconfigSecret:      hubKubeconfigSecret,
+			HubKubeconfigDir:         hubKubeconfigDir,
+			ClusterHealthCheckPeriod: 1 * time.Minute,
+		}
+
+		cancel := util.RunAgent("resorucetest", agentOptions, spokeCfg)
+		defer cancel()
 
 		// the spoke cluster and csr should be created after bootstrap
 		gomega.Eventually(func() bool {
@@ -83,7 +76,7 @@ var _ = ginkgo.Describe("Collecting Node Resource", func() {
 		err = util.AcceptManagedCluster(clusterClient, managedClusterName)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		err = util.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
+		err = authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// the managed cluster should have accepted condition after it is accepted

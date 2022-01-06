@@ -23,13 +23,12 @@ import (
 	"open-cluster-management.io/registration/pkg/features"
 	"open-cluster-management.io/registration/pkg/spoke"
 	"open-cluster-management.io/registration/test/integration/util"
-
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
 )
 
 var _ = ginkgo.Describe("Addon Registration", func() {
 	var managedClusterName, hubKubeconfigSecret, hubKubeconfigDir, addOnName string
 	var err error
+	var cancel context.CancelFunc
 
 	ginkgo.BeforeEach(func() {
 		suffix := rand.String(5)
@@ -38,23 +37,23 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		hubKubeconfigDir = path.Join(util.TestDir, fmt.Sprintf("addontest-%s", suffix), "hub-kubeconfig")
 		addOnName = fmt.Sprintf("addon-%s", suffix)
 
+		features.DefaultMutableFeatureGate.Set("AddonManagement=true")
+		agentOptions := spoke.SpokeAgentOptions{
+			ClusterName:              managedClusterName,
+			BootstrapKubeconfig:      bootstrapKubeConfigFile,
+			HubKubeconfigSecret:      hubKubeconfigSecret,
+			HubKubeconfigDir:         hubKubeconfigDir,
+			ClusterHealthCheckPeriod: 1 * time.Minute,
+		}
+
 		// run registration agent
-		go func() {
-			features.DefaultMutableFeatureGate.Set("AddonManagement=true")
-			agentOptions := spoke.SpokeAgentOptions{
-				ClusterName:              managedClusterName,
-				BootstrapKubeconfig:      bootstrapKubeConfigFile,
-				HubKubeconfigSecret:      hubKubeconfigSecret,
-				HubKubeconfigDir:         hubKubeconfigDir,
-				ClusterHealthCheckPeriod: 1 * time.Minute,
-			}
-			err := agentOptions.RunSpokeAgent(context.Background(), &controllercmd.ControllerContext{
-				KubeConfig:    spokeCfg,
-				EventRecorder: util.NewIntegrationTestEventRecorder("addontest"),
-			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		}()
+		cancel = util.RunAgent("addontest", agentOptions, spokeCfg)
 	})
+
+	ginkgo.AfterEach(
+		func() {
+			cancel()
+		})
 
 	assertSuccessClusterBootstrap := func() {
 		// the spoke cluster and csr should be created after bootstrap
@@ -95,7 +94,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		err = util.AcceptManagedCluster(clusterClient, managedClusterName)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		err = util.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
+		err = authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// the managed cluster should have accepted condition after it is accepted
@@ -155,7 +154,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 		now := time.Now()
-		err = util.ApproveCSR(kubeClient, csr, now.UTC(), now.Add(30*time.Second).UTC())
+		err = authn.ApproveCSR(kubeClient, csr, now.UTC(), now.Add(30*time.Second).UTC())
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	}
 

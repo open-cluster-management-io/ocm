@@ -17,8 +17,6 @@ import (
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	"open-cluster-management.io/registration/pkg/spoke"
 	"open-cluster-management.io/registration/test/integration/util"
-
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
 )
 
 var _ = ginkgo.Describe("Cluster Claim", func() {
@@ -26,6 +24,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 	var claims []*clusterv1alpha1.ClusterClaim
 	var maxCustomClusterClaims int
 	var err error
+	var cancel context.CancelFunc
 
 	ginkgo.JustBeforeEach(func() {
 		suffix := rand.String(5)
@@ -48,22 +47,21 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 		}
 
 		// run registration agent
-		go func() {
-			agentOptions := spoke.SpokeAgentOptions{
-				ClusterName:              managedClusterName,
-				BootstrapKubeconfig:      bootstrapKubeConfigFile,
-				HubKubeconfigSecret:      hubKubeconfigSecret,
-				HubKubeconfigDir:         hubKubeconfigDir,
-				ClusterHealthCheckPeriod: 1 * time.Minute,
-				MaxCustomClusterClaims:   maxCustomClusterClaims,
-			}
-			err := agentOptions.RunSpokeAgent(context.Background(), &controllercmd.ControllerContext{
-				KubeConfig:    spokeCfg,
-				EventRecorder: util.NewIntegrationTestEventRecorder("claimtest"),
-			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		}()
+		agentOptions := spoke.SpokeAgentOptions{
+			ClusterName:              managedClusterName,
+			BootstrapKubeconfig:      bootstrapKubeConfigFile,
+			HubKubeconfigSecret:      hubKubeconfigSecret,
+			HubKubeconfigDir:         hubKubeconfigDir,
+			ClusterHealthCheckPeriod: 1 * time.Minute,
+			MaxCustomClusterClaims:   maxCustomClusterClaims,
+		}
+		cancel = util.RunAgent("claimtest", agentOptions, spokeCfg)
 	})
+
+	ginkgo.AfterEach(
+		func() {
+			cancel()
+		})
 
 	assertSuccessBootstrap := func() {
 		// the spoke cluster and csr should be created after bootstrap
@@ -104,7 +102,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 		err = util.AcceptManagedCluster(clusterClient, managedClusterName)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		err = util.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
+		err = authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// the managed cluster should have accepted condition after it is accepted
