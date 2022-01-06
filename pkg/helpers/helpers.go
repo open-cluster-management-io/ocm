@@ -581,7 +581,6 @@ func SetRelatedResourcesStatusesWithObj(
 		return
 	}
 	SetRelatedResourcesStatuses(relatedResourcesStatuses, res)
-	return
 }
 
 func UpdateClusterManagerRelatedResourcesFn(relatedResources ...operatorapiv1.RelatedResourceMeta) UpdateClusterManagerStatusFunc {

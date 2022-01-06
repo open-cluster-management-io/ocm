@@ -67,16 +67,18 @@ func (s *clusterManagerStatusController) sync(ctx context.Context, controllerCon
 		return nil
 	}
 
+	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManagerName, clusterManager.Spec.DeployOption.Mode)
+
 	if err != nil {
 		return err
 	}
 
 	errs := []error{}
-	if err := s.updateStatusOfRegistration(ctx, clusterManager.Name); err != nil {
+	if err := s.updateStatusOfRegistration(ctx, clusterManager.Name, clusterManagerNamespace); err != nil {
 		errs = append(errs, err)
 	}
 
-	if err := s.updateStatusOfPlacement(ctx, clusterManager.Name); err != nil {
+	if err := s.updateStatusOfPlacement(ctx, clusterManager.Name, clusterManagerNamespace); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -84,17 +86,17 @@ func (s *clusterManagerStatusController) sync(ctx context.Context, controllerCon
 }
 
 // updateStatusOfRegistration checks registration deployment status and updates condition of clustermanager
-func (s *clusterManagerStatusController) updateStatusOfRegistration(ctx context.Context, clusterManagerName string) error {
+func (s *clusterManagerStatusController) updateStatusOfRegistration(ctx context.Context, clusterManagerName, clusterManagerNamespace string) error {
 	// Check registration deployment status
 	registrationDeploymentName := fmt.Sprintf("%s-registration-controller", clusterManagerName)
-	registrationDeployment, err := s.deploymentLister.Deployments(helpers.ClusterManagerNamespace).Get(registrationDeploymentName)
+	registrationDeployment, err := s.deploymentLister.Deployments(clusterManagerNamespace).Get(registrationDeploymentName)
 	if err != nil {
 		_, _, err := helpers.UpdateClusterManagerStatus(ctx, s.clusterManagerClient, clusterManagerName,
 			helpers.UpdateClusterManagerConditionFn(metav1.Condition{
 				Type:    registrationDegraded,
 				Status:  metav1.ConditionTrue,
 				Reason:  "GetRegistrationDeploymentFailed",
-				Message: fmt.Sprintf("Failed to get registration deployment %q %q: %v", helpers.ClusterManagerNamespace, registrationDeploymentName, err),
+				Message: fmt.Sprintf("Failed to get registration deployment %q %q: %v", clusterManagerNamespace, registrationDeploymentName, err),
 			}),
 		)
 		return err
@@ -106,7 +108,7 @@ func (s *clusterManagerStatusController) updateStatusOfRegistration(ctx context.
 				Type:    registrationDegraded,
 				Status:  metav1.ConditionTrue,
 				Reason:  "UnavailableRegistrationPod",
-				Message: fmt.Sprintf("%v of requested instances are unavailable of registration deployment %q %q", unavailablePod, helpers.ClusterManagerNamespace, registrationDeploymentName),
+				Message: fmt.Sprintf("%v of requested instances are unavailable of registration deployment %q %q", unavailablePod, clusterManagerNamespace, registrationDeploymentName),
 			}),
 		)
 		return err
@@ -124,17 +126,17 @@ func (s *clusterManagerStatusController) updateStatusOfRegistration(ctx context.
 }
 
 // updateStatusOfRegistration checks placement deployment status and updates condition of clustermanager
-func (s *clusterManagerStatusController) updateStatusOfPlacement(ctx context.Context, clusterManagerName string) error {
+func (s *clusterManagerStatusController) updateStatusOfPlacement(ctx context.Context, clusterManagerName, clusterManagerNamespace string) error {
 	// Check registration deployment status
 	placementDeploymentName := fmt.Sprintf("%s-placement-controller", clusterManagerName)
-	placementDeployment, err := s.deploymentLister.Deployments(helpers.ClusterManagerNamespace).Get(placementDeploymentName)
+	placementDeployment, err := s.deploymentLister.Deployments(clusterManagerNamespace).Get(placementDeploymentName)
 	if err != nil {
 		_, _, err := helpers.UpdateClusterManagerStatus(ctx, s.clusterManagerClient, clusterManagerName,
 			helpers.UpdateClusterManagerConditionFn(metav1.Condition{
 				Type:    placementDegraded,
 				Status:  metav1.ConditionTrue,
 				Reason:  "GetPlacementDeploymentFailed",
-				Message: fmt.Sprintf("Failed to get placement deployment %q %q: %v", helpers.ClusterManagerNamespace, placementDeploymentName, err),
+				Message: fmt.Sprintf("Failed to get placement deployment %q %q: %v", clusterManagerNamespace, placementDeploymentName, err),
 			}),
 		)
 		return err
@@ -146,7 +148,7 @@ func (s *clusterManagerStatusController) updateStatusOfPlacement(ctx context.Con
 				Type:    placementDegraded,
 				Status:  metav1.ConditionTrue,
 				Reason:  "UnavailablePlacementPod",
-				Message: fmt.Sprintf("%v of requested instances are unavailable of placement deployment %q %q", unavailablePod, helpers.ClusterManagerNamespace, placementDeploymentName),
+				Message: fmt.Sprintf("%v of requested instances are unavailable of placement deployment %q %q", unavailablePod, clusterManagerNamespace, placementDeploymentName),
 			}),
 		)
 		return err

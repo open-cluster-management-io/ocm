@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"fmt"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -11,9 +12,12 @@ import (
 
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	v1 "open-cluster-management.io/api/operator/v1"
 )
 
 const (
+	// ClusterManagerDefaultNamespace is the default namespace of clustermanager
+	ClusterManagerDefaultNamespace = "open-cluster-management-hub"
 	// KlusterletDefaultNamespace is the default namespace of klusterlet
 	KlusterletDefaultNamespace = "open-cluster-management-agent"
 	// BootstrapHubKubeConfig is the secret name of bootstrap kubeconfig secret to connect to hub
@@ -29,14 +33,19 @@ const (
 	// ExternalManagedKubeConfigWork is the secret name of kubeconfig secret to connecting to the managed cluster
 	// Only applicable to Detached mode, work-agent uses it to connect to the managed cluster.
 	ExternalManagedKubeConfigWork = "external-managed-kubeconfig-work"
-	// ClusterManagerNamespace is the namespace to deploy cluster manager components
-	ClusterManagerNamespace = "open-cluster-management-hub"
 
 	RegistrationWebhookSecret  = "registration-webhook-serving-cert"
 	RegistrationWebhookService = "cluster-manager-registration-webhook"
 	WorkWebhookSecret          = "work-webhook-serving-cert"
 	WorkWebhookService         = "cluster-manager-work-webhook"
 )
+
+func ClusterManagerNamespace(clustermanagername string, mode operatorapiv1.InstallMode) string {
+	if mode == operatorapiv1.InstallModeDetached {
+		return clustermanagername
+	}
+	return ClusterManagerDefaultNamespace
+}
 
 func KlusterletSecretQueueKeyFunc(klusterletLister operatorlister.KlusterletLister) factory.ObjectQueueKeyFunc {
 	return func(obj runtime.Object) string {
@@ -93,13 +102,14 @@ func KlusterletDeploymentQueueKeyFunc(klusterletLister operatorlister.Klusterlet
 func ClusterManagerDeploymentQueueKeyFunc(clusterManagerLister operatorlister.ClusterManagerLister) factory.ObjectQueueKeyFunc {
 	return func(obj runtime.Object) string {
 		accessor, _ := meta.Accessor(obj)
-		namespace := accessor.GetNamespace()
 		name := accessor.GetName()
+		namespace := accessor.GetNamespace()
 		interestedObjectFound := false
-		if namespace != ClusterManagerNamespace {
-			return ""
-		}
-		if strings.HasSuffix(name, "registration-controller") || strings.HasSuffix(name, "work-controller") || strings.HasSuffix(name, "placement-controller") {
+
+		if strings.HasSuffix(name, "registration-controller") ||
+			strings.HasSuffix(name, "registration-webhook") ||
+			strings.HasSuffix(name, "work-webhook") ||
+			strings.HasSuffix(name, "placement-controller") {
 			interestedObjectFound = true
 		}
 		if !interestedObjectFound {
@@ -111,26 +121,39 @@ func ClusterManagerDeploymentQueueKeyFunc(clusterManagerLister operatorlister.Cl
 			return ""
 		}
 
-		for _, clustermanager := range clustermanagers {
-			return clustermanager.Name
+		clustermanager, err := FindClusterManagerByNamespace(namespace, clustermanagers)
+		if err != nil {
+			return ""
 		}
 
-		return ""
+		return clustermanager.Name
 	}
 }
 
+func ClusterManagerSecretQueueKeyFunc(clusterManagerLister operatorlister.ClusterManagerLister) factory.ObjectQueueKeyFunc {
+	return clusterManagerByNamespaceQueueKeyFunc(clusterManagerLister)
+}
+
 func ClusterManagerConfigmapQueueKeyFunc(clusterManagerLister operatorlister.ClusterManagerLister) factory.ObjectQueueKeyFunc {
+	return clusterManagerByNamespaceQueueKeyFunc(clusterManagerLister)
+}
+
+func clusterManagerByNamespaceQueueKeyFunc(clusterManagerLister operatorlister.ClusterManagerLister) factory.ObjectQueueKeyFunc {
 	return func(obj runtime.Object) string {
+		accessor, _ := meta.Accessor(obj)
+		namespace := accessor.GetNamespace()
+
 		clustermanagers, err := clusterManagerLister.List(labels.Everything())
 		if err != nil {
 			return ""
 		}
 
-		for _, clustermanager := range clustermanagers {
-			return clustermanager.Name
+		clustermanager, err := FindClusterManagerByNamespace(namespace, clustermanagers)
+		if err != nil {
+			return ""
 		}
 
-		return ""
+		return clustermanager.Name
 	}
 }
 
@@ -142,4 +165,14 @@ func FindKlusterletByNamespace(klusterlets []*operatorapiv1.Klusterlet, namespac
 		}
 	}
 	return nil
+}
+
+func FindClusterManagerByNamespace(namespace string, clusterManagers []*v1.ClusterManager) (*v1.ClusterManager, error) {
+	for i := range clusterManagers {
+		if clusterManagers[i].Name == namespace ||
+			(clusterManagers[i].Spec.DeployOption.Mode == operatorapiv1.InstallModeDefault && namespace == ClusterManagerDefaultNamespace) {
+			return clusterManagers[i], nil
+		}
+	}
+	return nil, fmt.Errorf("no match for namespace %s", namespace)
 }

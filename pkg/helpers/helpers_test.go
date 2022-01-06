@@ -716,13 +716,13 @@ func TestApplyDeployment(t *testing.T) {
 		{
 			name:                "Apply a deployment without nodePlacement",
 			deploymentName:      "cluster-manager-registration-controller",
-			deploymentNamespace: "open-cluster-management-hub",
+			deploymentNamespace: ClusterManagerDefaultNamespace,
 			expectErr:           false,
 		},
 		{
 			name:                "Apply a deployment with nodePlacement",
 			deploymentName:      "cluster-manager-registration-controller",
-			deploymentNamespace: "open-cluster-management-hub",
+			deploymentNamespace: ClusterManagerDefaultNamespace,
 			nodePlacement: operatorapiv1.NodePlacement{
 				NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
 				Tolerations: []corev1.Toleration{
@@ -767,29 +767,21 @@ func TestApplyDeployment(t *testing.T) {
 	}
 }
 
-type config struct {
-	ClusterManagerName             string
-	RegistrationImage              string
-	RegistrationAPIServiceCABundle string
-	WorkImage                      string
-	WorkAPIServiceCABundle         string
-	PlacementImage                 string
-	Replica                        int32
-}
-
 func TestGetRelatedResource(t *testing.T) {
 	cases := []struct {
 		name                    string
 		manifestFile            string
-		config                  config
+		config                  manifests.HubConfig
 		expectedErr             error
 		expectedRelatedResource operatorapiv1.RelatedResourceMeta
 	}{
 		{
 			name:         "get correct crd relatedResources",
 			manifestFile: "cluster-manager/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml",
-
-			config:      config{ClusterManagerName: "test", Replica: 1},
+			config: manifests.HubConfig{
+				ClusterManagerName: "test",
+				Replica:            1,
+			},
 			expectedErr: nil,
 			expectedRelatedResource: operatorapiv1.RelatedResourceMeta{
 				Group:     "apiextensions.k8s.io",
@@ -802,8 +794,11 @@ func TestGetRelatedResource(t *testing.T) {
 		{
 			name:         "get correct clusterrole relatedResources",
 			manifestFile: "cluster-manager/cluster-manager-registration-clusterrole.yaml",
-			config:       config{ClusterManagerName: "test", Replica: 1},
-			expectedErr:  nil,
+			config: manifests.HubConfig{
+				ClusterManagerName: "test",
+				Replica:            1,
+			},
+			expectedErr: nil,
 			expectedRelatedResource: operatorapiv1.RelatedResourceMeta{
 				Group:     "rbac.authorization.k8s.io",
 				Version:   "v1",
@@ -815,13 +810,17 @@ func TestGetRelatedResource(t *testing.T) {
 		{
 			name:         "get correct deployment relatedResources",
 			manifestFile: "cluster-manager/cluster-manager-registration-deployment.yaml",
-			config:       config{ClusterManagerName: "test", Replica: 1},
-			expectedErr:  nil,
+			config: manifests.HubConfig{
+				ClusterManagerName:      "test",
+				ClusterManagerNamespace: "test-namespace",
+				Replica:                 1,
+			},
+			expectedErr: nil,
 			expectedRelatedResource: operatorapiv1.RelatedResourceMeta{
 				Group:     "apps",
 				Version:   "v1",
 				Resource:  "deployments",
-				Namespace: "open-cluster-management-hub",
+				Namespace: "test-namespace",
 				Name:      "test-registration-controller",
 			},
 		},

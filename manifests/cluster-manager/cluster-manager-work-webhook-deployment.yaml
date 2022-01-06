@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .ClusterManagerName }}-work-webhook
-  namespace: open-cluster-management-hub
+  namespace: {{ .ClusterManagerNamespace }}
   labels:
     app: {{ .ClusterManagerName }}-work-webhook
 spec:

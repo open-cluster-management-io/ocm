@@ -2,10 +2,10 @@ package certrotationcontroller
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
+	"github.com/openshift/library-go/pkg/controller/factory"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,22 +18,27 @@ import (
 	fakeoperatorclient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
-	"open-cluster-management.io/registration-operator/pkg/certrotation"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
 	testinghelper "open-cluster-management.io/registration-operator/pkg/helpers/testing"
 )
 
-const testClusterManagerName = "testclustermanager"
+const (
+	testClusterManagerNameDefault  = "testclustermanager-default"
+	testClusterManagerNameDetached = "testclustermanager-detached"
+)
 
-var secretNames = []string{"signer-key-pair-secret", "serving-cert-key-pair-secret"}
+var secretNames = []string{signerSecret, helpers.RegistrationWebhookSecret, helpers.WorkWebhookSecret}
 
-func newClusterManager() *operatorapiv1.ClusterManager {
+func newClusterManager(name string, mode operatorapiv1.InstallMode) *operatorapiv1.ClusterManager {
 	return &operatorapiv1.ClusterManager{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: testClusterManagerName,
+			Name: name,
 		},
 		Spec: operatorapiv1.ClusterManagerSpec{
 			RegistrationImagePullSpec: "testregistration",
+			DeployOption: operatorapiv1.DeployOption{
+				Mode: mode,
+			},
 		},
 	}
 }
@@ -43,44 +48,98 @@ type validateFunc func(t *testing.T, kubeClient kubernetes.Interface, err error)
 func TestCertRotation(t *testing.T) {
 	cases := []struct {
 		name            string
-		clusterManager  *operatorapiv1.ClusterManager
+		clusterManagers []*operatorapiv1.ClusterManager
 		existingObjects []runtime.Object
+		queueKey        string
 		validate        validateFunc
 	}{
 		{
-			name: "no cluster manager",
+			name:     "Sync All clustermanagers when no clustermanager created yet",
+			queueKey: factory.DefaultQueueKey,
 			validate: func(t *testing.T, kubeClient kubernetes.Interface, err error) {
 				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
+					t.Fatalf("expected no error, but get %q", err)
 				}
-				assertNoSecretCreated(t, kubeClient)
+				secretList, err := kubeClient.CoreV1().Secrets("").List(context.Background(), metav1.ListOptions{})
+				if err != nil {
+					t.Fatalf("expected no error when list secret:%s", err)
+				}
+				if len(secretList.Items) > 0 {
+					t.Fatal("expected no secret created")
+				}
 			},
 		},
 		{
-			name:           "no namespace",
-			clusterManager: newClusterManager(),
+			name: "Sync one clustermanager when the namespace not created yet",
+			clusterManagers: []*operatorapiv1.ClusterManager{
+				newClusterManager(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault),
+			},
+			queueKey: testClusterManagerNameDefault,
 			validate: func(t *testing.T, kubeClient kubernetes.Interface, err error) {
 				if err == nil {
 					t.Fatalf("expected an error")
 				}
-				assertNoSecretCreated(t, kubeClient)
+				secretList, err := kubeClient.CoreV1().Secrets("").List(context.Background(), metav1.ListOptions{})
+				if err != nil {
+					t.Fatalf("expected no error when list secret:%s", err)
+				}
+				if len(secretList.Items) > 0 {
+					t.Fatal("expected no secret created")
+				}
 			},
 		},
 		{
-			name:           "rotate cert",
-			clusterManager: newClusterManager(),
+			name: "Sync one clustermanager when there are two clustermanager",
+			clusterManagers: []*operatorapiv1.ClusterManager{
+				newClusterManager(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault),
+				newClusterManager(testClusterManagerNameDetached, operatorapiv1.InstallModeDetached),
+			},
 			existingObjects: []runtime.Object{
 				&corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: helpers.ClusterManagerNamespace,
+						Name: helpers.ClusterManagerNamespace(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault),
+					},
+				},
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: helpers.ClusterManagerNamespace(testClusterManagerNameDetached, operatorapiv1.InstallModeDetached),
 					},
 				},
 			},
+			queueKey: testClusterManagerNameDefault,
 			validate: func(t *testing.T, kubeClient kubernetes.Interface, err error) {
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
-				assertSecretsExistAndValid(t, kubeClient)
+				assertResourcesExistAndValid(t, kubeClient, helpers.ClusterManagerNamespace(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault))
+				assertResourcesNotExist(t, kubeClient, helpers.ClusterManagerNamespace(testClusterManagerNameDetached, operatorapiv1.InstallModeDetached))
+			},
+		},
+		{
+			name: "Sync all clustermanagaers",
+			clusterManagers: []*operatorapiv1.ClusterManager{
+				newClusterManager(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault),
+				newClusterManager(testClusterManagerNameDetached, operatorapiv1.InstallModeDetached),
+			},
+			existingObjects: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: helpers.ClusterManagerNamespace(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault),
+					},
+				},
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: helpers.ClusterManagerNamespace(testClusterManagerNameDetached, operatorapiv1.InstallModeDetached),
+					},
+				},
+			},
+			queueKey: factory.DefaultQueueKey,
+			validate: func(t *testing.T, kubeClient kubernetes.Interface, err error) {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				assertResourcesExistAndValid(t, kubeClient, helpers.ClusterManagerNamespace(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault))
+				assertResourcesExistAndValid(t, kubeClient, helpers.ClusterManagerNamespace(testClusterManagerNameDetached, operatorapiv1.InstallModeDetached))
 			},
 		},
 	}
@@ -90,8 +149,8 @@ func TestCertRotation(t *testing.T) {
 			kubeClient := fakekube.NewSimpleClientset(c.existingObjects...)
 			kubeInformer := kubeinformers.NewSharedInformerFactory(kubeClient, 5*time.Minute)
 			clusterManagers := []runtime.Object{}
-			if c.clusterManager != nil {
-				clusterManagers = append(clusterManagers, c.clusterManager)
+			for i := range c.clusterManagers {
+				clusterManagers = append(clusterManagers, c.clusterManagers[i])
 			}
 			operatorClient := fakeoperatorclient.NewSimpleClientset(clusterManagers...)
 			operatorInformers := operatorinformers.NewSharedInformerFactory(operatorClient, 5*time.Minute)
@@ -100,72 +159,25 @@ func TestCertRotation(t *testing.T) {
 				clusterManagerStore.Add(clusterManager)
 			}
 
-			syncContext := testinghelper.NewFakeSyncContext(t, "")
+			syncContext := testinghelper.NewFakeSyncContext(t, c.queueKey)
 			recorder := syncContext.Recorder()
 
-			signingRotation := certrotation.SigningRotation{
-				Namespace:        helpers.ClusterManagerNamespace,
-				Name:             "signer-key-pair-secret",
-				SignerNamePrefix: "test-signer",
-				Validity:         time.Hour * 1,
-				Lister:           kubeInformer.Core().V1().Secrets().Lister(),
-				Client:           kubeClient.CoreV1(),
-				EventRecorder:    recorder,
-			}
+			controller := NewCertRotationController(kubeClient, kubeInformer.Core().V1().Secrets(), kubeInformer.Core().V1().ConfigMaps(), operatorInformers.Operator().V1().ClusterManagers(), recorder)
 
-			caBundleRotation := certrotation.CABundleRotation{
-				Namespace:     helpers.ClusterManagerNamespace,
-				Name:          "ca-bundle-configmap",
-				Lister:        kubeInformer.Core().V1().ConfigMaps().Lister(),
-				Client:        kubeClient.CoreV1(),
-				EventRecorder: recorder,
-			}
-			targetRotations := []certrotation.TargetRotation{
-				{
-					Namespace:     helpers.ClusterManagerNamespace,
-					Name:          "serving-cert-key-pair-secret",
-					Validity:      time.Minute * 30,
-					HostNames:     []string{fmt.Sprintf("service1.%s.svc", helpers.ClusterManagerNamespace)},
-					Lister:        kubeInformer.Core().V1().Secrets().Lister(),
-					Client:        kubeClient.CoreV1(),
-					EventRecorder: recorder,
-				},
-			}
-
-			controller := &certRotationController{
-				signingRotation:      signingRotation,
-				caBundleRotation:     caBundleRotation,
-				targetRotations:      targetRotations,
-				kubeClient:           kubeClient,
-				clusterManagerLister: operatorInformers.Operator().V1().ClusterManagers().Lister(),
-			}
-
-			err := controller.sync(context.TODO(), syncContext)
+			err := controller.Sync(context.TODO(), syncContext)
 			c.validate(t, kubeClient, err)
 		})
 	}
 }
 
-func assertNoSecretCreated(t *testing.T, kubeClient kubernetes.Interface) {
-	for _, name := range secretNames {
-		_, err := kubeClient.CoreV1().Secrets(helpers.ClusterManagerNamespace).Get(context.Background(), name, metav1.GetOptions{})
-		if err == nil {
-			t.Fatalf("unexpected secret %q", name)
-		}
-		if !errors.IsNotFound(err) {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	}
-}
-
-func assertSecretsExistAndValid(t *testing.T, kubeClient kubernetes.Interface) {
-	configmap, err := kubeClient.CoreV1().ConfigMaps(helpers.ClusterManagerNamespace).Get(context.Background(), "ca-bundle-configmap", metav1.GetOptions{})
+func assertResourcesExistAndValid(t *testing.T, kubeClient kubernetes.Interface, namespace string) {
+	configmap, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), "ca-bundle-configmap", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	for _, name := range secretNames {
-		secret, err := kubeClient.CoreV1().Secrets(helpers.ClusterManagerNamespace).Get(context.Background(), name, metav1.GetOptions{})
+		secret, err := kubeClient.CoreV1().Secrets(namespace).Get(context.Background(), name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			t.Fatalf("secret not found: %v", name)
 		}
@@ -216,6 +228,20 @@ func assertSecretsExistAndValid(t *testing.T, kubeClient kubernetes.Interface) {
 		}
 		if !found {
 			t.Fatalf("no issuer found: %s", name)
+		}
+	}
+}
+
+func assertResourcesNotExist(t *testing.T, kubeClient kubernetes.Interface, namespace string) {
+	_, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), "ca-bundle-configmap", metav1.GetOptions{})
+	if !errors.IsNotFound(err) {
+		t.Fatalf("expect configmap not found, but get err: %v", err)
+	}
+
+	for _, name := range secretNames {
+		_, err := kubeClient.CoreV1().Secrets(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		if !errors.IsNotFound(err) {
+			t.Fatalf("expect secret not found, but get err: %v", err)
 		}
 	}
 }

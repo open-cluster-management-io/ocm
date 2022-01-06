@@ -8,5 +8,5 @@ roleRef:
   name: open-cluster-management:{{ .ClusterManagerName }}-placement:controller
 subjects:
 - kind: ServiceAccount
-  namespace: open-cluster-management-hub
+  namespace: {{ .ClusterManagerNamespace }}
   name: {{ .ClusterManagerName }}-placement-controller-sa

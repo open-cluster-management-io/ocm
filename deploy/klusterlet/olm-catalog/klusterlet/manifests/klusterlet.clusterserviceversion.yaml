@@ -209,6 +209,13 @@ spec:
           verbs:
           - update
           - patch
+        - apiGroups:
+          - work.open-cluster-management.io
+          resources:
+          - appliedmanifestworks
+          verbs:
+          - list
+          - update
         serviceAccountName: klusterlet
       deployments:
       - name: klusterlet

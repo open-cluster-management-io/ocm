@@ -41,6 +41,9 @@ func newClusterManager(name string) *operatorapiv1.ClusterManager {
 		},
 		Spec: operatorapiv1.ClusterManagerSpec{
 			RegistrationImagePullSpec: "testregistration",
+			DeployOption: operatorapiv1.DeployOption{
+				Mode: operatorapiv1.InstallModeDefault,
+			},
 		},
 	}
 }
@@ -96,7 +99,7 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.Cl
 
 	switch o := object.(type) {
 	case *corev1.Namespace:
-		testinghelper.AssertEqualNameNamespace(t, access.GetName(), "", helpers.ClusterManagerNamespace, "")
+		testinghelper.AssertEqualNameNamespace(t, access.GetName(), "", helpers.ClusterManagerNamespace(hubCore.Name, hubCore.Spec.DeployOption.Mode), "")
 	case *appsv1.Deployment:
 		if strings.Contains(o.Name, "registration") && hubCore.Spec.RegistrationImagePullSpec != o.Spec.Template.Spec.Containers[0].Image {
 			t.Errorf("Registration image does not match to the expected.")
@@ -170,6 +173,7 @@ func TestSyncDelete(t *testing.T) {
 	clusterManager.ObjectMeta.SetDeletionTimestamp(&now)
 	controller := newTestController(clusterManager).withCRDObject().withKubeObject().withAPIServiceObject()
 	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
+	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.ClusterName, clusterManager.Spec.DeployOption.Mode)
 
 	err := controller.controller.sync(nil, syncContext)
 	if err != nil {
@@ -211,7 +215,7 @@ func TestSyncDelete(t *testing.T) {
 	for _, action := range deleteKubeActions {
 		switch action.Resource.Resource {
 		case "namespaces":
-			testinghelper.AssertEqualNameNamespace(t, action.Name, "", helpers.ClusterManagerNamespace, "")
+			testinghelper.AssertEqualNameNamespace(t, action.Name, "", clusterManagerNamespace, "")
 		}
 	}
 }

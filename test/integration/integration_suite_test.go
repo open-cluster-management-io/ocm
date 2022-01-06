@@ -35,18 +35,19 @@ func TestIntegration(t *testing.T) {
 }
 
 const (
-	eventuallyTimeout  = 30 // seconds
-	eventuallyInterval = 1  // seconds
-	hubNamespace       = "open-cluster-management-hub"
-	spokeNamespace     = "open-cluster-management-agent"
-	clusterManagerName = "hub"
+	eventuallyTimeout    = 30 // seconds
+	eventuallyInterval   = 1  // seconds
+	hubNamespace         = "open-cluster-management-hub"
+	spokeNamespace       = "open-cluster-management-agent"
+	clusterManagerName   = "hub"
+	hubNamespaceDetached = "hub"
 )
 
+// default mode
 var testEnv *envtest.Environment
 var kubeClient kubernetes.Interface
 var apiExtensionClient apiextensionsclient.Interface
 var restConfig *rest.Config
-
 var operatorClient operatorclient.Interface
 
 // detachedTestEnv, detachedKubeClient, detachedAPIExtensionClient and detachedRestConfig is using in Detached mode.
@@ -57,6 +58,7 @@ var (
 	detachedKubeClient         kubernetes.Interface
 	detachedAPIExtensionClient apiextensionsclient.Interface
 	detachedRestConfig         *rest.Config
+	detachedOperatorClient     operatorclient.Interface
 )
 
 var cancel context.CancelFunc
@@ -118,8 +120,12 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(apiExtensionClient).ToNot(gomega.BeNil())
 
+	detachedOperatorClient, err = operatorclient.NewForConfig(detachedConfig)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	gomega.Expect(operatorClient).ToNot(gomega.BeNil())
+
 	// prepare a ClusterManager
-	clusterManager := &operatorapiv1.ClusterManager{
+	_, err = operatorClient.OperatorV1().ClusterManagers().Create(context.Background(), &operatorapiv1.ClusterManager{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterManagerName,
 		},
@@ -131,8 +137,22 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 				Mode: operatorapiv1.InstallModeDefault,
 			},
 		},
-	}
-	_, err = operatorClient.OperatorV1().ClusterManagers().Create(context.Background(), clusterManager, metav1.CreateOptions{})
+	}, metav1.CreateOptions{})
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	_, err = detachedOperatorClient.OperatorV1().ClusterManagers().Create(context.Background(), &operatorapiv1.ClusterManager{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: clusterManagerName,
+		},
+		Spec: operatorapiv1.ClusterManagerSpec{
+			RegistrationImagePullSpec: "quay.io/open-cluster-management/registration",
+			WorkImagePullSpec:         "quay.io/open-cluster-management/work",
+			PlacementImagePullSpec:    "quay.io/open-cluster-management/placement",
+			DeployOption: operatorapiv1.DeployOption{
+				Mode: operatorapiv1.InstallModeDetached,
+			},
+		},
+	}, metav1.CreateOptions{})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	restConfig = cfg
@@ -149,7 +169,9 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 var _ = ginkgo.AfterSuite(func() {
 	ginkgo.By("tearing down the test environment")
 
-	err := testEnv.Stop()
+	var err error
+
+	err = testEnv.Stop()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	err = detachedTestEnv.Stop()

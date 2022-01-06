@@ -63,7 +63,7 @@ func NewTester(kubeconfigPath string) (*Tester, error) {
 	var tester = Tester{
 		EventuallyTimeout:                60 * time.Second, // seconds
 		EventuallyInterval:               1 * time.Second,  // seconds
-		clusterManagerNamespace:          helpers.ClusterManagerNamespace,
+		clusterManagerNamespace:          helpers.ClusterManagerDefaultNamespace,
 		klusterletDefaultNamespace:       helpers.KlusterletDefaultNamespace,
 		hubRegistrationDeployment:        "cluster-manager-registration-controller",
 		hubRegistrationWebhookDeployment: "cluster-manager-registration-webhook",
