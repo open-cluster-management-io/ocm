@@ -38,7 +38,8 @@ operatorsdk_gen_dir:=$(dir $(OPERATOR_SDK))
 OLM_NAMESPACE?=olm
 OLM_VERSION?=0.16.1
 
-KUSTOMIZE?=$(PERMANENT_TMP_GOPATH)/bin/kustomize
+PWD=$(shell pwd)
+KUSTOMIZE?=$(PWD)/$(PERMANENT_TMP_GOPATH)/bin/kustomize
 KUSTOMIZE_VERSION?=v3.5.4
 KUSTOMIZE_ARCHIVE_NAME?=kustomize_$(KUSTOMIZE_VERSION)_$(GOHOSTOS)_$(GOHOSTARCH).tar.gz
 kustomize_dir:=$(dir $(KUSTOMIZE))
@@ -46,6 +47,7 @@ kustomize_dir:=$(dir $(KUSTOMIZE))
 KUBECTL?=kubectl
 KUBECONFIG?=./.kubeconfig
 HUB_KUBECONFIG?=./.hub-kubeconfig
+EXTERNAL_MANAGED_KUBECONFIG?=./.external-managed-kubeconfig
 
 OPERATOR_SDK_ARCHOS:=x86_64-linux-gnu
 ifeq ($(GOHOSTOS),darwin)
@@ -90,8 +92,13 @@ deploy-hub: deploy-hub-operator apply-hub-cr hub-kubeconfig
 
 deploy-spoke: deploy-spoke-operator apply-spoke-cr
 
+deploy-spoke-detached: deploy-spoke-operator apply-spoke-cr-detached
+
 deploy-hub-operator: ensure-kustomize
+	cp deploy/cluster-manager/config/kustomization.yaml deploy/cluster-manager/config/kustomization.yaml.tmp
+	cd deploy/cluster-manager/config && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/registration-operator:latest=$(IMAGE_NAME)
 	$(KUSTOMIZE) build deploy/cluster-manager/config | $(KUBECTL) apply -f -
+	mv deploy/cluster-manager/config/kustomization.yaml.tmp deploy/cluster-manager/config/kustomization.yaml
 
 apply-hub-cr:
 	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/placement,$(PLACEMENT_IMAGE)," deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers.cr.yaml | $(KUBECTL) apply -f -
@@ -99,6 +106,8 @@ apply-hub-cr:
 clean-hub: clean-hub-cr clean-hub-operator
 
 clean-spoke: clean-spoke-cr clean-spoke-operator
+
+clean-spoke-detached: clean-spoke-cr-detached clean-spoke-operator
 
 cluster-ip:
 	$(eval HUB_CONTEXT := $(shell $(KUBECTL) config current-context --kubeconfig $(HUB_KUBECONFIG)))
@@ -110,11 +119,27 @@ bootstrap-secret:
 	$(KUBECTL) get ns open-cluster-management-agent; if [ $$? -ne 0 ] ; then $(KUBECTL) create ns open-cluster-management-agent; fi
 	$(KUSTOMIZE) build deploy/klusterlet/config/samples/bootstrap | $(KUBECTL) apply -f -
 
+bootstrap-secret-detached:
+	cp $(HUB_KUBECONFIG) deploy/klusterlet/config/samples/bootstrap/hub-kubeconfig
+	$(KUBECTL) get ns klusterlet; if [ $$? -ne 0 ] ; then $(KUBECTL) create ns klusterlet; fi
+	$(KUSTOMIZE) build deploy/klusterlet/config/samples/bootstrap | $(SED_CMD) -e "s,namespace: open-cluster-management-agent,namespace: klusterlet," | $(KUBECTL) apply -f -
+
+external-managed-secret:
+	cp $(EXTERNAL_MANAGED_KUBECONFIG) deploy/klusterlet/config/samples/managedcluster/external-managed-kubeconfig
+	$(KUBECTL) get ns klusterlet; if [ $$? -ne 0 ] ; then $(KUBECTL) create ns klusterlet; fi
+	$(KUSTOMIZE) build deploy/klusterlet/config/samples/managedcluster | $(KUBECTL) apply -f -
+
 deploy-spoke-operator: ensure-kustomize
+	cp deploy/klusterlet/config/kustomization.yaml deploy/klusterlet/config/kustomization.yaml.tmp
+	cd deploy/klusterlet/config && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/registration-operator:latest=$(IMAGE_NAME)
 	$(KUSTOMIZE) build deploy/klusterlet/config | $(KUBECTL) apply -f -
+	mv deploy/klusterlet/config/kustomization.yaml.tmp deploy/klusterlet/config/kustomization.yaml
 
 apply-spoke-cr: bootstrap-secret
 	$(KUSTOMIZE) build deploy/klusterlet/config/samples | $(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," | $(KUBECTL) apply -f -
+
+apply-spoke-cr-detached: bootstrap-secret-detached external-managed-secret
+	$(KUSTOMIZE) build deploy/klusterlet/config/samples | $(SED_CMD) -e "s,mode: Default,mode: Detached," -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," | $(KUBECTL) apply -f -
 
 clean-hub-cr:
 	$(KUBECTL) delete managedcluster --all --ignore-not-found
@@ -126,6 +151,11 @@ clean-hub-operator:
 clean-spoke-cr:
 	$(KUSTOMIZE) build deploy/klusterlet/config/samples | $(KUBECTL) delete --ignore-not-found -f -
 	$(KUSTOMIZE) build deploy/klusterlet/config/samples/bootstrap | $(KUBECTL) delete --ignore-not-found -f -
+
+clean-spoke-cr-detached:
+	$(KUSTOMIZE) build deploy/klusterlet/config/samples | $(KUBECTL) delete --ignore-not-found -f -
+	$(KUSTOMIZE) build deploy/klusterlet/config/samples/bootstrap | $(SED_CMD) -e "s,namespace: open-cluster-management-agent,namespace: klusterlet," | $(KUBECTL) delete --ignore-not-found -f -
+	$(KUSTOMIZE) build deploy/klusterlet/config/samples/managedcluster | $(KUBECTL) delete --ignore-not-found -f -
 
 clean-spoke-operator:
 	$(KUSTOMIZE) build deploy/klusterlet/config | $(KUBECTL) delete --ignore-not-found -f -

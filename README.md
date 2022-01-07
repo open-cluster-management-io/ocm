@@ -86,6 +86,49 @@ We mainly provide deployment in two scenarios:
    make clean-spoke
    ``` 
 
+### Deploy spoke(Klusterlet) with Detached mode
+
+We support deploy the Klusterlet(registration-agent, work-agent) outside of managed cluster, called `Detached` mode, and we define the cluster where the Klusterlet runs as management-cluster.
+
+1. Set env variables.
+   ```shell
+   export KUBECONFIG=$HOME/.kube/config
+   ```
+2. Switch to hub context and deploy hub components.
+   ```
+   kubectl config use-context {hub-context}
+   make deploy-hub
+   ```
+   **PLEASE NOTE**: If you're running kubernetes in docker, the `server` address in kubeconfig may not be accessible for other clusters. In this case, you need to set `HUB_KUBECONFIG` explicitly.
+
+   For example, if your clusters are created by kind, you need to use kind's command to export a kubeconfig of hub with an accessible `server` address. ([The related issue](https://github.com/kubernetes-sigs/kind/issues/1305))
+
+   ```shell
+   kind get kubeconfig --name {kind-hub-cluster-name} --internal > ./.hub-kubeconfig # ./.hub-kubeconfig is default value of HUB_KUBECONFIG
+   ```
+3. Switch to management context and deploy agent components on management cluster.
+    ```
+    kubectl config use-context {management-context}
+    make deploy-spoke-detached
+    ```
+
+   **PLEASE NOTE**: If you're running kubernetes in docker, the `server` address in kubeconfig may not be accessible for other clusters. In this case, you need to set `EXTERNAL_MANAGED_KUBECONFIG` explicitly.
+
+   For example, if your clusters are created by kind, you need to use kind's command to export a kubeconfig of managed/spoke cluster with an accessible `server` address. ([The related issue](https://github.com/kubernetes-sigs/kind/issues/1305))
+
+   ```shell
+   kind get kubeconfig --name {kind-managed-cluster-name} --internal > ./.external-managed-kubeconfig # ./.external-managed-kubeconfig is default value of EXTERNAL_MANAGED_KUBECONFIG, it is only useful in Detached mode.
+   ```
+4. To clean the hub environment.
+   ```shell
+   kubectl config use-context {hub-context}
+   make clean-hub
+   ```
+5. To clean the spoke environment.
+   ```shell
+   kubectl config use-context {management-context}
+   make clean-spoke-detached
+
 ## What is next
 
 After a successful deployment, a `certificatesigningrequest` and a `managedcluster` will

@@ -17,8 +17,7 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: Klusterlet defines the configurations of agents running on the
-        managed cluster
+    - description: Klusterlet defines the configurations of agents running on the managed cluster
       displayName: Klusterlet
       kind: Klusterlet
       name: klusterlets.operator.open-cluster-management.io
