@@ -17,12 +17,13 @@ import (
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
-	"open-cluster-management.io/registration-operator/pkg/operators"
+	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet"
 	"open-cluster-management.io/registration-operator/test/integration/util"
 )
 
 func startKlusterletOperator(ctx context.Context) {
-	err := operators.RunKlusterletOperator(ctx, &controllercmd.ControllerContext{
+	o := &klusterlet.Options{}
+	err := o.RunKlusterletOperator(ctx, &controllercmd.ControllerContext{
 		KubeConfig:    restConfig,
 		EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
 	})

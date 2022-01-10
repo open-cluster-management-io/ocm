@@ -92,6 +92,7 @@ type klusterletController struct {
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
 	kubeVersion               *version.Version
 	operatorNamespace         string
+	skipHubSecretPlaceholder  bool
 
 	// buildManagedClusterClientsDetachedMode build clients for manged cluster in detached mode, this can be override for testing
 	buildManagedClusterClientsDetachedMode func(ctx context.Context, kubeClient kubernetes.Interface, namespace, secret string) (*managedClusterClients, error)
@@ -108,7 +109,8 @@ func NewKlusterletController(
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
 	kubeVersion *version.Version,
 	operatorNamespace string,
-	recorder events.Recorder) factory.Controller {
+	recorder events.Recorder,
+	skipHubSecretPlaceholder bool) factory.Controller {
 	controller := &klusterletController{
 		kubeClient:                             kubeClient,
 		apiExtensionClient:                     apiExtensionClient,
@@ -118,6 +120,7 @@ func NewKlusterletController(
 		kubeVersion:                            kubeVersion,
 		operatorNamespace:                      operatorNamespace,
 		buildManagedClusterClientsDetachedMode: buildManagedClusterClientsFromSecret,
+		skipHubSecretPlaceholder:               skipHubSecretPlaceholder,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -373,6 +376,9 @@ func (n *klusterletController) ensureHubKubeconfigSecret(ctx context.Context, co
 				Namespace: config.KlusterletNamespace,
 			},
 			Data: map[string][]byte{"placeholder": []byte("placeholder")},
+		}
+		if n.skipHubSecretPlaceholder {
+			return hubSecret, nil
 		}
 		hubSecret, err = n.kubeClient.CoreV1().Secrets(config.KlusterletNamespace).Create(ctx, hubSecret, metav1.CreateOptions{})
 		if err != nil {

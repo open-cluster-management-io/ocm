@@ -1,18 +1,18 @@
-package operators
+package klusterlet
 
 import (
 	"context"
 	"io/ioutil"
 	"time"
 
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	migrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset"
-
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
@@ -31,7 +31,7 @@ import (
 const defaultComponentNamespace = "open-cluster-management"
 
 // RunClusterManagerOperator starts a new cluster manager operator
-func RunClusterManagerOperator(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	// Build kubclient client and informer for managed cluster
 	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
@@ -103,8 +103,12 @@ func RunClusterManagerOperator(ctx context.Context, controllerContext *controlle
 	return nil
 }
 
+type Options struct {
+	SkipPlaceholderHubSecret bool
+}
+
 // RunKlusterletOperator starts a new klusterlet operator
-func RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	// Build kube client and informer for managed cluster
 	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
@@ -154,7 +158,8 @@ func RunKlusterletOperator(ctx context.Context, controllerContext *controllercmd
 		workClient.WorkV1().AppliedManifestWorks(),
 		kubeVersion,
 		operatorNamespace,
-		controllerContext.EventRecorder)
+		controllerContext.EventRecorder,
+		o.SkipPlaceholderHubSecret)
 
 	ssarController := ssarcontroller.NewKlustrletSSARController(
 		kubeClient,

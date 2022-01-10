@@ -5,14 +5,16 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
-	"open-cluster-management.io/registration-operator/pkg/operators"
+	"open-cluster-management.io/registration-operator/pkg/operators/clustermanager"
 	"open-cluster-management.io/registration-operator/pkg/version"
 )
 
 // NewHubOperatorCmd generatee a command to start hub operator
 func NewHubOperatorCmd() *cobra.Command {
+
+	options := clustermanager.Options{}
 	cmd := controllercmd.
-		NewControllerCommandConfig("clustermanager", version.Get(), operators.RunClusterManagerOperator).
+		NewControllerCommandConfig("clustermanager", version.Get(), options.RunClusterManagerOperator).
 		NewCommand()
 	cmd.Use = "hub"
 	cmd.Short = "Start the cluster manager operator"

@@ -18,7 +18,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
 	"open-cluster-management.io/registration-operator/pkg/helpers"
-	"open-cluster-management.io/registration-operator/pkg/operators"
+	"open-cluster-management.io/registration-operator/pkg/operators/clustermanager"
 	certrotation "open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/certrotationcontroller"
 	"open-cluster-management.io/registration-operator/test/integration/util"
 )
@@ -36,7 +36,8 @@ func startHubOperator(ctx context.Context, mode v1.InstallMode) {
 		config = detachedRestConfig
 	}
 
-	err := operators.RunClusterManagerOperator(ctx, &controllercmd.ControllerContext{
+	o := &clustermanager.Options{}
+	err := o.RunClusterManagerOperator(ctx, &controllercmd.ControllerContext{
 		KubeConfig:    config,
 		EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
 	})
