@@ -35,6 +35,10 @@ type ManifestWorkSpec struct {
 	// Foreground deletion strategy is applied to all the resource in this manifestwork if it is not set.
 	// +optional
 	DeleteOption *DeleteOption `json:"deleteOption,omitempty"`
+
+	// ManifestConfigs represents the configurations of manifests defined in workload field.
+	// +optional
+	ManifestConfigs []ManifestConfigOption `json:"manifestConfigs,omitempty"`
 }
 
 // Manifest represents a resource to be deployed on managed cluster.
@@ -59,13 +63,80 @@ type DeleteOption struct {
 	// 1. create manifestwork/2 to manage foo
 	// 2. update manifestwork/1 to selectively orphan foo
 	// 3. remove foo from manifestwork/1 without impacting continuity because manifestwork/2 adopts it.
-	// +kubebuilder:default=ForeGround
+	// +kubebuilder:default=Foreground
 	PropagationPolicy DeletePropagationPolicyType `json:"propagationPolicy"`
 
 	// selectivelyOrphan represents a list of resources following orphan deletion stratecy
 	SelectivelyOrphan *SelectivelyOrphan `json:"selectivelyOrphans,omitempty"`
 }
 
+// ManifestConfigOption represents the configurations of a manifest defined in workload field.
+type ManifestConfigOption struct {
+	// ResourceIdentifier represents the group, resource, name and namespace of a resoure.
+	// iff this refers to a resource not created by this manifest work, the related rules will not be executed.
+	// +kubebuilder:validation:Required
+	// +required
+	ResourceIdentifier ResourceIdentifier `json:"resourceIdentifier"`
+
+	// FeedbackRules defines what resource status field should be returned.
+	// +kubebuilder:validation:Required
+	// +required
+	FeedbackRules []FeedbackRule `json:"feedbackRules"`
+}
+
+type FeedbackRule struct {
+	// Type defines the option of how status can be returned.
+	// It can be jsonPaths or wellKnownStatus.
+	// If the type is JSONPaths, user should specify the jsonPaths field
+	// If the type is WellKnownStatus, certain common fields of status defined by a rule only
+	// for types in in k8s.io/api and open-cluster-management/api will be reported,
+	// If these status fields do not exist, no values will be reported.
+	// +kubebuilder:validation:Required
+	// +required
+	Type FeedBackType `json:"type"`
+
+	// JsonPaths defines the json path under status field to be synced.
+	// +optional
+	JsonPaths []JsonPath `json:"jsonPaths,omitempty"`
+}
+
+// +kubebuilder:validation:Enum=WellKnownStatus;JSONPaths
+type FeedBackType string
+
+const (
+	// WellKnownStatusType represents that values of some common status fields will be returned, which
+	// is reflected with a hardcoded rule only for types in k8s.io/api and open-cluster-management/api.
+	WellKnownStatusType FeedBackType = "WellKnownStatus"
+
+	// JSONPathsType represents that values of status fields with certain json paths specified will be
+	// returned
+	JSONPathsType FeedBackType = "JSONPaths"
+)
+
+type JsonPath struct {
+	// Name represents the alias name for this field
+	// +kubebuilder:validation:Required
+	// +required
+	Name string `json:"name"`
+
+	// Version is the version of the Kubernetes resource.
+	// If it is not specified, the resource with the semantically latest version is
+	// used to resolve the path.
+	// +optional
+	Version string `json:"version,omitempty"`
+
+	// Path represents the json path of the field under status.
+	// The path must point to a field with single value in the type of integer, bool or string.
+	// If the path points to a non-existing field, no value will be returned.
+	// If the path points to a structure, map or slice, no value will be returned and the status conddition
+	// of StatusFeedBackSynced will be set as false.
+	// Ref to https://kubernetes.io/docs/reference/kubectl/jsonpath/ on how to write a jsonPath.
+	// +kubebuilder:validation:Required
+	// +required
+	Path string `json:"path"`
+}
+
+// +kubebuilder:validation:Enum=Foreground;Orphan;SelectivelyOrphan
 type DeletePropagationPolicyType string
 
 const (
@@ -88,21 +159,31 @@ type SelectivelyOrphan struct {
 	OrphaningRules []OrphaningRule `json:"orphaningRules,omitempty"`
 }
 
-// OrphaningRule identifies a single resource included in this manifestwork
-type OrphaningRule struct {
-	// Group is the api group of the resources in the workload that the strategy is applied
-	// +required
+// ResourceIdentifier identifies a single resource included in this manifestwork
+type ResourceIdentifier struct {
+	// Group is the API Group of the Kubernetes resource,
+	// empty string indicates it is in core group.
+	// +optional
 	Group string `json:"group"`
-	// Resource is the resources in the workload that the strategy is applied
+
+	// Resource is the resource name of the Kubernetes resource.
+	// +kubebuilder:validation:Required
 	// +required
 	Resource string `json:"resource"`
-	// Namespace is the namespaces of the resources in the workload that the strategy is applied
-	// +optional
-	Namespace string `json:"namespace"`
-	// Name is the names of the resources in the workload that the strategy is applied
+
+	// Name is the name of the Kubernetes resource.
+	// +kubebuilder:validation:Required
 	// +required
 	Name string `json:"name"`
+
+	// Name is the namespace of the Kubernetes resource, empty string indicates
+	// it is a cluster scoped resource.
+	// +optional
+	Namespace string `json:"namespace"`
 }
+
+// OrphaningRule identifies a single resource included in this manifestwork to be orphaned
+type OrphaningRule ResourceIdentifier
 
 // ManifestResourceMeta represents the group, version, kind, as well as the group, version, resource, name and namespace of a resoure.
 type ManifestResourceMeta struct {
@@ -138,26 +219,12 @@ type ManifestResourceMeta struct {
 // AppliedManifestResourceMeta represents the group, version, resource, name and namespace of a resource.
 // Since these resources have been created, they must have valid group, version, resource, namespace, and name.
 type AppliedManifestResourceMeta struct {
-	// Group is the API Group of the Kubernetes resource.
-	// +required
-	Group string `json:"group"`
+	ResourceIdentifier `json:",inline"`
 
 	// Version is the version of the Kubernetes resource.
+	// +kubebuilder:validation:Required
 	// +required
 	Version string `json:"version"`
-
-	// Resource is the resource name of the Kubernetes resource.
-	// +required
-	Resource string `json:"resource"`
-
-	// Name is the name of the Kubernetes resource.
-	// +required
-	Name string `json:"name"`
-
-	// Name is the namespace of the Kubernetes resource, empty string indicates
-	// it is a cluster scoped resource.
-	// +required
-	Namespace string `json:"namespace"`
 
 	// UID is set on successful deletion of the Kubernetes resource by controller. The
 	// resource might be still visible on the managed cluster after this field is set.
@@ -218,10 +285,67 @@ type ManifestCondition struct {
 	// +required
 	ResourceMeta ManifestResourceMeta `json:"resourceMeta"`
 
+	// StatusFeedback represents the values of the feild synced back defined in statusFeedbacks
+	// +optional
+	StatusFeedbacks StatusFeedbackResult `json:"statusFeedback,omitempty"`
+
 	// Conditions represents the conditions of this resource on a managed cluster.
 	// +required
 	Conditions []metav1.Condition `json:"conditions"`
 }
+
+// StatusFeedbackResult represents the values of the feild synced back defined in statusFeedbacks
+type StatusFeedbackResult struct {
+	// Values represents the synced value of the interested field.
+	// +listType:=map
+	// +listMapKey:=name
+	// +optional
+	Values []FeedbackValue `json:"values,omitempty"`
+}
+
+type FeedbackValue struct {
+	// Name represents the alias name for this field. It is the same as what is specified
+	// in StatuFeedbackRule in the spec.
+	// +kubebuilder:validation:Required
+	// +required
+	Name string `json:"name"`
+
+	// Value is the value of the status field.
+	// The value of the status field can only be integer, string or boolean.
+	// +kubebuilder:validation:Required
+	// +required
+	Value FieldValue `json:"fieldValue"`
+}
+
+// FieldValue is the value of the status field.
+// The value of the status field can only be integer, string or boolean.
+type FieldValue struct {
+	// Type represents the type of the value, it can be integer, string or boolean.
+	// +kubebuilder:validation:Required
+	// +required
+	Type ValueType `json:"type"`
+
+	// Integer is the integer value when type is integer.
+	// +optional
+	Integer *int64 `json:"integer,omitempty"`
+
+	// String is the string value when when type is string.
+	// +optional
+	String *string `json:"string,omitempty"`
+
+	// Boolean is bool value when type is boolean.
+	// +optional
+	Boolean *bool `json:"boolean,omitempty"`
+}
+
+// +kubebuilder:validation:Enum=Integer;String;Boolean
+type ValueType string
+
+const (
+	Integer ValueType = "Integer"
+	String  ValueType = "String"
+	Boolean ValueType = "Boolean"
+)
 
 // ManifestConditionType represents the condition type of a single
 // resource manifest deployed on the managed cluster.

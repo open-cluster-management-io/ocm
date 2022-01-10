@@ -63,7 +63,7 @@ spec:
                     description: URL is the url of apiserver endpoint of the managed cluster.
                     type: string
             namespace:
-              description: 'Namespace is the namespace to deploy the agent. The namespace must have a prefix of "open-cluster-management-", and if it is not set, the namespace of "open-cluster-management-agent" is used to deploy agent. Note: in Detach mode, this field will be **ignored**, the agent will be deployed to the namespace named <klusterlet''s name>-open-cluster-management-agent'
+              description: 'Namespace is the namespace to deploy the agent. The namespace must have a prefix of "open-cluster-management-", and if it is not set, the namespace of "open-cluster-management-agent" is used to deploy agent. Note: in Detach mode, this field will be **ignored**, the agent will be deployed to the namespace with the same name as klusterlet.'
               type: string
             nodePlacement:
               description: NodePlacement enables explicit control over the scheduling of the deployed pods.

@@ -71,6 +71,37 @@ spec:
                       url:
                         description: URL is the URL of apiserver endpoint of the managed cluster.
                         type: string
+                taints:
+                  description: Taints is a property of managed cluster that allow the cluster to be repelled when scheduling. Taints, including 'ManagedClusterUnavailable' and 'ManagedClusterUnreachable', can not be added/removed by agent running on the managed cluster; while it's fine to add/remove other taints from either hub cluser or managed cluster.
+                  type: array
+                  items:
+                    description: The managed cluster this Taint is attached to has the "effect" on any placement that does not tolerate the Taint.
+                    type: object
+                    required:
+                      - effect
+                      - key
+                    properties:
+                      effect:
+                        description: Effect indicates the effect of the taint on placements that do not tolerate the taint. Valid effects are NoSelect, PreferNoSelect and NoSelectIfNew.
+                        type: string
+                        enum:
+                          - NoSelect
+                          - PreferNoSelect
+                          - NoSelectIfNew
+                      key:
+                        description: Key is the taint key applied to a cluster. e.g. bar or foo.example.com/bar. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                        type: string
+                        maxLength: 316
+                        pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      timeAdded:
+                        description: TimeAdded represents the time at which the taint was added.
+                        type: string
+                        format: date-time
+                        nullable: true
+                      value:
+                        description: Value is the taint value corresponding to the taint key.
+                        type: string
+                        maxLength: 1024
             status:
               description: Status represents the current status of joined managed cluster
               type: object

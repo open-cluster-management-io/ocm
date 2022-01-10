@@ -37,7 +37,11 @@ spec:
                     propagationPolicy:
                       description: propagationPolicy can be Foreground, Orphan or SelectivelyOrphan SelectivelyOrphan should be rarely used.  It is provided for cases where particular resources is transfering ownership from one ManifestWork to another or another management unit. Setting this value will allow a flow like 1. create manifestwork/2 to manage foo 2. update manifestwork/1 to selectively orphan foo 3. remove foo from manifestwork/1 without impacting continuity because manifestwork/2 adopts it.
                       type: string
-                      default: ForeGround
+                      default: Foreground
+                      enum:
+                        - Foreground
+                        - Orphan
+                        - SelectivelyOrphan
                     selectivelyOrphans:
                       description: selectivelyOrphan represents a list of resources following orphan deletion stratecy
                       type: object
@@ -46,21 +50,85 @@ spec:
                           description: orphaningRules defines a slice of orphaningrule. Each orphaningrule identifies a single resource included in this manifestwork
                           type: array
                           items:
-                            description: OrphaningRule identifies a single resource included in this manifestwork
+                            description: OrphaningRule identifies a single resource included in this manifestwork to be orphaned
                             type: object
+                            required:
+                              - name
+                              - resource
                             properties:
                               group:
-                                description: Group is the api group of the resources in the workload that the strategy is applied
+                                description: Group is the API Group of the Kubernetes resource, empty string indicates it is in core group.
                                 type: string
                               name:
-                                description: Name is the names of the resources in the workload that the strategy is applied
+                                description: Name is the name of the Kubernetes resource.
                                 type: string
                               namespace:
-                                description: Namespace is the namespaces of the resources in the workload that the strategy is applied
+                                description: Name is the namespace of the Kubernetes resource, empty string indicates it is a cluster scoped resource.
                                 type: string
                               resource:
-                                description: Resource is the resources in the workload that the strategy is applied
+                                description: Resource is the resource name of the Kubernetes resource.
                                 type: string
+                manifestConfigs:
+                  description: ManifestConfigs represents the configurations of manifests defined in workload field.
+                  type: array
+                  items:
+                    description: ManifestConfigOption represents the configurations of a manifest defined in workload field.
+                    type: object
+                    required:
+                      - feedbackRules
+                      - resourceIdentifier
+                    properties:
+                      feedbackRules:
+                        description: FeedbackRules defines what resource status field should be returned.
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - type
+                          properties:
+                            jsonPaths:
+                              description: JsonPaths defines the json path under status field to be synced.
+                              type: array
+                              items:
+                                type: object
+                                required:
+                                  - name
+                                  - path
+                                properties:
+                                  name:
+                                    description: Name represents the alias name for this field
+                                    type: string
+                                  path:
+                                    description: Path represents the json path of the field under status. The path must point to a field with single value in the type of integer, bool or string. If the path points to a non-existing field, no value will be returned. If the path points to a structure, map or slice, no value will be returned and the status conddition of StatusFeedBackSynced will be set as false. Ref to https://kubernetes.io/docs/reference/kubectl/jsonpath/ on how to write a jsonPath.
+                                    type: string
+                                  version:
+                                    description: Version is the version of the Kubernetes resource. If it is not specified, the resource with the semantically latest version is used to resolve the path.
+                                    type: string
+                            type:
+                              description: Type defines the option of how status can be returned. It can be jsonPaths or wellKnownStatus. If the type is JSONPaths, user should specify the jsonPaths field If the type is WellKnownStatus, certain common fields of status defined by a rule only for types in in k8s.io/api and open-cluster-management/api will be reported, If these status fields do not exist, no values will be reported.
+                              type: string
+                              enum:
+                                - WellKnownStatus
+                                - JSONPaths
+                      resourceIdentifier:
+                        description: ResourceIdentifier represents the group, resource, name and namespace of a resoure. iff this refers to a resource not created by this manifest work, the related rules will not be executed.
+                        type: object
+                        required:
+                          - name
+                          - resource
+                        properties:
+                          group:
+                            description: Group is the API Group of the Kubernetes resource, empty string indicates it is in core group.
+                            type: string
+                          name:
+                            description: Name is the name of the Kubernetes resource.
+                            type: string
+                          namespace:
+                            description: Name is the namespace of the Kubernetes resource, empty string indicates it is a cluster scoped resource.
+                            type: string
+                          resource:
+                            description: Resource is the resource name of the Kubernetes resource.
+                            type: string
                 workload:
                   description: Workload represents the manifest workload to be deployed on a managed cluster.
                   type: object
@@ -202,6 +270,48 @@ spec:
                               version:
                                 description: Version is the version of the Kubernetes resource.
                                 type: string
+                          statusFeedback:
+                            description: StatusFeedback represents the values of the feild synced back defined in statusFeedbacks
+                            type: object
+                            properties:
+                              values:
+                                description: Values represents the synced value of the interested field.
+                                type: array
+                                items:
+                                  type: object
+                                  required:
+                                    - fieldValue
+                                    - name
+                                  properties:
+                                    fieldValue:
+                                      description: Value is the value of the status field. The value of the status field can only be integer, string or boolean.
+                                      type: object
+                                      required:
+                                        - type
+                                      properties:
+                                        boolean:
+                                          description: Boolean is bool value when type is boolean.
+                                          type: boolean
+                                        integer:
+                                          description: Integer is the integer value when type is integer.
+                                          type: integer
+                                          format: int64
+                                        string:
+                                          description: String is the string value when when type is string.
+                                          type: string
+                                        type:
+                                          description: Type represents the type of the value, it can be integer, string or boolean.
+                                          type: string
+                                          enum:
+                                            - Integer
+                                            - String
+                                            - Boolean
+                                    name:
+                                      description: Name represents the alias name for this field. It is the same as what is specified in StatuFeedbackRule in the spec.
+                                      type: string
+                                x-kubernetes-list-map-keys:
+                                  - name
+                                x-kubernetes-list-type: map
       served: true
       storage: true
       subresources:

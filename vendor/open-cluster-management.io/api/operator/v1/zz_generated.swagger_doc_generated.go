@@ -12,7 +12,7 @@ package v1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_ClusterManager = map[string]string{
-	"":       "ClusterManager configures the controllers on the hub that govern registration and work distribution for attached Klusterlets. In Default mode, ClusterManager will only be deployed in open-cluster-management-hub namespace. In Detached mode, ClusterManager will be deployed in <cluster-manager's name>-open-cluster-management-hub namespace.",
+	"":       "ClusterManager configures the controllers on the hub that govern registration and work distribution for attached Klusterlets. In Default mode, ClusterManager will only be deployed in open-cluster-management-hub namespace. In Detached mode, ClusterManager will be deployed in the namespace with the same name as cluster manager.",
 	"spec":   "Spec represents a desired deployment configuration of controllers that govern registration and work distribution for attached Klusterlets.",
 	"status": "Status represents the current status of controllers that govern the lifecycle of managed clusters.",
 }
@@ -101,7 +101,7 @@ func (KlusterletList) SwaggerDoc() map[string]string {
 
 var map_KlusterletSpec = map[string]string{
 	"":                          "KlusterletSpec represents the desired deployment configuration of Klusterlet agent.",
-	"namespace":                 "Namespace is the namespace to deploy the agent. The namespace must have a prefix of \"open-cluster-management-\", and if it is not set, the namespace of \"open-cluster-management-agent\" is used to deploy agent. Note: in Detach mode, this field will be **ignored**, the agent will be deployed to the namespace named <klusterlet's name>-open-cluster-management-agent",
+	"namespace":                 "Namespace is the namespace to deploy the agent. The namespace must have a prefix of \"open-cluster-management-\", and if it is not set, the namespace of \"open-cluster-management-agent\" is used to deploy agent. Note: in Detach mode, this field will be **ignored**, the agent will be deployed to the namespace with the same name as klusterlet.",
 	"registrationImagePullSpec": "RegistrationImagePullSpec represents the desired image configuration of registration agent.",
 	"workImagePullSpec":         "WorkImagePullSpec represents the desired image configuration of work agent.",
 	"clusterName":               "ClusterName is the name of the managed cluster to be created on hub. The Klusterlet agent generates a random name if it is not set, or discovers the appropriate cluster name on OpenShift.",

@@ -112,6 +112,11 @@ type ManagedClusterAddOnStatus struct {
 	// key/cert and kubeconfig. Otherwise, the secret name will be "{addon name}-{signer name}-client-cert" whose contents includes key/cert.
 	// +optional
 	Registrations []RegistrationConfig `json:"registrations,omitempty"`
+
+	// healthCheck indicates how to check the healthiness status of the current addon. It should be
+	// set by each addon implementation, by default, the lease mode will be used.
+	// +optional
+	HealthCheck HealthCheck `json:"healthCheck,omitempty"`
 }
 
 const (
@@ -140,6 +145,27 @@ type ObjectReference struct {
 	// +kubebuilder:validation:Required
 	// +required
 	Name string `json:"name"`
+}
+
+// HealthCheckMode indicates the mode for the addon to check its healthiness status
+// +kubebuilder:validation:Enum=Lease;Customized
+type HealthCheckMode string
+
+const (
+	// HealthCheckModeLease, the addon maintains a lease in its installation namespace with
+	// its status, the registration agent will check this lease to maintain the addon healthiness
+	// status.
+	HealthCheckModeLease HealthCheckMode = "Lease"
+
+	// HealthCheckModeCustomized, the addon maintains its healthiness status by itself.
+	HealthCheckModeCustomized HealthCheckMode = "Customized"
+)
+
+type HealthCheck struct {
+	// mode indicates which mode will be used to check the healthiness status of the addon.
+	// +optional
+	// +kubebuilder:default=Lease
+	Mode HealthCheckMode `json:"mode,omitempty"`
 }
 
 // ManagedClusterAddOnList is a list of ManagedClusterAddOn resources.

@@ -13,7 +13,7 @@ import (
 
 // ClusterManager configures the controllers on the hub that govern registration and work distribution for attached Klusterlets.
 // In Default mode, ClusterManager will only be deployed in open-cluster-management-hub namespace.
-// In Detached mode, ClusterManager will be deployed in <cluster-manager's name>-open-cluster-management-hub namespace.
+// In Detached mode, ClusterManager will be deployed in the namespace with the same name as cluster manager.
 type ClusterManager struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -206,7 +206,7 @@ type KlusterletSpec struct {
 	// The namespace must have a prefix of "open-cluster-management-", and if it is not set,
 	// the namespace of "open-cluster-management-agent" is used to deploy agent.
 	// Note: in Detach mode, this field will be **ignored**, the agent will be deployed to the
-	// namespace named <klusterlet's name>-open-cluster-management-agent
+	// namespace with the same name as klusterlet.
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 

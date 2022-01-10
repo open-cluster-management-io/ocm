@@ -46,9 +46,13 @@ spec:
                   items:
                     description: AppliedManifestResourceMeta represents the group, version, resource, name and namespace of a resource. Since these resources have been created, they must have valid group, version, resource, namespace, and name.
                     type: object
+                    required:
+                      - name
+                      - resource
+                      - version
                     properties:
                       group:
-                        description: Group is the API Group of the Kubernetes resource.
+                        description: Group is the API Group of the Kubernetes resource, empty string indicates it is in core group.
                         type: string
                       name:
                         description: Name is the name of the Kubernetes resource.
