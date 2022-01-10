@@ -83,7 +83,7 @@ func (k *bootstrapController) sync(ctx context.Context, controllerContext factor
 		}
 
 		for _, klusterlet := range klusterlets {
-			namespace := helpers.KlusterletNamespace(klusterlet.Spec.DeployOption.Mode, klusterletName, klusterlet.Spec.Namespace)
+			namespace := helpers.KlusterletNamespace(klusterlet)
 			// enqueue the klusterlet to reconcile
 			controllerContext.Queue().Add(fmt.Sprintf("%s/%s", namespace, klusterlet.Name))
 		}

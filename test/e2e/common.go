@@ -169,7 +169,7 @@ func (t *Tester) CreateKlusterlet(name, clusterName, agentNamespace string, mode
 		},
 	}
 
-	agentNamespace = helpers.KlusterletNamespace(klusterlet.Spec.DeployOption.Mode, klusterlet.Name, klusterlet.Spec.Namespace)
+	agentNamespace = helpers.KlusterletNamespace(klusterlet)
 	klog.Infof("klusterlet: %s/%s, \t mode: %v, \t agent namespace: %s", klusterlet.Name, klusterlet.Namespace, mode, agentNamespace)
 
 	// create agentNamespace

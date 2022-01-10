@@ -44,8 +44,6 @@ const (
 	klusterletApplied            = "Applied"
 	klusterletReadyToApply       = "ReadyToApply"
 	appliedManifestWorkFinalizer = "cluster.open-cluster-management.io/applied-manifest-work-cleanup"
-	defaultReplica               = 3
-	singleReplica                = 1
 )
 
 var (
@@ -191,7 +189,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 	config := klusterletConfig{
 		KlusterletName:            klusterlet.Name,
-		KlusterletNamespace:       helpers.KlusterletNamespace(klusterlet.Spec.DeployOption.Mode, klusterletName, klusterlet.Spec.Namespace),
+		KlusterletNamespace:       helpers.KlusterletNamespace(klusterlet),
 		RegistrationImage:         klusterlet.Spec.RegistrationImagePullSpec,
 		WorkImage:                 klusterlet.Spec.WorkImagePullSpec,
 		ClusterName:               klusterlet.Spec.ClusterName,

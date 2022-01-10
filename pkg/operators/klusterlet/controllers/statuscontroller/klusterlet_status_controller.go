@@ -68,7 +68,7 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 	}
 	klusterlet = klusterlet.DeepCopy()
 
-	klusterletNS := helpers.KlusterletNamespace(klusterlet.Spec.DeployOption.Mode, klusterletName, klusterlet.Spec.Namespace)
+	klusterletNS := helpers.KlusterletNamespace(klusterlet)
 	registrationDeploymentName := fmt.Sprintf("%s-registration-agent", klusterlet.Name)
 	workDeploymentName := fmt.Sprintf("%s-work-agent", klusterlet.Name)
 

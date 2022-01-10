@@ -181,7 +181,7 @@ func newTestControllerDetached(klusterlet *opratorapiv1.Klusterlet, appliedManif
 	operatorInformers := operatorinformers.NewSharedInformerFactory(fakeOperatorClient, 5*time.Minute)
 	kubeVersion, _ := version.ParseGeneric("v1.18.0")
 
-	installedNamespace := helpers.KlusterletNamespace(klusterlet.Spec.DeployOption.Mode, klusterlet.Name, klusterlet.Spec.Namespace)
+	installedNamespace := helpers.KlusterletNamespace(klusterlet)
 	saRegistrationSecret := newServiceAccountSecret(fmt.Sprintf("%s-token", registrationServiceAccountName(klusterlet.Name)), klusterlet.Name)
 	saWorkSecret := newServiceAccountSecret(fmt.Sprintf("%s-token", workServiceAccountName(klusterlet.Name)), klusterlet.Name)
 	fakeManagedKubeClient := fakekube.NewSimpleClientset()
@@ -362,7 +362,7 @@ func ensureObject(t *testing.T, object runtime.Object, klusterlet *opratorapiv1.
 		t.Errorf("Unable to access objectmeta: %v", err)
 	}
 
-	namespace := helpers.KlusterletNamespace(klusterlet.Spec.DeployOption.Mode, klusterlet.Name, klusterlet.Spec.Namespace)
+	namespace := helpers.KlusterletNamespace(klusterlet)
 	switch o := object.(type) {
 	case *appsv1.Deployment:
 		if strings.Contains(access.GetName(), "registration") {
@@ -612,7 +612,7 @@ func TestSyncDeleteDetached(t *testing.T) {
 	klusterlet := newKlusterletDetached("klusterlet", "testns", "cluster1")
 	now := metav1.Now()
 	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
-	installedNamespace := helpers.KlusterletNamespace(klusterlet.Spec.DeployOption.Mode, klusterlet.Name, klusterlet.Spec.Namespace)
+	installedNamespace := helpers.KlusterletNamespace(klusterlet)
 	bootstrapKubeConfigSecret := newSecret(helpers.BootstrapHubKubeConfig, installedNamespace)
 	bootstrapKubeConfigSecret.Data["kubeconfig"] = newKubeConfig("testhost")
 	// externalManagedSecret := newSecret(helpers.ExternalManagedKubeConfig, installedNamespace)

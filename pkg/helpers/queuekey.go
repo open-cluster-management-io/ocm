@@ -159,7 +159,7 @@ func clusterManagerByNamespaceQueueKeyFunc(clusterManagerLister operatorlister.C
 
 func FindKlusterletByNamespace(klusterlets []*operatorapiv1.Klusterlet, namespace string) *operatorapiv1.Klusterlet {
 	for _, klusterlet := range klusterlets {
-		klusterletNS := KlusterletNamespace(klusterlet.Spec.DeployOption.Mode, klusterlet.Name, klusterlet.Spec.Namespace)
+		klusterletNS := KlusterletNamespace(klusterlet)
 		if namespace == klusterletNS {
 			return klusterlet
 		}

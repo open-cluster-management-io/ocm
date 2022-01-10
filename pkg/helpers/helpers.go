@@ -603,17 +603,17 @@ func UpdateKlusterletRelatedResourcesFn(relatedResources ...operatorapiv1.Relate
 
 // KlusterletNamespace returns the klusterletNamespace to deploy the agents.
 // Note in Detached mode, the specNamespace will be ignored.
-func KlusterletNamespace(mode operatorapiv1.InstallMode, klusterletName, specNamespace string) string {
-	if mode == operatorapiv1.InstallModeDetached {
-		return klusterletName
+func KlusterletNamespace(klusterlet *operatorapiv1.Klusterlet) string {
+	if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeDetached {
+		return klusterlet.GetName()
 	}
 
-	if len(specNamespace) == 0 {
+	if len(klusterlet.Spec.Namespace) == 0 {
 		// If namespace is not set, use the default namespace
 		return KlusterletDefaultNamespace
 	}
 
-	return specNamespace
+	return klusterlet.Spec.Namespace
 }
 
 // SyncSecret forked from https://github.com/openshift/library-go/blob/d9cdfbd844ea08465b938c46a16bed2ea23207e4/pkg/operator/resource/resourceapply/core.go#L357,

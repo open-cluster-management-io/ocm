@@ -44,7 +44,6 @@ type klusterletLocker struct {
 }
 
 const (
-	klusterletNamespace     = "open-cluster-management-agent"
 	bootstrapSecret         = "BootstrapSecret"
 	bootstrapSecretDegraded = "BootstrapSecretDegraded"
 	hubConfigSecret         = "HubConfigSecret"
@@ -123,10 +122,7 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 		defer c.deleteSSARChecking(klusterletName)
 
 		klog.V(4).Infof("Reconciling Klusterlet %q", klusterletName)
-		klusterletNS := klusterlet.Spec.Namespace
-		if klusterletNS == "" {
-			klusterletNS = klusterletNamespace
-		}
+		klusterletNS := helpers.KlusterletNamespace(klusterlet)
 
 		hubConfigDegradedCondition := checkAgentDegradedCondition(
 			ctx, c.kubeClient,

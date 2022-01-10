@@ -930,43 +930,65 @@ func TestUpdateRelatedResources(t *testing.T) {
 
 func TestKlusterletNamespace(t *testing.T) {
 	testcases := []struct {
-		name           string
-		klusterletName string
-		specNamespace  string
-		mode           operatorapiv1.InstallMode
-		expect         string
+		name       string
+		klusterlet *operatorapiv1.Klusterlet
+		expect     string
 	}{
 		{
-			name:          "Default mode without spec namespace",
-			specNamespace: "",
-			mode:          "",
-			expect:        KlusterletDefaultNamespace,
+			name: "Default mode without spec namespace",
+			klusterlet: &operatorapiv1.Klusterlet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "klusterlet",
+				},
+				Spec: operatorapiv1.KlusterletSpec{
+					Namespace:    "",
+					DeployOption: operatorapiv1.DeployOption{},
+				}},
+			expect: KlusterletDefaultNamespace,
 		},
 		{
-			name:          "Default mode with spec namespace",
-			specNamespace: "open-cluster-management-test",
-			mode:          "",
-			expect:        "open-cluster-management-test",
+			name: "Default mode with spec namespace",
+			klusterlet: &operatorapiv1.Klusterlet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "klusterlet",
+				},
+				Spec: operatorapiv1.KlusterletSpec{
+					Namespace:    "open-cluster-management-test",
+					DeployOption: operatorapiv1.DeployOption{},
+				}},
+			expect: "open-cluster-management-test",
 		},
 		{
-			name:           "Detached mode with spec namespace",
-			klusterletName: "klusterlet",
-			specNamespace:  "open-cluster-management-test",
-			mode:           operatorapiv1.InstallModeDetached,
-			expect:         "klusterlet",
+			name: "Detached mode with spec namespace",
+			klusterlet: &operatorapiv1.Klusterlet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "klusterlet",
+				},
+				Spec: operatorapiv1.KlusterletSpec{
+					Namespace:    "open-cluster-management-test",
+					DeployOption: operatorapiv1.DeployOption{Mode: operatorapiv1.InstallModeDetached},
+				},
+			},
+			expect: "klusterlet",
 		},
 		{
-			name:           "Detached mode without spec namespace",
-			klusterletName: "klusterlet",
-			specNamespace:  "",
-			mode:           operatorapiv1.InstallModeDetached,
-			expect:         "klusterlet",
+			name: "Detached mode without spec namespace",
+			klusterlet: &operatorapiv1.Klusterlet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "klusterlet",
+				},
+				Spec: operatorapiv1.KlusterletSpec{
+					Namespace:    "",
+					DeployOption: operatorapiv1.DeployOption{Mode: operatorapiv1.InstallModeDetached},
+				},
+			},
+			expect: "klusterlet",
 		},
 	}
 
 	for _, c := range testcases {
 		t.Run(c.name, func(t *testing.T) {
-			namespace := KlusterletNamespace(c.mode, c.klusterletName, c.specNamespace)
+			namespace := KlusterletNamespace(c.klusterlet)
 			if namespace != c.expect {
 				t.Errorf("Expect namespace %v, got %v", c.expect, namespace)
 			}

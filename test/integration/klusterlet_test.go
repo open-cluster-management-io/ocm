@@ -818,8 +818,26 @@ var _ = ginkgo.Describe("Klusterlet Detached mode", func() {
 
 	ginkgo.BeforeEach(func() {
 		var ctx context.Context
-		klusterletName := fmt.Sprintf("klusterlet-%s", rand.String(6))
-		klusterletNamespace = helpers.KlusterletNamespace(operatorapiv1.InstallModeDetached, klusterletName, "test")
+		klusterlet = &operatorapiv1.Klusterlet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("klusterlet-%s", rand.String(6)),
+			},
+			Spec: operatorapiv1.KlusterletSpec{
+				RegistrationImagePullSpec: "quay.io/open-cluster-management/registration",
+				WorkImagePullSpec:         "quay.io/open-cluster-management/work",
+				ExternalServerURLs: []operatorapiv1.ServerURL{
+					{
+						URL: "https://localhost",
+					},
+				},
+				ClusterName: "testcluster",
+				DeployOption: operatorapiv1.DeployOption{
+					Mode: operatorapiv1.InstallModeDetached,
+				},
+			},
+		}
+
+		klusterletNamespace = helpers.KlusterletNamespace(klusterlet)
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: klusterletNamespace,
@@ -840,26 +858,6 @@ var _ = ginkgo.Describe("Klusterlet Detached mode", func() {
 		}
 		_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(), managedKubeconfigSecret, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		klusterlet = &operatorapiv1.Klusterlet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: klusterletName,
-			},
-			Spec: operatorapiv1.KlusterletSpec{
-				RegistrationImagePullSpec: "quay.io/open-cluster-management/registration",
-				WorkImagePullSpec:         "quay.io/open-cluster-management/work",
-				ExternalServerURLs: []operatorapiv1.ServerURL{
-					{
-						URL: "https://localhost",
-					},
-				},
-				ClusterName: "testcluster",
-				Namespace:   klusterletNamespace,
-				DeployOption: operatorapiv1.DeployOption{
-					Mode: operatorapiv1.InstallModeDetached,
-				},
-			},
-		}
 
 		ctx, cancel = context.WithCancel(context.Background())
 		go startKlusterletOperator(ctx)
