@@ -46,6 +46,7 @@ var (
 		"cluster-manager/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml",
 		"cluster-manager/0000_03_clusters.open-cluster-management.io_placements.crd.yaml",
 		"cluster-manager/0000_04_clusters.open-cluster-management.io_placementdecisions.crd.yaml",
+		"cluster-manager/0000_05_clusters.open-cluster-management.io_addonplacementscores.crd.yaml",
 		"cluster-manager/cluster-manager-registration-clusterrole.yaml",
 		"cluster-manager/cluster-manager-registration-clusterrolebinding.yaml",
 		"cluster-manager/cluster-manager-namespace.yaml",

@@ -413,7 +413,7 @@ func TestSyncDeploy(t *testing.T) {
 	// Check if resources are created as expected
 	// 7 managed static manifests + 8 management static manifests - 2 duplicated service account manifests + 1 addon namespace + 2 deployments
 	if len(createObjects) != 16 {
-		t.Errorf("Expect 17 objects created in the sync loop, actual %d", len(createObjects))
+		t.Errorf("Expect 16 objects created in the sync loop, actual %d", len(createObjects))
 	}
 	for _, object := range createObjects {
 		ensureObject(t, object, klusterlet)
@@ -518,7 +518,7 @@ func TestSyncDeployDetached(t *testing.T) {
 		}
 	}
 	if len(createCRDObjectsManaged) != 2 {
-		t.Errorf("Expect 2 objects created in the sync loop, actual %d", len(createCRDObjects))
+		t.Errorf("Expect 2 objects created in the sync loop, actual %d", len(createCRDObjectsManaged))
 	}
 
 	operatorAction := controller.operatorClient.Actions()
