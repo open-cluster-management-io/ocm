@@ -12,6 +12,10 @@ type FakeClusterV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeClusterV1alpha1) AddOnPlacementScores(namespace string) v1alpha1.AddOnPlacementScoreInterface {
+	return &FakeAddOnPlacementScores{c, namespace}
+}
+
 func (c *FakeClusterV1alpha1) ClusterClaims() v1alpha1.ClusterClaimInterface {
 	return &FakeClusterClaims{c}
 }

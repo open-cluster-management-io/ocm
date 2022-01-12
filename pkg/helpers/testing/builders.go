@@ -2,6 +2,7 @@ package testing
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -52,6 +53,22 @@ func (b *placementBuilder) WithPrioritizerConfig(name string, weight int32) *pla
 	if len(name) > 0 {
 		b.placement.Spec.PrioritizerPolicy.Configurations = append(b.placement.Spec.PrioritizerPolicy.Configurations, clusterapiv1alpha1.PrioritizerConfig{Name: name, Weight: weight})
 	}
+	return b
+}
+
+func (b *placementBuilder) WithScoreCoordinateAddOn(resourceName, scoreName string, weight int32) *placementBuilder {
+	if b.placement.Spec.PrioritizerPolicy.Configurations == nil {
+		b.placement.Spec.PrioritizerPolicy.Configurations = []clusterapiv1alpha1.PrioritizerConfig{}
+	}
+	b.placement.Spec.PrioritizerPolicy.Configurations = append(b.placement.Spec.PrioritizerPolicy.Configurations, clusterapiv1alpha1.PrioritizerConfig{
+		ScoreCoordinate: &clusterapiv1alpha1.ScoreCoordinate{
+			Type: "AddOn",
+			AddOn: &clusterapiv1alpha1.AddOnScore{
+				ResourceName: resourceName,
+				ScoreName:    scoreName,
+			},
+		},
+		Weight: weight})
 	return b
 }
 
@@ -254,4 +271,41 @@ func NewClusterSetBinding(namespace, clusterSetName string) *clusterapiv1beta1.M
 			ClusterSet: clusterSetName,
 		},
 	}
+}
+
+type addOnPlacementScoreBuilder struct {
+	addOnPlacementScore *clusterapiv1alpha1.AddOnPlacementScore
+}
+
+func NewAddOnPlacementScore(clusternamespace, name string) *addOnPlacementScoreBuilder {
+	return &addOnPlacementScoreBuilder{
+		addOnPlacementScore: &clusterapiv1alpha1.AddOnPlacementScore{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: clusternamespace,
+				Name:      name,
+			},
+		},
+	}
+}
+
+func (a *addOnPlacementScoreBuilder) WithScore(name string, score int32) *addOnPlacementScoreBuilder {
+	if a.addOnPlacementScore.Status.Scores == nil {
+		a.addOnPlacementScore.Status.Scores = []clusterapiv1alpha1.AddOnPlacementScoreItem{}
+	}
+
+	a.addOnPlacementScore.Status.Scores = append(a.addOnPlacementScore.Status.Scores, clusterapiv1alpha1.AddOnPlacementScoreItem{
+		Name:  name,
+		Value: score,
+	})
+	return a
+}
+
+func (a *addOnPlacementScoreBuilder) WithValidUntil(validUntil time.Time) *addOnPlacementScoreBuilder {
+	vu := metav1.NewTime(validUntil)
+	a.addOnPlacementScore.Status.ValidUntil = &vu
+	return a
+}
+
+func (a *addOnPlacementScoreBuilder) Build() *clusterapiv1alpha1.AddOnPlacementScore {
+	return a.addOnPlacementScore
 }

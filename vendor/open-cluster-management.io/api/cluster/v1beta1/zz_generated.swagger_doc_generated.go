@@ -21,6 +21,33 @@ func (ManagedClusterSet) SwaggerDoc() map[string]string {
 	return map_ManagedClusterSet
 }
 
+var map_ManagedClusterSetList = map[string]string{
+	"":         "ManagedClusterSetList is a collection of ManagedClusterSet.",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+	"items":    "Items is a list of ManagedClusterSet.",
+}
+
+func (ManagedClusterSetList) SwaggerDoc() map[string]string {
+	return map_ManagedClusterSetList
+}
+
+var map_ManagedClusterSetSpec = map[string]string{
+	"": "ManagedClusterSetSpec describes the attributes of the ManagedClusterSet",
+}
+
+func (ManagedClusterSetSpec) SwaggerDoc() map[string]string {
+	return map_ManagedClusterSetSpec
+}
+
+var map_ManagedClusterSetStatus = map[string]string{
+	"":           "ManagedClusterSetStatus represents the current status of the ManagedClusterSet.",
+	"conditions": "Conditions contains the different condition statuses for this ManagedClusterSet.",
+}
+
+func (ManagedClusterSetStatus) SwaggerDoc() map[string]string {
+	return map_ManagedClusterSetStatus
+}
+
 var map_ManagedClusterSetBinding = map[string]string{
 	"":     "ManagedClusterSetBinding projects a ManagedClusterSet into a certain namespace. User is able to create a ManagedClusterSetBinding in a namespace and bind it to a ManagedClusterSet if they have an RBAC rule to CREATE on the virtual subresource of managedclustersets/bind. Workloads created in the same namespace can only be distributed to ManagedClusters in ManagedClusterSets bound in this namespace by higher level controllers.",
 	"spec": "Spec defines the attributes of ManagedClusterSetBinding.",
@@ -47,33 +74,6 @@ var map_ManagedClusterSetBindingSpec = map[string]string{
 
 func (ManagedClusterSetBindingSpec) SwaggerDoc() map[string]string {
 	return map_ManagedClusterSetBindingSpec
-}
-
-var map_ManagedClusterSetList = map[string]string{
-	"":         "ManagedClusterSetList is a collection of ManagedClusterSet.",
-	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
-	"items":    "Items is a list of ManagedClusterSet.",
-}
-
-func (ManagedClusterSetList) SwaggerDoc() map[string]string {
-	return map_ManagedClusterSetList
-}
-
-var map_ManagedClusterSetSpec = map[string]string{
-	"": "ManagedClusterSetSpec describes the attributes of the ManagedClusterSet",
-}
-
-func (ManagedClusterSetSpec) SwaggerDoc() map[string]string {
-	return map_ManagedClusterSetSpec
-}
-
-var map_ManagedClusterSetStatus = map[string]string{
-	"":           "ManagedClusterSetStatus represents the current status of the ManagedClusterSet.",
-	"conditions": "Conditions contains the different condition statuses for this ManagedClusterSet.",
-}
-
-func (ManagedClusterSetStatus) SwaggerDoc() map[string]string {
-	return map_ManagedClusterSetStatus
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

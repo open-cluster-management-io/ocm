@@ -153,6 +153,8 @@ func NewSchedulingController(
 
 func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	queueKey := syncCtx.QueueKey()
+	klog.V(4).Infof("Reconciling placement %q", queueKey)
+
 	namespace, name, err := cache.SplitMetaNamespaceKey(queueKey)
 	if err != nil {
 		// ignore placement whose key is not in format: namespace/name
@@ -160,7 +162,6 @@ func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncCon
 		return nil
 	}
 
-	klog.V(4).Infof("Reconciling placement %q", queueKey)
 	placement, err := c.placementLister.Placements(namespace).Get(name)
 	if errors.IsNotFound(err) {
 		// no work if placement is deleted
@@ -170,6 +171,10 @@ func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncCon
 		return err
 	}
 
+	return c.syncPlacement(ctx, placement)
+}
+
+func (c *schedulingController) syncPlacement(ctx context.Context, placement *clusterapiv1alpha1.Placement) error {
 	// no work if placement is deleting
 	if !placement.DeletionTimestamp.IsZero() {
 		return nil

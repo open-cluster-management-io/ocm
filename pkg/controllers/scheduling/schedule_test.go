@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,16 +60,6 @@ func TestSchedule(t *testing.T) {
 					Weight: 1,
 					Scores: PrioritizerScore{"cluster1": 0},
 				},
-				{
-					Name:   "ResourceAllocatableCPU",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceAllocatableMemory",
-					Weight: 0,
-					Scores: nil,
-				},
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
@@ -105,16 +96,6 @@ func TestSchedule(t *testing.T) {
 					Name:   "Steady",
 					Weight: 1,
 					Scores: PrioritizerScore{"cluster1": 0},
-				},
-				{
-					Name:   "ResourceAllocatableCPU",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceAllocatableMemory",
-					Weight: 0,
-					Scores: nil,
 				},
 			},
 			expectedUnScheduled: 2,
@@ -160,16 +141,6 @@ func TestSchedule(t *testing.T) {
 					Weight: 1,
 					Scores: PrioritizerScore{"cluster1": 100, "cluster2": 100, "cluster3": 0},
 				},
-				{
-					Name:   "ResourceAllocatableCPU",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceAllocatableMemory",
-					Weight: 0,
-					Scores: nil,
-				},
 			},
 			expectedUnScheduled: 0,
 		},
@@ -201,16 +172,6 @@ func TestSchedule(t *testing.T) {
 					Weight: 1,
 					Scores: PrioritizerScore{"cluster1": 0},
 				},
-				{
-					Name:   "ResourceAllocatableCPU",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceAllocatableMemory",
-					Weight: 0,
-					Scores: nil,
-				},
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
@@ -219,10 +180,13 @@ func TestSchedule(t *testing.T) {
 		},
 		{
 			name:      "placement with additive Prioritizer Policy",
-			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithNOC(2).WithPrioritizerPolicy("Additive").WithPrioritizerConfig("Balance", 3).WithPrioritizerConfig("ResourceAllocatableMemory", 1).Build(),
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithNOC(2).WithPrioritizerPolicy("Additive").WithPrioritizerConfig("Balance", 3).WithPrioritizerConfig("ResourceAllocatableMemory", 1).WithScoreCoordinateAddOn("demo", "demo", 1).Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet(clusterSetName),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
+				testinghelpers.NewAddOnPlacementScore("cluster1", "demo").WithScore("demo", 30).Build(),
+				testinghelpers.NewAddOnPlacementScore("cluster2", "demo").WithScore("demo", 40).Build(),
+				testinghelpers.NewAddOnPlacementScore("cluster3", "demo").WithScore("demo", 50).Build(),
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "100", "100").Build(),
@@ -252,14 +216,14 @@ func TestSchedule(t *testing.T) {
 					Scores: PrioritizerScore{"cluster1": 0, "cluster2": 0, "cluster3": 0},
 				},
 				{
-					Name:   "ResourceAllocatableCPU",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
 					Name:   "ResourceAllocatableMemory",
 					Weight: 1,
 					Scores: PrioritizerScore{"cluster1": 100, "cluster2": 0, "cluster3": -100},
+				},
+				{
+					Name:   "AddOn/demo/demo",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 30, "cluster2": 40, "cluster3": 50},
 				},
 			},
 			expectedUnScheduled: 0,
@@ -292,16 +256,6 @@ func TestSchedule(t *testing.T) {
 					Name:   "Balance",
 					Weight: 3,
 					Scores: PrioritizerScore{"cluster1": 100, "cluster2": 100, "cluster3": 100},
-				},
-				{
-					Name:   "Steady",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceAllocatableCPU",
-					Weight: 0,
-					Scores: nil,
 				},
 				{
 					Name:   "ResourceAllocatableMemory",
@@ -351,16 +305,6 @@ func TestSchedule(t *testing.T) {
 					Weight: 1,
 					Scores: PrioritizerScore{"cluster1": 100, "cluster2": 0},
 				},
-				{
-					Name:   "ResourceAllocatableCPU",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceAllocatableMemory",
-					Weight: 0,
-					Scores: nil,
-				},
 			},
 			expectedUnScheduled: 2,
 		},
@@ -401,16 +345,6 @@ func TestSchedule(t *testing.T) {
 					Name:   "Steady",
 					Weight: 1,
 					Scores: PrioritizerScore{"cluster1": 0, "cluster2": 0, "cluster3": 0},
-				},
-				{
-					Name:   "ResourceAllocatableCPU",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceAllocatableMemory",
-					Weight: 0,
-					Scores: nil,
 				},
 			},
 			expectedUnScheduled: 0,
@@ -463,16 +397,6 @@ func TestSchedule(t *testing.T) {
 					Weight: 1,
 					Scores: PrioritizerScore{"cluster1": 0, "cluster2": 0, "cluster3": 100},
 				},
-				{
-					Name:   "ResourceAllocatableCPU",
-					Weight: 0,
-					Scores: nil,
-				},
-				{
-					Name:   "ResourceAllocatableMemory",
-					Weight: 0,
-					Scores: nil,
-				},
 			},
 			expectedUnScheduled: 0,
 		},
@@ -504,7 +428,16 @@ func TestSchedule(t *testing.T) {
 				t.Errorf("expected filter results %v, but got %v", string(expected), string(actual))
 			}
 
-			actual, _ = json.Marshal(result.PrioritizerResults())
+			prioritizerResult := result.PrioritizerResults()
+			sort.SliceStable(prioritizerResult, func(i, j int) bool {
+				return prioritizerResult[i].Name < prioritizerResult[j].Name
+			})
+			expectedScoreResult := c.expectedScoreResult
+			sort.SliceStable(expectedScoreResult, func(i, j int) bool {
+				return expectedScoreResult[i].Name < expectedScoreResult[j].Name
+			})
+
+			actual, _ = json.Marshal(prioritizerResult)
 			expected, _ = json.Marshal(c.expectedScoreResult)
 			if !reflect.DeepEqual(actual, expected) {
 				t.Errorf("expected score results %v, but got %v", string(expected), string(actual))

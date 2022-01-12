@@ -18,6 +18,7 @@ func NewClusterInformerFactory(clusterClient clusterclient.Interface, objects ..
 	clusterSetBindingStore := clusterInformerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Informer().GetStore()
 	placementStore := clusterInformerFactory.Cluster().V1alpha1().Placements().Informer().GetStore()
 	placementDecisionStore := clusterInformerFactory.Cluster().V1alpha1().PlacementDecisions().Informer().GetStore()
+	addOnPlacementStore := clusterInformerFactory.Cluster().V1alpha1().AddOnPlacementScores().Informer().GetStore()
 
 	for _, obj := range objects {
 		switch obj.(type) {
@@ -31,6 +32,8 @@ func NewClusterInformerFactory(clusterClient clusterclient.Interface, objects ..
 			placementStore.Add(obj)
 		case *clusterapiv1alpha1.PlacementDecision:
 			placementDecisionStore.Add(obj)
+		case *clusterapiv1alpha1.AddOnPlacementScore:
+			addOnPlacementStore.Add(obj)
 		}
 	}
 

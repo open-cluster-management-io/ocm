@@ -25,6 +25,7 @@ namespace: open-cluster-management-hub
 # here. These are deployed via a "make install" dependency.
 
 resources:
+- ./addonplacementscores.crd.yaml
 - ./managedclusters.crd.yaml
 - ./managedclustersets.crd.yaml
 - ./managedclustersetbindings.crd.yaml
