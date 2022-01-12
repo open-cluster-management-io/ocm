@@ -327,15 +327,15 @@ type FieldValue struct {
 
 	// Integer is the integer value when type is integer.
 	// +optional
-	Integer int32 `json:"integer,omitempty"`
+	Integer *int64 `json:"integer,omitempty"`
 
 	// String is the string value when when type is string.
 	// +optional
-	String string `json:"string,omitempty"`
+	String *string `json:"string,omitempty"`
 
 	// Boolean is bool value when type is boolean.
 	// +optional
-	Boolean bool `json:"boolean,omitempty"`
+	Boolean *bool `json:"boolean,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=Integer;String;Boolean

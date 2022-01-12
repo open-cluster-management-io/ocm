@@ -47,6 +47,10 @@ spec:
                     crdName:
                       description: crdName is the name of the CRD used to configure instances of the managed add-on. This field should be configured if the add-on have a CRD that controls the configuration of the add-on.
                       type: string
+                    lastObservedGeneration:
+                      description: lastObservedGeneration is the observed generation of the custom resource for the configuration of the addon.
+                      type: integer
+                      format: int64
                 addOnMeta:
                   description: addOnMeta is a reference to the metadata information for the add-on.
                   type: object

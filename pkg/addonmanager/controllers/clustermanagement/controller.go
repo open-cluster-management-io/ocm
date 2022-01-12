@@ -112,13 +112,18 @@ func (c *clusterManagementController) sync(ctx context.Context, syncCtx factory.
 		return err
 	}
 
-	coordinate := addonapiv1alpha1.ConfigCoordinates{
+	expectedCoordinate := addonapiv1alpha1.ConfigCoordinates{
 		CRDName: clusterManagementAddon.Spec.AddOnConfiguration.CRDName,
 		CRName:  clusterManagementAddon.Spec.AddOnConfiguration.CRName,
 	}
+	actualCoordinate := addonapiv1alpha1.ConfigCoordinates{
+		CRDName: addon.Status.AddOnConfiguration.CRDName,
+		CRName:  addon.Status.AddOnConfiguration.CRName,
+	}
 
-	if !equality.Semantic.DeepEqual(coordinate, addon.Status.AddOnConfiguration) {
-		addon.Status.AddOnConfiguration = coordinate
+	if !equality.Semantic.DeepEqual(expectedCoordinate, actualCoordinate) {
+		addon.Status.AddOnConfiguration.CRDName = expectedCoordinate.CRDName
+		addon.Status.AddOnConfiguration.CRName = expectedCoordinate.CRName
 		*modified = true
 	}
 

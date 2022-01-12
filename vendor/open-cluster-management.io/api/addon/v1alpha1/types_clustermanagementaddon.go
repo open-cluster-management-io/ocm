@@ -66,6 +66,10 @@ type ConfigCoordinates struct {
 	// This field should be configured if add-on CR have a consistent name across the all of the ManagedCluster instaces.
 	// +optional
 	CRName string `json:"crName"`
+
+	// lastObservedGeneration is the observed generation of the custom resource for the configuration of the addon.
+	// +optional
+	LastObservedGeneration int64 `json:"lastObservedGeneration,omitempty"`
 }
 
 // ClusterManagementAddOnStatus represents the current status of cluster management add-on.
