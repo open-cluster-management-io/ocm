@@ -2,8 +2,12 @@ package cluster
 
 import (
 	"encoding/json"
+	"net/http"
 	"reflect"
 	"testing"
+	"time"
+
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,7 +16,7 @@ import (
 )
 
 func TestManagedClusterMutate(t *testing.T) {
-	pt := admissionv1beta1.PatchTypeJSONPatch
+	now := time.Now()
 	cases := []struct {
 		name                   string
 		request                *admissionv1beta1.AdmissionRequest
@@ -28,9 +32,7 @@ func TestManagedClusterMutate(t *testing.T) {
 					Resource: "tests",
 				},
 			},
-			expectedResponse: &admissionv1beta1.AdmissionResponse{
-				Allowed: true,
-			},
+			expectedResponse: newAdmissionResponse(true).build(),
 		},
 		{
 			name: "mutate deleting operation",
@@ -38,54 +40,193 @@ func TestManagedClusterMutate(t *testing.T) {
 				Resource:  managedclustersSchema,
 				Operation: admissionv1beta1.Delete,
 			},
-			expectedResponse: &admissionv1beta1.AdmissionResponse{
-				Allowed: true,
-			},
+			expectedResponse: newAdmissionResponse(true).build(),
 		},
 		{
-			name: "mutate a ManagedCluster without LeaseDurationSeconds setting",
+			name: "new taints",
 			request: &admissionv1beta1.AdmissionRequest{
 				Resource:  managedclustersSchema,
 				Operation: admissionv1beta1.Create,
-				Object:    newManagedClusterObj(),
+				Object: newManagedCluster().
+					withLeaseDurationSeconds(60).
+					addTaint(newTaint("a", "b", clusterv1.TaintEffectNoSelect, nil)).
+					addTaint(newTaint("c", "d", clusterv1.TaintEffectPreferNoSelect, nil)).
+					build(),
 			},
-			expectedResponse: &admissionv1beta1.AdmissionResponse{
-				Allowed:   true,
-				Patch:     []byte(`[{"op": "replace", "path": "/spec/leaseDurationSeconds", "value": 60}]`),
-				PatchType: &pt,
-			},
+			expectedResponse: newAdmissionResponse(true).
+				addJsonPatch(newTaintTimeAddedJsonPatch(0, now)).
+				addJsonPatch(newTaintTimeAddedJsonPatch(1, now)).
+				build(),
 		},
 		{
-			name: "mutate a ManagedCluster with LeaseDurationSeconds setting",
+			name: "new taint request denied",
 			request: &admissionv1beta1.AdmissionRequest{
 				Resource:  managedclustersSchema,
 				Operation: admissionv1beta1.Create,
-				Object:    newManagedClusterObjWithLeaseDurationSeconds(60),
+				Object: newManagedCluster().
+					withLeaseDurationSeconds(60).
+					addTaint(newTaint("a", "b", clusterv1.TaintEffectNoSelect, newTime(now, 0))).
+					addTaint(newTaint("c", "d", clusterv1.TaintEffectPreferNoSelect, newTime(now, 0))).
+					build(),
 			},
-			expectedResponse: &admissionv1beta1.AdmissionResponse{
-				Allowed: true,
-			},
+			expectedResponse: newAdmissionResponse(false).
+				withResult(metav1.StatusFailure, http.StatusBadRequest, metav1.StatusReasonBadRequest, "It is not allowed to set TimeAdded of Taint \"a,c\".").
+				build(),
 		},
+		{
+			name: "update taint",
+			request: &admissionv1beta1.AdmissionRequest{
+				Resource:  managedclustersSchema,
+				Operation: admissionv1beta1.Create,
+				OldObject: newManagedCluster().
+					withLeaseDurationSeconds(60).
+					addTaint(newTaint("a", "b", clusterv1.TaintEffectNoSelect, newTime(now, -10*time.Second))).
+					addTaint(newTaint("c", "d", clusterv1.TaintEffectNoSelect, newTime(now, -10*time.Second))).
+					build(),
+				Object: newManagedCluster().
+					withLeaseDurationSeconds(60).
+					addTaint(newTaint("a", "b", clusterv1.TaintEffectNoSelect, newTime(now, -10*time.Second))). // no change
+					addTaint(newTaint("c", "d", clusterv1.TaintEffectNoSelectIfNew, nil)).                      // effect modified
+					build(),
+			},
+			expectedResponse: newAdmissionResponse(true).
+				addJsonPatch(newTaintTimeAddedJsonPatch(1, now)).
+				build(),
+		},
+		{
+			name: "taint update request denied",
+			request: &admissionv1beta1.AdmissionRequest{
+				Resource:  managedclustersSchema,
+				Operation: admissionv1beta1.Create,
+				OldObject: newManagedCluster().
+					withLeaseDurationSeconds(60).
+					addTaint(newTaint("a", "b", clusterv1.TaintEffectNoSelect, newTime(now, -10*time.Second))).
+					addTaint(newTaint("c", "d", clusterv1.TaintEffectNoSelect, newTime(now, -10*time.Second))).
+					build(),
+				Object: newManagedCluster().
+					withLeaseDurationSeconds(60).
+					addTaint(newTaint("a", "b", clusterv1.TaintEffectNoSelect, newTime(now, -20*time.Second))).      // timeAdded modified
+					addTaint(newTaint("c", "d", clusterv1.TaintEffectNoSelectIfNew, newTime(now, -10*time.Second))). // effect modified with timeAdded
+					build(),
+			},
+			expectedResponse: newAdmissionResponse(false).
+				withResult(metav1.StatusFailure, http.StatusBadRequest, metav1.StatusReasonBadRequest, "It is not allowed to set TimeAdded of Taint \"a,c\".").
+				build(),
+		},
+		{
+			name: "delete taint",
+			request: &admissionv1beta1.AdmissionRequest{
+				Resource:  managedclustersSchema,
+				Operation: admissionv1beta1.Create,
+				OldObject: newManagedCluster().
+					withLeaseDurationSeconds(60).
+					addTaint(newTaint("a", "b", clusterv1.TaintEffectNoSelect, newTime(now, -10*time.Second))).
+					addTaint(newTaint("c", "d", clusterv1.TaintEffectNoSelect, newTime(now, -10*time.Second))).
+					build(),
+				Object: newManagedCluster().
+					withLeaseDurationSeconds(60).
+					addTaint(newTaint("a", "b", clusterv1.TaintEffectNoSelect, newTime(now, -10*time.Second))).
+					build(),
+			},
+			expectedResponse: newAdmissionResponse(true).build(),
+		},
+	}
+
+	nowFunc = func() time.Time {
+		return now
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			admissionHook := &ManagedClusterMutatingAdmissionHook{}
-
 			actualResponse := admissionHook.Admit(c.request)
-
 			if !reflect.DeepEqual(actualResponse, c.expectedResponse) {
-				t.Errorf("expected %#v but got: %#v", c.expectedResponse.Result, actualResponse.Result)
+				t.Errorf("expected \n%#v but got: \n%#v", c.expectedResponse, actualResponse)
 			}
 		})
 	}
 }
 
-func newManagedClusterObjWithLeaseDurationSeconds(leaseDurationSeconds int32) runtime.RawExtension {
-	managedCluster := testinghelpers.NewManagedCluster()
-	managedCluster.Spec.LeaseDurationSeconds = leaseDurationSeconds
-	clusterObj, _ := json.Marshal(managedCluster)
+type admissionResponseBuilder struct {
+	jsonPatchOperations []jsonPatchOperation
+	response            admissionv1beta1.AdmissionResponse
+}
+
+func newAdmissionResponse(allowed bool) *admissionResponseBuilder {
+	return &admissionResponseBuilder{
+		response: admissionv1beta1.AdmissionResponse{
+			Allowed: allowed,
+		},
+	}
+}
+
+func (b *admissionResponseBuilder) addJsonPatch(jsonPatch jsonPatchOperation) *admissionResponseBuilder {
+	b.jsonPatchOperations = append(b.jsonPatchOperations, jsonPatch)
+	pt := admissionv1beta1.PatchTypeJSONPatch
+	b.response.PatchType = &pt
+	return b
+}
+
+func (b *admissionResponseBuilder) withResult(status string, code int32, reason metav1.StatusReason, message string) *admissionResponseBuilder {
+	b.response.Result = &metav1.Status{
+		Status:  status,
+		Code:    code,
+		Reason:  reason,
+		Message: message,
+	}
+	return b
+}
+
+func (b *admissionResponseBuilder) build() *admissionv1beta1.AdmissionResponse {
+	if len(b.jsonPatchOperations) > 0 {
+		patch, _ := json.Marshal(b.jsonPatchOperations)
+		b.response.Patch = patch
+	}
+	return &b.response
+}
+
+type managedClusterBuilder struct {
+	cluster clusterv1.ManagedCluster
+}
+
+func newManagedCluster() *managedClusterBuilder {
+	return &managedClusterBuilder{
+		cluster: *testinghelpers.NewManagedCluster(),
+	}
+}
+
+func (b *managedClusterBuilder) withLeaseDurationSeconds(leaseDurationSeconds int32) *managedClusterBuilder {
+	b.cluster.Spec.LeaseDurationSeconds = leaseDurationSeconds
+	return b
+}
+
+func (b *managedClusterBuilder) addTaint(taint clusterv1.Taint) *managedClusterBuilder {
+	b.cluster.Spec.Taints = append(b.cluster.Spec.Taints, taint)
+	return b
+}
+
+func (b *managedClusterBuilder) build() runtime.RawExtension {
+	clusterObj, _ := json.Marshal(b.cluster)
 	return runtime.RawExtension{
 		Raw: clusterObj,
 	}
+}
+
+func newTaint(key, value string, effect clusterv1.TaintEffect, timeAdded *metav1.Time) clusterv1.Taint {
+	taint := clusterv1.Taint{
+		Key:    key,
+		Value:  value,
+		Effect: effect,
+	}
+
+	if timeAdded != nil {
+		taint.TimeAdded = *timeAdded
+	}
+
+	return taint
+}
+
+func newTime(time time.Time, offset time.Duration) *metav1.Time {
+	mt := metav1.NewTime(time.Add(offset))
+	return &mt
 }

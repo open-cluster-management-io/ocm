@@ -321,3 +321,17 @@ func ManagedClusterAssetFn(fs embed.FS, managedClusterName string) resourceapply
 		return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
 	}
 }
+
+// FindTaintByKey returns a taint if the managed cluster has a taint with the given key.
+func FindTaintByKey(managedCluster *clusterv1.ManagedCluster, key string) *clusterv1.Taint {
+	if managedCluster == nil {
+		return nil
+	}
+	for _, taint := range managedCluster.Spec.Taints {
+		if key != taint.Key {
+			continue
+		}
+		return &taint
+	}
+	return nil
+}

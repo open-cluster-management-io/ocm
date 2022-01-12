@@ -97,6 +97,7 @@ spec:
                         description: TimeAdded represents the time at which the taint was added.
                         type: string
                         format: date-time
+                        nullable: true
                       value:
                         description: Value is the taint value corresponding to the taint key.
                         type: string

@@ -82,6 +82,64 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 			})
 
+			ginkgo.It("Should have the timeAdded for taints", func() {
+				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
+				ginkgo.By(fmt.Sprintf("create a managed cluster %q with taint", clusterName))
+
+				cluster := newManagedCluster(clusterName, false, validURL)
+				cluster.Spec.Taints = []clusterv1.Taint{
+					{
+						Key:    "a",
+						Value:  "b",
+						Effect: clusterv1.TaintEffectNoSelect,
+					},
+				}
+				_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.TODO(), cluster, metav1.CreateOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				ginkgo.By("check if timeAdded of the taint is set automatically")
+				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				taint := findTaint(managedCluster.Spec.Taints, "a", "b", clusterv1.TaintEffectNoSelect)
+				gomega.Expect(taint).ShouldNot(gomega.BeNil())
+				gomega.Expect(taint.TimeAdded.IsZero()).To(gomega.BeFalse())
+
+				ginkgo.By("chang the effect of the taint")
+				// sleep and make sure the update is performed 1 second later than the creation
+				time.Sleep(1 * time.Second)
+				gomega.Eventually(func() error {
+					managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+					for index, taint := range managedCluster.Spec.Taints {
+						if taint.Key != "a" {
+							continue
+						}
+						if taint.Value != "b" {
+							continue
+						}
+						managedCluster.Spec.Taints[index] = clusterv1.Taint{
+							Key:    taint.Key,
+							Value:  taint.Value,
+							Effect: clusterv1.TaintEffectNoSelectIfNew,
+						}
+					}
+					_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
+					return err
+				}, 60*time.Second, 1*time.Second).Should(gomega.Succeed())
+
+				ginkgo.By("check if timeAdded of the taint is reset")
+				managedCluster, err = clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				updatedTaint := findTaint(managedCluster.Spec.Taints, "a", "b", clusterv1.TaintEffectNoSelectIfNew)
+				gomega.Expect(updatedTaint).ShouldNot(gomega.BeNil())
+				gomega.Expect(taint.TimeAdded.Equal(&updatedTaint.TimeAdded)).To(gomega.BeFalse(),
+					"timeAdded of taint should be updated (before=%s, after=%s)", taint.TimeAdded.Time.String(), updatedTaint.TimeAdded.Time.String())
+
+				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+			})
+
 			ginkgo.It("Should respond bad request when creating a managed cluster with invalid external server URLs", func() {
 				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
 				ginkgo.By(fmt.Sprintf("create a managed cluster %q with an invalid external server URL %q", clusterName, invalidURL))
@@ -770,5 +828,25 @@ func cleanupClusterClient(saNamespace, saName string) error {
 		return fmt.Errorf("delete cluster role binding %q failed: %v", clusterRoleBindingName, err)
 	}
 
+	return nil
+}
+
+// findTaint returns the first matched taint in the given taint array. Return nil if no taint matched.
+func findTaint(taints []clusterv1.Taint, key, value string, effect clusterv1.TaintEffect) *clusterv1.Taint {
+	for _, taint := range taints {
+		if len(key) != 0 && taint.Key != key {
+			continue
+		}
+
+		if len(value) != 0 && taint.Value != value {
+			continue
+		}
+
+		if len(effect) != 0 && taint.Effect != effect {
+			continue
+		}
+
+		return &taint
+	}
 	return nil
 }

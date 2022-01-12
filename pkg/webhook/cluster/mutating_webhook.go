@@ -2,9 +2,13 @@ package cluster
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
+	"time"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/registration/pkg/helpers"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,7 +17,13 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const defaultLeaseDurationSecondsPatch = `[{"op": "replace", "path": "/spec/leaseDurationSeconds", "value": 60}]`
+var nowFunc = time.Now
+
+type jsonPatchOperation struct {
+	Operation string      `json:"op"`
+	Path      string      `json:"path"`
+	Value     interface{} `json:"value,omitempty"`
+}
 
 // ManagedClusterMutatingAdmissionHook will mutate the creating/updating managedcluster request.
 type ManagedClusterMutatingAdmissionHook struct{}
@@ -58,18 +68,109 @@ func (a *ManagedClusterMutatingAdmissionHook) Admit(req *admissionv1beta1.Admiss
 		return status
 	}
 
-	// If LeaseDurationSeconds value is zero, update it to 60 by default
-	if managedCluster.Spec.LeaseDurationSeconds == 0 {
-		status.Patch = []byte(defaultLeaseDurationSecondsPatch)
-		pt := admissionv1beta1.PatchTypeJSONPatch
-		status.PatchType = &pt
+	var jsonPatches []jsonPatchOperation
+
+	// set timeAdded of taint if it is nil and reset it if it is modified
+	taintJsonPatches, status := a.processTaints(managedCluster, req.OldObject.Raw)
+	if !status.Allowed {
+		return status
+	}
+	jsonPatches = append(jsonPatches, taintJsonPatches...)
+
+	if len(jsonPatches) == 0 {
+		return status
 	}
 
+	patch, err := json.Marshal(jsonPatches)
+	if err != nil {
+		status.Allowed = false
+		status.Result = &metav1.Status{
+			Status: metav1.StatusFailure, Code: http.StatusInternalServerError, Reason: metav1.StatusReasonInternalError,
+			Message: err.Error(),
+		}
+		return status
+	}
+
+	status.Patch = patch
+	pt := admissionv1beta1.PatchTypeJSONPatch
+	status.PatchType = &pt
 	return status
+}
+
+// processTaints generates json patched for cluster taints
+func (a *ManagedClusterMutatingAdmissionHook) processTaints(managedCluster *clusterv1.ManagedCluster, oldManagedClusterRaw []byte) ([]jsonPatchOperation, *admissionv1beta1.AdmissionResponse) {
+	status := &admissionv1beta1.AdmissionResponse{
+		Allowed: true,
+	}
+
+	if len(managedCluster.Spec.Taints) == 0 {
+		return nil, status
+	}
+
+	var oldManagedCluster *clusterv1.ManagedCluster
+	if len(oldManagedClusterRaw) > 0 {
+		cluster := &clusterv1.ManagedCluster{}
+		if err := json.Unmarshal(oldManagedClusterRaw, cluster); err != nil {
+			status.Allowed = false
+			status.Result = &metav1.Status{
+				Status: metav1.StatusFailure, Code: http.StatusInternalServerError, Reason: metav1.StatusReasonInternalError,
+				Message: err.Error(),
+			}
+			return nil, status
+		}
+		oldManagedCluster = cluster
+	}
+
+	var invalidTaints []string
+	var jsonPatches []jsonPatchOperation
+	now := metav1.NewTime(nowFunc())
+	for index, taint := range managedCluster.Spec.Taints {
+		originalTaint := helpers.FindTaintByKey(oldManagedCluster, taint.Key)
+		switch {
+		case originalTaint == nil:
+			// new taint
+			if !taint.TimeAdded.IsZero() {
+				invalidTaints = append(invalidTaints, taint.Key)
+				continue
+			}
+			jsonPatches = append(jsonPatches, newTaintTimeAddedJsonPatch(index, now.Time))
+		case originalTaint.Value == taint.Value && originalTaint.Effect == taint.Effect:
+			// no change
+			if !originalTaint.TimeAdded.Equal(&taint.TimeAdded) {
+				invalidTaints = append(invalidTaints, taint.Key)
+			}
+		default:
+			// taint's value/effect has changed
+			if !taint.TimeAdded.IsZero() {
+				invalidTaints = append(invalidTaints, taint.Key)
+				continue
+			}
+			jsonPatches = append(jsonPatches, newTaintTimeAddedJsonPatch(index, now.Time))
+		}
+	}
+
+	if len(invalidTaints) == 0 {
+		return jsonPatches, status
+	}
+
+	status.Allowed = false
+	status.Result = &metav1.Status{
+		Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+		Message: fmt.Sprintf("It is not allowed to set TimeAdded of Taint %q.", strings.Join(invalidTaints, ",")),
+	}
+	return nil, status
 }
 
 // Initialize is called by generic-admission-server on startup to setup initialization that managedclusters webhook needs.
 func (a *ManagedClusterMutatingAdmissionHook) Initialize(kubeClientConfig *rest.Config, stopCh <-chan struct{}) error {
 	// do nothing
 	return nil
+}
+
+func newTaintTimeAddedJsonPatch(index int, timeAdded time.Time) jsonPatchOperation {
+	return jsonPatchOperation{
+		Operation: "replace",
+		Path:      fmt.Sprintf("/spec/taints/%d/timeAdded", index),
+		Value:     timeAdded.UTC().Format(time.RFC3339),
+	}
 }

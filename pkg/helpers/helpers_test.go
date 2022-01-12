@@ -451,6 +451,60 @@ func TestCleanUpGroupFromRoleBindings(t *testing.T) {
 	}
 }
 
+func TestFindTaintByKey(t *testing.T) {
+	cases := []struct {
+		name     string
+		cluster  *clusterv1.ManagedCluster
+		key      string
+		expected *clusterv1.Taint
+	}{
+		{
+			name: "nil of managed cluster",
+			key:  "taint1",
+		},
+		{
+			name: "taint found",
+			cluster: &clusterv1.ManagedCluster{
+				Spec: clusterv1.ManagedClusterSpec{
+					Taints: []clusterv1.Taint{
+						{
+							Key:   "taint1",
+							Value: "value1",
+						},
+					},
+				},
+			},
+			key: "taint1",
+			expected: &clusterv1.Taint{
+				Key:   "taint1",
+				Value: "value1",
+			},
+		},
+		{
+			name: "taint not found",
+			cluster: &clusterv1.ManagedCluster{
+				Spec: clusterv1.ManagedClusterSpec{
+					Taints: []clusterv1.Taint{
+						{
+							Key:   "taint1",
+							Value: "value1",
+						},
+					},
+				},
+			},
+			key: "taint2",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual := FindTaintByKey(c.cluster, c.key)
+			if !reflect.DeepEqual(actual, c.expected) {
+				t.Errorf("expected %v but got %v", c.expected, actual)
+			}
+		})
+	}
+}
+
 func getApplyFileNames(applyFiles map[string]runtime.Object) []string {
 	keys := []string{}
 	for key := range applyFiles {

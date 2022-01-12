@@ -295,7 +295,7 @@ spec:
                                         integer:
                                           description: Integer is the integer value when type is integer.
                                           type: integer
-                                          format: int32
+                                          format: int64
                                         string:
                                           description: String is the string value when when type is string.
                                           type: string
