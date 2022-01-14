@@ -11,7 +11,7 @@ require (
 	github.com/onsi/gomega v1.10.1
 	github.com/openshift/api v0.0.0-20210331193751-3acddb19d360
 	github.com/openshift/build-machinery-go v0.0.0-20211213093930-7e33a7eb4ce3
-	github.com/openshift/library-go v0.0.0-20210406144447-d9cdfbd844ea
+	github.com/openshift/library-go v0.0.0-20210407110438-80b76d711afb
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
 	k8s.io/api v0.21.1

@@ -194,11 +194,23 @@ func CleanUpStaticObject(
 	case *rbacv1.RoleBinding:
 		err = client.RbacV1().RoleBindings(t.Namespace).Delete(ctx, t.Name, metav1.DeleteOptions{})
 	case *apiextensionsv1.CustomResourceDefinition:
-		err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, t.Name, metav1.DeleteOptions{})
+		if apiExtensionClient == nil {
+			err = fmt.Errorf("apiExtensionClient is nil")
+		} else {
+			err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, t.Name, metav1.DeleteOptions{})
+		}
 	case *apiextensionsv1beta1.CustomResourceDefinition:
-		err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(ctx, t.Name, metav1.DeleteOptions{})
+		if apiExtensionClient == nil {
+			err = fmt.Errorf("apiExtensionClient is nil")
+		} else {
+			err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(ctx, t.Name, metav1.DeleteOptions{})
+		}
 	case *apiregistrationv1.APIService:
-		err = apiRegistrationClient.APIServices().Delete(ctx, t.Name, metav1.DeleteOptions{})
+		if apiRegistrationClient == nil {
+			err = fmt.Errorf("apiRegistrationClient is nil")
+		} else {
+			err = apiRegistrationClient.APIServices().Delete(ctx, t.Name, metav1.DeleteOptions{})
+		}
 	case *admissionv1.ValidatingWebhookConfiguration:
 		err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(ctx, t.Name, metav1.DeleteOptions{})
 	case *admissionv1.MutatingWebhookConfiguration:
@@ -337,10 +349,14 @@ func ApplyDirectly(
 			result.Result, result.Changed, result.Error = ApplyMutatingWebhookConfiguration(
 				client.AdmissionregistrationV1(), t)
 		case *apiregistrationv1.APIService:
-			t.ObjectMeta.Annotations = make(map[string]string)
-			checksum := fmt.Sprintf("%x", sha256.Sum256(t.Spec.CABundle))
-			t.ObjectMeta.Annotations["caBundle-checksum"] = string(checksum[:]) // to trigger the update when caBundle changed
-			result.Result, result.Changed, result.Error = resourceapply.ApplyAPIService(apiRegistrationClient, recorder, t)
+			if apiRegistrationClient == nil {
+				result.Error = fmt.Errorf("apiRegistrationClient is nil")
+			} else {
+				t.ObjectMeta.Annotations = make(map[string]string)
+				checksum := fmt.Sprintf("%x", sha256.Sum256(t.Spec.CABundle))
+				t.ObjectMeta.Annotations["caBundle-checksum"] = string(checksum[:]) // to trigger the update when caBundle changed
+				result.Result, result.Changed, result.Error = resourceapply.ApplyAPIService(apiRegistrationClient, recorder, t)
+			}
 		default:
 			genericApplyFiles = append(genericApplyFiles, file)
 		}
@@ -348,7 +364,6 @@ func ApplyDirectly(
 			ret = append(ret, result)
 		}
 	}
-
 	clientHolder := resourceapply.NewKubeClientHolder(client).WithAPIExtensionsClient(apiExtensionClient)
 	applyResults := resourceapply.ApplyDirectly(
 		clientHolder,

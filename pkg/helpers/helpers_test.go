@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -321,10 +322,12 @@ func TestApplyMutatingWebhookConfiguration(t *testing.T) {
 
 func TestApplyDirectly(t *testing.T) {
 	testcase := []struct {
-		name           string
-		applyFiles     map[string]runtime.Object
-		applyFileNames []string
-		expectErr      bool
+		name                    string
+		applyFiles              map[string]runtime.Object
+		applyFileNames          []string
+		nilapiExtensionClient   bool
+		nilapiRegistratonClient bool
+		expectErr               bool
 	}{
 		{
 			name: "Apply webhooks & apiservice & secret",
@@ -336,6 +339,45 @@ func TestApplyDirectly(t *testing.T) {
 			},
 			applyFileNames: []string{"validatingwebhooks", "mutatingwebhooks", "apiservice", "secret"},
 			expectErr:      false,
+		},
+		{
+			name: "Apply webhooks & apiservice & secret with nil apiRegistrationClient",
+			applyFiles: map[string]runtime.Object{
+				"validatingwebhooks": newUnstructured("admissionregistration.k8s.io/v1", "ValidatingWebhookConfiguration", "", "", map[string]interface{}{"webhooks": []interface{}{}}),
+				"mutatingwebhooks":   newUnstructured("admissionregistration.k8s.io/v1", "MutatingWebhookConfiguration", "", "", map[string]interface{}{"webhooks": []interface{}{}}),
+				"apiservice":         newUnstructured("apiregistration.k8s.io/v1", "APIService", "", "", map[string]interface{}{"spec": map[string]interface{}{"service": map[string]string{"name": "svc1", "namespace": "svc1"}}}),
+				"secret":             newUnstructured("v1", "Secret", "ns1", "n1", map[string]interface{}{"data": map[string]interface{}{"key1": []byte("key1")}}),
+			},
+			applyFileNames:          []string{"validatingwebhooks", "mutatingwebhooks", "apiservice", "secret"},
+			nilapiRegistratonClient: true,
+			expectErr:               true,
+		},
+		{
+			name: "Apply generic resources with nil apiExtensionclient & nil apiRegistrationClient",
+			applyFiles: map[string]runtime.Object{
+				"secret": newUnstructured("v1", "Secret", "ns1", "n1", map[string]interface{}{"data": map[string]interface{}{"key1": []byte("key1")}}),
+			},
+			nilapiExtensionClient:   true,
+			nilapiRegistratonClient: true,
+			applyFileNames:          []string{"secret"},
+			expectErr:               false,
+		},
+		{
+			name: "Apply CRD",
+			applyFiles: map[string]runtime.Object{
+				"crd": newUnstructured("apiextensions.k8s.io/v1beta1", "CustomResourceDefinition", "", "", map[string]interface{}{}),
+			},
+			applyFileNames: []string{"crd"},
+			expectErr:      false,
+		},
+		{
+			name: "Apply CRD with nil apiExtensionClient",
+			applyFiles: map[string]runtime.Object{
+				"crd": newUnstructured("apiextensions.k8s.io/v1beta1", "CustomResourceDefinition", "", "", map[string]interface{}{}),
+			},
+			applyFileNames:        []string{"crd"},
+			nilapiExtensionClient: true,
+			expectErr:             true,
 		},
 		{
 			name: "Apply unhandled object",
@@ -350,20 +392,47 @@ func TestApplyDirectly(t *testing.T) {
 	for _, c := range testcase {
 		t.Run(c.name, func(t *testing.T) {
 			fakeKubeClient := fakekube.NewSimpleClientset()
-			fakeResgistrationClient := fakeapiregistration.NewSimpleClientset()
 			fakeExtensionClient := fakeapiextensions.NewSimpleClientset()
-			results := ApplyDirectly(
-				fakeKubeClient, fakeExtensionClient, fakeResgistrationClient.ApiregistrationV1(),
-				eventstesting.NewTestingEventRecorder(t),
-				func(name string) ([]byte, error) {
-					if c.applyFiles[name] == nil {
-						return nil, fmt.Errorf("Failed to find file")
-					}
+			fakeResgistrationClient := fakeapiregistration.NewSimpleClientset().ApiregistrationV1()
+			fakeApplyFunc := func(name string) ([]byte, error) {
+				if c.applyFiles[name] == nil {
+					return nil, fmt.Errorf("Failed to find file")
+				}
 
-					return json.Marshal(c.applyFiles[name])
-				},
-				c.applyFileNames...,
-			)
+				return json.Marshal(c.applyFiles[name])
+			}
+			var results []resourceapply.ApplyResult
+			switch {
+			case c.nilapiExtensionClient && c.nilapiRegistratonClient:
+				results = ApplyDirectly(
+					fakeKubeClient, nil, nil,
+					eventstesting.NewTestingEventRecorder(t),
+					fakeApplyFunc,
+					c.applyFileNames...,
+				)
+			case c.nilapiExtensionClient:
+				results = ApplyDirectly(
+					fakeKubeClient, nil, fakeResgistrationClient,
+					eventstesting.NewTestingEventRecorder(t),
+					fakeApplyFunc,
+					c.applyFileNames...,
+				)
+			case c.nilapiRegistratonClient:
+				results = ApplyDirectly(
+					fakeKubeClient, fakeExtensionClient, nil,
+					eventstesting.NewTestingEventRecorder(t),
+					fakeApplyFunc,
+					c.applyFileNames...,
+				)
+			default:
+				results = ApplyDirectly(
+					fakeKubeClient, fakeExtensionClient, fakeResgistrationClient,
+					eventstesting.NewTestingEventRecorder(t),
+					fakeApplyFunc,
+					c.applyFileNames...,
+				)
+			}
+
 			aggregatedErr := []error{}
 			for _, r := range results {
 				if r.Error != nil {
@@ -372,7 +441,7 @@ func TestApplyDirectly(t *testing.T) {
 			}
 
 			if len(aggregatedErr) == 0 && c.expectErr {
-				t.Errorf("Expect an apply error")
+				t.Errorf("Expect an apply error: %s", c.name)
 			}
 			if len(aggregatedErr) != 0 && !c.expectErr {
 				t.Errorf("Expect no apply error, %v", operatorhelpers.NewMultiLineAggregate(aggregatedErr))
@@ -391,9 +460,11 @@ func TestDeleteStaticObject(t *testing.T) {
 		"kind1":              newUnstructured("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": []byte("key1")}}),
 	}
 	testcase := []struct {
-		name          string
-		applyFileName string
-		expectErr     bool
+		name                     string
+		applyFileName            string
+		expectErr                bool
+		nilapiExtensionClient    bool
+		nilapiRegistrationClient bool
 	}{
 		{
 			name:          "Delete validating webhooks",
@@ -411,6 +482,12 @@ func TestDeleteStaticObject(t *testing.T) {
 			expectErr:     false,
 		},
 		{
+			name:                     "Delete apiservice with nil apiRegistrationClient",
+			applyFileName:            "apiservice",
+			nilapiRegistrationClient: true,
+			expectErr:                true,
+		},
+		{
 			name:          "Delete secret",
 			applyFileName: "secret",
 			expectErr:     false,
@@ -419,6 +496,12 @@ func TestDeleteStaticObject(t *testing.T) {
 			name:          "Delete crd",
 			applyFileName: "crd",
 			expectErr:     false,
+		},
+		{
+			name:                  "Delete crd with nil apiExtensionClient",
+			applyFileName:         "crd",
+			nilapiExtensionClient: true,
+			expectErr:             true,
 		},
 		{
 			name:          "Delete unhandled object",
@@ -430,20 +513,47 @@ func TestDeleteStaticObject(t *testing.T) {
 	for _, c := range testcase {
 		t.Run(c.name, func(t *testing.T) {
 			fakeKubeClient := fakekube.NewSimpleClientset()
-			fakeResgistrationClient := fakeapiregistration.NewSimpleClientset()
+			fakeResgistrationClient := fakeapiregistration.NewSimpleClientset().ApiregistrationV1()
 			fakeExtensionClient := fakeapiextensions.NewSimpleClientset()
-			err := CleanUpStaticObject(
-				context.TODO(),
-				fakeKubeClient, fakeExtensionClient, fakeResgistrationClient.ApiregistrationV1(),
-				func(name string) ([]byte, error) {
-					if applyFiles[name] == nil {
-						return nil, fmt.Errorf("Failed to find file")
-					}
+			fakeAssetFunc := func(name string) ([]byte, error) {
+				if applyFiles[name] == nil {
+					return nil, fmt.Errorf("Failed to find file")
+				}
 
-					return json.Marshal(applyFiles[name])
-				},
-				c.applyFileName,
-			)
+				return json.Marshal(applyFiles[name])
+			}
+
+			var err error
+			switch {
+			case c.nilapiExtensionClient && c.nilapiRegistrationClient:
+				err = CleanUpStaticObject(
+					context.TODO(),
+					fakeKubeClient, nil, nil,
+					fakeAssetFunc,
+					c.applyFileName,
+				)
+			case c.nilapiExtensionClient:
+				err = CleanUpStaticObject(
+					context.TODO(),
+					fakeKubeClient, nil, fakeResgistrationClient,
+					fakeAssetFunc,
+					c.applyFileName,
+				)
+			case c.nilapiRegistrationClient:
+				err = CleanUpStaticObject(
+					context.TODO(),
+					fakeKubeClient, fakeExtensionClient, nil,
+					fakeAssetFunc,
+					c.applyFileName,
+				)
+			default:
+				err = CleanUpStaticObject(
+					context.TODO(),
+					fakeKubeClient, fakeExtensionClient, fakeResgistrationClient,
+					fakeAssetFunc,
+					c.applyFileName,
+				)
+			}
 
 			if err == nil && c.expectErr {
 				t.Errorf("Expect an apply error")
