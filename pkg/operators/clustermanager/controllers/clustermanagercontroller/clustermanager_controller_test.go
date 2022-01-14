@@ -57,7 +57,6 @@ func newTestController(clustermanager *operatorapiv1.ClusterManager) *testContro
 	hubController := &clusterManagerController{
 		clusterManagerClient: fakeOperatorClient.OperatorV1().ClusterManagers(),
 		clusterManagerLister: operatorInformers.Operator().V1().ClusterManagers().Lister(),
-		currentGeneration:    make([]int64, len(deploymentFiles)),
 		configMapLister:      kubeInfomers.Core().V1().ConfigMaps().Lister(),
 	}
 

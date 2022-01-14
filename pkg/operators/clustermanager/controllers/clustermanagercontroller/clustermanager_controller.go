@@ -95,7 +95,6 @@ type clusterManagerController struct {
 	kubeClient            kubernetes.Interface
 	apiExtensionClient    apiextensionsclient.Interface
 	apiRegistrationClient apiregistrationclient.APIServicesGetter
-	currentGeneration     []int64
 	configMapLister       corev1listers.ConfigMapLister
 }
 
@@ -116,7 +115,6 @@ func NewClusterManagerController(
 		clusterManagerClient:  clusterManagerClient,
 		clusterManagerLister:  clusterManagerInformer.Lister(),
 		configMapLister:       configMapInformer.Lister(),
-		currentGeneration:     make([]int64, len(deploymentFiles)),
 	}
 
 	return factory.New().WithSync(controller.sync).
