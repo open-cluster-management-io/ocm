@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	admissionclient "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
@@ -661,5 +662,39 @@ func SyncSecret(client, targetClient coreclientv1.SecretsGetter, recorder events
 		source.ResourceVersion = ""
 		source.OwnerReferences = ownerRefs
 		return resourceapply.ApplySecret(targetClient, recorder, source)
+	}
+}
+
+// GetHubKubeconfig is used to get the kubeconfig of the hub cluster.
+// If it's Default mode, the kubeconfig of the hub cluster should equal to the management cluster's kubeconfig.
+// If it's Detached mode, the kubeconfig of the hub cluster is stored as a secret under clustermanager namespace.
+func GetHubKubeconfig(ctx context.Context,
+	managementKubeconfig *rest.Config, // this is the kubeconfig of the cluster which controller is running on now.
+	clusternamagerName string,
+	clustermanagerMode operatorapiv1.InstallMode) (*restclient.Config, error) {
+	switch clustermanagerMode {
+	case operatorapiv1.InstallModeDefault:
+		return managementKubeconfig, nil
+	case operatorapiv1.InstallModeDetached:
+		clustermanagerNamespace := ClusterManagerNamespace(clusternamagerName, clustermanagerMode)
+		managementKubeclient, err := kubernetes.NewForConfig(managementKubeconfig)
+		if err != nil {
+			return nil, err
+		}
+
+		// get secret of external kubeconfig
+		secret, err := managementKubeclient.CoreV1().Secrets(clustermanagerNamespace).Get(ctx, ExternalHubKubeConfig, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		config, err := LoadClientConfigFromSecret(secret)
+		if err != nil {
+			return nil, err
+		}
+
+		return config, nil
+	default:
+		return nil, fmt.Errorf("unsupport install mode: %s", clustermanagerMode)
 	}
 }

@@ -24,6 +24,8 @@ const (
 	BootstrapHubKubeConfig = "bootstrap-hub-kubeconfig"
 	// HubKubeConfig is the secret name of kubeconfig secret to connect to hub with mtls
 	HubKubeConfig = "hub-kubeconfig-secret"
+	// ExternalHubKubeConfig is the secret name of kubeconfig secret to connecting to the hub cluster.
+	ExternalHubKubeConfig = "external-hub-kubeconfig"
 	// ExternalManagedKubeConfig is the secret name of kubeconfig secret to connecting to the managed cluster
 	// Only applicable to Detached mode, klusterlet-operator uses it to install resources on the managed cluster.
 	ExternalManagedKubeConfig = "external-managed-kubeconfig"

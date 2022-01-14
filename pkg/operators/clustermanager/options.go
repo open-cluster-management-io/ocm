@@ -9,7 +9,6 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
-	migrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset"
 
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
@@ -37,11 +36,11 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 	if err != nil {
 		return err
 	}
-	migrationClient, err := migrationclient.NewForConfig(controllerContext.KubeConfig)
-	if err != nil {
-		return err
-	}
 
+	// kubeInformer is for 3 usages: configmapInformer, secretInformer, deploynmentInformer
+	// After we introduced detached mode, the hub components could be installed in a customized namespace.(Before that, it only inform from "open-cluster-management-hub" namespace)
+	// It requires us to add filter for each Informer respectively.
+	// TODO: Wathc all namespace may cause performance issue.
 	kubeInformer := informers.NewSharedInformerFactoryWithOptions(kubeClient, 5*time.Minute)
 
 	// Build operator client and informer
@@ -75,8 +74,7 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		controllerContext.EventRecorder)
 
 	crdMigrationController := migrationcontroller.NewCRDMigrationController(
-		apiExtensionClient,
-		migrationClient.MigrationV1alpha1(),
+		controllerContext.KubeConfig,
 		operatorInformer.Operator().V1().ClusterManagers(),
 		controllerContext.EventRecorder)
 

@@ -41,11 +41,7 @@ func TestSupportStorageVersionMigration(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fakeAPIExtensionClient := fakeapiextensions.NewSimpleClientset(c.existingObjects...)
-			controller := crdMigrationController{
-				apiExtensionClient: fakeAPIExtensionClient,
-			}
-
-			actual, err := controller.supportStorageVersionMigration(context.TODO())
+			actual, err := supportStorageVersionMigration(context.TODO(), fakeAPIExtensionClient)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -94,11 +90,8 @@ func TestApplyStorageVersionMigrations(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fakeMigrationClient := fakemigrationclient.NewSimpleClientset(c.existingObjects...)
-			controller := crdMigrationController{
-				migrationClient: fakeMigrationClient.MigrationV1alpha1(),
-			}
 
-			err := controller.applyStorageVersionMigrations(context.TODO(), eventstesting.NewTestingEventRecorder(t))
+			err := applyStorageVersionMigrations(context.TODO(), fakeMigrationClient.MigrationV1alpha1(), eventstesting.NewTestingEventRecorder(t))
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -135,11 +128,8 @@ func TestRemoveStorageVersionMigrations(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fakeMigrationClient := fakemigrationclient.NewSimpleClientset(c.existingObjects...)
-			controller := crdMigrationController{
-				migrationClient: fakeMigrationClient.MigrationV1alpha1(),
-			}
 
-			err := controller.applyStorageVersionMigrations(context.TODO(), eventstesting.NewTestingEventRecorder(t))
+			err := applyStorageVersionMigrations(context.TODO(), fakeMigrationClient.MigrationV1alpha1(), eventstesting.NewTestingEventRecorder(t))
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
