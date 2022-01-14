@@ -1,0 +1,9 @@
+secretGenerator:
+  - name: external-hub-kubeconfig
+    namespace: cluster-manager
+    files:
+      - kubeconfig=external-hub-kubeconfig
+    type: "Opaque"
+
+generatorOptions:
+  disableNameSuffixHash: true

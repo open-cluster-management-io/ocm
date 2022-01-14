@@ -9,6 +9,7 @@ registration-operator
 dev-kubeconfig
 e2e-kubeconfig
 hub-kubeconfig
+external-hub-kubeconfig
 external-managed-kubeconfig
 munge-csv
 
@@ -21,5 +22,6 @@ _output/
 
 .kubeconfig
 .hub-kubeconfig
+.external-hub-kubeconfig
 .external-managed-kubeconfig
 .idea
