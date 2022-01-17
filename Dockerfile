@@ -1,4 +1,4 @@
-FROM docker.io/openshift/origin-release:golang-1.15 AS builder
+FROM registry.ci.openshift.org/stolostron/builder:go1.17-linux AS builder
 WORKDIR /go/src/open-cluster-management.io/placement
 COPY . .
 ENV GO_PACKAGE open-cluster-management.io/placement
