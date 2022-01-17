@@ -50,7 +50,7 @@ func TestFinalize(t *testing.T) {
 			validateDynamicActions:             noAction,
 		},
 		{
-			name:               "delete resources and remove finalizer",
+			name:               "get resources and remove finalizer",
 			terminated:         true,
 			existingFinalizers: []string{"a", controllers.AppliedManifestWorkFinalizer, "b"},
 			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
@@ -78,22 +78,22 @@ func TestFinalize(t *testing.T) {
 					t.Fatal(spew.Sdump(actions))
 				}
 
-				action := actions[0].(clienttesting.DeleteAction)
+				action := actions[0].(clienttesting.GetActionImpl)
 				resource, namespace, name := action.GetResource(), action.GetNamespace(), action.GetName()
 				if !reflect.DeepEqual(resource, schema.GroupVersionResource{Group: "g1", Version: "v1", Resource: "r1"}) || namespace != "" || name != "n1" {
 					t.Fatal(spew.Sdump(actions))
 				}
-				action = actions[1].(clienttesting.DeleteAction)
+				action = actions[1].(clienttesting.GetActionImpl)
 				resource, namespace, name = action.GetResource(), action.GetNamespace(), action.GetName()
 				if !reflect.DeepEqual(resource, schema.GroupVersionResource{Group: "g2", Version: "v2", Resource: "r2"}) || namespace != "ns2" || name != "n2" {
 					t.Fatal(spew.Sdump(actions))
 				}
-				action = actions[2].(clienttesting.DeleteAction)
+				action = actions[2].(clienttesting.GetActionImpl)
 				resource, namespace, name = action.GetResource(), action.GetNamespace(), action.GetName()
 				if !reflect.DeepEqual(resource, schema.GroupVersionResource{Group: "g3", Version: "v3", Resource: "r3"}) || namespace != "ns3" || name != "n3" {
 					t.Fatal(spew.Sdump(actions))
 				}
-				action = actions[3].(clienttesting.DeleteAction)
+				action = actions[3].(clienttesting.GetActionImpl)
 				resource, namespace, name = action.GetResource(), action.GetNamespace(), action.GetName()
 				if !reflect.DeepEqual(resource, schema.GroupVersionResource{Group: "g4", Version: "v4", Resource: "r4"}) || namespace != "" || name != "n4" {
 					t.Fatal(spew.Sdump(actions))
@@ -185,9 +185,7 @@ func TestFinalize(t *testing.T) {
 				now := metav1.Now()
 				testingWork.DeletionTimestamp = &now
 			}
-			for _, curr := range c.resourcesToRemove {
-				testingWork.Status.AppliedResources = append(testingWork.Status.AppliedResources, curr)
-			}
+			testingWork.Status.AppliedResources = append(testingWork.Status.AppliedResources, c.resourcesToRemove...)
 
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), c.existingResources...)
 			fakeClient := fakeworkclient.NewSimpleClientset(testingWork)

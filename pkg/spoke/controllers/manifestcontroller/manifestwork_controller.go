@@ -49,6 +49,7 @@ type ManifestWorkController struct {
 	spokeAPIExtensionClient   apiextensionsclient.Interface
 	hubHash                   string
 	restMapper                meta.RESTMapper
+	staticResourceCache       resourceapply.ResourceCache
 }
 
 type applyResult struct {
@@ -82,6 +83,9 @@ func NewManifestWorkController(
 		spokeAPIExtensionClient:   spokeAPIExtensionClient,
 		hubHash:                   hubHash,
 		restMapper:                restMapper,
+		// TODO we did not gc resources in cache, which may cause more memory usage. It
+		// should be refactored using own cache implementation in the future.
+		staticResourceCache: resourceapply.NewResourceCache(),
 	}
 
 	return factory.New().
@@ -190,7 +194,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	_, _, err = helper.UpdateManifestWorkStatus(
 		ctx, m.manifestWorkClient, manifestWork, m.generateUpdateStatusFunc(manifestWork.Generation, newManifestConditions))
 	if err != nil {
-		errs = append(errs, fmt.Errorf("Failed to update work status with err %w", err))
+		errs = append(errs, fmt.Errorf("failed to update work status with err %w", err))
 	}
 	if len(errs) > 0 {
 		err = utilerrors.NewAggregate(errs)
@@ -245,7 +249,7 @@ func (m *ManifestWorkController) applyOneManifest(
 
 	owner = manageOwnerRef(gvr, resMeta.Namespace, resMeta.Name, deleteOption, owner)
 
-	results := resourceapply.ApplyDirectly(ctx, clientHolder, recorder, func(name string) ([]byte, error) {
+	results := resourceapply.ApplyDirectly(ctx, clientHolder, recorder, m.staticResourceCache, func(name string) ([]byte, error) {
 		unstructuredObj := &unstructured.Unstructured{}
 		err := unstructuredObj.UnmarshalJSON(manifest.Raw)
 		if err != nil {
@@ -274,11 +278,11 @@ func (m *ManifestWorkController) decodeUnstructured(data []byte) (*unstructured.
 	unstructuredObj := &unstructured.Unstructured{}
 	err := unstructuredObj.UnmarshalJSON(data)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to decode object: %w", err)
+		return nil, fmt.Errorf("failed to decode object: %w", err)
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("Failed to find gvr from restmapping: %w", err)
+		return nil, fmt.Errorf("failed to find gvr from restmapping: %w", err)
 	}
 
 	return unstructuredObj, nil

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -42,6 +43,7 @@ func newController(work *workapiv1.ManifestWork, appliedWork *workapiv1.AppliedM
 		appliedManifestWorkClient: fakeWorkClient.WorkV1().AppliedManifestWorks(),
 		appliedManifestWorkLister: workInformerFactory.Work().V1().AppliedManifestWorks().Lister(),
 		restMapper:                mapper,
+		staticResourceCache:       resourceapply.NewResourceCache(),
 	}
 
 	workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(work)

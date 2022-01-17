@@ -1,6 +1,7 @@
 package util
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/onsi/ginkgo"
@@ -117,8 +118,13 @@ func (r *IntegrationTestEventRecorder) ComponentName() string {
 	return r.component
 }
 
+func (r *IntegrationTestEventRecorder) WithContext(ctx context.Context) events.Recorder {
+	return r
+}
+
 func (r *IntegrationTestEventRecorder) ForComponent(c string) events.Recorder {
-	return &IntegrationTestEventRecorder{component: c}
+	r.component = c
+	return r
 }
 
 func (r *IntegrationTestEventRecorder) WithComponentSuffix(suffix string) events.Recorder {

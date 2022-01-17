@@ -9,7 +9,7 @@ on:
 
 env:
   # Common versions
-  GO_VERSION: '1.16'
+  GO_VERSION: '1.17'
   GO_REQUIRED_MIN_VERSION: ''
   GOPATH: '/home/runner/work/work/work/go'
 defaults:

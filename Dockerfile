@@ -1,4 +1,4 @@
-FROM docker.io/openshift/origin-release:golang-1.16 AS builder
+FROM quay.io/bitnami/golang:1.17 AS builder
 WORKDIR /go/src/open-cluster-management.io/work
 COPY . .
 ENV GO_PACKAGE open-cluster-management.io/work

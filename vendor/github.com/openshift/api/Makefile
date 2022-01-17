@@ -16,7 +16,7 @@ GO_BUILD_PACKAGES :=$(GO_PACKAGES)
 GO_BUILD_PACKAGES_EXPANDED :=$(GO_BUILD_PACKAGES)
 # LDFLAGS are not needed for dummy builds (saving time on calling git commands)
 GO_LD_FLAGS:=
-CONTROLLER_GEN_VERSION :=v0.6.0
+CONTROLLER_GEN_VERSION :=v0.7.0
 
 # $1 - target name
 # $2 - apis
@@ -32,6 +32,7 @@ $(call add-crd-gen,imageregistry,./imageregistry/v1,./imageregistry/v1,./imagere
 $(call add-crd-gen,operator,./operator/v1,./operator/v1,./operator/v1)
 $(call add-crd-gen,operator-alpha,./operator/v1alpha1,./operator/v1alpha1,./operator/v1alpha1)
 $(call add-crd-gen,operatoringress,./operatoringress/v1,./operatoringress/v1,./operatoringress/v1)
+$(call add-crd-gen,sharedresource,./sharedresource/v1alpha1,./sharedresource/v1alpha1,./sharedresource/v1alpha1)
 $(call add-crd-gen,quota,./quota/v1,./quota/v1,./quota/v1)
 $(call add-crd-gen,samples,./samples/v1,./samples/v1,./samples/v1)
 $(call add-crd-gen,security,./security/v1,./security/v1,./security/v1)
@@ -40,6 +41,7 @@ $(call add-crd-gen,cloudnetwork,./cloudnetwork/v1,./cloudnetwork/v1,./cloudnetwo
 $(call add-crd-gen,network,./network/v1,./network/v1,./network/v1)
 $(call add-crd-gen,networkoperator,./networkoperator/v1,./networkoperator/v1,./networkoperator/v1)
 $(call add-crd-gen,operatorcontrolplane,./operatorcontrolplane/v1alpha1,./operatorcontrolplane/v1alpha1,./operatorcontrolplane/v1alpha1)
+$(call add-crd-gen,machine,./machine/v1beta1,./machine/v1beta1,./machine/v1beta1)
 
 RUNTIME ?= podman
 RUNTIME_IMAGE_NAME ?= openshift-api-generator
