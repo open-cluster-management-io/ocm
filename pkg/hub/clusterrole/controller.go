@@ -38,6 +38,7 @@ var manifestFiles embed.FS
 type clusterroleController struct {
 	kubeClient    kubernetes.Interface
 	clusterLister clusterv1listers.ManagedClusterLister
+	cache         resourceapply.ResourceCache
 	eventRecorder events.Recorder
 }
 
@@ -50,6 +51,7 @@ func NewManagedClusterClusterroleController(
 	c := &clusterroleController{
 		kubeClient:    kubeClient,
 		clusterLister: clusterInformer.Lister(),
+		cache:         resourceapply.NewResourceCache(),
 		eventRecorder: recorder.WithComponentSuffix("managed-cluster-clusterrole-controller"),
 	}
 	return factory.New().
@@ -84,14 +86,12 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 		)
 	}
 
-	cache := resourceapply.NewResourceCache()
-
 	// Make sure the managedcluser cluserroles are existed if there are clusters
 	results := resourceapply.ApplyDirectly(
 		ctx,
 		resourceapply.NewKubeClientHolder(c.kubeClient),
 		syncCtx.Recorder(),
-		cache,
+		c.cache,
 		manifestFiles.ReadFile,
 		clusterRoleFiles...,
 	)

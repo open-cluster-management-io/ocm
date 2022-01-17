@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	v1 "open-cluster-management.io/api/cluster/v1"
@@ -100,7 +101,7 @@ func TestSyncManagedCluster(t *testing.T) {
 				clusterStore.Add(cluster)
 			}
 
-			ctrl := managedClusterController{kubeClient, clusterClient, clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(), eventstesting.NewTestingEventRecorder(t)}
+			ctrl := managedClusterController{kubeClient, clusterClient, clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(), resourceapply.NewResourceCache(), eventstesting.NewTestingEventRecorder(t)}
 			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)

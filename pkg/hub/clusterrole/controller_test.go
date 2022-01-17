@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
@@ -74,6 +75,7 @@ func TestSyncManagedClusterClusterRole(t *testing.T) {
 			ctrl := &clusterroleController{
 				kubeClient:    kubeClient,
 				clusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
+				cache:         resourceapply.NewResourceCache(),
 				eventRecorder: eventstesting.NewTestingEventRecorder(t),
 			}
 
