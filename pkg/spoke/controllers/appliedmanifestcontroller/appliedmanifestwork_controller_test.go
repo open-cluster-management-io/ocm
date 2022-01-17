@@ -53,7 +53,7 @@ func TestSyncManifestWork(t *testing.T) {
 				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
 			},
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
 			},
 			manifests: []workapiv1.ManifestCondition{newManifest("", "v1", "secrets", "ns1", "n1")},
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -74,10 +74,10 @@ func TestSyncManifestWork(t *testing.T) {
 				spoketesting.NewUnstructuredSecret("ns6", "n6", false, "ns6-n6", *owner),
 			},
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
-				{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
-				{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns3", Name: "n3", UID: "ns3-n3"},
-				{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns4", Name: "n4", UID: "ns4-n4"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "ns2-n2"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "secrets", Namespace: "ns3", Name: "n3"}, UID: "ns3-n3"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "secrets", Namespace: "ns4", Name: "n4"}, UID: "ns4-n4"},
 			},
 			manifests: []workapiv1.ManifestCondition{
 				newManifest("", "v1", "secrets", "ns1", "n1"),
@@ -91,12 +91,12 @@ func TestSyncManifestWork(t *testing.T) {
 				}
 				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
 				if !reflect.DeepEqual(work.Status.AppliedResources, []workapiv1.AppliedManifestResourceMeta{
-					{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
-					{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
-					{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns3", Name: "n3", UID: "ns3-n3"},
-					{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns4", Name: "n4", UID: "ns4-n4"},
-					{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns5", Name: "n5", UID: "ns5-n5"},
-					{Group: "", Version: "v1", Resource: "secrets", Namespace: "ns6", Name: "n6", UID: "ns6-n6"},
+					{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
+					{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "ns2-n2"},
+					{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "secrets", Namespace: "ns3", Name: "n3"}, UID: "ns3-n3"},
+					{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "secrets", Namespace: "ns4", Name: "n4"}, UID: "ns4-n4"},
+					{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "secrets", Namespace: "ns5", Name: "n5"}, UID: "ns5-n5"},
+					{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "secrets", Namespace: "ns6", Name: "n6"}, UID: "ns6-n6"},
 				}) {
 					t.Fatal(spew.Sdump(actions))
 				}
@@ -114,9 +114,9 @@ func TestSyncManifestWork(t *testing.T) {
 				spoketesting.NewUnstructuredSecret("ns3", "n3", true, "ns3-n3", *owner),
 			},
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
-				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
-				{Version: "v1", Resource: "secrets", Namespace: "ns3", Name: "n3", UID: "ns3-n3"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "ns2-n2"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns3", Name: "n3"}, UID: "ns3-n3"},
 			},
 			manifests: []workapiv1.ManifestCondition{
 				newManifest("", "v1", "secrets", "ns1", "n1"),
@@ -138,8 +138,8 @@ func TestSyncManifestWork(t *testing.T) {
 				spoketesting.NewUnstructuredSecret("ns5", "n5", false, "ns5-n5", *owner),
 			},
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", Resource: "secrets", Namespace: "ns3", Name: "n3", UID: "ns3-n3"},
-				{Version: "v1", Resource: "secrets", Namespace: "ns4", Name: "n4", UID: "ns4-n4"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns3", Name: "n3"}, UID: "ns3-n3"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns4", Name: "n4"}, UID: "ns4-n4"},
 			},
 			manifests: []workapiv1.ManifestCondition{
 				newManifest("", "v1", "secrets", "ns1", "n1"),
@@ -151,8 +151,8 @@ func TestSyncManifestWork(t *testing.T) {
 				}
 				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
 				if !reflect.DeepEqual(work.Status.AppliedResources, []workapiv1.AppliedManifestResourceMeta{
-					{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
-					{Version: "v1", Resource: "secrets", Namespace: "ns5", Name: "n5", UID: "ns5-n5"},
+					{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
+					{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns5", Name: "n5"}, UID: "ns5-n5"},
 				}) {
 					t.Fatal(spew.Sdump(actions))
 				}
@@ -166,8 +166,8 @@ func TestSyncManifestWork(t *testing.T) {
 				spoketesting.NewUnstructuredSecret("ns2", "n2", false, "ns2-n2-updated", *owner),
 			},
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
-				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "ns2-n2"},
 			},
 			manifests: []workapiv1.ManifestCondition{
 				newManifest("", "v1", "secrets", "ns1", "n1"),
@@ -179,8 +179,8 @@ func TestSyncManifestWork(t *testing.T) {
 				}
 				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
 				if !reflect.DeepEqual(work.Status.AppliedResources, []workapiv1.AppliedManifestResourceMeta{
-					{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
-					{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2-updated"},
+					{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
+					{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "ns2-n2-updated"},
 				}) {
 					t.Fatal(spew.Sdump(actions))
 				}
@@ -248,51 +248,51 @@ func TestFindUntrackedResources(t *testing.T) {
 			name:             "no resource untracked",
 			appliedResources: nil,
 			newAppliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
 			},
 			expectedUntrackedResources: nil,
 		},
 		{
 			name: "some of original resources untracked",
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
-				{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
+				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
 			},
 			newAppliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
-				{Group: "g3", Version: "v3", Resource: "r3", Namespace: "ns3", Name: "n3"},
+				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
+				{Version: "v3", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g3", Resource: "r3", Namespace: "ns3", Name: "n3"}},
 			},
 			expectedUntrackedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
 			},
 		},
 		{
 			name: "all original resources untracked",
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
-				{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
+				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
 			},
 			newAppliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Group: "g3", Version: "v3", Resource: "r3", Namespace: "ns3", Name: "n3"},
-				{Group: "g4", Version: "v4", Resource: "r4", Namespace: "ns4", Name: "n4"},
+				{Version: "v3", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g3", Resource: "r3", Namespace: "ns3", Name: "n3"}},
+				{Version: "v4", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g4", Resource: "r4", Namespace: "ns4", Name: "n4"}},
 			},
 			expectedUntrackedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
-				{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
+				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
 			},
 		},
 		{
 			name: "changing version of original resources does not make it untracked",
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Group: "g1", Version: "v1", Resource: "r1", Namespace: "ns1", Name: "n1"},
-				{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
+				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
 			},
 			newAppliedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Group: "g1", Version: "v2", Resource: "r1", Namespace: "ns1", Name: "n1"},
-				{Group: "g4", Version: "v4", Resource: "r4", Namespace: "ns4", Name: "n4"},
+				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "ns1", Name: "n1"}},
+				{Version: "v4", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g4", Resource: "r4", Namespace: "ns4", Name: "n4"}},
 			},
 			expectedUntrackedResources: []workapiv1.AppliedManifestResourceMeta{
-				{Group: "g2", Version: "v2", Resource: "r2", Namespace: "ns2", Name: "n2"},
+				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
 			},
 		},
 	}

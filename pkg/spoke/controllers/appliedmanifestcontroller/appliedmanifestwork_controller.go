@@ -141,12 +141,14 @@ func (m *AppliedManifestWorkController) syncManifestWork(
 		}
 
 		appliedResources = append(appliedResources, workapiv1.AppliedManifestResourceMeta{
-			Group:     resourceStatus.ResourceMeta.Group,
-			Version:   resourceStatus.ResourceMeta.Version,
-			Resource:  resourceStatus.ResourceMeta.Resource,
-			Namespace: resourceStatus.ResourceMeta.Namespace,
-			Name:      resourceStatus.ResourceMeta.Name,
-			UID:       string(u.GetUID()),
+			ResourceIdentifier: workapiv1.ResourceIdentifier{
+				Group:     resourceStatus.ResourceMeta.Group,
+				Resource:  resourceStatus.ResourceMeta.Resource,
+				Namespace: resourceStatus.ResourceMeta.Namespace,
+				Name:      resourceStatus.ResourceMeta.Name,
+			},
+			Version: resourceStatus.ResourceMeta.Version,
+			UID:     string(u.GetUID()),
 		})
 	}
 	if len(errs) != 0 {

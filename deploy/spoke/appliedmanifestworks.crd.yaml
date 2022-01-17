@@ -12,91 +12,67 @@ spec:
   scope: Cluster
   preserveUnknownFields: false
   versions:
-  - name: v1
-    schema:
-      openAPIV3Schema:
-        description: AppliedManifestWork represents an applied manifestwork on managed
-          cluster that is placed on a managed cluster. An AppliedManifestWork links
-          to a manifestwork on a hub recording resources deployed in the managed cluster.
-          When the agent is removed from managed cluster, cluster-admin on managed
-          cluster can delete appliedmanifestwork to remove resources deployed by the
-          agent. The name of the appliedmanifestwork must be in the format of {hash
-          of hub's first kube-apiserver url}-{manifestwork name}
-        type: object
-        properties:
-          apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-            type: string
-          kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-            type: string
-          metadata:
-            type: object
-          spec:
-            description: Spec represents the desired configuration of AppliedManifestWork.
-            type: object
-            properties:
-              hubHash:
-                description: HubHash represents the hash of the first hub kube apiserver
-                  to identify which hub this AppliedManifestWork links to.
-                type: string
-              manifestWorkName:
-                description: ManifestWorkName represents the name of the related manifestwork
-                  on the hub.
-                type: string
-          status:
-            description: Status represents the current status of AppliedManifestWork.
-            type: object
-            properties:
-              appliedResources:
-                description: AppliedResources represents a list of resources defined
-                  within the manifestwork that are applied. Only resources with valid
-                  GroupVersionResource, namespace, and name are suitable. An item
-                  in this slice is deleted when there is no mapped manifest in manifestwork.Spec
-                  or by finalizer. The resource relating to the item will also be
-                  removed from managed cluster. The deleted resource may still be
-                  present until the finalizers for that resource are finished. However,
-                  the resource will not be undeleted, so it can be removed from this
-                  list and eventual consistency is preserved.
-                type: array
-                items:
-                  description: AppliedManifestResourceMeta represents the group, version,
-                    resource, name and namespace of a resource. Since these resources
-                    have been created, they must have valid group, version, resource,
-                    namespace, and name.
-                  type: object
-                  properties:
-                    group:
-                      description: Group is the API Group of the Kubernetes resource.
-                      type: string
-                    name:
-                      description: Name is the name of the Kubernetes resource.
-                      type: string
-                    namespace:
-                      description: Name is the namespace of the Kubernetes resource,
-                        empty string indicates it is a cluster scoped resource.
-                      type: string
-                    resource:
-                      description: Resource is the resource name of the Kubernetes
-                        resource.
-                      type: string
-                    uid:
-                      description: UID is set on successful deletion of the Kubernetes
-                        resource by controller. The resource might be still visible
-                        on the managed cluster after this field is set. It is not
-                        directly settable by a client.
-                      type: string
-                    version:
-                      description: Version is the version of the Kubernetes resource.
-                      type: string
-    served: true
-    storage: true
-    subresources:
-      status: {}
+    - name: v1
+      schema:
+        openAPIV3Schema:
+          description: AppliedManifestWork represents an applied manifestwork on managed cluster that is placed on a managed cluster. An AppliedManifestWork links to a manifestwork on a hub recording resources deployed in the managed cluster. When the agent is removed from managed cluster, cluster-admin on managed cluster can delete appliedmanifestwork to remove resources deployed by the agent. The name of the appliedmanifestwork must be in the format of {hash of hub's first kube-apiserver url}-{manifestwork name}
+          type: object
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: Spec represents the desired configuration of AppliedManifestWork.
+              type: object
+              properties:
+                hubHash:
+                  description: HubHash represents the hash of the first hub kube apiserver to identify which hub this AppliedManifestWork links to.
+                  type: string
+                manifestWorkName:
+                  description: ManifestWorkName represents the name of the related manifestwork on the hub.
+                  type: string
+            status:
+              description: Status represents the current status of AppliedManifestWork.
+              type: object
+              properties:
+                appliedResources:
+                  description: AppliedResources represents a list of resources defined within the manifestwork that are applied. Only resources with valid GroupVersionResource, namespace, and name are suitable. An item in this slice is deleted when there is no mapped manifest in manifestwork.Spec or by finalizer. The resource relating to the item will also be removed from managed cluster. The deleted resource may still be present until the finalizers for that resource are finished. However, the resource will not be undeleted, so it can be removed from this list and eventual consistency is preserved.
+                  type: array
+                  items:
+                    description: AppliedManifestResourceMeta represents the group, version, resource, name and namespace of a resource. Since these resources have been created, they must have valid group, version, resource, namespace, and name.
+                    type: object
+                    required:
+                      - name
+                      - resource
+                      - version
+                    properties:
+                      group:
+                        description: Group is the API Group of the Kubernetes resource, empty string indicates it is in core group.
+                        type: string
+                      name:
+                        description: Name is the name of the Kubernetes resource.
+                        type: string
+                      namespace:
+                        description: Name is the namespace of the Kubernetes resource, empty string indicates it is a cluster scoped resource.
+                        type: string
+                      resource:
+                        description: Resource is the resource name of the Kubernetes resource.
+                        type: string
+                      uid:
+                        description: UID is set on successful deletion of the Kubernetes resource by controller. The resource might be still visible on the managed cluster after this field is set. It is not directly settable by a client.
+                        type: string
+                      version:
+                        description: Version is the version of the Kubernetes resource.
+                        type: string
+      served: true
+      storage: true
+      subresources:
+        status: {}
 status:
   acceptedNames:
     kind: ""

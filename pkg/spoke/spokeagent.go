@@ -31,13 +31,15 @@ type WorkloadAgentOptions struct {
 	SpokeClusterName    string
 	QPS                 float32
 	Burst               int
+	StatusSyncInterval  time.Duration
 }
 
 // NewWorkloadAgentOptions returns the flags with default value set
 func NewWorkloadAgentOptions() *WorkloadAgentOptions {
 	return &WorkloadAgentOptions{
-		QPS:   50,
-		Burst: 100,
+		QPS:                50,
+		Burst:              100,
+		StatusSyncInterval: 30 * time.Second,
 	}
 }
 
@@ -51,6 +53,7 @@ func (o *WorkloadAgentOptions) AddFlags(cmd *cobra.Command) {
 	flags.StringVar(&o.SpokeClusterName, "spoke-cluster-name", o.SpokeClusterName, "Name of spoke cluster.")
 	flags.Float32Var(&o.QPS, "spoke-kube-api-qps", o.QPS, "QPS to use while talking with apiserver on spoke cluster.")
 	flags.IntVar(&o.Burst, "spoke-kube-api-burst", o.Burst, "Burst to use while talking with apiserver on spoke cluster.")
+	flags.DurationVar(&o.StatusSyncInterval, "status-sync-interval", o.StatusSyncInterval, "Interval to sync resource status to hub.")
 }
 
 // RunWorkloadAgent starts the controllers on agent to process work from hub.
@@ -151,6 +154,7 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 		hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName),
 		workInformerFactory.Work().V1().ManifestWorks(),
 		workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks(o.SpokeClusterName),
+		o.StatusSyncInterval,
 	)
 
 	go workInformerFactory.Start(ctx.Done())

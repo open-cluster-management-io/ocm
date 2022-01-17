@@ -173,11 +173,13 @@ func AssertAppliedResources(hubHash, workName string, gvrs []schema.GroupVersion
 	var appliedResources []workapiv1.AppliedManifestResourceMeta
 	for i := range gvrs {
 		appliedResources = append(appliedResources, workapiv1.AppliedManifestResourceMeta{
-			Group:     gvrs[i].Group,
-			Version:   gvrs[i].Version,
-			Resource:  gvrs[i].Resource,
-			Namespace: namespaces[i],
-			Name:      names[i],
+			ResourceIdentifier: workapiv1.ResourceIdentifier{
+				Group:     gvrs[i].Group,
+				Resource:  gvrs[i].Resource,
+				Namespace: namespaces[i],
+				Name:      names[i],
+			},
+			Version: gvrs[i].Version,
 		})
 	}
 
@@ -207,11 +209,13 @@ func AssertAppliedResources(hubHash, workName string, gvrs []schema.GroupVersion
 		var actualAppliedResources []workapiv1.AppliedManifestResourceMeta
 		for _, appliedResource := range appliedManifestWork.Status.AppliedResources {
 			actualAppliedResources = append(actualAppliedResources, workapiv1.AppliedManifestResourceMeta{
-				Group:     appliedResource.Group,
-				Version:   appliedResource.Version,
-				Resource:  appliedResource.Resource,
-				Namespace: appliedResource.Namespace,
-				Name:      appliedResource.Name,
+				ResourceIdentifier: workapiv1.ResourceIdentifier{
+					Group:     appliedResource.Group,
+					Resource:  appliedResource.Resource,
+					Namespace: appliedResource.Namespace,
+					Name:      appliedResource.Name,
+				},
+				Version: appliedResource.Version,
 			})
 		}
 

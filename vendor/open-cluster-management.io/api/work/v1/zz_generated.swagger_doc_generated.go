@@ -12,13 +12,9 @@ package v1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_AppliedManifestResourceMeta = map[string]string{
-	"":          "AppliedManifestResourceMeta represents the group, version, resource, name and namespace of a resource. Since these resources have been created, they must have valid group, version, resource, namespace, and name.",
-	"group":     "Group is the API Group of the Kubernetes resource.",
-	"version":   "Version is the version of the Kubernetes resource.",
-	"resource":  "Resource is the resource name of the Kubernetes resource.",
-	"name":      "Name is the name of the Kubernetes resource.",
-	"namespace": "Name is the namespace of the Kubernetes resource, empty string indicates it is a cluster scoped resource.",
-	"uid":       "UID is set on successful deletion of the Kubernetes resource by controller. The resource might be still visible on the managed cluster after this field is set. It is not directly settable by a client.",
+	"":        "AppliedManifestResourceMeta represents the group, version, resource, name and namespace of a resource. Since these resources have been created, they must have valid group, version, resource, namespace, and name.",
+	"version": "Version is the version of the Kubernetes resource.",
+	"uid":     "UID is set on successful deletion of the Kubernetes resource by controller. The resource might be still visible on the managed cluster after this field is set. It is not directly settable by a client.",
 }
 
 func (AppliedManifestResourceMeta) SwaggerDoc() map[string]string {
@@ -73,6 +69,46 @@ func (DeleteOption) SwaggerDoc() map[string]string {
 	return map_DeleteOption
 }
 
+var map_FeedbackRule = map[string]string{
+	"type":      "Type defines the option of how status can be returned. It can be jsonPaths or wellKnownStatus. If the type is JSONPaths, user should specify the jsonPaths field If the type is WellKnownStatus, certain common fields of status defined by a rule only for types in in k8s.io/api and open-cluster-management/api will be reported, If these status fields do not exist, no values will be reported.",
+	"jsonPaths": "JsonPaths defines the json path under status field to be synced.",
+}
+
+func (FeedbackRule) SwaggerDoc() map[string]string {
+	return map_FeedbackRule
+}
+
+var map_FeedbackValue = map[string]string{
+	"name":       "Name represents the alias name for this field. It is the same as what is specified in StatuFeedbackRule in the spec.",
+	"fieldValue": "Value is the value of the status field. The value of the status field can only be integer, string or boolean.",
+}
+
+func (FeedbackValue) SwaggerDoc() map[string]string {
+	return map_FeedbackValue
+}
+
+var map_FieldValue = map[string]string{
+	"":        "FieldValue is the value of the status field. The value of the status field can only be integer, string or boolean.",
+	"type":    "Type represents the type of the value, it can be integer, string or boolean.",
+	"integer": "Integer is the integer value when type is integer.",
+	"string":  "String is the string value when when type is string.",
+	"boolean": "Boolean is bool value when type is boolean.",
+}
+
+func (FieldValue) SwaggerDoc() map[string]string {
+	return map_FieldValue
+}
+
+var map_JsonPath = map[string]string{
+	"name":    "Name represents the alias name for this field",
+	"version": "Version is the version of the Kubernetes resource. If it is not specified, the resource with the semantically latest version is used to resolve the path.",
+	"path":    "Path represents the json path of the field under status. The path must point to a field with single value in the type of integer, bool or string. If the path points to a non-existing field, no value will be returned. If the path points to a structure, map or slice, no value will be returned and the status conddition of StatusFeedBackSynced will be set as false. Ref to https://kubernetes.io/docs/reference/kubectl/jsonpath/ on how to write a jsonPath.",
+}
+
+func (JsonPath) SwaggerDoc() map[string]string {
+	return map_JsonPath
+}
+
 var map_Manifest = map[string]string{
 	"": "Manifest represents a resource to be deployed on managed cluster.",
 }
@@ -82,13 +118,24 @@ func (Manifest) SwaggerDoc() map[string]string {
 }
 
 var map_ManifestCondition = map[string]string{
-	"":             "ManifestCondition represents the conditions of the resources deployed on a managed cluster.",
-	"resourceMeta": "ResourceMeta represents the group, version, kind, name and namespace of a resoure.",
-	"conditions":   "Conditions represents the conditions of this resource on a managed cluster.",
+	"":               "ManifestCondition represents the conditions of the resources deployed on a managed cluster.",
+	"resourceMeta":   "ResourceMeta represents the group, version, kind, name and namespace of a resoure.",
+	"statusFeedback": "StatusFeedback represents the values of the feild synced back defined in statusFeedbacks",
+	"conditions":     "Conditions represents the conditions of this resource on a managed cluster.",
 }
 
 func (ManifestCondition) SwaggerDoc() map[string]string {
 	return map_ManifestCondition
+}
+
+var map_ManifestConfigOption = map[string]string{
+	"":                   "ManifestConfigOption represents the configurations of a manifest defined in workload field.",
+	"resourceIdentifier": "ResourceIdentifier represents the group, resource, name and namespace of a resoure. iff this refers to a resource not created by this manifest work, the related rules will not be executed.",
+	"feedbackRules":      "FeedbackRules defines what resource status field should be returned.",
+}
+
+func (ManifestConfigOption) SwaggerDoc() map[string]string {
+	return map_ManifestConfigOption
 }
 
 var map_ManifestResourceMeta = map[string]string{
@@ -136,9 +183,10 @@ func (ManifestWorkList) SwaggerDoc() map[string]string {
 }
 
 var map_ManifestWorkSpec = map[string]string{
-	"":             "ManifestWorkSpec represents a desired configuration of manifests to be deployed on the managed cluster.",
-	"workload":     "Workload represents the manifest workload to be deployed on a managed cluster.",
-	"deleteOption": "DeleteOption represents deletion strategy when the manifestwork is deleted. Foreground deletion strategy is applied to all the resource in this manifestwork if it is not set.",
+	"":                "ManifestWorkSpec represents a desired configuration of manifests to be deployed on the managed cluster.",
+	"workload":        "Workload represents the manifest workload to be deployed on a managed cluster.",
+	"deleteOption":    "DeleteOption represents deletion strategy when the manifestwork is deleted. Foreground deletion strategy is applied to all the resource in this manifestwork if it is not set.",
+	"manifestConfigs": "ManifestConfigs represents the configurations of manifests defined in workload field.",
 }
 
 func (ManifestWorkSpec) SwaggerDoc() map[string]string {
@@ -164,16 +212,16 @@ func (ManifestsTemplate) SwaggerDoc() map[string]string {
 	return map_ManifestsTemplate
 }
 
-var map_OrphaningRule = map[string]string{
-	"":          "OrphaningRule identifies a single resource included in this manifestwork",
-	"group":     "Group is the api group of the resources in the workload that the strategy is applied",
-	"resource":  "Resource is the resources in the workload that the strategy is applied",
-	"namespace": "Namespace is the namespaces of the resources in the workload that the strategy is applied",
-	"name":      "Name is the names of the resources in the workload that the strategy is applied",
+var map_ResourceIdentifier = map[string]string{
+	"":          "ResourceIdentifier identifies a single resource included in this manifestwork",
+	"group":     "Group is the API Group of the Kubernetes resource, empty string indicates it is in core group.",
+	"resource":  "Resource is the resource name of the Kubernetes resource.",
+	"name":      "Name is the name of the Kubernetes resource.",
+	"namespace": "Name is the namespace of the Kubernetes resource, empty string indicates it is a cluster scoped resource.",
 }
 
-func (OrphaningRule) SwaggerDoc() map[string]string {
-	return map_OrphaningRule
+func (ResourceIdentifier) SwaggerDoc() map[string]string {
+	return map_ResourceIdentifier
 }
 
 var map_SelectivelyOrphan = map[string]string{
@@ -183,6 +231,15 @@ var map_SelectivelyOrphan = map[string]string{
 
 func (SelectivelyOrphan) SwaggerDoc() map[string]string {
 	return map_SelectivelyOrphan
+}
+
+var map_StatusFeedbackResult = map[string]string{
+	"":       "StatusFeedbackResult represents the values of the feild synced back defined in statusFeedbacks",
+	"values": "Values represents the synced value of the interested field.",
+}
+
+func (StatusFeedbackResult) SwaggerDoc() map[string]string {
+	return map_StatusFeedbackResult
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

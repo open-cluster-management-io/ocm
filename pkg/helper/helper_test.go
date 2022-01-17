@@ -340,7 +340,7 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 		{
 			name: "skip if resource does not exist",
 			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}},
 			},
 			owner: metav1.OwnerReference{Name: "n1", UID: "a"},
 		},
@@ -351,8 +351,8 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 				newSecret("ns2", "n2", true, "ns2-n2-xxx", metav1.OwnerReference{Name: "n1", UID: "a"}),
 			},
 			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
-				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "ns2-n2"},
 			},
 			owner: metav1.OwnerReference{Name: "n1", UID: "a"},
 		},
@@ -363,11 +363,11 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 				newSecret("ns2", "n2", false, "ns2-n2", metav1.OwnerReference{Name: "n2", UID: "b"}),
 			},
 			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
-				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "ns2-n2"},
 			},
 			expectedResourcesPendingFinalization: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
 			},
 			owner: metav1.OwnerReference{Name: "n1", UID: "a"},
 		},
@@ -378,11 +378,11 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 				newSecret("ns2", "n2", true, "ns2-n2", metav1.OwnerReference{Name: "n1", UID: "a"}),
 			},
 			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1"},
-				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "ns2-n2"},
 			},
 			expectedResourcesPendingFinalization: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "ns2-n2"},
 			},
 			owner: metav1.OwnerReference{Name: "n1", UID: "a"},
 		},
@@ -392,7 +392,7 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 				newSecret("ns1", "n1", false, "ns1-n1", metav1.OwnerReference{Name: "n2", UID: "b"}),
 			},
 			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
 			},
 			expectedResourcesPendingFinalization: []workapiv1.AppliedManifestResourceMeta{},
 			owner:                                metav1.OwnerReference{Name: "n1", UID: "a"},
@@ -403,8 +403,8 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 				newSecret("ns1", "n1", false, "ns1-n1", metav1.OwnerReference{Name: "n1", UID: "a"}, metav1.OwnerReference{Name: "n2", UID: "b"}),
 			},
 			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", Resource: "secrets", Namespace: "ns1", Name: "n1", UID: "ns1-n1"},
-				{Version: "v1", Resource: "secrets", Namespace: "ns2", Name: "n2", UID: "ns2-n2"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "ns2-n2"},
 			},
 			expectedResourcesPendingFinalization: []workapiv1.AppliedManifestResourceMeta{},
 			owner:                                metav1.OwnerReference{Name: "n1", UID: "a"},

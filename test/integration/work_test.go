@@ -19,7 +19,6 @@ import (
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/work/pkg/spoke"
-	"open-cluster-management.io/work/pkg/spoke/controllers/statuscontroller"
 	"open-cluster-management.io/work/test/integration/util"
 )
 
@@ -45,13 +44,12 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		o = spoke.NewWorkloadAgentOptions()
 		o.HubKubeconfigFile = hubKubeconfigFileName
 		o.SpokeClusterName = utilrand.String(5)
+		o.StatusSyncInterval = 3 * time.Second
 
 		ns := &corev1.Namespace{}
 		ns.Name = o.SpokeClusterName
 		_, err := spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		statuscontroller.ControllerReSyncInterval = 3 * time.Second
 
 		var ctx context.Context
 		ctx, cancel = context.WithCancel(context.Background())
@@ -428,7 +426,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 				}
 
 				for i := range work.Status.ResourceStatus.Manifests {
-					if len(work.Status.ResourceStatus.Manifests[i].Conditions) != 2 {
+					if len(work.Status.ResourceStatus.Manifests[i].Conditions) != 3 {
 						return false
 					}
 				}

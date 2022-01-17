@@ -10,9 +10,11 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/work/test/integration/util"
 )
 
 const (
@@ -249,19 +252,21 @@ var _ = ginkgo.Describe("Work agent", func() {
 
 			// check applied resources in manifestwork status
 			expectedAppliedResources := []workapiv1.AppliedManifestResourceMeta{
-				{Version: "v1", Resource: "configmaps", Namespace: ns1, Name: "cm1"},
-				{Version: "v1", Resource: "configmaps", Namespace: ns1, Name: "cm2"},
-				{Version: "v1", Resource: "configmaps", Namespace: ns2, Name: "cm3"},
-				{Version: "v1", Resource: "namespaces", Name: ns1},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "configmaps", Namespace: ns1, Name: "cm1"}},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "configmaps", Namespace: ns1, Name: "cm2"}},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "configmaps", Namespace: ns2, Name: "cm3"}},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "namespaces", Name: ns1}},
 			}
 			actualAppliedResources := []workapiv1.AppliedManifestResourceMeta{}
 			for _, appliedResource := range appliedManifestWork.Status.AppliedResources {
 				actualAppliedResources = append(actualAppliedResources, workapiv1.AppliedManifestResourceMeta{
-					Group:     appliedResource.Group,
-					Version:   appliedResource.Version,
-					Resource:  appliedResource.Resource,
-					Namespace: appliedResource.Namespace,
-					Name:      appliedResource.Name,
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     appliedResource.Group,
+						Resource:  appliedResource.Resource,
+						Namespace: appliedResource.Namespace,
+						Name:      appliedResource.Name,
+					},
+					Version: appliedResource.Version,
 				})
 			}
 			gomega.Expect(reflect.DeepEqual(actualAppliedResources, expectedAppliedResources)).To(gomega.BeTrue())
@@ -544,6 +549,109 @@ var _ = ginkgo.Describe("Work agent", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 		})
 	})
+
+	ginkgo.Context("ManifestWork status feedback", func() {
+		var workName string
+		var err error
+
+		ginkgo.BeforeEach(func() {
+			workName = fmt.Sprintf("statuswork-%s", nameSuffix)
+		})
+
+		ginkgo.AfterEach(func() {
+			// delete work
+			err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(context.Background(), workName, metav1.DeleteOptions{})
+			if err != nil {
+				gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+			}
+		})
+
+		ginkgo.It("should return wellkown status of deployment", func() {
+			deployment := newDeployment("nginx")
+			objects := []runtime.Object{deployment}
+			work := newManifestWork(clusterName, workName, objects...)
+			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "nginx",
+						Namespace: "default",
+					},
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.WellKnownStatusType,
+						},
+						{
+							Type: workapiv1.JSONPathsType,
+							JsonPaths: []workapiv1.JsonPath{
+								{
+									Name: "AvailableCondition",
+									Path: ".status.conditions[?(@.type==\"Available\")].status",
+								},
+							},
+						},
+					},
+				},
+			}
+			_, err = hubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Check deployment status
+			gomega.Eventually(func() error {
+				work, err := hubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if len(work.Status.ResourceStatus.Manifests) != 1 {
+					return fmt.Errorf("manifest count is not correct")
+				}
+
+				values := work.Status.ResourceStatus.Manifests[0].StatusFeedbacks.Values
+
+				expectedValues := []workapiv1.FeedbackValue{
+					{
+						Name: "ReadyReplicas",
+						Value: workapiv1.FieldValue{
+							Type:    workapiv1.Integer,
+							Integer: util.Int64Ptr(1),
+						},
+					},
+					{
+						Name: "Replicas",
+						Value: workapiv1.FieldValue{
+							Type:    workapiv1.Integer,
+							Integer: util.Int64Ptr(1),
+						},
+					},
+					{
+						Name: "AvailableReplicas",
+						Value: workapiv1.FieldValue{
+							Type:    workapiv1.Integer,
+							Integer: util.Int64Ptr(1),
+						},
+					},
+					{
+						Name: "AvailableCondition",
+						Value: workapiv1.FieldValue{
+							Type:   workapiv1.String,
+							String: util.StringPtr("True"),
+						},
+					},
+				}
+				if !apiequality.Semantic.DeepEqual(values, expectedValues) {
+					return fmt.Errorf("status feedback values are not correct, we got %v", values)
+				}
+
+				if ok := haveManifestCondition(work.Status.ResourceStatus.Manifests, "StatusFeedbackSynced", []metav1.ConditionStatus{metav1.ConditionTrue}); !ok {
+					return fmt.Errorf("statusFeedbackSynced condition should be True")
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		})
+	})
 })
 
 func newManifestWork(namespace, name string, objects ...runtime.Object) *workapiv1.ManifestWork {
@@ -630,6 +738,50 @@ func newJob(name string) *batchv1.Job {
 	}
 
 	return job
+}
+
+func newDeployment(name string) *appsv1.Deployment {
+	replica := int32(1)
+	deployment := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      name,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replica,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "nginx",
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": "nginx",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "nginx",
+							Image: "quay.io/bitnami/nginx:1.14.2",
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: 80,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return deployment
 }
 
 func newSecretBySize(namespace, name string, size int32) *corev1.Secret {
