@@ -17,7 +17,7 @@ spec:
       serviceAccountName: helloworld-sa
       containers:
       - name: helloworld-controller
-        image: helloworld-controller
+        image: example-addon-image
         imagePullPolicy: IfNotPresent
         env:
         - name: EXAMPLE_IMAGE_NAME

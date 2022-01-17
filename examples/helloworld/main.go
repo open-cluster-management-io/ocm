@@ -65,7 +65,7 @@ func newCommand() *cobra.Command {
 
 func newControllerCommand() *cobra.Command {
 	cmd := controllercmd.
-		NewControllerCommandConfig("addon-controller", version.Get(), runController).
+		NewControllerCommandConfig("helloworld-addon-controller", version.Get(), runController).
 		NewCommand()
 	cmd.Use = "controller"
 	cmd.Short = "Start the addon controller"

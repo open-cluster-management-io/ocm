@@ -1,0 +1,9 @@
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ManagedClusterAddOn
+metadata:
+  name: helloworldhelm
+  namespace: cluster1
+  annotations:
+    "addon.open-cluster-management.io/helmchart-values": '{"global":{"imagePullSecret":"mySecret","imageOverrides":{"helloWorldHelm":"quay.io/test:test"}},"logLevel":4}'
+spec:
+  installNamespace: open-cluster-management-agent-addon

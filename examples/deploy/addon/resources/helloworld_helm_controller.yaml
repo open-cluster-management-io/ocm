@@ -1,0 +1,24 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: helloworldhelm-controller
+  labels:
+    app: helloworldhelm-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: helloworldhelm-controller
+  template:
+    metadata:
+      labels:
+        app: helloworldhelm-controller
+    spec:
+      serviceAccountName: helloworld-sa
+      containers:
+      - name: helloworldhelm-controller
+        image: example-addon-image
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/helloworld_helm"
+          - "controller"

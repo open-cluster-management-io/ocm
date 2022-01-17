@@ -30,7 +30,7 @@ import (
 func newAgentCommand() *cobra.Command {
 	o := NewAgentOptions()
 	cmd := controllercmd.
-		NewControllerCommandConfig("addon-agent", version.Get(), o.RunAgent).
+		NewControllerCommandConfig("helloworld-addon-agent", version.Get(), o.RunAgent).
 		NewCommand()
 	cmd.Use = "agent"
 	cmd.Short = "Start the addon agent"

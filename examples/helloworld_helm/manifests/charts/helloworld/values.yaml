@@ -1,0 +1,26 @@
+org: open-cluster-management.io
+
+nameOverride: null
+
+clusterName: null
+addonInstallNamespace: null
+hubKubeConfigSecret: null
+
+resources:
+  requests:
+    memory: 32Mi
+  limits:
+    memory: 128Mi
+
+logLevel: 5
+
+global:
+  imagePullPolicy: IfNotPresent
+  imagePullSecret: null
+  imageOverrides:
+    helloWorldHelm: quay.io/open-cluster-management/helloworld-addon:latest
+  nodeSelector: {}
+  proxyConfig:
+    HTTP_PROXY: null
+    HTTPS_PROXY: null
+    NO_PROXY: null

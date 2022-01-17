@@ -47,7 +47,7 @@ deploy-ocm:
 
 deploy-example: ensure-kustomize
 	cp examples/deploy/addon/kustomization.yaml examples/deploy/addon/kustomization.yaml.tmp
-	cd examples/deploy/addon && $(KUSTOMIZE) edit set image helloworld-controller=$(EXAMPLE_IMAGE_NAME) && $(KUSTOMIZE) edit add configmap image-config --from-literal=EXAMPLE_IMAGE_NAME=$(EXAMPLE_IMAGE_NAME)
+	cd examples/deploy/addon && $(KUSTOMIZE) edit set image example-addon-image=$(EXAMPLE_IMAGE_NAME) && $(KUSTOMIZE) edit add configmap image-config --from-literal=EXAMPLE_IMAGE_NAME=$(EXAMPLE_IMAGE_NAME)
 	$(KUSTOMIZE) build examples/deploy/addon | $(KUBECTL) apply -f -
 	mv examples/deploy/addon/kustomization.yaml.tmp examples/deploy/addon/kustomization.yaml
 
