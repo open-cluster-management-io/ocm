@@ -11,12 +11,16 @@ import (
 
 func NewAgent() *cobra.Command {
 	agentOptions := spoke.NewSpokeAgentOptions()
-	cmd := controllercmd.
-		NewControllerCommandConfig("registration-agent", version.Get(), agentOptions.RunSpokeAgent).
-		NewCommand()
+	cmdConfig := controllercmd.
+		NewControllerCommandConfig("registration-agent", version.Get(), agentOptions.RunSpokeAgent)
+
+	cmd := cmdConfig.NewCommand()
 	cmd.Use = "agent"
 	cmd.Short = "Start the Cluster Registration Agent"
 
-	agentOptions.AddFlags(cmd.Flags())
+	flags := cmd.Flags()
+	agentOptions.AddFlags(flags)
+
+	flags.BoolVar(&cmdConfig.DisableLeaderElection, "disable-leader-election", false, "Disable leader election for the agent.")
 	return cmd
 }

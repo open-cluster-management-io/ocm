@@ -24,6 +24,7 @@ spec:
           - "agent"
           - "--cluster-name=cluster1"
           - "--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig"
+          - "--disable-leader-election"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
