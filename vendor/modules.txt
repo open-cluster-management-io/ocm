@@ -279,16 +279,16 @@ go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
-## explicit; go 1.11
+# golang.org/x/crypto v0.0.0-20211202192323-5770296d904e
+## explicit; go 1.17
 golang.org/x/crypto/cryptobyte
 golang.org/x/crypto/cryptobyte/asn1
+golang.org/x/crypto/internal/poly1305
 golang.org/x/crypto/internal/subtle
 golang.org/x/crypto/nacl/secretbox
-golang.org/x/crypto/poly1305
 golang.org/x/crypto/salsa20/salsa
-# golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
-## explicit; go 1.11
+# golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
+## explicit; go 1.17
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
 golang.org/x/net/html
@@ -308,8 +308,8 @@ golang.org/x/oauth2/internal
 # golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 ## explicit
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.0.0-20210225134936-a50acf3fe073
-## explicit; go 1.12
+# golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1
+## explicit; go 1.17
 golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/plan9
@@ -318,7 +318,7 @@ golang.org/x/sys/windows
 # golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
 ## explicit; go 1.11
 golang.org/x/term
-# golang.org/x/text v0.3.4
+# golang.org/x/text v0.3.6
 ## explicit; go 1.11
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
