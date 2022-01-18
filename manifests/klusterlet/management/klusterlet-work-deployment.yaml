@@ -50,6 +50,9 @@ spec:
           {{if eq .InstallMode "Detached"}}
           - "--spoke-kubeconfig=/spoke/config/kubeconfig"
           {{end}}
+          {{if eq .Replica 1}}
+          - "--disable-leader-election"
+          {{end}}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

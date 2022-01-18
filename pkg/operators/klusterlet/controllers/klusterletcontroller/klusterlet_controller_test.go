@@ -11,6 +11,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	fakeapiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,6 @@ import (
 	fakeoperatorclient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
-	fakeworkclientset "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	opratorapiv1 "open-cluster-management.io/api/operator/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
@@ -64,26 +64,6 @@ func newServiceAccountSecret(name, namespace string) *corev1.Secret {
 	secret.Data["token"] = []byte("test-token")
 	secret.Type = corev1.SecretTypeServiceAccountToken
 	return secret
-}
-
-func newWorkAgentDeployment(klusterletName, clusterName string) *appsv1.Deployment {
-	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-work-agent", klusterletName),
-			Namespace: helpers.KlusterletDefaultNamespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Args: []string{"/work", "agent", fmt.Sprintf("--spoke-cluster-name=%s", clusterName)},
-						},
-					},
-				},
-			},
-		},
-	}
 }
 
 func newKlusterlet(name, namespace, clustername string) *opratorapiv1.Klusterlet {
@@ -226,7 +206,7 @@ func newTestControllerDetached(klusterlet *opratorapiv1.Klusterlet, appliedManif
 	})
 
 	fakeManagedAPIExtensionClient := fakeapiextensions.NewSimpleClientset()
-	fakeManagedWorkClient := fakeworkclientset.NewSimpleClientset(appliedManifestWorks...)
+	fakeManagedWorkClient := fakeworkclient.NewSimpleClientset(appliedManifestWorks...)
 	hubController := &klusterletController{
 		klusterletClient:          fakeOperatorClient.OperatorV1().Klusterlets(),
 		kubeClient:                fakeKubeClient,
@@ -267,7 +247,8 @@ func newTestControllerDetached(klusterlet *opratorapiv1.Klusterlet, appliedManif
 	}
 }
 
-func ensureDeployments(t *testing.T, actions []clienttesting.Action, verb, serverURL, registrationClusterName, workClusterName string, count int) {
+func getDeployments(actions []clienttesting.Action, verb, suffix string) *appsv1.Deployment {
+
 	deployments := []*appsv1.Deployment{}
 	for _, action := range actions {
 		if action.GetVerb() != verb || action.GetResource().Resource != "deployments" {
@@ -285,74 +266,79 @@ func ensureDeployments(t *testing.T, actions []clienttesting.Action, verb, serve
 		}
 	}
 
-	if len(deployments) != count {
-		t.Errorf("Expect %s %d deployment, actual  %d", verb, count, len(deployments))
-	}
-
 	for _, deployment := range deployments {
-		if strings.HasSuffix(deployment.Name, "registration-agent") {
-			ensureRegistrationDeployment(t, deployment, serverURL, registrationClusterName)
-		} else if strings.HasSuffix(deployment.Name, "work-agent") {
-			ensureWorkDeployment(t, deployment, workClusterName)
-		} else {
-			t.Errorf("Unexpected deployment name %s", deployment.Name)
+		if strings.HasSuffix(deployment.Name, suffix) {
+			return deployment
 		}
 	}
+
+	return nil
 }
 
-func ensureRegistrationDeployment(t *testing.T, deployment *appsv1.Deployment, serverURL, clusterName string) {
+func assertRegistrationDeployment(t *testing.T, actions []clienttesting.Action, verb, serverURL, clusterName string, replica int32) {
+	deployment := getDeployments(actions, verb, "registration-agent")
+	if deployment == nil {
+		t.Errorf("registration deployment not found")
+	}
 	if len(deployment.Spec.Template.Spec.Containers) != 1 {
 		t.Errorf("Expect 1 containers in deployment spec, actual %d", len(deployment.Spec.Template.Spec.Containers))
 	}
+
 	args := deployment.Spec.Template.Spec.Containers[0].Args
-	if serverURL == "" && len(args) != 5 {
-		t.Errorf("Expect 5 args in container spec, actual %d", len(args))
-	}
-	if serverURL != "" && len(deployment.Spec.Template.Spec.Containers[0].Args) != 6 {
-		t.Errorf("Expect 6 args in container spec, actual %d", len(args))
-	}
-	clusterNameArg := ""
-	serverURLArg := ""
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "--cluster-name=") {
-			clusterNameArg = arg
-		}
-		if strings.HasPrefix(arg, "--spoke-external-server-urls=") {
-			serverURLArg = arg
-		}
+	expectedArgs := []string{
+		"/registration",
+		"agent",
+		fmt.Sprintf("--cluster-name=%s", clusterName),
+		"--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig",
+		"--feature-gates=AddonManagement=true",
 	}
 
-	desiredServerURLArg := ""
 	if serverURL != "" {
-		desiredServerURLArg = fmt.Sprintf("--spoke-external-server-urls=%s", serverURL)
-	}
-	if serverURLArg != desiredServerURLArg {
-		t.Errorf("Server url args not correct, expect %q, actual %q", desiredServerURLArg, serverURLArg)
+		expectedArgs = append(expectedArgs, fmt.Sprintf("--spoke-external-server-urls=%s", serverURL))
 	}
 
-	desiredClusterNameArg := fmt.Sprintf("--cluster-name=%s", clusterName)
-	if clusterNameArg != desiredClusterNameArg {
-		t.Errorf("Cluster name arg not correct, expect %q, actual %q", desiredClusterNameArg, clusterNameArg)
+	if *deployment.Spec.Replicas == 1 {
+		expectedArgs = append(expectedArgs, "--disable-leader-election")
+	}
+
+	if !equality.Semantic.DeepEqual(args, expectedArgs) {
+		t.Errorf("Expect args %v, but got %v", expectedArgs, args)
+	}
+
+	if *deployment.Spec.Replicas != replica {
+		t.Errorf("Unexpected registration replica, expect %d, got %d", replica, *deployment.Spec.Replicas)
 	}
 }
 
-func ensureWorkDeployment(t *testing.T, deployment *appsv1.Deployment, clusterName string) {
+func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, clusterName string, mode opratorapiv1.InstallMode, replica int32) {
+	deployment := getDeployments(actions, verb, "work-agent")
+	if deployment == nil {
+		t.Errorf("work deployment not found")
+	}
 	if len(deployment.Spec.Template.Spec.Containers) != 1 {
 		t.Errorf("Expect 1 containers in deployment spec, actual %d", len(deployment.Spec.Template.Spec.Containers))
 	}
 	args := deployment.Spec.Template.Spec.Containers[0].Args
-	if len(args) != 4 {
-		t.Errorf("Expect 4 args in container spec, actual %d", len(args))
+	expectArgs := []string{
+		"/work",
+		"agent",
+		fmt.Sprintf("--spoke-cluster-name=%s", clusterName),
+		"--hub-kubeconfig=/spoke/hub-kubeconfig/kubeconfig",
 	}
-	clusterNameArg := ""
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "--spoke-cluster-name") {
-			clusterNameArg = arg
-		}
+
+	if mode == opratorapiv1.InstallModeDetached {
+		expectArgs = append(expectArgs, "--spoke-kubeconfig=/spoke/config/kubeconfig")
 	}
-	desiredClusterNameArg := fmt.Sprintf("--spoke-cluster-name=%s", clusterName)
-	if desiredClusterNameArg != clusterNameArg {
-		t.Errorf("Expect cluster namee arg is %q, actual %q", desiredClusterNameArg, clusterNameArg)
+
+	if *deployment.Spec.Replicas == 1 {
+		expectArgs = append(expectArgs, "--disable-leader-election")
+	}
+
+	if !equality.Semantic.DeepEqual(args, expectArgs) {
+		t.Errorf("Expect args %v, but got %v", expectArgs, args)
+	}
+	if *deployment.Spec.Replicas != replica {
+		t.Errorf("Unexpected registration replica, expect %d, got %d", replica, *deployment.Spec.Replicas)
 	}
 }
 
@@ -734,6 +720,72 @@ func TestGetServersFromKlusterlet(t *testing.T) {
 	}
 }
 
+func TestReplica(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	hubSecret := newSecret(helpers.HubKubeConfig, "testns")
+	hubSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	hubSecret.Data["cluster-name"] = []byte("cluster1")
+	objects := []runtime.Object{
+		newNamespace("testns"),
+		newSecret(helpers.BootstrapHubKubeConfig, "testns"),
+		hubSecret,
+	}
+
+	controller := newTestController(klusterlet, nil, objects...)
+	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
+
+	err := controller.controller.sync(context.TODO(), syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	// should have 1 replica for registration deployment and 0 for work
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "create", "", "cluster1", 1)
+	assertWorkDeployment(t, controller.kubeClient.Actions(), "create", "cluster1", opratorapiv1.InstallModeDefault, 0)
+
+	klusterlet = newKlusterlet("klusterlet", "testns", "cluster1")
+	klusterlet.Status.Conditions = []metav1.Condition{
+		{
+			Type:   hubConnectionDegraded,
+			Status: metav1.ConditionFalse,
+		},
+	}
+
+	controller.operatorStore.Update(klusterlet)
+
+	controller.kubeClient.ClearActions()
+	controller.operatorClient.ClearActions()
+
+	err = controller.controller.sync(context.TODO(), syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	// should have 1 replica for work
+	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster1", opratorapiv1.InstallModeDefault, 1)
+
+	controller.kubeClient.PrependReactor("list", "nodes", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		if action.GetVerb() != "list" {
+			return false, nil, nil
+		}
+
+		nodes := &corev1.NodeList{Items: []corev1.Node{*newNode("master1"), *newNode("master2"), *newNode("master3")}}
+
+		return true, nodes, nil
+	})
+
+	controller.kubeClient.ClearActions()
+	controller.operatorClient.ClearActions()
+
+	err = controller.controller.sync(context.TODO(), syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "update", "", "cluster1", 3)
+	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster1", opratorapiv1.InstallModeDefault, 3)
+}
+
 func TestClusterNameChange(t *testing.T) {
 	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
 	namespace := newNamespace("testns")
@@ -744,14 +796,13 @@ func TestClusterNameChange(t *testing.T) {
 	controller := newTestController(klusterlet, nil, bootStrapSecret, hubSecret, namespace)
 	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
 
-	ctx := context.TODO()
-	err := controller.controller.sync(ctx, syncContext)
+	err := controller.controller.sync(context.TODO(), syncContext)
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 
 	// Check if deployment has the right cluster name set
-	ensureDeployments(t, controller.kubeClient.Actions(), "create", "", "cluster1", "cluster1", 2)
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "create", "", "cluster1", 1)
 
 	operatorAction := controller.operatorClient.Actions()
 	if len(operatorAction) != 2 {
@@ -774,11 +825,11 @@ func TestClusterNameChange(t *testing.T) {
 	klusterlet.Generation = 1
 	controller.operatorStore.Update(klusterlet)
 
-	err = controller.controller.sync(ctx, syncContext)
+	err = controller.controller.sync(context.TODO(), syncContext)
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
-	ensureDeployments(t, controller.kubeClient.Actions(), "update", "", "", "cluster1", 1)
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "update", "", "", 1)
 
 	// Update hubconfigsecret and sync again
 	hubSecret.Data["cluster-name"] = []byte("cluster2")
@@ -796,11 +847,11 @@ func TestClusterNameChange(t *testing.T) {
 	})
 	controller.kubeClient.ClearActions()
 
-	err = controller.controller.sync(nil, syncContext)
+	err = controller.controller.sync(context.TODO(), syncContext)
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
-	ensureDeployments(t, controller.kubeClient.Actions(), "update", "", "", "cluster2", 1)
+	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster2", "", 0)
 
 	// Update klusterlet with different cluster name and rerun sync
 	klusterlet = newKlusterlet("klusterlet", "testns", "cluster3")
@@ -810,11 +861,12 @@ func TestClusterNameChange(t *testing.T) {
 	controller.operatorClient.ClearActions()
 	controller.operatorStore.Update(klusterlet)
 
-	err = controller.controller.sync(nil, syncContext)
+	err = controller.controller.sync(context.TODO(), syncContext)
 	if err != nil {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
-	ensureDeployments(t, controller.kubeClient.Actions(), "update", "https://localhost", "cluster3", "cluster3", 2)
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "update", "https://localhost", "cluster3", 1)
+	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster3", "", 0)
 }
 
 func TestSyncWithPullSecret(t *testing.T) {
