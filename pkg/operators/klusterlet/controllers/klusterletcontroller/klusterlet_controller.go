@@ -43,6 +43,7 @@ const (
 	imagePullSecret              = "open-cluster-management-image-pull-credentials"
 	klusterletApplied            = "Applied"
 	klusterletReadyToApply       = "ReadyToApply"
+	hubConnectionDegraded        = "HubConnectionDegraded"
 	appliedManifestWorkFinalizer = "cluster.open-cluster-management.io/applied-manifest-work-cleanup"
 )
 
@@ -300,12 +301,6 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 	relatedResources = append(relatedResources, statuses...)
 
-	// Create hub config secret
-	hubSecret, err := n.ensureHubKubeconfigSecret(ctx, &config)
-	if err != nil {
-		return err
-	}
-
 	// Apply static files on management cluster
 	// Apply role, rolebinding, service account for registration and work to the management cluster.
 	statuses, err = n.applyStaticFiles(ctx, klusterletName, managementStaticResourceFiles, &config, n.kubeClient,
@@ -335,15 +330,22 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 	relatedResources = append(relatedResources, statuses...)
 
-	// If cluster name is empty, read cluster name from hub config secret
+	// If cluster name is empty, read cluster name from hub config secret.
+	// registration-agent generated the cluster name and set it into hub config secret.
 	if config.ClusterName == "" {
-		clusterName := hubSecret.Data["cluster-name"]
-		if clusterName != nil {
-			config.ClusterName = string(clusterName)
+		err = n.getClusterNameFromHubKubeConfigSecret(ctx, &config)
+		if err != nil {
+			return err
 		}
 	}
 	// Deploy work agent
-	statuses, workGeneration, err := n.applyDeployment(ctx, klusterlet, &config, "klusterlet/management/klusterlet-work-deployment.yaml", controllerContext.Recorder())
+	// scale up the work agent deployment when the hubConnectionDegraded condition is False.
+	// because the work agent deployment has a dependency of hub-kubeconfig-secret secret.
+	workConfig := config
+	if !meta.IsStatusConditionFalse(klusterlet.Status.Conditions, hubConnectionDegraded) {
+		workConfig.Replica = 0
+	}
+	statuses, workGeneration, err := n.applyDeployment(ctx, klusterlet, &workConfig, "klusterlet/management/klusterlet-work-deployment.yaml", controllerContext.Recorder())
 	if err != nil {
 		return err
 	}
@@ -364,38 +366,28 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	return nil
 }
 
-// ensureHubKubeconfigSecret will create a placeholder hub kubeconfig if it is not exist.
-func (n *klusterletController) ensureHubKubeconfigSecret(ctx context.Context, config *klusterletConfig) (*corev1.Secret, error) {
+// getClusterNameFromHubKubeConfigSecret gets cluster name from hub kubeConfig secret
+func (n *klusterletController) getClusterNameFromHubKubeConfigSecret(ctx context.Context, config *klusterletConfig) error {
 	hubSecret, err := n.kubeClient.CoreV1().Secrets(config.KlusterletNamespace).Get(ctx, helpers.HubKubeConfig, metav1.GetOptions{})
-	switch {
-	case errors.IsNotFound(err):
-		// Create an empty secret with placeholder
-		hubSecret = &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      helpers.HubKubeConfig,
-				Namespace: config.KlusterletNamespace,
-			},
-			Data: map[string][]byte{"placeholder": []byte("placeholder")},
-		}
-		if n.skipHubSecretPlaceholder {
-			return hubSecret, nil
-		}
-		hubSecret, err = n.kubeClient.CoreV1().Secrets(config.KlusterletNamespace).Create(ctx, hubSecret, metav1.CreateOptions{})
-		if err != nil {
-			_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, config.KlusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
-				Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
-				Message: fmt.Sprintf("Failed to create hub kubeconfig secret -n %q %q: %v", hubSecret.Namespace, hubSecret.Name, err),
-			}))
-			return hubSecret, err
-		}
-	case err != nil:
+	if err != nil {
 		_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, config.KlusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
 			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
-			Message: fmt.Sprintf("Failed to get hub kubeconfig secret with error %v", err),
+			Message: fmt.Sprintf("Failed to get cluster name from hub kubeconfig secret with error %v", err),
 		}))
-		return hubSecret, err
+		return err
 	}
-	return hubSecret, nil
+
+	clusterName := hubSecret.Data["cluster-name"]
+	if len(clusterName) == 0 {
+		err = fmt.Errorf("the cluster name in the secret is empty")
+		_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, config.KlusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
+			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
+			Message: fmt.Sprintf("Failed to get cluster name from hub kubeconfig secret with error %v", err),
+		}))
+		return err
+	}
+	config.ClusterName = string(clusterName)
+	return nil
 }
 
 // applyDeployment applies deployment on the management cluster
