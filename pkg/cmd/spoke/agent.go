@@ -12,12 +12,17 @@ import (
 // NewWorkloadAgent generates a command to start workload agent
 func NewWorkloadAgent() *cobra.Command {
 	o := spoke.NewWorkloadAgentOptions()
-	cmd := controllercmd.
-		NewControllerCommandConfig("work-agent", version.Get(), o.RunWorkloadAgent).
-		NewCommand()
+	cmdConfig := controllercmd.
+		NewControllerCommandConfig("work-agent", version.Get(), o.RunWorkloadAgent)
+	cmd := cmdConfig.NewCommand()
 	cmd.Use = "agent"
 	cmd.Short = "Start the Cluster Registration Agent"
 
 	o.AddFlags(cmd)
+
+	// add disable leader election flag
+	flags := cmd.Flags()
+	flags.BoolVar(&cmdConfig.DisableLeaderElection, "disable-leader-election", false, "Disable leader election for the agent.")
+
 	return cmd
 }
