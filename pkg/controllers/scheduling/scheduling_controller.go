@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -36,12 +37,15 @@ import (
 )
 
 const (
-	clusterSetLabel          = "cluster.open-cluster-management.io/clusterset"
-	placementLabel           = "cluster.open-cluster-management.io/placement"
-	schedulingControllerName = "SchedulingController"
-	maxNumOfClusterDecisions = 100
-	maxEventMessageLength    = 1000 //the event message can have at most 1024 characters, use 1000 as limitation here to keep some buffer
+	clusterSetLabel                = "cluster.open-cluster-management.io/clusterset"
+	placementLabel                 = "cluster.open-cluster-management.io/placement"
+	schedulingControllerName       = "SchedulingController"
+	schedulingControllerResyncName = "SchedulingControllerResync"
+	maxNumOfClusterDecisions       = 100
+	maxEventMessageLength          = 1000 //the event message can have at most 1024 characters, use 1000 as limitation here to keep some buffer
 )
+
+var ResyncInterval = time.Minute * 5
 
 type enqueuePlacementFunc func(namespace, name string)
 
@@ -151,18 +155,83 @@ func NewSchedulingController(
 		ToController(schedulingControllerName, recorder)
 }
 
+func NewSchedulingControllerResync(
+	clusterClient clusterclient.Interface,
+	clusterInformer clusterinformerv1.ManagedClusterInformer,
+	clusterSetInformer clusterinformerv1beta1.ManagedClusterSetInformer,
+	clusterSetBindingInformer clusterinformerv1beta1.ManagedClusterSetBindingInformer,
+	placementInformer clusterinformerv1alpha1.PlacementInformer,
+	placementDecisionInformer clusterinformerv1alpha1.PlacementDecisionInformer,
+	scheduler Scheduler,
+	recorder events.Recorder, krecorder kevents.EventRecorder,
+) factory.Controller {
+	syncCtx := factory.NewSyncContext(schedulingControllerResyncName, recorder)
+	enqueuePlacementFunc := func(namespace, name string) {
+		syncCtx.Queue().Add(fmt.Sprintf("%s/%s", namespace, name))
+	}
+
+	// build controller
+	c := &schedulingController{
+		clusterClient:           clusterClient,
+		clusterLister:           clusterInformer.Lister(),
+		clusterSetLister:        clusterSetInformer.Lister(),
+		clusterSetBindingLister: clusterSetBindingInformer.Lister(),
+		placementLister:         placementInformer.Lister(),
+		placementDecisionLister: placementDecisionInformer.Lister(),
+		enqueuePlacementFunc:    enqueuePlacementFunc,
+		recorder:                krecorder,
+		scheduler:               scheduler,
+	}
+
+	return factory.New().
+		WithSyncContext(syncCtx).
+		WithSync(c.resync).
+		ResyncEvery(ResyncInterval).
+		ToController(schedulingControllerResyncName, recorder)
+
+}
+
+// Resync the placement which depends on AddOnPlacementScore periodically
+func (c *schedulingController) resync(ctx context.Context, syncCtx factory.SyncContext) error {
+	queueKey := syncCtx.QueueKey()
+	klog.V(4).Infof("Resync placement %q", queueKey)
+
+	if queueKey == "key" {
+		placements, err := c.placementLister.List(labels.Everything())
+		if err != nil {
+			return err
+		}
+
+		for _, placement := range placements {
+			for _, config := range placement.Spec.PrioritizerPolicy.Configurations {
+				if config.ScoreCoordinate != nil && config.ScoreCoordinate.Type == clusterapiv1alpha1.ScoreCoordinateTypeAddOn {
+					key, _ := cache.MetaNamespaceKeyFunc(placement)
+					klog.V(4).Infof("Requeue placement %s", key)
+					syncCtx.Queue().Add(key)
+					break
+				}
+			}
+		}
+
+		return nil
+	} else {
+		placement, err := c.getPlacement(queueKey)
+		if errors.IsNotFound(err) {
+			// no work if placement is deleted
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		return c.syncPlacement(ctx, placement)
+	}
+}
+
 func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	queueKey := syncCtx.QueueKey()
 	klog.V(4).Infof("Reconciling placement %q", queueKey)
 
-	namespace, name, err := cache.SplitMetaNamespaceKey(queueKey)
-	if err != nil {
-		// ignore placement whose key is not in format: namespace/name
-		utilruntime.HandleError(err)
-		return nil
-	}
-
-	placement, err := c.placementLister.Placements(namespace).Get(name)
+	placement, err := c.getPlacement(queueKey)
 	if errors.IsNotFound(err) {
 		// no work if placement is deleted
 		return nil
@@ -172,6 +241,22 @@ func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncCon
 	}
 
 	return c.syncPlacement(ctx, placement)
+}
+
+func (c *schedulingController) getPlacement(queueKey string) (*clusterapiv1alpha1.Placement, error) {
+	namespace, name, err := cache.SplitMetaNamespaceKey(queueKey)
+	if err != nil {
+		// ignore placement whose key is not in format: namespace/name
+		utilruntime.HandleError(err)
+		return nil, nil
+	}
+
+	placement, err := c.placementLister.Placements(namespace).Get(name)
+	if err != nil {
+		return nil, err
+	}
+
+	return placement, nil
 }
 
 func (c *schedulingController) syncPlacement(ctx context.Context, placement *clusterapiv1alpha1.Placement) error {

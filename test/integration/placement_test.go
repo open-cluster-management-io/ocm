@@ -19,6 +19,7 @@ import (
 	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	controllers "open-cluster-management.io/placement/pkg/controllers"
+	scheduling "open-cluster-management.io/placement/pkg/controllers/scheduling"
 	"open-cluster-management.io/placement/test/integration/util"
 )
 
@@ -57,6 +58,7 @@ var _ = ginkgo.Describe("Placement", func() {
 		// start controller manager
 		var ctx context.Context
 		ctx, cancel = context.WithCancel(context.Background())
+		scheduling.ResyncInterval = time.Second * 5
 		go controllers.RunControllerManager(ctx, &controllercmd.ControllerContext{
 			KubeConfig:    restConfig,
 			EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
@@ -668,6 +670,60 @@ var _ = ginkgo.Describe("Placement", func() {
 			//Checking the result of the placement
 			assertCreatingPlacement(placementName, noc(2), 2, prioritizerPolicy)
 			assertClusterNamesOfDecisions(placementName, []string{clusterNames[1], clusterNames[2]})
+		})
+
+		ginkgo.It("Should reschedule every ResyncInterval and update desicion when AddOnPlacementScore changes", func() {
+			// cluster settings
+			clusterNames := []string{
+				clusterName + "-1",
+				clusterName + "-2",
+				clusterName + "-3",
+			}
+
+			// placement settings
+			prioritizerPolicy := clusterapiv1alpha1.PrioritizerPolicy{
+				Mode: clusterapiv1alpha1.PrioritizerPolicyModeExact,
+				Configurations: []clusterapiv1alpha1.PrioritizerConfig{
+					{
+						ScoreCoordinate: &clusterapiv1alpha1.ScoreCoordinate{
+
+							Type: "AddOn",
+							AddOn: &clusterapiv1alpha1.AddOnScore{
+								ResourceName: "demo",
+								ScoreName:    "demo",
+							},
+						},
+						Weight: 1,
+					},
+				},
+			}
+
+			//Creating the clusters with resources
+			assertBindingClusterSet(clusterSet1Name)
+			assertCreatingClustersWithNames(clusterSet1Name, clusterNames)
+
+			//Creating the placement
+			assertCreatingPlacement(placementName, noc(2), 2, prioritizerPolicy)
+
+			//Checking the result of the placement when no AddOnPlacementScores
+			assertClusterNamesOfDecisions(placementName, []string{clusterNames[0], clusterNames[1]})
+
+			//Creating the AddOnPlacementScores
+			assertCreatingAddOnPlacementScores(clusterNames[0], "demo", "demo", 80)
+			assertCreatingAddOnPlacementScores(clusterNames[1], "demo", "demo", 90)
+			assertCreatingAddOnPlacementScores(clusterNames[2], "demo", "demo", 100)
+
+			//Checking the result of the placement when AddOnPlacementScores added
+			assertClusterNamesOfDecisions(placementName, []string{clusterNames[1], clusterNames[2]})
+
+			//update the AddOnPlacementScores
+			assertCreatingAddOnPlacementScores(clusterNames[0], "demo", "demo", 100)
+			assertCreatingAddOnPlacementScores(clusterNames[1], "demo", "demo", 90)
+			assertCreatingAddOnPlacementScores(clusterNames[2], "demo", "demo", 100)
+
+			//Checking the result of the placement when AddOnPlacementScores updated
+			assertClusterNamesOfDecisions(placementName, []string{clusterNames[0], clusterNames[2]})
+
 		})
 
 		ginkgo.It("Should keep steady successfully even placementdecisions' balance and cluster situation changes", func() {
