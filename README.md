@@ -184,7 +184,7 @@ Slack channel: [#open-cluster-mgmt](http://slack.k8s.io/#open-cluster-mgmt)
 
 ## License
 
-This code is released under the Apache 2.0 license. See the file LICENSE for more information.
+This code is released under the Apache 2.0 license. See the file [LICENSE](LICENSE) for more information.
 
 
 <!--
