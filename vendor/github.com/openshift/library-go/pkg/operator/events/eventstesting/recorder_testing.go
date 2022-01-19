@@ -1,6 +1,7 @@
 package eventstesting
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -10,6 +11,10 @@ import (
 type TestingEventRecorder struct {
 	t         *testing.T
 	component string
+}
+
+func (r *TestingEventRecorder) WithContext(ctx context.Context) events.Recorder {
+	return r
 }
 
 // NewTestingEventRecorder provides event recorder that will log all recorded events to the error log.

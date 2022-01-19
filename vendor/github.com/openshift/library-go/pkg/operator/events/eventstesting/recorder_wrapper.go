@@ -1,6 +1,7 @@
 package eventstesting
 
 import (
+	"context"
 	"testing"
 
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -9,6 +10,10 @@ import (
 type EventRecorder struct {
 	realEventRecorder    events.Recorder
 	testingEventRecorder *TestingEventRecorder
+}
+
+func (e *EventRecorder) WithContext(ctx context.Context) events.Recorder {
+	return e
 }
 
 func NewEventRecorder(t *testing.T, r events.Recorder) events.Recorder {

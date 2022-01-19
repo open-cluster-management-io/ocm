@@ -56,7 +56,7 @@ func TestAddonAgentManifests(t *testing.T) {
 		t.Fatalf("failed to new agentAddon %v", err)
 	}
 	cluster := newManagedCluster("test")
-	annotaitonValues := `{"global":{"imagePullSecret":"mySecret","imageOverrides":{"helloWorldHelm":"quay.io/test:test"}},"logLevel":4}`
+	annotaitonValues := `{"global":{"imagePullSecret":"mySecret","imageOverrides":{"helloWorldHelm":"quay.io/test:test"}}}`
 	addon := newManagedClusterAddon("test", "myNs", annotaitonValues)
 	objects, err := agentAddon.Manifests(cluster, addon)
 	if err != nil {
@@ -67,6 +67,7 @@ func TestAddonAgentManifests(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp %v", err)
 	}
+	defer os.RemoveAll(tmpDir)
 
 	for _, o := range objects {
 		data, err := yaml.Marshal(o)

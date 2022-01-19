@@ -7,10 +7,7 @@ import (
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory/helmaddonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -19,17 +16,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
-var (
-	genericScheme = runtime.NewScheme()
-	genericCodecs = serializer.NewCodecFactory(genericScheme)
-	genericCodec  = genericCodecs.UniversalDeserializer()
-)
-
 const defaultExampleImage = "quay.io/open-cluster-management/helloworld-addon:latest"
-
-func init() {
-	scheme.AddToScheme(genericScheme)
-}
 
 //go:embed manifests
 //go:embed manifests/charts/helloworld
@@ -77,6 +64,7 @@ func applyManifestFromFile(file, clusterName, addonName string, kubeclient *kube
 	results := resourceapply.ApplyDirectly(context.Background(),
 		resourceapply.NewKubeClientHolder(kubeclient),
 		recorder,
+		resourceapply.NewResourceCache(),
 		func(name string) ([]byte, error) {
 			template, err := FS.ReadFile(file)
 			if err != nil {

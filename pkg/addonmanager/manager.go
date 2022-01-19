@@ -80,7 +80,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 	if err != nil {
 		klog.Warningf("unable to identify the current namespace for events: %v", err)
 	}
-	controllerRef, err := events.GetControllerReferenceForCurrentPod(kubeClient, namespace, nil)
+	controllerRef, err := events.GetControllerReferenceForCurrentPod(ctx, kubeClient, namespace, nil)
 	if err != nil {
 		klog.Warningf("unable to get owner reference (falling back to namespace): %v", err)
 	}

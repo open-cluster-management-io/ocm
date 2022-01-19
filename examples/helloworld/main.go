@@ -14,14 +14,12 @@ import (
 	"github.com/spf13/pflag"
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+	"open-cluster-management.io/addon-framework/examples/helloworld/agent"
 	"open-cluster-management.io/addon-framework/pkg/version"
 
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 )
-
-// addOnAgentInstallationNamespace is the namespace on the managed cluster to install the helloworld addon agent.
-const addOnAgentInstallationNamespace = "default"
 
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -58,7 +56,7 @@ func newCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(newControllerCommand())
-	cmd.AddCommand(newAgentCommand())
+	cmd.AddCommand(agent.NewAgentCommand(addonName))
 
 	return cmd
 }

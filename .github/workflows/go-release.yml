@@ -1,0 +1,43 @@
+name: GoRelease
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+env:
+  # Common versions
+  GO_VERSION: '1.17'
+  GO_REQUIRED_MIN_VERSION: ''
+  GOPATH: '/home/runner/work/work/work/go'
+  GITHUB_REF: ${{ github.ref }}
+
+defaults:
+  run:
+    working-directory: go/src/open-cluster-management.io/work
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+          path: go/src/open-cluster-management.io/addon-framework
+      - name: get release version
+        run: |
+          echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+      - name: get major release version
+        run: |
+          echo "MAJOR_RELEASE_VERSION=${RELEASE_VERSION%.*}" >> $GITHUB_ENV
+      - name: generate changelog
+        run: |
+          echo "# Work $RELEASE_VERSION" > /home/runner/work/changelog.txt
+          echo "- See the [CHANGELOG](https://github.com/open-cluster-management-io/addon-framework/blob/main/CHANGELOG/CHANGELOG-${MAJOR_RELEASE_VERSION}.md) for more details." >> /home/runner/addon-framework/changelog.txt
+      - name: publish release
+        uses: softprops/action-gh-release@v0.1.5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          body_path: /home/runner/addon-framework/changelog.txt

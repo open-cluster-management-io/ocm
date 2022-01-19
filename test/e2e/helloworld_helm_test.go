@@ -17,7 +17,7 @@ import (
 
 const (
 	helloWorldHelmAddonName = "helloworldhelm"
-	addonInstallNamespace   = "open-cluster-management-agent-addon"
+	addonInstallNamespace   = "default"
 )
 
 var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
@@ -103,7 +103,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			copyiedConfig, err := hubKubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(context.Background(), fmt.Sprintf("%v-%v", configmap.Name, managedClusterName), metav1.GetOptions{})
+			copyiedConfig, err := hubKubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(context.Background(), configmap.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -122,7 +122,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 			}
 			newAddon := addon.DeepCopy()
 			newAddon.SetAnnotations(map[string]string{
-				"addon.open-cluster-management.io/helmchart-values": `{"global":{"imagePullSecret":"mySecret","imageOverrides":{"helloWorldHelm":"quay.io/test:test"}},"logLevel":4}`,
+				"addon.open-cluster-management.io/helmchart-values": `{"global":{"imagePullSecret":"mySecret","imageOverrides":{"helloWorldHelm":"quay.io/test:test"}}}`,
 			})
 			_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
@@ -132,7 +132,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			agentDeploy, err := hubKubeClient.AppsV1().Deployments(addonInstallNamespace).Get(context.Background(), "helloworldhelm-agent", metav1.GetOptions{})
+			agentDeploy, err := hubKubeClient.AppsV1().Deployments("default").Get(context.Background(), "helloworldhelm-agent", metav1.GetOptions{})
 			if err != nil {
 				return err
 			}

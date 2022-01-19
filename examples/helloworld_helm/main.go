@@ -15,6 +15,7 @@ import (
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
+	helloworldagent "open-cluster-management.io/addon-framework/examples/helloworld/agent"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory/helmaddonfactory"
 	"open-cluster-management.io/addon-framework/pkg/version"
 
@@ -23,9 +24,6 @@ import (
 )
 
 const (
-	// addOnAgentInstallationNamespace is the namespace on the managed cluster to install the helloworldhelm addon agent.
-	addOnAgentInstallationNamespace = "open-cluster-management-agent-addon"
-
 	addonName = "helloworldhelm"
 )
 
@@ -64,7 +62,7 @@ func newCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(newControllerCommand())
-	cmd.AddCommand(newAgentCommand())
+	cmd.AddCommand(helloworldagent.NewAgentCommand(addonName))
 
 	return cmd
 }
@@ -101,7 +99,14 @@ func runController(ctx context.Context, controllerContext *controllercmd.Control
 	}
 
 	err = mgr.AddAgent(agentAddon)
+	if err != nil {
+		klog.Fatal(err)
+	}
+
 	err = mgr.Start(ctx)
+	if err != nil {
+		klog.Fatal(err)
+	}
 	<-ctx.Done()
 
 	return nil

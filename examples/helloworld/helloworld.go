@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	helloworldagent "open-cluster-management.io/addon-framework/examples/helloworld/agent"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -26,7 +27,10 @@ var (
 	genericCodec  = genericCodecs.UniversalDeserializer()
 )
 
-const defaultExampleImage = "quay.io/open-cluster-management/helloworld-addon:latest"
+const (
+	defaultExampleImage = "quay.io/open-cluster-management/helloworld-addon:latest"
+	addonName           = "helloworld"
+)
 
 func init() {
 	scheme.AddToScheme(genericScheme)
@@ -72,13 +76,13 @@ func (h *helloWorldAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *ad
 
 func (h *helloWorldAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	return agent.AgentAddonOptions{
-		AddonName: "helloworld",
+		AddonName: addonName,
 		Registration: &agent.RegistrationOption{
-			CSRConfigurations: agent.KubeClientSignerConfigurations("helloworld", h.agentName),
+			CSRConfigurations: agent.KubeClientSignerConfigurations(addonName, h.agentName),
 			CSRApproveCheck:   utils.DefaultCSRApprover(h.agentName),
 			PermissionConfig:  h.setupAgentPermissions,
 		},
-		InstallStrategy: agent.InstallAllStrategy(addOnAgentInstallationNamespace),
+		InstallStrategy: agent.InstallAllStrategy(helloworldagent.HelloworldAgentInstallationNamespace),
 	}
 }
 
@@ -100,7 +104,7 @@ func (h *helloWorldAgent) setupAgentPermissions(cluster *clusterv1.ManagedCluste
 func loadManifestFromFile(file string, cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (runtime.Object, error) {
 	installNamespace := addon.Spec.InstallNamespace
 	if len(installNamespace) == 0 {
-		installNamespace = addOnAgentInstallationNamespace
+		installNamespace = helloworldagent.HelloworldAgentInstallationNamespace
 	}
 
 	image := os.Getenv("EXAMPLE_IMAGE_NAME")
@@ -146,6 +150,7 @@ func applyManifestFromFile(file, clusterName, addonName string, kubeclient *kube
 	results := resourceapply.ApplyDirectly(context.Background(),
 		resourceapply.NewKubeClientHolder(kubeclient),
 		recorder,
+		resourceapply.NewResourceCache(),
 		func(name string) ([]byte, error) {
 			template, err := fs.ReadFile(file)
 			if err != nil {

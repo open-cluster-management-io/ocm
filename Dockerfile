@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux AS builder
+FROM quay.io/bitnami/golang:1.17 AS builder
 WORKDIR /go/src/open-cluster-management.io/addon-framework
 COPY . .
 ENV GO_PACKAGE open-cluster-management.io/addon-framework

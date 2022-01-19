@@ -12,8 +12,6 @@ resources:
   limits:
     memory: 128Mi
 
-logLevel: 5
-
 global:
   imagePullPolicy: IfNotPresent
   imagePullSecret: null
