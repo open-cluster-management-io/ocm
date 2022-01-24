@@ -40,6 +40,7 @@ spec:
           - "agent"
           - "--hub-kubeconfig=/var/run/hub/kubeconfig"
           - "--cluster-name={{ .Values.clusterName }}"
+          - "--addon-namespace={{ .Values.addonInstallNamespace }}"
         volumeMounts:
           - name: hub-config
             mountPath: /var/run/hub

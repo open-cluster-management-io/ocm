@@ -1,4 +1,4 @@
-package helmaddonfactory
+package addonfactory
 
 import (
 	"reflect"
@@ -34,8 +34,8 @@ func TestGetValuesFromAddonAnnotation(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			values, err := GetValuesFromAddonAnnotation(newManagedCluster("test"),
-				newManagedClusterAddon("test", "test", "test", c.annotationValues))
+			values, err := GetValuesFromAddonAnnotation(NewFakeManagedCluster("test"),
+				NewFakeManagedClusterAddon("test", "test", "test", c.annotationValues))
 			if !c.expectedErr && err != nil {
 				t.Errorf("expected no error, bug got err %v", err)
 			}
@@ -48,37 +48,40 @@ func TestGetValuesFromAddonAnnotation(t *testing.T) {
 
 func TestMergeStructValues(t *testing.T) {
 	type global struct {
-		Image string
-		Tag   string
+		Image string `json:"image"`
+		Tag   string `json:"tag"`
 	}
 	type config struct {
-		Name   string
-		Global global
+		Name   string `json:"name"`
+		Global global `json:"global"`
 	}
 	cases := []struct {
 		name           string
-		aStruct        config
-		bValues        Values
+		jsonStruct     config
+		values         Values
 		expectedValues Values
 	}{
 		{
 			name: "merge ok",
-			aStruct: config{
+			jsonStruct: config{
 				Name: "test",
 				Global: global{
 					Image: "test",
 					Tag:   "test",
 				},
 			},
-			bValues:        Values{"Name": "dev", "label": "dev"},
-			expectedValues: Values{"Name": "dev", "label": "dev", "global": map[string]interface{}{"Image": "test", "Tag": "test"}},
+			values:         Values{"name": "dev", "label": "dev"},
+			expectedValues: Values{"name": "dev", "label": "dev", "global": map[string]interface{}{"image": "test", "tag": "test"}},
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			aValues := StructToValues(c.aStruct)
-			mergedValues := MergeValues(aValues, c.bValues)
+			aValues, err := JsonStructToValues(c.jsonStruct)
+			if err != nil {
+				t.Fatalf("failed to struct to values %v", err)
+			}
+			mergedValues := MergeValues(aValues, c.values)
 			if len(mergedValues) != len(c.expectedValues) {
 				t.Errorf("expected values %v, but got values %v", c.expectedValues, mergedValues)
 			}

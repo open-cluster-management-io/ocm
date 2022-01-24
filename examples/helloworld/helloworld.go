@@ -12,9 +12,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	helloworldagent "open-cluster-management.io/addon-framework/examples/helloworld/agent"
+	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -32,109 +32,36 @@ const (
 	addonName           = "helloworld"
 )
 
-func init() {
-	scheme.AddToScheme(genericScheme)
-}
-
 //go:embed manifests
+//go:embed manifests/templates
 var fs embed.FS
-
-var manifestFiles = []string{
-	// serviceaccount to run addon-agent
-	"manifests/serviceaccount.yaml",
-	// clusterrolebinding to bind appropriate clusterrole to the serviceaccount
-	"manifests/clusterrolebinding.yaml",
-	// deployment to deploy addon-agent
-	"manifests/deployment.yaml",
-}
 
 var agentPermissionFiles = []string{
 	// role with RBAC rules to access resources on hub
-	"manifests/role.yaml",
+	"manifests/permission/role.yaml",
 	// rolebinding to bind the above role to a certain user group
-	"manifests/rolebinding.yaml",
+	"manifests/permission/rolebinding.yaml",
 }
 
-// Another agent with registration enabled.
-type helloWorldAgent struct {
-	kubeConfig *rest.Config
-	recorder   events.Recorder
-	agentName  string
-}
+func newRegistrationOption(kubeConfig *rest.Config, recorder events.Recorder, agentName string) *agent.RegistrationOption {
+	return &agent.RegistrationOption{
+		CSRConfigurations: agent.KubeClientSignerConfigurations(addonName, agentName),
+		CSRApproveCheck:   utils.DefaultCSRApprover(agentName),
+		PermissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+			kubeclient, err := kubernetes.NewForConfig(kubeConfig)
+			if err != nil {
+				return err
+			}
 
-func (h *helloWorldAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
-	objects := []runtime.Object{}
-	for _, file := range manifestFiles {
-		object, err := loadManifestFromFile(file, cluster, addon)
-		if err != nil {
-			return nil, err
-		}
-		objects = append(objects, object)
-	}
-	return objects, nil
-}
+			for _, file := range agentPermissionFiles {
+				if err := applyManifestFromFile(file, cluster.Name, addon.Name, kubeclient, recorder); err != nil {
+					return err
+				}
+			}
 
-func (h *helloWorldAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
-	return agent.AgentAddonOptions{
-		AddonName: addonName,
-		Registration: &agent.RegistrationOption{
-			CSRConfigurations: agent.KubeClientSignerConfigurations(addonName, h.agentName),
-			CSRApproveCheck:   utils.DefaultCSRApprover(h.agentName),
-			PermissionConfig:  h.setupAgentPermissions,
+			return nil
 		},
-		InstallStrategy: agent.InstallAllStrategy(helloworldagent.HelloworldAgentInstallationNamespace),
 	}
-}
-
-func (h *helloWorldAgent) setupAgentPermissions(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
-	kubeclient, err := kubernetes.NewForConfig(h.kubeConfig)
-	if err != nil {
-		return err
-	}
-
-	for _, file := range agentPermissionFiles {
-		if err := applyManifestFromFile(file, cluster.Name, addon.Name, kubeclient, h.recorder); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func loadManifestFromFile(file string, cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (runtime.Object, error) {
-	installNamespace := addon.Spec.InstallNamespace
-	if len(installNamespace) == 0 {
-		installNamespace = helloworldagent.HelloworldAgentInstallationNamespace
-	}
-
-	image := os.Getenv("EXAMPLE_IMAGE_NAME")
-	if len(image) == 0 {
-		image = defaultExampleImage
-	}
-
-	manifestConfig := struct {
-		KubeConfigSecret      string
-		ClusterName           string
-		AddonInstallNamespace string
-		Image                 string
-	}{
-		KubeConfigSecret:      fmt.Sprintf("%s-hub-kubeconfig", addon.Name),
-		AddonInstallNamespace: installNamespace,
-		ClusterName:           cluster.Name,
-		Image:                 image,
-	}
-
-	template, err := fs.ReadFile(file)
-	if err != nil {
-		return nil, err
-	}
-
-	raw := assets.MustCreateAssetFromTemplate(file, template, &manifestConfig).Data
-	object, _, err := genericCodec.Decode(raw, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	return object, nil
 }
 
 func applyManifestFromFile(file, clusterName, addonName string, kubeclient *kubernetes.Clientset, recorder events.Recorder) error {
@@ -168,4 +95,31 @@ func applyManifestFromFile(file, clusterName, addonName string, kubeclient *kube
 	}
 
 	return nil
+}
+
+func getValues(cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+	installNamespace := addon.Spec.InstallNamespace
+	if len(installNamespace) == 0 {
+		installNamespace = helloworldagent.HelloworldAgentInstallationNamespace
+	}
+
+	image := os.Getenv("EXAMPLE_IMAGE_NAME")
+	if len(image) == 0 {
+		image = defaultExampleImage
+	}
+
+	manifestConfig := struct {
+		KubeConfigSecret      string
+		ClusterName           string
+		AddonInstallNamespace string
+		Image                 string
+	}{
+		KubeConfigSecret:      fmt.Sprintf("%s-hub-kubeconfig", addon.Name),
+		AddonInstallNamespace: installNamespace,
+		ClusterName:           cluster.Name,
+		Image:                 image,
+	}
+
+	return addonfactory.StructToValues(manifestConfig), nil
 }

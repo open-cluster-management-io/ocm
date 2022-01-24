@@ -9,7 +9,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"open-cluster-management.io/addon-framework/pkg/addonfactory/helmaddonfactory"
+	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -85,21 +85,20 @@ func applyManifestFromFile(file, clusterName, addonName string, kubeclient *kube
 }
 
 type global struct {
-	ImagePullPolicy string
-	ImagePullSecret string
-	ImageOverrides  map[string]string
-	NodeSelector    map[string]string
-	ProxyConfig     map[string]string
+	ImagePullPolicy string            `json:"imagePullPolicy,omitempty"`
+	ImagePullSecret string            `json:"imagePullSecret,omitempty"`
+	ImageOverrides  map[string]string `json:"imageOverrides,omitempty"`
+	NodeSelector    map[string]string `json:"nodeSelector,omitempty"`
+	ProxyConfig     map[string]string `json:"proxyConfig,omitempty"`
 }
 type userValues struct {
-	ClusterNamespace string
-	LogLevel         int32
-	Global           global
+	ClusterNamespace string `json:"clusterNamespace,omitempty"`
+	Global           global `json:"global,omitempty"`
 }
 
 func getValues(cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (helmaddonfactory.Values, error) {
-	userValues := userValues{
+	addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+	userJsonValues := userValues{
 		ClusterNamespace: cluster.GetName(),
 		Global: global{
 			ImagePullPolicy: "IfNotPresent",
@@ -108,5 +107,9 @@ func getValues(cluster *clusterv1.ManagedCluster,
 			},
 		},
 	}
-	return helmaddonfactory.StructToValues(userValues), nil
+	values, err := addonfactory.JsonStructToValues(userJsonValues)
+	if err != nil {
+		return nil, err
+	}
+	return values, nil
 }

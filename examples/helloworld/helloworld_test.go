@@ -18,10 +18,10 @@ import (
 func newAgentAddon(t *testing.T) (agent.AgentAddon, error) {
 	registrationOption := newRegistrationOption(nil, nil, utilrand.String(5))
 
-	agentAddon, err := addonfactory.NewAgentAddonFactory(addonName, FS, "manifests/charts/helloworld").
+	agentAddon, err := addonfactory.NewAgentAddonFactory(addonName, fs, "manifests/templates").
 		WithGetValuesFuncs(getValues, addonfactory.GetValuesFromAddonAnnotation).
 		WithAgentRegistrationOption(registrationOption).
-		BuildHelmAgentAddon()
+		BuildTemplateAgentAddon()
 	if err != nil {
 		t.Errorf("failed to build agentAddon")
 		return agentAddon, err
@@ -56,7 +56,7 @@ func TestAddonAgentManifests(t *testing.T) {
 		t.Fatalf("failed to new agentAddon %v", err)
 	}
 	cluster := newManagedCluster("test")
-	annotaitonValues := `{"global":{"imagePullSecret":"mySecret","imageOverrides":{"helloWorldHelm":"quay.io/test:test"}}}`
+	annotaitonValues := `{"Image":"quay.io/test:test"}`
 	addon := newManagedClusterAddon("test", "myNs", annotaitonValues)
 	objects, err := agentAddon.Manifests(cluster, addon)
 	if err != nil {

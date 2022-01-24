@@ -1,4 +1,4 @@
-package helmaddonfactory
+package addonfactory
 
 import (
 	"fmt"
@@ -14,20 +14,13 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
-// the annotation Name of customized chart values
-const annotationValuesName string = "addon.open-cluster-management.io/helmchart-values"
-
-// the built-in values
-const (
-	clusterName           string = "clusterName"
-	addonInstallNamespace string = "addonInstallNamespace"
-	hubKubeConfigSecret   string = "hubKubeConfigSecret"
-)
-
-type Values map[string]interface{}
-
-type GetValuesFunc func(cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error)
+// helmBuiltinValues includes the built-in values for helm agentAddon.
+// the values in helm chart should begin with a lowercase letter, so we need convert it to Values by JsonStructToValues.
+type helmBuiltinValues struct {
+	ClusterName           string `json:"clusterName"`
+	AddonInstallNamespace string `json:"addonInstallNamespace"`
+	HubKubeConfigSecret   string `json:"hubKubeConfigSecret,omitempty"`
+}
 
 type HelmAgentAddon struct {
 	decoder           runtime.Decoder
@@ -103,44 +96,55 @@ func (a *HelmAgentAddon) getValues(
 
 	for i := 0; i < len(a.getValuesFuncs); i++ {
 		if a.getValuesFuncs[i] != nil {
+			userValues, err := a.getValuesFuncs[i](cluster, addon)
+			if err != nil {
+				return overrideValues, err
+			}
+			overrideValues = MergeValues(overrideValues, userValues)
 		}
-		userValues, err := a.getValuesFuncs[i](cluster, addon)
-		if err != nil {
-			return overrideValues, err
-		}
-		overrideValues = MergeValues(overrideValues, userValues)
 	}
 
-	overrideValues = MergeValues(overrideValues, a.getBuiltInValues(cluster, addon))
+	builtinValues, err := a.getBuiltinValues(cluster, addon)
+	if err != nil {
+		klog.Error("failed to get builtinValue. err:%v", err)
+		return nil, err
+	}
+
+	overrideValues = MergeValues(overrideValues, builtinValues)
 
 	values, err := chartutil.ToRenderValues(a.chart, overrideValues,
 		a.releaseOptions(cluster, addon), a.capabilities(cluster, addon))
 	if err != nil {
-		klog.Error("failed to render helm chart with values %v. err:%v", overrideValues, err)
+		klog.Errorf("failed to render helm chart with values %v. err:%v", overrideValues, err)
 		return values, err
 	}
 
 	return values, nil
 }
 
-func (a *HelmAgentAddon) getBuiltInValues(
+func (a *HelmAgentAddon) getBuiltinValues(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) Values {
-	builtInValues := Values{}
-
-	builtInValues[clusterName] = cluster.GetName()
+	addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+	builtinValues := helmBuiltinValues{}
+	builtinValues.ClusterName = cluster.GetName()
 
 	installNamespace := addon.Spec.InstallNamespace
 	if len(installNamespace) == 0 {
 		installNamespace = AddonDefaultInstallNamespace
 	}
-	builtInValues[addonInstallNamespace] = installNamespace
+	builtinValues.AddonInstallNamespace = installNamespace
 
 	// TODO: hubKubeConfigSecret depends on the signer configuration in registration, and the registration is an array.
 	if a.agentAddonOptions.Registration != nil {
-		builtInValues[hubKubeConfigSecret] = fmt.Sprintf("%s-hub-kubeconfig", a.agentAddonOptions.AddonName)
+		builtinValues.HubKubeConfigSecret = fmt.Sprintf("%s-hub-kubeconfig", a.agentAddonOptions.AddonName)
 	}
-	return builtInValues
+
+	helmBuiltinValues, err := JsonStructToValues(builtinValues)
+	if err != nil {
+		klog.Error("failed to convert builtinValues to values %v.err:%v", builtinValues, err)
+		return nil, err
+	}
+	return helmBuiltinValues, nil
 }
 
 // only support Capabilities.KubeVersion
@@ -165,5 +169,6 @@ func (a *HelmAgentAddon) releaseOptions(
 
 // validateChart validates chart by rendering and decoding chart with an empty cluster and addon
 func (a *HelmAgentAddon) validateChart() error {
+	// TODO: validate chart
 	return nil
 }

@@ -46,6 +46,7 @@ type AgentOptions struct {
 	HubKubeconfigFile string
 	SpokeClusterName  string
 	AddonName         string
+	AddonNamespace    string
 }
 
 // NewWorkloadAgentOptions returns the flags with default value set
@@ -58,6 +59,7 @@ func (o *AgentOptions) AddFlags(cmd *cobra.Command) {
 	// This command only supports reading from config
 	flags.StringVar(&o.HubKubeconfigFile, "hub-kubeconfig", o.HubKubeconfigFile, "Location of kubeconfig file to connect to hub cluster.")
 	flags.StringVar(&o.SpokeClusterName, "cluster-name", o.SpokeClusterName, "Name of spoke cluster.")
+	flags.StringVar(&o.AddonNamespace, "addon-namespace", o.AddonNamespace, "Installation namespace of addon.")
 }
 
 // RunAgent starts the controllers on agent to process work from hub.
@@ -84,13 +86,14 @@ func (o *AgentOptions) RunAgent(ctx context.Context, controllerContext *controll
 		spokeKubeClient,
 		hubKubeInformerFactory.Core().V1().ConfigMaps(),
 		o.SpokeClusterName,
+		o.AddonNamespace,
 		controllerContext.EventRecorder,
 	)
 	// create a lease updater
 	leaseUpdater := lease.NewLeaseUpdater(
 		spokeKubeClient,
 		o.AddonName,
-		HelloworldAgentInstallationNamespace,
+		o.AddonNamespace,
 	)
 
 	go hubKubeInformerFactory.Start(ctx.Done())
@@ -105,6 +108,7 @@ type agentController struct {
 	spokeKubeClient    kubernetes.Interface
 	hunConfigMapLister corev1lister.ConfigMapLister
 	clusterName        string
+	addonNamespace     string
 	recorder           events.Recorder
 }
 
@@ -112,11 +116,13 @@ func newAgentController(
 	spokeKubeClient kubernetes.Interface,
 	configmapInformers corev1informers.ConfigMapInformer,
 	clusterName string,
+	addonNamespace string,
 	recorder events.Recorder,
 ) factory.Controller {
 	c := &agentController{
 		spokeKubeClient:    spokeKubeClient,
 		clusterName:        clusterName,
+		addonNamespace:     addonNamespace,
 		hunConfigMapLister: configmapInformers.Lister(),
 		recorder:           recorder,
 	}
@@ -149,7 +155,7 @@ func (c *agentController) sync(ctx context.Context, syncCtx factory.SyncContext)
 	configmap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cm.Name,
-			Namespace: HelloworldAgentInstallationNamespace,
+			Namespace: c.addonNamespace,
 		},
 		Data: cm.Data,
 	}

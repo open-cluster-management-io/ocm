@@ -16,7 +16,7 @@ import (
 	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
 	helloworldagent "open-cluster-management.io/addon-framework/examples/helloworld/agent"
-	"open-cluster-management.io/addon-framework/pkg/addonfactory/helmaddonfactory"
+	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/version"
 
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -89,10 +89,10 @@ func runController(ctx context.Context, controllerContext *controllercmd.Control
 		controllerContext.EventRecorder,
 		utilrand.String(5))
 
-	agentAddon, err := helmaddonfactory.NewAgentAddonFactoryWithHelmChartFS(addonName, FS, "manifests/charts/helloworld").
-		WithGetValuesFuncs([]helmaddonfactory.GetValuesFunc{getValues, helmaddonfactory.GetValuesFromAddonAnnotation}).
+	agentAddon, err := addonfactory.NewAgentAddonFactory(addonName, FS, "manifests/charts/helloworld").
+		WithGetValuesFuncs(getValues, addonfactory.GetValuesFromAddonAnnotation).
 		WithAgentRegistrationOption(registrationOption).
-		Build()
+		BuildHelmAgentAddon()
 	if err != nil {
 		klog.Errorf("failed to build agent %v", err)
 		return err

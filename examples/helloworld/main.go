@@ -14,7 +14,10 @@ import (
 	"github.com/spf13/pflag"
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/examples/helloworld/agent"
+	"open-cluster-management.io/addon-framework/pkg/addonfactory"
+	addonagent "open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/version"
 
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -76,14 +79,30 @@ func runController(ctx context.Context, controllerContext *controllercmd.Control
 	if err != nil {
 		return err
 	}
-	agentRegistration := &helloWorldAgent{
-		kubeConfig: controllerContext.KubeConfig,
-		recorder:   controllerContext.EventRecorder,
-		agentName:  utilrand.String(5),
-	}
-	mgr.AddAgent(agentRegistration)
-	mgr.Start(ctx)
+	registrationOption := newRegistrationOption(
+		controllerContext.KubeConfig,
+		controllerContext.EventRecorder,
+		utilrand.String(5))
 
+	agentAddon, err := addonfactory.NewAgentAddonFactory(addonName, fs, "manifests/templates").
+		WithGetValuesFuncs(getValues, addonfactory.GetValuesFromAddonAnnotation).
+		WithAgentRegistrationOption(registrationOption).
+		WithInstallStrategy(addonagent.InstallAllStrategy(agent.HelloworldAgentInstallationNamespace)).
+		BuildTemplateAgentAddon()
+	if err != nil {
+		klog.Errorf("failed to build agent %v", err)
+		return err
+	}
+
+	err = mgr.AddAgent(agentAddon)
+	if err != nil {
+		klog.Fatal(err)
+	}
+
+	err = mgr.Start(ctx)
+	if err != nil {
+		klog.Fatal(err)
+	}
 	<-ctx.Done()
 
 	return nil

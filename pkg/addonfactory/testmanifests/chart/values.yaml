@@ -31,6 +31,8 @@ imagePullPolicy: IfNotPresent
 imagePullSecret: null
 
 global:
+  imagePullPolicy: IfNotPresent
+  imagePullSecret: null
   imageOverrides:
     testImage: quay.io/testimage:test
   nodeSelector: {}
