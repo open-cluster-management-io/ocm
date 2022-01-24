@@ -114,16 +114,16 @@ func (r *leaseUpdater) reconcile(ctx context.Context) {
 	// Update lease on managed cluster at first, it returns in valid, it means lease is not supported yet
 	// and fallback to use hub lease.
 	err := r.updateLease(ctx, r.leaseNamespace, r.kubeClient)
-	if err != nil {
-		klog.Errorf("Failed to update lease %s/%s: %v on managed cluster", r.leaseName, r.leaseNamespace, err)
-	}
-
 	if errors.IsNotFound(err) && r.hubKubeClient != nil {
 		if err := r.updateLease(ctx, r.clusterName, r.hubKubeClient); err != nil {
 			klog.Errorf("Failed to update lease %s/%s: %v on hub", r.clusterName, r.leaseNamespace, err)
 		}
+		return
 	}
-	return
+
+	if err != nil {
+		klog.Errorf("Failed to update lease %s/%s: %v on managed cluster", r.leaseName, r.leaseNamespace, err)
+	}
 }
 
 // CheckAddonPodFunc checks whether the agent pod is running
