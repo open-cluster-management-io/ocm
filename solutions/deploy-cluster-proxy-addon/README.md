@@ -4,7 +4,7 @@
 
 Set up the dev environment in your local machine following [setup dev environment](../setup-dev-environment).
 
-## Support provisioning LoadBalancer typed service for kind
+## (Optional) Support provisioning LoadBalancer typed service for kind
 
 Run `./support.sh` to support provision loanblancer typed service for kind.
 
