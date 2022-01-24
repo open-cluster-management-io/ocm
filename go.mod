@@ -23,6 +23,10 @@ require (
 	sigs.k8s.io/controller-runtime v0.11.0
 )
 
+// to enable run webhook server outside of cluster
+// TODO: replace with the latest generic-admission-server
+replace github.com/openshift/generic-admission-server => github.com/xuezhaojun/generic-admission-server v1.14.1-0.20211102085821-f3b9a5baab1e
+
 require (
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
