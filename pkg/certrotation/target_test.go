@@ -102,17 +102,23 @@ func TestSetTargetCertKeyPairSecret(t *testing.T) {
 type validateReasonFunc func(t *testing.T, actualReason string)
 
 func TestNeedNewTargetCertKeyPair(t *testing.T) {
-	certData1, keyData1, caData1, err := newServingCertKeyPair("service1.ns1.svc", "signer1", time.Hour*-1)
+	correctHostname := "service1.ns1.svc"
+	certData1, keyData1, caData1, _, err := newServingCertKeyPair(correctHostname, "signer1", time.Hour*-1)
 	if err != nil {
 		t.Fatalf("Expected no error, but got: %v", err)
 	}
 
-	certData2, keyData2, caData2, err := newServingCertKeyPair("service1.ns1.svc", "signer2", time.Hour*1)
+	certData2, keyData2, caData2, signer2, err := newServingCertKeyPair(correctHostname, "signer2", time.Hour*1)
 	if err != nil {
 		t.Fatalf("Expected no error, but got: %v", err)
 	}
 
-	_, _, caData3, err := newServingCertKeyPair("service1.ns1.svc", "signer2", time.Hour*1)
+	_, _, caData3, _, err := newServingCertKeyPair(correctHostname, "signer2", time.Hour*1)
+	if err != nil {
+		t.Fatalf("Expected no error, but got: %v", err)
+	}
+	wrongHostname := "service2.ns1.svc"
+	certData4, keyData4, _, err := newServingCertKeyPairWithSigner(signer2, wrongHostname, "signer2", time.Hour*1)
 	if err != nil {
 		t.Fatalf("Expected no error, but got: %v", err)
 	}
@@ -225,30 +231,46 @@ func TestNeedNewTargetCertKeyPair(t *testing.T) {
 			caBundle:       caCert3,
 			validateReason: startsWith(fmt.Sprintf("issuer %q not in ca bundle:\n", "signer2")),
 		},
+		{
+			name: "issued SAN mismatch",
+			secret: &corev1.Secret{
+				Data: map[string][]byte{
+					"tls.crt": certData4,
+					"tls.key": keyData4,
+				},
+			},
+			caBundle:       caCert2,
+			validateReason: startsWith("issued hostnames mismatch in ca bundle:"),
+		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			actual := needNewTargetCertKeyPair(c.secret, c.caBundle)
+			actual := needNewTargetCertKeyPair(c.secret, c.caBundle, []string{correctHostname})
 			c.validateReason(t, actual)
 		})
 	}
 }
 
-func newServingCertKeyPair(hostName, signerName string, validity time.Duration) (certData, keyData, caData []byte, err error) {
+func newServingCertKeyPair(hostName, signerName string, validity time.Duration) (certData, keyData, caData []byte, signer *crypto.CA, err error) {
 	ca, err := crypto.MakeSelfSignedCAConfigForDuration(signerName, validity)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-
-	signer := &crypto.CA{
+	signer = &crypto.CA{
 		SerialGenerator: &crypto.RandomSerialGenerator{},
 		Config:          ca,
 	}
-
+	certData, keyData, caData, err = newServingCertKeyPairWithSigner(signer, hostName, signerName, validity)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	return certData, keyData, caData, signer, nil
+}
+func newServingCertKeyPairWithSigner(signer *crypto.CA, hostName, signerName string, validity time.Duration) (certData, keyData, caData []byte, err error) {
 	caCertBytes := &bytes.Buffer{}
 	caKeyBytes := &bytes.Buffer{}
-	if err := ca.WriteCertConfig(caCertBytes, caKeyBytes); err != nil {
+	if err := signer.Config.WriteCertConfig(caCertBytes, caKeyBytes); err != nil {
 		return nil, nil, nil, err
 	}
 

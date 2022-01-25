@@ -45,7 +45,7 @@ func (c TargetRotation) EnsureTargetCertKeyPair(signingCertKeyPair *crypto.CA, c
 	}
 	targetCertKeyPairSecret.Type = corev1.SecretTypeTLS
 
-	reason := needNewTargetCertKeyPair(targetCertKeyPairSecret, caBundleCerts)
+	reason := needNewTargetCertKeyPair(targetCertKeyPairSecret, caBundleCerts, c.HostNames)
 	if len(reason) == 0 {
 		return nil
 	}
@@ -70,7 +70,8 @@ func (c TargetRotation) EnsureTargetCertKeyPair(signingCertKeyPair *crypto.CA, c
 //   3) or we are over the renewal percentage of the validity
 //   4) or the CA bundle doesn't contain a CA cert that matches exiting secret's common name.
 //   5) or the CA bundle doesn't contain the parent CA cert of the exiting secret.
-func needNewTargetCertKeyPair(secret *corev1.Secret, caBundleCerts []*x509.Certificate) string {
+//   6) or the previously signed SANs in the CA bundle doesn't match expectation
+func needNewTargetCertKeyPair(secret *corev1.Secret, caBundleCerts []*x509.Certificate, hostnames []string) string {
 	certData := secret.Data["tls.crt"]
 	if len(certData) == 0 {
 		return "missing tls.crt"
@@ -108,6 +109,23 @@ func needNewTargetCertKeyPair(secret *corev1.Secret, caBundleCerts []*x509.Certi
 	}
 	if !containsIssuer {
 		return fmt.Sprintf("issuer %q not in ca bundle:\n%s", cert.Issuer.CommonName, certs.CertificateBundleToString(caBundleCerts))
+	}
+
+	expectedIPs, expectedHosts := crypto.IPAddressesDNSNames(hostnames)
+	currentNames := sets.NewString(cert.DNSNames...)
+	if !sets.NewString(expectedHosts...).Equal(currentNames) {
+		return fmt.Sprintf("issued hostnames mismatch in ca bundle: (current) %v, (expected) %v", currentNames, expectedHosts)
+	}
+	currentIPs := sets.NewString()
+	for _, ip := range cert.IPAddresses {
+		currentIPs.Insert(ip.String())
+	}
+	expectedStrIPs := sets.NewString()
+	for _, ip := range expectedIPs {
+		expectedStrIPs.Insert(ip.String())
+	}
+	if !expectedStrIPs.Equal(currentIPs) {
+		return fmt.Sprintf("issued ip addresses mismatch in ca bundle: (current) %v, (expected) %v", currentIPs, expectedIPs)
 	}
 
 	return ""
