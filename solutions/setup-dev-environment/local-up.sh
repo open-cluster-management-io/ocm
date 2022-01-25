@@ -22,11 +22,11 @@ joincmd=$(clusteradm init --use-bootstrap-token | grep clusteradm)
 
 kubectl config use ${c1ctx}
 echo "Join cluster1 to hub"
-$(echo ${joincmd} | sed "s/<cluster_name>/$c1/g")
+$(echo ${joincmd} --force-internal-endpoint-lookup --wait | sed "s/<cluster_name>/$c1/g")
 
 kubectl config use ${c2ctx}
 echo "Join cluster2 to hub"
-$(echo ${joincmd} | sed "s/<cluster_name>/$c2/g")
+$(echo ${joincmd} --force-internal-endpoint-lookup --wait | sed "s/<cluster_name>/$c2/g")
 
 kubectl config use ${hubctx}
 echo "Accept join of cluster1 and cluster2"
