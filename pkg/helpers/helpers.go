@@ -246,3 +246,47 @@ func FindTaintByKey(managedCluster *clusterv1.ManagedCluster, key string) *clust
 	}
 	return nil
 }
+
+func IsTaintEqual(taint1, taint2 clusterv1.Taint) bool {
+	// Ignore the comparison of time
+	return taint1.Key == taint2.Key && taint1.Value == taint2.Value && taint1.Effect == taint2.Effect
+}
+
+// AddTaints add taints to the specified slice, if it did not already exist.
+// Return a boolean indicating whether the slice has been updated.
+func AddTaints(taints *[]clusterv1.Taint, taint clusterv1.Taint) bool {
+	if taints == nil || *taints == nil {
+		*taints = make([]clusterv1.Taint, 0)
+	}
+	if FindTaint(*taints, taint) != nil {
+		return false
+	}
+	*taints = append(*taints, taint)
+	return true
+}
+
+func RemoveTaints(taints *[]clusterv1.Taint, targets ...clusterv1.Taint) (updated bool) {
+	if taints == nil || len(*taints) == 0 || len(targets) == 0 {
+		return false
+	}
+
+	newTaints := make([]clusterv1.Taint, 0)
+	for _, v := range *taints {
+		if FindTaint(targets, v) == nil {
+			newTaints = append(newTaints, v)
+		}
+	}
+	updated = len(*taints) != len(newTaints)
+	*taints = newTaints
+	return updated
+}
+
+func FindTaint(taints []clusterv1.Taint, taint clusterv1.Taint) *clusterv1.Taint {
+	for i := range taints {
+		if IsTaintEqual(taints[i], taint) {
+			return &taints[i]
+		}
+	}
+
+	return nil
+}

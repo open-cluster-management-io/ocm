@@ -74,6 +74,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	transport.CertCallbackRefreshDuration = 5 * time.Second
 	clientcert.ControllerResyncInterval = 5 * time.Second
 	managedcluster.CreatingControllerSyncInterval = 1 * time.Second
+	hub.ResyncInterval = 5 * time.Second
 
 	// crank up the addon lease sync and udpate speed
 	spoke.AddOnLeaseControllerSyncInterval = 5 * time.Second

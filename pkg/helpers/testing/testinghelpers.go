@@ -90,14 +90,27 @@ func NewAcceptedManagedCluster() *clusterv1.ManagedCluster {
 
 func NewAvailableManagedCluster() *clusterv1.ManagedCluster {
 	managedCluster := NewAcceptedManagedCluster()
-	availableCondtion := NewManagedClusterCondition(
+	availableCondition := NewManagedClusterCondition(
 		clusterv1.ManagedClusterConditionAvailable,
 		"True",
 		"ManagedClusterAvailable",
 		"Managed cluster is available",
 		nil,
 	)
-	managedCluster.Status.Conditions = append(managedCluster.Status.Conditions, availableCondtion)
+	managedCluster.Status.Conditions = append(managedCluster.Status.Conditions, availableCondition)
+	return managedCluster
+}
+
+func NewUnAvailableManagedCluster() *clusterv1.ManagedCluster {
+	managedCluster := NewAcceptedManagedCluster()
+	condition := NewManagedClusterCondition(
+		clusterv1.ManagedClusterConditionAvailable,
+		"False",
+		"ManagedClusterUnAvailable",
+		"Managed cluster is Unavailable",
+		nil,
+	)
+	managedCluster.Status.Conditions = append(managedCluster.Status.Conditions, condition)
 	return managedCluster
 }
 

@@ -2,6 +2,7 @@ package hub
 
 import (
 	"context"
+	"open-cluster-management.io/registration/pkg/hub/taint"
 	"time"
 
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -24,6 +25,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
+
+var ResyncInterval = 5 * time.Minute
 
 // RunControllerManager starts the controllers on hub to manage spoke cluster registration.
 func RunControllerManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
@@ -68,6 +71,12 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		controllerContext.EventRecorder,
 	)
 
+	taintController := taint.NewTaintController(
+		clusterClient,
+		clusterInformers.Cluster().V1().ManagedClusters(),
+		controllerContext.EventRecorder,
+	)
+
 	csrController := csr.NewCSRApprovingController(
 		kubeClient,
 		kubeInfomers.Certificates().V1().CertificateSigningRequests(),
@@ -79,7 +88,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		clusterClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		kubeInfomers.Coordination().V1().Leases(),
-		5*time.Minute, //TODO: this interval time should be allowed to change from outside
+		ResyncInterval, //TODO: this interval time should be allowed to change from outside
 		controllerContext.EventRecorder,
 	)
 
@@ -127,6 +136,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	go addOnInformers.Start(ctx.Done())
 
 	go managedClusterController.Run(ctx, 1)
+	go taintController.Run(ctx, 1)
 	go csrController.Run(ctx, 1)
 	go leaseController.Run(ctx, 1)
 	go rbacFinalizerController.Run(ctx, 1)
