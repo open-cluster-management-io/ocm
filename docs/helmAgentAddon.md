@@ -1,8 +1,8 @@
 # Overview
-This doc is used to introduce how to migrate Helm Chart to an Addon.
+This doc is used to introduce how to migrate Helm Chart to an AddOn.
 
 ## Limitations
-1. Not all of built-in Objects of Helm Chart are support in Addon. We only support below:
+1. Not all of built-in Objects of Helm Chart are support in AddOn. We only support below:
 * Capabilities.KubeVersion
 * Release.Name
 * Release.Namespace
@@ -19,11 +19,10 @@ We have an example for Helm Chart migration in [helloworld_helm](../examples/hel
 		return err
 	}
 
-	agentAddon, err := helmaddonfactory.NewAgentAddonFactoryWithHelmChartFS(addonName, FS, "manifests/charts/helloworld").
-		WithScheme(scheme).
-        WithGetValuesFuncs([]helmaddonfactory.GetValuesFunc{getValues, helmaddonfactory.GetValuesFromAddonAnnotation}).
-		WithAgentRegistrationOption(newRegistrationOption()).
-		Build()
+	agentAddon, err := addonfactory.NewAgentAddonFactory(addonName, FS, "manifests/charts/helloworld").
+		WithGetValuesFuncs(getValues, addonfactory.GetValuesFromAddonAnnotation).
+		WithAgentRegistrationOption(registrationOption).
+		BuildHelmAgentAddon()
 	if err != nil {
 		return err
 	}
@@ -34,22 +33,23 @@ We have an example for Helm Chart migration in [helloworld_helm](../examples/hel
 
 ### Values definition 
 #### Built-in values
-Addon built-in values
+AddOn built-in values
 * `Value.clusterName`
 * `Value.addonInstallNamespace`
-* `Value.hubKubeConfigSecret` (used when the addon is needed to registered to the Hub cluster)
+* `Value.hubKubeConfigSecret` (used when the AddOn is needed to register to the Hub cluster)
 
 Helm Chart built-in values
 * `Capabilities.KubeVersion` is the `ManagedCluster.Status.Version.Kubernetes`.
-* `Release.Name`  is the addon name.
+* `Release.Name`  is the AddOn name.
 * `Release.Namespace`  is the `addonInstallNamespace`.
 
 In the list of `GetValuesFuncs`, the values from the big index Func will override the one from low index Func.
 The built-in values will override the values got from the list of `GetValuesFuncs`.
 
+The Variable names in Values should begin with lowercase. So the best practice is to define a json struct for the values, and convert it to Values using the `JsonStructToValues`.
 
 #### Values from annotation of ManagedClusterAddon
-We support a helper `GetValuesFunc` named GetValuesFromAddonAnnotation which can get values from annotation of ManagedClusterAddon.
-The key of the Helm Chart values in annotation is `addon.open-cluster-management.io/helmchart-values`,
+We support a helper `GetValuesFunc` named `GetValuesFromAddonAnnotation` which can get values from annotation of ManagedClusterAddon.
+The key of the Helm Chart values in annotation is `addon.open-cluster-management.io/values`,
 and the value should be a valid json string which has key-value format.
 

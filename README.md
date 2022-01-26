@@ -1,6 +1,6 @@
-# Addon Framework
+# AddOn Framework
 
-This is to define an addon framework library.
+This is to define an AddOn framework library.
 
 Still in PoC phase.
 
@@ -17,68 +17,25 @@ You can reach the maintainers of this project at:
 -->
 
 ------
-## Getting Started
+## Purpose
 
-### Prerequisites
+This library is used to implement AddOn management like installation, registration etc.
+So developers could be able to develop their own addon functions more easily.
 
-These instructions assume:
+## Concepts
 
-- You have at least one running kubernetes cluster;
-- You have already followed instructions from [registration-operator](https://github.com/open-cluster-management-io/registration-operator) and installed OCM successfully;
-- At least one managed cluster has been imported and accepted;
+* [ManagedClusterAddon](https://github.com/open-cluster-management-io/api/blob/main/addon/v1alpha1/types_managedclusteraddon.go)
+* [ClusterManagementAddOn](https://github.com/open-cluster-management-io/api/blob/main/addon/v1alpha1/types_managedclusteraddon.go)
 
-### Deploy the helloworld addon
-Set environment variables.
-```sh
-export KUBECONFIG=</path/to/hub_cluster/kubeconfig>
-```
+## Design Doc
 
-Build the docker image to run the sample addon.
-```sh
-# get imagebuilder first
-go get github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.1
-export PATH=$PATH:$(go env GOPATH)/bin
-# build image
-make images
-export EXAMPLE_IMAGE_NAME=<helloworld_addon_image_name> # export EXAMPLE_IMAGE_NAME=quay.io/open-cluster-management/helloworld-addon:latest
-```
+* [AddOn Framework](https://github.com/open-cluster-management-io/enhancements/tree/main/enhancements/sig-architecture/8-addon-framework)
 
-If your are using kind, load image into kind hub cluster.
-```sh
-kind load docker-image $EXAMPLE_IMAGE_NAME --name <your-hub-cluster-name> # kind load docker-image  $EXAMPLE_IMAGE_NAME --name cluster1
-```
+## AddOn Consumers
+* [cluster-proxy](https://github.com/open-cluster-management-io/cluster-proxy) 
 
-And then deploy helloworld addon controller on hub cluster
-```
-make deploy-example
-```
-The helloworld addon controller will create one `ManagedClusterAddOn` for each managed cluster automatically to install the helloworld agent on the managed cluster.
+* [managed-serviceaccount](https://github.com/open-cluster-management-io/managed-serviceaccount)
 
-### What is next
-After a successful deployment, check on the managed cluster and see the helloworld addon agent has been deployed from the hub cluster.
-```
-kubectl --kubeconfig </path/to/managed_cluster/kubeconfig> -n default get pods
-NAME                               READY   STATUS    RESTARTS   AGE
-helloworld-agent-b99d47f76-v2j6h   1/1     Running   0          53s
-```
+## AddOn Examples 
 
-### Clean up
-Undeploy helloworld addon controller from hub cluster.
-```
-make undeploy-example
-```
-
-Remove the addon CR from hub cluster. It will undeploy the helloworld addon agent from the managed cluster as well.
-```
-kubectl --kubeconfig </path/to/hub_cluster/kubeconfig> delete managedclusteraddons -n <managed_cluster_name> helloworld
-```
-
-Follow instructions from [registration-operator](https://github.com/open-cluster-management-io/registration-operator) to uninstall OCM if necessary;
-
-<!--
-## XXX References
-
-If you have any further question about xxx, please refer to
-[XXX help documentation](docs/xxx_help.md) for further information.
--->
-
+We have examples to implement AddOn using Helm Chart or Go Template. You can find more details in [examples](examples/README.md).
