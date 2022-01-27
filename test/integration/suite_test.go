@@ -33,6 +33,8 @@ var hubClusterClient clusterv1client.Interface
 var hubAddonClient addonv1alpha1client.Interface
 var hubKubeClient kubernetes.Interface
 var testAddonImpl *testAddon
+var cancel context.CancelFunc
+var mgrContext context.Context
 
 func TestIntegration(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
@@ -70,13 +72,15 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		manifests:     map[string][]runtime.Object{},
 		registrations: map[string][]addonapiv1alpha1.RegistrationConfig{},
 	}
+
+	mgrContext, cancel = context.WithCancel(context.TODO())
 	// start hub controller
 	go func() {
 		mgr, err := addonmanager.New(cfg)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		err = mgr.AddAgent(testAddonImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		mgr.Start(context.Background())
+		mgr.Start(mgrContext)
 	}()
 
 	close(done)
@@ -85,6 +89,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 var _ = ginkgo.AfterSuite(func() {
 	ginkgo.By("tearing down the test environment")
 
+	cancel()
 	err := testEnv.Stop()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 })

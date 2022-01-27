@@ -188,6 +188,7 @@ func TestReconcile(t *testing.T) {
 				workLister:                workInformerFactory.Work().V1().ManifestWorks().Lister(),
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
 				eventRecorder:             eventstesting.NewTestingEventRecorder(t),
+				cache:                     newWorkCache(),
 			}
 
 			for _, obj := range c.addon {

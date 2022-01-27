@@ -36,6 +36,7 @@ type addonDeployController struct {
 	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
 	workLister                worklister.ManifestWorkLister
 	agentAddons               map[string]agent.AgentAddon
+	cache                     *workCache
 	eventRecorder             events.Recorder
 }
 
@@ -55,7 +56,8 @@ func NewAddonDeployController(
 		managedClusterAddonLister: addonInformers.Lister(),
 		workLister:                workInformers.Lister(),
 		agentAddons:               agentAddons,
-		eventRecorder:             recorder.WithComponentSuffix(fmt.Sprintf("addon-deploy-controller")),
+		cache:                     newWorkCache(),
+		eventRecorder:             recorder.WithComponentSuffix("addon-deploy-controller"),
 	}
 
 	return factory.New().WithFilteredEventsInformersQueueKeyFunc(
@@ -95,7 +97,7 @@ func NewAddonDeployController(
 			},
 			workInformers.Informer(),
 		).
-		WithSync(c.sync).ToController(fmt.Sprintf("addon-deploy-controller"), recorder)
+		WithSync(c.sync).ToController("addon-deploy-controller", recorder)
 }
 
 func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
@@ -116,6 +118,7 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 	// Get ManagedCluster
 	managedCluster, err := c.managedClusterLister.Get(clusterName)
 	if errors.IsNotFound(err) {
+		c.cache.removeCache(addonName, clusterName)
 		return nil
 	}
 	if err != nil {
@@ -129,11 +132,18 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 
 	managedClusterAddon, err := c.managedClusterAddonLister.ManagedClusterAddOns(clusterName).Get(addonName)
 	if errors.IsNotFound(err) {
+		c.cache.removeCache(addonName, clusterName)
 		return nil
 	}
 	if err != nil {
 		return err
 	}
+
+	if !managedClusterAddon.DeletionTimestamp.IsZero() {
+		c.cache.removeCache(addonName, clusterName)
+		return nil
+	}
+
 	owner := metav1.NewControllerRef(managedClusterAddon, addonapiv1alpha1.GroupVersion.WithKind("ManagedClusterAddOn"))
 
 	managedClusterAddonCopy := managedClusterAddon.DeepCopy()
@@ -198,6 +208,7 @@ func (c *addonDeployController) applyWork(ctx context.Context, required *workapi
 		existingWork, err = c.workClient.WorkV1().ManifestWorks(required.Namespace).Create(ctx, required, metav1.CreateOptions{})
 		if err == nil {
 			c.eventRecorder.Eventf("ManifestWorkCreated", "Created %s/%s because it was missing", required.Namespace, required.Name)
+			c.cache.updateCache(required, existingWork)
 			return existingWork, nil
 		}
 		c.eventRecorder.Warningf("ManifestWorkCreateFailed", "Failed to create ManifestWork %s/%s: %v", required.Namespace, required.Name, err)
@@ -207,12 +218,18 @@ func (c *addonDeployController) applyWork(ctx context.Context, required *workapi
 		return nil, err
 	}
 
-	if ManifestsEqual(existingWork.Spec.Workload.Manifests, required.Spec.Workload.Manifests) {
+	if c.cache.safeToSkipApply(required, existingWork) {
 		return existingWork, nil
 	}
+
+	if ManifestsEqual(required.Spec.Workload.Manifests, existingWork.Spec.Workload.Manifests) {
+		return existingWork, nil
+	}
+
 	existingWork.Spec.Workload = required.Spec.Workload
 	existingWork, err = c.workClient.WorkV1().ManifestWorks(existingWork.Namespace).Update(ctx, existingWork, metav1.UpdateOptions{})
 	if err == nil {
+		c.cache.updateCache(required, existingWork)
 		c.eventRecorder.Eventf("ManifestWorkUpdate", "Updated %s/%s because it was changing", required.Namespace, required.Name)
 		return existingWork, nil
 	}
