@@ -60,9 +60,10 @@ func (ClusterManagementAddOnStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ConfigCoordinates = map[string]string{
-	"":        "ConfigCoordinates represents the information for locating the CRD and CR that configures the add-on.",
-	"crdName": "crdName is the name of the CRD used to configure instances of the managed add-on. This field should be configured if the add-on have a CRD that controls the configuration of the add-on.",
-	"crName":  "crName is the name of the CR used to configure instances of the managed add-on. This field should be configured if add-on CR have a consistent name across the all of the ManagedCluster instaces.",
+	"":                       "ConfigCoordinates represents the information for locating the CRD and CR that configures the add-on.",
+	"crdName":                "crdName is the name of the CRD used to configure instances of the managed add-on. This field should be configured if the add-on have a CRD that controls the configuration of the add-on.",
+	"crName":                 "crName is the name of the CR used to configure instances of the managed add-on. This field should be configured if add-on CR have a consistent name across the all of the ManagedCluster instaces.",
+	"lastObservedGeneration": "lastObservedGeneration is the observed generation of the custom resource for the configuration of the addon.",
 }
 
 func (ConfigCoordinates) SwaggerDoc() map[string]string {

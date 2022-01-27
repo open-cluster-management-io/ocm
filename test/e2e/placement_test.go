@@ -12,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
-	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
@@ -103,19 +102,19 @@ var _ = Describe("Placement", func() {
 		}
 
 		By("Create a placement")
-		placement := &clusterapiv1alpha1.Placement{
+		placement := &clusterapiv1beta1.Placement{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: placementNamespace,
 				Name:      placementName,
 			},
 		}
 
-		placement, err = t.ClusterClient.ClusterV1alpha1().Placements(placementNamespace).Create(context.TODO(), placement, metav1.CreateOptions{})
+		placement, err = t.ClusterClient.ClusterV1beta1().Placements(placementNamespace).Create(context.TODO(), placement, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Check if placementdecisions are created with desired number of decisions")
 		Eventually(func() bool {
-			placementDecisions, err := t.ClusterClient.ClusterV1alpha1().PlacementDecisions(placementNamespace).List(context.TODO(), metav1.ListOptions{
+			placementDecisions, err := t.ClusterClient.ClusterV1beta1().PlacementDecisions(placementNamespace).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: fmt.Sprintf("%s=%s", placementLabel, placementName),
 			})
 			if err != nil {
@@ -132,7 +131,7 @@ var _ = Describe("Placement", func() {
 
 		By("Check if placement status is updated")
 		Eventually(func() bool {
-			placement, err := t.ClusterClient.ClusterV1alpha1().Placements(placementNamespace).Get(context.TODO(), placementName, metav1.GetOptions{})
+			placement, err := t.ClusterClient.ClusterV1beta1().Placements(placementNamespace).Get(context.TODO(), placementName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
@@ -141,16 +140,16 @@ var _ = Describe("Placement", func() {
 				return false
 			}
 
-			return meta.IsStatusConditionTrue(placement.Status.Conditions, clusterapiv1alpha1.PlacementConditionSatisfied)
+			return meta.IsStatusConditionTrue(placement.Status.Conditions, clusterapiv1beta1.PlacementConditionSatisfied)
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(BeTrue())
 
 		By("Delete placement")
-		err = t.ClusterClient.ClusterV1alpha1().Placements(placementNamespace).Delete(context.TODO(), placementName, metav1.DeleteOptions{})
+		err = t.ClusterClient.ClusterV1beta1().Placements(placementNamespace).Delete(context.TODO(), placementName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Check if placementdecisions are deleted as well")
 		Eventually(func() bool {
-			placementDecisions, err := t.ClusterClient.ClusterV1alpha1().PlacementDecisions(placementNamespace).List(context.TODO(), metav1.ListOptions{
+			placementDecisions, err := t.ClusterClient.ClusterV1beta1().PlacementDecisions(placementNamespace).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: fmt.Sprintf("%s=%s", placementLabel, placementName),
 			})
 			if err != nil {

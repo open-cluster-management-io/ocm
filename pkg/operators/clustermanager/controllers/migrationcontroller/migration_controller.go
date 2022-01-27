@@ -40,6 +40,8 @@ var (
 	migrationRequestFiles = []string{
 		"cluster-manager/cluster-manager-managedclustersets-migration.yaml",
 		"cluster-manager/cluster-manager-managedclustersetbindings-migration.yaml",
+		"cluster-manager/cluster-manager-placements-migration.yaml",
+		"cluster-manager/cluster-manager-placementdecisions-migration.yaml",
 	}
 )
 
