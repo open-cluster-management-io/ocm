@@ -1,3 +1,4 @@
+{{- if not (eq .Values.clusterName "local-cluster") }}
 apiVersion: cluster.open-cluster-management.io/v1alpha1
 kind: ClusterClaim
 metadata:
@@ -7,3 +8,4 @@ metadata:
   name: clusterName
 spec:
   value:  {{ .Values.clusterName }}
+{{- end }}

@@ -35,6 +35,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 		expectedInstallNamespace string
 		expectedNodeSelector     map[string]string
 		expectedImage            string
+		expectedObjectCnt        int
 	}{
 		{
 			name:             "template render ok with annotation config and default scheme",
@@ -52,6 +53,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 			expectedInstallNamespace: "myNs",
 			expectedNodeSelector:     map[string]string{"host": "ssd"},
 			expectedImage:            "quay.io/helloworld:2.4",
+			expectedObjectCnt:        2,
 		},
 		{
 			name:        "deployment template render ok with default scheme but no annotation config",
@@ -67,6 +69,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 			expectedInstallNamespace: AddonDefaultInstallNamespace,
 			expectedNodeSelector:     map[string]string{},
 			expectedImage:            "quay.io/helloworld:latest",
+			expectedObjectCnt:        2,
 		},
 		{
 			name:                     "deployment template render ok with default scheme,but no userConfig",
@@ -78,6 +81,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 			expectedInstallNamespace: AddonDefaultInstallNamespace,
 			expectedNodeSelector:     map[string]string{"host": "ssd"},
 			expectedImage:            "quay.io/helloworld:2.4",
+			expectedObjectCnt:        2,
 		},
 		{
 			name:                     "template render ok with userConfig and custom scheme",
@@ -89,6 +93,19 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 			expectedInstallNamespace: AddonDefaultInstallNamespace,
 			expectedNodeSelector:     map[string]string{"host": "ssd"},
 			expectedImage:            "quay.io/helloworld:2.4",
+			expectedObjectCnt:        2,
+		},
+		{
+			name:                     "template render ok with empty yaml",
+			dir:                      "testmanifests/template",
+			scheme:                   scheme,
+			clusterName:              "local-cluster",
+			addonName:                "helloworld",
+			annotationConfig:         `{"NodeSelector":{"host":"ssd"},"Image":"quay.io/helloworld:2.4"}`,
+			expectedInstallNamespace: AddonDefaultInstallNamespace,
+			expectedNodeSelector:     map[string]string{"host": "ssd"},
+			expectedImage:            "quay.io/helloworld:2.4",
+			expectedObjectCnt:        1,
 		},
 	}
 	for _, c := range cases {
@@ -107,6 +124,9 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 			objects, err := agentAddon.Manifests(cluster, clusterAddon)
 			if err != nil {
 				t.Errorf("expected no error, got err %v", err)
+			}
+			if len(objects) != c.expectedObjectCnt {
+				t.Errorf("expected %v objects, but got %v", c.expectedObjectCnt, len(objects))
 			}
 			for _, o := range objects {
 				switch object := o.(type) {

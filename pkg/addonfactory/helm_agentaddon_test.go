@@ -68,18 +68,31 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 		expectedInstallNamespace string
 		expectedNodeSelector     map[string]string
 		expectedImage            string
+		expectedObjCnt           int
 	}{
 		{
-			name:        "template render ok with annotation values",
-			scheme:      testScheme,
-			clusterName: "cluster1",
-			addonName:   "helloworld",
-
+			name:                     "template render ok with annotation values",
+			scheme:                   testScheme,
+			clusterName:              "cluster1",
+			addonName:                "helloworld",
 			installNamespace:         "myNs",
 			annotationValues:         `{"global": {"nodeSelector":{"host":"ssd"},"imageOverrides":{"testImage":"quay.io/helloworld:2.4"}}}`,
 			expectedInstallNamespace: "myNs",
 			expectedNodeSelector:     map[string]string{"host": "ssd"},
 			expectedImage:            "quay.io/helloworld:2.4",
+			expectedObjCnt:           4,
+		},
+		{
+			name:                     "template render ok with empty yaml",
+			scheme:                   testScheme,
+			clusterName:              "local-cluster",
+			addonName:                "helloworld",
+			installNamespace:         "myNs",
+			annotationValues:         `{"global": {"nodeSelector":{"host":"ssd"},"imageOverrides":{"testImage":"quay.io/helloworld:2.4"}}}`,
+			expectedInstallNamespace: "myNs",
+			expectedNodeSelector:     map[string]string{"host": "ssd"},
+			expectedImage:            "quay.io/helloworld:2.4",
+			expectedObjCnt:           2,
 		},
 	}
 	for _, c := range cases {
@@ -98,8 +111,9 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 			if err != nil {
 				t.Errorf("expected no error, got err %v", err)
 			}
-			if len(objects) != 4 {
-				t.Errorf("expected 4 objects,but got %v", len(objects))
+
+			if len(objects) != c.expectedObjCnt {
+				t.Errorf("expected %v objects,but got %v", c.expectedObjCnt, len(objects))
 			}
 			for _, o := range objects {
 				switch object := o.(type) {

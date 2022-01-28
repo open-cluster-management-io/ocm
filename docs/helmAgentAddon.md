@@ -3,7 +3,7 @@ This doc is used to introduce how to migrate Helm Chart to an AddOn.
 
 ## Limitations
 1. Not all of built-in Objects of Helm Chart are support in AddOn. We only support below:
-* Capabilities.KubeVersion
+* Capabilities.KubeVersion.Version
 * Release.Name
 * Release.Namespace
 

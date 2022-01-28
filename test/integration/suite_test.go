@@ -84,7 +84,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	}()
 
 	close(done)
-}, 60)
+}, 300)
 
 var _ = ginkgo.AfterSuite(func() {
 	ginkgo.By("tearing down the test environment")

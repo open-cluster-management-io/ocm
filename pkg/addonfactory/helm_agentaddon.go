@@ -86,7 +86,7 @@ func (a *HelmAgentAddon) Manifests(
 		if len(data) == 0 {
 			continue
 		}
-		klog.V(4).Infof("%v/n", data)
+		klog.V(4).Infof("rendered template: %v", data)
 		object, _, err := a.decoder.Decode([]byte(data), nil, nil)
 		if err != nil {
 			if runtime.IsMissingKind(err) {
