@@ -3,7 +3,6 @@ package helpers
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -38,32 +37,25 @@ func EnsureSAToken(ctx context.Context, saName, saNamespace string, client kuber
 		return fmt.Errorf("token secret for %s not exist yet", saName)
 	}
 
-	prefix := saName
-	if len(prefix) > 63 {
-		prefix = prefix[:37]
-	}
-
 	for _, secret := range sa.Secrets {
-		if strings.HasPrefix(secret.Name, prefix) && strings.Contains(secret.Name, "token") {
-			tokenSecretName := secret.Name
+		// get the token secret
+		tokenSecretName := secret.Name
 
-			// get the token secret
-			tokenSecret, err := client.CoreV1().Secrets(saNamespace).Get(ctx, tokenSecretName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-
-			if tokenSecret.Type != corev1.SecretTypeServiceAccountToken {
-				continue
-			}
-
-			saToken, ok := tokenSecret.Data["token"]
-			if !ok {
-				return fmt.Errorf("no token in data for secret %s", tokenSecretName)
-			}
-
-			return renderSAToken(saToken)
+		tokenSecret, err := client.CoreV1().Secrets(saNamespace).Get(ctx, tokenSecretName, metav1.GetOptions{})
+		if err != nil {
+			return err
 		}
+
+		if tokenSecret.Type != corev1.SecretTypeServiceAccountToken {
+			continue
+		}
+
+		saToken, ok := tokenSecret.Data["token"]
+		if !ok {
+			return fmt.Errorf("no token in data for secret %s", tokenSecretName)
+		}
+
+		return renderSAToken(saToken)
 	}
 
 	return fmt.Errorf("no token secret for this service account %s", sa.Name)
