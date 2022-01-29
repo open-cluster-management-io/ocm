@@ -26,13 +26,10 @@ import (
 	"k8s.io/klog/v2"
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterinformerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
-	clusterinformerv1alpha1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1alpha1"
 	clusterinformerv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
-	clusterlisterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
-	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
@@ -55,8 +52,8 @@ type schedulingController struct {
 	clusterLister           clusterlisterv1.ManagedClusterLister
 	clusterSetLister        clusterlisterv1beta1.ManagedClusterSetLister
 	clusterSetBindingLister clusterlisterv1beta1.ManagedClusterSetBindingLister
-	placementLister         clusterlisterv1alpha1.PlacementLister
-	placementDecisionLister clusterlisterv1alpha1.PlacementDecisionLister
+	placementLister         clusterlisterv1beta1.PlacementLister
+	placementDecisionLister clusterlisterv1beta1.PlacementDecisionLister
 	enqueuePlacementFunc    enqueuePlacementFunc
 	scheduler               Scheduler
 	recorder                kevents.EventRecorder
@@ -68,8 +65,8 @@ func NewSchedulingController(
 	clusterInformer clusterinformerv1.ManagedClusterInformer,
 	clusterSetInformer clusterinformerv1beta1.ManagedClusterSetInformer,
 	clusterSetBindingInformer clusterinformerv1beta1.ManagedClusterSetBindingInformer,
-	placementInformer clusterinformerv1alpha1.PlacementInformer,
-	placementDecisionInformer clusterinformerv1alpha1.PlacementDecisionInformer,
+	placementInformer clusterinformerv1beta1.PlacementInformer,
+	placementDecisionInformer clusterinformerv1beta1.PlacementDecisionInformer,
 	scheduler Scheduler,
 	recorder events.Recorder, krecorder kevents.EventRecorder,
 ) factory.Controller {
@@ -160,8 +157,8 @@ func NewSchedulingControllerResync(
 	clusterInformer clusterinformerv1.ManagedClusterInformer,
 	clusterSetInformer clusterinformerv1beta1.ManagedClusterSetInformer,
 	clusterSetBindingInformer clusterinformerv1beta1.ManagedClusterSetBindingInformer,
-	placementInformer clusterinformerv1alpha1.PlacementInformer,
-	placementDecisionInformer clusterinformerv1alpha1.PlacementDecisionInformer,
+	placementInformer clusterinformerv1beta1.PlacementInformer,
+	placementDecisionInformer clusterinformerv1beta1.PlacementDecisionInformer,
 	scheduler Scheduler,
 	recorder events.Recorder, krecorder kevents.EventRecorder,
 ) factory.Controller {
@@ -204,7 +201,7 @@ func (c *schedulingController) resync(ctx context.Context, syncCtx factory.SyncC
 
 		for _, placement := range placements {
 			for _, config := range placement.Spec.PrioritizerPolicy.Configurations {
-				if config.ScoreCoordinate != nil && config.ScoreCoordinate.Type == clusterapiv1alpha1.ScoreCoordinateTypeAddOn {
+				if config.ScoreCoordinate != nil && config.ScoreCoordinate.Type == clusterapiv1beta1.ScoreCoordinateTypeAddOn {
 					key, _ := cache.MetaNamespaceKeyFunc(placement)
 					klog.V(4).Infof("Requeue placement %s", key)
 					syncCtx.Queue().Add(key)
@@ -243,7 +240,7 @@ func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncCon
 	return c.syncPlacement(ctx, placement)
 }
 
-func (c *schedulingController) getPlacement(queueKey string) (*clusterapiv1alpha1.Placement, error) {
+func (c *schedulingController) getPlacement(queueKey string) (*clusterapiv1beta1.Placement, error) {
 	namespace, name, err := cache.SplitMetaNamespaceKey(queueKey)
 	if err != nil {
 		// ignore placement whose key is not in format: namespace/name
@@ -259,7 +256,7 @@ func (c *schedulingController) getPlacement(queueKey string) (*clusterapiv1alpha
 	return placement, nil
 }
 
-func (c *schedulingController) syncPlacement(ctx context.Context, placement *clusterapiv1alpha1.Placement) error {
+func (c *schedulingController) syncPlacement(ctx context.Context, placement *clusterapiv1beta1.Placement) error {
 	// no work if placement is deleting
 	if !placement.DeletionTimestamp.IsZero() {
 		return nil
@@ -323,7 +320,7 @@ func (c *schedulingController) getValidManagedClusterSetBindings(placementNamesp
 }
 
 // getEligibleClusterSets returns the names of clusterset that eligible for the placement
-func (c *schedulingController) getEligibleClusterSets(placement *clusterapiv1alpha1.Placement, bindings []*clusterapiv1beta1.ManagedClusterSetBinding) []string {
+func (c *schedulingController) getEligibleClusterSets(placement *clusterapiv1beta1.Placement, bindings []*clusterapiv1beta1.ManagedClusterSetBinding) []string {
 	// filter out invaid clustersetbindings
 	clusterSetNames := sets.NewString()
 	for _, binding := range bindings {
@@ -358,7 +355,7 @@ func (c *schedulingController) getAvailableClusters(clusterSetNames []string) ([
 // updateStatus updates the status of the placement according to intermediate scheduling data.
 func (c *schedulingController) updateStatus(
 	ctx context.Context,
-	placement *clusterapiv1alpha1.Placement,
+	placement *clusterapiv1beta1.Placement,
 	eligibleClusterSetNames []string,
 	numOfBindings,
 	numOfAvailableClusters int,
@@ -380,7 +377,7 @@ func (c *schedulingController) updateStatus(
 	if reflect.DeepEqual(newPlacement.Status, placement.Status) {
 		return nil
 	}
-	_, err := c.clusterClient.ClusterV1alpha1().Placements(newPlacement.Namespace).UpdateStatus(ctx, newPlacement, metav1.UpdateOptions{})
+	_, err := c.clusterClient.ClusterV1beta1().Placements(newPlacement.Namespace).UpdateStatus(ctx, newPlacement, metav1.UpdateOptions{})
 	return err
 }
 
@@ -394,7 +391,7 @@ func newSatisfiedCondition(
 	numOfUnscheduledDecisions int,
 ) metav1.Condition {
 	condition := metav1.Condition{
-		Type: clusterapiv1alpha1.PlacementConditionSatisfied,
+		Type: clusterapiv1beta1.PlacementConditionSatisfied,
 	}
 	switch {
 	case numOfBindings == 0:
@@ -429,8 +426,8 @@ func newSatisfiedCondition(
 // cluster decision slice. New placementdecisions will be created if no one exists.
 func (c *schedulingController) bind(
 	ctx context.Context,
-	placement *clusterapiv1alpha1.Placement,
-	clusterDecisions []clusterapiv1alpha1.ClusterDecision,
+	placement *clusterapiv1beta1.Placement,
+	clusterDecisions []clusterapiv1beta1.ClusterDecision,
 	clusterScores PrioritizerScore,
 ) error {
 	// sort clusterdecisions by cluster name
@@ -440,10 +437,10 @@ func (c *schedulingController) bind(
 
 	// split the cluster decisions into slices, the size of each slice cannot exceed
 	// maxNumOfClusterDecisions.
-	decisionSlices := [][]clusterapiv1alpha1.ClusterDecision{}
+	decisionSlices := [][]clusterapiv1beta1.ClusterDecision{}
 	remainingDecisions := clusterDecisions
 	for index := 0; len(remainingDecisions) > 0; index++ {
-		var decisionSlice []clusterapiv1alpha1.ClusterDecision
+		var decisionSlice []clusterapiv1beta1.ClusterDecision
 		switch {
 		case len(remainingDecisions) > maxNumOfClusterDecisions:
 			decisionSlice = remainingDecisions[0:maxNumOfClusterDecisions]
@@ -489,7 +486,7 @@ func (c *schedulingController) bind(
 		if placementDecisionNames.Has(placementDecision.Name) {
 			continue
 		}
-		err := c.clusterClient.ClusterV1alpha1().PlacementDecisions(
+		err := c.clusterClient.ClusterV1beta1().PlacementDecisions(
 			placementDecision.Namespace).Delete(ctx, placementDecision.Name, metav1.DeleteOptions{})
 		if errors.IsNotFound(err) {
 			continue
@@ -509,9 +506,9 @@ func (c *schedulingController) bind(
 // then updates the status with the given ClusterDecision slice if necessary
 func (c *schedulingController) createOrUpdatePlacementDecision(
 	ctx context.Context,
-	placement *clusterapiv1alpha1.Placement,
+	placement *clusterapiv1beta1.Placement,
 	placementDecisionName string,
-	clusterDecisions []clusterapiv1alpha1.ClusterDecision,
+	clusterDecisions []clusterapiv1beta1.ClusterDecision,
 	clusterScores PrioritizerScore,
 ) error {
 	if len(clusterDecisions) > maxNumOfClusterDecisions {
@@ -522,8 +519,8 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 	switch {
 	case errors.IsNotFound(err):
 		// create the placementdecision if not exists
-		owner := metav1.NewControllerRef(placement, clusterapiv1alpha1.GroupVersion.WithKind("Placement"))
-		placementDecision = &clusterapiv1alpha1.PlacementDecision{
+		owner := metav1.NewControllerRef(placement, clusterapiv1beta1.GroupVersion.WithKind("Placement"))
+		placementDecision = &clusterapiv1beta1.PlacementDecision{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      placementDecisionName,
 				Namespace: placement.Namespace,
@@ -534,7 +531,7 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 			},
 		}
 		var err error
-		placementDecision, err = c.clusterClient.ClusterV1alpha1().PlacementDecisions(
+		placementDecision, err = c.clusterClient.ClusterV1beta1().PlacementDecisions(
 			placement.Namespace).Create(ctx, placementDecision, metav1.CreateOptions{})
 		if err != nil {
 			return err
@@ -554,7 +551,7 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 
 	newPlacementDecision := placementDecision.DeepCopy()
 	newPlacementDecision.Status.Decisions = clusterDecisions
-	newPlacementDecision, err = c.clusterClient.ClusterV1alpha1().PlacementDecisions(newPlacementDecision.Namespace).
+	newPlacementDecision, err = c.clusterClient.ClusterV1beta1().PlacementDecisions(newPlacementDecision.Namespace).
 		UpdateStatus(ctx, newPlacementDecision, metav1.UpdateOptions{})
 
 	if err != nil {

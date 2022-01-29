@@ -8,7 +8,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	cache "k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	clusterlisterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 )
@@ -16,7 +15,7 @@ import (
 type clusterEventHandler struct {
 	clusterSetLister        clusterlisterv1beta1.ManagedClusterSetLister
 	clusterSetBindingLister clusterlisterv1beta1.ManagedClusterSetBindingLister
-	placementLister         clusterlisterv1alpha1.PlacementLister
+	placementLister         clusterlisterv1beta1.PlacementLister
 	enqueuePlacementFunc    enqueuePlacementFunc
 }
 

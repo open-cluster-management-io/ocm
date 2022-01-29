@@ -11,14 +11,13 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
-	clusterlisterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
 type clusterSetBindingEventHandler struct {
 	clusterSetLister     clusterlisterv1beta1.ManagedClusterSetLister
-	placementLister      clusterlisterv1alpha1.PlacementLister
+	placementLister      clusterlisterv1beta1.PlacementLister
 	enqueuePlacementFunc enqueuePlacementFunc
 }
 
@@ -71,7 +70,7 @@ func (h *clusterSetBindingEventHandler) onChange(obj interface{}) {
 // into controller queue for further reconciliation
 func enqueuePlacementsByClusterSetBinding(
 	namespace, clusterSetBindingName string,
-	placementLister clusterlisterv1alpha1.PlacementLister,
+	placementLister clusterlisterv1beta1.PlacementLister,
 	enqueuePlacementFunc enqueuePlacementFunc,
 ) error {
 	placements, err := placementLister.Placements(namespace).List(labels.Everything())

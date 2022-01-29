@@ -7,7 +7,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
-	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	testinghelpers "open-cluster-management.io/placement/pkg/helpers/testing"
 )
 
@@ -16,7 +16,7 @@ func TestScoreClusterWithResource(t *testing.T) {
 		name              string
 		resource          clusterapiv1.ResourceName
 		algorithm         string
-		placement         *clusterapiv1alpha1.Placement
+		placement         *clusterapiv1beta1.Placement
 		clusters          []*clusterapiv1.ManagedCluster
 		existingDecisions []runtime.Object
 		expectedScores    map[string]int64

@@ -1,0 +1,73 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: managedclustersetbindings.cluster.open-cluster-management.io
+spec:
+  group: cluster.open-cluster-management.io
+  names:
+    kind: ManagedClusterSetBinding
+    listKind: ManagedClusterSetBindingList
+    plural: managedclustersetbindings
+    shortNames:
+      - mclsetbinding
+      - mclsetbindings
+    singular: managedclustersetbinding
+  scope: Namespaced
+  preserveUnknownFields: false
+  versions:
+    - name: v1alpha1
+      deprecated: true
+      deprecationWarning: "cluster.open-cluster-management.io/v1alpha1 ManagedClusterSetBinding is deprecated; use cluster.open-cluster-management.io/v1beta1 ManagedClusterSetBinding"
+      schema:
+        openAPIV3Schema:
+          description: ManagedClusterSetBinding projects a ManagedClusterSet into a certain namespace. User is able to create a ManagedClusterSetBinding in a namespace and bind it to a ManagedClusterSet if they have an RBAC rule to CREATE on the virtual subresource of managedclustersets/bind. Workloads created in the same namespace can only be distributed to ManagedClusters in ManagedClusterSets bound in this namespace by higher level controllers.
+          type: object
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: Spec defines the attributes of ManagedClusterSetBinding.
+              type: object
+              properties:
+                clusterSet:
+                  description: ClusterSet is the name of the ManagedClusterSet to bind. It must match the instance name of the ManagedClusterSetBinding and cannot change once created. User is allowed to set this field if they have an RBAC rule to CREATE on the virtual subresource of managedclustersets/bind.
+                  type: string
+                  minLength: 1
+      served: true
+      storage: false
+    - name: v1beta1
+      schema:
+        openAPIV3Schema:
+          description: ManagedClusterSetBinding projects a ManagedClusterSet into a certain namespace. User is able to create a ManagedClusterSetBinding in a namespace and bind it to a ManagedClusterSet if they have an RBAC rule to CREATE on the virtual subresource of managedclustersets/bind. Workloads created in the same namespace can only be distributed to ManagedClusters in ManagedClusterSets bound in this namespace by higher level controllers.
+          type: object
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: Spec defines the attributes of ManagedClusterSetBinding.
+              type: object
+              properties:
+                clusterSet:
+                  description: ClusterSet is the name of the ManagedClusterSet to bind. It must match the instance name of the ManagedClusterSetBinding and cannot change once created. User is allowed to set this field if they have an RBAC rule to CREATE on the virtual subresource of managedclustersets/bind.
+                  type: string
+                  minLength: 1
+      served: true
+      storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

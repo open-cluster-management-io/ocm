@@ -11,14 +11,13 @@ import (
 	"k8s.io/klog/v2"
 
 	errorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
-	clusterlisterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
 type clusterSetEventHandler struct {
 	clusterSetBindingLister clusterlisterv1beta1.ManagedClusterSetBindingLister
-	placementLister         clusterlisterv1alpha1.PlacementLister
+	placementLister         clusterlisterv1beta1.PlacementLister
 	enqueuePlacementFunc    enqueuePlacementFunc
 }
 
@@ -74,7 +73,7 @@ func (h *clusterSetEventHandler) onChange(obj interface{}) {
 func enqueuePlacementsByClusterSet(
 	clusterSetName string,
 	clusterSetBindingLister clusterlisterv1beta1.ManagedClusterSetBindingLister,
-	placementLister clusterlisterv1alpha1.PlacementLister,
+	placementLister clusterlisterv1beta1.PlacementLister,
 	enqueuePlacementFunc enqueuePlacementFunc,
 ) error {
 	bindings, err := clusterSetBindingLister.List(labels.Everything())

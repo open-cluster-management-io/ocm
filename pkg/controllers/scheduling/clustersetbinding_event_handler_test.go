@@ -58,7 +58,7 @@ func TestOnClusterSetBindingChange(t *testing.T) {
 			queuedKeys := sets.NewString()
 			handler := &clusterSetBindingEventHandler{
 				clusterSetLister: clusterInformerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
-				placementLister:  clusterInformerFactory.Cluster().V1alpha1().Placements().Lister(),
+				placementLister:  clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
 				enqueuePlacementFunc: func(namespace, name string) {
 					queuedKeys.Insert(fmt.Sprintf("%s/%s", namespace, name))
 				},
@@ -105,7 +105,7 @@ func TestEnqueuePlacementsByClusterSetBinding(t *testing.T) {
 			err := enqueuePlacementsByClusterSetBinding(
 				c.namespace,
 				c.clusterSetBindingName,
-				clusterInformerFactory.Cluster().V1alpha1().Placements().Lister(),
+				clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
 				func(namespace, name string) {
 					queuedKeys.Insert(fmt.Sprintf("%s/%s", namespace, name))
 				},
@@ -177,7 +177,7 @@ func TestOnClusterSetBindingDelete(t *testing.T) {
 			queuedKeys := sets.NewString()
 			handler := &clusterSetBindingEventHandler{
 				clusterSetLister: clusterInformerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
-				placementLister:  clusterInformerFactory.Cluster().V1alpha1().Placements().Lister(),
+				placementLister:  clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
 				enqueuePlacementFunc: func(namespace, name string) {
 					queuedKeys.Insert(fmt.Sprintf("%s/%s", namespace, name))
 				},

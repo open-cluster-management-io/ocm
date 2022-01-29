@@ -6,7 +6,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/labels"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
-	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	"open-cluster-management.io/placement/pkg/plugins"
 )
 
@@ -39,7 +39,7 @@ func (b *Balance) Description() string {
 	return description
 }
 
-func (b *Balance) Score(ctx context.Context, placement *clusterapiv1alpha1.Placement, clusters []*clusterapiv1.ManagedCluster) (map[string]int64, error) {
+func (b *Balance) Score(ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) (map[string]int64, error) {
 	scores := map[string]int64{}
 	for _, cluster := range clusters {
 		scores[cluster.Name] = plugins.MaxClusterScore

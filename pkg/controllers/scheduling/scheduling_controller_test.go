@@ -15,7 +15,7 @@ import (
 	kevents "k8s.io/client-go/tools/events"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
-	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	testinghelpers "open-cluster-management.io/placement/pkg/helpers/testing"
 )
 
@@ -24,7 +24,7 @@ type testScheduler struct {
 }
 
 func (s *testScheduler) Schedule(ctx context.Context,
-	placement *clusterapiv1alpha1.Placement,
+	placement *clusterapiv1beta1.Placement,
 	clusters []*clusterapiv1.ManagedCluster,
 ) (ScheduleResult, error) {
 	return s.result, nil
@@ -36,7 +36,7 @@ func TestSchedulingController_sync(t *testing.T) {
 
 	cases := []struct {
 		name            string
-		placement       *clusterapiv1alpha1.Placement
+		placement       *clusterapiv1beta1.Placement
 		initObjs        []runtime.Object
 		scheduleResult  *scheduleResult
 		validateActions func(t *testing.T, actions []clienttesting.Action)
@@ -50,7 +50,7 @@ func TestSchedulingController_sync(t *testing.T) {
 					testinghelpers.NewManagedCluster("cluster2").Build(),
 					testinghelpers.NewManagedCluster("cluster3").Build(),
 				},
-				scheduledDecisions: []clusterapiv1alpha1.ClusterDecision{
+				scheduledDecisions: []clusterapiv1beta1.ClusterDecision{
 					{ClusterName: "cluster1"},
 					{ClusterName: "cluster2"},
 					{ClusterName: "cluster3"},
@@ -62,7 +62,7 @@ func TestSchedulingController_sync(t *testing.T) {
 				testinghelpers.AssertActions(t, actions, "create", "update", "update")
 				// check if Placement has been updated
 				actual := actions[2].(clienttesting.UpdateActionImpl).Object
-				placement, ok := actual.(*clusterapiv1alpha1.Placement)
+				placement, ok := actual.(*clusterapiv1beta1.Placement)
 				if !ok {
 					t.Errorf("expected Placement was updated")
 				}
@@ -72,7 +72,7 @@ func TestSchedulingController_sync(t *testing.T) {
 				}
 				testinghelpers.HasCondition(
 					placement.Status.Conditions,
-					clusterapiv1alpha1.PlacementConditionSatisfied,
+					clusterapiv1beta1.PlacementConditionSatisfied,
 					"AllDecisionsScheduled",
 					metav1.ConditionTrue,
 				)
@@ -92,7 +92,7 @@ func TestSchedulingController_sync(t *testing.T) {
 					testinghelpers.NewManagedCluster("cluster2").Build(),
 					testinghelpers.NewManagedCluster("cluster3").Build(),
 				},
-				scheduledDecisions: []clusterapiv1alpha1.ClusterDecision{
+				scheduledDecisions: []clusterapiv1beta1.ClusterDecision{
 					{ClusterName: "cluster1"},
 					{ClusterName: "cluster2"},
 					{ClusterName: "cluster3"},
@@ -104,7 +104,7 @@ func TestSchedulingController_sync(t *testing.T) {
 				testinghelpers.AssertActions(t, actions, "create", "update", "update")
 				// check if Placement has been updated
 				actual := actions[2].(clienttesting.UpdateActionImpl).Object
-				placement, ok := actual.(*clusterapiv1alpha1.Placement)
+				placement, ok := actual.(*clusterapiv1beta1.Placement)
 				if !ok {
 					t.Errorf("expected Placement was updated")
 				}
@@ -114,7 +114,7 @@ func TestSchedulingController_sync(t *testing.T) {
 				}
 				testinghelpers.HasCondition(
 					placement.Status.Conditions,
-					clusterapiv1alpha1.PlacementConditionSatisfied,
+					clusterapiv1beta1.PlacementConditionSatisfied,
 					"NotAllDecisionsScheduled",
 					metav1.ConditionFalse,
 				)
@@ -125,7 +125,7 @@ func TestSchedulingController_sync(t *testing.T) {
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
 			scheduleResult: &scheduleResult{
 				feasibleClusters:     []*clusterapiv1.ManagedCluster{},
-				scheduledDecisions:   []clusterapiv1alpha1.ClusterDecision{},
+				scheduledDecisions:   []clusterapiv1beta1.ClusterDecision{},
 				unscheduledDecisions: 0,
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -133,7 +133,7 @@ func TestSchedulingController_sync(t *testing.T) {
 				testinghelpers.AssertActions(t, actions, "update")
 				// check if Placement has been updated
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
-				placement, ok := actual.(*clusterapiv1alpha1.Placement)
+				placement, ok := actual.(*clusterapiv1beta1.Placement)
 				if !ok {
 					t.Errorf("expected Placement was updated")
 				}
@@ -143,7 +143,7 @@ func TestSchedulingController_sync(t *testing.T) {
 				}
 				testinghelpers.HasCondition(
 					placement.Status.Conditions,
-					clusterapiv1alpha1.PlacementConditionSatisfied,
+					clusterapiv1beta1.PlacementConditionSatisfied,
 					"NoManagedClusterSetBindings",
 					metav1.ConditionFalse,
 				)
@@ -167,7 +167,7 @@ func TestSchedulingController_sync(t *testing.T) {
 					testinghelpers.NewManagedCluster("cluster2").Build(),
 					testinghelpers.NewManagedCluster("cluster3").Build(),
 				},
-				scheduledDecisions: []clusterapiv1alpha1.ClusterDecision{
+				scheduledDecisions: []clusterapiv1beta1.ClusterDecision{
 					{ClusterName: "cluster1"},
 					{ClusterName: "cluster2"},
 					{ClusterName: "cluster3"},
@@ -190,8 +190,8 @@ func TestSchedulingController_sync(t *testing.T) {
 				clusterLister:           clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				clusterSetLister:        clusterInformerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
 				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Lister(),
-				placementLister:         clusterInformerFactory.Cluster().V1alpha1().Placements().Lister(),
-				placementDecisionLister: clusterInformerFactory.Cluster().V1alpha1().PlacementDecisions().Lister(),
+				placementLister:         clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
+				placementDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
 				scheduler:               s,
 				recorder:                kevents.NewFakeRecorder(100),
 			}
@@ -418,7 +418,7 @@ func TestBind(t *testing.T) {
 	cases := []struct {
 		name             string
 		initObjs         []runtime.Object
-		clusterDecisions []clusterapiv1alpha1.ClusterDecision
+		clusterDecisions []clusterapiv1beta1.ClusterDecision
 		validateActions  func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
@@ -427,7 +427,7 @@ func TestBind(t *testing.T) {
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, actions, "create", "update")
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				placementDecision, ok := actual.(*clusterapiv1alpha1.PlacementDecision)
+				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
 					t.Errorf("expected PlacementDecision was updated")
 				}
@@ -441,14 +441,14 @@ func TestBind(t *testing.T) {
 				testinghelpers.AssertActions(t, actions, "create", "update", "create", "update")
 				selectedClusters := newSelectedClusters(101)
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				placementDecision, ok := actual.(*clusterapiv1alpha1.PlacementDecision)
+				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
 					t.Errorf("expected PlacementDecision was updated")
 				}
 				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[0:100]...)
 
 				actual = actions[3].(clienttesting.UpdateActionImpl).Object
-				placementDecision, ok = actual.(*clusterapiv1alpha1.PlacementDecision)
+				placementDecision, ok = actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
 					t.Errorf("expected PlacementDecision was updated")
 				}
@@ -480,7 +480,7 @@ func TestBind(t *testing.T) {
 				testinghelpers.AssertActions(t, actions, "create", "update")
 				selectedClusters := newSelectedClusters(128)
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				placementDecision, ok := actual.(*clusterapiv1alpha1.PlacementDecision)
+				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
 					t.Errorf("expected PlacementDecision was updated")
 				}
@@ -501,7 +501,7 @@ func TestBind(t *testing.T) {
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, actions, "update", "delete")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
-				placementDecision, ok := actual.(*clusterapiv1alpha1.PlacementDecision)
+				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
 					t.Errorf("expected PlacementDecision was updated")
 				}
@@ -535,7 +535,7 @@ func TestBind(t *testing.T) {
 				"placementdecisions",
 				func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 					createAction := action.(clienttesting.CreateActionImpl)
-					pd := createAction.Object.(*clusterapiv1alpha1.PlacementDecision)
+					pd := createAction.Object.(*clusterapiv1beta1.PlacementDecision)
 					pd.Name = fmt.Sprintf("%s%s", pd.GenerateName, rand.String(5))
 					return false, pd, nil
 				},
@@ -550,8 +550,8 @@ func TestBind(t *testing.T) {
 				clusterLister:           clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				clusterSetLister:        clusterInformerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
 				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Lister(),
-				placementLister:         clusterInformerFactory.Cluster().V1alpha1().Placements().Lister(),
-				placementDecisionLister: clusterInformerFactory.Cluster().V1alpha1().PlacementDecisions().Lister(),
+				placementLister:         clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
+				placementDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
 				scheduler:               s,
 				recorder:                kevents.NewFakeRecorder(100),
 			}
@@ -570,7 +570,7 @@ func TestBind(t *testing.T) {
 	}
 }
 
-func assertClustersSelected(t *testing.T, decisons []clusterapiv1alpha1.ClusterDecision, clusterNames ...string) {
+func assertClustersSelected(t *testing.T, decisons []clusterapiv1beta1.ClusterDecision, clusterNames ...string) {
 	names := sets.NewString(clusterNames...)
 	for _, decision := range decisons {
 		if names.Has(decision.ClusterName) {
@@ -583,9 +583,9 @@ func assertClustersSelected(t *testing.T, decisons []clusterapiv1alpha1.ClusterD
 	}
 }
 
-func newClusterDecisions(num int) (decisions []clusterapiv1alpha1.ClusterDecision) {
+func newClusterDecisions(num int) (decisions []clusterapiv1beta1.ClusterDecision) {
 	for i := 0; i < num; i++ {
-		decisions = append(decisions, clusterapiv1alpha1.ClusterDecision{
+		decisions = append(decisions, clusterapiv1beta1.ClusterDecision{
 			ClusterName: fmt.Sprintf("cluster%d", i+1),
 		})
 	}

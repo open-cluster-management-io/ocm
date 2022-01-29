@@ -37,6 +37,16 @@ GO_TEST_PACKAGES :=./pkg/...
 # It will generate target "image-$(1)" for building the image and binding it as a prerequisite to target "images".
 $(call build-image,$(IMAGE),$(IMAGE_REGISTRY)/$(IMAGE),./Dockerfile,.)
 
+update: copy-crd
+
+copy-crd:
+	bash -x hack/copy-crds.sh
+
+verify: verify-crds
+
+verify-crds:
+	bash -x hack/verify-crds.sh
+
 deploy-hub: ensure-kustomize
 	cp deploy/hub/kustomization.yaml deploy/hub/kustomization.yaml.tmp
 	cd deploy/hub && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/placement:latest=$(IMAGE_NAME)

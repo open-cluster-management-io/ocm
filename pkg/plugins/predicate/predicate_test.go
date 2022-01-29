@@ -9,14 +9,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
-	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	testinghelpers "open-cluster-management.io/placement/pkg/helpers/testing"
 )
 
 func TestMatchWithClusterPredicates(t *testing.T) {
 	cases := []struct {
 		name                 string
-		placement            *clusterapiv1alpha1.Placement
+		placement            *clusterapiv1beta1.Placement
 		clusters             []*clusterapiv1.ManagedCluster
 		expectedClusterNames []string
 	}{
@@ -37,7 +37,7 @@ func TestMatchWithClusterPredicates(t *testing.T) {
 			name: "match with claim",
 			placement: testinghelpers.NewPlacement("test", "test").AddPredicate(
 				nil,
-				&clusterapiv1alpha1.ClusterClaimSelector{
+				&clusterapiv1beta1.ClusterClaimSelector{
 					MatchExpressions: []metav1.LabelSelectorRequirement{
 						{
 							Key:      "cloud",
@@ -60,7 +60,7 @@ func TestMatchWithClusterPredicates(t *testing.T) {
 						"cloud": "Amazon",
 					},
 				},
-				&clusterapiv1alpha1.ClusterClaimSelector{
+				&clusterapiv1beta1.ClusterClaimSelector{
 					MatchExpressions: []metav1.LabelSelectorRequirement{
 						{
 							Key:      "region",
@@ -87,7 +87,7 @@ func TestMatchWithClusterPredicates(t *testing.T) {
 					"cloud": "Amazon",
 				},
 			}, nil).AddPredicate(
-				nil, &clusterapiv1alpha1.ClusterClaimSelector{
+				nil, &clusterapiv1beta1.ClusterClaimSelector{
 					MatchExpressions: []metav1.LabelSelectorRequirement{
 						{
 							Key:      "region",

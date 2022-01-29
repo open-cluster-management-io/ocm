@@ -13,6 +13,7 @@ import (
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterlisterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
+	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 )
 
 type FakeSyncContext struct {
@@ -35,13 +36,13 @@ func NewFakeSyncContext(t *testing.T, queueKey string) *FakeSyncContext {
 
 type FakePluginHandle struct {
 	recorder                kevents.EventRecorder
-	placementDecisionLister clusterlisterv1alpha1.PlacementDecisionLister
+	placementDecisionLister clusterlisterv1beta1.PlacementDecisionLister
 	scoreLister             clusterlisterv1alpha1.AddOnPlacementScoreLister
 	client                  clusterclient.Interface
 }
 
 func (f *FakePluginHandle) EventRecorder() kevents.EventRecorder { return f.recorder }
-func (f *FakePluginHandle) DecisionLister() clusterlisterv1alpha1.PlacementDecisionLister {
+func (f *FakePluginHandle) DecisionLister() clusterlisterv1beta1.PlacementDecisionLister {
 	return f.placementDecisionLister
 }
 func (f *FakePluginHandle) ScoreLister() clusterlisterv1alpha1.AddOnPlacementScoreLister {
@@ -57,7 +58,7 @@ func NewFakePluginHandle(
 	return &FakePluginHandle{
 		recorder:                kevents.NewFakeRecorder(100),
 		client:                  client,
-		placementDecisionLister: informers.Cluster().V1alpha1().PlacementDecisions().Lister(),
+		placementDecisionLister: informers.Cluster().V1beta1().PlacementDecisions().Lister(),
 		scoreLister:             informers.Cluster().V1alpha1().AddOnPlacementScores().Lister(),
 	}
 }

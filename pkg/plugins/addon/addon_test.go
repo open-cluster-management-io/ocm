@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	testingclock "k8s.io/utils/clock/testing"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
-	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterapivbeta1 "open-cluster-management.io/api/cluster/v1beta1"
 	testinghelpers "open-cluster-management.io/placement/pkg/helpers/testing"
 )
 
@@ -19,7 +19,7 @@ var expiredTime = fakeTime.Add(-30 * time.Second)
 func TestScoreClusterWithAddOn(t *testing.T) {
 	cases := []struct {
 		name                string
-		placement           *clusterapiv1alpha1.Placement
+		placement           *clusterapivbeta1.Placement
 		clusters            []*clusterapiv1.ManagedCluster
 		existingAddOnScores []runtime.Object
 		expectedScores      map[string]int64

@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
-	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	"open-cluster-management.io/placement/test/integration/util"
 )
@@ -32,11 +31,11 @@ var _ = ginkgo.Describe("Placement scalability test", func() {
 	var sampleCount = 10
 	var err error
 
-	assertNumberOfDecisions := func(placement *clusterapiv1alpha1.Placement, desiredNOD int) error {
+	assertNumberOfDecisions := func(placement *clusterapiv1beta1.Placement, desiredNOD int) error {
 		var localerr error
 		gomega.Eventually(func() bool {
 			localerr = nil
-			pdl, err := clusterClient.ClusterV1alpha1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
+			pdl, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
 				LabelSelector: placementLabel + "=" + placement.Name,
 			})
 			if err != nil {
@@ -65,11 +64,11 @@ var _ = ginkgo.Describe("Placement scalability test", func() {
 		return localerr
 	}
 
-	assertPlacementStatus := func(placement *clusterapiv1alpha1.Placement, numOfSelectedClusters int, satisfied bool) error {
+	assertPlacementStatus := func(placement *clusterapiv1beta1.Placement, numOfSelectedClusters int, satisfied bool) error {
 		var localerr error
 		gomega.Eventually(func() bool {
 			localerr = nil
-			placement, err := clusterClient.ClusterV1alpha1().Placements(namespace).Get(context.Background(), placement.Name, metav1.GetOptions{})
+			placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placement.Name, metav1.GetOptions{})
 			if err != nil {
 				localerr = err
 				return false
@@ -80,7 +79,7 @@ var _ = ginkgo.Describe("Placement scalability test", func() {
 			}
 			if !util.HasCondition(
 				placement.Status.Conditions,
-				clusterapiv1alpha1.PlacementConditionSatisfied,
+				clusterapiv1beta1.PlacementConditionSatisfied,
 				"",
 				status,
 			) {
@@ -139,7 +138,7 @@ var _ = ginkgo.Describe("Placement scalability test", func() {
 	}
 
 	assertCreatingPlacement := func(noc *int32, nod int) error {
-		placement := &clusterapiv1alpha1.Placement{
+		placement := &clusterapiv1beta1.Placement{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    namespace,
 				GenerateName: "placement-",
@@ -147,11 +146,11 @@ var _ = ginkgo.Describe("Placement scalability test", func() {
 					placementSetLabel: placementSetName,
 				},
 			},
-			Spec: clusterapiv1alpha1.PlacementSpec{
+			Spec: clusterapiv1beta1.PlacementSpec{
 				NumberOfClusters: noc,
 			},
 		}
-		pl, err := clusterClient.ClusterV1alpha1().Placements(namespace).Create(context.Background(), placement, metav1.CreateOptions{})
+		pl, err := clusterClient.ClusterV1beta1().Placements(namespace).Create(context.Background(), placement, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		err = assertNumberOfDecisions(pl, nod)
@@ -180,7 +179,7 @@ var _ = ginkgo.Describe("Placement scalability test", func() {
 
 		var localerr error
 
-		pls, err := clusterClient.ClusterV1alpha1().Placements(namespace).List(context.Background(), metav1.ListOptions{
+		pls, err := clusterClient.ClusterV1beta1().Placements(namespace).List(context.Background(), metav1.ListOptions{
 			LabelSelector: placementSetLabel + "=" + placementSetName,
 		})
 		if err != nil {
@@ -227,7 +226,7 @@ var _ = ginkgo.Describe("Placement scalability test", func() {
 
 	ginkgo.AfterEach(func() {
 		ginkgo.By("Delete placement")
-		err = clusterClient.ClusterV1alpha1().Placements(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{
+		err = clusterClient.ClusterV1beta1().Placements(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: placementSetLabel + "=" + placementSetName,
 		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())

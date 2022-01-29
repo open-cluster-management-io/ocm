@@ -8,7 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
-	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	"open-cluster-management.io/placement/pkg/plugins"
 )
 
@@ -36,7 +36,7 @@ func (p *Predicate) Description() string {
 }
 
 func (p *Predicate) Filter(
-	ctx context.Context, placement *clusterapiv1alpha1.Placement, clusters []*clusterapiv1.ManagedCluster) ([]*clusterapiv1.ManagedCluster, error) {
+	ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) ([]*clusterapiv1.ManagedCluster, error) {
 
 	if len(placement.Spec.Predicates) == 0 {
 		return clusters, nil
@@ -105,7 +105,7 @@ func convertLabelSelector(labelSelector metav1.LabelSelector) (labels.Selector, 
 }
 
 // convertClaimSelector converts ClusterClaimSelector to labels.Selector
-func convertClaimSelector(clusterClaimSelector clusterapiv1alpha1.ClusterClaimSelector) (labels.Selector, error) {
+func convertClaimSelector(clusterClaimSelector clusterapiv1beta1.ClusterClaimSelector) (labels.Selector, error) {
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchExpressions: clusterClaimSelector.MatchExpressions,
 	})

@@ -7,12 +7,12 @@ import (
 	"sort"
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
-	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	"open-cluster-management.io/placement/pkg/plugins"
 )
 
 const (
-	placementLabel = clusterapiv1alpha1.PlacementLabel
+	placementLabel = clusterapiv1beta1.PlacementLabel
 	description    = `
 	ResourceAllocatableCPU and ResourceAllocatableMemory prioritizer makes the scheduling 
 	decisions based on the resource allocatable of managed clusters. 
@@ -77,7 +77,7 @@ func (r *ResourcePrioritizer) Description() string {
 	return description
 }
 
-func (r *ResourcePrioritizer) Score(ctx context.Context, placement *clusterapiv1alpha1.Placement, clusters []*clusterapiv1.ManagedCluster) (map[string]int64, error) {
+func (r *ResourcePrioritizer) Score(ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) (map[string]int64, error) {
 	if r.algorithm == "Allocatable" {
 		return mostResourceAllocatableScores(r.resource, clusters)
 	}

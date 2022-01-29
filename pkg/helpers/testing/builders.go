@@ -15,12 +15,12 @@ import (
 )
 
 type placementBuilder struct {
-	placement *clusterapiv1alpha1.Placement
+	placement *clusterapiv1beta1.Placement
 }
 
 func NewPlacement(namespace, name string) *placementBuilder {
 	return &placementBuilder{
-		placement: &clusterapiv1alpha1.Placement{
+		placement: &clusterapiv1beta1.Placement{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      name,
@@ -39,8 +39,8 @@ func (b *placementBuilder) WithNOC(noc int32) *placementBuilder {
 	return b
 }
 
-func (b *placementBuilder) WithPrioritizerPolicy(mode clusterapiv1alpha1.PrioritizerPolicyModeType) *placementBuilder {
-	b.placement.Spec.PrioritizerPolicy = clusterapiv1alpha1.PrioritizerPolicy{
+func (b *placementBuilder) WithPrioritizerPolicy(mode clusterapiv1beta1.PrioritizerPolicyModeType) *placementBuilder {
+	b.placement.Spec.PrioritizerPolicy = clusterapiv1beta1.PrioritizerPolicy{
 		Mode: mode,
 	}
 	return b
@@ -48,22 +48,28 @@ func (b *placementBuilder) WithPrioritizerPolicy(mode clusterapiv1alpha1.Priorit
 
 func (b *placementBuilder) WithPrioritizerConfig(name string, weight int32) *placementBuilder {
 	if b.placement.Spec.PrioritizerPolicy.Configurations == nil {
-		b.placement.Spec.PrioritizerPolicy.Configurations = []clusterapiv1alpha1.PrioritizerConfig{}
+		b.placement.Spec.PrioritizerPolicy.Configurations = []clusterapiv1beta1.PrioritizerConfig{}
 	}
 	if len(name) > 0 {
-		b.placement.Spec.PrioritizerPolicy.Configurations = append(b.placement.Spec.PrioritizerPolicy.Configurations, clusterapiv1alpha1.PrioritizerConfig{Name: name, Weight: weight})
+		b.placement.Spec.PrioritizerPolicy.Configurations = append(b.placement.Spec.PrioritizerPolicy.Configurations, clusterapiv1beta1.PrioritizerConfig{
+			ScoreCoordinate: &clusterapiv1beta1.ScoreCoordinate{
+				Type:    clusterapiv1beta1.ScoreCoordinateTypeBuiltIn,
+				BuiltIn: name,
+			},
+			Weight: weight,
+		})
 	}
 	return b
 }
 
 func (b *placementBuilder) WithScoreCoordinateAddOn(resourceName, scoreName string, weight int32) *placementBuilder {
 	if b.placement.Spec.PrioritizerPolicy.Configurations == nil {
-		b.placement.Spec.PrioritizerPolicy.Configurations = []clusterapiv1alpha1.PrioritizerConfig{}
+		b.placement.Spec.PrioritizerPolicy.Configurations = []clusterapiv1beta1.PrioritizerConfig{}
 	}
-	b.placement.Spec.PrioritizerPolicy.Configurations = append(b.placement.Spec.PrioritizerPolicy.Configurations, clusterapiv1alpha1.PrioritizerConfig{
-		ScoreCoordinate: &clusterapiv1alpha1.ScoreCoordinate{
-			Type: "AddOn",
-			AddOn: &clusterapiv1alpha1.AddOnScore{
+	b.placement.Spec.PrioritizerPolicy.Configurations = append(b.placement.Spec.PrioritizerPolicy.Configurations, clusterapiv1beta1.PrioritizerConfig{
+		ScoreCoordinate: &clusterapiv1beta1.ScoreCoordinate{
+			Type: clusterapiv1beta1.ScoreCoordinateTypeAddOn,
+			AddOn: &clusterapiv1beta1.AddOnScore{
 				ResourceName: resourceName,
 				ScoreName:    scoreName,
 			},
@@ -83,9 +89,9 @@ func (b *placementBuilder) WithDeletionTimestamp() *placementBuilder {
 	return b
 }
 
-func (b *placementBuilder) AddPredicate(labelSelector *metav1.LabelSelector, claimSelector *clusterapiv1alpha1.ClusterClaimSelector) *placementBuilder {
+func (b *placementBuilder) AddPredicate(labelSelector *metav1.LabelSelector, claimSelector *clusterapiv1beta1.ClusterClaimSelector) *placementBuilder {
 	if b.placement.Spec.Predicates == nil {
-		b.placement.Spec.Predicates = []clusterapiv1alpha1.ClusterPredicate{}
+		b.placement.Spec.Predicates = []clusterapiv1beta1.ClusterPredicate{}
 	}
 	b.placement.Spec.Predicates = append(b.placement.Spec.Predicates, NewClusterPredicate(labelSelector, claimSelector))
 	return b
@@ -98,7 +104,7 @@ func (b *placementBuilder) WithNumOfSelectedClusters(nosc int) *placementBuilder
 
 func (b *placementBuilder) WithSatisfiedCondition(numbOfScheduledDecisions, numbOfUnscheduledDecisions int) *placementBuilder {
 	condition := metav1.Condition{
-		Type: clusterapiv1alpha1.PlacementConditionSatisfied,
+		Type: clusterapiv1beta1.PlacementConditionSatisfied,
 	}
 	switch {
 	case numbOfUnscheduledDecisions == 0:
@@ -114,21 +120,13 @@ func (b *placementBuilder) WithSatisfiedCondition(numbOfScheduledDecisions, numb
 	return b
 }
 
-func (b *placementBuilder) WithPrioritizerConfigs(name string, weight int32) *placementBuilder {
-	if b.placement.Spec.PrioritizerPolicy.Configurations == nil {
-		b.placement.Spec.PrioritizerPolicy.Configurations = []clusterapiv1alpha1.PrioritizerConfig{}
-	}
-	b.placement.Spec.PrioritizerPolicy.Configurations = append(b.placement.Spec.PrioritizerPolicy.Configurations, clusterapiv1alpha1.PrioritizerConfig{Name: name, Weight: weight})
-	return b
-}
-
-func (b *placementBuilder) Build() *clusterapiv1alpha1.Placement {
+func (b *placementBuilder) Build() *clusterapiv1beta1.Placement {
 	return b.placement
 }
 
-func NewClusterPredicate(labelSelector *metav1.LabelSelector, claimSelector *clusterapiv1alpha1.ClusterClaimSelector) clusterapiv1alpha1.ClusterPredicate {
-	predicate := clusterapiv1alpha1.ClusterPredicate{
-		RequiredClusterSelector: clusterapiv1alpha1.ClusterSelector{},
+func NewClusterPredicate(labelSelector *metav1.LabelSelector, claimSelector *clusterapiv1beta1.ClusterClaimSelector) clusterapiv1beta1.ClusterPredicate {
+	predicate := clusterapiv1beta1.ClusterPredicate{
+		RequiredClusterSelector: clusterapiv1beta1.ClusterSelector{},
 	}
 
 	if labelSelector != nil {
@@ -143,12 +141,12 @@ func NewClusterPredicate(labelSelector *metav1.LabelSelector, claimSelector *clu
 }
 
 type placementDecisionBuilder struct {
-	placementDecision *clusterapiv1alpha1.PlacementDecision
+	placementDecision *clusterapiv1beta1.PlacementDecision
 }
 
 func NewPlacementDecision(namespace, name string) *placementDecisionBuilder {
 	return &placementDecisionBuilder{
-		placementDecision: &clusterapiv1alpha1.PlacementDecision{
+		placementDecision: &clusterapiv1beta1.PlacementDecision{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      name,
@@ -181,9 +179,9 @@ func (b *placementDecisionBuilder) WithDeletionTimestamp() *placementDecisionBui
 }
 
 func (b *placementDecisionBuilder) WithDecisions(clusterNames ...string) *placementDecisionBuilder {
-	decisions := []clusterapiv1alpha1.ClusterDecision{}
+	decisions := []clusterapiv1beta1.ClusterDecision{}
 	for _, clusterName := range clusterNames {
-		decisions = append(decisions, clusterapiv1alpha1.ClusterDecision{
+		decisions = append(decisions, clusterapiv1beta1.ClusterDecision{
 			ClusterName: clusterName,
 		})
 	}
@@ -191,7 +189,7 @@ func (b *placementDecisionBuilder) WithDecisions(clusterNames ...string) *placem
 	return b
 }
 
-func (b *placementDecisionBuilder) Build() *clusterapiv1alpha1.PlacementDecision {
+func (b *placementDecisionBuilder) Build() *clusterapiv1beta1.PlacementDecision {
 	return b.placementDecision
 }
 

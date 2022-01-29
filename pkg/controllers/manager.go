@@ -39,7 +39,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	scheduler := scheduling.NewPluginScheduler(
 		scheduling.NewSchedulerHandler(
 			clusterClient,
-			clusterInformers.Cluster().V1alpha1().PlacementDecisions().Lister(),
+			clusterInformers.Cluster().V1beta1().PlacementDecisions().Lister(),
 			clusterInformers.Cluster().V1alpha1().AddOnPlacementScores().Lister(),
 			recorder),
 	)
@@ -47,7 +47,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	if controllerContext.Server != nil {
 		debug := debugger.NewDebugger(
 			scheduler,
-			clusterInformers.Cluster().V1alpha1().Placements(),
+			clusterInformers.Cluster().V1beta1().Placements(),
 			clusterInformers.Cluster().V1().ManagedClusters(),
 		)
 
@@ -59,8 +59,8 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		clusterInformers.Cluster().V1beta1().ManagedClusterSets(),
 		clusterInformers.Cluster().V1beta1().ManagedClusterSetBindings(),
-		clusterInformers.Cluster().V1alpha1().Placements(),
-		clusterInformers.Cluster().V1alpha1().PlacementDecisions(),
+		clusterInformers.Cluster().V1beta1().Placements(),
+		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
 		scheduler,
 		controllerContext.EventRecorder, recorder,
 	)
@@ -70,8 +70,8 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		clusterInformers.Cluster().V1beta1().ManagedClusterSets(),
 		clusterInformers.Cluster().V1beta1().ManagedClusterSetBindings(),
-		clusterInformers.Cluster().V1alpha1().Placements(),
-		clusterInformers.Cluster().V1alpha1().PlacementDecisions(),
+		clusterInformers.Cluster().V1beta1().Placements(),
+		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
 		scheduler,
 		controllerContext.EventRecorder, recorder,
 	)

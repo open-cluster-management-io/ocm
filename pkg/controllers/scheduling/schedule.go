@@ -9,8 +9,9 @@ import (
 	kevents "k8s.io/client-go/tools/events"
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterlisterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
+	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
-	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	"open-cluster-management.io/placement/pkg/plugins"
 	"open-cluster-management.io/placement/pkg/plugins/addon"
 	"open-cluster-management.io/placement/pkg/plugins/balance"
@@ -33,7 +34,7 @@ type PrioritizerScore map[string]int64
 type Scheduler interface {
 	Schedule(
 		ctx context.Context,
-		placement *clusterapiv1alpha1.Placement,
+		placement *clusterapiv1beta1.Placement,
 		clusters []*clusterapiv1.ManagedCluster,
 	) (ScheduleResult, error)
 }
@@ -49,7 +50,7 @@ type ScheduleResult interface {
 	PrioritizerScores() PrioritizerScore
 
 	// Decisions returns the decisions of the schedule
-	Decisions() []clusterapiv1alpha1.ClusterDecision
+	Decisions() []clusterapiv1beta1.ClusterDecision
 
 	// NumOfUnscheduled returns the number of unscheduled.
 	NumOfUnscheduled() int
@@ -71,7 +72,7 @@ type PrioritizerResult struct {
 // ScheduleResult is the result for a certain schedule.
 type scheduleResult struct {
 	feasibleClusters     []*clusterapiv1.ManagedCluster
-	scheduledDecisions   []clusterapiv1alpha1.ClusterDecision
+	scheduledDecisions   []clusterapiv1beta1.ClusterDecision
 	unscheduledDecisions int
 
 	filteredRecords map[string][]*clusterapiv1.ManagedCluster
@@ -81,13 +82,13 @@ type scheduleResult struct {
 
 type schedulerHandler struct {
 	recorder                kevents.EventRecorder
-	placementDecisionLister clusterlisterv1alpha1.PlacementDecisionLister
+	placementDecisionLister clusterlisterv1beta1.PlacementDecisionLister
 	scoreLister             clusterlisterv1alpha1.AddOnPlacementScoreLister
 	clusterClient           clusterclient.Interface
 }
 
 func NewSchedulerHandler(
-	clusterClient clusterclient.Interface, placementDecisionLister clusterlisterv1alpha1.PlacementDecisionLister, scoreLister clusterlisterv1alpha1.AddOnPlacementScoreLister, recorder kevents.EventRecorder) plugins.Handle {
+	clusterClient clusterclient.Interface, placementDecisionLister clusterlisterv1beta1.PlacementDecisionLister, scoreLister clusterlisterv1alpha1.AddOnPlacementScoreLister, recorder kevents.EventRecorder) plugins.Handle {
 
 	return &schedulerHandler{
 		recorder:                recorder,
@@ -101,7 +102,7 @@ func (s *schedulerHandler) EventRecorder() kevents.EventRecorder {
 	return s.recorder
 }
 
-func (s *schedulerHandler) DecisionLister() clusterlisterv1alpha1.PlacementDecisionLister {
+func (s *schedulerHandler) DecisionLister() clusterlisterv1beta1.PlacementDecisionLister {
 	return s.placementDecisionLister
 }
 
@@ -116,13 +117,13 @@ func (s *schedulerHandler) ClusterClient() clusterclient.Interface {
 // Initialize the default prioritizer weight.
 // Balane and Steady weight 1, others weight 0.
 // The default weight can be replaced by each placement's PrioritizerConfigs.
-var defaultPrioritizerConfig = map[clusterapiv1alpha1.ScoreCoordinate]int32{
+var defaultPrioritizerConfig = map[clusterapiv1beta1.ScoreCoordinate]int32{
 	{
-		Type:    clusterapiv1alpha1.ScoreCoordinateTypeBuiltIn,
+		Type:    clusterapiv1beta1.ScoreCoordinateTypeBuiltIn,
 		BuiltIn: PrioritizerBalance,
 	}: 1,
 	{
-		Type:    clusterapiv1alpha1.ScoreCoordinateTypeBuiltIn,
+		Type:    clusterapiv1beta1.ScoreCoordinateTypeBuiltIn,
 		BuiltIn: PrioritizerSteady,
 	}: 1,
 }
@@ -130,7 +131,7 @@ var defaultPrioritizerConfig = map[clusterapiv1alpha1.ScoreCoordinate]int32{
 type pluginScheduler struct {
 	handle             plugins.Handle
 	filters            []plugins.Filter
-	prioritizerWeights map[clusterapiv1alpha1.ScoreCoordinate]int32
+	prioritizerWeights map[clusterapiv1beta1.ScoreCoordinate]int32
 }
 
 func NewPluginScheduler(handle plugins.Handle) *pluginScheduler {
@@ -145,7 +146,7 @@ func NewPluginScheduler(handle plugins.Handle) *pluginScheduler {
 
 func (s *pluginScheduler) Schedule(
 	ctx context.Context,
-	placement *clusterapiv1alpha1.Placement,
+	placement *clusterapiv1beta1.Placement,
 	clusters []*clusterapiv1.ManagedCluster,
 ) (ScheduleResult, error) {
 	var err error
@@ -237,7 +238,7 @@ func (s *pluginScheduler) Schedule(
 
 // makeClusterDecisions selects clusters based on given cluster slice and then creates
 // cluster decisions.
-func selectClusters(placement *clusterapiv1alpha1.Placement, clusters []*clusterapiv1.ManagedCluster) []clusterapiv1alpha1.ClusterDecision {
+func selectClusters(placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) []clusterapiv1beta1.ClusterDecision {
 	numOfDecisions := len(clusters)
 	if placement.Spec.NumberOfClusters != nil {
 		numOfDecisions = int(*placement.Spec.NumberOfClusters)
@@ -249,9 +250,9 @@ func selectClusters(placement *clusterapiv1alpha1.Placement, clusters []*cluster
 		clusters = clusters[:numOfDecisions]
 	}
 
-	decisions := []clusterapiv1alpha1.ClusterDecision{}
+	decisions := []clusterapiv1beta1.ClusterDecision{}
 	for _, cluster := range clusters {
-		decisions = append(decisions, clusterapiv1alpha1.ClusterDecision{
+		decisions = append(decisions, clusterapiv1beta1.ClusterDecision{
 			ClusterName: cluster.Name,
 		})
 	}
@@ -261,20 +262,20 @@ func selectClusters(placement *clusterapiv1alpha1.Placement, clusters []*cluster
 // Get prioritizer weight for the placement.
 // In Additive and "" mode, will override defaultWeight with what placement has defined and return.
 // In Exact mode, will return the name and weight defined in placement.
-func getWeights(defaultWeight map[clusterapiv1alpha1.ScoreCoordinate]int32, placement *clusterapiv1alpha1.Placement) (map[clusterapiv1alpha1.ScoreCoordinate]int32, error) {
+func getWeights(defaultWeight map[clusterapiv1beta1.ScoreCoordinate]int32, placement *clusterapiv1beta1.Placement) (map[clusterapiv1beta1.ScoreCoordinate]int32, error) {
 	mode := placement.Spec.PrioritizerPolicy.Mode
 	switch {
-	case mode == clusterapiv1alpha1.PrioritizerPolicyModeExact:
-		return mergeWeights(nil, placement.Spec.PrioritizerPolicy.Configurations), nil
-	case mode == clusterapiv1alpha1.PrioritizerPolicyModeAdditive || mode == "":
-		return mergeWeights(defaultWeight, placement.Spec.PrioritizerPolicy.Configurations), nil
+	case mode == clusterapiv1beta1.PrioritizerPolicyModeExact:
+		return mergeWeights(nil, placement.Spec.PrioritizerPolicy.Configurations)
+	case mode == clusterapiv1beta1.PrioritizerPolicyModeAdditive || mode == "":
+		return mergeWeights(defaultWeight, placement.Spec.PrioritizerPolicy.Configurations)
 	default:
 		return nil, fmt.Errorf("incorrect prioritizer policy mode: %s", mode)
 	}
 }
 
-func mergeWeights(defaultWeight map[clusterapiv1alpha1.ScoreCoordinate]int32, customizedWeight []clusterapiv1alpha1.PrioritizerConfig) map[clusterapiv1alpha1.ScoreCoordinate]int32 {
-	weights := make(map[clusterapiv1alpha1.ScoreCoordinate]int32)
+func mergeWeights(defaultWeight map[clusterapiv1beta1.ScoreCoordinate]int32, customizedWeight []clusterapiv1beta1.PrioritizerConfig) (map[clusterapiv1beta1.ScoreCoordinate]int32, error) {
+	weights := make(map[clusterapiv1beta1.ScoreCoordinate]int32)
 	// copy the default weight
 	for sc, w := range defaultWeight {
 		weights[sc] = w
@@ -285,25 +286,20 @@ func mergeWeights(defaultWeight map[clusterapiv1alpha1.ScoreCoordinate]int32, cu
 		if c.ScoreCoordinate != nil {
 			weights[*c.ScoreCoordinate] = c.Weight
 		} else {
-			// Keep compatibility for pre-existing data which doesn't have scorecoordinate field.
-			sc := clusterapiv1alpha1.ScoreCoordinate{
-				Type:    clusterapiv1alpha1.ScoreCoordinateTypeBuiltIn,
-				BuiltIn: c.Name,
-			}
-			weights[sc] = c.Weight
+			return nil, fmt.Errorf("scoreCoordinate field is required")
 		}
 	}
-	return weights
+	return weights, nil
 }
 
 // Generate prioritizers for the placement.
-func getPrioritizers(weights map[clusterapiv1alpha1.ScoreCoordinate]int32, handle plugins.Handle) (map[clusterapiv1alpha1.ScoreCoordinate]plugins.Prioritizer, error) {
-	result := make(map[clusterapiv1alpha1.ScoreCoordinate]plugins.Prioritizer)
+func getPrioritizers(weights map[clusterapiv1beta1.ScoreCoordinate]int32, handle plugins.Handle) (map[clusterapiv1beta1.ScoreCoordinate]plugins.Prioritizer, error) {
+	result := make(map[clusterapiv1beta1.ScoreCoordinate]plugins.Prioritizer)
 	for k, v := range weights {
 		if v == 0 {
 			continue
 		}
-		if k.Type == clusterapiv1alpha1.ScoreCoordinateTypeBuiltIn {
+		if k.Type == clusterapiv1beta1.ScoreCoordinateTypeBuiltIn {
 			switch {
 			case k.BuiltIn == PrioritizerBalance:
 				result[k] = balance.New(handle)
@@ -347,7 +343,7 @@ func (r *scheduleResult) PrioritizerScores() PrioritizerScore {
 	return r.scoreSum
 }
 
-func (r *scheduleResult) Decisions() []clusterapiv1alpha1.ClusterDecision {
+func (r *scheduleResult) Decisions() []clusterapiv1beta1.ClusterDecision {
 	return r.scheduledDecisions
 }
 

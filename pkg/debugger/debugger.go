@@ -8,9 +8,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	clusterinformerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
-	clusterinformerv1alpha1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1alpha1"
+	clusterinformerv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
-	clusterlisterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
+	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	scheduling "open-cluster-management.io/placement/pkg/controllers/scheduling"
 )
 
@@ -20,7 +20,7 @@ const DebugPath = "/debug/placements/"
 type Debugger struct {
 	scheduler       scheduling.Scheduler
 	clusterLister   clusterlisterv1.ManagedClusterLister
-	placementLister clusterlisterv1alpha1.PlacementLister
+	placementLister clusterlisterv1beta1.PlacementLister
 }
 
 // DebugResult is the result returned by debugger
@@ -32,7 +32,7 @@ type DebugResult struct {
 
 func NewDebugger(
 	scheduler scheduling.Scheduler,
-	placementInformer clusterinformerv1alpha1.PlacementInformer,
+	placementInformer clusterinformerv1beta1.PlacementInformer,
 	clusterInformer clusterinformerv1.ManagedClusterInformer) *Debugger {
 	return &Debugger{
 		scheduler:       scheduler,

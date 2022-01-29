@@ -16,8 +16,8 @@ func NewClusterInformerFactory(clusterClient clusterclient.Interface, objects ..
 	clusterStore := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore()
 	clusterSetStore := clusterInformerFactory.Cluster().V1beta1().ManagedClusterSets().Informer().GetStore()
 	clusterSetBindingStore := clusterInformerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Informer().GetStore()
-	placementStore := clusterInformerFactory.Cluster().V1alpha1().Placements().Informer().GetStore()
-	placementDecisionStore := clusterInformerFactory.Cluster().V1alpha1().PlacementDecisions().Informer().GetStore()
+	placementStore := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore()
+	placementDecisionStore := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore()
 	addOnPlacementStore := clusterInformerFactory.Cluster().V1alpha1().AddOnPlacementScores().Informer().GetStore()
 
 	for _, obj := range objects {
@@ -28,9 +28,9 @@ func NewClusterInformerFactory(clusterClient clusterclient.Interface, objects ..
 			clusterSetStore.Add(obj)
 		case *clusterapiv1beta1.ManagedClusterSetBinding:
 			clusterSetBindingStore.Add(obj)
-		case *clusterapiv1alpha1.Placement:
+		case *clusterapiv1beta1.Placement:
 			placementStore.Add(obj)
-		case *clusterapiv1alpha1.PlacementDecision:
+		case *clusterapiv1beta1.PlacementDecision:
 			placementDecisionStore.Add(obj)
 		case *clusterapiv1alpha1.AddOnPlacementScore:
 			addOnPlacementStore.Add(obj)

@@ -8,12 +8,12 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
-	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	"open-cluster-management.io/placement/pkg/plugins"
 )
 
 const (
-	placementLabel = clusterapiv1alpha1.PlacementLabel
+	placementLabel = clusterapiv1beta1.PlacementLabel
 	description    = `
 	Customize prioritizer get cluster scores from AddOnPlacementScores with sepcific
 	resource name and score name. The clusters which doesn't have corresponding 
@@ -66,7 +66,7 @@ func (c *AddOn) Description() string {
 	return description
 }
 
-func (c *AddOn) Score(ctx context.Context, placement *clusterapiv1alpha1.Placement, clusters []*clusterapiv1.ManagedCluster) (map[string]int64, error) {
+func (c *AddOn) Score(ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) (map[string]int64, error) {
 	scores := map[string]int64{}
 	expiredScores := ""
 
@@ -78,7 +78,7 @@ func (c *AddOn) Score(ctx context.Context, placement *clusterapiv1alpha1.Placeme
 		// get AddOnPlacementScores CR with resourceName
 		addOnScores, err := c.handle.ScoreLister().AddOnPlacementScores(namespace).Get(c.resourceName)
 		if err != nil {
-			klog.Warningf("Getting AddOnPlacementScores failed :%s", err)
+			klog.Warningf("Getting AddOnPlacementScores failed: %s", err)
 			continue
 		}
 

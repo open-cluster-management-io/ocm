@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
-	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	scheduling "open-cluster-management.io/placement/pkg/controllers/scheduling"
 	testinghelpers "open-cluster-management.io/placement/pkg/helpers/testing"
 )
@@ -40,8 +40,8 @@ func (r *testResult) PrioritizerScores() scheduling.PrioritizerScore {
 	return r.scoreSum
 }
 
-func (r *testResult) Decisions() []clusterapiv1alpha1.ClusterDecision {
-	return []clusterapiv1alpha1.ClusterDecision{}
+func (r *testResult) Decisions() []clusterapiv1beta1.ClusterDecision {
+	return []clusterapiv1beta1.ClusterDecision{}
 }
 
 func (r *testResult) NumOfUnscheduled() int {
@@ -49,7 +49,7 @@ func (r *testResult) NumOfUnscheduled() int {
 }
 
 func (s *testScheduler) Schedule(ctx context.Context,
-	placement *clusterapiv1alpha1.Placement,
+	placement *clusterapiv1beta1.Placement,
 	clusters []*clusterapiv1.ManagedCluster,
 ) (scheduling.ScheduleResult, error) {
 	return s.result, nil
@@ -86,7 +86,7 @@ func TestDebugger(t *testing.T) {
 			clusterInformerFactory := testinghelpers.NewClusterInformerFactory(clusterClient, c.initObjs...)
 			s := &testScheduler{result: &testResult{filterResults: c.filterResults, prioritizeResults: c.prioritizeResults}}
 			debugger := NewDebugger(
-				s, clusterInformerFactory.Cluster().V1alpha1().Placements(), clusterInformerFactory.Cluster().V1().ManagedClusters())
+				s, clusterInformerFactory.Cluster().V1beta1().Placements(), clusterInformerFactory.Cluster().V1().ManagedClusters())
 			server := httptest.NewServer(http.HandlerFunc(debugger.Handler))
 			res, err := http.Get(fmt.Sprintf("%s%s%s", server.URL, DebugPath, c.key))
 

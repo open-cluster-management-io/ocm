@@ -8,7 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
-	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	"open-cluster-management.io/placement/pkg/plugins"
 )
 
@@ -42,7 +42,7 @@ func (s *Steady) Description() string {
 }
 
 func (s *Steady) Score(
-	ctx context.Context, placement *clusterapiv1alpha1.Placement, clusters []*clusterapiv1.ManagedCluster) (map[string]int64, error) {
+	ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) (map[string]int64, error) {
 	// query placementdecisions with label selector
 	scores := map[string]int64{}
 	requirement, err := labels.NewRequirement(placementLabel, selection.Equals, []string{placement.Name})

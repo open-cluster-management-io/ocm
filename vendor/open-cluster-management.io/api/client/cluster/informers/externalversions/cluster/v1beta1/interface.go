@@ -12,6 +12,10 @@ type Interface interface {
 	ManagedClusterSets() ManagedClusterSetInformer
 	// ManagedClusterSetBindings returns a ManagedClusterSetBindingInformer.
 	ManagedClusterSetBindings() ManagedClusterSetBindingInformer
+	// Placements returns a PlacementInformer.
+	Placements() PlacementInformer
+	// PlacementDecisions returns a PlacementDecisionInformer.
+	PlacementDecisions() PlacementDecisionInformer
 }
 
 type version struct {
@@ -33,4 +37,14 @@ func (v *version) ManagedClusterSets() ManagedClusterSetInformer {
 // ManagedClusterSetBindings returns a ManagedClusterSetBindingInformer.
 func (v *version) ManagedClusterSetBindings() ManagedClusterSetBindingInformer {
 	return &managedClusterSetBindingInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// Placements returns a PlacementInformer.
+func (v *version) Placements() PlacementInformer {
+	return &placementInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// PlacementDecisions returns a PlacementDecisionInformer.
+func (v *version) PlacementDecisions() PlacementDecisionInformer {
+	return &placementDecisionInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
