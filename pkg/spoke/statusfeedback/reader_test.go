@@ -48,6 +48,43 @@ const (
 		}
 	}
 	`
+	jobJson = `
+	{
+		"apiVersion": "batch/v1",
+		"kind": "Job",
+		"metadata": {
+			"name": "test"
+		},
+		"status": {
+			"conditions": [
+				{
+					"status": "True",
+					"type": "Complete"
+				}
+			],
+			"succeeded": 1
+		}
+	}
+	`
+	podJson = `
+	{
+		"apiVersion": "v1",
+		"kind": "Pod",
+		"metadata": {
+			"name": "test"
+		},
+		"status": {
+			"conditions": [
+				{
+					"status": "False",
+					"type": "Ready"
+				}
+			],
+	
+			"phase": "Succeeded"
+		}
+	}
+`
 )
 
 func unstrctureObject(data string) *unstructured.Unstructured {
@@ -167,6 +204,50 @@ func TestStatusReader(t *testing.T) {
 					Value: workapiv1.FieldValue{
 						Type:    workapiv1.Integer,
 						Integer: util.Int64Ptr(2),
+					},
+				},
+			},
+		},
+		{
+			name:        "Job values",
+			object:      unstrctureObject(jobJson),
+			rule:        workapiv1.FeedbackRule{Type: workapiv1.WellKnownStatusType},
+			expectError: false,
+			expectedValue: []workapiv1.FeedbackValue{
+				{
+					Name: "JobComplete",
+					Value: workapiv1.FieldValue{
+						Type:   workapiv1.String,
+						String: util.StringPtr("True"),
+					},
+				},
+				{
+					Name: "JobSucceeded",
+					Value: workapiv1.FieldValue{
+						Type:    workapiv1.Integer,
+						Integer: util.Int64Ptr(1),
+					},
+				},
+			},
+		},
+		{
+			name:        "Pod values",
+			object:      unstrctureObject(podJson),
+			rule:        workapiv1.FeedbackRule{Type: workapiv1.WellKnownStatusType},
+			expectError: false,
+			expectedValue: []workapiv1.FeedbackValue{
+				{
+					Name: "PodReady",
+					Value: workapiv1.FieldValue{
+						Type:   workapiv1.String,
+						String: util.StringPtr("False"),
+					},
+				},
+				{
+					Name: "PodPhase",
+					Value: workapiv1.FieldValue{
+						Type:   workapiv1.String,
+						String: util.StringPtr("Succeeded"),
 					},
 				},
 			},

@@ -28,10 +28,34 @@ var deploymentRule = []workapiv1.JsonPath{
 	},
 }
 
+var jobRule = []workapiv1.JsonPath{
+	{
+		Name: "JobComplete",
+		Path: `.status.conditions[?(@.type=="Complete")].status`,
+	},
+	{
+		Name: "JobSucceeded",
+		Path: `.status.succeeded`,
+	},
+}
+
+var podRule = []workapiv1.JsonPath{
+	{
+		Name: "PodReady",
+		Path: `.status.conditions[?(@.type=="Ready")].status`,
+	},
+	{
+		Name: "PodPhase",
+		Path: `.status.phase`,
+	},
+}
+
 func DefaultWellKnownStatusRule() WellKnownStatusRuleResolver {
 	return &DefaultWellKnownStatusResolver{
 		rules: map[schema.GroupVersionKind][]workapiv1.JsonPath{
 			{Group: "apps", Version: "v1", Kind: "Deployment"}: deploymentRule,
+			{Group: "batch", Version: "v1", Kind: "Job"}:       jobRule,
+			{Group: "", Version: "v1", Kind: "Pod"}:            podRule,
 		},
 	}
 }
