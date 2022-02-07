@@ -22,6 +22,7 @@ import (
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/lease"
 	"open-cluster-management.io/addon-framework/pkg/version"
+	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 )
 
 // Helloworld Agent is an example that syncs configmap in cluster namespace of hub cluster
@@ -79,13 +80,19 @@ func (o *AgentOptions) RunAgent(ctx context.Context, controllerContext *controll
 	if err != nil {
 		return err
 	}
+	addonClient, err := addonv1alpha1client.NewForConfig(hubRestConfig)
+	if err != nil {
+		return err
+	}
 	hubKubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(hubKubeClient, 10*time.Minute, informers.WithNamespace(o.SpokeClusterName))
 
 	// create an agent contoller
 	agent := newAgentController(
 		spokeKubeClient,
+		addonClient,
 		hubKubeInformerFactory.Core().V1().ConfigMaps(),
 		o.SpokeClusterName,
+		o.AddonName,
 		o.AddonNamespace,
 		controllerContext.EventRecorder,
 	)
@@ -106,22 +113,28 @@ func (o *AgentOptions) RunAgent(ctx context.Context, controllerContext *controll
 
 type agentController struct {
 	spokeKubeClient    kubernetes.Interface
+	addonClient        addonv1alpha1client.Interface
 	hunConfigMapLister corev1lister.ConfigMapLister
 	clusterName        string
+	addonName          string
 	addonNamespace     string
 	recorder           events.Recorder
 }
 
 func newAgentController(
 	spokeKubeClient kubernetes.Interface,
+	addonClient addonv1alpha1client.Interface,
 	configmapInformers corev1informers.ConfigMapInformer,
 	clusterName string,
+	addonName string,
 	addonNamespace string,
 	recorder events.Recorder,
 ) factory.Controller {
 	c := &agentController{
 		spokeKubeClient:    spokeKubeClient,
+		addonClient:        addonClient,
 		clusterName:        clusterName,
+		addonName:          addonName,
 		addonNamespace:     addonNamespace,
 		hunConfigMapLister: configmapInformers.Lister(),
 		recorder:           recorder,
@@ -152,10 +165,19 @@ func (c *agentController) sync(ctx context.Context, syncCtx factory.SyncContext)
 		return err
 	}
 
+	addon, err := c.addonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(ctx, c.addonName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if !addon.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
 	configmap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cm.Name,
 			Namespace: c.addonNamespace,
+			Labels:    map[string]string{"synced-from-hub": ""},
 		},
 		Data: cm.Data,
 	}

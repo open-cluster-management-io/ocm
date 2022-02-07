@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -93,6 +92,9 @@ func NewAddonDeployController(
 				if _, ok := c.agentAddons[addonName]; !ok {
 					return false
 				}
+				if accessor.GetName() != deployWorkName(addonName) {
+					return false
+				}
 				return true
 			},
 			workInformers.Informer(),
@@ -118,7 +120,7 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 	// Get ManagedCluster
 	managedCluster, err := c.managedClusterLister.Get(clusterName)
 	if errors.IsNotFound(err) {
-		c.cache.removeCache(addonName, clusterName)
+		c.cache.removeCache(deployWorkName(addonName), clusterName)
 		return nil
 	}
 	if err != nil {
@@ -132,7 +134,7 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 
 	managedClusterAddon, err := c.managedClusterAddonLister.ManagedClusterAddOns(clusterName).Get(addonName)
 	if errors.IsNotFound(err) {
-		c.cache.removeCache(addonName, clusterName)
+		c.cache.removeCache(deployWorkName(addonName), clusterName)
 		return nil
 	}
 	if err != nil {
@@ -140,7 +142,7 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 	}
 
 	if !managedClusterAddon.DeletionTimestamp.IsZero() {
-		c.cache.removeCache(addonName, clusterName)
+		c.cache.removeCache(deployWorkName(addonName), clusterName)
 		return nil
 	}
 
@@ -155,14 +157,14 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return nil
 	}
 
-	work, err := buildManifestWorkFromObject(clusterName, addonName, objects)
+	work, _, err := buildManifestWorkFromObject(clusterName, addonName, objects)
 	if err != nil {
 		return err
 	}
 	work.OwnerReferences = []metav1.OwnerReference{*owner}
 
 	// apply work
-	work, err = c.applyWork(ctx, work)
+	work, err = applyWork(c.workClient, c.workLister, c.cache, c.eventRecorder, ctx, work)
 	if err != nil {
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
 			Type:    "ManifestApplied",
@@ -199,82 +201,4 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 	_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterAddonCopy.Namespace).UpdateStatus(
 		ctx, managedClusterAddonCopy, metav1.UpdateOptions{})
 	return err
-}
-
-func (c *addonDeployController) applyWork(ctx context.Context, required *workapiv1.ManifestWork) (*workapiv1.ManifestWork, error) {
-	existingWork, err := c.workLister.ManifestWorks(required.Namespace).Get(required.Name)
-	existingWork = existingWork.DeepCopy()
-	if errors.IsNotFound(err) {
-		existingWork, err = c.workClient.WorkV1().ManifestWorks(required.Namespace).Create(ctx, required, metav1.CreateOptions{})
-		if err == nil {
-			c.eventRecorder.Eventf("ManifestWorkCreated", "Created %s/%s because it was missing", required.Namespace, required.Name)
-			c.cache.updateCache(required, existingWork)
-			return existingWork, nil
-		}
-		c.eventRecorder.Warningf("ManifestWorkCreateFailed", "Failed to create ManifestWork %s/%s: %v", required.Namespace, required.Name, err)
-		return nil, err
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	if c.cache.safeToSkipApply(required, existingWork) {
-		return existingWork, nil
-	}
-
-	if ManifestsEqual(required.Spec.Workload.Manifests, existingWork.Spec.Workload.Manifests) {
-		return existingWork, nil
-	}
-
-	existingWork.Spec.Workload = required.Spec.Workload
-	existingWork, err = c.workClient.WorkV1().ManifestWorks(existingWork.Namespace).Update(ctx, existingWork, metav1.UpdateOptions{})
-	if err == nil {
-		c.cache.updateCache(required, existingWork)
-		c.eventRecorder.Eventf("ManifestWorkUpdate", "Updated %s/%s because it was changing", required.Namespace, required.Name)
-		return existingWork, nil
-	}
-	c.eventRecorder.Warningf("ManifestWorkUpdateFailed", "Failed to update ManifestWork %s/%s: %v", required.Namespace, required.Name, err)
-	return nil, err
-}
-
-func buildManifestWorkFromObject(cluster, addonName string, objects []runtime.Object) (*workapiv1.ManifestWork, error) {
-	work := &workapiv1.ManifestWork{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("addon-%s-deploy", addonName),
-			Namespace: cluster,
-			Labels: map[string]string{
-				constants.AddonLabel: addonName,
-			},
-		},
-		Spec: workapiv1.ManifestWorkSpec{
-			Workload: workapiv1.ManifestsTemplate{
-				Manifests: []workapiv1.Manifest{},
-			},
-		},
-	}
-
-	for _, object := range objects {
-		rawObject, err := runtime.Encode(unstructured.UnstructuredJSONScheme, object)
-		if err != nil {
-			return nil, err
-		}
-		work.Spec.Workload.Manifests = append(work.Spec.Workload.Manifests, workapiv1.Manifest{
-			RawExtension: runtime.RawExtension{Raw: rawObject},
-		})
-	}
-
-	return work, nil
-}
-
-func ManifestsEqual(new, old []workapiv1.Manifest) bool {
-	if len(new) != len(old) {
-		return false
-	}
-
-	for i := range new {
-		if !equality.Semantic.DeepEqual(new[i].Raw, old[i].Raw) {
-			return false
-		}
-	}
-	return true
 }

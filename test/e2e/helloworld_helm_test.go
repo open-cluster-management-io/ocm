@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
@@ -60,7 +61,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 			_, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), helloWorldHelmAddonName, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
-					return err
+					return nil
 				}
 				return err
 			}
@@ -76,6 +77,15 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 			if err != nil {
 				return err
 			}
+			hasPreDeleteFinalizer := false
+			for _, f := range addon.Finalizers {
+				if f == constants.PreDeleteHookFinalizer {
+					hasPreDeleteFinalizer = true
+				}
+			}
+			if !hasPreDeleteFinalizer {
+				return fmt.Errorf("expected pre delete hook finalizer")
+			}
 
 			if !meta.IsStatusConditionTrue(addon.Status.Conditions, "ManifestApplied") {
 				return fmt.Errorf("addon should be applied to spoke, but get condition %v", addon.Status.Conditions)
@@ -84,6 +94,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 			if !meta.IsStatusConditionTrue(addon.Status.Conditions, "Available") {
 				return fmt.Errorf("addon should be available on spoke, but get condition %v", addon.Status.Conditions)
 			}
+
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
@@ -112,6 +123,44 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 				return fmt.Errorf("expected configmap is not correct, %v", copyiedConfig.Data)
 			}
 			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		// delete addon CR, the pre-delete job should clean up the configmap. the addon and agent should be deleted too.
+		err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), helloWorldHelmAddonName, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gomega.Eventually(func() error {
+			_, err := hubKubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(context.Background(), configmap.Name, metav1.GetOptions{})
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				return err
+			}
+
+			return fmt.Errorf("the configmap should be deleted")
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		gomega.Eventually(func() error {
+			_, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), helloWorldHelmAddonName, metav1.GetOptions{})
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				return err
+			}
+
+			return fmt.Errorf("the managedClusterAddon should be deleted")
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		gomega.Eventually(func() error {
+			_, err := hubKubeClient.AppsV1().Deployments(addonInstallNamespace).Get(context.Background(), "helloworldhelm-agent", metav1.GetOptions{})
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				return err
+			}
+
+			return fmt.Errorf("the agent deployment should be deleted")
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 	ginkgo.It("values in annotation of addon cr works", func() {

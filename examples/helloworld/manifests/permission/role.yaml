@@ -7,3 +7,6 @@ rules:
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get", "list", "watch"]
+  - apiGroups: ["addon.open-cluster-management.io"]
+    resources: ["managedclusteraddons"]
+    verbs: ["get", "list", "watch"]

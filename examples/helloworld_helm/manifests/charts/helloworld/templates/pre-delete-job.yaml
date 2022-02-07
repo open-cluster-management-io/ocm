@@ -1,0 +1,33 @@
+kind: Job
+apiVersion: batch/v1
+metadata:
+  name: {{ template "helloworldhelm.name" . }}-cleanup-configmap
+  namespace: {{ .Release.Namespace }}
+  labels:
+    "open-cluster-management.io/addon-pre-delete": ""
+spec:
+  manualSelector: true
+  selector:
+    matchLabels:
+      job: {{ template "helloworldhelm.name" . }}-cleanup-configmap
+  template:
+    metadata:
+      labels:
+        job: {{ template "helloworldhelm.name" . }}-cleanup-configmap
+    spec:
+      serviceAccountName: {{ template "helloworldhelm.name" . }}-agent-sa
+      restartPolicy: Never
+      containers:
+      - name: {{ template "helloworldhelm.name" . }}-agent
+        image: {{ .Values.global.imageOverrides.helloWorldHelm }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        args:
+          - "/helloworld_helm"
+          - "cleanup"
+          - "--addon-namespace={{ .Values.addonInstallNamespace }}"
+      {{- if .Values.global.imagePullSecret }}
+      imagePullSecrets:
+        - name: "{{ .Values.global.imagePullSecret }}"
+      {{- end }}

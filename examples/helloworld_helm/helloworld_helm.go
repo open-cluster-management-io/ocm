@@ -85,15 +85,15 @@ func applyManifestFromFile(file, clusterName, addonName string, kubeclient *kube
 }
 
 type global struct {
-	ImagePullPolicy string            `json:"imagePullPolicy,omitempty"`
-	ImagePullSecret string            `json:"imagePullSecret,omitempty"`
-	ImageOverrides  map[string]string `json:"imageOverrides,omitempty"`
-	NodeSelector    map[string]string `json:"nodeSelector,omitempty"`
-	ProxyConfig     map[string]string `json:"proxyConfig,omitempty"`
+	ImagePullPolicy string            `json:"imagePullPolicy"`
+	ImagePullSecret string            `json:"imagePullSecret"`
+	ImageOverrides  map[string]string `json:"imageOverrides"`
+	NodeSelector    map[string]string `json:"nodeSelector"`
+	ProxyConfig     map[string]string `json:"proxyConfig"`
 }
 type userValues struct {
-	ClusterNamespace string `json:"clusterNamespace,omitempty"`
-	Global           global `json:"global,omitempty"`
+	ClusterNamespace string `json:"clusterNamespace"`
+	Global           global `json:"global"`
 }
 
 func getValues(cluster *clusterv1.ManagedCluster,

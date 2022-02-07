@@ -56,8 +56,8 @@ func TestAddonAgentManifests(t *testing.T) {
 		t.Fatalf("failed to new agentAddon %v", err)
 	}
 	cluster := newManagedCluster("test")
-	annotaitonValues := `{"global":{"imagePullSecret":"mySecret","imageOverrides":{"helloWorldHelm":"quay.io/test:test"}}}`
-	addon := newManagedClusterAddon("test", "myNs", annotaitonValues)
+	annotationValues := `{"global":{"imagePullSecret":"mySecret","imageOverrides":{"helloWorldHelm":"quay.io/test:test"}}}`
+	addon := newManagedClusterAddon("test", "myNs", annotationValues)
 	objects, err := agentAddon.Manifests(cluster, addon)
 	if err != nil {
 		t.Fatalf("failed to get manifests %v", err)
