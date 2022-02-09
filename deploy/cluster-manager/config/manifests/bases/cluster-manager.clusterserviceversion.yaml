@@ -7,7 +7,7 @@ metadata:
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
     containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2021-10-20T20:00:31Z"
+    createdAt: "2022-02-09T20:00:31Z"
     description: Manages the installation and upgrade of the ClusterManager.
     repository: https://github.com/open-cluster-management-io/registration-operator
     support: Red Hat, Inc.
@@ -88,8 +88,8 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc.
-  replaces: cluster-manager.v0.5.0
+  replaces: cluster-manager.v0.6.0
   selector:
     matchLabels:
       app: cluster-manager
-  version: 0.6.0
+  version: 0.7.0
