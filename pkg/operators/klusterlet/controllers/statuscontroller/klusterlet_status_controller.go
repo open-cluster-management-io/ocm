@@ -86,8 +86,8 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 		},
 	)
 
-	registrationDesiredCondition := checkAgentDeploymentDired(ctx, k.kubeClient, klusterletNS, registrationDeploymentName, klusterletRegistrationDesiredDegraded)
-	workDesiredCondition := checkAgentDeploymentDired(ctx, k.kubeClient, klusterletNS, workDeploymentName, klusterletWorkDesiredDegraded)
+	registrationDesiredCondition := checkAgentDeploymentDesired(ctx, k.kubeClient, klusterletNS, registrationDeploymentName, klusterletRegistrationDesiredDegraded)
+	workDesiredCondition := checkAgentDeploymentDesired(ctx, k.kubeClient, klusterletNS, workDeploymentName, klusterletWorkDesiredDegraded)
 
 	_, _, err = helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
 		helpers.UpdateKlusterletConditionFn(availableCondition),
@@ -103,7 +103,7 @@ type klusterletAgent struct {
 }
 
 // Check agent deployment, if the desired replicas is not equal to available replicas, return degraded condition
-func checkAgentDeploymentDired(ctx context.Context, kubeClient kubernetes.Interface, namespace, deploymentName, conditionType string) metav1.Condition {
+func checkAgentDeploymentDesired(ctx context.Context, kubeClient kubernetes.Interface, namespace, deploymentName, conditionType string) metav1.Condition {
 	deployment, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deploymentName, metav1.GetOptions{})
 	if err != nil {
 		return metav1.Condition{
@@ -126,7 +126,7 @@ func checkAgentDeploymentDired(ctx context.Context, kubeClient kubernetes.Interf
 		Type:    conditionType,
 		Status:  metav1.ConditionFalse,
 		Reason:  "DeploymentsFunctional",
-		Message: fmt.Sprintf("deployments replicas are desired: %d", &deployment.Spec.Replicas),
+		Message: fmt.Sprintf("deployments replicas are desired: %d", *deployment.Spec.Replicas),
 	}
 }
 
