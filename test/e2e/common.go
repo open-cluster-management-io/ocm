@@ -367,6 +367,28 @@ func (t *Tester) CreateWorkOfConfigMap(name, clusterName, configMapName, configM
 		Create(context.TODO(), manifestWork, metav1.CreateOptions{})
 }
 
+func (t *Tester) checkKlusterletStatus(klusterletName, condType, reason string, status metav1.ConditionStatus) error {
+	klusterlet, err := t.OperatorClient.OperatorV1().Klusterlets().Get(context.TODO(), klusterletName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	cond := meta.FindStatusCondition(klusterlet.Status.Conditions, condType)
+	if cond == nil {
+		return fmt.Errorf("cannot find condition type %s", condType)
+	}
+
+	if cond.Reason != reason {
+		return fmt.Errorf("condition reason is not matched, expect %s, got %s", reason, cond.Reason)
+	}
+
+	if cond.Status != status {
+		return fmt.Errorf("condition status is not matched, expect %s, got %s", status, cond.Status)
+	}
+
+	return nil
+}
+
 func (t *Tester) cleanKlusterletResources(klusterletName, clusterName string) error {
 	if klusterletName == "" {
 		return fmt.Errorf("the klusterlet name should not be null")

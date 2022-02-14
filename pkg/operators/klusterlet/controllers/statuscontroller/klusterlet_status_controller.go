@@ -85,9 +85,13 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 			},
 		},
 	)
+	availableCondition.ObservedGeneration = klusterlet.Generation
 
 	registrationDesiredCondition := checkAgentDeploymentDesired(ctx, k.kubeClient, klusterletNS, registrationDeploymentName, klusterletRegistrationDesiredDegraded)
+	registrationDesiredCondition.ObservedGeneration = klusterlet.Generation
+
 	workDesiredCondition := checkAgentDeploymentDesired(ctx, k.kubeClient, klusterletNS, workDeploymentName, klusterletWorkDesiredDegraded)
+	workDesiredCondition.ObservedGeneration = klusterlet.Generation
 
 	_, _, err = helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
 		helpers.UpdateKlusterletConditionFn(availableCondition),

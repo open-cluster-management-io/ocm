@@ -3,7 +3,6 @@ package ssarcontroller
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -121,32 +120,28 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 	go func() {
 		defer c.deleteSSARChecking(klusterletName)
 
-		klog.V(4).Infof("Reconciling Klusterlet %q", klusterletName)
+		klog.V(4).Infof("Checking hub kubeconfig for klusterlet %q", klusterletName)
 		klusterletNS := helpers.KlusterletNamespace(klusterlet)
 
 		hubConfigDegradedCondition := checkAgentDegradedCondition(
 			ctx, c.kubeClient,
-			hubConfigSecret, hubConfigSecretDegraded,
+			hubConnectionDegraded,
 			klusterletAgent{
 				clusterName: klusterlet.Spec.ClusterName,
 				namespace:   klusterletNS,
 			},
-			[]degradedCheckFunc{checkHubConfigSecret},
+			klusterlet.Generation,
+			checkHubConfigSecret,
 		)
 
 		// the hub kubeconfig is functional, the bootstrap kubeconfig check is not needed,
-		// ignore it to reduce to send the sar requests
+		// ignore it to avoid sending additional sar requests
 		if hubConfigDegradedCondition.Status == metav1.ConditionFalse {
 			_, _, err := helpers.UpdateKlusterletStatus(
 				ctx,
 				c.klusterletClient,
 				klusterletName,
-				helpers.UpdateKlusterletConditionFn(metav1.Condition{
-					Type:    hubConnectionDegraded,
-					Status:  metav1.ConditionFalse,
-					Reason:  fmt.Sprintf("HubConnectionFunctional"),
-					Message: fmt.Sprintf("Hub connection is functioning correctly"),
-				}),
+				helpers.UpdateKlusterletConditionFn(hubConfigDegradedCondition),
 			)
 
 			if err != nil {
@@ -159,24 +154,27 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 
 		bootstrapDegradedCondition := checkAgentDegradedCondition(
 			ctx, c.kubeClient,
-			bootstrapSecret, bootstrapSecretDegraded,
+			hubConnectionDegraded,
 			klusterletAgent{
 				clusterName: klusterlet.Spec.ClusterName,
 				namespace:   klusterletNS,
 			},
-			[]degradedCheckFunc{checkBootstrapSecret},
+			klusterlet.Generation,
+			checkBootstrapSecret,
 		)
 
-		// merge the bootstrap and hubconfig degraded conditions to hub connection degraged condition
+		// The status is always true here since the hub kubeconfig check fails. Need to add the additional
+		// message relating to bootstrap kubeconfig check here.
 		_, _, err := helpers.UpdateKlusterletStatus(
 			ctx,
 			c.klusterletClient,
 			klusterletName,
 			helpers.UpdateKlusterletConditionFn(metav1.Condition{
-				Type:    hubConnectionDegraded,
-				Status:  metav1.ConditionTrue,
-				Reason:  bootstrapDegradedCondition.Reason + "," + hubConfigDegradedCondition.Reason,
-				Message: bootstrapDegradedCondition.Message + "\n" + hubConfigDegradedCondition.Message,
+				Type:               hubConnectionDegraded,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: klusterlet.Generation,
+				Reason:             bootstrapDegradedCondition.Reason + "," + hubConfigDegradedCondition.Reason,
+				Message:            bootstrapDegradedCondition.Message + "\n" + hubConfigDegradedCondition.Message,
 			}),
 		)
 		if err != nil {
@@ -195,78 +193,66 @@ type klusterletAgent struct {
 
 func checkAgentDegradedCondition(
 	ctx context.Context, kubeClient kubernetes.Interface,
-	secretName, degradedType string,
+	degradedType string,
 	agent klusterletAgent,
-	degradedCheckFns []degradedCheckFunc) metav1.Condition {
-	degradedConditionReasons := []string{}
-	degradedConditionMessages := []string{}
-	for _, degradedCheckFn := range degradedCheckFns {
-		currCond := degradedCheckFn(ctx, kubeClient, agent)
-		if currCond == nil {
-			continue
-		}
-		degradedConditionReasons = append(degradedConditionReasons, currCond.Reason)
-		degradedConditionMessages = append(degradedConditionMessages, currCond.Message)
-	}
-
-	if len(degradedConditionReasons) == 0 {
-		return metav1.Condition{
-			Type:    degradedType,
-			Status:  metav1.ConditionFalse,
-			Reason:  fmt.Sprintf("%sFunctional", secretName),
-			Message: fmt.Sprintf("%s is functioning correctly", secretName),
-		}
-	}
-
-	return metav1.Condition{
-		Type:    degradedType,
-		Status:  metav1.ConditionTrue,
-		Reason:  strings.Join(degradedConditionReasons, ","),
-		Message: strings.Join(degradedConditionMessages, "\n"),
-	}
+	generation int64,
+	degradedCheckFn degradedCheckFunc) metav1.Condition {
+	currCond := degradedCheckFn(ctx, kubeClient, agent)
+	currCond.Type = degradedType
+	currCond.ObservedGeneration = generation
+	return currCond
 }
 
-type degradedCheckFunc func(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) *metav1.Condition
+type degradedCheckFunc func(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) metav1.Condition
 
 // Check bootstrap secret, if the secret is invalid, return registration degraded condition
-func checkBootstrapSecret(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) *metav1.Condition {
+func checkBootstrapSecret(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) metav1.Condition {
 	// Check if bootstrap secret exists
 	bootstrapSecret, err := kubeClient.CoreV1().Secrets(agent.namespace).Get(ctx, helpers.BootstrapHubKubeConfig, metav1.GetOptions{})
 	if err != nil {
-		return &metav1.Condition{
+		return metav1.Condition{
+			Status:  metav1.ConditionTrue,
 			Reason:  "BootstrapSecretMissing",
 			Message: fmt.Sprintf("Failed to get bootstrap secret %q %q: %v", agent.namespace, helpers.BootstrapHubKubeConfig, err),
 		}
 	}
 
 	// Check if bootstrap secret works by building kube client
-	bootstrapClient, err := buildKubeClientWithSecret(bootstrapSecret)
+	bootstrapClient, host, err := buildKubeClientWithSecret(bootstrapSecret)
 	if err != nil {
-		return &metav1.Condition{
+		return metav1.Condition{
+			Status: metav1.ConditionTrue,
 			Reason: "BootstrapSecretError",
-			Message: fmt.Sprintf("Failed to build bootstrap kube client with bootstrap secret %q %q: %v",
-				agent.namespace, helpers.BootstrapHubKubeConfig, err),
+			Message: fmt.Sprintf("Failed to build bootstrap kube client with bootstrap secret %q/%q to apiserver %s: %v",
+				agent.namespace, helpers.BootstrapHubKubeConfig, host, err),
 		}
 	}
 
 	// Check the bootstrap client permissions by creating SelfSubjectAccessReviews
 	allowed, failedReview, err := createSelfSubjectAccessReviews(ctx, bootstrapClient, getBootstrapSSARs())
 	if err != nil {
-		return &metav1.Condition{
+		return metav1.Condition{
+			Status: metav1.ConditionTrue,
 			Reason: "BootstrapSecretError",
 			Message: fmt.Sprintf("Failed to create %+v with bootstrap secret %q %q: %v",
 				failedReview, agent.namespace, helpers.BootstrapHubKubeConfig, err),
 		}
 	}
 	if !allowed {
-		return &metav1.Condition{
+		return metav1.Condition{
+			Status: metav1.ConditionTrue,
 			Reason: "BootstrapSecretUnauthorized",
-			Message: fmt.Sprintf("Operation for resource %+v is not allowed with bootstrap secret %q %q",
-				failedReview.Spec.ResourceAttributes, agent.namespace, helpers.BootstrapHubKubeConfig),
+			Message: fmt.Sprintf("Operation for resource %+v is not allowed with bootstrap secret %q/%q to apiserver %s",
+				failedReview.Spec.ResourceAttributes, agent.namespace, helpers.BootstrapHubKubeConfig, host),
 		}
 	}
 
-	return nil
+	return metav1.Condition{
+		Status: metav1.ConditionFalse,
+		Reason: "BootstrapSecretFunctional",
+		Message: fmt.Sprintf("Bootstrap secret %s/%s to apiserver %s is configured correctly",
+			agent.namespace, helpers.BootstrapHubKubeConfig, host),
+	}
 }
 
 func getBootstrapSSARs() []authorizationv1.SelfSubjectAccessReview {
@@ -285,17 +271,19 @@ func getBootstrapSSARs() []authorizationv1.SelfSubjectAccessReview {
 }
 
 // Check hub-kubeconfig-secret, if the secret is invalid, return degraded condition
-func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) *metav1.Condition {
+func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, agent klusterletAgent) metav1.Condition {
 	hubConfigSecret, err := kubeClient.CoreV1().Secrets(agent.namespace).Get(ctx, helpers.HubKubeConfig, metav1.GetOptions{})
 	if err != nil {
-		return &metav1.Condition{
+		return metav1.Condition{
+			Status:  metav1.ConditionTrue,
 			Reason:  "HubKubeConfigSecretMissing",
 			Message: fmt.Sprintf("Failed to get hub kubeconfig secret %q %q: %v", agent.namespace, helpers.HubKubeConfig, err),
 		}
 	}
 
 	if hubConfigSecret.Data["kubeconfig"] == nil {
-		return &metav1.Condition{
+		return metav1.Condition{
+			Status: metav1.ConditionTrue,
 			Reason: "HubKubeConfigMissing",
 			Message: fmt.Sprintf("Failed to get kubeconfig from `kubectl get secret -n %q %q -ojsonpath='{.data.kubeconfig}'`. "+
 				"This is set by the klusterlet registration deployment, but the CSR must be approved by the cluster-admin on the hub.",
@@ -303,9 +291,10 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 		}
 	}
 
-	hubClient, err := buildKubeClientWithSecret(hubConfigSecret)
+	hubClient, host, err := buildKubeClientWithSecret(hubConfigSecret)
 	if err != nil {
-		return &metav1.Condition{
+		return metav1.Condition{
+			Status: metav1.ConditionTrue,
 			Reason: "HubKubeConfigError",
 			Message: fmt.Sprintf("Failed to build hub kube client with hub config secret %q %q: %v",
 				hubConfigSecret.Namespace, hubConfigSecret.Name, err),
@@ -316,7 +305,8 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 	// If cluster name is empty, read cluster name from hub config secret
 	if clusterName == "" {
 		if hubConfigSecret.Data["cluster-name"] == nil {
-			return &metav1.Condition{
+			return metav1.Condition{
+				Status: metav1.ConditionTrue,
 				Reason: "ClusterNameMissing",
 				Message: fmt.Sprintf(
 					"Failed to get cluster name from `kubectl get secret -n %q %q -ojsonpath='{.data.cluster-name}`."+
@@ -329,21 +319,28 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 	// Check the hub kubeconfig permissions by creating SelfSubjectAccessReviews
 	allowed, failedReview, err := createSelfSubjectAccessReviews(ctx, hubClient, getHubConfigSSARs(clusterName))
 	if err != nil {
-		return &metav1.Condition{
+		return metav1.Condition{
+			Status: metav1.ConditionTrue,
 			Reason: "HubKubeConfigError",
-			Message: fmt.Sprintf("Failed to create %+v with hub config secret %q %q: %v",
-				failedReview, hubConfigSecret.Namespace, hubConfigSecret.Name, err),
+			Message: fmt.Sprintf("Failed to create %+v with hub config secret %q/%q to apiserver %s: %v",
+				failedReview, hubConfigSecret.Namespace, hubConfigSecret.Name, host, err),
 		}
 	}
 	if !allowed {
-		return &metav1.Condition{
+		return metav1.Condition{
+			Status: metav1.ConditionTrue,
 			Reason: "HubKubeConfigUnauthorized",
-			Message: fmt.Sprintf("Operation for resource %+v is not allowed with hub config secret %q %q",
-				failedReview.Spec.ResourceAttributes, hubConfigSecret.Namespace, hubConfigSecret.Name),
+			Message: fmt.Sprintf("Operation for resource %+v is not allowed with hub config secret %q/%q to apiserver %s",
+				failedReview.Spec.ResourceAttributes, hubConfigSecret.Namespace, hubConfigSecret.Name, host),
 		}
 	}
 
-	return nil
+	return metav1.Condition{
+		Status: metav1.ConditionFalse,
+		Reason: "HubConnectionFunctional",
+		Message: fmt.Sprintf("Hub kubeconfig secret %s/%s to apiserver %s is working",
+			agent.namespace, helpers.HubKubeConfig, host),
+	}
 }
 
 func getHubConfigSSARs(clusterName string) []authorizationv1.SelfSubjectAccessReview {
@@ -417,17 +414,22 @@ func getHubConfigSSARs(clusterName string) []authorizationv1.SelfSubjectAccessRe
 	return reviews
 }
 
-func buildKubeClientWithSecret(secret *corev1.Secret) (kubernetes.Interface, error) {
+func buildKubeClientWithSecret(secret *corev1.Secret) (kubernetes.Interface, string, error) {
 	restConfig, err := helpers.LoadClientConfigFromSecret(secret)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	// reduce qps and burst of client, because too many managed clusters registration on hub and send ssar requests at once could cause resource pressure
 	restConfig.QPS = 2
 	restConfig.Burst = 5
 
-	return kubernetes.NewForConfig(restConfig)
+	client, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return client, restConfig.Host, nil
 }
 
 func generateSelfSubjectAccessReviews(resource authorizationv1.ResourceAttributes, verbs ...string) []authorizationv1.SelfSubjectAccessReview {

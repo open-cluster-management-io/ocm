@@ -2,6 +2,7 @@ package util
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/onsi/gomega"
 
@@ -17,26 +18,34 @@ const (
 
 func AssertKlusterletCondition(
 	name string, operatorClient operatorclientset.Interface, expectedType, expectedReason string, expectedWorkStatus metav1.ConditionStatus) {
-	gomega.Eventually(func() bool {
+	gomega.Eventually(func() error {
 		klusterlet, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
-			return false
+			return err
 		}
 
 		// check work status condition
-		return HasCondition(klusterlet.Status.Conditions, expectedType, expectedReason, expectedWorkStatus)
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		if !HasCondition(klusterlet.Status.Conditions, expectedType, expectedReason, expectedWorkStatus) {
+			return fmt.Errorf("expect have type %s with reason %s and status %s, but got %v",
+				expectedType, expectedReason, expectedWorkStatus, klusterlet.Status.Conditions)
+		}
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
 func AssertClusterManagerCondition(
 	name string, operatorClient operatorclientset.Interface, expectedType, expectedReason string, expectedWorkStatus metav1.ConditionStatus) {
-	gomega.Eventually(func() bool {
+	gomega.Eventually(func() error {
 		clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
-			return false
+			return err
 		}
 
 		// check work status condition
-		return HasCondition(clusterManager.Status.Conditions, expectedType, expectedReason, expectedWorkStatus)
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		if !HasCondition(clusterManager.Status.Conditions, expectedType, expectedReason, expectedWorkStatus) {
+			return fmt.Errorf("expect have type %s with reason %s and status %s, but got %v",
+				expectedType, expectedReason, expectedWorkStatus, clusterManager.Status.Conditions)
+		}
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }

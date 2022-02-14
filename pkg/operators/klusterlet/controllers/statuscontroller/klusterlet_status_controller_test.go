@@ -6,14 +6,11 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeinformers "k8s.io/client-go/informers"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 
 	fakeoperatorclient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
@@ -24,42 +21,6 @@ import (
 type testController struct {
 	controller     *klusterletStatusController
 	operatorClient *fakeoperatorclient.Clientset
-}
-
-type serverResponse struct {
-	allowToOperateManagedClusters      bool
-	allowToOperateManagedClusterStatus bool
-	allowToOperateManifestWorks        bool
-}
-
-func newSecret(name, namespace string) *corev1.Secret {
-	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Data: map[string][]byte{},
-	}
-}
-
-func newKubeConfig(host string) []byte {
-	configData, _ := runtime.Encode(clientcmdlatest.Codec, &clientcmdapi.Config{
-		Clusters: map[string]*clientcmdapi.Cluster{"default-cluster": {
-			Server:                host,
-			InsecureSkipTLSVerify: true,
-		}},
-		Contexts: map[string]*clientcmdapi.Context{"default-context": {
-			Cluster: "default-cluster",
-		}},
-		CurrentContext: "default-context",
-	})
-	return configData
-}
-
-func newSecretWithKubeConfig(name, namespace string, kubeConfig []byte) *corev1.Secret {
-	secret := newSecret(name, namespace)
-	secret.Data["kubeconfig"] = kubeConfig
-	return secret
 }
 
 func newKlusterlet(name, namespace, clustername string) *operatorapiv1.Klusterlet {

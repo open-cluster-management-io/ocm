@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
 
@@ -37,6 +38,12 @@ var _ = Describe("Create klusterlet CR", func() {
 			return err
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
 
+		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
+		Eventually(func() error {
+			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded", "BootstrapSecretFunctional,HubKubeConfigSecretMissing", metav1.ConditionTrue)
+			return err
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+
 		By(fmt.Sprintf("approve the created managed cluster %v", clusterName))
 		Eventually(func() error {
 			return t.ApproveCSR(clusterName)
@@ -50,6 +57,12 @@ var _ = Describe("Create klusterlet CR", func() {
 		By(fmt.Sprintf("waiting for the managed cluster %v to be ready", clusterName))
 		Eventually(func() error {
 			return t.CheckManagedClusterStatus(clusterName)
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+
+		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
+		Eventually(func() error {
+			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
+			return err
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
 	})
 
@@ -67,30 +80,9 @@ var _ = Describe("Create klusterlet CR", func() {
 			return err
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
 
-		By(fmt.Sprintf("approve the created managed cluster %v", clusterName))
+		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
 		Eventually(func() error {
-			return t.ApproveCSR(clusterName)
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
-
-		By(fmt.Sprintf("accept the created managed cluster %v", clusterName))
-		Eventually(func() error {
-			return t.AcceptsClient(clusterName)
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
-
-		By(fmt.Sprintf("waiting for the managed cluster %v to be ready", clusterName))
-		Eventually(func() error {
-			return t.CheckManagedClusterStatus(clusterName)
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
-	})
-
-	It("Create klusterlet CR in Detached mode", func() {
-		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v", klusterletName, clusterName))
-		_, err := t.CreateKlusterlet(klusterletName, clusterName, agentNamespace, operatorapiv1.InstallModeDetached)
-		Expect(err).ToNot(HaveOccurred())
-
-		By(fmt.Sprintf("waiting for the managed cluster %v to be created", clusterName))
-		Eventually(func() error {
-			_, err := t.GetCreatedManagedCluster(clusterName)
+			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded", "BootstrapSecretFunctional,HubKubeConfigSecretMissing", metav1.ConditionTrue)
 			return err
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
 
@@ -107,6 +99,51 @@ var _ = Describe("Create klusterlet CR", func() {
 		By(fmt.Sprintf("waiting for the managed cluster %v to be ready", clusterName))
 		Eventually(func() error {
 			return t.CheckManagedClusterStatus(clusterName)
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+
+		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
+		Eventually(func() error {
+			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
+			return err
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+	})
+
+	It("Create klusterlet CR in Detached mode", func() {
+		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v", klusterletName, clusterName))
+		_, err := t.CreateKlusterlet(klusterletName, clusterName, agentNamespace, operatorapiv1.InstallModeDetached)
+		Expect(err).ToNot(HaveOccurred())
+
+		By(fmt.Sprintf("waiting for the managed cluster %v to be created", clusterName))
+		Eventually(func() error {
+			_, err := t.GetCreatedManagedCluster(clusterName)
+			return err
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+
+		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
+		Eventually(func() error {
+			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded", "BootstrapSecretFunctional,HubKubeConfigSecretMissing", metav1.ConditionTrue)
+			return err
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+
+		By(fmt.Sprintf("approve the created managed cluster %v", clusterName))
+		Eventually(func() error {
+			return t.ApproveCSR(clusterName)
+		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+
+		By(fmt.Sprintf("accept the created managed cluster %v", clusterName))
+		Eventually(func() error {
+			return t.AcceptsClient(clusterName)
+		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+
+		By(fmt.Sprintf("waiting for the managed cluster %v to be ready", clusterName))
+		Eventually(func() error {
+			return t.CheckManagedClusterStatus(clusterName)
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+
+		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
+		Eventually(func() error {
+			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
+			return err
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
 	})
 })
