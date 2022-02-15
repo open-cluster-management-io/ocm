@@ -1,0 +1,8 @@
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ClusterManagementAddOn
+metadata:
+  name: helloworld
+spec:
+  addOnMeta:
+    displayName: helloworld
+    description: "helloworld is an example addon created by go template"

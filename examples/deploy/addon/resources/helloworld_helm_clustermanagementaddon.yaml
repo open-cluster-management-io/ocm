@@ -1,0 +1,8 @@
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ClusterManagementAddOn
+metadata:
+  name: helloworldhelm
+spec:
+  addOnMeta:
+    displayName: helloworldhelm
+    description: "helloworldhelm is an example addon created by helm chart"

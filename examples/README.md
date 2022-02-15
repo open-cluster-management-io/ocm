@@ -59,7 +59,12 @@ kubectl apply -f examples/deploy/addon-cr/helloworld_helm_addon_cr.yaml
 We can check the helloworld_helm AddOn agent is deployed in the `installNamespace` on the managed cluster. 
 
 ## Clean up
-Undeploy example AddOn controllers from hub cluster.
+Undeploy managedClusterAddons firstly.
+```sh
+make undeploy-addon
+```
+
+Undeploy example AddOn controllers from hub cluster after all managedClusterAddons are deleted.
 ```sh
 make undeploy-example
 ```
