@@ -62,6 +62,8 @@ type CSRSignerFunc func(csr *certificatesv1.CertificateSigningRequest) []byte
 
 type CSRApproveFunc func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool
 
+type PermissionConfigFunc func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error
+
 // RegistrationOption defines how agent is registered to the hub cluster. It needs to define:
 // 1. csr with what subject/signer should be created
 // 2. how csr is approved
@@ -92,7 +94,7 @@ type RegistrationOption struct {
 	// cluster by calling the kubernetes api explicitly. Additionally we can also extend arbitrary third-party
 	// permission setup in this callback.
 	// +optional
-	PermissionConfig func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error
+	PermissionConfig PermissionConfigFunc
 
 	// CSRSign signs a csr and returns a certificate. It is used when the addon has its own customized signer.
 	// The returned byte array shall be a valid non-nil PEM encoded x509 certificate.
