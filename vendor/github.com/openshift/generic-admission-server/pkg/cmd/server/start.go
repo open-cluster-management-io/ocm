@@ -7,14 +7,13 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/openshift/generic-admission-server/pkg/apiserver"
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/client-go/rest"
-
-	"github.com/openshift/generic-admission-server/pkg/apiserver"
-	"github.com/openshift/library-go/pkg/config/client"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 const defaultEtcdPathPrefix = "/registry/online.openshift.io"
@@ -129,14 +128,20 @@ func (o AdmissionServerOptions) RunAdmissionServer(stopCh <-chan struct{}) error
 }
 
 func getClientConfig(kubeconfigFile string) (*rest.Config, error) {
+	var kubeconfig *rest.Config
+	var err error
 	if len(kubeconfigFile) > 0 {
-		return client.GetClientConfig(kubeconfigFile, nil)
+		loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigFile}
+		loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
+		kubeconfig, err = loader.ClientConfig()
+		if err != nil {
+			return nil, fmt.Errorf("failed to load kubeconfig at %q: %v", kubeconfigFile, err)
+		}
+	} else {
+		kubeconfig, err = rest.InClusterConfig()
+		if err != nil {
+			return nil, err
+		}
 	}
-
-	clientConfig, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	return clientConfig, nil
+	return kubeconfig, nil
 }
