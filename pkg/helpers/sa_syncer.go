@@ -7,7 +7,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -89,7 +88,7 @@ func RenderToKubeconfigSecret(secretName, secretNamespace string, templateKubeco
 		if err != nil {
 			return err
 		}
-		_, _, err = resourceapply.ApplySecret(client, recorder, &v1.Secret{
+		_, _, err = resourceapply.ApplySecret(client, recorder, &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: secretNamespace,
 				Name:      secretName,

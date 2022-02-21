@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
@@ -52,16 +53,19 @@ const (
 
 type crdMigrationController struct {
 	kubeconfig           *rest.Config
+	kubeClient           kubernetes.Interface
 	clusterManagerLister operatorlister.ClusterManagerLister
 }
 
 // NewClusterManagerController construct cluster manager hub controller
 func NewCRDMigrationController(
 	kubeconfig *rest.Config,
+	kubeClient kubernetes.Interface,
 	clusterManagerInformer operatorinformer.ClusterManagerInformer,
 	recorder events.Recorder) factory.Controller {
 	controller := &crdMigrationController{
 		kubeconfig:           kubeconfig,
+		kubeClient:           kubeClient,
 		clusterManagerLister: clusterManagerInformer.Lister(),
 	}
 
@@ -87,7 +91,7 @@ func (c *crdMigrationController) sync(ctx context.Context, controllerContext fac
 	}
 
 	// If mode is default, then config is management kubeconfig, else it would use management kubeconfig to find the hub
-	hubKubeconfig, err := helpers.GetHubKubeconfig(ctx, c.kubeconfig, clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
+	hubKubeconfig, err := helpers.GetHubKubeconfig(ctx, c.kubeconfig, c.kubeClient, clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
 	if err != nil {
 		return err
 	}

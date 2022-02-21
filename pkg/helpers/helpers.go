@@ -25,7 +25,6 @@ import (
 	admissionclient "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
@@ -457,7 +456,7 @@ func UpdateKlusterletGenerationsFn(generations ...operatorapiv1.GenerationStatus
 }
 
 // LoadClientConfigFromSecret returns a client config loaded from the given secret
-func LoadClientConfigFromSecret(secret *corev1.Secret) (*restclient.Config, error) {
+func LoadClientConfigFromSecret(secret *corev1.Secret) (*rest.Config, error) {
 	kubeconfigData, ok := secret.Data["kubeconfig"]
 	if !ok {
 		return nil, fmt.Errorf("unable to find kubeconfig in secret %q %q",
@@ -685,17 +684,14 @@ func SyncSecret(client, targetClient coreclientv1.SecretsGetter, recorder events
 // If it's Detached mode, the kubeconfig of the hub cluster is stored as a secret under clustermanager namespace.
 func GetHubKubeconfig(ctx context.Context,
 	managementKubeconfig *rest.Config, // this is the kubeconfig of the cluster which controller is running on now.
+	managementKubeclient kubernetes.Interface,
 	clusternamagerName string,
-	clustermanagerMode operatorapiv1.InstallMode) (*restclient.Config, error) {
+	clustermanagerMode operatorapiv1.InstallMode) (*rest.Config, error) {
 	switch clustermanagerMode {
 	case operatorapiv1.InstallModeDefault:
 		return managementKubeconfig, nil
 	case operatorapiv1.InstallModeDetached:
 		clustermanagerNamespace := ClusterManagerNamespace(clusternamagerName, clustermanagerMode)
-		managementKubeclient, err := kubernetes.NewForConfig(managementKubeconfig)
-		if err != nil {
-			return nil, err
-		}
 
 		// get secret of external kubeconfig
 		secret, err := managementKubeclient.CoreV1().Secrets(clustermanagerNamespace).Get(ctx, ExternalHubKubeConfig, metav1.GetOptions{})
@@ -710,6 +706,7 @@ func GetHubKubeconfig(ctx context.Context,
 
 		return config, nil
 	default:
-		return nil, fmt.Errorf("unsupport install mode: %s", clustermanagerMode)
+		// backward compatible with previous crd.
+		return managementKubeconfig, nil
 	}
 }

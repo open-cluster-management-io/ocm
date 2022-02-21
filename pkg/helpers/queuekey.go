@@ -12,7 +12,6 @@ import (
 
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
-	v1 "open-cluster-management.io/api/operator/v1"
 )
 
 const (
@@ -169,7 +168,7 @@ func FindKlusterletByNamespace(klusterlets []*operatorapiv1.Klusterlet, namespac
 	return nil
 }
 
-func FindClusterManagerByNamespace(namespace string, clusterManagers []*v1.ClusterManager) (*v1.ClusterManager, error) {
+func FindClusterManagerByNamespace(namespace string, clusterManagers []*operatorapiv1.ClusterManager) (*operatorapiv1.ClusterManager, error) {
 	for i := range clusterManagers {
 		if clusterManagers[i].Name == namespace ||
 			(clusterManagers[i].Spec.DeployOption.Mode == operatorapiv1.InstallModeDefault && namespace == ClusterManagerDefaultNamespace) {

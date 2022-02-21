@@ -23,8 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/client-go/kubernetes/fake"
 	fakekube "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 	fakeapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
@@ -682,11 +682,11 @@ func TestLoadClientConfigFromSecret(t *testing.T) {
 		},
 		{
 			name:   "load kubeconfig without references to external key/cert files",
-			secret: newKubeConfigSecret("ns1", "secret1", newKubeConfig("", ""), nil, nil),
+			secret: newKubeConfigSecret("ns1", "secret1", newKubeConfig("testhost", "", ""), nil, nil),
 		},
 		{
 			name:             "load kubeconfig with references to external key/cert files",
-			secret:           newKubeConfigSecret("ns1", "secret1", newKubeConfig("tls.crt", "tls.key"), []byte("--- TRUNCATED ---"), []byte("--- REDACTED ---")),
+			secret:           newKubeConfigSecret("ns1", "secret1", newKubeConfig("testhost", "tls.crt", "tls.key"), []byte("--- TRUNCATED ---"), []byte("--- REDACTED ---")),
 			expectedCertData: []byte("--- TRUNCATED ---"),
 			expectedKeyData:  []byte("--- REDACTED ---"),
 		},
@@ -719,10 +719,10 @@ func TestLoadClientConfigFromSecret(t *testing.T) {
 	}
 }
 
-func newKubeConfig(certFile, keyFile string) []byte {
+func newKubeConfig(host, certFile, keyFile string) []byte {
 	configData, _ := runtime.Encode(clientcmdlatest.Codec, &clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{"test-cluster": {
-			Server:                "https://test-host:443",
+			Server:                fmt.Sprintf("https://%s:443", host),
 			InsecureSkipTLSVerify: true,
 		}},
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{"test-auth": {
@@ -1250,8 +1250,8 @@ func TestSyncSecret(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset(tc.existingObjects...)
-			clientTarget := fake.NewSimpleClientset()
+			client := fakekube.NewSimpleClientset(tc.existingObjects...)
+			clientTarget := fakekube.NewSimpleClientset()
 			secret, changed, err := SyncSecret(client.CoreV1(), clientTarget.CoreV1(), events.NewInMemoryRecorder("test"), tc.sourceNamespace, tc.sourceName, tc.targetNamespace, tc.targetName, tc.ownerRefs)
 
 			if !reflect.DeepEqual(err, tc.expectedErr) {
@@ -1265,6 +1265,70 @@ func TestSyncSecret(t *testing.T) {
 
 			if changed != tc.expectedChanged {
 				t.Errorf("%s: expected changed %t, got %t", tc.name, tc.expectedChanged, changed)
+			}
+		})
+	}
+}
+
+func TestGetHubKubeconfig(t *testing.T) {
+	managemengConfig := &rest.Config{Host: "localhost"}
+	tt := []struct {
+		name         string
+		mode         operatorapiv1.InstallMode
+		secret       []runtime.Object
+		namespace    string
+		expectedHost string
+		expectedErr  bool
+	}{
+		{
+			name:         "default mode",
+			mode:         operatorapiv1.InstallModeDefault,
+			secret:       []runtime.Object{},
+			namespace:    "test",
+			expectedHost: "localhost",
+			expectedErr:  false,
+		},
+		{
+			name:         "empty mode",
+			mode:         "",
+			secret:       []runtime.Object{},
+			namespace:    "test",
+			expectedHost: "localhost",
+			expectedErr:  false,
+		},
+		{
+			name:         "detach mode no secret",
+			mode:         operatorapiv1.InstallModeDetached,
+			secret:       []runtime.Object{},
+			namespace:    "test",
+			expectedHost: "localhost",
+			expectedErr:  true,
+		},
+		{
+			name:         "detach mode",
+			mode:         operatorapiv1.InstallModeDetached,
+			secret:       []runtime.Object{newKubeConfigSecret("test", ExternalHubKubeConfig, newKubeConfig("testhost", "tls.crt", "tls.key"), []byte("--- TRUNCATED ---"), []byte("--- REDACTED ---"))},
+			namespace:    "test",
+			expectedHost: "https://testhost:443",
+			expectedErr:  false,
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			client := fakekube.NewSimpleClientset(tc.secret...)
+			config, err := GetHubKubeconfig(context.TODO(), managemengConfig, client, tc.namespace, tc.mode)
+			if tc.expectedErr && err == nil {
+				t.Error("Expect to get err, but got nil")
+			}
+			if !tc.expectedErr && err != nil {
+				t.Errorf("Expect not err, but got %v", err)
+			}
+			if err != nil {
+				return
+			}
+			if config.Host != tc.expectedHost {
+				t.Errorf("Expect host %s, but got %s", tc.expectedHost, config.Host)
 			}
 		})
 	}
