@@ -7,7 +7,7 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.17.0
 	github.com/openshift/build-machinery-go v0.0.0-20211213093930-7e33a7eb4ce3
-	github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480
+	github.com/openshift/generic-admission-server v1.14.1-0.20220220163846-6395b86cc87e
 	github.com/openshift/library-go v0.0.0-20220112153822-ac82336bd076
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
@@ -23,10 +23,6 @@ require (
 	open-cluster-management.io/api v0.5.1-0.20220106083637-f4d9773affaf
 	sigs.k8s.io/controller-runtime v0.11.0
 )
-
-// to enable run webhook server outside of cluster
-// TODO: replace with the latest generic-admission-server
-replace github.com/openshift/generic-admission-server => github.com/xuezhaojun/generic-admission-server v1.14.1-0.20211102085821-f3b9a5baab1e
 
 require (
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
