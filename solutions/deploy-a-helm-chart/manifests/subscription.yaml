@@ -7,12 +7,12 @@ spec:
   channel: default/demo-helmrepo
   name: nginx-ingress
   placement:
-    placementRef: 
+    placementRef:
       name: demo-placement
       kind: Placement
   packageOverrides:
-  - packageName: nginx-ingress
-    packageAlias: nginx-ingress-simple
+  - packageName: nginx-lego
+    packageAlias: nginx-lego-simple
     packageOverrides:
     - path: spec
       value:

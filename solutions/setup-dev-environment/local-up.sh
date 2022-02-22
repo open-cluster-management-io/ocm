@@ -30,4 +30,6 @@ $(echo ${joincmd} --force-internal-endpoint-lookup --wait | sed "s/<cluster_name
 
 kubectl config use ${hubctx}
 echo "Accept join of cluster1 and cluster2"
-clusteradm accept --clusters ${c1},${c2}
+clusteradm accept --clusters ${c1},${c2} --wait
+
+kubectl get managedclusters --all-namespaces

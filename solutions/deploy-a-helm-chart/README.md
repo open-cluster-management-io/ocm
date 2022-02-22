@@ -10,13 +10,13 @@ Install application manager addon on the hub cluster
 
 ```
 kubectl config use kind-hub
-clusteradm install addons --names application-manager
+clusteradm install addon --names application-manager
 ```
 
 Install application manager agent on all the managed clusters
 
 ```
-clusteradm enable addons --names application-manager --clusters cluster1,cluster2
+clusteradm addon enable --name application-manager --cluster cluster1,cluster2
 ```
 
 You will see that all agents is available after waiting a while
