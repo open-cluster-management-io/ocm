@@ -50,30 +50,68 @@ type ClusterManagerSpec struct {
 	// DeployOption contains the options of deploying a cluster-manager
 	// Default mode is used if DeployOption is not set.
 	// +optional
-	// +kubebuilder:default={mode: Default}
-	DeployOption DeployOption `json:"deployOption,omitempty"`
+	DeployOption ClusterManagerDeployOption `json:"deployOption,omitempty"`
 }
 
-// DeployOption describes the deploy options for cluster-manager or klusterlet
-type DeployOption struct {
-	// Mode can be Default or Detached.
-	// For cluster-manager:
-	//   - In Default mode, the Hub is installed as a whole and all parts of Hub are deployed in the same cluster.
-	//   - In Detached mode, only crd and configurations are installed on one cluster(defined as hub-cluster). Controllers run in another cluster (defined as management-cluster) and connect to the hub with the kubeconfig in secret of "external-hub-kubeconfig"(a kubeconfig of hub-cluster with cluster-admin permission).
-	// For klusterlet:
-	//   - In Default mode, all klusterlet related resources are deployed on the managed cluster.
-	//   - In Detached mode, only crd and configurations are installed on the spoke/managed cluster. Controllers run in another cluster (defined as management-cluster) and connect to the mangaged cluster with the kubeconfig in secret of "external-managed-kubeconfig"(a kubeconfig of managed-cluster with cluster-admin permission).
-	// The purpose of Detached mode is to give it more flexibility, for example we can install a hub on a cluster with no worker nodes, meanwhile running all deployments on another more powerful cluster.
-	// And we can also register a managed cluster to the hub that has some firewall rules preventing access from the managed cluster.
-	//
+// DetachedClusterManagerConfiguration represents customized configurations we need to set for clustermanager in the detached mode.
+type DetachedClusterManagerConfiguration struct {
+	// RegistrationWebhookConfiguration represents the customized webhook-server configuration of registration.
+	// +optional
+	RegistrationWebhookConfiguration WebhookConfiguration `json:"registrationWebhookConfiguration,omitempty"`
+
+	// WorkWebhookConfiguration represents the customized webhook-server configuration of work.
+	// +optional
+	WorkWebhookConfiguration WebhookConfiguration `json:"workWebhookConfiguration,omitempty"`
+}
+
+// WebhookConfiguration has two properties: Address and Port.
+type WebhookConfiguration struct {
+	// Address represents the address of a webhook-server.
+	// It could be in IP format or fqdn format.
+	// The Address must be reachable by apiserver of the hub cluster.
+	// +required
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$
+	Address string `json:"address"`
+
+	// Port represents the port of a webhook-server. The default value of Port is 443.
+	// +optional
+	// +default=443
+	// +kubebuilder:default=443
+	// +kubebuilder:validation:Maximum=65535
+	Port int32 `json:"port,omitempty"`
+}
+
+// KlusterletDeployOption describes the deploy options for klusterlet
+type KlusterletDeployOption struct {
+	// Mode can be Default or Detached. It is Default mode if not specified
+	// In Default mode, all klusterlet related resources are deployed on the managed cluster.
+	// In Detached mode, only crd and configurations are installed on the spoke/managed cluster. Controllers run in another
+	// cluster (defined as management-cluster) and connect to the mangaged cluster with the kubeconfig in secret of
+	// "external-managed-kubeconfig"(a kubeconfig of managed-cluster with cluster-admin permission).
 	// Note: Do not modify the Mode field once it's applied.
-	//
+	// +optional
+	Mode InstallMode `json:"mode"`
+}
+
+// ClusterManagerDeployOption describes the deploy options for cluster-manager
+type ClusterManagerDeployOption struct {
+	// Mode can be Default or Detached.
+	// In Default mode, the Hub is installed as a whole and all parts of Hub are deployed in the same cluster.
+	// In Detached mode, only crd and configurations are installed on one cluster(defined as hub-cluster). Controllers run in another
+	// cluster (defined as management-cluster) and connect to the hub with the kubeconfig in secret of "external-hub-kubeconfig"(a kubeconfig
+	// of hub-cluster with cluster-admin permission).
+	// Note: Do not modify the Mode field once it's applied.
 	// +required
 	// +default=Default
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Default
 	// +kubebuilder:validation:Enum=Default;Detached
 	Mode InstallMode `json:"mode"`
+
+	// Detached includes configurations we needs for clustermanager in the detached mode.
+	// +optional
+	Detached *DetachedClusterManagerConfiguration `json:"detached,omitempty"`
 }
 
 // InstallMode represents the mode of deploy cluster-manager or klusterlet
@@ -211,13 +249,13 @@ type KlusterletSpec struct {
 	Namespace string `json:"namespace,omitempty"`
 
 	// RegistrationImagePullSpec represents the desired image configuration of registration agent.
-	// +required
-	// +kubebuilder:default=quay.io/open-cluster-management/registration
-	RegistrationImagePullSpec string `json:"registrationImagePullSpec"`
+	// quay.io/open-cluster-management.io/registration:latest will be used if unspecified.
+	// +optional
+	RegistrationImagePullSpec string `json:"registrationImagePullSpec,omitempty"`
 
 	// WorkImagePullSpec represents the desired image configuration of work agent.
-	// +required
-	// +kubebuilder:default=quay.io/open-cluster-management/work
+	// quay.io/open-cluster-management.io/work:latest will be used if unspecified.
+	// +optional
 	WorkImagePullSpec string `json:"workImagePullSpec,omitempty"`
 
 	// ClusterName is the name of the managed cluster to be created on hub.
@@ -236,8 +274,7 @@ type KlusterletSpec struct {
 
 	// DeployOption contains the options of deploying a klusterlet
 	// +optional
-	// +kubebuilder:default={mode: Default}
-	DeployOption DeployOption `json:"deployOption,omitempty"`
+	DeployOption KlusterletDeployOption `json:"deployOption,omitempty"`
 }
 
 // ServerURL represents the apiserver url and ca bundle that is accessible externally

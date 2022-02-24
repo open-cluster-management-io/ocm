@@ -133,7 +133,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 			RegistrationImagePullSpec: "quay.io/open-cluster-management/registration",
 			WorkImagePullSpec:         "quay.io/open-cluster-management/work",
 			PlacementImagePullSpec:    "quay.io/open-cluster-management/placement",
-			DeployOption: operatorapiv1.DeployOption{
+			DeployOption: operatorapiv1.ClusterManagerDeployOption{
 				Mode: operatorapiv1.InstallModeDefault,
 			},
 		},
@@ -148,7 +148,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 			RegistrationImagePullSpec: "quay.io/open-cluster-management/registration",
 			WorkImagePullSpec:         "quay.io/open-cluster-management/work",
 			PlacementImagePullSpec:    "quay.io/open-cluster-management/placement",
-			DeployOption: operatorapiv1.DeployOption{
+			DeployOption: operatorapiv1.ClusterManagerDeployOption{
 				Mode: operatorapiv1.InstallModeDetached,
 			},
 		},

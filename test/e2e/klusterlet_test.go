@@ -27,6 +27,47 @@ var _ = Describe("Create klusterlet CR", func() {
 		t.cleanKlusterletResources(klusterletName, clusterName)
 	})
 
+	// This test case is helpful for the Backward compatibility
+	It("Create klusterlet CR with install mode empty", func() {
+		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v", klusterletName, clusterName))
+		// Set install mode empty
+		_, err := t.CreateKlusterlet(klusterletName, clusterName, agentNamespace, "")
+		Expect(err).ToNot(HaveOccurred())
+
+		By(fmt.Sprintf("waiting for the managed cluster %v to be created", clusterName))
+		Eventually(func() error {
+			_, err := t.GetCreatedManagedCluster(clusterName)
+			return err
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+
+		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
+		Eventually(func() error {
+			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded", "BootstrapSecretFunctional,HubKubeConfigSecretMissing", metav1.ConditionTrue)
+			return err
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+
+		By(fmt.Sprintf("approve the created managed cluster %v", clusterName))
+		Eventually(func() error {
+			return t.ApproveCSR(clusterName)
+		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+
+		By(fmt.Sprintf("accept the created managed cluster %v", clusterName))
+		Eventually(func() error {
+			return t.AcceptsClient(clusterName)
+		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+
+		By(fmt.Sprintf("waiting for the managed cluster %v to be ready", clusterName))
+		Eventually(func() error {
+			return t.CheckManagedClusterStatus(clusterName)
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+
+		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
+		Eventually(func() error {
+			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
+			return err
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+	})
+
 	It("Create klusterlet CR with managed cluster name", func() {
 		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v", klusterletName, clusterName))
 		_, err := t.CreateKlusterlet(klusterletName, clusterName, agentNamespace, operatorapiv1.InstallModeDefault)

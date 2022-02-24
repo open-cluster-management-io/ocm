@@ -32,19 +32,11 @@ spec:
                 description: ClusterName is the name of the managed cluster to be created on hub. The Klusterlet agent generates a random name if it is not set, or discovers the appropriate cluster name on OpenShift.
                 type: string
               deployOption:
-                default:
-                  mode: Default
                 description: DeployOption contains the options of deploying a klusterlet
                 properties:
                   mode:
-                    default: Default
-                    description: "Mode can be Default or Detached. For cluster-manager:   - In Default mode, the Hub is installed as a whole and all parts of Hub are deployed in the same cluster.   - In Detached mode, only crd and configurations are installed on one cluster(defined as hub-cluster). Controllers run in another cluster (defined as management-cluster) and connect to the hub with the kubeconfig in secret of \"external-hub-kubeconfig\"(a kubeconfig of hub-cluster with cluster-admin permission). For klusterlet:   - In Default mode, all klusterlet related resources are deployed on the managed cluster.   - In Detached mode, only crd and configurations are installed on the spoke/managed cluster. Controllers run in another cluster (defined as management-cluster) and connect to the mangaged cluster with the kubeconfig in secret of \"external-managed-kubeconfig\"(a kubeconfig of managed-cluster with cluster-admin permission). The purpose of Detached mode is to give it more flexibility, for example we can install a hub on a cluster with no worker nodes, meanwhile running all deployments on another more powerful cluster. And we can also register a managed cluster to the hub that has some firewall rules preventing access from the managed cluster. \n Note: Do not modify the Mode field once it's applied."
-                    enum:
-                    - Default
-                    - Detached
+                    description: 'Mode can be Default or Detached. It is Default mode if not specified In Default mode, all klusterlet related resources are deployed on the managed cluster. In Detached mode, only crd and configurations are installed on the spoke/managed cluster. Controllers run in another cluster (defined as management-cluster) and connect to the mangaged cluster with the kubeconfig in secret of "external-managed-kubeconfig"(a kubeconfig of managed-cluster with cluster-admin permission). Note: Do not modify the Mode field once it''s applied.'
                     type: string
-                required:
-                - mode
                 type: object
               externalServerURLs:
                 description: ExternalServerURLs represents the a list of apiserver urls and ca bundles that is accessible externally If it is set empty, managed cluster has no externally accessible url that hub cluster can visit.
@@ -96,12 +88,10 @@ spec:
                     type: array
                 type: object
               registrationImagePullSpec:
-                default: quay.io/open-cluster-management/registration
-                description: RegistrationImagePullSpec represents the desired image configuration of registration agent.
+                description: RegistrationImagePullSpec represents the desired image configuration of registration agent. quay.io/open-cluster-management.io/registration:latest will be used if unspecified.
                 type: string
               workImagePullSpec:
-                default: quay.io/open-cluster-management/work
-                description: WorkImagePullSpec represents the desired image configuration of work agent.
+                description: WorkImagePullSpec represents the desired image configuration of work agent. quay.io/open-cluster-management.io/work:latest will be used if unspecified.
                 type: string
             type: object
           status:

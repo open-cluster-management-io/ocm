@@ -69,9 +69,6 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				},
 				ClusterName: "testcluster",
 				Namespace:   klusterletNamespace,
-				DeployOption: operatorapiv1.DeployOption{
-					Mode: operatorapiv1.InstallModeDefault,
-				},
 			},
 		}
 
@@ -881,7 +878,7 @@ var _ = ginkgo.Describe("Klusterlet Detached mode", func() {
 					},
 				},
 				ClusterName: "testcluster",
-				DeployOption: operatorapiv1.DeployOption{
+				DeployOption: operatorapiv1.KlusterletDeployOption{
 					Mode: operatorapiv1.InstallModeDetached,
 				},
 			},

@@ -41,7 +41,7 @@ func newClusterManager(name string) *operatorapiv1.ClusterManager {
 		},
 		Spec: operatorapiv1.ClusterManagerSpec{
 			RegistrationImagePullSpec: "testregistration",
-			DeployOption: operatorapiv1.DeployOption{
+			DeployOption: operatorapiv1.ClusterManagerDeployOption{
 				Mode: operatorapiv1.InstallModeDefault,
 			},
 		},

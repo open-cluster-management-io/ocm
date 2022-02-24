@@ -163,7 +163,7 @@ func (t *Tester) CreateKlusterlet(name, clusterName, agentNamespace string, mode
 			},
 			ClusterName: clusterName,
 			Namespace:   agentNamespace,
-			DeployOption: operatorapiv1.DeployOption{
+			DeployOption: operatorapiv1.KlusterletDeployOption{
 				Mode: mode,
 			},
 		},
