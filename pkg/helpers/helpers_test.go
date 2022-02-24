@@ -23,12 +23,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/client-go/kubernetes/fake"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+	clienttesting "k8s.io/client-go/testing"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 	fakeapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
-
 	opereatorfake "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/registration-operator/manifests"
@@ -873,6 +874,189 @@ func TestApplyDeployment(t *testing.T) {
 			if !reflect.DeepEqual(deployment.Spec.Template.Spec.Tolerations, c.nodePlacement.Tolerations) {
 				t.Errorf("Expect Tolerations %v, got %v", c.nodePlacement.Tolerations, deployment.Spec.Template.Spec.Tolerations)
 			}
+		})
+	}
+}
+
+func TestApplyEndpoints(t *testing.T) {
+	tests := []struct {
+		name             string
+		existing         []runtime.Object
+		input            *corev1.Endpoints
+		verifyActions    func(actions []clienttesting.Action, t *testing.T)
+		expectedModified bool
+	}{
+		{
+			name: "create",
+			existing: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				},
+			},
+			input: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "foo",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						Addresses: []corev1.EndpointAddress{
+							{
+								IP: "192.13.12.1",
+							},
+						},
+						Ports: []corev1.EndpointPort{
+							{
+								Port:     80,
+								Protocol: "tcp",
+							},
+						},
+					},
+				},
+			},
+			expectedModified: true,
+			verifyActions: func(actions []clienttesting.Action, t *testing.T) {
+				if len(actions) != 2 {
+					t.Fatal("action count mismatch")
+				}
+				if !actions[0].Matches("get", "endpoints") || actions[0].(clienttesting.GetAction).GetName() != "foo" {
+					t.Error("unexpected action:", actions[0])
+				}
+				if !actions[1].Matches("create", "endpoints") {
+					t.Error("unexpected action:", actions[1])
+				}
+			},
+		},
+		{
+			name: "remain same",
+			existing: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				},
+				&corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "foo",
+						Namespace: "foo",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP: "192.13.12.1",
+								},
+							},
+							Ports: []corev1.EndpointPort{
+								{
+									Port: 80,
+								},
+							},
+						},
+					},
+				},
+			},
+			input: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "foo",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						Addresses: []corev1.EndpointAddress{
+							{
+								IP: "192.13.12.1",
+							},
+						},
+						Ports: []corev1.EndpointPort{
+							{
+								Port: 80,
+							},
+						},
+					},
+				},
+			},
+			expectedModified: false,
+			verifyActions: func(actions []clienttesting.Action, t *testing.T) {
+				if len(actions) != 1 {
+					t.Fatal("action count mismatch")
+				}
+				if !actions[0].Matches("get", "endpoints") || actions[0].(clienttesting.GetAction).GetName() != "foo" {
+					t.Error("unexpected action:", actions[0])
+				}
+			},
+		},
+		{
+			name: "update",
+			existing: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				},
+				&corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "foo",
+						Namespace: "foo",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP: "192.13.12.1",
+								},
+							},
+							Ports: []corev1.EndpointPort{
+								{
+									Port: 80,
+								},
+							},
+						},
+					},
+				},
+			},
+			input: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "foo",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						Addresses: []corev1.EndpointAddress{
+							{
+								IP: "192.13.12.1",
+							},
+						},
+						Ports: []corev1.EndpointPort{
+							{
+								Port: 81,
+							},
+						},
+					},
+				},
+			},
+			expectedModified: true,
+			verifyActions: func(actions []clienttesting.Action, t *testing.T) {
+				if len(actions) != 2 {
+					t.Fatal("action count mismatch")
+				}
+				if !actions[0].Matches("get", "endpoints") || actions[0].(clienttesting.GetAction).GetName() != "foo" {
+					t.Error("unexpected action:", actions[0])
+				}
+				if !actions[1].Matches("update", "endpoints") {
+					t.Error("unexpected action:", actions[1])
+				}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client := fake.NewSimpleClientset(test.existing...)
+			_, actualModified, err := ApplyEndpoints(context.TODO(), client.CoreV1(), test.input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if test.expectedModified != actualModified {
+				t.Errorf("expected %v, got %v", test.expectedModified, actualModified)
+			}
+			test.verifyActions(client.Actions(), t)
 		})
 	}
 }

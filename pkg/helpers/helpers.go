@@ -176,6 +176,8 @@ func CleanUpStaticObject(
 	switch t := object.(type) {
 	case *corev1.Namespace:
 		err = client.CoreV1().Namespaces().Delete(ctx, t.Name, metav1.DeleteOptions{})
+	case *corev1.Endpoints:
+		err = client.CoreV1().Endpoints(t.Namespace).Delete(ctx, t.Name, metav1.DeleteOptions{})
 	case *corev1.Service:
 		err = client.CoreV1().Services(t.Namespace).Delete(ctx, t.Name, metav1.DeleteOptions{})
 	case *corev1.ServiceAccount:
@@ -316,6 +318,30 @@ func ApplyDeployment(
 	return generationStatus, nil
 }
 
+func ApplyEndpoints(ctx context.Context, client coreclientv1.EndpointsGetter, required *corev1.Endpoints) (*corev1.Endpoints, bool, error) {
+	existing, err := client.Endpoints(required.Namespace).Get(ctx, required.Name, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		requiredCopy := required.DeepCopy()
+		actual, err := client.Endpoints(required.Namespace).Create(ctx, requiredCopy, metav1.CreateOptions{})
+		return actual, true, err
+	}
+	if err != nil {
+		return nil, false, err
+	}
+
+	modified := resourcemerge.BoolPtr(false)
+	existingCopy := existing.DeepCopy()
+	resourcemerge.EnsureObjectMeta(modified, &existingCopy.ObjectMeta, required.ObjectMeta)
+
+	if !*modified && equality.Semantic.DeepEqual(existingCopy.Subsets, required.Subsets) {
+		return existingCopy, false, nil
+	}
+
+	existingCopy.Subsets = required.Subsets
+	actual, err := client.Endpoints(required.Namespace).Update(ctx, existingCopy, metav1.UpdateOptions{})
+	return actual, true, err
+}
+
 func ApplyDirectly(
 	client kubernetes.Interface,
 	apiExtensionClient apiextensionsclient.Interface,
@@ -356,6 +382,8 @@ func ApplyDirectly(
 				t.ObjectMeta.Annotations["caBundle-checksum"] = string(checksum[:]) // to trigger the update when caBundle changed
 				result.Result, result.Changed, result.Error = resourceapply.ApplyAPIService(apiRegistrationClient, recorder, t)
 			}
+		case *corev1.Endpoints:
+			result.Result, result.Changed, result.Error = ApplyEndpoints(context.TODO(), client.CoreV1(), t)
 		default:
 			genericApplyFiles = append(genericApplyFiles, file)
 		}
@@ -523,6 +551,8 @@ func GenerateRelatedResource(objBytes []byte) (operatorapiv1.RelatedResourceMeta
 		relatedResource = newRelatedResource(appsv1.SchemeGroupVersion.WithResource("deployments"), requiredObj)
 	case *corev1.Namespace:
 		relatedResource = newRelatedResource(corev1.SchemeGroupVersion.WithResource("namespaces"), requiredObj)
+	case *corev1.Endpoints:
+		relatedResource = newRelatedResource(corev1.SchemeGroupVersion.WithResource("endpoints"), requiredObj)
 	case *corev1.Service:
 		relatedResource = newRelatedResource(corev1.SchemeGroupVersion.WithResource("services"), requiredObj)
 	case *corev1.Pod:
