@@ -18,6 +18,31 @@ metadata:
             "registrationImagePullSpec": "quay.io/open-cluster-management/registration",
             "workImagePullSpec": "quay.io/open-cluster-management/work"
           }
+        },
+        {
+          "apiVersion": "operator.open-cluster-management.io/v1",
+          "kind": "ClusterManager",
+          "metadata": {
+            "name": "cluster-manager"
+          },
+          "spec": {
+            "deployOption": {
+              "detached": {
+                "registrationWebhookConfiguration": {
+                  "address": "management-control-plane",
+                  "port": 30443
+                },
+                "workWebhookConfiguration": {
+                  "address": "management-control-plane",
+                  "port": 31443
+                }
+              },
+              "mode": "Detached"
+            },
+            "placementImagePullSpec": "quay.io/open-cluster-management/placement",
+            "registrationImagePullSpec": "quay.io/open-cluster-management/registration",
+            "workImagePullSpec": "quay.io/open-cluster-management/work"
+          }
         }
       ]
     capabilities: Basic Install

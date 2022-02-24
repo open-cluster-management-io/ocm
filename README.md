@@ -42,7 +42,7 @@ We mainly provide deployment in two scenarios:
 
 ### Deploy all-in-on deployment
 
-1. Set an env variable `KUBECONFIG` to kubeconfig file path. 
+1. Set the env variable `KUBECONFIG` to kubeconfig file path. 
    ```shell
    export KUBECONFIG=$HOME/.kube/config
    ```
@@ -82,9 +82,81 @@ We mainly provide deployment in two scenarios:
    ```
 5. To clean the spoke environment.
    ```shell
-   kubectl config use-context {spoke context} 
+   kubectl config use-context {spoke-context} 
    make clean-spoke
    ``` 
+
+### Deploy hub(Clustermanager) with Detached mode
+
+1. Create 3 Kind clusters: management cluster, hub cluster and a managed cluster. 
+
+   ```shell
+   kind create cluster --name hub
+   cat <<EOF | kind create cluster --name management --config=-
+   kind: Cluster
+   apiVersion: kind.x-k8s.io/v1alpha4
+   nodes:
+   - role: control-plane
+   extraPortMappings:
+   - containerPort: 30443
+      hostPort: 30443
+      protocol: TCP
+   - containerPort: 31443
+      hostPort: 31443
+      protocol: TCP
+   EOF
+   kind create cluster --name managed
+   ```
+
+2. Set the env variable `KUBECONFIG` to kubeconfig file path. 
+   ```shell
+   export KUBECONFIG=$HOME/.kube/config
+   ```
+
+3. Get the `EXTERNAL_HUB_KUBECONFIG` kubeconfig.
+   ```shell
+   kind get kubeconfig --name kind-hub --internal > ./.external-hub-kubeconfig  
+   ```
+
+4. Switch to management cluster and deploy hub components.
+   ```shell
+   kubectl config use-context {management-context}
+   make deploy-hub-detached
+   ```
+
+    After deploy hub successfully, the user needs to expose webhook-servers in the management cluster manually.
+
+    ```shell
+    cat <<EOF | kubectl apply -f -
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: cluster-manager-registration-webhook-external
+      namespace: cluster-manager
+    spec:
+      type: NodePort
+      selector:
+        app: cluster-manager-registration-webhook
+      ports:
+        - port: 443
+          targetPort: 6443
+          nodePort: 30443
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: cluster-manager-work-webhook-external
+      namespace: cluster-manager
+    spec:
+      type: NodePort
+      selector:
+        app: cluster-manager-work-webhook
+      ports:
+        - port: 443
+          targetPort: 6443
+          nodePort: 31443
+    EOF
+    ```
 
 ### Deploy spoke(Klusterlet) with Detached mode
 

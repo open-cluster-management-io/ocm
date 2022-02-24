@@ -112,7 +112,7 @@ apply-hub-cr:
 	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/placement,$(PLACEMENT_IMAGE)," deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers.cr.yaml | $(KUBECTL) apply -f -
 
 apply-hub-cr-detached: external-hub-secret
-	$(SED_CMD) -e "s,cluster-manager,$(DETACHED_CLUSTER_MANAGER_NAME)," -e "s,mode: Default,mode: Detached," -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/placement,$(PLACEMENT_IMAGE)," deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers.cr.yaml | $(KUBECTL) apply -f -
+	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/placement,$(PLACEMENT_IMAGE)," deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers_detached.cr.yaml | $(KUBECTL) apply -f -
 
 clean-hub: clean-hub-cr clean-hub-operator
 

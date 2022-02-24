@@ -36,13 +36,18 @@ spec:
                   operator: In
                   values:
                   - clustermanager-registration-controller
+      {{ if not .DetachedMode }}
       serviceAccountName: {{ .ClusterManagerName }}-registration-controller-sa
+      {{ end }}
       containers:
       - name: hub-registration-controller
         image: {{ .RegistrationImage }}
         args:
           - "/registration"
           - "controller"
+          {{ if .DetachedMode }}
+          - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
+          {{ end }}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -67,3 +72,13 @@ spec:
           requests:
             cpu: 100m
             memory: 128Mi
+      {{ if .DetachedMode }}
+        volumeMounts:
+        - mountPath: /var/run/secrets/hub
+          name: kubeconfig
+          readOnly: true
+      volumes:
+      - name: kubeconfig
+        secret:
+          secretName: {{ .ClusterManagerName }}-registration-controller-sa-kubeconfig
+      {{ end }}

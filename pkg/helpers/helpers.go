@@ -710,21 +710,19 @@ func SyncSecret(client, targetClient coreclientv1.SecretsGetter, recorder events
 }
 
 // GetHubKubeconfig is used to get the kubeconfig of the hub cluster.
-// If it's Default mode, the kubeconfig of the hub cluster should equal to the management cluster's kubeconfig.
+// If it's Default mode, the kubeconfig of the hub cluster should equal to the operator cluster's kubeconfig and mostly, it's the InClusterConfig.
 // If it's Detached mode, the kubeconfig of the hub cluster is stored as a secret under clustermanager namespace.
 func GetHubKubeconfig(ctx context.Context,
-	managementKubeconfig *rest.Config, // this is the kubeconfig of the cluster which controller is running on now.
-	managementKubeclient kubernetes.Interface,
-	clusternamagerName string,
+	operatorKubeconfig *rest.Config, // this is the kubeconfig of the cluster which controller is running on now.
+	operatorClient kubernetes.Interface,
+	clustermamagerName string,
 	clustermanagerMode operatorapiv1.InstallMode) (*rest.Config, error) {
 	switch clustermanagerMode {
-	case operatorapiv1.InstallModeDefault:
-		return managementKubeconfig, nil
 	case operatorapiv1.InstallModeDetached:
-		clustermanagerNamespace := ClusterManagerNamespace(clusternamagerName, clustermanagerMode)
+		clustermanagerNamespace := ClusterManagerNamespace(clustermamagerName, clustermanagerMode)
 
 		// get secret of external kubeconfig
-		secret, err := managementKubeclient.CoreV1().Secrets(clustermanagerNamespace).Get(ctx, ExternalHubKubeConfig, metav1.GetOptions{})
+		secret, err := operatorClient.CoreV1().Secrets(clustermanagerNamespace).Get(ctx, ExternalHubKubeConfig, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -737,6 +735,6 @@ func GetHubKubeconfig(ctx context.Context,
 		return config, nil
 	default:
 		// backward compatible with previous crd.
-		return managementKubeconfig, nil
+		return operatorKubeconfig, nil
 	}
 }

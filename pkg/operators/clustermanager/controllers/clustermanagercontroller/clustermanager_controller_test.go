@@ -1,22 +1,29 @@
 package clustermanagercontroller
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	fakeapiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeinformers "k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	fakekube "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
 	fakeapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
+	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 	fakeoperatorlient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
@@ -25,12 +32,17 @@ import (
 	testinghelper "open-cluster-management.io/registration-operator/pkg/helpers/testing"
 )
 
+var (
+	ctx = context.Background()
+)
+
 type testController struct {
-	controller            *clusterManagerController
-	kubeClient            *fakekube.Clientset
-	apiExtensionClient    *fakeapiextensions.Clientset
-	apiRegistrationClient *fakeapiregistration.Clientset
-	operatorClient        *fakeoperatorlient.Clientset
+	clusterManagerController *clusterManagerController
+	managementKubeClient     *fakekube.Clientset
+	hubKubeClient            *fakekube.Clientset
+	apiExtensionClient       *fakeapiextensions.Clientset
+	apiRegistrationClient    *fakeapiregistration.Clientset
+	operatorClient           *fakeoperatorlient.Clientset
 }
 
 func newClusterManager(name string) *operatorapiv1.ClusterManager {
@@ -54,7 +66,7 @@ func newTestController(clustermanager *operatorapiv1.ClusterManager) *testContro
 	fakeOperatorClient := fakeoperatorlient.NewSimpleClientset(clustermanager)
 	operatorInformers := operatorinformers.NewSharedInformerFactory(fakeOperatorClient, 5*time.Minute)
 
-	hubController := &clusterManagerController{
+	clusterManagerController := &clusterManagerController{
 		clusterManagerClient: fakeOperatorClient.OperatorV1().ClusterManagers(),
 		clusterManagerLister: operatorInformers.Operator().V1().ClusterManagers().Lister(),
 		configMapLister:      kubeInfomers.Core().V1().ConfigMaps().Lister(),
@@ -64,30 +76,32 @@ func newTestController(clustermanager *operatorapiv1.ClusterManager) *testContro
 	store.Add(clustermanager)
 
 	return &testController{
-		controller:     hubController,
-		operatorClient: fakeOperatorClient,
+		clusterManagerController: clusterManagerController,
+		operatorClient:           fakeOperatorClient,
 	}
 }
 
-func (t *testController) withKubeObject(objects ...runtime.Object) *testController {
-	fakeKubeClient := fakekube.NewSimpleClientset(objects...)
-	t.controller.kubeClient = fakeKubeClient
-	t.kubeClient = fakeKubeClient
-	return t
-}
+func setup(t *testing.T, tc *testController, crds ...runtime.Object) {
+	fakeHubKubeClient := fakekube.NewSimpleClientset()
+	fakeManagementKubeClient := fakekube.NewSimpleClientset()
+	fakeAPIExtensionClient := fakeapiextensions.NewSimpleClientset(crds...)
+	fakeAPIRegistrationClient := fakeapiregistration.NewSimpleClientset()
 
-func (t *testController) withCRDObject(objects ...runtime.Object) *testController {
-	fakeAPIExtensionClient := fakeapiextensions.NewSimpleClientset(objects...)
-	t.controller.apiExtensionClient = fakeAPIExtensionClient
-	t.apiExtensionClient = fakeAPIExtensionClient
-	return t
-}
+	// set clients in test controller
+	tc.apiExtensionClient = fakeAPIExtensionClient
+	tc.apiRegistrationClient = fakeAPIRegistrationClient
+	tc.hubKubeClient = fakeHubKubeClient
+	tc.managementKubeClient = fakeManagementKubeClient
 
-func (t *testController) withAPIServiceObject(objects ...runtime.Object) *testController {
-	fakeAPIRegistrationClient := fakeapiregistration.NewSimpleClientset(objects...)
-	t.controller.apiRegistrationClient = fakeAPIRegistrationClient.ApiregistrationV1()
-	t.apiRegistrationClient = fakeAPIRegistrationClient
-	return t
+	// set clients in clustermanager controller
+	tc.clusterManagerController.recorder = eventstesting.NewTestingEventRecorder(t)
+	tc.clusterManagerController.operatorKubeClient = fakeManagementKubeClient
+	tc.clusterManagerController.generateHubClusterClients = func(hubKubeConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, apiregistrationclient.APIServicesGetter, error) {
+		return fakeHubKubeClient, fakeAPIExtensionClient, fakeAPIRegistrationClient.ApiregistrationV1(), nil
+	}
+	tc.clusterManagerController.ensureSAKubeconfigs = func(ctx context.Context, clusterManagerName, clusterManagerNamespace string, hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error {
+		return nil
+	}
 }
 
 func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.ClusterManager) {
@@ -112,16 +126,18 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.Cl
 // TestSyncDeploy tests sync manifests of hub component
 func TestSyncDeploy(t *testing.T) {
 	clusterManager := newClusterManager("testhub")
-	controller := newTestController(clusterManager).withCRDObject().withKubeObject().withAPIServiceObject()
+	tc := newTestController(clusterManager)
+	setup(t, tc)
+
 	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
 
-	err := controller.controller.sync(nil, syncContext)
+	err := tc.clusterManagerController.sync(ctx, syncContext)
 	if err != nil {
-		t.Errorf("Expected non error when sync, %v", err)
+		t.Fatalf("Expected no error when sync, %v", err)
 	}
 
 	createKubeObjects := []runtime.Object{}
-	kubeActions := controller.kubeClient.Actions()
+	kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...) // record objects from both hub and management cluster
 	for _, action := range kubeActions {
 		if action.GetVerb() == "create" {
 			object := action.(clienttesting.CreateActionImpl).Object
@@ -130,13 +146,14 @@ func TestSyncDeploy(t *testing.T) {
 	}
 
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 23)
+	// We expect creat the namespace twice respectively in the management cluster and the hub cluster.
+	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 24)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager)
 	}
 
 	createCRDObjects := []runtime.Object{}
-	crdActions := controller.apiExtensionClient.Actions()
+	crdActions := tc.apiExtensionClient.Actions()
 	for _, action := range crdActions {
 		if action.GetVerb() == "create" {
 			object := action.(clienttesting.CreateActionImpl).Object
@@ -147,7 +164,7 @@ func TestSyncDeploy(t *testing.T) {
 	testinghelper.AssertEqualNumber(t, len(createCRDObjects), 9)
 
 	createAPIServiceObjects := []runtime.Object{}
-	apiServiceActions := controller.apiRegistrationClient.Actions()
+	apiServiceActions := tc.apiRegistrationClient.Actions()
 	for _, action := range apiServiceActions {
 		if action.GetVerb() == "create" {
 			object := action.(clienttesting.CreateActionImpl).Object
@@ -157,7 +174,7 @@ func TestSyncDeploy(t *testing.T) {
 	// Check if resources are created as expected
 	testinghelper.AssertEqualNumber(t, len(createAPIServiceObjects), 2)
 
-	clusterManagerAction := controller.operatorClient.Actions()
+	clusterManagerAction := tc.operatorClient.Actions()
 	testinghelper.AssertEqualNumber(t, len(clusterManagerAction), 2)
 	testinghelper.AssertAction(t, clusterManagerAction[1], "update")
 	testinghelper.AssertOnlyConditions(
@@ -170,27 +187,30 @@ func TestSyncDelete(t *testing.T) {
 	clusterManager := newClusterManager("testhub")
 	now := metav1.Now()
 	clusterManager.ObjectMeta.SetDeletionTimestamp(&now)
-	controller := newTestController(clusterManager).withCRDObject().withKubeObject().withAPIServiceObject()
+
+	tc := newTestController(clusterManager)
+	setup(t, tc)
+
 	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
 	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.ClusterName, clusterManager.Spec.DeployOption.Mode)
 
-	err := controller.controller.sync(nil, syncContext)
+	err := tc.clusterManagerController.sync(ctx, syncContext)
 	if err != nil {
-		t.Errorf("Expected non error when sync, %v", err)
+		t.Fatalf("Expected non error when sync, %v", err)
 	}
 
 	deleteKubeActions := []clienttesting.DeleteActionImpl{}
-	kubeActions := controller.kubeClient.Actions()
+	kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...)
 	for _, action := range kubeActions {
 		if action.GetVerb() == "delete" {
 			deleteKubeAction := action.(clienttesting.DeleteActionImpl)
 			deleteKubeActions = append(deleteKubeActions, deleteKubeAction)
 		}
 	}
-	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 19)
+	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 20) // delete namespace both from the hub cluster and the mangement cluster
 
 	deleteCRDActions := []clienttesting.DeleteActionImpl{}
-	crdActions := controller.apiExtensionClient.Actions()
+	crdActions := tc.apiExtensionClient.Actions()
 	for _, action := range crdActions {
 		if action.GetVerb() == "delete" {
 			deleteCRDAction := action.(clienttesting.DeleteActionImpl)
@@ -201,7 +221,7 @@ func TestSyncDelete(t *testing.T) {
 	testinghelper.AssertEqualNumber(t, len(deleteCRDActions), 11)
 
 	deleteAPIServiceActions := []clienttesting.DeleteActionImpl{}
-	apiServiceActions := controller.apiRegistrationClient.Actions()
+	apiServiceActions := tc.apiRegistrationClient.Actions()
 	for _, action := range apiServiceActions {
 		if action.GetVerb() == "delete" {
 			deleteAPIServiceAction := action.(clienttesting.DeleteActionImpl)
@@ -229,11 +249,13 @@ func TestDeleteCRD(t *testing.T) {
 			Name: crdNames[0],
 		},
 	}
-	controller := newTestController(clusterManager).withCRDObject(crd).withKubeObject().withAPIServiceObject()
+
+	tc := newTestController(clusterManager)
+	setup(t, tc, crd)
 
 	// Return crd with the first get, and return not found with the 2nd get
 	getCount := 0
-	controller.apiExtensionClient.PrependReactor("get", "customresourcedefinitions", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+	tc.apiExtensionClient.PrependReactor("get", "customresourcedefinitions", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 		if getCount == 0 {
 			getCount = getCount + 1
 			return true, crd, nil
@@ -243,13 +265,34 @@ func TestDeleteCRD(t *testing.T) {
 
 	})
 	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
-	err := controller.controller.sync(nil, syncContext)
+	err := tc.clusterManagerController.sync(ctx, syncContext)
 	if err == nil {
-		t.Errorf("Expected error when sync")
+		t.Fatalf("Expected error when sync at first time")
 	}
 
-	err = controller.controller.sync(nil, syncContext)
+	err = tc.clusterManagerController.sync(ctx, syncContext)
 	if err != nil {
-		t.Errorf("Expected no error when sync: %v", err)
+		t.Fatalf("Expected no error when sync at second time: %v", err)
+	}
+}
+
+func TestIsIPFormat(t *testing.T) {
+	cases := []struct {
+		address    string
+		isIPFormat bool
+	}{
+		{
+			address:    "127.0.0.1",
+			isIPFormat: true,
+		},
+		{
+			address:    "localhost",
+			isIPFormat: false,
+		},
+	}
+	for _, c := range cases {
+		if isIPFormat(c.address) != c.isIPFormat {
+			t.Fatalf("expected %v, got %v", c.isIPFormat, isIPFormat(c.address))
+		}
 	}
 }

@@ -1071,7 +1071,7 @@ func TestGetRelatedResource(t *testing.T) {
 	}{
 		{
 			name:         "get correct crd relatedResources",
-			manifestFile: "cluster-manager/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml",
+			manifestFile: "cluster-manager/hub/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml",
 			config: manifests.HubConfig{
 				ClusterManagerName: "test",
 				Replica:            1,
@@ -1087,7 +1087,7 @@ func TestGetRelatedResource(t *testing.T) {
 		},
 		{
 			name:         "get correct clusterrole relatedResources",
-			manifestFile: "cluster-manager/cluster-manager-registration-clusterrole.yaml",
+			manifestFile: "cluster-manager/hub/cluster-manager-registration-clusterrole.yaml",
 			config: manifests.HubConfig{
 				ClusterManagerName: "test",
 				Replica:            1,
@@ -1103,7 +1103,7 @@ func TestGetRelatedResource(t *testing.T) {
 		},
 		{
 			name:         "get correct deployment relatedResources",
-			manifestFile: "cluster-manager/cluster-manager-registration-deployment.yaml",
+			manifestFile: "cluster-manager/management/cluster-manager-registration-deployment.yaml",
 			config: manifests.HubConfig{
 				ClusterManagerName:      "test",
 				ClusterManagerNamespace: "test-namespace",

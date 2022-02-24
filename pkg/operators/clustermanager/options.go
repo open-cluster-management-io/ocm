@@ -5,11 +5,8 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
-
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
 	"open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/certrotationcontroller"
@@ -25,14 +22,6 @@ type Options struct {
 func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	// Build kubclient client and informer for managed cluster
 	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
-	if err != nil {
-		return err
-	}
-	apiExtensionClient, err := apiextensionsclient.NewForConfig(controllerContext.KubeConfig)
-	if err != nil {
-		return err
-	}
-	apiRegistrationClient, err := apiregistrationclient.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
@@ -52,8 +41,7 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 
 	clusterManagerController := clustermanagercontroller.NewClusterManagerController(
 		kubeClient,
-		apiExtensionClient,
-		apiRegistrationClient.ApiregistrationV1(),
+		controllerContext.KubeConfig,
 		operatorClient.OperatorV1().ClusterManagers(),
 		operatorInformer.Operator().V1().ClusterManagers(),
 		kubeInformer.Apps().V1().Deployments(),

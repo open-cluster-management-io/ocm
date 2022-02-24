@@ -1,0 +1,11 @@
+kind: Endpoints
+apiVersion: v1
+metadata:
+  name: cluster-manager-registration-webhook
+  namespace: {{ .ClusterManagerNamespace }}
+subsets:
+  - addresses:
+      - ip: {{.RegistrationWebhook.Address}}
+    ports:
+      - port: {{.RegistrationWebhook.Port}}
+        name: tls

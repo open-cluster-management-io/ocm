@@ -3,6 +3,7 @@ package helpers
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -26,9 +27,9 @@ import (
 // 	return err
 // }
 // ...
-func EnsureSAToken(ctx context.Context, saName, saNamespace string, client kubernetes.Interface, renderSAToken func([]byte) error) error {
+func EnsureSAToken(ctx context.Context, saName, saNamespace string, saClient kubernetes.Interface, renderSAToken func([]byte) error) error {
 	// get the service account
-	sa, err := client.CoreV1().ServiceAccounts(saNamespace).Get(ctx, saName, metav1.GetOptions{})
+	sa, err := saClient.CoreV1().ServiceAccounts(saNamespace).Get(ctx, saName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -40,7 +41,8 @@ func EnsureSAToken(ctx context.Context, saName, saNamespace string, client kuber
 		// get the token secret
 		tokenSecretName := secret.Name
 
-		tokenSecret, err := client.CoreV1().Secrets(saNamespace).Get(ctx, tokenSecretName, metav1.GetOptions{})
+		// get the token secret
+		tokenSecret, err := saClient.CoreV1().Secrets(saNamespace).Get(ctx, tokenSecretName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -61,16 +63,35 @@ func EnsureSAToken(ctx context.Context, saName, saNamespace string, client kuber
 }
 
 // RenderToKubeconfigSecret would render saToken to a secret.
-func RenderToKubeconfigSecret(secretName, secretNamespace string, templateKubeconfig *rest.Config, client coreclientv1.SecretsGetter, recorder events.Recorder) func([]byte) error {
+func RenderToKubeconfigSecret(secretName, secretNamespace string, templateKubeconfig *rest.Config, secretClient coreclientv1.SecretsGetter, recorder events.Recorder) func([]byte) error {
 	return func(saToken []byte) error {
+		var c *clientcmdapi.Cluster
+		if len(templateKubeconfig.CAData) != 0 {
+			c = &clientcmdapi.Cluster{
+				Server:                   templateKubeconfig.Host,
+				CertificateAuthorityData: templateKubeconfig.CAData,
+			}
+		} else if len(templateKubeconfig.CAFile) != 0 {
+			caData, err := ioutil.ReadFile(templateKubeconfig.CAFile)
+			if err != nil {
+				return err
+			}
+			c = &clientcmdapi.Cluster{
+				Server:                   templateKubeconfig.Host,
+				CertificateAuthorityData: caData,
+			}
+		} else {
+			c = &clientcmdapi.Cluster{
+				Server:                templateKubeconfig.Host,
+				InsecureSkipTLSVerify: true,
+			}
+		}
+
 		kubeconfigContent, err := clientcmd.Write(clientcmdapi.Config{
 			Kind:       "Config",
 			APIVersion: "v1",
 			Clusters: map[string]*clientcmdapi.Cluster{
-				"cluster": {
-					Server:                   templateKubeconfig.Host,
-					CertificateAuthorityData: templateKubeconfig.CAData,
-				},
+				"cluster": c,
 			},
 			Contexts: map[string]*clientcmdapi.Context{
 				"context": {
@@ -88,7 +109,7 @@ func RenderToKubeconfigSecret(secretName, secretNamespace string, templateKubeco
 		if err != nil {
 			return err
 		}
-		_, _, err = resourceapply.ApplySecret(client, recorder, &corev1.Secret{
+		_, _, err = resourceapply.ApplySecret(secretClient, recorder, &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: secretNamespace,
 				Name:      secretName,

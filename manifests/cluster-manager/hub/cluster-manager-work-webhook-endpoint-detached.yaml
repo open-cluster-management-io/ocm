@@ -1,0 +1,11 @@
+kind: Endpoints
+apiVersion: v1
+metadata:
+  name: cluster-manager-work-webhook
+  namespace: {{ .ClusterManagerNamespace }}
+subsets:
+  - addresses:
+      - ip: {{.WorkWebhook.Address}}
+    ports:
+      - port: {{.WorkWebhook.Port}}
+        name: tls

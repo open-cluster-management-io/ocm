@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .ClusterManagerName }}-work-webhook
+  name: {{ .ClusterManagerName }}-registration-webhook
   namespace: {{ .ClusterManagerNamespace }}
   labels:
-    app: {{ .ClusterManagerName }}-work-webhook
+    app: {{ .ClusterManagerName }}-registration-webhook
 spec:
   replicas: {{ .Replica }}
   selector:
     matchLabels:
-      app: {{ .ClusterManagerName }}-work-webhook
+      app: {{ .ClusterManagerName }}-registration-webhook
   template:
     metadata:
       labels:
-        app: {{ .ClusterManagerName }}-work-webhook
+        app: {{ .ClusterManagerName }}-registration-webhook
     spec:
       affinity:
         podAntiAffinity:
@@ -26,7 +26,7 @@ spec:
                 - key: app
                   operator: In
                   values:
-                  - {{ .ClusterManagerName }}-work-webhook
+                  - {{ .ClusterManagerName }}-registration-webhook
           - weight: 30
             podAffinityTerm:
               topologyKey: kubernetes.io/hostname
@@ -35,17 +35,24 @@ spec:
                 - key: app
                   operator: In
                   values:
-                  - {{ .ClusterManagerName }}-work-webhook
-      serviceAccountName: {{ .ClusterManagerName }}-work-webhook-sa
+                  - {{ .ClusterManagerName }}-registration-webhook
+      {{ if not .DetachedMode }}
+      serviceAccountName: {{ .ClusterManagerName }}-registration-webhook-sa
+      {{ end }}
       containers:
-      - name: {{ .ClusterManagerName }}-work-webhook-sa
-        image: {{ .WorkImage }}
+      - name: {{ .ClusterManagerName }}-registration-webhook-sa
+        image: {{ .RegistrationImage }}
         args:
-          - "/work"
+          - "/registration"
           - "webhook"
           - "--secure-port=6443"
           - "--tls-cert-file=/serving-cert/tls.crt"
           - "--tls-private-key-file=/serving-cert/tls.key"
+          {{ if .DetachedMode }}
+          - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
+          - "--authentication-kubeconfig=/var/run/secrets/hub/kubeconfig"
+          - "--authorization-kubeconfig=/var/run/secrets/hub/kubeconfig"
+          {{ end }}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -74,8 +81,17 @@ spec:
         - name: webhook-secret
           mountPath: "/serving-cert"
           readOnly: true
+        {{ if .DetachedMode }}
+        - mountPath: /var/run/secrets/hub
+          name: kubeconfig
+          readOnly: true
+        {{ end }}
       volumes:
       - name: webhook-secret
         secret:
-          secretName: work-webhook-serving-cert
-
+          secretName: registration-webhook-serving-cert
+      {{ if .DetachedMode }}
+      - name: kubeconfig
+        secret:
+          secretName: {{ .ClusterManagerName }}-registration-webhook-sa-kubeconfig
+      {{ end }}

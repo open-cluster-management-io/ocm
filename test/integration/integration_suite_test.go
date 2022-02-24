@@ -150,6 +150,16 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 			PlacementImagePullSpec:    "quay.io/open-cluster-management/placement",
 			DeployOption: operatorapiv1.ClusterManagerDeployOption{
 				Mode: operatorapiv1.InstallModeDetached,
+				Detached: &operatorapiv1.DetachedClusterManagerConfiguration{
+					RegistrationWebhookConfiguration: operatorapiv1.WebhookConfiguration{
+						Address: "localhost",
+						Port:    443,
+					},
+					WorkWebhookConfiguration: operatorapiv1.WebhookConfiguration{
+						Address: "localhost",
+						Port:    443,
+					},
+				},
 			},
 		},
 	}, metav1.CreateOptions{})
@@ -161,7 +171,8 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	ctx, c := context.WithCancel(context.TODO())
 	cancel = c
 
-	go ServiceAccountCtl(ctx)
+	go ServiceAccountCtl(ctx, kubeClient)
+	go ServiceAccountCtl(ctx, detachedKubeClient)
 
 	close(done)
 }, 60)
@@ -181,8 +192,8 @@ var _ = ginkgo.AfterSuite(func() {
 })
 
 // ServiceAccountCtl watch service accounts and create a corresponding secret for it.
-func ServiceAccountCtl(ctx context.Context) {
-	w, err := detachedKubeClient.CoreV1().ServiceAccounts("").Watch(ctx, metav1.ListOptions{})
+func ServiceAccountCtl(ctx context.Context, kubeClient kubernetes.Interface) {
+	w, err := kubeClient.CoreV1().ServiceAccounts("").Watch(ctx, metav1.ListOptions{})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	klog.Infof("service account controller start")
 
@@ -219,14 +230,14 @@ func ServiceAccountCtl(ctx context.Context) {
 				Type: corev1.SecretTypeServiceAccountToken,
 			}
 
-			_, err = detachedKubeClient.CoreV1().Secrets(sa.Namespace).Create(ctx, secret, metav1.CreateOptions{})
+			_, err = kubeClient.CoreV1().Secrets(sa.Namespace).Create(ctx, secret, metav1.CreateOptions{})
 			if errors.IsAlreadyExists(err) {
 				klog.Infof("secret %s/%s already exist", secret.Namespace, secret.Name)
 			} else {
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			}
 
-			_, err = detachedKubeClient.CoreV1().Secrets(sa.Namespace).Get(ctx, secret.Name, metav1.GetOptions{})
+			_, err = kubeClient.CoreV1().Secrets(sa.Namespace).Get(ctx, secret.Name, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			err := retry.OnError(retry.DefaultBackoff,
@@ -234,7 +245,7 @@ func ServiceAccountCtl(ctx context.Context) {
 					return true
 				},
 				func() error {
-					serviceAccount, err := detachedKubeClient.CoreV1().ServiceAccounts(sa.Namespace).Get(ctx, sa.Name, metav1.GetOptions{})
+					serviceAccount, err := kubeClient.CoreV1().ServiceAccounts(sa.Namespace).Get(ctx, sa.Name, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}
@@ -244,7 +255,7 @@ func ServiceAccountCtl(ctx context.Context) {
 							Name:      secret.Name,
 						},
 					}
-					_, err = detachedKubeClient.CoreV1().ServiceAccounts(serviceAccount.Namespace).Update(ctx, serviceAccount, metav1.UpdateOptions{})
+					_, err = kubeClient.CoreV1().ServiceAccounts(serviceAccount.Namespace).Update(ctx, serviceAccount, metav1.UpdateOptions{})
 					return err
 				})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
