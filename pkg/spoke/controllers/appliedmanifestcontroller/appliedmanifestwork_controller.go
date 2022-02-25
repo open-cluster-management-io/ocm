@@ -163,7 +163,7 @@ func (m *AppliedManifestWorkController) syncManifestWork(
 	reason := fmt.Sprintf("it is no longer maintained by manifestwork %s", manifestWork.Name)
 
 	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(
-		noLongerMaintainedResources, reason, m.spokeDynamicClient, controllerContext.Recorder(), *owner)
+		ctx, noLongerMaintainedResources, reason, m.spokeDynamicClient, controllerContext.Recorder(), *owner)
 	if len(errs) != 0 {
 		return utilerrors.NewAggregate(errs)
 	}
@@ -218,17 +218,13 @@ func (m *AppliedManifestWorkController) syncManifestWork(
 func findUntrackedResources(appliedResources, newAppliedResources []workapiv1.AppliedManifestResourceMeta) []workapiv1.AppliedManifestResourceMeta {
 	var untracked []workapiv1.AppliedManifestResourceMeta
 
-	resourceIndex := map[workapiv1.AppliedManifestResourceMeta]struct{}{}
+	resourceIndex := map[workapiv1.ResourceIdentifier]struct{}{}
 	for _, resource := range newAppliedResources {
-		key := resource.DeepCopy()
-		key.UID, key.Version = "", ""
-		resourceIndex[*key] = struct{}{}
+		resourceIndex[resource.ResourceIdentifier] = struct{}{}
 	}
 
 	for _, resource := range appliedResources {
-		key := resource.DeepCopy()
-		key.UID, key.Version = "", ""
-		if _, ok := resourceIndex[*key]; !ok {
+		if _, ok := resourceIndex[resource.ResourceIdentifier]; !ok {
 			untracked = append(untracked, resource)
 		}
 	}

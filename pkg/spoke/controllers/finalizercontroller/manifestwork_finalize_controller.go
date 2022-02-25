@@ -107,7 +107,7 @@ func (m *ManifestWorkFinalizeController) sync(ctx context.Context, controllerCon
 	helper.RemoveFinalizer(manifestWork, controllers.ManifestWorkFinalizer)
 	_, err = m.manifestWorkClient.Update(ctx, manifestWork, metav1.UpdateOptions{})
 	if err != nil {
-		return fmt.Errorf("Failed to remove finalizer from ManifestWork %s/%s: %w", manifestWork.Namespace, manifestWork.Name, err)
+		return fmt.Errorf("failed to remove finalizer from ManifestWork %s/%s: %w", manifestWork.Namespace, manifestWork.Name, err)
 	}
 
 	return nil

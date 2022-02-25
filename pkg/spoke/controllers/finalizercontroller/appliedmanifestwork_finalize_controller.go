@@ -100,7 +100,7 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 	// scoped resource correctly.
 	reason := fmt.Sprintf("manifestwork %s is terminating", appliedManifestWork.Spec.ManifestWorkName)
 	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(
-		appliedManifestWork.Status.AppliedResources, reason, m.spokeDynamicClient, controllerContext.Recorder(), *owner)
+		ctx, appliedManifestWork.Status.AppliedResources, reason, m.spokeDynamicClient, controllerContext.Recorder(), *owner)
 
 	updatedAppliedManifestWork := false
 	if len(appliedManifestWork.Status.AppliedResources) != len(resourcesPendingFinalization) {
@@ -109,7 +109,7 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 		appliedManifestWork, err = m.appliedManifestWorkClient.UpdateStatus(ctx, appliedManifestWork, metav1.UpdateOptions{})
 		if err != nil {
 			errs = append(errs, fmt.Errorf(
-				"Failed to update status of AppliedManifestWork %s: %w", originalManifestWork.Name, err))
+				"failed to update status of AppliedManifestWork %s: %w", originalManifestWork.Name, err))
 		} else {
 			updatedAppliedManifestWork = true
 		}
@@ -132,7 +132,7 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 	helper.RemoveFinalizer(appliedManifestWork, controllers.AppliedManifestWorkFinalizer)
 	_, err = m.appliedManifestWorkClient.Update(ctx, appliedManifestWork, metav1.UpdateOptions{})
 	if err != nil {
-		return fmt.Errorf("Failed to remove finalizer from AppliedManifestWork %s: %w", appliedManifestWork.Name, err)
+		return fmt.Errorf("failed to remove finalizer from AppliedManifestWork %s: %w", appliedManifestWork.Name, err)
 	}
 	return nil
 }

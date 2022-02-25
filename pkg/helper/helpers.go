@@ -192,6 +192,7 @@ func updateManifestWorkStatus(
 // DeleteAppliedResources deletes all given applied resources and returns those pending for finalization
 // If the uid recorded in resources is different from what we get by client, ignore the deletion.
 func DeleteAppliedResources(
+	ctx context.Context,
 	resources []workapiv1.AppliedManifestResourceMeta,
 	reason string,
 	dynamicClient dynamic.Interface,
@@ -214,7 +215,7 @@ func DeleteAppliedResources(
 		u, err := dynamicClient.
 			Resource(gvr).
 			Namespace(resource.Namespace).
-			Get(context.TODO(), resource.Name, metav1.GetOptions{})
+			Get(ctx, resource.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			klog.V(2).Infof("Resource %v with key %s/%s is removed Successfully", gvr, resource.Namespace, resource.Name)
 			continue
@@ -245,7 +246,7 @@ func DeleteAppliedResources(
 			}
 
 			u.SetOwnerReferences(existingOwner)
-			_, err = dynamicClient.Resource(gvr).Namespace(resource.Namespace).Update(context.TODO(), u, metav1.UpdateOptions{})
+			_, err = dynamicClient.Resource(gvr).Namespace(resource.Namespace).Update(ctx, u, metav1.UpdateOptions{})
 			if err != nil {
 				errs = append(errs, fmt.Errorf(
 					"Failed to remove owner from resource %v with key %s/%s: %w",
