@@ -26,21 +26,20 @@ type templateFile struct {
 }
 
 type TemplateAgentAddon struct {
-	decoder           runtime.Decoder
-	templateFiles     []templateFile
-	getValuesFuncs    []GetValuesFunc
-	agentAddonOptions agent.AgentAddonOptions
+	decoder            runtime.Decoder
+	templateFiles      []templateFile
+	getValuesFuncs     []GetValuesFunc
+	agentAddonOptions  agent.AgentAddonOptions
+	trimCRDDescription bool
 }
 
-func newTemplateAgentAddon(
-	scheme *runtime.Scheme,
-	getValuesFuncs []GetValuesFunc,
-	agentAddonOptions agent.AgentAddonOptions) *TemplateAgentAddon {
+func newTemplateAgentAddon(factory *AgentAddonFactory) *TemplateAgentAddon {
 	return &TemplateAgentAddon{
-		decoder: serializer.NewCodecFactory(scheme).UniversalDeserializer(),
-
-		getValuesFuncs:    getValuesFuncs,
-		agentAddonOptions: agentAddonOptions}
+		decoder:            serializer.NewCodecFactory(factory.scheme).UniversalDeserializer(),
+		getValuesFuncs:     factory.getValuesFuncs,
+		agentAddonOptions:  factory.agentAddonOptions,
+		trimCRDDescription: factory.trimCRDDescription,
+	}
 }
 
 func (a *TemplateAgentAddon) Manifests(
@@ -70,6 +69,9 @@ func (a *TemplateAgentAddon) Manifests(
 		objects = append(objects, object)
 	}
 
+	if a.trimCRDDescription {
+		objects = trimCRDDescription(objects)
+	}
 	return objects, nil
 }
 

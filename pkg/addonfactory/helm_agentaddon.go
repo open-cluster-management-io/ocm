@@ -24,22 +24,20 @@ type helmBuiltinValues struct {
 }
 
 type HelmAgentAddon struct {
-	decoder           runtime.Decoder
-	chart             *chart.Chart
-	getValuesFuncs    []GetValuesFunc
-	agentAddonOptions agent.AgentAddonOptions
+	decoder            runtime.Decoder
+	chart              *chart.Chart
+	getValuesFuncs     []GetValuesFunc
+	agentAddonOptions  agent.AgentAddonOptions
+	trimCRDDescription bool
 }
 
-func newHelmAgentAddon(
-	scheme *runtime.Scheme,
-	chart *chart.Chart,
-	getValuesFuncs []GetValuesFunc,
-	agentAddonOptions agent.AgentAddonOptions) *HelmAgentAddon {
+func newHelmAgentAddon(factory *AgentAddonFactory, chart *chart.Chart) *HelmAgentAddon {
 	return &HelmAgentAddon{
-		decoder:           serializer.NewCodecFactory(scheme).UniversalDeserializer(),
-		chart:             chart,
-		getValuesFuncs:    getValuesFuncs,
-		agentAddonOptions: agentAddonOptions,
+		decoder:            serializer.NewCodecFactory(factory.scheme).UniversalDeserializer(),
+		chart:              chart,
+		getValuesFuncs:     factory.getValuesFuncs,
+		agentAddonOptions:  factory.agentAddonOptions,
+		trimCRDDescription: factory.trimCRDDescription,
 	}
 }
 
@@ -98,6 +96,9 @@ func (a *HelmAgentAddon) Manifests(
 		objects = append(objects, object)
 	}
 
+	if a.trimCRDDescription {
+		objects = trimCRDDescription(objects)
+	}
 	return objects, nil
 }
 

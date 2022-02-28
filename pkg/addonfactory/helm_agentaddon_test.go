@@ -103,6 +103,7 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 			agentAddon, err := NewAgentAddonFactory(c.addonName, chartFS, "testmanifests/chart").
 				WithGetValuesFuncs(getValues, GetValuesFromAddonAnnotation).
 				WithScheme(c.scheme).
+				WithTrimCRDDescription().
 				BuildHelmAgentAddon()
 			if err != nil {
 				t.Errorf("expected no error, got err %v", err)
@@ -140,13 +141,247 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 					if object.Name != "test.cluster.open-cluster-management.io" {
 						t.Errorf("expected v1 crd test, but got %v", object.Name)
 					}
+					if !validateTrimCRDv1(object) {
+						t.Errorf("the crd is not compredded")
+					}
 				case *apiextensionsv1beta1.CustomResourceDefinition:
 					if object.Name != "clusterclaims.cluster.open-cluster-management.io" {
 						t.Errorf("expected v1 crd clusterclaims, but got %v", object.Name)
+					}
+					if !validateTrimCRDv1beta1(object) {
+						t.Errorf("the crd is not compredded")
 					}
 				}
 
 			}
 		})
 	}
+}
+
+func validateTrimCRDv1(crd *apiextensionsv1.CustomResourceDefinition) bool {
+	versions := crd.Spec.Versions
+	for i := range versions {
+		properties := versions[i].Schema.OpenAPIV3Schema.Properties
+		for _, p := range properties {
+			if hasDescriptionV1(&p) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func hasDescriptionV1(p *apiextensionsv1.JSONSchemaProps) bool {
+	if p == nil {
+		return false
+	}
+
+	if p.Description != "" {
+		return true
+	}
+
+	if p.Items != nil {
+		if hasDescriptionV1(p.Items.Schema) {
+			return true
+		}
+		for _, v := range p.Items.JSONSchemas {
+			if hasDescriptionV1(&v) {
+				return true
+			}
+		}
+	}
+
+	if len(p.AllOf) != 0 {
+		for _, v := range p.AllOf {
+			if hasDescriptionV1(&v) {
+				return true
+			}
+		}
+	}
+
+	if len(p.OneOf) != 0 {
+		for _, v := range p.OneOf {
+			if hasDescriptionV1(&v) {
+				return true
+			}
+		}
+	}
+
+	if len(p.AnyOf) != 0 {
+		for _, v := range p.AnyOf {
+			if hasDescriptionV1(&v) {
+				return true
+			}
+		}
+	}
+
+	if p.Not != nil {
+		if hasDescriptionV1(p.Not) {
+			return true
+		}
+	}
+
+	if len(p.Properties) != 0 {
+		for _, v := range p.Properties {
+			if hasDescriptionV1(&v) {
+				return true
+			}
+		}
+	}
+
+	if len(p.PatternProperties) != 0 {
+		for _, v := range p.PatternProperties {
+			if hasDescriptionV1(&v) {
+				return true
+			}
+		}
+	}
+
+	if p.AdditionalProperties != nil {
+		if hasDescriptionV1(p.AdditionalProperties.Schema) {
+			return true
+		}
+	}
+
+	if len(p.Dependencies) != 0 {
+		for _, v := range p.Dependencies {
+			if hasDescriptionV1(v.Schema) {
+				return true
+			}
+		}
+	}
+
+	if p.AdditionalItems != nil {
+		if hasDescriptionV1(p.AdditionalItems.Schema) {
+			return true
+		}
+	}
+
+	if len(p.Definitions) != 0 {
+		for _, v := range p.Definitions {
+			if hasDescriptionV1(&v) {
+				return true
+			}
+		}
+	}
+
+	if p.ExternalDocs != nil && p.ExternalDocs.Description != "" {
+		return true
+	}
+
+	return false
+}
+
+func validateTrimCRDv1beta1(crd *apiextensionsv1beta1.CustomResourceDefinition) bool {
+	versions := crd.Spec.Versions
+	for i := range versions {
+		properties := versions[i].Schema.OpenAPIV3Schema.Properties
+		for _, p := range properties {
+			if hasDescriptionV1beta1(&p) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func hasDescriptionV1beta1(p *apiextensionsv1beta1.JSONSchemaProps) bool {
+	if p == nil {
+		return false
+	}
+
+	if p.Description != "" {
+		return true
+	}
+
+	if p.Items != nil {
+		if hasDescriptionV1beta1(p.Items.Schema) {
+			return true
+		}
+		for _, v := range p.Items.JSONSchemas {
+			if hasDescriptionV1beta1(&v) {
+				return true
+			}
+		}
+	}
+
+	if len(p.AllOf) != 0 {
+		for _, v := range p.AllOf {
+			if hasDescriptionV1beta1(&v) {
+				return true
+			}
+		}
+	}
+
+	if len(p.OneOf) != 0 {
+		for _, v := range p.OneOf {
+			if hasDescriptionV1beta1(&v) {
+				return true
+			}
+		}
+	}
+
+	if len(p.AnyOf) != 0 {
+		for _, v := range p.AnyOf {
+			if hasDescriptionV1beta1(&v) {
+				return true
+			}
+		}
+	}
+
+	if p.Not != nil {
+		if hasDescriptionV1beta1(p.Not) {
+			return true
+		}
+	}
+
+	if len(p.Properties) != 0 {
+		for _, v := range p.Properties {
+			if hasDescriptionV1beta1(&v) {
+				return true
+			}
+		}
+	}
+
+	if len(p.PatternProperties) != 0 {
+		for _, v := range p.PatternProperties {
+			if hasDescriptionV1beta1(&v) {
+				return true
+			}
+		}
+	}
+
+	if p.AdditionalProperties != nil {
+		if hasDescriptionV1beta1(p.AdditionalProperties.Schema) {
+			return true
+		}
+	}
+
+	if len(p.Dependencies) != 0 {
+		for _, v := range p.Dependencies {
+			if hasDescriptionV1beta1(v.Schema) {
+				return true
+			}
+		}
+	}
+
+	if p.AdditionalItems != nil {
+		if hasDescriptionV1beta1(p.AdditionalItems.Schema) {
+			return true
+		}
+	}
+
+	if len(p.Definitions) != 0 {
+		for _, v := range p.Definitions {
+			if hasDescriptionV1beta1(&v) {
+				return true
+			}
+		}
+	}
+
+	if p.ExternalDocs != nil && p.ExternalDocs.Description != "" {
+		return true
+	}
+
+	return false
 }

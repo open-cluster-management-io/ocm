@@ -31,6 +31,8 @@ type AgentAddonFactory struct {
 	dir               string
 	getValuesFuncs    []GetValuesFunc
 	agentAddonOptions agent.AgentAddonOptions
+	// trimCRDDescription flag is used to trim the description of CRDs in manifestWork. disabled by default.
+	trimCRDDescription bool
 }
 
 // NewAgentAddonFactory builds an addonAgentFactory instance with addon name and fs.
@@ -44,6 +46,7 @@ func NewAgentAddonFactory(addonName string, fs embed.FS, dir string) *AgentAddon
 			Registration:    nil,
 			InstallStrategy: nil,
 		},
+		trimCRDDescription: false,
 	}
 }
 
@@ -76,6 +79,12 @@ func (f *AgentAddonFactory) WithAgentRegistrationOption(option *agent.Registrati
 	return f
 }
 
+// WithTrimCRDDescription is to enable trim the description of CRDs in manifestWork.
+func (f *AgentAddonFactory) WithTrimCRDDescription() *AgentAddonFactory {
+	f.trimCRDDescription = true
+	return f
+}
+
 // BuildHelmAgentAddon builds a helm agentAddon instance.
 func (f *AgentAddonFactory) BuildHelmAgentAddon() (agent.AgentAddon, error) {
 	if f.scheme == nil {
@@ -90,7 +99,8 @@ func (f *AgentAddonFactory) BuildHelmAgentAddon() (agent.AgentAddon, error) {
 		return nil, err
 	}
 	// TODO: validate chart
-	agentAddon := newHelmAgentAddon(f.scheme, userChart, f.getValuesFuncs, f.agentAddonOptions)
+
+	agentAddon := newHelmAgentAddon(f, userChart)
 
 	return agentAddon, nil
 }
@@ -113,7 +123,7 @@ func (f *AgentAddonFactory) BuildTemplateAgentAddon() (agent.AgentAddon, error) 
 	_ = apiextensionsv1.AddToScheme(f.scheme)
 	_ = apiextensionsv1beta1.AddToScheme(f.scheme)
 
-	agentAddon := newTemplateAgentAddon(f.scheme, f.getValuesFuncs, f.agentAddonOptions)
+	agentAddon := newTemplateAgentAddon(f)
 
 	for _, file := range templateFiles {
 		template, err := f.fs.ReadFile(file)
