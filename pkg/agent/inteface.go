@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -104,7 +105,13 @@ type RegistrationOption struct {
 
 type StrategyType string
 
-const InstallAll StrategyType = "*"
+const (
+	// InstallAll indicate to install addon to all clusters
+	InstallAll StrategyType = "*"
+
+	// InstallByLabel indicate to install addon based on clusters' label
+	InstallByLabel StrategyType = "LabelSelector"
+)
 
 // InstallStrategy is the installation strategy of the manifests prescribed by Manifests(..).
 type InstallStrategy struct {
@@ -113,6 +120,9 @@ type InstallStrategy struct {
 	Type StrategyType
 	// InstallNamespace is target deploying namespace in the managed cluster upon automatic addon installation.
 	InstallNamespace string
+
+	// LabelSelector is used to filter clusters based on label. It is only used when strategyType is InstallByLabel
+	LabelSelector *metav1.LabelSelector
 }
 
 type HealthProber struct {
@@ -170,6 +180,14 @@ func InstallAllStrategy(installNamespace string) *InstallStrategy {
 	return &InstallStrategy{
 		Type:             InstallAll,
 		InstallNamespace: installNamespace,
+	}
+}
+
+func InstallByLabelStrategy(installNamespace string, selector metav1.LabelSelector) *InstallStrategy {
+	return &InstallStrategy{
+		Type:             InstallByLabel,
+		InstallNamespace: installNamespace,
+		LabelSelector:    &selector,
 	}
 }
 

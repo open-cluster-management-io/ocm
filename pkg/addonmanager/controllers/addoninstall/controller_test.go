@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
@@ -32,6 +33,13 @@ func (t *testAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 		AddonName:       t.name,
 		InstallStrategy: t.strategy,
 	}
+}
+
+func newManagedClusterWithLabel(name, key, value string) *clusterv1.ManagedCluster {
+	cluster := addontesting.NewManagedCluster(name)
+	cluster.Labels = map[string]string{key: value}
+
+	return cluster
 }
 
 func TestReconcile(t *testing.T) {
@@ -76,6 +84,38 @@ func TestReconcile(t *testing.T) {
 				}
 			},
 			testaddon: &testAgent{name: "test", strategy: agent.InstallAllStrategy("test")},
+		},
+		{
+			name:                 "selector install strategy with unmatched cluster",
+			addon:                []runtime.Object{},
+			cluster:              []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			validateAddonActions: addontesting.AssertNoActions,
+			testaddon: &testAgent{name: "test", strategy: agent.InstallByLabelStrategy("test", metav1.LabelSelector{
+				MatchLabels: map[string]string{"mode": "dev"},
+			})},
+		},
+		{
+			name:                 "selector install strategy with nil label selector",
+			addon:                []runtime.Object{},
+			cluster:              []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			validateAddonActions: addontesting.AssertNoActions,
+			testaddon:            &testAgent{name: "test", strategy: &agent.InstallStrategy{Type: agent.InstallByLabel}},
+		},
+		{
+			name:    "selector install strategy with matched cluster",
+			addon:   []runtime.Object{},
+			cluster: []runtime.Object{newManagedClusterWithLabel("cluster1", "mode", "dev")},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "create")
+				actual := actions[0].(clienttesting.CreateActionImpl).Object
+				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+				if addOn.Spec.InstallNamespace != "test" {
+					t.Errorf("Install namespace is not correct, expected test but got %s", addOn.Spec.InstallNamespace)
+				}
+			},
+			testaddon: &testAgent{name: "test", strategy: agent.InstallByLabelStrategy("test", metav1.LabelSelector{
+				MatchLabels: map[string]string{"mode": "dev"},
+			})},
 		},
 	}
 

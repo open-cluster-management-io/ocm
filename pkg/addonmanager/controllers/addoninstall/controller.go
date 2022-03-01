@@ -2,13 +2,13 @@ package addoninstall
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -41,7 +41,7 @@ func NewAddonInstallController(
 		managedClusterLister:      clusterInformers.Lister(),
 		managedClusterAddonLister: addonInformers.Lister(),
 		agentAddons:               agentAddons,
-		eventRecorder:             recorder.WithComponentSuffix(fmt.Sprintf("addon-install-controller")),
+		eventRecorder:             recorder.WithComponentSuffix("addon-install-controller"),
 	}
 
 	return factory.New().WithFilteredEventsInformersQueueKeyFunc(
@@ -65,14 +65,14 @@ func NewAddonInstallController(
 			},
 			clusterInformers.Informer(),
 		).
-		WithSync(c.sync).ToController(fmt.Sprintf("addon-install-controller"), recorder)
+		WithSync(c.sync).ToController("addon-install-controller", recorder)
 }
 
 func (c *addonInstallController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	clusterName := syncCtx.QueueKey()
 	klog.V(4).Infof("Reconciling addon deploy on cluster %q", clusterName)
 
-	_, err := c.managedClusterLister.Get(clusterName)
+	cluster, err := c.managedClusterLister.Get(clusterName)
 	if errors.IsNotFound(err) {
 		return nil
 	}
@@ -87,6 +87,24 @@ func (c *addonInstallController) sync(ctx context.Context, syncCtx factory.SyncC
 
 		switch addon.GetAgentAddonOptions().InstallStrategy.Type {
 		case agent.InstallAll:
+			return c.applyAddon(ctx, addonName, clusterName, addon.GetAgentAddonOptions().InstallStrategy.InstallNamespace)
+		case agent.InstallByLabel:
+			labelSelector := addon.GetAgentAddonOptions().InstallStrategy.LabelSelector
+			if labelSelector == nil {
+				klog.Warningf("installByLabel strategy is set, but label selector is not set")
+				return nil
+			}
+
+			selector, err := metav1.LabelSelectorAsSelector(labelSelector)
+			if err != nil {
+				klog.Warningf("labels selector is not correct: %v", err)
+				return nil
+			}
+
+			if !selector.Matches(labels.Set(cluster.Labels)) {
+				return nil
+			}
+
 			return c.applyAddon(ctx, addonName, clusterName, addon.GetAgentAddonOptions().InstallStrategy.InstallNamespace)
 		}
 	}
