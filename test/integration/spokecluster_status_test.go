@@ -86,10 +86,7 @@ var _ = ginkgo.Describe("Collecting Node Resource", func() {
 				return false
 			}
 			accpeted := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
-			if accpeted == nil {
-				return false
-			}
-			return true
+			return accpeted != nil
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 		// the hub kubeconfig secret should be filled after the csr is approved

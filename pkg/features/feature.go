@@ -27,23 +27,41 @@ const (
 	// AddonManagement will start new controllers in the spoke-agent to manage the managed cluster addons
 	// registration and maintains the status of managed cluster addons through watching their leases.
 	AddonManagement featuregate.Feature = "AddonManagement"
+
+	// DefaultCluster will make registration hub controller to maintain a default cluster set. All clusters
+	// without clusterset label will be automatically added into the default cluster set by adding a label
+	// "cluster.open-cluster-management.io/clusterset=default" to the clusters.
+	DefaultClusterSet featuregate.Feature = "DefaultClusterSet"
 )
 
 var (
-	// DefaultMutableFeatureGate is made up of multiple mutable feature-gates.
-	DefaultMutableFeatureGate featuregate.MutableFeatureGate = featuregate.NewFeatureGate()
+	// DefaultSpokeMutableFeatureGate is made up of multiple mutable feature-gates for registration agent.
+	DefaultSpokeMutableFeatureGate featuregate.MutableFeatureGate = featuregate.NewFeatureGate()
+
+	// DefaultHubMutableFeatureGate made up of multiple mutable feature-gates for registration hub controller.
+	DefaultHubMutableFeatureGate featuregate.MutableFeatureGate = featuregate.NewFeatureGate()
 )
 
 func init() {
-	if err := DefaultMutableFeatureGate.Add(defaultRegistrationFeatureGates); err != nil {
+	if err := DefaultSpokeMutableFeatureGate.Add(defaultSpokeRegistrationFeatureGates); err != nil {
+		klog.Fatalf("Unexpected error: %v", err)
+	}
+	if err := DefaultHubMutableFeatureGate.Add(defaultHubRegistrationFeatureGates); err != nil {
 		klog.Fatalf("Unexpected error: %v", err)
 	}
 }
 
-// defaultRegistrationFeatureGates consists of all known ocm-registration
-// feature keys.  To add a new feature, define a key for it above and
+// defaultSpokeRegistrationFeatureGates consists of all known ocm-registration
+// feature keys for registration agent.  To add a new feature, define a key for it above and
 // add it here.
-var defaultRegistrationFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+var defaultSpokeRegistrationFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	ClusterClaim:    {Default: true, PreRelease: featuregate.Beta},
 	AddonManagement: {Default: false, PreRelease: featuregate.Alpha},
+}
+
+// defaultHubRegistrationFeatureGates consists of all known ocm-registration
+// feature keys for registration hub controller.  To add a new feature, define a key for it above and
+// add it here.
+var defaultHubRegistrationFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	DefaultClusterSet: {Default: false, PreRelease: featuregate.Alpha},
 }

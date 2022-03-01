@@ -58,6 +58,9 @@ var testNamespace string
 
 var authn *util.TestAuthn
 
+var ctx context.Context
+var cancel context.CancelFunc
+
 func TestIntegration(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Integration Suite", []ginkgo.Reporter{printer.NewlineReporter{}})
@@ -69,6 +72,8 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	ginkgo.By("bootstrapping test environment")
 
 	var err error
+
+	ctx, cancel = context.WithCancel(context.TODO())
 
 	// crank up the sync speed
 	transport.CertCallbackRefreshDuration = 5 * time.Second
@@ -147,7 +152,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 
 	// start hub controller
 	go func() {
-		err := hub.RunControllerManager(context.Background(), &controllercmd.ControllerContext{
+		err := hub.RunControllerManager(ctx, &controllercmd.ControllerContext{
 			KubeConfig:    cfg,
 			EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
 		})
@@ -159,6 +164,8 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 
 var _ = ginkgo.AfterSuite(func() {
 	ginkgo.By("tearing down the test environment")
+
+	cancel()
 
 	err := testEnv.Stop()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())

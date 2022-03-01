@@ -319,7 +319,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	spokeClusterInformerFactory := clusterv1informers.NewSharedInformerFactory(spokeClusterClient, 10*time.Minute)
 
 	var managedClusterClaimController factory.Controller
-	if features.DefaultMutableFeatureGate.Enabled(features.ClusterClaim) {
+	if features.DefaultSpokeMutableFeatureGate.Enabled(features.ClusterClaim) {
 		// create managedClusterClaimController to sync cluster claims
 		managedClusterClaimController = managedcluster.NewManagedClusterClaimController(
 			o.ClusterName,
@@ -333,7 +333,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 
 	var addOnLeaseController factory.Controller
 	var addOnRegistrationController factory.Controller
-	if features.DefaultMutableFeatureGate.Enabled(features.AddonManagement) {
+	if features.DefaultSpokeMutableFeatureGate.Enabled(features.AddonManagement) {
 		addOnLeaseController = addon.NewManagedClusterAddOnLeaseController(
 			o.ClusterName,
 			addOnClient,
@@ -370,10 +370,10 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	go managedClusterJoiningController.Run(ctx, 1)
 	go managedClusterLeaseController.Run(ctx, 1)
 	go managedClusterHealthCheckController.Run(ctx, 1)
-	if features.DefaultMutableFeatureGate.Enabled(features.ClusterClaim) {
+	if features.DefaultSpokeMutableFeatureGate.Enabled(features.ClusterClaim) {
 		go managedClusterClaimController.Run(ctx, 1)
 	}
-	if features.DefaultMutableFeatureGate.Enabled(features.AddonManagement) {
+	if features.DefaultSpokeMutableFeatureGate.Enabled(features.AddonManagement) {
 		go addOnLeaseController.Run(ctx, 1)
 		go addOnRegistrationController.Run(ctx, 1)
 	}
@@ -384,7 +384,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 
 // AddFlags registers flags for Agent
 func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
-	features.DefaultMutableFeatureGate.AddFlag(fs)
+	features.DefaultSpokeMutableFeatureGate.AddFlag(fs)
 	fs.StringVar(&o.ClusterName, "cluster-name", o.ClusterName,
 		"If non-empty, will use as cluster name instead of generated random name.")
 	fs.StringVar(&o.BootstrapKubeconfig, "bootstrap-kubeconfig", o.BootstrapKubeconfig,

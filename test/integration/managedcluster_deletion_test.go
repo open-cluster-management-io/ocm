@@ -71,10 +71,7 @@ var _ = ginkgo.Describe("Cluster deleting", func() {
 
 		gomega.Eventually(func() bool {
 			_, err := workClient.WorkV1().ManifestWorks(managedCluster.Name).Get(context.Background(), "work1", metav1.GetOptions{})
-			if errors.IsNotFound(err) {
-				return true
-			}
-			return false
+			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 		gomega.Eventually(func() bool {

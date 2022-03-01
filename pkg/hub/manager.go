@@ -2,8 +2,9 @@ package hub
 
 import (
 	"context"
-	"open-cluster-management.io/registration/pkg/hub/taint"
 	"time"
+
+	"open-cluster-management.io/registration/pkg/hub/taint"
 
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
@@ -11,6 +12,7 @@ import (
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
+	"open-cluster-management.io/registration/pkg/features"
 	"open-cluster-management.io/registration/pkg/hub/addon"
 	"open-cluster-management.io/registration/pkg/hub/clusterrole"
 	"open-cluster-management.io/registration/pkg/hub/csr"
@@ -129,6 +131,10 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		addOnInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 		controllerContext.EventRecorder,
 	)
+
+	if features.DefaultHubMutableFeatureGate.Enabled(features.DefaultClusterSet) {
+		// TODO define default clusterset controller here
+	}
 
 	go clusterInformers.Start(ctx.Done())
 	go workInformers.Start(ctx.Done())

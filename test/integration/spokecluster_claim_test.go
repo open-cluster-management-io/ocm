@@ -111,11 +111,8 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 			if err != nil {
 				return false
 			}
-			accpeted := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
-			if accpeted == nil {
-				return false
-			}
-			return true
+			accepted := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
+			return accepted != nil
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 		// the hub kubeconfig secret should be filled after the csr is approved
@@ -134,10 +131,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 				return false
 			}
 			joined := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
-			if joined == nil {
-				return false
-			}
-			return true
+			return joined != nil
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	}
 

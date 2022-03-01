@@ -37,7 +37,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		hubKubeconfigDir = path.Join(util.TestDir, fmt.Sprintf("addontest-%s", suffix), "hub-kubeconfig")
 		addOnName = fmt.Sprintf("addon-%s", suffix)
 
-		features.DefaultMutableFeatureGate.Set("AddonManagement=true")
+		features.DefaultSpokeMutableFeatureGate.Set("AddonManagement=true")
 		agentOptions := spoke.SpokeAgentOptions{
 			ClusterName:              managedClusterName,
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
@@ -104,10 +104,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 				return false
 			}
 			accpeted := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
-			if accpeted == nil {
-				return false
-			}
-			return true
+			return accpeted != nil
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 		// the hub kubeconfig secret should be filled after the csr is approved
@@ -126,19 +123,13 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 				return false
 			}
 			joined := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined)
-			if joined == nil {
-				return false
-			}
-			return true
+			return joined != nil
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 		// ensure cluster namespace is in place
 		gomega.Eventually(func() bool {
 			_, err := kubeClient.CoreV1().Namespaces().Get(context.TODO(), managedClusterName, metav1.GetOptions{})
-			if err != nil {
-				return false
-			}
-			return true
+			return err == nil
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	}
 
@@ -147,10 +138,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		var csr *certificates.CertificateSigningRequest
 		gomega.Eventually(func() bool {
 			csr, err = util.FindUnapprovedAddOnCSR(kubeClient, managedClusterName, addOnName)
-			if err != nil {
-				return false
-			}
-			return true
+			return err == nil
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 		now := time.Now()
@@ -257,11 +245,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 	assertSecretGone := func(secretNamespace, secretName string) {
 		gomega.Eventually(func() bool {
 			_, err = kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
-			if errors.IsNotFound(err) {
-				return true
-			}
-
-			return false
+			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	}
 

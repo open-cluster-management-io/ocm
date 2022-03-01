@@ -100,14 +100,15 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 		_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		// move the cluster to the new clusterset
-		managedCluster, err = clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedCluster.Name, metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		managedCluster.Labels = map[string]string{
-			clusterSetLabel: "cs2",
-		}
-
 		gomega.Eventually(func() error {
+			// move the cluster to the new clusterset
+			managedCluster, err = clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedCluster.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			managedCluster.Labels = map[string]string{
+				clusterSetLabel: "cs2",
+			}
 			_, err := clusterClient.ClusterV1().ManagedClusters().Update(context.Background(), managedCluster, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())

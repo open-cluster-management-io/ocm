@@ -91,7 +91,7 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 	}
 
 	startRegistrationAgent := func(managedClusterName, bootstrapKubeConfigFile, hubKubeconfigSecret, hubKubeconfigDir string) context.CancelFunc {
-		features.DefaultMutableFeatureGate.Set("AddonManagement=true")
+		features.DefaultSpokeMutableFeatureGate.Set("AddonManagement=true")
 		agentOptions := spoke.SpokeAgentOptions{
 			ClusterName:              managedClusterName,
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
