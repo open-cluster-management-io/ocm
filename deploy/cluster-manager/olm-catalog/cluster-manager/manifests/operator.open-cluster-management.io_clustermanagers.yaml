@@ -26,9 +26,14 @@ spec:
           metadata:
             type: object
           spec:
+            default:
+              deployOption:
+                mode: Default
             description: Spec represents a desired deployment configuration of controllers that govern registration and work distribution for attached Klusterlets.
             properties:
               deployOption:
+                default:
+                  mode: Default
                 description: DeployOption contains the options of deploying a cluster-manager Default mode is used if DeployOption is not set.
                 properties:
                   detached:

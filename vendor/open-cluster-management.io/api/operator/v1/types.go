@@ -19,6 +19,7 @@ type ClusterManager struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec represents a desired deployment configuration of controllers that govern registration and work distribution for attached Klusterlets.
+	// +kubebuilder:default={deployOption: {mode: Default}}
 	Spec ClusterManagerSpec `json:"spec"`
 
 	// Status represents the current status of controllers that govern the lifecycle of managed clusters.
@@ -50,6 +51,7 @@ type ClusterManagerSpec struct {
 	// DeployOption contains the options of deploying a cluster-manager
 	// Default mode is used if DeployOption is not set.
 	// +optional
+	// +kubebuilder:default={mode: Default}
 	DeployOption ClusterManagerDeployOption `json:"deployOption,omitempty"`
 }
 
@@ -107,7 +109,7 @@ type ClusterManagerDeployOption struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Default
 	// +kubebuilder:validation:Enum=Default;Detached
-	Mode InstallMode `json:"mode"`
+	Mode InstallMode `json:"mode,omitempty"`
 
 	// Detached includes configurations we needs for clustermanager in the detached mode.
 	// +optional
