@@ -12,6 +12,7 @@ import (
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	"open-cluster-management.io/registration/pkg/features"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -25,11 +26,12 @@ import (
 )
 
 const (
-	apiserviceName  = "v1.admission.cluster.open-cluster-management.io"
-	invalidURL      = "127.0.0.1:8001"
-	validURL        = "https://127.0.0.1:8443"
-	saNamespace     = "default"
-	clusterSetLabel = "cluster.open-cluster-management.io/clusterset"
+	defaultClusterSetName = "default"
+	apiserviceName        = "v1.admission.cluster.open-cluster-management.io"
+	invalidURL            = "127.0.0.1:8001"
+	validURL              = "https://127.0.0.1:8443"
+	saNamespace           = "default"
+	clusterSetLabel       = "cluster.open-cluster-management.io/clusterset"
 )
 
 var _ = ginkgo.Describe("Admission webhook", func() {
@@ -38,6 +40,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 	ginkgo.BeforeEach(func() {
 		// make sure the api service v1.admission.cluster.open-cluster-management.io is available
 		gomega.Eventually(func() bool {
+			features.DefaultHubMutableFeatureGate.Set("DefaultClusterSet=true")
 			apiService, err := hubAPIServiceClient.APIServices().Get(context.TODO(), apiserviceName, metav1.GetOptions{})
 			if err != nil {
 				return false
@@ -81,7 +84,20 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 
 				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 			})
+			ginkgo.It("Should have the default Clusterset Label", func() {
+				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
+				ginkgo.By(fmt.Sprintf("create a managed cluster %q", clusterName))
 
+				_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.TODO(), newManagedCluster(clusterName, false, validURL), metav1.CreateOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				gomega.Expect(managedCluster.Labels[clusterSetLabel]).To(gomega.Equal(string(defaultClusterSetName)))
+
+				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+			})
 			ginkgo.It("Should have the timeAdded for taints", func() {
 				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
 				ginkgo.By(fmt.Sprintf("create a managed cluster %q with taint", clusterName))
@@ -201,6 +217,11 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 						APIGroups: []string{"cluster.open-cluster-management.io"},
 						Resources: []string{"managedclusters"},
 						Verbs:     []string{"create", "get", "update"},
+					},
+					{
+						APIGroups: []string{"cluster.open-cluster-management.io"},
+						Resources: []string{"managedclustersets/join"},
+						Verbs:     []string{"create"},
 					},
 					{
 						APIGroups:     []string{"register.open-cluster-management.io"},
@@ -343,6 +364,41 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				gomega.Expect(managedCluster.Spec.LeaseDurationSeconds).To(gomega.Equal(int32(60)))
 			})
 
+			ginkgo.It("Should not delete the default ClusterSet Label", func() {
+				ginkgo.By(fmt.Sprintf("try to update managed cluster %q ClusterSet label", clusterName))
+				err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+					managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+					delete(managedCluster.Labels, clusterSetLabel)
+					_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
+					return err
+				})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(managedCluster.Labels[clusterSetLabel]).To(gomega.Equal(string(defaultClusterSetName)))
+			})
+
+			ginkgo.It("Should not update the other ClusterSet Label", func() {
+				ginkgo.By(fmt.Sprintf("try to update managed cluster %q ClusterSet label", clusterName))
+				err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+					managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+					managedCluster.Labels[clusterSetLabel] = "s1"
+
+					_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
+					return err
+				})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(managedCluster.Labels[clusterSetLabel]).To(gomega.Equal("s1"))
+			})
+
 			ginkgo.It("Should respond bad request when updating a managed cluster with invalid external server URLs", func() {
 				ginkgo.By(fmt.Sprintf("update managed cluster %q with an invalid external server URL %q", clusterName, invalidURL))
 
@@ -466,6 +522,12 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 						APIGroups: []string{"cluster.open-cluster-management.io"},
 						Resources: []string{"managedclusters"},
 						Verbs:     []string{"create", "get", "update"},
+					},
+					{
+						APIGroups:     []string{"cluster.open-cluster-management.io"},
+						Resources:     []string{"managedclustersets/join"},
+						ResourceNames: []string{"default"},
+						Verbs:         []string{"create"},
 					},
 				}, nil)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
