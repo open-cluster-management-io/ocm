@@ -84,6 +84,40 @@ func TestSyncClusterSet(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:           "sync a legacy clusterset",
+			clusterSetName: "mcs1",
+			existingClusterSet: &clusterv1beta1.ManagedClusterSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "mcs1",
+				},
+				Spec: clusterv1beta1.ManagedClusterSetSpec{
+					ClusterSelector: clusterv1beta1.ManagedClusterSelector{
+						SelectorType: clusterv1beta1.LegacyClusterSetLabel,
+					},
+				},
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testinghelpers.AssertActions(t, actions, "update")
+			},
+		},
+		{
+			name:           "ignore any non-legacy clusterset",
+			clusterSetName: "mcs1",
+			existingClusterSet: &clusterv1beta1.ManagedClusterSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "mcs1",
+				},
+				Spec: clusterv1beta1.ManagedClusterSetSpec{
+					ClusterSelector: clusterv1beta1.ManagedClusterSelector{
+						SelectorType: "SingleClusterLabel",
+					},
+				},
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testinghelpers.AssertNoActions(t, actions)
+			},
+		},
 	}
 
 	for _, c := range cases {

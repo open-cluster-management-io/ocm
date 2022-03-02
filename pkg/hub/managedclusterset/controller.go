@@ -141,8 +141,15 @@ func (c *managedClusterSetController) sync(ctx context.Context, syncCtx factory.
 	return nil
 }
 
-// syncClusterSet syncs a particular cluster set
+// syncClusterSet syncs a particular cluster set. Currently only support the legacy type of clusterset.
+// The logic should be updated once any new type of clusterset added.
 func (c *managedClusterSetController) syncClusterSet(ctx context.Context, originalClusterSet *clusterv1beta1.ManagedClusterSet) error {
+	// ignore the non-legacy clusterset
+	selectorType := originalClusterSet.Spec.ClusterSelector.SelectorType
+	if len(selectorType) > 0 && selectorType != clusterv1beta1.LegacyClusterSetLabel {
+		return nil
+	}
+
 	clusterSet := originalClusterSet.DeepCopy()
 
 	// find out the containing clusters of clusterset
