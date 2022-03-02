@@ -25,6 +25,7 @@ import (
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/registration/pkg/clientcert"
+	"open-cluster-management.io/registration/pkg/features"
 	"open-cluster-management.io/registration/pkg/hub"
 	"open-cluster-management.io/registration/pkg/spoke"
 	"open-cluster-management.io/registration/pkg/spoke/addon"
@@ -149,6 +150,9 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	}
 	err = util.PrepareSpokeAgentNamespace(kubeClient, testNamespace)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	// enable DefaultClusterSet feature gate
+	features.DefaultHubMutableFeatureGate.Set("DefaultClusterSet=true")
 
 	// start hub controller
 	go func() {

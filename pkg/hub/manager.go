@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"open-cluster-management.io/registration/pkg/features"
 	"open-cluster-management.io/registration/pkg/hub/taint"
 
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -12,7 +13,6 @@ import (
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
-	"open-cluster-management.io/registration/pkg/features"
 	"open-cluster-management.io/registration/pkg/hub/addon"
 	"open-cluster-management.io/registration/pkg/hub/clusterrole"
 	"open-cluster-management.io/registration/pkg/hub/csr"
@@ -22,6 +22,7 @@ import (
 	"open-cluster-management.io/registration/pkg/hub/rbacfinalizerdeletion"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
+	"github.com/openshift/library-go/pkg/controller/factory"
 
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -132,8 +133,13 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		controllerContext.EventRecorder,
 	)
 
+	var defaultManagedClusterSetController factory.Controller
 	if features.DefaultHubMutableFeatureGate.Enabled(features.DefaultClusterSet) {
-		// TODO define default clusterset controller here
+		defaultManagedClusterSetController = managedclusterset.NewDefaultManagedClusterSetController(
+			clusterClient.ClusterV1beta1(),
+			clusterInformers.Cluster().V1beta1().ManagedClusterSets(),
+			controllerContext.EventRecorder,
+		)
 	}
 
 	go clusterInformers.Start(ctx.Done())
@@ -150,6 +156,9 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	go clusterroleController.Run(ctx, 1)
 	go addOnHealthCheckController.Run(ctx, 1)
 	go addOnFeatureDiscoveryController.Run(ctx, 1)
+	if features.DefaultHubMutableFeatureGate.Enabled(features.DefaultClusterSet) {
+		go defaultManagedClusterSetController.Run(ctx, 1)
+	}
 
 	<-ctx.Done()
 	return nil
