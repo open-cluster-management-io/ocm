@@ -45,6 +45,7 @@ spec:
         args:
           - "/registration"
           - "controller"
+          - "--feature-gates=DefaultClusterSet=true"
           {{ if .DetachedMode }}
           - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
           {{ end }}
