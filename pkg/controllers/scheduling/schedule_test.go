@@ -10,6 +10,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
@@ -49,6 +50,10 @@ func TestSchedule(t *testing.T) {
 					Name:             "Predicate",
 					FilteredClusters: []string{"cluster1"},
 				},
+				{
+					Name:             "Predicate,TaintToleration",
+					FilteredClusters: []string{"cluster1"},
+				},
 			},
 			expectedScoreResult: []PrioritizerResult{
 				{
@@ -84,6 +89,10 @@ func TestSchedule(t *testing.T) {
 			expectedFilterResult: []FilterResult{
 				{
 					Name:             "Predicate",
+					FilteredClusters: []string{"cluster1"},
+				},
+				{
+					Name:             "Predicate,TaintToleration",
 					FilteredClusters: []string{"cluster1"},
 				},
 			},
@@ -130,6 +139,10 @@ func TestSchedule(t *testing.T) {
 					Name:             "Predicate",
 					FilteredClusters: []string{"cluster1", "cluster2", "cluster3"},
 				},
+				{
+					Name:             "Predicate,TaintToleration",
+					FilteredClusters: []string{"cluster1", "cluster2", "cluster3"},
+				},
 			},
 			expectedScoreResult: []PrioritizerResult{
 				{
@@ -161,6 +174,10 @@ func TestSchedule(t *testing.T) {
 					Name:             "Predicate",
 					FilteredClusters: []string{"cluster1"},
 				},
+				{
+					Name:             "Predicate,TaintToleration",
+					FilteredClusters: []string{"cluster1"},
+				},
 			},
 			expectedScoreResult: []PrioritizerResult{
 				{
@@ -178,6 +195,67 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
 			},
 			expectedUnScheduled: 0,
+		},
+		{
+			name: "placement with taint and toleration",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithNOC(3).AddToleration(
+				&clusterapiv1beta1.Toleration{
+					Key:      "key1",
+					Value:    "value1",
+					Operator: clusterapiv1beta1.TolerationOpEqual,
+				}).Build(),
+			initObjs: []runtime.Object{
+				testinghelpers.NewClusterSet(clusterSetName),
+				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
+				testinghelpers.NewAddOnPlacementScore("cluster1", "demo").WithScore("demo", 30).Build(),
+				testinghelpers.NewAddOnPlacementScore("cluster2", "demo").WithScore("demo", 40).Build(),
+				testinghelpers.NewAddOnPlacementScore("cluster3", "demo").WithScore("demo", 50).Build(),
+			},
+			clusters: []*clusterapiv1.ManagedCluster{
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).WithTaint(
+					&clusterapiv1.Taint{
+						Key:       "key1",
+						Value:     "value1",
+						Effect:    clusterapiv1.TaintEffectNoSelect,
+						TimeAdded: metav1.Time{},
+					}).Build(),
+				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterSetLabel, clusterSetName).WithTaint(
+					&clusterapiv1.Taint{
+						Key:       "key2",
+						Value:     "value2",
+						Effect:    clusterapiv1.TaintEffectNoSelect,
+						TimeAdded: metav1.Time{},
+					}).Build(),
+				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterSetLabel, clusterSetName).Build(),
+			},
+			decisions: []runtime.Object{},
+			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
+				{ClusterName: "cluster1"},
+				{ClusterName: "cluster3"},
+			},
+			expectedFilterResult: []FilterResult{
+				{
+					Name:             "Predicate",
+					FilteredClusters: []string{"cluster1", "cluster2", "cluster3"},
+				},
+				{
+					Name:             "Predicate,TaintToleration",
+					FilteredClusters: []string{"cluster1", "cluster3"},
+				},
+			},
+			expectedScoreResult: []PrioritizerResult{
+				{
+					Name:   "Balance",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 100, "cluster3": 100},
+				},
+				{
+					Name:   "Steady",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 0, "cluster3": 0},
+				},
+			},
+			expectedUnScheduled: 1,
 		},
 		{
 			name:      "placement with additive Prioritizer Policy",
@@ -202,6 +280,10 @@ func TestSchedule(t *testing.T) {
 			expectedFilterResult: []FilterResult{
 				{
 					Name:             "Predicate",
+					FilteredClusters: []string{"cluster1", "cluster2", "cluster3"},
+				},
+				{
+					Name:             "Predicate,TaintToleration",
 					FilteredClusters: []string{"cluster1", "cluster2", "cluster3"},
 				},
 			},
@@ -251,6 +333,10 @@ func TestSchedule(t *testing.T) {
 					Name:             "Predicate",
 					FilteredClusters: []string{"cluster1", "cluster2", "cluster3"},
 				},
+				{
+					Name:             "Predicate,TaintToleration",
+					FilteredClusters: []string{"cluster1", "cluster2", "cluster3"},
+				},
 			},
 			expectedScoreResult: []PrioritizerResult{
 				{
@@ -294,6 +380,10 @@ func TestSchedule(t *testing.T) {
 					Name:             "Predicate",
 					FilteredClusters: []string{"cluster1", "cluster2"},
 				},
+				{
+					Name:             "Predicate,TaintToleration",
+					FilteredClusters: []string{"cluster1", "cluster2"},
+				},
 			},
 			expectedScoreResult: []PrioritizerResult{
 				{
@@ -333,6 +423,10 @@ func TestSchedule(t *testing.T) {
 			expectedFilterResult: []FilterResult{
 				{
 					Name:             "Predicate",
+					FilteredClusters: []string{"cluster1", "cluster2", "cluster3"},
+				},
+				{
+					Name:             "Predicate,TaintToleration",
 					FilteredClusters: []string{"cluster3", "cluster1", "cluster2"},
 				},
 			},
@@ -357,18 +451,18 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewClusterSet(clusterSetName),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName("others", 1)).
-					WithDecisions("cluster3", "cluster2").Build(),
+					WithDecisions("cluster2", "cluster3").Build(),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName("others", 2)).
-					WithDecisions("cluster2", "cluster1").Build(),
+					WithDecisions("cluster1", "cluster2").Build(),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
 					WithLabel(placementLabel, placementName).
 					WithDecisions("cluster3").Build(),
 			},
 			decisions: []runtime.Object{
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName("others", 1)).
-					WithDecisions("cluster3", "cluster2").Build(),
+					WithDecisions("cluster2", "cluster3").Build(),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName("others", 2)).
-					WithDecisions("cluster2", "cluster1").Build(),
+					WithDecisions("cluster1", "cluster2").Build(),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
 					WithLabel(placementLabel, placementName).
 					WithDecisions("cluster3").Build(),
@@ -384,6 +478,10 @@ func TestSchedule(t *testing.T) {
 			expectedFilterResult: []FilterResult{
 				{
 					Name:             "Predicate",
+					FilteredClusters: []string{"cluster1", "cluster2", "cluster3"},
+				},
+				{
+					Name:             "Predicate,TaintToleration",
 					FilteredClusters: []string{"cluster3", "cluster1", "cluster2"},
 				},
 			},

@@ -97,6 +97,14 @@ func (b *placementBuilder) AddPredicate(labelSelector *metav1.LabelSelector, cla
 	return b
 }
 
+func (b *placementBuilder) AddToleration(toleration *clusterapiv1beta1.Toleration) *placementBuilder {
+	if b.placement.Spec.Tolerations == nil {
+		b.placement.Spec.Tolerations = []clusterapiv1beta1.Toleration{}
+	}
+	b.placement.Spec.Tolerations = append(b.placement.Spec.Tolerations, *toleration)
+	return b
+}
+
 func (b *placementBuilder) WithNumOfSelectedClusters(nosc int) *placementBuilder {
 	b.placement.Status.NumberOfSelectedClusters = int32(nosc)
 	return b
@@ -244,6 +252,14 @@ func (b *managedClusterBuilder) WithResource(resourceName clusterapiv1.ResourceN
 
 	b.cluster.Status.Allocatable[resourceName], _ = resource.ParseQuantity(allocatable)
 	b.cluster.Status.Capacity[resourceName], _ = resource.ParseQuantity(capacity)
+	return b
+}
+
+func (b *managedClusterBuilder) WithTaint(taint *clusterapiv1.Taint) *managedClusterBuilder {
+	if b.cluster.Spec.Taints == nil {
+		b.cluster.Spec.Taints = []clusterapiv1.Taint{}
+	}
+	b.cluster.Spec.Taints = append(b.cluster.Spec.Taints, *taint)
 	return b
 }
 

@@ -18,6 +18,7 @@ import (
 	"open-cluster-management.io/placement/pkg/plugins/predicate"
 	"open-cluster-management.io/placement/pkg/plugins/resource"
 	"open-cluster-management.io/placement/pkg/plugins/steady"
+	"open-cluster-management.io/placement/pkg/plugins/tainttoleration"
 )
 
 const (
@@ -139,6 +140,7 @@ func NewPluginScheduler(handle plugins.Handle) *pluginScheduler {
 		handle: handle,
 		filters: []plugins.Filter{
 			predicate.New(handle),
+			tainttoleration.New(handle),
 		},
 		prioritizerWeights: defaultPrioritizerConfig,
 	}
@@ -324,10 +326,21 @@ func getPrioritizers(weights map[clusterapiv1beta1.ScoreCoordinate]int32, handle
 
 func (r *scheduleResult) FilterResults() []FilterResult {
 	results := []FilterResult{}
-	for name, r := range r.filteredRecords {
+
+	// order the FilterResults by key length
+	filteredRecordsKey := []string{}
+	for name := range r.filteredRecords {
+		filteredRecordsKey = append(filteredRecordsKey, name)
+	}
+	sort.SliceStable(filteredRecordsKey, func(i, j int) bool {
+		return len(filteredRecordsKey[i]) < len(filteredRecordsKey[j])
+	})
+
+	// go through the FilterResults by key length
+	for _, name := range filteredRecordsKey {
 		result := FilterResult{Name: name, FilteredClusters: []string{}}
 
-		for _, c := range r {
+		for _, c := range r.filteredRecords[name] {
 			result.FilteredClusters = append(result.FilteredClusters, c.Name)
 		}
 		results = append(results, result)
