@@ -133,11 +133,17 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		controllerContext.EventRecorder,
 	)
 
-	var defaultManagedClusterSetController factory.Controller
+	var defaultManagedClusterSetController, defaultManagedClusterSetLabelController factory.Controller
 	if features.DefaultHubMutableFeatureGate.Enabled(features.DefaultClusterSet) {
 		defaultManagedClusterSetController = managedclusterset.NewDefaultManagedClusterSetController(
 			clusterClient.ClusterV1beta1(),
 			clusterInformers.Cluster().V1beta1().ManagedClusterSets(),
+			controllerContext.EventRecorder,
+		)
+
+		defaultManagedClusterSetLabelController = managedclusterset.NewDefaultManagedClusterSetLabelController(
+			clusterClient,
+			clusterInformers.Cluster().V1().ManagedClusters(),
 			controllerContext.EventRecorder,
 		)
 	}
@@ -158,6 +164,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	go addOnFeatureDiscoveryController.Run(ctx, 1)
 	if features.DefaultHubMutableFeatureGate.Enabled(features.DefaultClusterSet) {
 		go defaultManagedClusterSetController.Run(ctx, 1)
+		go defaultManagedClusterSetLabelController.Run(ctx, 1)
 	}
 
 	<-ctx.Done()
