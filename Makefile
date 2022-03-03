@@ -50,6 +50,7 @@ HUB_KUBECONFIG?=./.hub-kubeconfig
 DETACHED_CLUSTER_MANAGER_NAME?=cluster-manager
 EXTERNAL_HUB_KUBECONFIG?=./.external-hub-kubeconfig
 EXTERNAL_MANAGED_KUBECONFIG?=./.external-managed-kubeconfig
+MANAGED_CLUSTER_NAME ?= cluster1
 
 OPERATOR_SDK_ARCHOS:=x86_64-linux-gnu
 ifeq ($(GOHOSTOS),darwin)
@@ -152,7 +153,9 @@ deploy-spoke-operator: ensure-kustomize
 	mv deploy/klusterlet/config/kustomization.yaml.tmp deploy/klusterlet/config/kustomization.yaml
 
 apply-spoke-cr: bootstrap-secret
-	$(KUSTOMIZE) build deploy/klusterlet/config/samples | $(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build deploy/klusterlet/config/samples \
+	| $(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,cluster1,$(MANAGED_CLUSTER_NAME)," \
+	| $(KUBECTL) apply -f -
 
 apply-spoke-cr-detached: bootstrap-secret-detached external-managed-secret
 	$(KUSTOMIZE) build deploy/klusterlet/config/samples | $(SED_CMD) -e "s,mode: Default,mode: Detached," -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," | $(KUBECTL) apply -f -
