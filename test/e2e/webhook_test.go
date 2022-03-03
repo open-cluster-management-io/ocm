@@ -12,7 +12,6 @@ import (
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
-	"open-cluster-management.io/registration/pkg/features"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -40,7 +39,6 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 	ginkgo.BeforeEach(func() {
 		// make sure the api service v1.admission.cluster.open-cluster-management.io is available
 		gomega.Eventually(func() bool {
-			features.DefaultHubMutableFeatureGate.Set("DefaultClusterSet=true")
 			apiService, err := hubAPIServiceClient.APIServices().Get(context.TODO(), apiserviceName, metav1.GetOptions{})
 			if err != nil {
 				return false
