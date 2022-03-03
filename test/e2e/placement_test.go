@@ -107,6 +107,14 @@ var _ = Describe("Placement", func() {
 				Namespace: placementNamespace,
 				Name:      placementName,
 			},
+			Spec: clusterapiv1beta1.PlacementSpec{
+				Tolerations: []clusterapiv1beta1.Toleration{
+					{
+						Key:      "cluster.open-cluster-management.io/unreachable",
+						Operator: clusterapiv1beta1.TolerationOpExists,
+					},
+				},
+			},
 		}
 
 		placement, err = t.ClusterClient.ClusterV1beta1().Placements(placementNamespace).Create(context.TODO(), placement, metav1.CreateOptions{})
