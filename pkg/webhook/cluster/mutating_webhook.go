@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -109,33 +108,36 @@ func (a *ManagedClusterMutatingAdmissionHook) Admit(req *admissionv1beta1.Admiss
 
 //addDefaultClusterSetLabel add label "cluster.open-cluster-management.io/clusterset:default" for ManagedCluster if the managedCluster has no ManagedClusterSet label
 func (a *ManagedClusterMutatingAdmissionHook) addDefaultClusterSetLabel(managedCluster *clusterv1.ManagedCluster, clusterObj []byte) ([]jsonPatchOperation, *admissionv1beta1.AdmissionResponse) {
-	cluster := managedCluster.DeepCopy()
-	modified := false
 	var jsonPatches []jsonPatchOperation
 
 	status := &admissionv1beta1.AdmissionResponse{
 		Allowed: true,
 	}
 
-	if len(managedCluster.Labels) != 0 {
-		if _, ok := managedCluster.Labels[clusterSetLabel]; ok {
-			return nil, status
+	if len(managedCluster.Labels) == 0 {
+		jsonPatches = []jsonPatchOperation{
+			{
+				Operation: "add",
+				Path:      fmt.Sprintf("/metadata/labels"),
+				Value: map[string]string{
+					clusterSetLabel: defaultClusterSetName,
+				},
+			},
 		}
+		return jsonPatches, status
 	}
 
-	clusterSetLabels := map[string]string{}
-	clusterSetLabels[clusterSetLabel] = defaultClusterSetName
-	// merge clusterSetLabel into ManagedCluster.Labels
-	resourcemerge.MergeMap(&modified, &cluster.Labels, clusterSetLabels)
-
-	// no work if the cluster labels have no change
-	if !modified {
+	if _, ok := managedCluster.Labels[clusterSetLabel]; ok {
 		return nil, status
 	}
-
-	labelPatch := newLabelJsonPatch()
-
-	jsonPatches = append(jsonPatches, labelPatch)
+	jsonPatches = []jsonPatchOperation{
+		{
+			Operation: "add",
+			// there is a "/" in clusterset label. So need to transfer the "/" to "~1".
+			Path:  "/metadata/labels/cluster.open-cluster-management.io~1clusterset",
+			Value: defaultClusterSetName,
+		},
+	}
 	return jsonPatches, status
 }
 
@@ -214,13 +216,5 @@ func newTaintTimeAddedJsonPatch(index int, timeAdded time.Time) jsonPatchOperati
 		Operation: "replace",
 		Path:      fmt.Sprintf("/spec/taints/%d/timeAdded", index),
 		Value:     timeAdded.UTC().Format(time.RFC3339),
-	}
-}
-
-func newLabelJsonPatch() jsonPatchOperation {
-	return jsonPatchOperation{
-		Operation: "add",
-		Path:      fmt.Sprintf("/metadata/labels"),
-		Value:     map[string]string{clusterSetLabel: defaultClusterSetName},
 	}
 }

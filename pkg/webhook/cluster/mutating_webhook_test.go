@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
@@ -148,7 +149,13 @@ func TestManagedClusterMutate(t *testing.T) {
 					build(),
 			},
 			expectedResponse: newAdmissionResponse(true).
-				addJsonPatch(newLabelJsonPatch()).
+				addJsonPatch(jsonPatchOperation{
+					Operation: "add",
+					Path:      fmt.Sprintf("/metadata/labels"),
+					Value: map[string]string{
+						clusterSetLabel: defaultClusterSetName,
+					},
+				}).
 				build(),
 		},
 		{
@@ -188,7 +195,11 @@ func TestManagedClusterMutate(t *testing.T) {
 					build(),
 			},
 			expectedResponse: newAdmissionResponse(true).
-				addJsonPatch(newLabelJsonPatch()).
+				addJsonPatch(jsonPatchOperation{
+					Operation: "add",
+					Path:      "/metadata/labels/cluster.open-cluster-management.io~1clusterset",
+					Value:     defaultClusterSetName,
+				}).
 				build(),
 		},
 	}

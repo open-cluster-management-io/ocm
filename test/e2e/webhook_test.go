@@ -82,11 +82,11 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 
 				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 			})
-			ginkgo.It("Should have the default Clusterset Label", func() {
+			ginkgo.It("Should have the default Clusterset Label (no labels in cluster)", func() {
 				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
 				ginkgo.By(fmt.Sprintf("create a managed cluster %q", clusterName))
-
-				_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.TODO(), newManagedCluster(clusterName, false, validURL), metav1.CreateOptions{})
+				oriManagedCluster := newManagedCluster(clusterName, false, validURL)
+				_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.TODO(), oriManagedCluster, metav1.CreateOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
@@ -94,6 +94,26 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 
 				gomega.Expect(managedCluster.Labels[clusterSetLabel]).To(gomega.Equal(string(defaultClusterSetName)))
 
+				gomega.Expect(len(managedCluster.Labels)).To(gomega.Equal(len(oriManagedCluster.Labels) + 1))
+				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+			})
+			ginkgo.It("Should have the default Clusterset Label (has labels in cluster)", func() {
+				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
+				ginkgo.By(fmt.Sprintf("create a managed cluster %q", clusterName))
+				oriManagedCluster := newManagedCluster(clusterName, false, validURL)
+
+				oriManagedCluster.Labels = map[string]string{
+					"test": "test_value",
+				}
+				_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.TODO(), oriManagedCluster, metav1.CreateOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				gomega.Expect(managedCluster.Labels[clusterSetLabel]).To(gomega.Equal(string(defaultClusterSetName)))
+
+				gomega.Expect(len(managedCluster.Labels)).To(gomega.Equal(len(oriManagedCluster.Labels) + 1))
 				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 			})
 			ginkgo.It("Should have the timeAdded for taints", func() {
@@ -715,6 +735,7 @@ func newManagedCluster(name string, accepted bool, externalURL string) *clusterv
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
+
 		Spec: clusterv1.ManagedClusterSpec{
 			HubAcceptsClient: accepted,
 			ManagedClusterClientConfigs: []clusterv1.ClientConfig{
