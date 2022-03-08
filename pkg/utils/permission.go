@@ -11,7 +11,6 @@ import (
 	"k8s.io/utils/pointer"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -187,10 +186,10 @@ func (b *unionPermissionBuilder) build() agent.PermissionConfigFunc {
 	}
 }
 
-func ensureAddonOwnerReference(metadata *metav1.ObjectMeta, addon *addonv1alpha1.ManagedClusterAddOn) {
+func ensureAddonOwnerReference(metadata *metav1.ObjectMeta, addon *addonapiv1alpha1.ManagedClusterAddOn) {
 	metadata.OwnerReferences = []metav1.OwnerReference{
 		{
-			APIVersion:         addonv1alpha1.GroupVersion.String(),
+			APIVersion:         addonapiv1alpha1.GroupVersion.String(),
 			Kind:               "ManagedClusterAddOn",
 			Name:               addon.Name,
 			BlockOwnerDeletion: pointer.Bool(true),

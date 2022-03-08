@@ -1,5 +1,7 @@
 package constants
 
+import "fmt"
+
 const (
 	// AddonLabel is the label for addon
 	AddonLabel = "open-cluster-management.io/addon-name"
@@ -13,3 +15,8 @@ const (
 	// PreDeleteHookFinalizer is the finalizer for an addon which has deployed hook objects
 	PreDeleteHookFinalizer = "cluster.open-cluster-management.io/addon-pre-delete"
 )
+
+// DeployWorkName return the name of work for the addon
+func DeployWorkName(addonName string) string {
+	return fmt.Sprintf("addon-%s-deploy", addonName)
+}

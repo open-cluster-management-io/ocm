@@ -46,10 +46,10 @@ type addonManager struct {
 func (a *addonManager) AddAgent(addon agent.AgentAddon) error {
 	addonOption := addon.GetAgentAddonOptions()
 	if len(addonOption.AddonName) == 0 {
-		return fmt.Errorf("Addon name should be set")
+		return fmt.Errorf("addon name should be set")
 	}
 	if _, ok := a.addonAgents[addonOption.AddonName]; ok {
-		return fmt.Errorf("An agent is added for the addon already")
+		return fmt.Errorf("an agent is added for the addon already")
 	}
 	a.addonAgents[addonOption.AddonName] = addon
 	return nil
@@ -188,6 +188,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 	addonHealthCheckController := addonhealthcheck.NewAddonHealthCheckController(
 		addonClient,
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		workInformers.Work().V1().ManifestWorks(),
 		a.addonAgents,
 		eventRecorder)
 

@@ -16,10 +16,6 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
-func deployWorkName(addonName string) string {
-	return fmt.Sprintf("addon-%s-deploy", addonName)
-}
-
 func preDeleteHookWorkName(addonName string) string {
 	return fmt.Sprintf("addon-%s-pre-delete", addonName)
 }
@@ -154,7 +150,7 @@ func buildManifestWorkFromObject(
 		}
 	}
 
-	deployManifestWork = newManifestWork(deployWorkName(addonName), addonName, cluster, deployManifests)
+	deployManifestWork = newManifestWork(constants.DeployWorkName(addonName), addonName, cluster, deployManifests)
 	hookManifestWork = newManifestWork(preDeleteHookWorkName(addonName), addonName, cluster, hookManifests)
 	if hookManifestWork != nil {
 		hookManifestWork.Spec.ManifestConfigs = manifestConfigs

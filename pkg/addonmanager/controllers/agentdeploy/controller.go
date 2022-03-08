@@ -92,7 +92,7 @@ func NewAddonDeployController(
 				if _, ok := c.agentAddons[addonName]; !ok {
 					return false
 				}
-				if accessor.GetName() != deployWorkName(addonName) {
+				if accessor.GetName() != constants.DeployWorkName(addonName) {
 					return false
 				}
 				return true
@@ -120,7 +120,7 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 	// Get ManagedCluster
 	managedCluster, err := c.managedClusterLister.Get(clusterName)
 	if errors.IsNotFound(err) {
-		c.cache.removeCache(deployWorkName(addonName), clusterName)
+		c.cache.removeCache(constants.DeployWorkName(addonName), clusterName)
 		return nil
 	}
 	if err != nil {
@@ -134,7 +134,7 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 
 	managedClusterAddon, err := c.managedClusterAddonLister.ManagedClusterAddOns(clusterName).Get(addonName)
 	if errors.IsNotFound(err) {
-		c.cache.removeCache(deployWorkName(addonName), clusterName)
+		c.cache.removeCache(constants.DeployWorkName(addonName), clusterName)
 		return nil
 	}
 	if err != nil {
@@ -142,7 +142,7 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 	}
 
 	if !managedClusterAddon.DeletionTimestamp.IsZero() {
-		c.cache.removeCache(deployWorkName(addonName), clusterName)
+		c.cache.removeCache(constants.DeployWorkName(addonName), clusterName)
 		return nil
 	}
 
@@ -162,6 +162,8 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return err
 	}
 	work.OwnerReferences = []metav1.OwnerReference{*owner}
+
+	c.setStatusFeedbackRule(work, agentAddon)
 
 	// apply work
 	work, err = applyWork(c.workClient, c.workLister, c.cache, c.eventRecorder, ctx, work)
@@ -201,4 +203,29 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 	_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterAddonCopy.Namespace).UpdateStatus(
 		ctx, managedClusterAddonCopy, metav1.UpdateOptions{})
 	return err
+}
+
+func (c *addonDeployController) setStatusFeedbackRule(work *workapiv1.ManifestWork, agentAddon agent.AgentAddon) {
+	if agentAddon.GetAgentAddonOptions().HealthProber == nil {
+		return
+	}
+
+	if agentAddon.GetAgentAddonOptions().HealthProber.Type != agent.HealthProberTypeWork {
+		return
+	}
+
+	if agentAddon.GetAgentAddonOptions().HealthProber.WorkProber == nil {
+		return
+	}
+
+	probeRules := agentAddon.GetAgentAddonOptions().HealthProber.WorkProber.ProbeFields
+
+	work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{}
+
+	for _, rule := range probeRules {
+		work.Spec.ManifestConfigs = append(work.Spec.ManifestConfigs, workapiv1.ManifestConfigOption{
+			ResourceIdentifier: rule.ResourceIdentifier,
+			FeedbackRules:      rule.ProbeRules,
+		})
+	}
 }

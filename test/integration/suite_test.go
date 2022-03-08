@@ -100,6 +100,7 @@ type testAddon struct {
 	registrations map[string][]addonapiv1alpha1.RegistrationConfig
 	approveCSR    bool
 	cert          []byte
+	prober        *agent.HealthProber
 }
 
 func (t *testAddon) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
@@ -108,7 +109,8 @@ func (t *testAddon) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapi
 
 func (t *testAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 	option := agent.AgentAddonOptions{
-		AddonName: t.name,
+		AddonName:    t.name,
+		HealthProber: t.prober,
 	}
 
 	if len(t.registrations) > 0 {
