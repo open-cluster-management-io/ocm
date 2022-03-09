@@ -59,7 +59,7 @@ var _ = Describe("Placement", func() {
 			Expect(err).ToNot(HaveOccurred())
 		}
 
-		// delete clusterset created
+		// delete created clusterset
 		err = t.ClusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.Background(), clusterSetName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
