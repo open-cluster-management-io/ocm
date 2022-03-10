@@ -40,7 +40,7 @@ func TestOnClusterSetBindingChange(t *testing.T) {
 			name: "on clustersetbinding change",
 			obj:  testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1"),
+				testinghelpers.NewClusterSet("clusterset1").Build(),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),
 				testinghelpers.NewPlacement("ns2", "placement2").Build(),
 			},
@@ -137,7 +137,7 @@ func TestOnClusterSetBindingDelete(t *testing.T) {
 			name: "clusterset",
 			obj:  testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1"),
+				testinghelpers.NewClusterSet("clusterset1").Build(),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),
 			},
 			queuedKeys: []string{
@@ -150,7 +150,7 @@ func TestOnClusterSetBindingDelete(t *testing.T) {
 				Obj: testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
 			},
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1"),
+				testinghelpers.NewClusterSet("clusterset1").Build(),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),
 			},
 			queuedKeys: []string{
@@ -163,7 +163,7 @@ func TestOnClusterSetBindingDelete(t *testing.T) {
 				Obj: "invalid object type",
 			},
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1"),
+				testinghelpers.NewClusterSet("clusterset1").Build(),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),
 			},
 		},

@@ -24,8 +24,8 @@ func TestEnqueuePlacementsByClusterSet(t *testing.T) {
 			name:           "enqueue placements in a namespace",
 			clusterSetName: "clusterset1",
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1"),
-				testinghelpers.NewClusterSet("clusterset2"),
+				testinghelpers.NewClusterSet("clusterset1").Build(),
+				testinghelpers.NewClusterSet("clusterset2").Build(),
 				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
 				testinghelpers.NewClusterSetBinding("ns1", "clusterset2"),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),
@@ -76,7 +76,7 @@ func TestOnClusterSetAdd(t *testing.T) {
 		},
 		{
 			name: "clusterset",
-			obj:  testinghelpers.NewClusterSet("clusterset1"),
+			obj:  testinghelpers.NewClusterSet("clusterset1").Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),
@@ -123,7 +123,7 @@ func TestOnClusterSetDelete(t *testing.T) {
 		},
 		{
 			name: "clusterset",
-			obj:  testinghelpers.NewClusterSet("clusterset1"),
+			obj:  testinghelpers.NewClusterSet("clusterset1").Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),
@@ -135,7 +135,7 @@ func TestOnClusterSetDelete(t *testing.T) {
 		{
 			name: "tombstone",
 			obj: cache.DeletedFinalStateUnknown{
-				Obj: testinghelpers.NewClusterSet("clusterset1"),
+				Obj: testinghelpers.NewClusterSet("clusterset1").Build(),
 			},
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),

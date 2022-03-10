@@ -343,13 +343,58 @@ func (c *schedulingController) getAvailableClusters(clusterSetNames []string) ([
 	if len(clusterSetNames) == 0 {
 		return nil, nil
 	}
-	// list clusters from those clustersets
-	requirement, err := labels.NewRequirement(clusterSetLabel, selection.In, clusterSetNames)
-	if err != nil {
-		return nil, err
+
+	// filter avilable cluserset label and values
+	avilableClusterSetsLabels := map[string]sets.String{}
+	for _, name := range clusterSetNames {
+		// ignore clusterset if failed to get
+		clusterSet, err := c.clusterSetLister.Get(name)
+		if err != nil {
+			continue
+		}
+
+		// clusterset ClusterSelector type is empty or LegacyClusterSetLabel is treated as avaliable
+		selectorType := clusterSet.Spec.ClusterSelector.SelectorType
+		if len(selectorType) == 0 || selectorType == clusterapiv1beta1.LegacyClusterSetLabel {
+			if avilableClusterSetsLabels[clusterSetLabel] == nil {
+				avilableClusterSetsLabels[clusterSetLabel] = sets.NewString()
+			}
+			// store label and values
+			avilableClusterSetsLabels[clusterSetLabel].Insert(name)
+		}
 	}
-	labelSelector := labels.NewSelector().Add(*requirement)
-	return c.clusterLister.List(labelSelector)
+
+	// list all avilable clusters
+	avilableClusters := map[string]*clusterapiv1.ManagedCluster{}
+	for label, vals := range avilableClusterSetsLabels {
+		requirement, err := labels.NewRequirement(label, selection.In, vals.List())
+		if err != nil {
+			klog.Warning(err)
+			continue
+		}
+
+		labelSelector := labels.NewSelector().Add(*requirement)
+		clusters, err := c.clusterLister.List(labelSelector)
+		if err != nil {
+			klog.Warning(err)
+			continue
+		}
+		for i := range clusters {
+			avilableClusters[clusters[i].Name] = clusters[i]
+		}
+	}
+
+	if len(avilableClusters) == 0 {
+		return nil, nil
+	}
+
+	result := []*clusterapiv1.ManagedCluster{}
+	for _, c := range avilableClusters {
+		result = append(result, c)
+	}
+
+	return result, nil
+
 }
 
 // updateStatus updates the status of the placement according to intermediate scheduling data.

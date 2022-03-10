@@ -267,12 +267,27 @@ func (b *managedClusterBuilder) Build() *clusterapiv1.ManagedCluster {
 	return b.cluster
 }
 
-func NewClusterSet(clusterSetName string) *clusterapiv1beta1.ManagedClusterSet {
-	return &clusterapiv1beta1.ManagedClusterSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: clusterSetName,
+type managedClusterSetBuilder struct {
+	clusterset *clusterapiv1beta1.ManagedClusterSet
+}
+
+func NewClusterSet(clusterSetName string) *managedClusterSetBuilder {
+	return &managedClusterSetBuilder{
+		clusterset: &clusterapiv1beta1.ManagedClusterSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: clusterSetName,
+			},
 		},
 	}
+}
+
+func (b *managedClusterSetBuilder) WithClusterSelector(SelectorType clusterapiv1beta1.SelectorType) *managedClusterSetBuilder {
+	b.clusterset.Spec.ClusterSelector.SelectorType = SelectorType
+	return b
+}
+
+func (b *managedClusterSetBuilder) Build() *clusterapiv1beta1.ManagedClusterSet {
+	return b.clusterset
 }
 
 func NewClusterSetBinding(namespace, clusterSetName string) *clusterapiv1beta1.ManagedClusterSetBinding {

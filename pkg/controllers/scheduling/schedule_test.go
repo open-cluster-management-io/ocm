@@ -38,7 +38,7 @@ func TestSchedule(t *testing.T) {
 			name:      "new placement satisfied",
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet(clusterSetName),
+				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 			},
 			decisions: []runtime.Object{},
@@ -76,7 +76,7 @@ func TestSchedule(t *testing.T) {
 			name:      "new placement unsatisfied",
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithNOC(3).Build(),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet(clusterSetName),
+				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 			},
 			decisions: []runtime.Object{},
@@ -114,7 +114,7 @@ func TestSchedule(t *testing.T) {
 			name:      "placement with all decisions scheduled",
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithNOC(2).Build(),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet(clusterSetName),
+				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
 					WithLabel(placementLabel, placementName).
@@ -162,7 +162,7 @@ func TestSchedule(t *testing.T) {
 			name:      "placement with empty Prioritizer Policy",
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithPrioritizerPolicy("").Build(),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet(clusterSetName),
+				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 			},
 			decisions: []runtime.Object{},
@@ -205,7 +205,7 @@ func TestSchedule(t *testing.T) {
 					Operator: clusterapiv1beta1.TolerationOpEqual,
 				}).Build(),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet(clusterSetName),
+				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 				testinghelpers.NewAddOnPlacementScore("cluster1", "demo").WithScore("demo", 30).Build(),
 				testinghelpers.NewAddOnPlacementScore("cluster2", "demo").WithScore("demo", 40).Build(),
@@ -261,7 +261,7 @@ func TestSchedule(t *testing.T) {
 			name:      "placement with additive Prioritizer Policy",
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithNOC(2).WithPrioritizerPolicy("Additive").WithPrioritizerConfig("Balance", 3).WithPrioritizerConfig("ResourceAllocatableMemory", 1).WithScoreCoordinateAddOn("demo", "demo", 1).Build(),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet(clusterSetName),
+				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 				testinghelpers.NewAddOnPlacementScore("cluster1", "demo").WithScore("demo", 30).Build(),
 				testinghelpers.NewAddOnPlacementScore("cluster2", "demo").WithScore("demo", 40).Build(),
@@ -315,7 +315,7 @@ func TestSchedule(t *testing.T) {
 			name:      "placement with exact Prioritizer Policy",
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithNOC(2).WithPrioritizerPolicy("Exact").WithPrioritizerConfig("Balance", 3).WithPrioritizerConfig("ResourceAllocatableMemory", 1).Build(),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet(clusterSetName),
+				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
@@ -356,7 +356,7 @@ func TestSchedule(t *testing.T) {
 			name:      "placement with part of decisions scheduled",
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithNOC(4).Build(),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet(clusterSetName),
+				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
 					WithLabel(placementLabel, placementName).
@@ -403,7 +403,7 @@ func TestSchedule(t *testing.T) {
 			name:      "schedule to cluster with least decisions",
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithNOC(1).Build(),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet(clusterSetName),
+				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName("others", 1)).
 					WithDecisions("cluster1", "cluster2").Build(),
@@ -448,7 +448,7 @@ func TestSchedule(t *testing.T) {
 			name:      "do not schedule to other cluster even with least decisions",
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithNOC(1).Build(),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet(clusterSetName),
+				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName("others", 1)).
 					WithDecisions("cluster2", "cluster3").Build(),

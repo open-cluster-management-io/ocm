@@ -41,8 +41,8 @@ func TestOnClusterChange(t *testing.T) {
 			name: "clusterset exists",
 			obj:  testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset1").Build(),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1"),
-				testinghelpers.NewClusterSet("clusterset2"),
+				testinghelpers.NewClusterSet("clusterset1").Build(),
+				testinghelpers.NewClusterSet("clusterset2").Build(),
 				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
 				testinghelpers.NewClusterSetBinding("ns2", "clusterset1"),
 				testinghelpers.NewClusterSetBinding("ns2", "clusterset2"),
@@ -100,7 +100,7 @@ func TestOnClusterUpdate(t *testing.T) {
 				WithLabel(clusterSetLabel, "clusterset1").WithLabel("cloud", "Amazon").Build(),
 			oldObj: testinghelpers.NewManagedCluster("cluster1").WithLabel("cloud", "Amazon").Build(),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1"),
+				testinghelpers.NewClusterSet("clusterset1").Build(),
 				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),
 			},
@@ -114,7 +114,7 @@ func TestOnClusterUpdate(t *testing.T) {
 			oldObj: testinghelpers.NewManagedCluster("cluster1").
 				WithLabel(clusterSetLabel, "clusterset1").WithLabel("cloud", "Amazon").Build(),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1"),
+				testinghelpers.NewClusterSet("clusterset1").Build(),
 				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),
 			},
@@ -129,7 +129,7 @@ func TestOnClusterUpdate(t *testing.T) {
 			oldObj: testinghelpers.NewManagedCluster("cluster1").
 				WithLabel(clusterSetLabel, "clusterset1").WithLabel("cloud", "google").Build(),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1"),
+				testinghelpers.NewClusterSet("clusterset1").Build(),
 				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),
 			},
@@ -144,8 +144,8 @@ func TestOnClusterUpdate(t *testing.T) {
 			oldObj: testinghelpers.NewManagedCluster("cluster1").
 				WithLabel(clusterSetLabel, "clusterset1").WithLabel("cloud", "Amazon").Build(),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1"),
-				testinghelpers.NewClusterSet("clusterset2"),
+				testinghelpers.NewClusterSet("clusterset1").Build(),
+				testinghelpers.NewClusterSet("clusterset2").Build(),
 				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
 				testinghelpers.NewClusterSetBinding("ns2", "clusterset2"),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),
@@ -197,7 +197,7 @@ func TestOnClusterDelete(t *testing.T) {
 			name: "cluster",
 			obj:  testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset1").Build(),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1"),
+				testinghelpers.NewClusterSet("clusterset1").Build(),
 				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),
 			},
@@ -211,7 +211,7 @@ func TestOnClusterDelete(t *testing.T) {
 				Obj: testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset1").Build(),
 			},
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1"),
+				testinghelpers.NewClusterSet("clusterset1").Build(),
 				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),
 			},
@@ -225,7 +225,7 @@ func TestOnClusterDelete(t *testing.T) {
 				Obj: "invalid object type",
 			},
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1"),
+				testinghelpers.NewClusterSet("clusterset1").Build(),
 				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),
 			},
