@@ -128,11 +128,7 @@ func (c *addonHookDeployController) sync(ctx context.Context, syncCtx factory.Sy
 		return err
 	}
 
-	if !managedCluster.DeletionTimestamp.IsZero() {
-		// managed cluster is deleting, remove cache.
-		c.cache.removeCache(preDeleteHookWorkName(addonName), clusterName)
-		return nil
-	}
+	// should continue to apply pre-delete hook when the managedCluster is deleting.
 
 	managedClusterAddon, err := c.managedClusterAddonLister.ManagedClusterAddOns(clusterName).Get(addonName)
 	if errors.IsNotFound(err) {
