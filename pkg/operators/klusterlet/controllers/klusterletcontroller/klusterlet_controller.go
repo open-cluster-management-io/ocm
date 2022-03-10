@@ -44,6 +44,7 @@ const (
 	klusterletApplied            = "Applied"
 	klusterletReadyToApply       = "ReadyToApply"
 	hubConnectionDegraded        = "HubConnectionDegraded"
+	hubKubeConfigSecretMissing   = "HubKubeConfigSecretMissing"
 	appliedManifestWorkFinalizer = "cluster.open-cluster-management.io/applied-manifest-work-cleanup"
 )
 
@@ -338,13 +339,20 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			return err
 		}
 	}
-	// Deploy work agent
-	// scale up the work agent deployment when the hubConnectionDegraded condition is False.
-	// because the work agent deployment has a dependency of hub-kubeconfig-secret secret.
+	// Deploy work agent.
+	// * work agent is scaled to 0 only when degrade is true with the reason is HubKubeConfigSecretMissing.
+	//   It is to ensure a fast startup of work agent when the klusterlet is bootstrapped at the first time.
+	// * The work agent should not be scaled to 0 in degraded condition with other reasons,
+	//   because we still need work agent running even though the hub kubconfig is missing some certain permission.
+	//   It can ensure work agent to clean up the resources defined in manifestworks when cluster is detaching from the hub.
 	workConfig := config
-	if !meta.IsStatusConditionFalse(klusterlet.Status.Conditions, hubConnectionDegraded) {
+	hubConnectionDegradedCondition := meta.FindStatusCondition(klusterlet.Status.Conditions, hubConnectionDegraded)
+	if hubConnectionDegradedCondition == nil {
+		workConfig.Replica = 0
+	} else if hubConnectionDegradedCondition.Status == metav1.ConditionTrue && strings.Contains(hubConnectionDegradedCondition.Reason, hubKubeConfigSecretMissing) {
 		workConfig.Replica = 0
 	}
+
 	statuses, workGeneration, err := n.applyDeployment(ctx, klusterlet, &workConfig, "klusterlet/management/klusterlet-work-deployment.yaml", controllerContext.Recorder())
 	if err != nil {
 		return err

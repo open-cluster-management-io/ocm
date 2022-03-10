@@ -433,7 +433,9 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 					return false
 				}
 				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
-				gomega.Expect(len(actual.Spec.Template.Spec.Containers[0].Args)).Should(gomega.Equal(4))
+				// klusterlet has no condition, replica is 0
+				gomega.Expect(actual.Status.Replicas).Should(gomega.Equal(int32(0)))
+				gomega.Expect(len(actual.Spec.Template.Spec.Containers[0].Args)).Should(gomega.Equal(5))
 				if actual.Spec.Template.Spec.Containers[0].Args[2] != "--spoke-cluster-name=cluster2" {
 					return false
 				}
@@ -597,7 +599,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "HubConnectionDegraded", "BootstrapSecretMissing,HubKubeConfigMissing", metav1.ConditionTrue)
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "RegistrationDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "WorkDesiredDegraded", "DeploymentsFunctional", metav1.ConditionFalse)
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "WorkDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
 
 			// Create a bootstrap secret and make sure the kubeconfig can work
 			bootStrapSecret := &corev1.Secret{
@@ -614,7 +616,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "HubConnectionDegraded", "BootstrapSecretFunctional,HubKubeConfigMissing", metav1.ConditionTrue)
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "RegistrationDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "WorkDesiredDegraded", "DeploymentsFunctional", metav1.ConditionFalse)
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "WorkDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
 
 			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.HubKubeConfig, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
