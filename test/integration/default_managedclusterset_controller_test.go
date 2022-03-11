@@ -60,4 +60,6 @@ var _ = ginkgo.Describe("DefaultManagedClusterSet", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
+	// TODO:
+	//		add test case for edit default managedclusterset spec operation
 })

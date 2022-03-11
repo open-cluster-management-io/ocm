@@ -67,6 +67,13 @@ func TestSyncDefaultClusterSet(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:               "sync default cluster set with disabled annotation",
+			existingClusterSet: newDefaultManagedClusterSetWithAnnotation(defaultManagedClusterSetName, autoUpdateAnnotation, "false", defaultManagedClusterSetSpec, false),
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testinghelpers.AssertNoActions(t, actions)
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -105,6 +112,24 @@ func newDefaultManagedClusterSet(name string, spec clusterv1beta1.ManagedCluster
 	clusterSet := &clusterv1beta1.ManagedClusterSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
+		},
+		Spec: spec,
+	}
+	if terminating {
+		now := metav1.Now()
+		clusterSet.DeletionTimestamp = &now
+	}
+
+	return clusterSet
+}
+
+func newDefaultManagedClusterSetWithAnnotation(name string, k, v string, spec clusterv1beta1.ManagedClusterSetSpec, terminating bool) *clusterv1beta1.ManagedClusterSet {
+	clusterSet := &clusterv1beta1.ManagedClusterSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Annotations: map[string]string{
+				k: v,
+			},
 		},
 		Spec: spec,
 	}

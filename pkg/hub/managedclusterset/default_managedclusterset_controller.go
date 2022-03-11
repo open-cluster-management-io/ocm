@@ -19,7 +19,10 @@ import (
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
-const defaultManagedClusterSetName = "default"
+const (
+	autoUpdateAnnotation         = "cluster.open-cluster-management.io/autoupdate"
+	defaultManagedClusterSetName = "default"
+)
 
 var defaultManagedClusterSetSpec = clusterv1beta1.ManagedClusterSetSpec{
 	ClusterSelector: clusterv1beta1.ManagedClusterSelector{
@@ -110,6 +113,12 @@ func (c *defaultManagedClusterSetController) sync(ctx context.Context, syncCtx f
 func (c *defaultManagedClusterSetController) syncDefaultClusterSet(ctx context.Context, originalDefaultClusterSet *clusterv1beta1.ManagedClusterSet) error {
 	defaultClusterSet := originalDefaultClusterSet.DeepCopy()
 
+	// if the annotation has set to disable, default clusterset controller will not work.
+	if hasAnnotation(defaultClusterSet, autoUpdateAnnotation, "false") {
+		klog.V(4).Info("DefaultManagedClusterSetDisabled", "The DefaultManagedClusterSet is disabled by user")
+		return nil
+	}
+
 	// if defaultClusterSet.Spec is changed, rollback the change by update it to the original value.
 	if !equality.Semantic.DeepEqual(defaultClusterSet.Spec, defaultManagedClusterSetSpec) {
 		defaultClusterSet.Spec = defaultManagedClusterSetSpec
@@ -123,4 +132,14 @@ func (c *defaultManagedClusterSetController) syncDefaultClusterSet(ctx context.C
 	}
 
 	return nil
+}
+
+func hasAnnotation(set *clusterv1beta1.ManagedClusterSet, key, value string) bool {
+	if set.Annotations == nil {
+		return false
+	}
+	if v, ok := set.Annotations[key]; ok && v == value {
+		return true
+	}
+	return false
 }
