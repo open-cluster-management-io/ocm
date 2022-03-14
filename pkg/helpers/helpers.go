@@ -517,6 +517,19 @@ func LoadClientConfigFromSecret(secret *corev1.Secret) (*rest.Config, error) {
 	return clientcmd.NewDefaultClientConfig(*config, nil).ClientConfig()
 }
 
+// DetermineReplica determines the replica of deployment based on:
+// - mode: if it is Hosted mode will return 1
+// - node: list master nodes in the cluster and return 1 if the
+// number of master nodes is equal or less than 1. Return 3 otherwise.
+func DetermineReplica(ctx context.Context, kubeClient kubernetes.Interface, mode operatorapiv1.InstallMode) int32 {
+	// For hosted mode, there may be many cluster-manager/klusterlet running on the management cluster,
+	// set the replica to 1 to reduce the footprint of the management cluster.
+	if mode == operatorapiv1.InstallModeDetached {
+		return singleReplica
+	}
+	return DetermineReplicaByNodes(ctx, kubeClient)
+}
+
 // DetermineReplicaByNodes determines the replica of deployment based on:
 // list master nodes in the cluster and return 1 if
 // the number of master nodes is equal or less than 1. Return 3 otherwise.

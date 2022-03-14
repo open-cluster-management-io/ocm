@@ -763,6 +763,7 @@ func newKubeConfigSecret(namespace, name string, kubeConfigData, certData, keyDa
 func TestDeterminReplica(t *testing.T) {
 	cases := []struct {
 		name            string
+		mode            operatorapiv1.InstallMode
 		existingNodes   []runtime.Object
 		expectedReplica int32
 	}{
@@ -776,12 +777,24 @@ func TestDeterminReplica(t *testing.T) {
 			existingNodes:   []runtime.Object{newNode("node1"), newNode("node2"), newNode("node3")},
 			expectedReplica: defaultReplica,
 		},
+		{
+			name:            "single node hosted mode",
+			mode:            operatorapiv1.InstallModeDetached,
+			existingNodes:   []runtime.Object{newNode("node1")},
+			expectedReplica: singleReplica,
+		},
+		{
+			name:            "multiple node hosted mode",
+			mode:            operatorapiv1.InstallModeDetached,
+			existingNodes:   []runtime.Object{newNode("node1"), newNode("node2"), newNode("node3")},
+			expectedReplica: singleReplica,
+		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fakeKubeClient := fakekube.NewSimpleClientset(c.existingNodes...)
-			replica := DetermineReplicaByNodes(context.Background(), fakeKubeClient)
+			replica := DetermineReplica(context.Background(), fakeKubeClient, c.mode)
 			if replica != c.expectedReplica {
 				t.Errorf("Unexpected replica, actual: %d, expected: %d", replica, c.expectedReplica)
 			}

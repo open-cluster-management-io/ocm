@@ -90,8 +90,8 @@ spec:
           initialDelaySeconds: 2
         resources:
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: 2m
+            memory: 16Mi
       volumes:
       - name: bootstrap-secret
         secret:
