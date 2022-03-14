@@ -234,6 +234,41 @@ func (t *Tester) CreateKlusterlet(name, clusterName, agentNamespace string, mode
 	return realKlusterlet, nil
 }
 
+func (t *Tester) CreatePureHostedKlusterlet(name, clusterName string) (*operatorapiv1.Klusterlet, error) {
+	if name == "" {
+		return nil, fmt.Errorf("the name should not be null")
+	}
+
+	var klusterlet = &operatorapiv1.Klusterlet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: operatorapiv1.KlusterletSpec{
+			RegistrationImagePullSpec: "quay.io/open-cluster-management/registration:latest",
+			WorkImagePullSpec:         "quay.io/open-cluster-management/work:latest",
+			ExternalServerURLs: []operatorapiv1.ServerURL{
+				{
+					URL: "https://localhost",
+				},
+			},
+			ClusterName: clusterName,
+			DeployOption: operatorapiv1.KlusterletDeployOption{
+				Mode: operatorapiv1.InstallModeDetached,
+			},
+		},
+	}
+
+	// create klusterlet CR
+	realKlusterlet, err := t.OperatorClient.OperatorV1().Klusterlets().Create(context.TODO(),
+		klusterlet, metav1.CreateOptions{})
+	if err != nil {
+		klog.Errorf("failed to create klusterlet %v . %v", klusterlet.Name, err)
+		return nil, err
+	}
+
+	return realKlusterlet, nil
+}
+
 func (t *Tester) GetCreatedManagedCluster(clusterName string) (*clusterv1.ManagedCluster, error) {
 	if clusterName == "" {
 		return nil, fmt.Errorf("the name of managedcluster should not be null")

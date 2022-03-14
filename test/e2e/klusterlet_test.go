@@ -1,10 +1,12 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -186,5 +188,42 @@ var _ = Describe("Create klusterlet CR", func() {
 			err := t.checkKlusterletStatus(klusterletName, "HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
 			return err
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+	})
+})
+
+var _ = Describe("Delete klusterlet CR", func() {
+	var klusterletName string
+	var clusterName string
+
+	BeforeEach(func() {
+		klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
+		clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
+	})
+
+	It("Delete klusterlet CR in Hosted mode without external managed kubeconfig", func() {
+		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v in Hosted mode", klusterletName, clusterName))
+		_, err := t.CreatePureHostedKlusterlet(klusterletName, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		By(fmt.Sprintf("check klusterlet %s status", klusterletName))
+		Eventually(func() error {
+			err := t.checkKlusterletStatus(klusterletName, "ReadyToApply", "KlusterletPrepareFailed", metav1.ConditionFalse)
+			return err
+		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+
+		By(fmt.Sprintf("delete the klusterlet %s", klusterletName))
+		err = t.OperatorClient.OperatorV1().Klusterlets().Delete(context.TODO(),
+			klusterletName, metav1.DeleteOptions{})
+		Expect(err).ToNot(HaveOccurred())
+
+		By(fmt.Sprintf("check klusterlet %s was deleted", klusterletName))
+		Eventually(func() error {
+			_, err := t.OperatorClient.OperatorV1().Klusterlets().Get(context.TODO(),
+				klusterletName, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return fmt.Errorf("klusterlet still exists")
+		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
 	})
 })

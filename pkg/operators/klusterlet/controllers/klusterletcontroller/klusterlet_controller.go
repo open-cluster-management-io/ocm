@@ -176,21 +176,6 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		return err
 	}
 	klusterlet = klusterlet.DeepCopy()
-	// Update finalizer at first
-	if klusterlet.DeletionTimestamp.IsZero() {
-		hasFinalizer := false
-		for i := range klusterlet.Finalizers {
-			if klusterlet.Finalizers[i] == klusterletFinalizer {
-				hasFinalizer = true
-				break
-			}
-		}
-		if !hasFinalizer {
-			klusterlet.Finalizers = append(klusterlet.Finalizers, klusterletFinalizer)
-			_, err = n.klusterletClient.Update(ctx, klusterlet, metav1.UpdateOptions{})
-			return err
-		}
-	}
 
 	config := klusterletConfig{
 		KlusterletName:            klusterlet.Name,
@@ -229,6 +214,23 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 				Type: klusterletReadyToApply, Status: metav1.ConditionTrue, Reason: "KlusterletPrepared",
 				Message: "Klusterlet is ready to apply",
 			}))
+		}
+	}
+
+	// Update finalizer after the clients created, otherwise, for Hosted mode if users did not provide the
+	// external managed cluster kubeconfig, we can not delete the finalizer
+	if klusterlet.DeletionTimestamp.IsZero() {
+		hasFinalizer := false
+		for i := range klusterlet.Finalizers {
+			if klusterlet.Finalizers[i] == klusterletFinalizer {
+				hasFinalizer = true
+				break
+			}
+		}
+		if !hasFinalizer {
+			klusterlet.Finalizers = append(klusterlet.Finalizers, klusterletFinalizer)
+			_, err = n.klusterletClient.Update(ctx, klusterlet, metav1.UpdateOptions{})
+			return err
 		}
 	}
 
