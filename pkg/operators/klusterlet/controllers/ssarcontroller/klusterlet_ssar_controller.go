@@ -50,7 +50,7 @@ const (
 	hubConnectionDegraded   = "HubConnectionDegraded"
 )
 
-func NewKlustrletSSARController(
+func NewKlusterletSSARController(
 	kubeClient kubernetes.Interface,
 	klusterletClient operatorv1client.KlusterletInterface,
 	klusterletInformer operatorinformer.KlusterletInformer,

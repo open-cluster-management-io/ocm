@@ -81,7 +81,7 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		controllerContext.EventRecorder,
 		o.SkipPlaceholderHubSecret)
 
-	ssarController := ssarcontroller.NewKlustrletSSARController(
+	ssarController := ssarcontroller.NewKlusterletSSARController(
 		kubeClient,
 		operatorClient.OperatorV1().Klusterlets(),
 		operatorInformer.Operator().V1().Klusterlets(),
