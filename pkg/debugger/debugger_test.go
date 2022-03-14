@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -53,6 +54,10 @@ func (s *testScheduler) Schedule(ctx context.Context,
 	clusters []*clusterapiv1.ManagedCluster,
 ) (scheduling.ScheduleResult, error) {
 	return s.result, nil
+}
+
+func (r *testResult) RequeueAfter() *time.Duration {
+	return nil
 }
 
 func TestDebugger(t *testing.T) {

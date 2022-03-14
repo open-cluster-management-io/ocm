@@ -220,7 +220,8 @@ func (c *schedulingController) resync(ctx context.Context, syncCtx factory.SyncC
 		if err != nil {
 			return err
 		}
-		return c.syncPlacement(ctx, placement)
+		// Do not pass syncCtx to syncPlacement, since don't want to requeue the placement when resyncing the placement.
+		return c.syncPlacement(ctx, nil, placement)
 	}
 }
 
@@ -237,7 +238,7 @@ func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncCon
 		return err
 	}
 
-	return c.syncPlacement(ctx, placement)
+	return c.syncPlacement(ctx, syncCtx, placement)
 }
 
 func (c *schedulingController) getPlacement(queueKey string) (*clusterapiv1beta1.Placement, error) {
@@ -256,7 +257,7 @@ func (c *schedulingController) getPlacement(queueKey string) (*clusterapiv1beta1
 	return placement, nil
 }
 
-func (c *schedulingController) syncPlacement(ctx context.Context, placement *clusterapiv1beta1.Placement) error {
+func (c *schedulingController) syncPlacement(ctx context.Context, syncCtx factory.SyncContext, placement *clusterapiv1beta1.Placement) error {
 	// no work if placement is deleting
 	if !placement.DeletionTimestamp.IsZero() {
 		return nil
@@ -281,6 +282,14 @@ func (c *schedulingController) syncPlacement(ctx context.Context, placement *clu
 	scheduleResult, err := c.scheduler.Schedule(ctx, placement, clusters)
 	if err != nil {
 		return err
+	}
+
+	// requeue placement if requeueAfter is defined in scheduleResult
+	if syncCtx != nil && scheduleResult.RequeueAfter() != nil {
+		key, _ := cache.MetaNamespaceKeyFunc(placement)
+		t := scheduleResult.RequeueAfter()
+		klog.V(4).Infof("Requeue placement %s after %t", key, t)
+		syncCtx.Queue().AddAfter(key, *t)
 	}
 
 	err = c.bind(ctx, placement, scheduleResult.Decisions(), scheduleResult.PrioritizerScores())

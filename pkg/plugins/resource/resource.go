@@ -77,23 +77,29 @@ func (r *ResourcePrioritizer) Description() string {
 	return description
 }
 
-func (r *ResourcePrioritizer) Score(ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) (map[string]int64, error) {
+func (r *ResourcePrioritizer) Score(ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) plugins.PluginScoreResult {
 	if r.algorithm == "Allocatable" {
 		return mostResourceAllocatableScores(r.resource, clusters)
 	}
-	return nil, nil
+	return plugins.PluginScoreResult{}
+}
+
+func (r *ResourcePrioritizer) RequeueAfter(ctx context.Context, placement *clusterapiv1beta1.Placement) plugins.PluginRequeueResult {
+	return plugins.PluginRequeueResult{}
 }
 
 // Calculate clusters scores based on the resource allocatable.
 // The clusters that has the most allocatable are given the highest score, while the least is given the lowest score.
 // The score range is from -100 to 100.
-func mostResourceAllocatableScores(resourceName clusterapiv1.ResourceName, clusters []*clusterapiv1.ManagedCluster) (map[string]int64, error) {
+func mostResourceAllocatableScores(resourceName clusterapiv1.ResourceName, clusters []*clusterapiv1.ManagedCluster) plugins.PluginScoreResult {
 	scores := map[string]int64{}
 
 	// get resourceName's min and max allocatable among all the clusters
 	minAllocatable, maxAllocatable, err := getClustersMinMaxAllocatableResource(clusters, resourceName)
 	if err != nil {
-		return scores, nil
+		return plugins.PluginScoreResult{
+			Scores: scores,
+		}
 	}
 
 	for _, cluster := range clusters {
@@ -112,7 +118,9 @@ func mostResourceAllocatableScores(resourceName clusterapiv1.ResourceName, clust
 		}
 	}
 
-	return scores, nil
+	return plugins.PluginScoreResult{
+		Scores: scores,
+	}
 }
 
 // Go through one cluster resources and return the allocatable and capacity of the resourceName.

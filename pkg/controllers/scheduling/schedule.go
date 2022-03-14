@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	kevents "k8s.io/client-go/tools/events"
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterlisterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
@@ -55,6 +57,9 @@ type ScheduleResult interface {
 
 	// NumOfUnscheduled returns the number of unscheduled.
 	NumOfUnscheduled() int
+
+	// RequeueAfter returns the requeue time interval of the placement
+	RequeueAfter() *time.Duration
 }
 
 type FilterResult struct {
@@ -79,22 +84,25 @@ type scheduleResult struct {
 	filteredRecords map[string][]*clusterapiv1.ManagedCluster
 	scoreRecords    []PrioritizerResult
 	scoreSum        PrioritizerScore
+	requeueAfter    *time.Duration
 }
 
 type schedulerHandler struct {
 	recorder                kevents.EventRecorder
 	placementDecisionLister clusterlisterv1beta1.PlacementDecisionLister
 	scoreLister             clusterlisterv1alpha1.AddOnPlacementScoreLister
+	clusterLister           clusterlisterv1.ManagedClusterLister
 	clusterClient           clusterclient.Interface
 }
 
 func NewSchedulerHandler(
-	clusterClient clusterclient.Interface, placementDecisionLister clusterlisterv1beta1.PlacementDecisionLister, scoreLister clusterlisterv1alpha1.AddOnPlacementScoreLister, recorder kevents.EventRecorder) plugins.Handle {
+	clusterClient clusterclient.Interface, placementDecisionLister clusterlisterv1beta1.PlacementDecisionLister, scoreLister clusterlisterv1alpha1.AddOnPlacementScoreLister, clusterLister clusterlisterv1.ManagedClusterLister, recorder kevents.EventRecorder) plugins.Handle {
 
 	return &schedulerHandler{
 		recorder:                recorder,
 		placementDecisionLister: placementDecisionLister,
 		scoreLister:             scoreLister,
+		clusterLister:           clusterLister,
 		clusterClient:           clusterClient,
 	}
 }
@@ -109,6 +117,10 @@ func (s *schedulerHandler) DecisionLister() clusterlisterv1beta1.PlacementDecisi
 
 func (s *schedulerHandler) ScoreLister() clusterlisterv1alpha1.AddOnPlacementScoreLister {
 	return s.scoreLister
+}
+
+func (s *schedulerHandler) ClusterLister() clusterlisterv1.ManagedClusterLister {
+	return s.clusterLister
 }
 
 func (s *schedulerHandler) ClusterClient() clusterclient.Interface {
@@ -151,7 +163,6 @@ func (s *pluginScheduler) Schedule(
 	placement *clusterapiv1beta1.Placement,
 	clusters []*clusterapiv1.ManagedCluster,
 ) (ScheduleResult, error) {
-	var err error
 	filtered := clusters
 
 	results := &scheduleResult{
@@ -163,7 +174,9 @@ func (s *pluginScheduler) Schedule(
 	filterPipline := []string{}
 
 	for _, f := range s.filters {
-		filtered, err = f.Filter(ctx, placement, filtered)
+		filterResult := f.Filter(ctx, placement, filtered)
+		filtered = filterResult.Filtered
+		err := filterResult.Err
 
 		if err != nil {
 			return nil, err
@@ -195,7 +208,10 @@ func (s *pluginScheduler) Schedule(
 	}
 	for sc, p := range prioritizers {
 		// Get cluster score.
-		score, err := p.Score(ctx, placement, filtered)
+		scoreResult := p.Score(ctx, placement, filtered)
+		score := scoreResult.Scores
+		err := scoreResult.Err
+
 		if err != nil {
 			return nil, err
 		}
@@ -226,7 +242,6 @@ func (s *pluginScheduler) Schedule(
 	results.scoreSum = scoreSum
 
 	// select clusters and generate cluster decisions
-	// TODO: sort the feasible clusters and make sure the selection stable
 	decisions := selectClusters(placement, filtered)
 	scheduled, unscheduled := len(decisions), 0
 	if placement.Spec.NumberOfClusters != nil {
@@ -234,6 +249,20 @@ func (s *pluginScheduler) Schedule(
 	}
 	results.scheduledDecisions = decisions
 	results.unscheduledDecisions = unscheduled
+
+	// set placement requeue time
+	for _, f := range s.filters {
+		if r := f.RequeueAfter(ctx, placement); r.RequeueTime != nil {
+			newRequeueAfter := time.Until(*r.RequeueTime)
+			results.requeueAfter = setRequeueAfter(results.requeueAfter, &newRequeueAfter)
+		}
+	}
+	for _, p := range prioritizers {
+		if r := p.RequeueAfter(ctx, placement); r.RequeueTime != nil {
+			newRequeueAfter := time.Until(*r.RequeueTime)
+			results.requeueAfter = setRequeueAfter(results.requeueAfter, &newRequeueAfter)
+		}
+	}
 
 	return results, nil
 }
@@ -259,6 +288,19 @@ func selectClusters(placement *clusterapiv1beta1.Placement, clusters []*clustera
 		})
 	}
 	return decisions
+}
+
+// setRequeueAfter selects minimal time.Duration as requeue time
+func setRequeueAfter(requeueAfter, newRequeueAfter *time.Duration) *time.Duration {
+	if newRequeueAfter == nil {
+		return requeueAfter
+	}
+
+	if requeueAfter == nil || *newRequeueAfter < *requeueAfter {
+		return newRequeueAfter
+	}
+
+	return requeueAfter
 }
 
 // Get prioritizer weight for the placement.
@@ -362,4 +404,8 @@ func (r *scheduleResult) Decisions() []clusterapiv1beta1.ClusterDecision {
 
 func (r *scheduleResult) NumOfUnscheduled() int {
 	return r.unscheduledDecisions
+}
+
+func (r *scheduleResult) RequeueAfter() *time.Duration {
+	return r.requeueAfter
 }

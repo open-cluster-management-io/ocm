@@ -66,7 +66,7 @@ func (c *AddOn) Description() string {
 	return description
 }
 
-func (c *AddOn) Score(ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) (map[string]int64, error) {
+func (c *AddOn) Score(ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) plugins.PluginScoreResult {
 	scores := map[string]int64{}
 	expiredScores := ""
 
@@ -104,5 +104,11 @@ func (c *AddOn) Score(ctx context.Context, placement *clusterapiv1beta1.Placemen
 			"AddOnPlacementScores%s expired", expiredScores)
 	}
 
-	return scores, nil
+	return plugins.PluginScoreResult{
+		Scores: scores,
+	}
+}
+
+func (c *AddOn) RequeueAfter(ctx context.Context, placement *clusterapiv1beta1.Placement) plugins.PluginRequeueResult {
+	return plugins.PluginRequeueResult{}
 }

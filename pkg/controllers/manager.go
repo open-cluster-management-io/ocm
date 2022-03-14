@@ -41,6 +41,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 			clusterClient,
 			clusterInformers.Cluster().V1beta1().PlacementDecisions().Lister(),
 			clusterInformers.Cluster().V1alpha1().AddOnPlacementScores().Lister(),
+			clusterInformers.Cluster().V1().ManagedClusters().Lister(),
 			recorder),
 	)
 

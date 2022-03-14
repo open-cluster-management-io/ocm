@@ -583,9 +583,11 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertPlacementStatus(placementName, nod, true)
 		})
 
-		//TODO: should requeue when expire TolerationSeconds
-		ginkgo.It("Should schedule successfully with taint/toleration", func() {
+		ginkgo.It("Should schedule successfully with taint/toleration and requeue when expire TolerationSeconds", func() {
 			addedTime := metav1.Now()
+			addedTime_60 := addedTime.Add(-60 * time.Second)
+			tolerationSeconds_10 := int64(10)
+			tolerationSeconds_20 := int64(20)
 
 			// cluster settings
 			clusterNames := []string{
@@ -611,20 +613,39 @@ var _ = ginkgo.Describe("Placement", func() {
 				TimeAdded: addedTime,
 			})
 			assertUpdatingClusterWithClusterTaint(clusterNames[2], &clusterapiv1.Taint{
-				Key:       "key3",
-				Value:     "value3",
-				Effect:    clusterapiv1.TaintEffectPreferNoSelect,
-				TimeAdded: addedTime,
+				Key:       "key2",
+				Value:     "value2",
+				Effect:    clusterapiv1.TaintEffectNoSelect,
+				TimeAdded: metav1.NewTime(addedTime_60),
 			})
 
 			//Checking the result of the placement
 			assertCreatingPlacement(placementName, noc(4), 3, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{
 				{
-					Key:      "key1",
-					Operator: clusterapiv1beta1.TolerationOpExists,
+					Key:               "key1",
+					Operator:          clusterapiv1beta1.TolerationOpExists,
+					TolerationSeconds: &tolerationSeconds_10,
+				},
+				{
+					Key:               "key2",
+					Operator:          clusterapiv1beta1.TolerationOpExists,
+					TolerationSeconds: &tolerationSeconds_20,
 				},
 			})
-			assertClusterNamesOfDecisions(placementName, []string{clusterNames[0], clusterNames[2], clusterNames[3]})
+			assertClusterNamesOfDecisions(placementName, []string{clusterNames[0], clusterNames[1], clusterNames[3]})
+
+			//Check placement requeue, clusterNames[0] should be removed when TolerationSeconds expired.
+			assertClusterNamesOfDecisions(placementName, []string{clusterNames[1], clusterNames[3]})
+			//Check placement requeue, clusterNames[1] should be removed when TolerationSeconds expired.
+			assertClusterNamesOfDecisions(placementName, []string{clusterNames[3]})
+			//Check placement update, clusterNames[3] should be removed when new taint added.
+			assertUpdatingClusterWithClusterTaint(clusterNames[3], &clusterapiv1.Taint{
+				Key:       "key3",
+				Value:     "value3",
+				Effect:    clusterapiv1.TaintEffectNoSelect,
+				TimeAdded: metav1.NewTime(addedTime_60),
+			})
+			assertClusterNamesOfDecisions(placementName, []string{})
 		})
 
 		ginkgo.It("Should schedule successfully with default SchedulePolicy", func() {

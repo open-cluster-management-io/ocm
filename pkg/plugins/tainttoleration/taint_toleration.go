@@ -3,17 +3,22 @@ package tainttoleration
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
+	"time"
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	"open-cluster-management.io/placement/pkg/plugins"
 )
 
 var _ plugins.Filter = &TaintToleration{}
+var TolerationClock = (clock.Clock)(clock.RealClock{})
 
 const (
 	placementLabel = "cluster.open-cluster-management.io/placement"
@@ -38,80 +43,146 @@ func (pl *TaintToleration) Description() string {
 	return description
 }
 
-func (pl *TaintToleration) Filter(ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) ([]*clusterapiv1.ManagedCluster, error) {
+func (pl *TaintToleration) Filter(ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) plugins.PluginFilterResult {
 	if len(clusters) == 0 {
-		return clusters, nil
+		return plugins.PluginFilterResult{
+			Filtered: clusters,
+		}
 	}
 
 	// do validation on each toleration and return error if necessary
 	for _, toleration := range placement.Spec.Tolerations {
 		if len(toleration.Key) == 0 && toleration.Operator != clusterapiv1beta1.TolerationOpExists {
-			return nil, errors.New("If the key is empty, operator must be Exists.\n")
+			return plugins.PluginFilterResult{
+				Err: errors.New("If the key is empty, operator must be Exists.\n"),
+			}
 		}
 		if toleration.Operator == clusterapiv1beta1.TolerationOpExists && len(toleration.Value) > 0 {
-			return nil, errors.New("If the operator is Exists, the value should be empty.\n")
+			return plugins.PluginFilterResult{
+				Err: errors.New("If the operator is Exists, the value should be empty.\n"),
+			}
 		}
 	}
 
-	existingDecisions := getDecisions(pl.handle, placement)
+	decisionClusterNames := getDecisionClusterNames(pl.handle, placement)
 
 	// filter the clusters
 	matched := []*clusterapiv1.ManagedCluster{}
 	for _, cluster := range clusters {
-		if isClusterTolerated(cluster, placement.Spec.Tolerations, existingDecisions.Has(cluster.Name)) {
+		if tolerated, _ := isClusterTolerated(cluster, placement.Spec.Tolerations, decisionClusterNames.Has(cluster.Name)); tolerated {
 			matched = append(matched, cluster)
 		}
 	}
 
-	return matched, nil
+	return plugins.PluginFilterResult{
+		Filtered: matched,
+	}
+}
+
+func (pl *TaintToleration) RequeueAfter(ctx context.Context, placement *clusterapiv1beta1.Placement) plugins.PluginRequeueResult {
+	// get exist decisions clusters
+	decisionClusterNames, decisionClusters := getDecisionClusters(pl.handle, placement)
+	if decisionClusterNames == nil || decisionClusters == nil {
+		return plugins.PluginRequeueResult{}
+	}
+
+	var minRequeue *plugins.PluginRequeueResult
+	// filter and record pluginRequeueResults
+	for _, cluster := range decisionClusters {
+		if tolerated, requeue := isClusterTolerated(cluster, placement.Spec.Tolerations, decisionClusterNames.Has(cluster.Name)); tolerated {
+			minRequeue = minRequeueTime(minRequeue, requeue)
+		}
+	}
+
+	if minRequeue == nil {
+		return plugins.PluginRequeueResult{}
+	}
+
+	return *minRequeue
 }
 
 // isClusterTolerated returns true if a cluster is tolerated by the given toleration array
-func isClusterTolerated(cluster *clusterapiv1.ManagedCluster, tolerations []clusterapiv1beta1.Toleration, inDecision bool) bool {
+func isClusterTolerated(cluster *clusterapiv1.ManagedCluster, tolerations []clusterapiv1beta1.Toleration, inDecision bool) (bool, *plugins.PluginRequeueResult) {
+	var minRequeue *plugins.PluginRequeueResult
 	for _, taint := range cluster.Spec.Taints {
-		if !isTaintTolerated(taint, tolerations, inDecision) {
-			return false
+		tolerated, requeue := isTaintTolerated(taint, tolerations, inDecision)
+		if !tolerated {
+			return false, nil
 		}
+		minRequeue = minRequeueTime(minRequeue, requeue)
 	}
-	return true
+
+	return true, minRequeue
 }
 
 // isTaintTolerated returns true if a taint is tolerated by the given toleration array
-func isTaintTolerated(taint clusterapiv1.Taint, tolerations []clusterapiv1beta1.Toleration, inDecision bool) bool {
-	if (taint.Effect == clusterapiv1.TaintEffectPreferNoSelect) || (taint.Effect == clusterapiv1.TaintEffectNoSelectIfNew && inDecision) {
-		return true
+func isTaintTolerated(taint clusterapiv1.Taint, tolerations []clusterapiv1beta1.Toleration, inDecision bool) (bool, *plugins.PluginRequeueResult) {
+	if taint.Effect == clusterapiv1.TaintEffectPreferNoSelect {
+		return true, nil
+	}
+
+	if (taint.Effect == clusterapiv1.TaintEffectNoSelectIfNew) && inDecision {
+		return true, nil
 	}
 
 	for _, toleration := range tolerations {
-		if isTolerated(taint, toleration) {
-			return true
+		if tolerated, requeue := isTolerated(taint, toleration); tolerated {
+			return true, requeue
 		}
 	}
-	return false
+
+	return false, nil
 }
 
 // isTolerated returns true if a taint is tolerated by the given toleration
-func isTolerated(taint clusterapiv1.Taint, toleration clusterapiv1beta1.Toleration) bool {
+func isTolerated(taint clusterapiv1.Taint, toleration clusterapiv1beta1.Toleration) (bool, *plugins.PluginRequeueResult) {
 	if len(toleration.Effect) > 0 && toleration.Effect != taint.Effect {
-		return false
+		return false, nil
 	}
 
 	if len(toleration.Key) > 0 && toleration.Key != taint.Key {
-		return false
+		return false, nil
 	}
 
+	taintMatched := false
 	switch toleration.Operator {
 	// empty operator means Equal
 	case "", clusterapiv1beta1.TolerationOpEqual:
-		return toleration.Value == taint.Value
+		taintMatched = (toleration.Value == taint.Value)
 	case clusterapiv1beta1.TolerationOpExists:
-		return true
-	default:
-		return false
+		taintMatched = true
 	}
+
+	if taintMatched {
+		return isTolerationTimeExpired(taint, toleration)
+	}
+
+	return false, nil
+
 }
 
-func getDecisions(handle plugins.Handle, placement *clusterapiv1beta1.Placement) sets.String {
+// isTolerationTimeExpired returns true if TolerationSeconds is nil or not expired
+func isTolerationTimeExpired(taint clusterapiv1.Taint, toleration clusterapiv1beta1.Toleration) (bool, *plugins.PluginRequeueResult) {
+	// TolerationSeconds is nil means it never expire
+	if toleration.TolerationSeconds == nil {
+		return true, nil
+	}
+
+	requeueTime := taint.TimeAdded.Add(time.Duration(*toleration.TolerationSeconds) * time.Second)
+
+	if TolerationClock.Now().Before(requeueTime) {
+		message := fmt.Sprintf("Cluster %s taint is added at %v, placement toleration seconds is %d", "clustername", taint.TimeAdded, *toleration.TolerationSeconds)
+		p := plugins.PluginRequeueResult{
+			RequeueTime: &requeueTime,
+			Reasons:     []string{message},
+		}
+		return true, &p
+	}
+
+	return false, nil
+}
+
+func getDecisionClusterNames(handle plugins.Handle, placement *clusterapiv1beta1.Placement) sets.String {
 	existingDecisions := sets.String{}
 
 	// query placementdecisions with label selector
@@ -133,4 +204,42 @@ func getDecisions(handle plugins.Handle, placement *clusterapiv1beta1.Placement)
 	}
 
 	return existingDecisions
+}
+
+func getDecisionClusters(handle plugins.Handle, placement *clusterapiv1beta1.Placement) (sets.String, []*clusterapiv1.ManagedCluster) {
+	// get existing decision cluster name
+	decisionClusterNames := getDecisionClusterNames(handle, placement)
+
+	// get existing decision clusters
+	decisionClusters := []*clusterapiv1.ManagedCluster{}
+	for c := range decisionClusterNames {
+		if managedCluser, err := handle.ClusterLister().Get(c); err != nil {
+			klog.Warningf("Failed to get ManagedCluster: %s", err)
+		} else {
+			decisionClusters = append(decisionClusters, managedCluser)
+		}
+	}
+
+	return decisionClusterNames, decisionClusters
+}
+
+// return the PluginRequeueResult with minimal requeue time
+func minRequeueTime(x, y *plugins.PluginRequeueResult) *plugins.PluginRequeueResult {
+	if x == nil {
+		return y
+	}
+	if y == nil {
+		return x
+	}
+
+	t1 := x.RequeueTime
+	t2 := y.RequeueTime
+	if t1 == nil || t2 == nil {
+		return nil
+	}
+	if t1.Before(*t2) {
+		return x
+	} else {
+		return y
+	}
 }
