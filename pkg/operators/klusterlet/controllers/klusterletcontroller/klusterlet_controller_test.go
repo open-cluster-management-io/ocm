@@ -85,9 +85,9 @@ func newKlusterlet(name, namespace, clustername string) *opratorapiv1.Klusterlet
 	}
 }
 
-func newKlusterletDetached(name, namespace, clustername string) *opratorapiv1.Klusterlet {
+func newKlusterletHosted(name, namespace, clustername string) *opratorapiv1.Klusterlet {
 	klusterlet := newKlusterlet(name, namespace, clustername)
-	klusterlet.Spec.DeployOption.Mode = opratorapiv1.InstallModeDetached
+	klusterlet.Spec.DeployOption.Mode = opratorapiv1.InstallModeHosted
 	return klusterlet
 }
 
@@ -162,7 +162,7 @@ func newTestController(klusterlet *opratorapiv1.Klusterlet, appliedManifestWorks
 	}
 }
 
-func newTestControllerDetached(klusterlet *opratorapiv1.Klusterlet, appliedManifestWorks []runtime.Object, objects ...runtime.Object) *testController {
+func newTestControllerHosted(klusterlet *opratorapiv1.Klusterlet, appliedManifestWorks []runtime.Object, objects ...runtime.Object) *testController {
 	fakeKubeClient := fakekube.NewSimpleClientset(objects...)
 	fakeAPIExtensionClient := fakeapiextensions.NewSimpleClientset()
 	fakeOperatorClient := fakeoperatorclient.NewSimpleClientset(klusterlet)
@@ -225,7 +225,7 @@ func newTestControllerDetached(klusterlet *opratorapiv1.Klusterlet, appliedManif
 		kubeVersion:               kubeVersion,
 		operatorNamespace:         "open-cluster-management",
 		cache:                     resourceapply.NewResourceCache(),
-		buildManagedClusterClientsDetachedMode: func(ctx context.Context, kubeClient kubernetes.Interface, namespace, secret string) (*managedClusterClients, error) {
+		buildManagedClusterClientsHostedMode: func(ctx context.Context, kubeClient kubernetes.Interface, namespace, secret string) (*managedClusterClients, error) {
 			return &managedClusterClients{
 				kubeClient:                fakeManagedKubeClient,
 				apiExtensionClient:        fakeManagedAPIExtensionClient,
@@ -336,7 +336,7 @@ func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, cl
 		"--hub-kubeconfig=/spoke/hub-kubeconfig/kubeconfig",
 	}
 
-	if mode == opratorapiv1.InstallModeDetached {
+	if mode == opratorapiv1.InstallModeDetached || mode == opratorapiv1.InstallModeHosted {
 		expectArgs = append(expectArgs, "--spoke-kubeconfig=/spoke/config/kubeconfig")
 	}
 
@@ -439,10 +439,10 @@ func TestSyncDeploy(t *testing.T) {
 		testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue))
 }
 
-// TestSyncDeployDetached test deployment of klusterlet components in detached mode
-func TestSyncDeployDetached(t *testing.T) {
+// TestSyncDeployHosted test deployment of klusterlet components in hosted mode
+func TestSyncDeployHosted(t *testing.T) {
 	installedNamespace := "klusterlet"
-	klusterlet := newKlusterletDetached("klusterlet", "testns", "cluster1")
+	klusterlet := newKlusterletHosted("klusterlet", "testns", "cluster1")
 	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, installedNamespace)
 	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, installedNamespace)
 	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
@@ -450,7 +450,7 @@ func TestSyncDeployDetached(t *testing.T) {
 	// externalManagedSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	namespace := newNamespace(installedNamespace)
 	pullSecret := newSecret(imagePullSecret, "open-cluster-management")
-	controller := newTestControllerDetached(klusterlet, nil, bootStrapSecret, hubKubeConfigSecret, namespace, pullSecret /*externalManagedSecret*/)
+	controller := newTestControllerHosted(klusterlet, nil, bootStrapSecret, hubKubeConfigSecret, namespace, pullSecret /*externalManagedSecret*/)
 	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
 
 	err := controller.controller.sync(context.TODO(), syncContext)
@@ -604,8 +604,8 @@ func TestSyncDelete(t *testing.T) {
 	}
 }
 
-func TestSyncDeleteDetached(t *testing.T) {
-	klusterlet := newKlusterletDetached("klusterlet", "testns", "cluster1")
+func TestSyncDeleteHosted(t *testing.T) {
+	klusterlet := newKlusterletHosted("klusterlet", "testns", "cluster1")
 	now := metav1.Now()
 	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
 	installedNamespace := helpers.KlusterletNamespace(klusterlet)
@@ -619,7 +619,7 @@ func TestSyncDeleteDetached(t *testing.T) {
 		newAppliedManifestWorks("testhost", []string{appliedManifestWorkFinalizer}, true),
 		newAppliedManifestWorks("testhost-2", []string{appliedManifestWorkFinalizer}, false),
 	}
-	controller := newTestControllerDetached(klusterlet, appliedManifestWorks, bootstrapKubeConfigSecret, namespace /*externalManagedSecret*/)
+	controller := newTestControllerHosted(klusterlet, appliedManifestWorks, bootstrapKubeConfigSecret, namespace /*externalManagedSecret*/)
 	syncContext := testinghelper.NewFakeSyncContext(t, klusterlet.Name)
 
 	err := controller.controller.sync(context.TODO(), syncContext)

@@ -600,7 +600,7 @@ func LoadClientConfigFromSecret(secret *corev1.Secret) (*rest.Config, error) {
 func DetermineReplica(ctx context.Context, kubeClient kubernetes.Interface, mode operatorapiv1.InstallMode) int32 {
 	// For hosted mode, there may be many cluster-manager/klusterlet running on the management cluster,
 	// set the replica to 1 to reduce the footprint of the management cluster.
-	if mode == operatorapiv1.InstallModeDetached {
+	if mode == operatorapiv1.InstallModeDetached || mode == operatorapiv1.InstallModeHosted {
 		return singleReplica
 	}
 	return DetermineReplicaByNodes(ctx, kubeClient)
@@ -736,9 +736,9 @@ func UpdateKlusterletRelatedResourcesFn(relatedResources ...operatorapiv1.Relate
 }
 
 // KlusterletNamespace returns the klusterletNamespace to deploy the agents.
-// Note in Detached mode, the specNamespace will be ignored.
+// Note in Hosted mode, the specNamespace will be ignored.
 func KlusterletNamespace(klusterlet *operatorapiv1.Klusterlet) string {
-	if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeDetached {
+	if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeDetached || klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeHosted {
 		return klusterlet.GetName()
 	}
 

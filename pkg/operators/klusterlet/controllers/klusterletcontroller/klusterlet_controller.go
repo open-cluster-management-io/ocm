@@ -99,8 +99,8 @@ type klusterletController struct {
 	skipHubSecretPlaceholder  bool
 	cache                     resourceapply.ResourceCache
 
-	// buildManagedClusterClientsDetachedMode build clients for manged cluster in detached mode, this can be override for testing
-	buildManagedClusterClientsDetachedMode func(ctx context.Context, kubeClient kubernetes.Interface, namespace, secret string) (*managedClusterClients, error)
+	// buildManagedClusterClientsHostedMode build clients for manged cluster in hosted mode, this can be override for testing
+	buildManagedClusterClientsHostedMode func(ctx context.Context, kubeClient kubernetes.Interface, namespace, secret string) (*managedClusterClients, error)
 }
 
 // NewKlusterletController construct klusterlet controller
@@ -118,17 +118,17 @@ func NewKlusterletController(
 	recorder events.Recorder,
 	skipHubSecretPlaceholder bool) factory.Controller {
 	controller := &klusterletController{
-		kubeClient:                             kubeClient,
-		apiExtensionClient:                     apiExtensionClient,
-		dynamicClient:                          dynamicClient,
-		klusterletClient:                       klusterletClient,
-		klusterletLister:                       klusterletInformer.Lister(),
-		appliedManifestWorkClient:              appliedManifestWorkClient,
-		kubeVersion:                            kubeVersion,
-		operatorNamespace:                      operatorNamespace,
-		buildManagedClusterClientsDetachedMode: buildManagedClusterClientsFromSecret,
-		skipHubSecretPlaceholder:               skipHubSecretPlaceholder,
-		cache:                                  resourceapply.NewResourceCache(),
+		kubeClient:                           kubeClient,
+		apiExtensionClient:                   apiExtensionClient,
+		dynamicClient:                        dynamicClient,
+		klusterletClient:                     klusterletClient,
+		klusterletLister:                     klusterletInformer.Lister(),
+		appliedManifestWorkClient:            appliedManifestWorkClient,
+		kubeVersion:                          kubeVersion,
+		operatorNamespace:                    operatorNamespace,
+		buildManagedClusterClientsHostedMode: buildManagedClusterClientsFromSecret,
+		skipHubSecretPlaceholder:             skipHubSecretPlaceholder,
+		cache:                                resourceapply.NewResourceCache(),
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -166,7 +166,7 @@ type managedClusterClients struct {
 	apiExtensionClient        apiextensionsclient.Interface
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
 	dynamicClient             dynamic.Interface
-	// Only used for Detached mode to generate managed cluster kubeconfig
+	// Only used for Hosted mode to generate managed cluster kubeconfig
 	// with minimum permission for registration and work.
 	kubeconfig *rest.Config
 }
@@ -209,8 +209,13 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		appliedManifestWorkClient: n.appliedManifestWorkClient,
 	}
 
+	// TODO: remove this when detached mode is not used in klusterlet
 	if config.InstallMode == operatorapiv1.InstallModeDetached {
-		managedClusterClients, err = n.buildManagedClusterClientsDetachedMode(ctx, n.kubeClient, config.KlusterletNamespace, config.ExternalManagedKubeConfigSecret)
+		config.InstallMode = operatorapiv1.InstallModeHosted
+	}
+
+	if config.InstallMode == operatorapiv1.InstallModeHosted {
+		managedClusterClients, err = n.buildManagedClusterClientsHostedMode(ctx, n.kubeClient, config.KlusterletNamespace, config.ExternalManagedKubeConfigSecret)
 		if err != nil {
 			_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
 				Type: klusterletReadyToApply, Status: metav1.ConditionFalse, Reason: "KlusterletPrepareFailed",
@@ -261,9 +266,9 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	if err != nil {
 		return err
 	}
-	// For now, whether in Default or Detached mode, the addons will be deployed on the managed cluster.
+	// For now, whether in Default or Hosted mode, the addons will be deployed on the managed cluster.
 	// sync image pull secret from management cluster to managed cluster for addon namespace
-	// TODO(zhujian7): In the future, we may consider deploy addons on the management cluster in Detached mode.
+	// TODO(zhujian7): In the future, we may consider deploy addons on the management cluster in Hosted mode.
 	addonNamespace := fmt.Sprintf("%s-addon", config.KlusterletNamespace)
 	// Ensure the klusterlet addon namespace
 	err = n.ensureNamespace(ctx, managedClusterClients.kubeClient, klusterletName, addonNamespace)
@@ -276,8 +281,8 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		return err
 	}
 
-	if config.InstallMode == operatorapiv1.InstallModeDetached {
-		// In detached mode, we should ensure the namespace on the managed cluster since
+	if config.InstallMode == operatorapiv1.InstallModeHosted {
+		// In hosted mode, we should ensure the namespace on the managed cluster since
 		// some resources(eg:service account) are still deployed on managed cluster.
 		err := n.ensureNamespace(ctx, managedClusterClients.kubeClient, klusterletName, config.KlusterletNamespace)
 		if err != nil {
@@ -321,7 +326,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 	relatedResources = append(relatedResources, statuses...)
 
-	if config.InstallMode == operatorapiv1.InstallModeDetached {
+	if config.InstallMode == operatorapiv1.InstallModeHosted {
 		// Create managed config secret for registration and work.
 		err = n.createManagedClusterKubeconfig(ctx, klusterletName, config.KlusterletNamespace, registrationServiceAccountName(klusterletName), config.ExternalManagedKubeConfigRegistrationSecret,
 			managedClusterClients.kubeconfig, managedClusterClients.kubeClient, n.kubeClient.CoreV1(), controllerContext.Recorder())
@@ -619,8 +624,8 @@ func (n *klusterletController) cleanUp(
 
 	// Remove secrets
 	secrets := []string{config.HubKubeConfigSecret}
-	if config.InstallMode == operatorapiv1.InstallModeDetached {
-		// In Detached mod, also need to remove the external-managed-kubeconfig-registration and external-managed-kubeconfig-work
+	if config.InstallMode == operatorapiv1.InstallModeHosted {
+		// In Hosted mod, also need to remove the external-managed-kubeconfig-registration and external-managed-kubeconfig-work
 		secrets = append(secrets, []string{config.ExternalManagedKubeConfigRegistrationSecret, config.ExternalManagedKubeConfigWorkSecret}...)
 	}
 	for _, secret := range secrets {
@@ -656,8 +661,8 @@ func (n *klusterletController) cleanUp(
 	}
 
 	// remove the klusterlet namespace and klusterlet addon namespace on the managed cluster
-	// For now, whether in Default or Detached mode, the addons will be deployed on the managed cluster.
-	// TODO(zhujian7): In the future, we may consider deploy addons on the management cluster in Detached mode.
+	// For now, whether in Default or Hosted mode, the addons will be deployed on the managed cluster.
+	// TODO(zhujian7): In the future, we may consider deploy addons on the management cluster in Hosted mode.
 	namespaces := []string{config.KlusterletNamespace, fmt.Sprintf("%s-addon", config.KlusterletNamespace)}
 	for _, namespace := range namespaces {
 		err = managedClients.kubeClient.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
@@ -683,7 +688,7 @@ func (n *klusterletController) cleanUp(
 	// The klusterlet namespace on the management cluster should be removed **at the end**. Otherwise if any failure occurred,
 	// the managed-external-kubeconfig secret would be removed and the next reconcile will fail due to can not build the
 	// managed cluster clients.
-	if config.InstallMode == operatorapiv1.InstallModeDetached {
+	if config.InstallMode == operatorapiv1.InstallModeHosted {
 		// remove the klusterlet namespace on the management cluster
 		err = n.kubeClient.CoreV1().Namespaces().Delete(ctx, config.KlusterletNamespace, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
@@ -809,7 +814,7 @@ func getServersFromKlusterlet(klusterlet *operatorapiv1.Klusterlet) string {
 	return strings.Join(serverString, ",")
 }
 
-// getManagedKubeConfig is a helper func for Detached mode, it will retrive managed cluster
+// getManagedKubeConfig is a helper func for Hosted mode, it will retrive managed cluster
 // kubeconfig from "external-managed-kubeconfig" secret.
 func getManagedKubeConfig(ctx context.Context, kubeClient kubernetes.Interface, namespace, secretName string) (*rest.Config, error) {
 	managedKubeconfigSecret, err := kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{})

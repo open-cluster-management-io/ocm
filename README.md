@@ -121,7 +121,7 @@ We mainly provide deployment in two scenarios:
 4. Switch to management cluster and deploy hub components.
    ```shell
    kubectl config use-context {management-context}
-   make deploy-hub-detached
+   make deploy-hub-hosted
    ```
 
     After deploy hub successfully, the user needs to expose webhook-servers in the management cluster manually.
@@ -181,7 +181,7 @@ We support deploy the Klusterlet(registration-agent, work-agent) outside of mana
 3. Switch to management context and deploy agent components on management cluster.
     ```
     kubectl config use-context {management-context}
-    make deploy-spoke-detached
+    make deploy-spoke-hosted
     ```
 
    **PLEASE NOTE**: If you're running kubernetes in docker, the `server` address in kubeconfig may not be accessible for other clusters. In this case, you need to set `EXTERNAL_MANAGED_KUBECONFIG` explicitly.
@@ -199,7 +199,7 @@ We support deploy the Klusterlet(registration-agent, work-agent) outside of mana
 5. To clean the spoke environment.
    ```shell
    kubectl config use-context {management-context}
-   make clean-spoke-detached
+   make clean-spoke-hosted
 
 ## What is next
 

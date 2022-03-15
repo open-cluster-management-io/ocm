@@ -51,7 +51,7 @@ spec:
           {{if .ExternalServerURL}}
           - "--spoke-external-server-urls={{ .ExternalServerURL }}"
           {{end}}
-          {{if eq .InstallMode "Detached"}}
+          {{if eq .InstallMode "Hosted"}}
           - "--spoke-kubeconfig=/spoke/config/kubeconfig"
           {{end}}
           {{if eq .Replica 1}}
@@ -70,7 +70,7 @@ spec:
           readOnly: true
         - name: hub-kubeconfig
           mountPath: "/spoke/hub-kubeconfig"
-        {{if eq .InstallMode "Detached"}}
+        {{if eq .InstallMode "Hosted"}}
         - name: spoke-kubeconfig-secret
           mountPath: "/spoke/config"
           readOnly: true
@@ -99,7 +99,7 @@ spec:
       - name: hub-kubeconfig
         emptyDir:
           medium: Memory
-      {{if eq .InstallMode "Detached"}}
+      {{if eq .InstallMode "Hosted"}}
       - name: spoke-kubeconfig-secret
         secret:
           secretName: {{ .ExternalManagedKubeConfigRegistrationSecret }}

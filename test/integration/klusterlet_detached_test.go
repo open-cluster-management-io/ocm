@@ -14,7 +14,7 @@ import (
 	"open-cluster-management.io/registration-operator/test/integration/util"
 )
 
-var _ = ginkgo.Describe("Klusterlet Detached mode", func() {
+var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 	var cancel context.CancelFunc
 	var klusterlet *operatorapiv1.Klusterlet
 	var klusterletNamespace string
@@ -43,7 +43,7 @@ var _ = ginkgo.Describe("Klusterlet Detached mode", func() {
 				},
 				ClusterName: "testcluster",
 				DeployOption: operatorapiv1.KlusterletDeployOption{
-					Mode: operatorapiv1.InstallModeDetached,
+					Mode: operatorapiv1.InstallModeHosted,
 				},
 			},
 		}

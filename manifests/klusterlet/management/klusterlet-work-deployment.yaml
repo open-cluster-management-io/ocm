@@ -47,7 +47,7 @@ spec:
           - "agent"
           - "--spoke-cluster-name={{ .ClusterName }}"
           - "--hub-kubeconfig=/spoke/hub-kubeconfig/kubeconfig"
-          {{if eq .InstallMode "Detached"}}
+          {{if eq .InstallMode "Hosted"}}
           - "--spoke-kubeconfig=/spoke/config/kubeconfig"
           {{end}}
           {{if eq .Replica 1}}
@@ -64,7 +64,7 @@ spec:
         - name: hub-kubeconfig-secret
           mountPath: "/spoke/hub-kubeconfig"
           readOnly: true
-        {{if eq .InstallMode "Detached"}}
+        {{if eq .InstallMode "Hosted"}}
         - name: spoke-kubeconfig-secret
           mountPath: "/spoke/config"
           readOnly: true
@@ -90,7 +90,7 @@ spec:
       - name: hub-kubeconfig-secret
         secret:
           secretName: {{ .HubKubeConfigSecret }}
-      {{if eq .InstallMode "Detached"}}
+      {{if eq .InstallMode "Hosted"}}
       - name: spoke-kubeconfig-secret
         secret:
           secretName: {{ .ExternalManagedKubeConfigWorkSecret }}

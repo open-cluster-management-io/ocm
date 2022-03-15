@@ -207,8 +207,8 @@ func (t *Tester) CreateKlusterlet(name, clusterName, agentNamespace string, mode
 		}
 	}
 
-	if mode == operatorapiv1.InstallModeDetached {
-		// create external-managed-kubeconfig, will use the same cluster to simulate the Detached mode.
+	if mode == operatorapiv1.InstallModeDetached || mode == operatorapiv1.InstallModeHosted {
+		// create external-managed-kubeconfig, will use the same cluster to simulate the Hosted mode.
 		secret.Namespace = agentNamespace
 		secret.Name = helpers.ExternalManagedKubeConfig
 		if _, err := t.KubeClient.CoreV1().Secrets(agentNamespace).Get(context.TODO(), secret.Name, metav1.GetOptions{}); err != nil {
@@ -253,7 +253,7 @@ func (t *Tester) CreatePureHostedKlusterlet(name, clusterName string) (*operator
 			},
 			ClusterName: clusterName,
 			DeployOption: operatorapiv1.KlusterletDeployOption{
-				Mode: operatorapiv1.InstallModeDetached,
+				Mode: operatorapiv1.InstallModeHosted,
 			},
 		},
 	}

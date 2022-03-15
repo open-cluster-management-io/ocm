@@ -804,13 +804,13 @@ func TestDeterminReplica(t *testing.T) {
 		},
 		{
 			name:            "single node hosted mode",
-			mode:            operatorapiv1.InstallModeDetached,
+			mode:            operatorapiv1.InstallModeHosted,
 			existingNodes:   []runtime.Object{newNode("node1")},
 			expectedReplica: singleReplica,
 		},
 		{
 			name:            "multiple node hosted mode",
-			mode:            operatorapiv1.InstallModeDetached,
+			mode:            operatorapiv1.InstallModeHosted,
 			existingNodes:   []runtime.Object{newNode("node1"), newNode("node2"), newNode("node3")},
 			expectedReplica: singleReplica,
 		},
@@ -1292,27 +1292,27 @@ func TestKlusterletNamespace(t *testing.T) {
 			expect: "open-cluster-management-test",
 		},
 		{
-			name: "Detached mode with spec namespace",
+			name: "Hosted mode with spec namespace",
 			klusterlet: &operatorapiv1.Klusterlet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "klusterlet",
 				},
 				Spec: operatorapiv1.KlusterletSpec{
 					Namespace:    "open-cluster-management-test",
-					DeployOption: operatorapiv1.KlusterletDeployOption{Mode: operatorapiv1.InstallModeDetached},
+					DeployOption: operatorapiv1.KlusterletDeployOption{Mode: operatorapiv1.InstallModeHosted},
 				},
 			},
 			expect: "klusterlet",
 		},
 		{
-			name: "Detached mode without spec namespace",
+			name: "Hosted mode without spec namespace",
 			klusterlet: &operatorapiv1.Klusterlet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "klusterlet",
 				},
 				Spec: operatorapiv1.KlusterletSpec{
 					Namespace:    "",
-					DeployOption: operatorapiv1.KlusterletDeployOption{Mode: operatorapiv1.InstallModeDetached},
+					DeployOption: operatorapiv1.KlusterletDeployOption{Mode: operatorapiv1.InstallModeHosted},
 				},
 			},
 			expect: "klusterlet",

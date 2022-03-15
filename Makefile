@@ -47,7 +47,7 @@ kustomize_dir:=$(dir $(KUSTOMIZE))
 KUBECTL?=kubectl
 KUBECONFIG?=./.kubeconfig
 HUB_KUBECONFIG?=./.hub-kubeconfig
-DETACHED_CLUSTER_MANAGER_NAME?=cluster-manager
+HOSTED_CLUSTER_MANAGER_NAME?=cluster-manager
 EXTERNAL_HUB_KUBECONFIG?=./.external-hub-kubeconfig
 EXTERNAL_MANAGED_KUBECONFIG?=./.external-managed-kubeconfig
 MANAGED_CLUSTER_NAME ?= cluster1
@@ -138,8 +138,8 @@ bootstrap-secret-hosted:
 
 external-hub-secret:
 	cp $(EXTERNAL_HUB_KUBECONFIG) deploy/cluster-manager/config/samples/cluster-manager/external-hub-kubeconfig
-	$(KUBECTL) get ns $(DETACHED_CLUSTER_MANAGER_NAME); if [ $$? -ne 0 ] ; then $(KUBECTL) create ns $(DETACHED_CLUSTER_MANAGER_NAME); fi
-	$(KUSTOMIZE) build deploy/cluster-manager/config/samples/cluster-manager | $(SED_CMD) -e "s,cluster-manager,$(DETACHED_CLUSTER_MANAGER_NAME)," | $(KUBECTL) apply -f -
+	$(KUBECTL) get ns $(HOSTED_CLUSTER_MANAGER_NAME); if [ $$? -ne 0 ] ; then $(KUBECTL) create ns $(HOSTED_CLUSTER_MANAGER_NAME); fi
+	$(KUSTOMIZE) build deploy/cluster-manager/config/samples/cluster-manager | $(SED_CMD) -e "s,cluster-manager,$(HOSTED_CLUSTER_MANAGER_NAME)," | $(KUBECTL) apply -f -
 
 external-managed-secret:
 	cp $(EXTERNAL_MANAGED_KUBECONFIG) deploy/klusterlet/config/samples/managedcluster/external-managed-kubeconfig
@@ -166,8 +166,8 @@ clean-hub-cr:
 
 clean-hub-cr-hosted:
 	$(KUBECTL) delete managedcluster --all --ignore-not-found
-	$(KUSTOMIZE) build deploy/cluster-manager/config/samples | $(SED_CMD) -e "s,cluster-manager,$(DETACHED_CLUSTER_MANAGER_NAME)," | $(KUBECTL) delete --ignore-not-found -f -
-	$(KUSTOMIZE) build deploy/cluster-manager/config/samples/cluster-manager | $(SED_CMD) -e "s,cluster-manager,$(DETACHED_CLUSTER_MANAGER_NAME)," | $(KUBECTL) delete --ignore-not-found -f -
+	$(KUSTOMIZE) build deploy/cluster-manager/config/samples | $(SED_CMD) -e "s,cluster-manager,$(HOSTED_CLUSTER_MANAGER_NAME)," | $(KUBECTL) delete --ignore-not-found -f -
+	$(KUSTOMIZE) build deploy/cluster-manager/config/samples/cluster-manager | $(SED_CMD) -e "s,cluster-manager,$(HOSTED_CLUSTER_MANAGER_NAME)," | $(KUBECTL) delete --ignore-not-found -f -
 
 clean-hub-operator:
 	$(KUSTOMIZE) build deploy/cluster-manager/config | $(KUBECTL) delete --ignore-not-found -f -
