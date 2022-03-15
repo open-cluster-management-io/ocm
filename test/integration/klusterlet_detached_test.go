@@ -64,7 +64,7 @@ var _ = ginkgo.Describe("Klusterlet Detached mode", func() {
 				Namespace: klusterletNamespace,
 			},
 			Data: map[string][]byte{
-				"kubeconfig": util.NewKubeConfig(detachedRestConfig),
+				"kubeconfig": util.NewKubeConfig(hostedRestConfig),
 			},
 		}
 		_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(), managedKubeconfigSecret, metav1.CreateOptions{})
@@ -120,13 +120,13 @@ var _ = ginkgo.Describe("Klusterlet Detached mode", func() {
 
 			// Check CRDs
 			gomega.Eventually(func() bool {
-				if _, err := detachedAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), "appliedmanifestworks.work.open-cluster-management.io", metav1.GetOptions{}); err != nil {
+				if _, err := hostedAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), "appliedmanifestworks.work.open-cluster-management.io", metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := detachedAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), "clusterclaims.cluster.open-cluster-management.io", metav1.GetOptions{}); err != nil {
+				if _, err := hostedAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), "clusterclaims.cluster.open-cluster-management.io", metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -134,25 +134,25 @@ var _ = ginkgo.Describe("Klusterlet Detached mode", func() {
 
 			// Check clusterrole/clusterrolebinding
 			gomega.Eventually(func() bool {
-				if _, err := detachedKubeClient.RbacV1().ClusterRoles().Get(context.Background(), registrationManagedRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.RbacV1().ClusterRoles().Get(context.Background(), registrationManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := detachedKubeClient.RbacV1().ClusterRoles().Get(context.Background(), workManagedRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.RbacV1().ClusterRoles().Get(context.Background(), workManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := detachedKubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), registrationManagedRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), registrationManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := detachedKubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), workManagedRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), workManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -211,13 +211,13 @@ var _ = ginkgo.Describe("Klusterlet Detached mode", func() {
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := detachedKubeClient.CoreV1().ServiceAccounts(klusterletNamespace).Get(context.Background(), registrationSAName, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.CoreV1().ServiceAccounts(klusterletNamespace).Get(context.Background(), registrationSAName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := detachedKubeClient.CoreV1().ServiceAccounts(klusterletNamespace).Get(context.Background(), workSAName, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.CoreV1().ServiceAccounts(klusterletNamespace).Get(context.Background(), workSAName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -240,7 +240,7 @@ var _ = ginkgo.Describe("Klusterlet Detached mode", func() {
 			// Check addon namespace
 			addonNamespace := fmt.Sprintf("%s-addon", klusterletNamespace)
 			gomega.Eventually(func() bool {
-				if _, err := detachedKubeClient.CoreV1().Namespaces().Get(context.Background(), addonNamespace, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.CoreV1().Namespaces().Get(context.Background(), addonNamespace, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true

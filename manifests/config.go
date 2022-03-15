@@ -9,7 +9,7 @@ type HubConfig struct {
 	WorkAPIServiceCABundle         string
 	PlacementImage                 string
 	Replica                        int32
-	DetachedMode                   bool
+	HostedMode                     bool
 	RegistrationWebhook            Webhook
 	WorkWebhook                    Webhook
 }

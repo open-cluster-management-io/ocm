@@ -73,18 +73,18 @@ var (
 		"cluster-manager/hub/cluster-manager-registration-webhook-apiservice.yaml",
 	}
 
-	// The hubDetachedWebhookServiceFiles should only be deployed on the hub cluster when the deploy mode is detached.
+	// The hubHostedWebhookServiceFiles should only be deployed on the hub cluster when the deploy mode is hosted.
 	hubDefaultWebhookServiceFiles = []string{
 		"cluster-manager/hub/cluster-manager-registration-webhook-service.yaml",
 		"cluster-manager/hub/cluster-manager-work-webhook-service.yaml",
 	}
-	hubDetachedWebhookServiceFiles = []string{
-		"cluster-manager/hub/cluster-manager-registration-webhook-service-detached.yaml",
-		"cluster-manager/hub/cluster-manager-work-webhook-service-detached.yaml",
+	hubHostedWebhookServiceFiles = []string{
+		"cluster-manager/hub/cluster-manager-registration-webhook-service-hosted.yaml",
+		"cluster-manager/hub/cluster-manager-work-webhook-service-hosted.yaml",
 	}
-	// hubDetachedWebhookEndpointFiles only apply when the deploy mode is detached and address is IPFormat.
-	hubDetachedWebhookEndpointRegistration = "cluster-manager/hub/cluster-manager-registration-webhook-endpoint-detached.yaml"
-	hubDetachedWebhookEndpointWork         = "cluster-manager/hub/cluster-manager-work-webhook-endpoint-detached.yaml"
+	// hubHostedWebhookEndpointFiles only apply when the deploy mode is hosted and address is IPFormat.
+	hubHostedWebhookEndpointRegistration = "cluster-manager/hub/cluster-manager-registration-webhook-endpoint-hosted.yaml"
+	hubHostedWebhookEndpointWork         = "cluster-manager/hub/cluster-manager-work-webhook-endpoint-hosted.yaml"
 
 	// The hubRbacResourceFiles should be deployed in the hub cluster.
 	hubRbacResourceFiles = []string{
@@ -201,14 +201,14 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		WorkImage:               clusterManager.Spec.WorkImagePullSpec,
 		PlacementImage:          clusterManager.Spec.PlacementImagePullSpec,
 		Replica:                 helpers.DetermineReplica(ctx, n.operatorKubeClient, clusterManagerMode),
-		DetachedMode:            clusterManager.Spec.DeployOption.Mode == operatorapiv1.InstallModeDetached,
+		HostedMode:              clusterManager.Spec.DeployOption.Mode == operatorapiv1.InstallModeHosted,
 	}
-	// If we are deploying in the detached mode, it requires us to create webhook in a different way with the default mode.
-	// In the detached mode, the webhook servers is running in the management cluster but the users are accessing the hub cluster.
+	// If we are deploying in the hosted mode, it requires us to create webhook in a different way with the default mode.
+	// In the hosted mode, the webhook servers is running in the management cluster but the users are accessing the hub cluster.
 	// So we need to add configuration to make the apiserver of the hub cluster could access the webhook servers on the management cluster.
-	if clusterManager.Spec.DeployOption.Detached != nil {
-		config.RegistrationWebhook = convertWebhookConfiguration(clusterManager.Spec.DeployOption.Detached.RegistrationWebhookConfiguration)
-		config.WorkWebhook = convertWebhookConfiguration(clusterManager.Spec.DeployOption.Detached.WorkWebhookConfiguration)
+	if clusterManager.Spec.DeployOption.Hosted != nil {
+		config.RegistrationWebhook = convertWebhookConfiguration(clusterManager.Spec.DeployOption.Hosted.RegistrationWebhookConfiguration)
+		config.WorkWebhook = convertWebhookConfiguration(clusterManager.Spec.DeployOption.Hosted.WorkWebhookConfiguration)
 	}
 
 	// Update finalizer at first
@@ -445,10 +445,10 @@ func applyManagementResources(
 	clusterManagerMode := clusterManager.Spec.DeployOption.Mode
 	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManagerName, clusterManagerMode)
 
-	// In the Detached mode, ensure the rbac kubeconfig secrets is existed for deployments to mount.
+	// In the Hosted mode, ensure the rbac kubeconfig secrets is existed for deployments to mount.
 	// In this step, we get serviceaccount token from the hub cluster to form a kubeconfig and set it as a secret on the management cluster.
 	// Before this step, the serviceaccounts in the hub cluster and the namespace in the management cluster should be applied first.
-	if clusterManagerMode == operatorapiv1.InstallModeDetached {
+	if clusterManagerMode == operatorapiv1.InstallModeHosted {
 		err = ensureSAKubeconfigs(ctx, clusterManagerName, clusterManagerNamespace,
 			hubKubeConfig, hubClient, managementKubeClient, recorder)
 		if err != nil {
@@ -650,14 +650,14 @@ func getHubResources(mode operatorapiv1.InstallMode, isRegistrationIPFormat, isW
 	hubResources = append(hubResources, hubWebhookResourceFiles...)
 	hubResources = append(hubResources, hubRbacResourceFiles...)
 
-	// the hubDetachedWebhookServiceFiles are only used in detached mode
-	if mode == operatorapiv1.InstallModeDetached {
-		hubResources = append(hubResources, hubDetachedWebhookServiceFiles...)
+	// the hubHostedWebhookServiceFiles are only used in hosted mode
+	if mode == operatorapiv1.InstallModeHosted {
+		hubResources = append(hubResources, hubHostedWebhookServiceFiles...)
 		if isRegistrationIPFormat {
-			hubResources = append(hubResources, hubDetachedWebhookEndpointRegistration)
+			hubResources = append(hubResources, hubHostedWebhookEndpointRegistration)
 		}
 		if isWorkIPFormat {
-			hubResources = append(hubResources, hubDetachedWebhookEndpointWork)
+			hubResources = append(hubResources, hubHostedWebhookEndpointWork)
 		}
 	} else {
 		hubResources = append(hubResources, hubDefaultWebhookServiceFiles...)

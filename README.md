@@ -86,7 +86,7 @@ We mainly provide deployment in two scenarios:
    make clean-spoke
    ``` 
 
-### Deploy hub(Clustermanager) with Detached mode
+### Deploy hub(Clustermanager) with Hosted mode
 
 1. Create 3 Kind clusters: management cluster, hub cluster and a managed cluster. 
 
@@ -158,9 +158,9 @@ We mainly provide deployment in two scenarios:
     EOF
     ```
 
-### Deploy spoke(Klusterlet) with Detached mode
+### Deploy spoke(Klusterlet) with Hosted mode
 
-We support deploy the Klusterlet(registration-agent, work-agent) outside of managed cluster, called `Detached` mode, and we define the cluster where the Klusterlet runs as management-cluster.
+We support deploy the Klusterlet(registration-agent, work-agent) outside of managed cluster, called `Hosted` mode, and we define the cluster where the Klusterlet runs as management-cluster.
 
 1. Set env variables.
    ```shell
@@ -189,7 +189,7 @@ We support deploy the Klusterlet(registration-agent, work-agent) outside of mana
    For example, if your clusters are created by kind, you need to use kind's command to export a kubeconfig of managed/spoke cluster with an accessible `server` address. ([The related issue](https://github.com/kubernetes-sigs/kind/issues/1305))
 
    ```shell
-   kind get kubeconfig --name {kind-managed-cluster-name} --internal > ./.external-managed-kubeconfig # ./.external-managed-kubeconfig is default value of EXTERNAL_MANAGED_KUBECONFIG, it is only useful in Detached mode.
+   kind get kubeconfig --name {kind-managed-cluster-name} --internal > ./.external-managed-kubeconfig # ./.external-managed-kubeconfig is default value of EXTERNAL_MANAGED_KUBECONFIG, it is only useful in Hosted mode.
    ```
 4. To clean the hub environment.
    ```shell

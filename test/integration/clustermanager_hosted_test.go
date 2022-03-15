@@ -20,44 +20,44 @@ import (
 	"open-cluster-management.io/registration-operator/test/integration/util"
 )
 
-var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
-	var detachesCtx context.Context
-	var detachedCancel context.CancelFunc
+var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
+	var hostedCtx context.Context
+	var hostedCancel context.CancelFunc
 	var hubRegistrationDeployment = fmt.Sprintf("%s-registration-controller", clusterManagerName)
 
 	ginkgo.BeforeEach(func() {
-		detachesCtx, detachedCancel = context.WithCancel(context.Background())
+		hostedCtx, hostedCancel = context.WithCancel(context.Background())
 
 		recorder := util.NewIntegrationTestEventRecorder("integration")
 
-		// Create the detached hub namespace
+		// Create the hosted hub namespace
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: hubNamespaceDetached,
+				Name: hubNamespaceHosted,
 			},
 		}
-		_, _, err := resourceapply.ApplyNamespace(detachesCtx, detachedKubeClient.CoreV1(), recorder, ns)
+		_, _, err := resourceapply.ApplyNamespace(hostedCtx, hostedKubeClient.CoreV1(), recorder, ns)
 		gomega.Expect(err).To(gomega.BeNil())
 
 		// Create the external hub kubeconfig secret
 		hubKubeconfigSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      helpers.ExternalHubKubeConfig,
-				Namespace: hubNamespaceDetached,
+				Namespace: hubNamespaceHosted,
 			},
 			Data: map[string][]byte{
-				"kubeconfig": util.NewKubeConfig(detachedRestConfig),
+				"kubeconfig": util.NewKubeConfig(hostedRestConfig),
 			},
 		}
-		_, _, err = resourceapply.ApplySecret(detachesCtx, detachedKubeClient.CoreV1(), recorder, hubKubeconfigSecret)
+		_, _, err = resourceapply.ApplySecret(hostedCtx, hostedKubeClient.CoreV1(), recorder, hubKubeconfigSecret)
 		gomega.Expect(err).To(gomega.BeNil())
 
-		go startHubOperator(detachesCtx, v1.InstallModeDetached)
+		go startHubOperator(hostedCtx, v1.InstallModeHosted)
 	})
 
 	ginkgo.AfterEach(func() {
-		if detachedCancel != nil {
-			detachedCancel()
+		if hostedCancel != nil {
+			hostedCancel()
 		}
 	})
 
@@ -65,7 +65,7 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 		ginkgo.It("should have expected resource created successfully", func() {
 			// Check namespace
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.CoreV1().Namespaces().Get(detachesCtx, hubNamespaceDetached, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.CoreV1().Namespaces().Get(hostedCtx, hubNamespaceHosted, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -76,37 +76,37 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 			hubRegistrationWebhookClusterRole := fmt.Sprintf("open-cluster-management:%s-registration:webhook", clusterManagerName)
 			hubWorkWebhookClusterRole := fmt.Sprintf("open-cluster-management:%s-registration:webhook", clusterManagerName)
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.RbacV1().ClusterRoles().Get(detachesCtx, hubRegistrationClusterRole, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.RbacV1().ClusterRoles().Get(hostedCtx, hubRegistrationClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.RbacV1().ClusterRoles().Get(detachesCtx, hubRegistrationWebhookClusterRole, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.RbacV1().ClusterRoles().Get(hostedCtx, hubRegistrationWebhookClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.RbacV1().ClusterRoles().Get(detachesCtx, hubWorkWebhookClusterRole, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.RbacV1().ClusterRoles().Get(hostedCtx, hubWorkWebhookClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.RbacV1().ClusterRoleBindings().Get(detachesCtx, hubRegistrationClusterRole, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(hostedCtx, hubRegistrationClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.RbacV1().ClusterRoleBindings().Get(detachesCtx, hubRegistrationWebhookClusterRole, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(hostedCtx, hubRegistrationWebhookClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.RbacV1().ClusterRoleBindings().Get(detachesCtx, hubWorkWebhookClusterRole, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(hostedCtx, hubWorkWebhookClusterRole, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -117,19 +117,19 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 			hubRegistrationWebhookSA := fmt.Sprintf("%s-registration-webhook-sa", clusterManagerName)
 			hubWorkWebhookSA := fmt.Sprintf("%s-work-webhook-sa", clusterManagerName)
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.CoreV1().ServiceAccounts(hubNamespaceDetached).Get(detachesCtx, hubRegistrationSA, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.CoreV1().ServiceAccounts(hubNamespaceHosted).Get(hostedCtx, hubRegistrationSA, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.CoreV1().ServiceAccounts(hubNamespaceDetached).Get(detachesCtx, hubRegistrationWebhookSA, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.CoreV1().ServiceAccounts(hubNamespaceHosted).Get(hostedCtx, hubRegistrationWebhookSA, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.CoreV1().ServiceAccounts(hubNamespaceDetached).Get(detachesCtx, hubWorkWebhookSA, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.CoreV1().ServiceAccounts(hubNamespaceHosted).Get(hostedCtx, hubWorkWebhookSA, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -137,7 +137,7 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 
 			// Check deployment
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.AppsV1().Deployments(hubNamespaceDetached).Get(detachesCtx, hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -145,7 +145,7 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 
 			hubRegistrationWebhookDeployment := fmt.Sprintf("%s-registration-webhook", clusterManagerName)
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.AppsV1().Deployments(hubNamespaceDetached).Get(detachesCtx, hubRegistrationWebhookDeployment, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationWebhookDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -153,7 +153,7 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 
 			hubWorkWebhookDeployment := fmt.Sprintf("%s-work-webhook", clusterManagerName)
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.AppsV1().Deployments(hubNamespaceDetached).Get(detachesCtx, hubWorkWebhookDeployment, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubWorkWebhookDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -161,14 +161,14 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 
 			// Check service
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.CoreV1().Services(hubNamespaceDetached).Get(detachesCtx, "cluster-manager-registration-webhook", metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.CoreV1().Services(hubNamespaceHosted).Get(hostedCtx, "cluster-manager-registration-webhook", metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.CoreV1().Services(hubNamespaceDetached).Get(detachesCtx, "cluster-manager-work-webhook", metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.CoreV1().Services(hubNamespaceHosted).Get(hostedCtx, "cluster-manager-work-webhook", metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -177,7 +177,7 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 			// Check webhook secret
 			registrationWebhookSecret := "registration-webhook-serving-cert"
 			gomega.Eventually(func() error {
-				s, err := detachedKubeClient.CoreV1().Secrets(hubNamespaceDetached).Get(detachesCtx, registrationWebhookSecret, metav1.GetOptions{})
+				s, err := hostedKubeClient.CoreV1().Secrets(hubNamespaceHosted).Get(hostedCtx, registrationWebhookSecret, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -193,7 +193,7 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 
 			workWebhookSecret := "work-webhook-serving-cert"
 			gomega.Eventually(func() error {
-				s, err := detachedKubeClient.CoreV1().Secrets(hubNamespaceDetached).Get(detachesCtx, workWebhookSecret, metav1.GetOptions{})
+				s, err := hostedKubeClient.CoreV1().Secrets(hubNamespaceHosted).Get(hostedCtx, workWebhookSecret, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -210,7 +210,7 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 			// Check validating webhook
 			registrationValidtingWebhook := "managedclustervalidators.admission.cluster.open-cluster-management.io"
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(detachesCtx, registrationValidtingWebhook, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(hostedCtx, registrationValidtingWebhook, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -218,18 +218,18 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 
 			workValidtingWebhook := "manifestworkvalidators.admission.work.open-cluster-management.io"
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(detachesCtx, workValidtingWebhook, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(hostedCtx, workValidtingWebhook, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
-			util.AssertClusterManagerCondition(clusterManagerName, detachedOperatorClient, "Applied", "ClusterManagerApplied", metav1.ConditionTrue)
+			util.AssertClusterManagerCondition(clusterManagerName, hostedOperatorClient, "Applied", "ClusterManagerApplied", metav1.ConditionTrue)
 		})
 
 		ginkgo.It("Deployment should be updated when clustermanager is changed", func() {
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.AppsV1().Deployments(hubNamespaceDetached).Get(detachesCtx, hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -237,7 +237,7 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 
 			// Check if generations are correct
 			gomega.Eventually(func() error {
-				actual, err := detachedOperatorClient.OperatorV1().ClusterManagers().Get(detachesCtx, clusterManagerName, metav1.GetOptions{})
+				actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(hostedCtx, clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -249,14 +249,14 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
-			clusterManager, err := detachedOperatorClient.OperatorV1().ClusterManagers().Get(detachesCtx, clusterManagerName, metav1.GetOptions{})
+			clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(hostedCtx, clusterManagerName, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			clusterManager.Spec.RegistrationImagePullSpec = "testimage:latest"
-			_, err = detachedOperatorClient.OperatorV1().ClusterManagers().Update(detachesCtx, clusterManager, metav1.UpdateOptions{})
+			_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(hostedCtx, clusterManager, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			gomega.Eventually(func() error {
-				actual, err := detachedKubeClient.AppsV1().Deployments(hubNamespaceDetached).Get(detachesCtx, hubRegistrationDeployment, metav1.GetOptions{})
+				actual, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -269,7 +269,7 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 
 			// Check if generations are correct
 			gomega.Eventually(func() error {
-				actual, err := detachedOperatorClient.OperatorV1().ClusterManagers().Get(detachesCtx, clusterManagerName, metav1.GetOptions{})
+				actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(hostedCtx, clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -283,7 +283,7 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 
 			// Check if relatedResources are correct
 			gomega.Eventually(func() error {
-				actual, err := detachedOperatorClient.OperatorV1().ClusterManagers().Get(detachesCtx, clusterManagerName, metav1.GetOptions{})
+				actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(hostedCtx, clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -296,7 +296,7 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 		})
 
 		ginkgo.It("Deployment should be added nodeSelector and toleration when add nodePlacement into clustermanager", func() {
-			clusterManager, err := detachedOperatorClient.OperatorV1().ClusterManagers().Get(detachesCtx, clusterManagerName, metav1.GetOptions{})
+			clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(hostedCtx, clusterManagerName, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			clusterManager.Spec.NodePlacement = v1.NodePlacement{
 				NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
@@ -308,11 +308,11 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 					},
 				},
 			}
-			_, err = detachedOperatorClient.OperatorV1().ClusterManagers().Update(detachesCtx, clusterManager, metav1.UpdateOptions{})
+			_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(hostedCtx, clusterManager, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			gomega.Eventually(func() error {
-				actual, err := detachedKubeClient.AppsV1().Deployments(hubNamespaceDetached).Get(detachesCtx, hubRegistrationDeployment, metav1.GetOptions{})
+				actual, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -337,18 +337,18 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 		})
 		ginkgo.It("Deployment should be reconciled when manually updated", func() {
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.AppsV1().Deployments(hubNamespaceDetached).Get(detachesCtx, hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
-			registrationoDeployment, err := detachedKubeClient.AppsV1().Deployments(hubNamespaceDetached).Get(detachesCtx, hubRegistrationDeployment, metav1.GetOptions{})
+			registrationoDeployment, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			registrationoDeployment.Spec.Template.Spec.Containers[0].Image = "testimage2:latest"
-			_, err = detachedKubeClient.AppsV1().Deployments(hubNamespaceDetached).Update(detachesCtx, registrationoDeployment, metav1.UpdateOptions{})
+			_, err = hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Update(hostedCtx, registrationoDeployment, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Eventually(func() error {
-				registrationoDeployment, err := detachedKubeClient.AppsV1().Deployments(hubNamespaceDetached).Get(detachesCtx, hubRegistrationDeployment, metav1.GetOptions{})
+				registrationoDeployment, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -360,12 +360,12 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 
 			// Check if generations are correct
 			gomega.Eventually(func() error {
-				actual, err := detachedOperatorClient.OperatorV1().ClusterManagers().Get(detachesCtx, clusterManagerName, metav1.GetOptions{})
+				actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(hostedCtx, clusterManagerName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
-				registrationDeployment, err := detachedKubeClient.AppsV1().Deployments(hubNamespaceDetached).Get(detachesCtx, hubRegistrationDeployment, metav1.GetOptions{})
+				registrationDeployment, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -383,26 +383,26 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 	ginkgo.Context("Cluster manager statuses", func() {
 		ginkgo.It("should have correct degraded conditions", func() {
 			gomega.Eventually(func() error {
-				if _, err := detachedKubeClient.AppsV1().Deployments(hubNamespaceDetached).Get(detachesCtx, hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
 			// The cluster manager should be unavailable at first
-			util.AssertClusterManagerCondition(clusterManagerName, detachedOperatorClient, "HubRegistrationDegraded", "UnavailableRegistrationPod", metav1.ConditionTrue)
+			util.AssertClusterManagerCondition(clusterManagerName, hostedOperatorClient, "HubRegistrationDegraded", "UnavailableRegistrationPod", metav1.ConditionTrue)
 
 			// Update replica of deployment
-			registrationDeployment, err := detachedKubeClient.AppsV1().Deployments(hubNamespaceDetached).Get(detachesCtx, hubRegistrationDeployment, metav1.GetOptions{})
+			registrationDeployment, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			registrationDeployment.Status.AvailableReplicas = 3
 			registrationDeployment.Status.Replicas = 3
 			registrationDeployment.Status.ReadyReplicas = 3
-			_, err = detachedKubeClient.AppsV1().Deployments(hubNamespaceDetached).UpdateStatus(detachesCtx, registrationDeployment, metav1.UpdateOptions{})
+			_, err = hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).UpdateStatus(hostedCtx, registrationDeployment, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// The cluster manager should be functional at last
-			util.AssertClusterManagerCondition(clusterManagerName, detachedOperatorClient, "HubRegistrationDegraded", "RegistrationFunctional", metav1.ConditionFalse)
+			util.AssertClusterManagerCondition(clusterManagerName, hostedOperatorClient, "HubRegistrationDegraded", "RegistrationFunctional", metav1.ConditionFalse)
 		})
 	})
 
@@ -412,11 +412,11 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 			// wait until all secrets and configmap are in place
 			gomega.Eventually(func() error {
 				for _, name := range secretNames {
-					if _, err := detachedKubeClient.CoreV1().Secrets(hubNamespaceDetached).Get(detachesCtx, name, metav1.GetOptions{}); err != nil {
+					if _, err := hostedKubeClient.CoreV1().Secrets(hubNamespaceHosted).Get(hostedCtx, name, metav1.GetOptions{}); err != nil {
 						return err
 					}
 				}
-				if _, err := detachedKubeClient.CoreV1().ConfigMaps(hubNamespaceDetached).Get(detachesCtx, "ca-bundle-configmap", metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.CoreV1().ConfigMaps(hubNamespaceHosted).Get(hostedCtx, "ca-bundle-configmap", metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -424,12 +424,12 @@ var _ = ginkgo.Describe("ClusterManager Detached Mode", func() {
 
 			// both serving cert and signing cert should aways be valid
 			gomega.Consistently(func() error {
-				configmap, err := detachedKubeClient.CoreV1().ConfigMaps(hubNamespaceDetached).Get(detachesCtx, "ca-bundle-configmap", metav1.GetOptions{})
+				configmap, err := hostedKubeClient.CoreV1().ConfigMaps(hubNamespaceHosted).Get(hostedCtx, "ca-bundle-configmap", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 				for _, name := range []string{"signer-secret", "registration-webhook-serving-cert", "work-webhook-serving-cert"} {
-					secret, err := detachedKubeClient.CoreV1().Secrets(hubNamespaceDetached).Get(detachesCtx, name, metav1.GetOptions{})
+					secret, err := hostedKubeClient.CoreV1().Secrets(hubNamespaceHosted).Get(hostedCtx, name, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}

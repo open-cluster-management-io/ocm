@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 ## v0.6.0
 
 ### New Features
-* Support `Detached` mode to deploy `Klusterlet` outside the managed cluster. ([#172](https://github.com/open-cluster-management-io/registration-operator/pull/172) [#180](https://github.com/open-cluster-management-io/registration-operator/pull/180) [@zhujian7](https://github.com/zhujian7), [#179](https://github.com/open-cluster-management-io/registration-operator/pull/179) [#186](https://github.com/open-cluster-management-io/registration-operator/pull/186) [#188](https://github.com/open-cluster-management-io/registration-operator/pull/188) [@xuezhaojun](https://github.com/xuezhaojun)
+* Support `Hosted` mode to deploy `Klusterlet` outside the managed cluster. ([#172](https://github.com/open-cluster-management-io/registration-operator/pull/172) [#180](https://github.com/open-cluster-management-io/registration-operator/pull/180) [@zhujian7](https://github.com/zhujian7), [#179](https://github.com/open-cluster-management-io/registration-operator/pull/179) [#186](https://github.com/open-cluster-management-io/registration-operator/pull/186) [#188](https://github.com/open-cluster-management-io/registration-operator/pull/188) [@xuezhaojun](https://github.com/xuezhaojun)
  )
 
 ### Added

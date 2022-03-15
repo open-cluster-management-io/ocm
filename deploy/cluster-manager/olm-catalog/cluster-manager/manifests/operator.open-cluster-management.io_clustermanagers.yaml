@@ -15,7 +15,7 @@ spec:
   - name: v1
     schema:
       openAPIV3Schema:
-        description: ClusterManager configures the controllers on the hub that govern registration and work distribution for attached Klusterlets. In Default mode, ClusterManager will only be deployed in open-cluster-management-hub namespace. In Detached mode, ClusterManager will be deployed in the namespace with the same name as cluster manager.
+        description: ClusterManager configures the controllers on the hub that govern registration and work distribution for attached Klusterlets. In Default mode, ClusterManager will only be deployed in open-cluster-management-hub namespace. In Hosted mode, ClusterManager will be deployed in the namespace with the same name as cluster manager.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
@@ -36,8 +36,8 @@ spec:
                   mode: Default
                 description: DeployOption contains the options of deploying a cluster-manager Default mode is used if DeployOption is not set.
                 properties:
-                  detached:
-                    description: Detached includes configurations we needs for clustermanager in the detached mode.
+                  hosted:
+                    description: Hosted includes configurations we needs for clustermanager in the Hosted mode.
                     properties:
                       registrationWebhookConfiguration:
                         description: RegistrationWebhookConfiguration represents the customized webhook-server configuration of registration.
@@ -74,10 +74,10 @@ spec:
                     type: object
                   mode:
                     default: Default
-                    description: 'Mode can be Default or Detached. In Default mode, the Hub is installed as a whole and all parts of Hub are deployed in the same cluster. In Detached mode, only crd and configurations are installed on one cluster(defined as hub-cluster). Controllers run in another cluster (defined as management-cluster) and connect to the hub with the kubeconfig in secret of "external-hub-kubeconfig"(a kubeconfig of hub-cluster with cluster-admin permission). Note: Do not modify the Mode field once it''s applied.'
+                    description: 'Mode can be Default or Hosted. In Default mode, the Hub is installed as a whole and all parts of Hub are deployed in the same cluster. In Hosted mode, only crd and configurations are installed on one cluster(defined as hub-cluster). Controllers run in another cluster (defined as management-cluster) and connect to the hub with the kubeconfig in secret of "external-hub-kubeconfig"(a kubeconfig of hub-cluster with cluster-admin permission). Note: Do not modify the Mode field once it''s applied.'
                     enum:
                     - Default
-                    - Detached
+                    - Hosted
                     type: string
                 required:
                 - mode

@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	testClusterManagerNameDefault  = "testclustermanager-default"
-	testClusterManagerNameDetached = "testclustermanager-detached"
+	testClusterManagerNameDefault = "testclustermanager-default"
+	testClusterManagerNameHosted  = "testclustermanager-hosted"
 )
 
 var secretNames = []string{signerSecret, helpers.RegistrationWebhookSecret, helpers.WorkWebhookSecret}
@@ -92,7 +92,7 @@ func TestCertRotation(t *testing.T) {
 			name: "Sync one clustermanager when there are two clustermanager",
 			clusterManagers: []*operatorapiv1.ClusterManager{
 				newClusterManager(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault),
-				newClusterManager(testClusterManagerNameDetached, operatorapiv1.InstallModeDetached),
+				newClusterManager(testClusterManagerNameHosted, operatorapiv1.InstallModeHosted),
 			},
 			existingObjects: []runtime.Object{
 				&corev1.Namespace{
@@ -102,7 +102,7 @@ func TestCertRotation(t *testing.T) {
 				},
 				&corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: helpers.ClusterManagerNamespace(testClusterManagerNameDetached, operatorapiv1.InstallModeDetached),
+						Name: helpers.ClusterManagerNamespace(testClusterManagerNameHosted, operatorapiv1.InstallModeHosted),
 					},
 				},
 			},
@@ -112,14 +112,14 @@ func TestCertRotation(t *testing.T) {
 					t.Fatalf("unexpected error: %v", err)
 				}
 				assertResourcesExistAndValid(t, kubeClient, helpers.ClusterManagerNamespace(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault))
-				assertResourcesNotExist(t, kubeClient, helpers.ClusterManagerNamespace(testClusterManagerNameDetached, operatorapiv1.InstallModeDetached))
+				assertResourcesNotExist(t, kubeClient, helpers.ClusterManagerNamespace(testClusterManagerNameHosted, operatorapiv1.InstallModeHosted))
 			},
 		},
 		{
 			name: "Sync all clustermanagaers",
 			clusterManagers: []*operatorapiv1.ClusterManager{
 				newClusterManager(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault),
-				newClusterManager(testClusterManagerNameDetached, operatorapiv1.InstallModeDetached),
+				newClusterManager(testClusterManagerNameHosted, operatorapiv1.InstallModeHosted),
 			},
 			existingObjects: []runtime.Object{
 				&corev1.Namespace{
@@ -129,7 +129,7 @@ func TestCertRotation(t *testing.T) {
 				},
 				&corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: helpers.ClusterManagerNamespace(testClusterManagerNameDetached, operatorapiv1.InstallModeDetached),
+						Name: helpers.ClusterManagerNamespace(testClusterManagerNameHosted, operatorapiv1.InstallModeHosted),
 					},
 				},
 			},
@@ -139,7 +139,7 @@ func TestCertRotation(t *testing.T) {
 					t.Fatalf("unexpected error: %v", err)
 				}
 				assertResourcesExistAndValid(t, kubeClient, helpers.ClusterManagerNamespace(testClusterManagerNameDefault, operatorapiv1.InstallModeDefault))
-				assertResourcesExistAndValid(t, kubeClient, helpers.ClusterManagerNamespace(testClusterManagerNameDetached, operatorapiv1.InstallModeDetached))
+				assertResourcesExistAndValid(t, kubeClient, helpers.ClusterManagerNamespace(testClusterManagerNameHosted, operatorapiv1.InstallModeHosted))
 			},
 		},
 	}

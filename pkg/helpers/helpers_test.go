@@ -1522,7 +1522,7 @@ func TestGetHubKubeconfig(t *testing.T) {
 		},
 		{
 			name:         "detach mode no secret",
-			mode:         operatorapiv1.InstallModeDetached,
+			mode:         operatorapiv1.InstallModeHosted,
 			secret:       []runtime.Object{},
 			namespace:    "test",
 			expectedHost: "localhost",
@@ -1530,7 +1530,7 @@ func TestGetHubKubeconfig(t *testing.T) {
 		},
 		{
 			name:         "detach mode",
-			mode:         operatorapiv1.InstallModeDetached,
+			mode:         operatorapiv1.InstallModeHosted,
 			secret:       []runtime.Object{newKubeConfigSecret("test", ExternalHubKubeConfig, newKubeConfig("testhost", "tls.crt", "tls.key"), []byte("--- TRUNCATED ---"), []byte("--- REDACTED ---"))},
 			namespace:    "test",
 			expectedHost: "https://testhost:443",

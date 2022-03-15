@@ -186,15 +186,15 @@ func TestClusterManagerDeploymentQueueKeyFunc(t *testing.T) {
 			expectedKey:    "",
 		},
 		{
-			name:           "key by registrartion controller in detached mode, namespace not match",
+			name:           "key by registrartion controller in hosted mode, namespace not match",
 			object:         newDeployment("testhub-registration-controller", ClusterManagerDefaultNamespace, 0),
-			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeDetached),
+			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeHosted),
 			expectedKey:    "",
 		},
 		{
-			name:           "key by registrartion controller in detached mode, namespace match",
+			name:           "key by registrartion controller in hosted mode, namespace match",
 			object:         newDeployment("testhub-registration-controller", "testhub", 0),
-			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeDetached),
+			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeHosted),
 			expectedKey:    "testhub",
 		},
 	}

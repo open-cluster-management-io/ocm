@@ -13,7 +13,7 @@ import (
 
 // ClusterManager configures the controllers on the hub that govern registration and work distribution for attached Klusterlets.
 // In Default mode, ClusterManager will only be deployed in open-cluster-management-hub namespace.
-// In Detached mode, ClusterManager will be deployed in the namespace with the same name as cluster manager.
+// In Hosted mode, ClusterManager will be deployed in the namespace with the same name as cluster manager.
 type ClusterManager struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -55,8 +55,8 @@ type ClusterManagerSpec struct {
 	DeployOption ClusterManagerDeployOption `json:"deployOption,omitempty"`
 }
 
-// DetachedClusterManagerConfiguration represents customized configurations we need to set for clustermanager in the detached mode.
-type DetachedClusterManagerConfiguration struct {
+// HostedClusterManagerConfiguration represents customized configurations we need to set for clustermanager in the Hosted mode.
+type HostedClusterManagerConfiguration struct {
 	// RegistrationWebhookConfiguration represents the customized webhook-server configuration of registration.
 	// +optional
 	RegistrationWebhookConfiguration WebhookConfiguration `json:"registrationWebhookConfiguration,omitempty"`
@@ -86,9 +86,9 @@ type WebhookConfiguration struct {
 
 // KlusterletDeployOption describes the deploy options for klusterlet
 type KlusterletDeployOption struct {
-	// Mode can be Default or Detached. It is Default mode if not specified
+	// Mode can be Default or Hosted. It is Default mode if not specified
 	// In Default mode, all klusterlet related resources are deployed on the managed cluster.
-	// In Detached mode, only crd and configurations are installed on the spoke/managed cluster. Controllers run in another
+	// In Hosted mode, only crd and configurations are installed on the spoke/managed cluster. Controllers run in another
 	// cluster (defined as management-cluster) and connect to the mangaged cluster with the kubeconfig in secret of
 	// "external-managed-kubeconfig"(a kubeconfig of managed-cluster with cluster-admin permission).
 	// Note: Do not modify the Mode field once it's applied.
@@ -98,9 +98,9 @@ type KlusterletDeployOption struct {
 
 // ClusterManagerDeployOption describes the deploy options for cluster-manager
 type ClusterManagerDeployOption struct {
-	// Mode can be Default or Detached.
+	// Mode can be Default or Hosted.
 	// In Default mode, the Hub is installed as a whole and all parts of Hub are deployed in the same cluster.
-	// In Detached mode, only crd and configurations are installed on one cluster(defined as hub-cluster). Controllers run in another
+	// In Hosted mode, only crd and configurations are installed on one cluster(defined as hub-cluster). Controllers run in another
 	// cluster (defined as management-cluster) and connect to the hub with the kubeconfig in secret of "external-hub-kubeconfig"(a kubeconfig
 	// of hub-cluster with cluster-admin permission).
 	// Note: Do not modify the Mode field once it's applied.
@@ -108,12 +108,12 @@ type ClusterManagerDeployOption struct {
 	// +default=Default
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Default
-	// +kubebuilder:validation:Enum=Default;Detached
+	// +kubebuilder:validation:Enum=Default;Hosted
 	Mode InstallMode `json:"mode,omitempty"`
 
-	// Detached includes configurations we needs for clustermanager in the detached mode.
+	// Hosted includes configurations we needs for clustermanager in the Hosted mode.
 	// +optional
-	Detached *DetachedClusterManagerConfiguration `json:"detached,omitempty"`
+	Hosted *HostedClusterManagerConfiguration `json:"hosted,omitempty"`
 }
 
 // InstallMode represents the mode of deploy cluster-manager or klusterlet
@@ -126,7 +126,12 @@ const (
 
 	// InstallModeDetached means deploying components outside.
 	// The cluster-manager will be deployed outside of the hub-cluster, the klusterlet will be deployed outside of the managed-cluster.
+	// DEPRECATED: please use Hosted instead.
 	InstallModeDetached InstallMode = "Detached"
+
+	// InstallModeHosted means deploying components outside.
+	// The cluster-manager will be deployed outside of the hub-cluster, the klusterlet will be deployed outside of the managed-cluster.
+	InstallModeHosted InstallMode = "Hosted"
 )
 
 // ClusterManagerStatus represents the current status of the registration and work distribution controllers running on the hub.
@@ -227,7 +232,7 @@ type ClusterManagerList struct {
 // Klusterlet represents controllers to install the resources for a managed cluster.
 // When configured, the Klusterlet requires a secret named bootstrap-hub-kubeconfig in the
 // agent namespace to allow API requests to the hub for the registration protocol.
-// In Detached mode, the Klusterlet requires an additional secret named external-managed-kubeconfig
+// In Hosted mode, the Klusterlet requires an additional secret named external-managed-kubeconfig
 // in the agent namespace to allow API requests to the managed cluster for resources installation.
 type Klusterlet struct {
 	metav1.TypeMeta   `json:",inline"`

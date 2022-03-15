@@ -7,8 +7,8 @@ spec:
   workImagePullSpec: quay.io/open-cluster-management/work
   placementImagePullSpec: quay.io/open-cluster-management/placement
   deployOption:
-    mode: Detached
-    detached:
+    mode: Hosted
+    hosted:
       registrationWebhookConfiguration:
         address: management-control-plane
         port: 30443

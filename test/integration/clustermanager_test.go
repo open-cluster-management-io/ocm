@@ -32,8 +32,8 @@ func startHubOperator(ctx context.Context, mode v1.InstallMode) {
 	switch mode {
 	case v1.InstallModeDefault:
 		config = restConfig
-	case v1.InstallModeDetached:
-		config = detachedRestConfig
+	case v1.InstallModeHosted:
+		config = hostedRestConfig
 	}
 
 	o := &clustermanager.Options{}

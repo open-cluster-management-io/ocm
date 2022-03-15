@@ -36,7 +36,7 @@ spec:
                   operator: In
                   values:
                   - {{ .ClusterManagerName }}-work-webhook
-      {{ if not .DetachedMode }}
+      {{ if not .HostedMode }}
       serviceAccountName: {{ .ClusterManagerName }}-work-webhook-sa
       {{ end }}
       containers:
@@ -48,7 +48,7 @@ spec:
           - "--secure-port=6443"
           - "--tls-cert-file=/serving-cert/tls.crt"
           - "--tls-private-key-file=/serving-cert/tls.key"
-          {{ if .DetachedMode }}
+          {{ if .HostedMode }}
           - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
           - "--authentication-kubeconfig=/var/run/secrets/hub/kubeconfig"
           - "--authorization-kubeconfig=/var/run/secrets/hub/kubeconfig"
@@ -81,7 +81,7 @@ spec:
         - name: webhook-secret
           mountPath: "/serving-cert"
           readOnly: true
-        {{ if .DetachedMode }}
+        {{ if .HostedMode }}
         - mountPath: /var/run/secrets/hub
           name: kubeconfig
           readOnly: true
@@ -90,7 +90,7 @@ spec:
       - name: webhook-secret
         secret:
           secretName: work-webhook-serving-cert
-      {{ if .DetachedMode }}
+      {{ if .HostedMode }}
       - name: kubeconfig
         secret:
           secretName: {{ .ClusterManagerName }}-work-webhook-sa-kubeconfig

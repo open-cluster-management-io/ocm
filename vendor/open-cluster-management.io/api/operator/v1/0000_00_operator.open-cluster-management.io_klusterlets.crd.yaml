@@ -15,7 +15,7 @@ spec:
     - name: v1
       schema:
         openAPIV3Schema:
-          description: Klusterlet represents controllers to install the resources for a managed cluster. When configured, the Klusterlet requires a secret named bootstrap-hub-kubeconfig in the agent namespace to allow API requests to the hub for the registration protocol. In Detached mode, the Klusterlet requires an additional secret named external-managed-kubeconfig in the agent namespace to allow API requests to the managed cluster for resources installation.
+          description: Klusterlet represents controllers to install the resources for a managed cluster. When configured, the Klusterlet requires a secret named bootstrap-hub-kubeconfig in the agent namespace to allow API requests to the hub for the registration protocol. In Hosted mode, the Klusterlet requires an additional secret named external-managed-kubeconfig in the agent namespace to allow API requests to the managed cluster for resources installation.
           type: object
           properties:
             apiVersion:
@@ -38,7 +38,7 @@ spec:
                   type: object
                   properties:
                     mode:
-                      description: 'Mode can be Default or Detached. It is Default mode if not specified In Default mode, all klusterlet related resources are deployed on the managed cluster. In Detached mode, only crd and configurations are installed on the spoke/managed cluster. Controllers run in another cluster (defined as management-cluster) and connect to the mangaged cluster with the kubeconfig in secret of "external-managed-kubeconfig"(a kubeconfig of managed-cluster with cluster-admin permission). Note: Do not modify the Mode field once it''s applied.'
+                      description: 'Mode can be Default or Hosted. It is Default mode if not specified In Default mode, all klusterlet related resources are deployed on the managed cluster. In Hosted mode, only crd and configurations are installed on the spoke/managed cluster. Controllers run in another cluster (defined as management-cluster) and connect to the mangaged cluster with the kubeconfig in secret of "external-managed-kubeconfig"(a kubeconfig of managed-cluster with cluster-admin permission). Note: Do not modify the Mode field once it''s applied.'
                       type: string
                 externalServerURLs:
                   description: ExternalServerURLs represents the a list of apiserver urls and ca bundles that is accessible externally If it is set empty, managed cluster has no externally accessible url that hub cluster can visit.

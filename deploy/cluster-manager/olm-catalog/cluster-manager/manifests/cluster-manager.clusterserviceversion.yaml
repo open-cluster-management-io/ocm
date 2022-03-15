@@ -27,7 +27,7 @@ metadata:
           },
           "spec": {
             "deployOption": {
-              "detached": {
+              "hosted": {
                 "registrationWebhookConfiguration": {
                   "address": "management-control-plane",
                   "port": 30443
@@ -37,7 +37,7 @@ metadata:
                   "port": 31443
                 }
               },
-              "mode": "Detached"
+              "mode": "Hosted"
             },
             "placementImagePullSpec": "quay.io/open-cluster-management/placement",
             "registrationImagePullSpec": "quay.io/open-cluster-management/registration",

@@ -26,13 +26,13 @@ const (
 	// ExternalHubKubeConfig is the secret name of kubeconfig secret to connecting to the hub cluster.
 	ExternalHubKubeConfig = "external-hub-kubeconfig"
 	// ExternalManagedKubeConfig is the secret name of kubeconfig secret to connecting to the managed cluster
-	// Only applicable to Detached mode, klusterlet-operator uses it to install resources on the managed cluster.
+	// Only applicable to Hosted mode, klusterlet-operator uses it to install resources on the managed cluster.
 	ExternalManagedKubeConfig = "external-managed-kubeconfig"
 	// ExternalManagedKubeConfigRegistration is the secret name of kubeconfig secret to connecting to the managed cluster
-	// Only applicable to Detached mode, registration-agent uses it to connect to the managed cluster.
+	// Only applicable to Hosted mode, registration-agent uses it to connect to the managed cluster.
 	ExternalManagedKubeConfigRegistration = "external-managed-kubeconfig-registration"
 	// ExternalManagedKubeConfigWork is the secret name of kubeconfig secret to connecting to the managed cluster
-	// Only applicable to Detached mode, work-agent uses it to connect to the managed cluster.
+	// Only applicable to Hosted mode, work-agent uses it to connect to the managed cluster.
 	ExternalManagedKubeConfigWork = "external-managed-kubeconfig-work"
 
 	RegistrationWebhookSecret  = "registration-webhook-serving-cert"
@@ -42,7 +42,7 @@ const (
 )
 
 func ClusterManagerNamespace(clustermanagername string, mode operatorapiv1.InstallMode) string {
-	if mode == operatorapiv1.InstallModeDetached {
+	if mode == operatorapiv1.InstallModeHosted {
 		return clustermanagername
 	}
 	return ClusterManagerDefaultNamespace

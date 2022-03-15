@@ -36,7 +36,7 @@ spec:
                   operator: In
                   values:
                   - clustermanager-registration-controller
-      {{ if not .DetachedMode }}
+      {{ if not .HostedMode }}
       serviceAccountName: {{ .ClusterManagerName }}-registration-controller-sa
       {{ end }}
       containers:
@@ -46,7 +46,7 @@ spec:
           - "/registration"
           - "controller"
           - "--feature-gates=DefaultClusterSet=true"
-          {{ if .DetachedMode }}
+          {{ if .HostedMode }}
           - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
           {{ end }}
         securityContext:
@@ -73,7 +73,7 @@ spec:
           requests:
             cpu: 2m
             memory: 16Mi
-      {{ if .DetachedMode }}
+      {{ if .HostedMode }}
         volumeMounts:
         - mountPath: /var/run/secrets/hub
           name: kubeconfig

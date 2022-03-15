@@ -35,12 +35,12 @@ func TestIntegration(t *testing.T) {
 }
 
 const (
-	eventuallyTimeout    = 30 // seconds
-	eventuallyInterval   = 1  // seconds
-	hubNamespace         = "open-cluster-management-hub"
-	spokeNamespace       = "open-cluster-management-agent"
-	clusterManagerName   = "hub"
-	hubNamespaceDetached = "hub"
+	eventuallyTimeout  = 30 // seconds
+	eventuallyInterval = 1  // seconds
+	hubNamespace       = "open-cluster-management-hub"
+	spokeNamespace     = "open-cluster-management-agent"
+	clusterManagerName = "hub"
+	hubNamespaceHosted = "hub"
 )
 
 // default mode
@@ -50,15 +50,15 @@ var apiExtensionClient apiextensionsclient.Interface
 var restConfig *rest.Config
 var operatorClient operatorclient.Interface
 
-// detachedTestEnv, detachedKubeClient, detachedAPIExtensionClient and detachedRestConfig is using in Detached mode.
+// hostedTestEnv, hostedKubeClient, hostedAPIExtensionClient and hostedRestConfig is using in Hosted mode.
 // for cluster manager, it represents the hub cluster;
 // while for klusterlet, it represents the managed cluster.
 var (
-	detachedTestEnv            *envtest.Environment
-	detachedKubeClient         kubernetes.Interface
-	detachedAPIExtensionClient apiextensionsclient.Interface
-	detachedRestConfig         *rest.Config
-	detachedOperatorClient     operatorclient.Interface
+	hostedTestEnv            *envtest.Environment
+	hostedKubeClient         kubernetes.Interface
+	hostedAPIExtensionClient apiextensionsclient.Interface
+	hostedRestConfig         *rest.Config
+	hostedOperatorClient     operatorclient.Interface
 )
 
 var envCancel context.CancelFunc
@@ -100,28 +100,28 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(operatorClient).ToNot(gomega.BeNil())
 
-	// start a local kube-apiserver as the hub/managed cluster for Detached mode.
-	detachedTestEnv = &envtest.Environment{
+	// start a local kube-apiserver as the hub/managed cluster for Hosted mode.
+	hostedTestEnv = &envtest.Environment{
 		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths: []string{
 			filepath.Join(".", "deploy", "cluster-manager", "olm-catalog", "cluster-manager", "manifests"),
 			filepath.Join(".", "deploy", "klusterlet", "olm-catalog", "klusterlet", "manifests"),
 		},
 	}
-	detachedConfig, err := detachedTestEnv.Start()
+	hostedConfig, err := hostedTestEnv.Start()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(cfg).ToNot(gomega.BeNil())
 
 	// prepare clients
-	detachedKubeClient, err = kubernetes.NewForConfig(detachedConfig)
+	hostedKubeClient, err = kubernetes.NewForConfig(hostedConfig)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(kubeClient).ToNot(gomega.BeNil())
 
-	detachedAPIExtensionClient, err = apiextensionsclient.NewForConfig(detachedConfig)
+	hostedAPIExtensionClient, err = apiextensionsclient.NewForConfig(hostedConfig)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(apiExtensionClient).ToNot(gomega.BeNil())
 
-	detachedOperatorClient, err = operatorclient.NewForConfig(detachedConfig)
+	hostedOperatorClient, err = operatorclient.NewForConfig(hostedConfig)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(operatorClient).ToNot(gomega.BeNil())
 
@@ -141,7 +141,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	}, metav1.CreateOptions{})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-	_, err = detachedOperatorClient.OperatorV1().ClusterManagers().Create(context.Background(), &operatorapiv1.ClusterManager{
+	_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Create(context.Background(), &operatorapiv1.ClusterManager{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterManagerName,
 		},
@@ -150,8 +150,8 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 			WorkImagePullSpec:         "quay.io/open-cluster-management/work",
 			PlacementImagePullSpec:    "quay.io/open-cluster-management/placement",
 			DeployOption: operatorapiv1.ClusterManagerDeployOption{
-				Mode: operatorapiv1.InstallModeDetached,
-				Detached: &operatorapiv1.DetachedClusterManagerConfiguration{
+				Mode: operatorapiv1.InstallModeHosted,
+				Hosted: &operatorapiv1.HostedClusterManagerConfiguration{
 					RegistrationWebhookConfiguration: operatorapiv1.WebhookConfiguration{
 						Address: "localhost",
 						Port:    443,
@@ -167,12 +167,12 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	restConfig = cfg
-	detachedRestConfig = detachedConfig
+	hostedRestConfig = hostedConfig
 
 	envCtx, envCancel = context.WithCancel(context.TODO())
 
 	go ServiceAccountCtl(envCtx, kubeClient)
-	go ServiceAccountCtl(envCtx, detachedKubeClient)
+	go ServiceAccountCtl(envCtx, hostedKubeClient)
 
 	close(done)
 }, 60)
@@ -185,7 +185,7 @@ var _ = ginkgo.AfterSuite(func() {
 	err := testEnv.Stop()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-	err = detachedTestEnv.Stop()
+	err = hostedTestEnv.Stop()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 })
 

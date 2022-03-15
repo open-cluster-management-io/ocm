@@ -36,7 +36,7 @@ spec:
                   operator: In
                   values:
                   - clustermanager-placement-controller
-      {{ if not .DetachedMode }}
+      {{ if not .HostedMode }}
       serviceAccountName: {{ .ClusterManagerName }}-placement-controller-sa
       {{ end }}
       containers:
@@ -45,7 +45,7 @@ spec:
         args:
           - "/placement"
           - "controller"
-          {{ if .DetachedMode }}
+          {{ if .HostedMode }}
           - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
           {{ end }}
         securityContext:
@@ -72,7 +72,7 @@ spec:
           requests:
             cpu: 2m
             memory: 16Mi
-      {{ if .DetachedMode }}
+      {{ if .HostedMode }}
         volumeMounts:
         - mountPath: /var/run/secrets/hub
           name: kubeconfig

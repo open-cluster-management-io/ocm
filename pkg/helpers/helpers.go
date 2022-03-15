@@ -800,14 +800,14 @@ func SyncSecret(ctx context.Context, client, targetClient coreclientv1.SecretsGe
 
 // GetHubKubeconfig is used to get the kubeconfig of the hub cluster.
 // If it's Default mode, the kubeconfig of the hub cluster should equal to the operator cluster's kubeconfig and mostly, it's the InClusterConfig.
-// If it's Detached mode, the kubeconfig of the hub cluster is stored as a secret under clustermanager namespace.
+// If it's Hosted mode, the kubeconfig of the hub cluster is stored as a secret under clustermanager namespace.
 func GetHubKubeconfig(ctx context.Context,
 	operatorKubeconfig *rest.Config, // this is the kubeconfig of the cluster which controller is running on now.
 	operatorClient kubernetes.Interface,
 	clustermamagerName string,
 	clustermanagerMode operatorapiv1.InstallMode) (*rest.Config, error) {
 	switch clustermanagerMode {
-	case operatorapiv1.InstallModeDetached:
+	case operatorapiv1.InstallModeHosted:
 		clustermanagerNamespace := ClusterManagerNamespace(clustermamagerName, clustermanagerMode)
 
 		// get secret of external kubeconfig
