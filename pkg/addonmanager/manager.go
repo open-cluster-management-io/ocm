@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"time"
 
+	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeinformers "k8s.io/client-go/informers"
@@ -20,6 +21,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/clustermanagement"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/registration"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
@@ -72,6 +74,11 @@ func (a *addonManager) Start(ctx context.Context) error {
 	}
 
 	workClient, err := workv1client.NewForConfig(a.config)
+	if err != nil {
+		return err
+	}
+
+	v1CSRSupported, _, err := utils.IsCSRSupported(kubeClient)
 	if err != nil {
 		return err
 	}
@@ -150,24 +157,6 @@ func (a *addonManager) Start(ctx context.Context) error {
 		eventRecorder,
 	)
 
-	csrApproveController := certificate.NewCSRApprovingController(
-		kubeClient,
-		clusterInformers.Cluster().V1().ManagedClusters(),
-		kubeInfomers.Certificates().V1().CertificateSigningRequests(),
-		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
-		a.addonAgents,
-		eventRecorder,
-	)
-
-	csrSignController := certificate.NewCSRSignController(
-		kubeClient,
-		clusterInformers.Cluster().V1().ManagedClusters(),
-		kubeInfomers.Certificates().V1().CertificateSigningRequests(),
-		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
-		a.addonAgents,
-		eventRecorder,
-	)
-
 	clusterManagementController := clustermanagement.NewClusterManagementController(
 		addonClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
@@ -192,6 +181,31 @@ func (a *addonManager) Start(ctx context.Context) error {
 		a.addonAgents,
 		eventRecorder)
 
+	var csrApproveController factory.Controller
+	var csrSignController factory.Controller
+	// Spawn the following controllers only if v1 CSR api is supported in the
+	// hub cluster. Under v1beta1 CSR api, all the CSR objects will be signed
+	// by the kube-controller-manager so custom CSR controller should be
+	// disabled to avoid conflict.
+	if v1CSRSupported {
+		csrApproveController = certificate.NewCSRApprovingController(
+			kubeClient,
+			clusterInformers.Cluster().V1().ManagedClusters(),
+			kubeInfomers.Certificates().V1().CertificateSigningRequests(),
+			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+			a.addonAgents,
+			eventRecorder,
+		)
+		csrSignController = certificate.NewCSRSignController(
+			kubeClient,
+			clusterInformers.Cluster().V1().ManagedClusters(),
+			kubeInfomers.Certificates().V1().CertificateSigningRequests(),
+			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+			a.addonAgents,
+			eventRecorder,
+		)
+	}
+
 	go addonInformers.Start(ctx.Done())
 	go workInformers.Start(ctx.Done())
 	go clusterInformers.Start(ctx.Done())
@@ -200,11 +214,15 @@ func (a *addonManager) Start(ctx context.Context) error {
 	go deployController.Run(ctx, 1)
 	go hookDeployController.Run(ctx, 1)
 	go registrationController.Run(ctx, 1)
-	go csrApproveController.Run(ctx, 1)
-	go csrSignController.Run(ctx, 1)
 	go clusterManagementController.Run(ctx, 1)
 	go addonInstallController.Run(ctx, 1)
 	go addonHealthCheckController.Run(ctx, 1)
+	if csrApproveController != nil {
+		go csrApproveController.Run(ctx, 1)
+	}
+	if csrSignController != nil {
+		go csrSignController.Run(ctx, 1)
+	}
 	return nil
 }
 

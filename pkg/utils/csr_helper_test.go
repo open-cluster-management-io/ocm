@@ -6,8 +6,11 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/crypto"
+	"github.com/stretchr/testify/assert"
 	certificatesv1 "k8s.io/api/certificates/v1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -171,5 +174,62 @@ func TestUnionApprover(t *testing.T) {
 				t.Errorf("Expected approve is %t, but got %t", c.approved, approved)
 			}
 		})
+	}
+}
+
+func TestIsCSRSupported(t *testing.T) {
+	cases := []struct {
+		apiResources    []*metav1.APIResourceList
+		expectedV1      bool
+		expectedV1beta1 bool
+		expectedError   error
+	}{
+		{
+			apiResources: []*metav1.APIResourceList{
+				{
+					GroupVersion: certificatesv1.SchemeGroupVersion.String(),
+					APIResources: []metav1.APIResource{
+						{
+							Name: "certificatesigningrequests",
+							Kind: "CertificateSigningRequest",
+						},
+					},
+				},
+				{
+					GroupVersion: certificatesv1beta1.SchemeGroupVersion.String(),
+					APIResources: []metav1.APIResource{
+						{
+							Name: "certificatesigningrequests",
+							Kind: "CertificateSigningRequest",
+						},
+					},
+				},
+			},
+			expectedV1:      true,
+			expectedV1beta1: true,
+		},
+		{
+			apiResources: []*metav1.APIResourceList{
+				{
+					GroupVersion: certificatesv1beta1.SchemeGroupVersion.String(),
+					APIResources: []metav1.APIResource{
+						{
+							Name: "certificatesigningrequests",
+							Kind: "CertificateSigningRequest",
+						},
+					},
+				},
+			},
+			expectedV1:      false,
+			expectedV1beta1: true,
+		},
+	}
+	for _, c := range cases {
+		fakeClient := fake.NewSimpleClientset()
+		fakeClient.Resources = c.apiResources
+		v1Supported, v1beta1Supported, err := IsCSRSupported(fakeClient)
+		assert.Equal(t, c.expectedV1, v1Supported)
+		assert.Equal(t, c.expectedV1beta1, v1beta1Supported)
+		assert.Equal(t, c.expectedError, err)
 	}
 }

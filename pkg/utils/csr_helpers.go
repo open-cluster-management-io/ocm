@@ -12,7 +12,11 @@ import (
 	"time"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -177,4 +181,29 @@ func UnionCSRApprover(approvers ...agent.CSRApproveFunc) agent.CSRApproveFunc {
 
 		return true
 	}
+}
+
+// IsCSRSupported checks whether the cluster supports v1 or v1beta1 csr api.
+func IsCSRSupported(nativeClient kubernetes.Interface) (bool, bool, error) {
+	mapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(nativeClient.Discovery()))
+	mappings, err := mapper.RESTMappings(schema.GroupKind{
+		Group: certificatesv1.GroupName,
+		Kind:  "CertificateSigningRequest",
+	})
+	if err != nil {
+		return false, false, err
+	}
+	v1CSRSupported := false
+	for _, mapping := range mappings {
+		if mapping.GroupVersionKind.Version == "v1" {
+			v1CSRSupported = true
+		}
+	}
+	v1beta1CSRSupported := false
+	for _, mapping := range mappings {
+		if mapping.GroupVersionKind.Version == "v1beta1" {
+			v1beta1CSRSupported = true
+		}
+	}
+	return v1CSRSupported, v1beta1CSRSupported, nil
 }
