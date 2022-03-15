@@ -31,17 +31,11 @@ func TestE2E(tt *testing.T) {
 var _ = BeforeSuite(func() {
 	var err error
 
-	Eventually(func() error {
-		return t.CheckHubReady()
-	}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+	Eventually(t.CheckClusterManagerStatus, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
 
-	Eventually(func() error {
-		return t.CheckClusterManagerStatus()
-	}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+	Eventually(t.CheckHubReady, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
 
-	Eventually(func() error {
-		return t.CheckKlusterletOperatorReady()
-	}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+	Eventually(t.CheckKlusterletOperatorReady, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
 
 	err = t.SetBootstrapHubSecret("")
 	Expect(err).ToNot(HaveOccurred())

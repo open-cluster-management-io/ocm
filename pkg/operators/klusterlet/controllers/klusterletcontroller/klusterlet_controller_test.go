@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	fakeapiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
@@ -18,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/version"
+	fakedynamic "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
@@ -41,6 +43,7 @@ type testController struct {
 	kubeClient         *fakekube.Clientset
 	apiExtensionClient *fakeapiextensions.Clientset
 	operatorClient     *fakeoperatorclient.Clientset
+	dynamicClient      *fakedynamic.FakeDynamicClient
 	workClient         *fakeworkclient.Clientset
 	operatorStore      cache.Store
 
@@ -130,14 +133,19 @@ func newTestController(klusterlet *opratorapiv1.Klusterlet, appliedManifestWorks
 	operatorInformers := operatorinformers.NewSharedInformerFactory(fakeOperatorClient, 5*time.Minute)
 	kubeVersion, _ := version.ParseGeneric("v1.18.0")
 
+	scheme := runtime.NewScheme()
+	dynamicClient := fakedynamic.NewSimpleDynamicClient(scheme)
+
 	hubController := &klusterletController{
 		klusterletClient:          fakeOperatorClient.OperatorV1().Klusterlets(),
 		kubeClient:                fakeKubeClient,
 		apiExtensionClient:        fakeAPIExtensionClient,
+		dynamicClient:             dynamicClient,
 		appliedManifestWorkClient: fakeWorkClient.WorkV1().AppliedManifestWorks(),
 		klusterletLister:          operatorInformers.Operator().V1().Klusterlets().Lister(),
 		kubeVersion:               kubeVersion,
 		operatorNamespace:         "open-cluster-management",
+		cache:                     resourceapply.NewResourceCache(),
 	}
 
 	store := operatorInformers.Operator().V1().Klusterlets().Informer().GetStore()
@@ -147,6 +155,7 @@ func newTestController(klusterlet *opratorapiv1.Klusterlet, appliedManifestWorks
 		controller:         hubController,
 		kubeClient:         fakeKubeClient,
 		apiExtensionClient: fakeAPIExtensionClient,
+		dynamicClient:      dynamicClient,
 		operatorClient:     fakeOperatorClient,
 		workClient:         fakeWorkClient,
 		operatorStore:      store,
@@ -215,6 +224,7 @@ func newTestControllerDetached(klusterlet *opratorapiv1.Klusterlet, appliedManif
 		klusterletLister:          operatorInformers.Operator().V1().Klusterlets().Lister(),
 		kubeVersion:               kubeVersion,
 		operatorNamespace:         "open-cluster-management",
+		cache:                     resourceapply.NewResourceCache(),
 		buildManagedClusterClientsDetachedMode: func(ctx context.Context, kubeClient kubernetes.Interface, namespace, secret string) (*managedClusterClients, error) {
 			return &managedClusterClients{
 				kubeClient:                fakeManagedKubeClient,
@@ -925,6 +935,15 @@ func TestDeployOnKube111(t *testing.T) {
 		}
 	}
 
+	dynamicAction := controller.dynamicClient.Actions()
+	createCRDObjects := []runtime.Object{}
+	for _, action := range dynamicAction {
+		if action.GetVerb() == "create" {
+			object := action.(clienttesting.CreateActionImpl).Object
+			createCRDObjects = append(createCRDObjects, object)
+		}
+	}
+
 	// Check if resources are created as expected
 	// 7 managed static manifests + 8 management static manifests - 2 duplicated service account manifests + 1 addon namespace + 2 deployments + 2 kube111 clusterrolebindings
 	if len(createObjects) != 18 {
@@ -932,6 +951,9 @@ func TestDeployOnKube111(t *testing.T) {
 	}
 	for _, object := range createObjects {
 		ensureObject(t, object, klusterlet)
+	}
+	if len(createCRDObjects) != 2 {
+		t.Errorf("Expect 2 v1beta1 crd objects created in the sync loop, actual %d", len(createCRDObjects))
 	}
 
 	operatorAction := controller.operatorClient.Actions()

@@ -117,7 +117,7 @@ var _ = Describe("Placement", func() {
 			},
 		}
 
-		placement, err = t.ClusterClient.ClusterV1beta1().Placements(placementNamespace).Create(context.TODO(), placement, metav1.CreateOptions{})
+		_, err = t.ClusterClient.ClusterV1beta1().Placements(placementNamespace).Create(context.TODO(), placement, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Check if placementdecisions are created with desired number of decisions")

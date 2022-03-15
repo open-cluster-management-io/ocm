@@ -18,6 +18,7 @@ import (
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -128,6 +129,7 @@ type clusterManagerController struct {
 	operatorKubeconfig   *rest.Config
 	configMapLister      corev1listers.ConfigMapLister
 	recorder             events.Recorder
+	cache                resourceapply.ResourceCache
 	// For testcases which don't need these functions, we could set fake funcs
 	generateHubClusterClients func(hubConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, apiregistrationclient.APIServicesGetter, error)
 	ensureSAKubeconfigs       func(ctx context.Context, clusterManagerName, clusterManagerNamespace string, hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error
@@ -152,6 +154,7 @@ func NewClusterManagerController(
 		recorder:                  recorder,
 		generateHubClusterClients: generateHubClients,
 		ensureSAKubeconfigs:       ensureSAKubeconfigs,
+		cache:                     resourceapply.NewResourceCache(),
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -249,12 +252,14 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	var relatedResources []operatorapiv1.RelatedResourceMeta
 
 	// Apply resources on the hub cluster
-	hubAppliedErrs, err := applyHubResources(clusterManagerNamespace,
+	hubAppliedErrs, err := applyHubResources(
+		ctx,
+		clusterManagerNamespace,
 		clusterManagerMode,
 		config,
 		&relatedResources,
 		hubClient, hubApiExtensionClient, hubApiRegistrationClient,
-		n.configMapLister, n.recorder)
+		n.configMapLister, n.recorder, n.cache)
 	if err != nil {
 		return err
 	}
@@ -266,7 +271,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		config,
 		&relatedResources,
 		hubClient, hubKubeConfig,
-		managementClient, n.recorder, n.ensureSAKubeconfigs,
+		managementClient, n.recorder, n.cache, n.ensureSAKubeconfigs,
 	)
 	if err != nil {
 		return err
@@ -311,6 +316,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 }
 
 func applyHubResources(
+	ctx context.Context,
 	clusterManagerNamespace string,
 	clusterManagerMode operatorapiv1.InstallMode,
 	manifestsConfig manifests.HubConfig, // used to render templates
@@ -319,14 +325,18 @@ func applyHubResources(
 	hubClient kubernetes.Interface, hubApiExtensionClient apiextensionsclient.Interface, hubApiRegistrationClient apiregistrationclient.APIServicesGetter,
 	configMapLister corev1listers.ConfigMapLister,
 	recorder events.Recorder,
+	cache resourceapply.ResourceCache,
 ) (appliedErrs []error, err error) {
 	// Apply hub cluster resources
 	hubResources := getHubResources(clusterManagerMode, manifestsConfig.RegistrationWebhook.IsIPFormat, manifestsConfig.WorkWebhook.IsIPFormat)
 	resourceResults := helpers.ApplyDirectly(
+		ctx,
 		hubClient,
 		hubApiExtensionClient,
 		hubApiRegistrationClient,
+		nil,
 		recorder,
+		cache,
 		func(name string) ([]byte, error) {
 			template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
 			if err != nil {
@@ -367,10 +377,13 @@ func applyHubResources(
 	// The reason why apply Apiservice after apply other staticfiles(including namespace) is because Apiservices requires the CABundleConfigmap.
 	// And it will return an error(uncatchable with NotFound type) if the namespace is not created.
 	apiserviceResults := helpers.ApplyDirectly(
+		ctx,
 		hubClient,
 		hubApiExtensionClient,
 		hubApiRegistrationClient,
+		nil,
 		recorder,
+		cache,
 		func(name string) ([]byte, error) {
 			template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
 			if err != nil {
@@ -399,6 +412,7 @@ func applyManagementResources(
 	hubClient kubernetes.Interface, hubKubeConfig *rest.Config,
 	managementKubeClient kubernetes.Interface,
 	recorder events.Recorder,
+	cache resourceapply.ResourceCache,
 	ensureSAKubeconfigs func(ctx context.Context, clusterManagerName, clusterManagerNamespace string, hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error,
 ) (currentGenerations []operatorapiv1.GenerationStatus, appliedErrs []error, err error) {
 	// Apply management cluster resources(namespace and deployments).
@@ -406,8 +420,10 @@ func applyManagementResources(
 	// And CABundle is used to render apiservice resources.
 	managementResources := []string{namespaceResource}
 	resourceResults := helpers.ApplyDirectly(
-		managementKubeClient, nil, nil,
+		ctx,
+		managementKubeClient, nil, nil, nil,
 		recorder,
+		cache,
 		func(name string) ([]byte, error) {
 			template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
 			if err != nil {
@@ -442,6 +458,7 @@ func applyManagementResources(
 
 	for _, file := range deploymentFiles {
 		currentGeneration, err := helpers.ApplyDeployment(
+			ctx,
 			managementKubeClient,
 			clusterManager.Status.Generations,
 			clusterManager.Spec.NodePlacement,
@@ -592,7 +609,7 @@ func ensureSAKubeconfigs(ctx context.Context, clusterManagerName, clusterManager
 	// setup template kubeconfig
 	ensureSAToken := func(saName string) error {
 		return helpers.EnsureSAToken(ctx, saName, clusterManagerNamespace, hubClient,
-			helpers.RenderToKubeconfigSecret(saName+"-kubeconfig", clusterManagerNamespace, &rest.Config{
+			helpers.RenderToKubeconfigSecret(ctx, saName+"-kubeconfig", clusterManagerNamespace, &rest.Config{
 				Host: hubKubeConfig.Host,
 				TLSClientConfig: rest.TLSClientConfig{
 					CAData: hubKubeConfig.CAData,

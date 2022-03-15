@@ -179,7 +179,7 @@ func TestRenderToKubeconfigSecret(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			render := RenderToKubeconfigSecret(tt.args.secretName, tt.args.secretNamespace, tt.args.templateKubeconfig, tt.args.client, tt.args.recorder)
+			render := RenderToKubeconfigSecret(context.TODO(), tt.args.secretName, tt.args.secretNamespace, tt.args.templateKubeconfig, tt.args.client, tt.args.recorder)
 			err := render([]byte("sa-token"))
 			if err != nil {
 				t.Errorf("renderSaToken, err should be nil but got %s", err.Error())
@@ -213,6 +213,10 @@ func newTestingEventRecorder(t *testing.T) events.Recorder {
 
 func (r *testingEventRecorder) ComponentName() string {
 	return r.component
+}
+
+func (r *testingEventRecorder) WithContext(ctx context.Context) events.Recorder {
+	return r
 }
 
 func (r *testingEventRecorder) ForComponent(c string) events.Recorder {

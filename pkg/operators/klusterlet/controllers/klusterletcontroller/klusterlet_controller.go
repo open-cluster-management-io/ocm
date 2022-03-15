@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/client-go/dynamic"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
 	coreinformer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -91,10 +92,12 @@ type klusterletController struct {
 	klusterletLister          operatorlister.KlusterletLister
 	kubeClient                kubernetes.Interface
 	apiExtensionClient        apiextensionsclient.Interface
+	dynamicClient             dynamic.Interface
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
 	kubeVersion               *version.Version
 	operatorNamespace         string
 	skipHubSecretPlaceholder  bool
+	cache                     resourceapply.ResourceCache
 
 	// buildManagedClusterClientsDetachedMode build clients for manged cluster in detached mode, this can be override for testing
 	buildManagedClusterClientsDetachedMode func(ctx context.Context, kubeClient kubernetes.Interface, namespace, secret string) (*managedClusterClients, error)
@@ -104,6 +107,7 @@ type klusterletController struct {
 func NewKlusterletController(
 	kubeClient kubernetes.Interface,
 	apiExtensionClient apiextensionsclient.Interface,
+	dynamicClient dynamic.Interface,
 	klusterletClient operatorv1client.KlusterletInterface,
 	klusterletInformer operatorinformer.KlusterletInformer,
 	secretInformer coreinformer.SecretInformer,
@@ -116,6 +120,7 @@ func NewKlusterletController(
 	controller := &klusterletController{
 		kubeClient:                             kubeClient,
 		apiExtensionClient:                     apiExtensionClient,
+		dynamicClient:                          dynamicClient,
 		klusterletClient:                       klusterletClient,
 		klusterletLister:                       klusterletInformer.Lister(),
 		appliedManifestWorkClient:              appliedManifestWorkClient,
@@ -123,6 +128,7 @@ func NewKlusterletController(
 		operatorNamespace:                      operatorNamespace,
 		buildManagedClusterClientsDetachedMode: buildManagedClusterClientsFromSecret,
 		skipHubSecretPlaceholder:               skipHubSecretPlaceholder,
+		cache:                                  resourceapply.NewResourceCache(),
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -159,6 +165,7 @@ type managedClusterClients struct {
 	kubeClient                kubernetes.Interface
 	apiExtensionClient        apiextensionsclient.Interface
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
+	dynamicClient             dynamic.Interface
 	// Only used for Detached mode to generate managed cluster kubeconfig
 	// with minimum permission for registration and work.
 	kubeconfig *rest.Config
@@ -198,6 +205,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	managedClusterClients := &managedClusterClients{
 		kubeClient:                n.kubeClient,
 		apiExtensionClient:        n.apiExtensionClient,
+		dynamicClient:             n.dynamicClient,
 		appliedManifestWorkClient: n.appliedManifestWorkClient,
 	}
 
@@ -282,7 +290,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	// TODO remove this when we do not support kube 1.11 any longer
 	if cnt, err := n.kubeVersion.Compare("v1.12.0"); err == nil && cnt < 0 {
 		statuses, err := n.applyStaticFiles(ctx, klusterletName, kube111StaticResourceFiles, &config, managedClusterClients.kubeClient,
-			managedClusterClients.apiExtensionClient, controllerContext.Recorder())
+			managedClusterClients.apiExtensionClient, managedClusterClients.dynamicClient, controllerContext.Recorder())
 		if err != nil {
 			return err
 		}
@@ -298,7 +306,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		appliedStaticFiles = append(crdV1StaticFiles, managedStaticResourceFiles...)
 	}
 	statuses, err := n.applyStaticFiles(ctx, klusterletName, appliedStaticFiles, &config, managedClusterClients.kubeClient,
-		managedClusterClients.apiExtensionClient, controllerContext.Recorder())
+		managedClusterClients.apiExtensionClient, managedClusterClients.dynamicClient, controllerContext.Recorder())
 	if err != nil {
 		return err
 	}
@@ -307,7 +315,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	// Apply static files on management cluster
 	// Apply role, rolebinding, service account for registration and work to the management cluster.
 	statuses, err = n.applyStaticFiles(ctx, klusterletName, managementStaticResourceFiles, &config, n.kubeClient,
-		n.apiExtensionClient, controllerContext.Recorder())
+		n.apiExtensionClient, managedClusterClients.dynamicClient, controllerContext.Recorder())
 	if err != nil {
 		return err
 	}
@@ -405,6 +413,7 @@ func (n *klusterletController) applyDeployment(ctx context.Context, klusterlet *
 	[]operatorapiv1.RelatedResourceMeta, operatorapiv1.GenerationStatus, error) {
 	var relatedResources []operatorapiv1.RelatedResourceMeta
 	generationStatus, err := helpers.ApplyDeployment(
+		ctx,
 		n.kubeClient,
 		klusterlet.Status.Generations,
 		klusterlet.Spec.NodePlacement,
@@ -436,14 +445,19 @@ func (n *klusterletController) applyDeployment(ctx context.Context, klusterlet *
 func (n *klusterletController) applyStaticFiles(ctx context.Context, klusterletName string,
 	staticFiles []string,
 	config *klusterletConfig,
-	destKubeclient kubernetes.Interface, destApiExtensionClient apiextensionsclient.Interface,
+	destKubeclient kubernetes.Interface, destApiExtensionClient apiextensionsclient.Interface, destDynamicClient dynamic.Interface,
 	recorder events.Recorder) ([]operatorapiv1.RelatedResourceMeta, error) {
 	errs := []error{}
 	var relatedResources []operatorapiv1.RelatedResourceMeta
 
-	resourceResults := resourceapply.ApplyDirectly(
-		resourceapply.NewKubeClientHolder(destKubeclient).WithAPIExtensionsClient(destApiExtensionClient),
+	resourceResults := helpers.ApplyDirectly(
+		ctx,
+		destKubeclient,
+		destApiExtensionClient,
+		nil,
+		destDynamicClient,
 		recorder,
+		n.cache,
 		func(name string) ([]byte, error) {
 			template, err := manifests.KlusterletManifestFiles.ReadFile(name)
 			if err != nil {
@@ -499,7 +513,7 @@ func (n *klusterletController) createManagedClusterKubeconfig(
 		},
 		func() error {
 			return helpers.EnsureSAToken(ctx, saName, klusterletNamespace, saClient,
-				helpers.RenderToKubeconfigSecret(secretName, klusterletNamespace, kubeconfigTemplate, n.kubeClient.CoreV1(), recorder))
+				helpers.RenderToKubeconfigSecret(ctx, secretName, klusterletNamespace, kubeconfigTemplate, n.kubeClient.CoreV1(), recorder))
 		})
 	if err != nil {
 		_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
@@ -513,6 +527,7 @@ func (n *klusterletController) createManagedClusterKubeconfig(
 // syncPullSecret will sync pull secret from the sourceClient cluster to the targetClient cluster in desired namespace.
 func (n *klusterletController) syncPullSecret(ctx context.Context, sourceClient, targetClient kubernetes.Interface, klusterletName, namespace string, recorder events.Recorder) error {
 	_, _, err := helpers.SyncSecret(
+		ctx,
 		sourceClient.CoreV1(),
 		targetClient.CoreV1(),
 		recorder,
@@ -828,6 +843,11 @@ func buildManagedClusterClientsFromSecret(ctx context.Context, client kubernetes
 	if err != nil {
 		return nil, err
 	}
+	dynamicClient, err := dynamic.NewForConfig(managedKubeConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	workClient, err := workclientset.NewForConfig(managedKubeConfig)
 	if err != nil {
 		return nil, err
@@ -837,6 +857,7 @@ func buildManagedClusterClientsFromSecret(ctx context.Context, client kubernetes
 		kubeClient:                kubeClient,
 		apiExtensionClient:        apiExtensionClient,
 		appliedManifestWorkClient: workClient.WorkV1().AppliedManifestWorks(),
+		dynamicClient:             dynamicClient,
 		kubeconfig:                managedKubeConfig}, nil
 }
 

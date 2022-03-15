@@ -10,6 +10,9 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type OpenShiftAPIServerConfig struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -155,6 +158,9 @@ type JenkinsPipelineConfig struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type OpenShiftControllerManagerConfig struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -183,6 +189,11 @@ type OpenShiftControllerManagerConfig struct {
 	Ingress            IngressControllerConfig          `json:"ingress"`
 	ImageImport        ImageImportControllerConfig      `json:"imageImport"`
 	SecurityAllocator  SecurityAllocator                `json:"securityAllocator"`
+
+	// featureGates are the set of extra OpenShift feature gates for openshift-controller-manager.
+	// These feature gates can be used to enable features that are tech preview or otherwise not available on
+	// OpenShift by default.
+	FeatureGates []string `json:"featureGates"`
 }
 
 type DeployerControllerConfig struct {
@@ -253,6 +264,10 @@ type ImageImportControllerConfig struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // BuildDefaultsConfig controls the default information for Builds
+//
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type BuildDefaultsConfig struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -300,6 +315,10 @@ type SourceStrategyDefaultsConfig struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // BuildOverridesConfig controls override settings for builds
+//
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type BuildOverridesConfig struct {
 	metav1.TypeMeta `json:",inline"`
 

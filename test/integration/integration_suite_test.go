@@ -61,7 +61,8 @@ var (
 	detachedOperatorClient     operatorclient.Interface
 )
 
-var cancel context.CancelFunc
+var envCancel context.CancelFunc
+var envCtx context.Context
 
 var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	logf.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
@@ -168,11 +169,10 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	restConfig = cfg
 	detachedRestConfig = detachedConfig
 
-	ctx, c := context.WithCancel(context.TODO())
-	cancel = c
+	envCtx, envCancel = context.WithCancel(context.TODO())
 
-	go ServiceAccountCtl(ctx, kubeClient)
-	go ServiceAccountCtl(ctx, detachedKubeClient)
+	go ServiceAccountCtl(envCtx, kubeClient)
+	go ServiceAccountCtl(envCtx, detachedKubeClient)
 
 	close(done)
 }, 60)
@@ -180,15 +180,13 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 var _ = ginkgo.AfterSuite(func() {
 	ginkgo.By("tearing down the test environment")
 
-	var err error
+	envCancel()
 
-	err = testEnv.Stop()
+	err := testEnv.Stop()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	err = detachedTestEnv.Stop()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-	cancel()
 })
 
 // ServiceAccountCtl watch service accounts and create a corresponding secret for it.

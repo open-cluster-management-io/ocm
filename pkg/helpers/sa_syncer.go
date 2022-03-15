@@ -63,7 +63,7 @@ func EnsureSAToken(ctx context.Context, saName, saNamespace string, saClient kub
 }
 
 // RenderToKubeconfigSecret would render saToken to a secret.
-func RenderToKubeconfigSecret(secretName, secretNamespace string, templateKubeconfig *rest.Config, secretClient coreclientv1.SecretsGetter, recorder events.Recorder) func([]byte) error {
+func RenderToKubeconfigSecret(ctx context.Context, secretName, secretNamespace string, templateKubeconfig *rest.Config, secretClient coreclientv1.SecretsGetter, recorder events.Recorder) func([]byte) error {
 	return func(saToken []byte) error {
 		var c *clientcmdapi.Cluster
 		if len(templateKubeconfig.CAData) != 0 {
@@ -109,7 +109,7 @@ func RenderToKubeconfigSecret(secretName, secretNamespace string, templateKubeco
 		if err != nil {
 			return err
 		}
-		_, _, err = resourceapply.ApplySecret(secretClient, recorder, &corev1.Secret{
+		_, _, err = resourceapply.ApplySecret(ctx, secretClient, recorder, &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: secretNamespace,
 				Name:      secretName,

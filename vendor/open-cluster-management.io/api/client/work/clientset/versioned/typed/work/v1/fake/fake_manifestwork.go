@@ -101,7 +101,7 @@ func (c *FakeManifestWorks) UpdateStatus(ctx context.Context, manifestWork *work
 // Delete takes name of the manifestWork and deletes it. Returns an error if one occurs.
 func (c *FakeManifestWorks) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(manifestworksResource, c.ns, name), &workv1.ManifestWork{})
+		Invokes(testing.NewDeleteActionWithOptions(manifestworksResource, c.ns, name, opts), &workv1.ManifestWork{})
 
 	return err
 }

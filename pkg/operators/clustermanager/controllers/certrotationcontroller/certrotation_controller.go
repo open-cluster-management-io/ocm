@@ -243,13 +243,13 @@ func (c certRotationController) syncOne(ctx context.Context, syncCtx factory.Syn
 
 	// Ensure certificates are exists
 	rotations := c.rotationMap[clustermanagerName] // reconcile cert/key pair for signer
-	signingCertKeyPair, err := rotations.signingRotation.EnsureSigningCertKeyPair()
+	signingCertKeyPair, err := rotations.signingRotation.EnsureSigningCertKeyPair(ctx)
 	if err != nil {
 		return err
 	}
 
 	// reconcile ca bundle
-	cabundleCerts, err := rotations.caBundleRotation.EnsureConfigMapCABundle(signingCertKeyPair)
+	cabundleCerts, err := rotations.caBundleRotation.EnsureConfigMapCABundle(ctx, signingCertKeyPair)
 	if err != nil {
 		return err
 	}
@@ -257,7 +257,7 @@ func (c certRotationController) syncOne(ctx context.Context, syncCtx factory.Syn
 	// reconcile target cert/key pairs
 	errs := []error{}
 	for _, targetRotation := range rotations.targetRotations {
-		if err := targetRotation.EnsureTargetCertKeyPair(signingCertKeyPair, cabundleCerts); err != nil {
+		if err := targetRotation.EnsureTargetCertKeyPair(ctx, signingCertKeyPair, cabundleCerts); err != nil {
 			errs = append(errs, err)
 		}
 	}

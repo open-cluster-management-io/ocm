@@ -11,6 +11,9 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type KubeAPIServerConfig struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -140,7 +143,7 @@ type UserAgentDenyRule struct {
 // MasterAuthConfig configures authentication options in addition to the standard
 // oauth token and client certificate authenticators
 type MasterAuthConfig struct {
-	// requestHeader holds options for setting up a front proxy against the the API.  It is optional.
+	// requestHeader holds options for setting up a front proxy against the API.  It is optional.
 	RequestHeader *RequestHeaderAuthenticationOptions `json:"requestHeader"`
 	// webhookTokenAuthenticators, if present configures remote token reviewers
 	WebhookTokenAuthenticators []WebhookTokenAuthenticator `json:"webhookTokenAuthenticators"`
@@ -187,6 +190,9 @@ type AggregatorConfig struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type KubeControllerManagerConfig struct {
 	metav1.TypeMeta `json:",inline"`
 

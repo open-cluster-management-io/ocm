@@ -94,7 +94,7 @@ func (c *FakeClusterManagers) UpdateStatus(ctx context.Context, clusterManager *
 // Delete takes name of the clusterManager and deletes it. Returns an error if one occurs.
 func (c *FakeClusterManagers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(clustermanagersResource, name), &operatorv1.ClusterManager{})
+		Invokes(testing.NewRootDeleteActionWithOptions(clustermanagersResource, name, opts), &operatorv1.ClusterManager{})
 	return err
 }
 

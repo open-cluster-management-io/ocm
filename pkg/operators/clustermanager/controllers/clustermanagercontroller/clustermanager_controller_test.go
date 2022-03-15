@@ -8,6 +8,7 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -70,6 +71,7 @@ func newTestController(clustermanager *operatorapiv1.ClusterManager) *testContro
 		clusterManagerClient: fakeOperatorClient.OperatorV1().ClusterManagers(),
 		clusterManagerLister: operatorInformers.Operator().V1().ClusterManagers().Lister(),
 		configMapLister:      kubeInfomers.Core().V1().ConfigMaps().Lister(),
+		cache:                resourceapply.NewResourceCache(),
 	}
 
 	store := operatorInformers.Operator().V1().ClusterManagers().Informer().GetStore()

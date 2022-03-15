@@ -1,6 +1,7 @@
 package certrotation
 
 import (
+	"context"
 	"crypto/x509"
 	"fmt"
 	"time"
@@ -32,7 +33,7 @@ type TargetRotation struct {
 	EventRecorder events.Recorder
 }
 
-func (c TargetRotation) EnsureTargetCertKeyPair(signingCertKeyPair *crypto.CA, caBundleCerts []*x509.Certificate) error {
+func (c TargetRotation) EnsureTargetCertKeyPair(ctx context.Context, signingCertKeyPair *crypto.CA, caBundleCerts []*x509.Certificate) error {
 	originalTargetCertKeyPairSecret, err := c.Lister.Secrets(c.Namespace).Get(c.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
@@ -54,7 +55,7 @@ func (c TargetRotation) EnsureTargetCertKeyPair(signingCertKeyPair *crypto.CA, c
 		return err
 	}
 
-	if _, _, err = resourceapply.ApplySecret(c.Client, c.EventRecorder, targetCertKeyPairSecret); err != nil {
+	if _, _, err = resourceapply.ApplySecret(ctx, c.Client, c.EventRecorder, targetCertKeyPairSecret); err != nil {
 		return err
 	}
 	return nil

@@ -94,7 +94,7 @@ func (c *FakeKlusterlets) UpdateStatus(ctx context.Context, klusterlet *operator
 // Delete takes name of the klusterlet and deletes it. Returns an error if one occurs.
 func (c *FakeKlusterlets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(klusterletsResource, name), &operatorv1.Klusterlet{})
+		Invokes(testing.NewRootDeleteActionWithOptions(klusterletsResource, name, opts), &operatorv1.Klusterlet{})
 	return err
 }
 

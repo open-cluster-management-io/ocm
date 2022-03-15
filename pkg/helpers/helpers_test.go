@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/client-go/kubernetes/fake"
+	fakedynamic "k8s.io/client-go/dynamic/fake"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
@@ -366,6 +366,14 @@ func TestApplyDirectly(t *testing.T) {
 		{
 			name: "Apply CRD",
 			applyFiles: map[string]runtime.Object{
+				"crd": newUnstructured("apiextensions.k8s.io/v1", "CustomResourceDefinition", "", "", map[string]interface{}{}),
+			},
+			applyFileNames: []string{"crd"},
+			expectErr:      false,
+		},
+		{
+			name: "Apply v1beta1 CRD",
+			applyFiles: map[string]runtime.Object{
 				"crd": newUnstructured("apiextensions.k8s.io/v1beta1", "CustomResourceDefinition", "", "", map[string]interface{}{}),
 			},
 			applyFileNames: []string{"crd"},
@@ -374,7 +382,7 @@ func TestApplyDirectly(t *testing.T) {
 		{
 			name: "Apply CRD with nil apiExtensionClient",
 			applyFiles: map[string]runtime.Object{
-				"crd": newUnstructured("apiextensions.k8s.io/v1beta1", "CustomResourceDefinition", "", "", map[string]interface{}{}),
+				"crd": newUnstructured("apiextensions.k8s.io/v1", "CustomResourceDefinition", "", "", map[string]interface{}{}),
 			},
 			applyFileNames:        []string{"crd"},
 			nilapiExtensionClient: true,
@@ -402,33 +410,50 @@ func TestApplyDirectly(t *testing.T) {
 
 				return json.Marshal(c.applyFiles[name])
 			}
+
+			scheme := runtime.NewScheme()
+			dynamicClient := fakedynamic.NewSimpleDynamicClient(scheme)
+
+			cache := resourceapply.NewResourceCache()
 			var results []resourceapply.ApplyResult
 			switch {
 			case c.nilapiExtensionClient && c.nilapiRegistratonClient:
 				results = ApplyDirectly(
+					context.TODO(),
 					fakeKubeClient, nil, nil,
+					dynamicClient,
 					eventstesting.NewTestingEventRecorder(t),
+					cache,
 					fakeApplyFunc,
 					c.applyFileNames...,
 				)
 			case c.nilapiExtensionClient:
 				results = ApplyDirectly(
+					context.TODO(),
 					fakeKubeClient, nil, fakeResgistrationClient,
+					dynamicClient,
 					eventstesting.NewTestingEventRecorder(t),
+					cache,
 					fakeApplyFunc,
 					c.applyFileNames...,
 				)
 			case c.nilapiRegistratonClient:
 				results = ApplyDirectly(
+					context.TODO(),
 					fakeKubeClient, fakeExtensionClient, nil,
+					dynamicClient,
 					eventstesting.NewTestingEventRecorder(t),
+					cache,
 					fakeApplyFunc,
 					c.applyFileNames...,
 				)
 			default:
 				results = ApplyDirectly(
+					context.TODO(),
 					fakeKubeClient, fakeExtensionClient, fakeResgistrationClient,
+					dynamicClient,
 					eventstesting.NewTestingEventRecorder(t),
+					cache,
 					fakeApplyFunc,
 					c.applyFileNames...,
 				)
@@ -865,6 +890,7 @@ func TestApplyDeployment(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			fakeKubeClient := fakekube.NewSimpleClientset()
 			_, err := ApplyDeployment(
+				context.TODO(),
 				fakeKubeClient, []operatorapiv1.GenerationStatus{}, c.nodePlacement,
 				func(name string) ([]byte, error) {
 					return json.Marshal(newDeploymentUnstructured(c.deploymentName, c.deploymentNamespace))
@@ -1061,7 +1087,7 @@ func TestApplyEndpoints(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset(test.existing...)
+			client := fakekube.NewSimpleClientset(test.existing...)
 			_, actualModified, err := ApplyEndpoints(context.TODO(), client.CoreV1(), test.input)
 			if err != nil {
 				t.Fatal(err)
@@ -1449,7 +1475,8 @@ func TestSyncSecret(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			client := fakekube.NewSimpleClientset(tc.existingObjects...)
 			clientTarget := fakekube.NewSimpleClientset()
-			secret, changed, err := SyncSecret(client.CoreV1(), clientTarget.CoreV1(), events.NewInMemoryRecorder("test"), tc.sourceNamespace, tc.sourceName, tc.targetNamespace, tc.targetName, tc.ownerRefs)
+			secret, changed, err := SyncSecret(
+				context.TODO(), client.CoreV1(), clientTarget.CoreV1(), events.NewInMemoryRecorder("test"), tc.sourceNamespace, tc.sourceName, tc.targetNamespace, tc.targetName, tc.ownerRefs)
 
 			if !reflect.DeepEqual(err, tc.expectedErr) {
 				t.Errorf("%s: expected error %v, got %v", tc.name, tc.expectedErr, err)

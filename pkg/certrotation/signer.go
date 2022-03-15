@@ -2,6 +2,7 @@ package certrotation
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"time"
 
@@ -28,7 +29,7 @@ type SigningRotation struct {
 	EventRecorder    events.Recorder
 }
 
-func (c SigningRotation) EnsureSigningCertKeyPair() (*crypto.CA, error) {
+func (c SigningRotation) EnsureSigningCertKeyPair(ctx context.Context) (*crypto.CA, error) {
 	originalSigningCertKeyPairSecret, err := c.Lister.Secrets(c.Namespace).Get(c.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
@@ -46,7 +47,7 @@ func (c SigningRotation) EnsureSigningCertKeyPair() (*crypto.CA, error) {
 			return nil, err
 		}
 
-		actualSigningCertKeyPairSecret, _, err := resourceapply.ApplySecret(c.Client, c.EventRecorder, signingCertKeyPairSecret)
+		actualSigningCertKeyPairSecret, _, err := resourceapply.ApplySecret(ctx, c.Client, c.EventRecorder, signingCertKeyPairSecret)
 		if err != nil {
 			return nil, err
 		}

@@ -1,6 +1,7 @@
 package util
 
 import (
+	"context"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -15,6 +16,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 	certutil "k8s.io/client-go/util/cert"
@@ -30,6 +32,10 @@ type IntegrationTestEventRecorder struct {
 
 func (r *IntegrationTestEventRecorder) ComponentName() string {
 	return r.component
+}
+
+func (r *IntegrationTestEventRecorder) WithContext(ctx context.Context) events.Recorder {
+	return r
 }
 
 func (r *IntegrationTestEventRecorder) ForComponent(c string) events.Recorder {
@@ -56,9 +62,7 @@ func (r *IntegrationTestEventRecorder) Warningf(reason, messageFmt string, args 
 	r.Warning(reason, fmt.Sprintf(messageFmt, args...))
 }
 
-func (r *IntegrationTestEventRecorder) Shutdown() {
-	return
-}
+func (r *IntegrationTestEventRecorder) Shutdown() {}
 
 func HasCondition(conditions []metav1.Condition, expectedType, expectedReason string, expectedStatus metav1.ConditionStatus) bool {
 	found := false
@@ -82,15 +86,22 @@ func HasCondition(conditions []metav1.Condition, expectedType, expectedReason st
 	return found
 }
 
-func NewKubeConfig(host string) []byte {
+func NewKubeConfig(config *rest.Config) []byte {
 	configData, _ := runtime.Encode(clientcmdlatest.Codec, &clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{"test-cluster": {
-			Server:                host,
+			Server:                config.Host,
 			InsecureSkipTLSVerify: true,
 		}},
 		Contexts: map[string]*clientcmdapi.Context{"test-context": {
-			Cluster: "test-cluster",
+			Cluster:  "test-cluster",
+			AuthInfo: "test-user",
 		}},
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"test-user": {
+				ClientCertificateData: config.CertData,
+				ClientKeyData:         config.KeyData,
+			},
+		},
 		CurrentContext: "test-context",
 	})
 	return configData
