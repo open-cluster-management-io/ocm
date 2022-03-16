@@ -30,8 +30,7 @@ func main() {
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 
-	logs.InitLogs()
-	defer logs.FlushLogs()
+	logs.NewOptions().AddFlags(pflag.CommandLine)
 
 	command := newCommand()
 	if err := command.Execute(); err != nil {
