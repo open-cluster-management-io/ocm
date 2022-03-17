@@ -78,7 +78,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 		return err
 	}
 
-	v1CSRSupported, _, err := utils.IsCSRSupported(kubeClient)
+	v1CSRSupported, v1beta1Supported, err := utils.IsCSRSupported(kubeClient)
 	if err != nil {
 		return err
 	}
@@ -192,6 +192,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 			kubeClient,
 			clusterInformers.Cluster().V1().ManagedClusters(),
 			kubeInfomers.Certificates().V1().CertificateSigningRequests(),
+			nil,
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 			a.addonAgents,
 			eventRecorder,
@@ -200,6 +201,16 @@ func (a *addonManager) Start(ctx context.Context) error {
 			kubeClient,
 			clusterInformers.Cluster().V1().ManagedClusters(),
 			kubeInfomers.Certificates().V1().CertificateSigningRequests(),
+			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+			a.addonAgents,
+			eventRecorder,
+		)
+	} else if v1beta1Supported {
+		csrApproveController = certificate.NewCSRApprovingController(
+			kubeClient,
+			clusterInformers.Cluster().V1().ManagedClusters(),
+			nil,
+			kubeInfomers.Certificates().V1beta1().CertificateSigningRequests(),
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 			a.addonAgents,
 			eventRecorder,

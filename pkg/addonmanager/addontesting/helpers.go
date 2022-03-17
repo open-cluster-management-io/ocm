@@ -7,6 +7,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	certv1 "k8s.io/api/certificates/v1"
+	certv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -129,6 +130,37 @@ func NewApprovedCSR(addon, cluster string) *certv1.CertificateSigningRequest {
 	csr := NewCSR(addon, cluster)
 	csr.Status.Conditions = append(csr.Status.Conditions, certv1.CertificateSigningRequestCondition{
 		Type:   certv1.CertificateApproved,
+		Status: corev1.ConditionTrue,
+	})
+	return csr
+}
+
+func NewV1beta1CSR(addon, cluster string) *certv1beta1.CertificateSigningRequest {
+	return &certv1beta1.CertificateSigningRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("addon-%s", addon),
+			Labels: map[string]string{
+				"open-cluster-management.io/cluster-name": cluster,
+				"open-cluster-management.io/addon-name":   addon,
+			},
+		},
+		Spec: certv1beta1.CertificateSigningRequestSpec{},
+	}
+}
+
+func NewDeniedV1beta1CSR(addon, cluster string) *certv1beta1.CertificateSigningRequest {
+	csr := NewV1beta1CSR(addon, cluster)
+	csr.Status.Conditions = append(csr.Status.Conditions, certv1beta1.CertificateSigningRequestCondition{
+		Type:   certv1beta1.CertificateDenied,
+		Status: corev1.ConditionTrue,
+	})
+	return csr
+}
+
+func NewApprovedV1beta1CSR(addon, cluster string) *certv1beta1.CertificateSigningRequest {
+	csr := NewV1beta1CSR(addon, cluster)
+	csr.Status.Conditions = append(csr.Status.Conditions, certv1beta1.CertificateSigningRequestCondition{
+		Type:   certv1beta1.CertificateApproved,
 		Status: corev1.ConditionTrue,
 	})
 	return csr
