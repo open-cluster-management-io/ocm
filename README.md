@@ -25,7 +25,7 @@ So developers could be able to develop their own addon functions more easily.
 ## Concepts
 
 * [ManagedClusterAddon](https://github.com/open-cluster-management-io/api/blob/main/addon/v1alpha1/types_managedclusteraddon.go)
-* [ClusterManagementAddOn](https://github.com/open-cluster-management-io/api/blob/main/addon/v1alpha1/types_managedclusteraddon.go)
+* [ClusterManagementAddOn](https://github.com/open-cluster-management-io/api/blob/main/addon/v1alpha1/types_clustermanagementaddon.go)
 
 ## Design Doc
 
