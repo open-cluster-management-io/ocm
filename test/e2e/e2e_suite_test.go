@@ -34,6 +34,11 @@ func TestE2E(t *testing.T) {
 	ginkgo.RunSpecs(t, "E2E suite")
 }
 
+const (
+	eventuallyTimeout  = 30 // seconds
+	eventuallyInterval = 1  // seconds
+)
+
 var (
 	hubClient           kubernetes.Interface
 	hubDynamicClient    dynamic.Interface
