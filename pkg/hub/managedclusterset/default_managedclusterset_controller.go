@@ -80,7 +80,7 @@ func NewDefaultManagedClusterSetController(
 
 func (c *defaultManagedClusterSetController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	defaultClusterSetName := defaultManagedClusterSetName
-	klog.Infof("Reconciling DefaultManagedClusterSet")
+	klog.V(4).Infof("Reconciling DefaultManagedClusterSet")
 
 	defaultClusterSet, err := c.clusterSetLister.Get(defaultClusterSetName)
 
