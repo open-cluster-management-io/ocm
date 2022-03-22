@@ -114,7 +114,7 @@ func (o *AgentOptions) RunAgent(ctx context.Context, controllerContext *controll
 type agentController struct {
 	spokeKubeClient    kubernetes.Interface
 	addonClient        addonv1alpha1client.Interface
-	hunConfigMapLister corev1lister.ConfigMapLister
+	hubConfigMapLister corev1lister.ConfigMapLister
 	clusterName        string
 	addonName          string
 	addonNamespace     string
@@ -136,7 +136,7 @@ func newAgentController(
 		clusterName:        clusterName,
 		addonName:          addonName,
 		addonNamespace:     addonNamespace,
-		hunConfigMapLister: configmapInformers.Lister(),
+		hubConfigMapLister: configmapInformers.Lister(),
 		recorder:           recorder,
 	}
 	return factory.New().WithInformersQueueKeyFunc(
@@ -157,7 +157,7 @@ func (c *agentController) sync(ctx context.Context, syncCtx factory.SyncContext)
 		return nil
 	}
 
-	cm, err := c.hunConfigMapLister.ConfigMaps(clusterName).Get(name)
+	cm, err := c.hubConfigMapLister.ConfigMaps(clusterName).Get(name)
 	switch {
 	case errors.IsNotFound(err):
 		return nil
