@@ -22,6 +22,7 @@ spec:
         args:
           - "/registration"
           - "controller"
+          - "--feature-gates=DefaultClusterSet=true"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
