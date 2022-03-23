@@ -1,14 +1,23 @@
 package clientcert
 
 import (
+	"context"
 	"crypto/x509/pkix"
 	"errors"
 	"fmt"
 	"time"
 
+	"github.com/openshift/library-go/pkg/operator/events"
+	certificates "k8s.io/api/certificates/v1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	certificatesinformers "k8s.io/client-go/informers/certificates/v1"
+	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1"
+	certificateslisters "k8s.io/client-go/listers/certificates/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
@@ -157,16 +166,84 @@ func BuildKubeconfig(clientConfig *restclient.Config, certPath, keyPath string) 
 	return kubeconfig
 }
 
-// isCSRApproved returns true if the given csr has been approved
-func isCSRApproved(csr *certificatesv1.CertificateSigningRequest) bool {
+type csrControl interface {
+	create(ctx context.Context, recorder events.Recorder, objMeta metav1.ObjectMeta, csrData []byte, signerName string) (string, error)
+	isApproved(name string) (bool, error)
+	getIssuedCertificate(name string) ([]byte, error)
+	informer() cache.SharedIndexInformer
+}
+
+var _ csrControl = &v1CSRControl{}
+
+type v1CSRControl struct {
+	hubCSRInformer certificatesinformers.CertificateSigningRequestInformer
+	hubCSRLister   certificateslisters.CertificateSigningRequestLister
+	hubCSRClient   csrclient.CertificateSigningRequestInterface
+}
+
+func (v *v1CSRControl) isApproved(name string) (bool, error) {
+	csr, err := v.get(name)
+	if err != nil {
+		return false, err
+	}
+	v1CSR := csr.(*certificates.CertificateSigningRequest)
 	approved := false
-	for _, condition := range csr.Status.Conditions {
+	for _, condition := range v1CSR.Status.Conditions {
 		if condition.Type == certificatesv1.CertificateDenied {
-			return false
+			return false, nil
 		} else if condition.Type == certificatesv1.CertificateApproved {
 			approved = true
 		}
 	}
+	return approved, nil
+}
 
-	return approved
+func (v *v1CSRControl) getIssuedCertificate(name string) ([]byte, error) {
+	csr, err := v.get(name)
+	if err != nil {
+		return nil, err
+	}
+	v1CSR := csr.(*certificates.CertificateSigningRequest)
+	return v1CSR.Status.Certificate, nil
+}
+
+func (v *v1CSRControl) create(ctx context.Context, recorder events.Recorder, objMeta metav1.ObjectMeta, csrData []byte, signerName string) (string, error) {
+	csr := &certificates.CertificateSigningRequest{
+		ObjectMeta: objMeta,
+		Spec: certificates.CertificateSigningRequestSpec{
+			Request: csrData,
+			Usages: []certificates.KeyUsage{
+				certificates.UsageDigitalSignature,
+				certificates.UsageKeyEncipherment,
+				certificates.UsageClientAuth,
+			},
+			SignerName: signerName,
+		},
+	}
+
+	req, err := v.hubCSRClient.Create(ctx, csr, metav1.CreateOptions{})
+	if err != nil {
+		return "", err
+	}
+	recorder.Eventf("CSRCreated", "A csr %q is created", req.Name)
+	return req.Name, nil
+}
+
+func (v *v1CSRControl) informer() cache.SharedIndexInformer {
+	return v.hubCSRInformer.Informer()
+}
+
+func (v *v1CSRControl) get(name string) (metav1.Object, error) {
+	csr, err := v.hubCSRLister.Get(name)
+	switch {
+	case apierrors.IsNotFound(err):
+		// fallback to fetching csr from hub apiserver in case it is not cached by informer yet
+		csr, err = v.hubCSRClient.Get(context.Background(), name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("unable to get csr %q. It might have already been deleted.", name)
+		}
+	case err != nil:
+		return nil, err
+	}
+	return csr, nil
 }

@@ -210,10 +210,10 @@ func TestRegistrationSync(t *testing.T) {
 			}
 
 			controller := addOnRegistrationController{
-				clusterName:    clusterName,
-				kubeClient:     kubeClient,
-				hubAddOnLister: addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				recorder:       eventstesting.NewTestingEventRecorder(t),
+				clusterName:     clusterName,
+				spokeKubeClient: kubeClient,
+				hubAddOnLister:  addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				recorder:        eventstesting.NewTestingEventRecorder(t),
 				startRegistrationFunc: func(ctx context.Context, config registrationConfig) context.CancelFunc {
 					_, cancel := context.WithCancel(context.Background())
 					return cancel

@@ -153,6 +153,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 
 	// enable DefaultClusterSet feature gate
 	features.DefaultHubMutableFeatureGate.Set("DefaultClusterSet=true")
+	features.DefaultHubMutableFeatureGate.Set("V1beta1CSRAPICompatibility=true")
 
 	// start hub controller
 	go func() {

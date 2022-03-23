@@ -199,17 +199,20 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		}
 
 		controllerName := fmt.Sprintf("BootstrapClientCertController@cluster:%s", o.ClusterName)
-		clientCertForHubController := managedcluster.NewClientCertForHubController(
+		clientCertForHubController, err := managedcluster.NewClientCertForHubController(
 			o.ClusterName, o.AgentName, o.ComponentNamespace, o.HubKubeconfigSecret,
 			kubeconfigData,
 			// store the secret in the cluster where the agent pod runs
-			managementKubeClient.CoreV1(),
 			namespacedManagementKubeInformerFactory.Core().V1().Secrets(),
-			bootstrapKubeClient.CertificatesV1().CertificateSigningRequests(),
-			bootstrapInformerFactory.Certificates().V1().CertificateSigningRequests(),
+			bootstrapInformerFactory.Certificates(),
+			managementKubeClient,
+			bootstrapKubeClient,
 			controllerContext.EventRecorder,
 			controllerName,
 		)
+		if err != nil {
+			return err
+		}
 
 		bootstrapCtx, stopBootstrap := context.WithCancel(ctx)
 
@@ -274,17 +277,19 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 
 	// create another ClientCertForHubController for client certificate rotation
 	controllerName := fmt.Sprintf("ClientCertController@cluster:%s", o.ClusterName)
-	clientCertForHubController := managedcluster.NewClientCertForHubController(
+	clientCertForHubController, err := managedcluster.NewClientCertForHubController(
 		o.ClusterName, o.AgentName, o.ComponentNamespace, o.HubKubeconfigSecret,
 		kubeconfigData,
-		// store the secret in the cluster where the agent pod runs
-		managementKubeClient.CoreV1(),
 		namespacedManagementKubeInformerFactory.Core().V1().Secrets(),
-		hubKubeClient.CertificatesV1().CertificateSigningRequests(),
-		hubKubeInformerFactory.Certificates().V1().CertificateSigningRequests(),
+		hubKubeInformerFactory.Certificates(),
+		managementKubeClient,
+		hubKubeClient,
 		controllerContext.EventRecorder,
 		controllerName,
 	)
+	if err != nil {
+		return err
+	}
 
 	// create ManagedClusterJoiningController to reconcile instances of ManagedCluster on the managed cluster
 	managedClusterJoiningController := managedcluster.NewManagedClusterJoiningController(
@@ -352,9 +357,9 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			// In the future we need to maintain the hub cluster kubeconfig secret on the **management**
 			// cluster when there is an appropriate way to deploy addon agents on the management cluster.
 			spokeKubeClient,
-			hubKubeInformerFactory.Certificates().V1().CertificateSigningRequests(),
+			hubKubeInformerFactory.Certificates(),
 			addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
-			hubKubeClient.CertificatesV1().CertificateSigningRequests(),
+			hubKubeClient,
 			controllerContext.EventRecorder,
 		)
 	}

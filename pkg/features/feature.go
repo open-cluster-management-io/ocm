@@ -33,6 +33,14 @@ const (
 	// without clusterset label will be automatically added into the default cluster set by adding a label
 	// "cluster.open-cluster-management.io/clusterset=default" to the clusters.
 	DefaultClusterSet featuregate.Feature = "DefaultClusterSet"
+
+	// V1beta1CSRAPICompatibility will make the spoke registration agent to issue CSR requests
+	// via V1beta1 api, so that registration agent can still manage the certificate rotation for the
+	// ManagedCluster and  ManagedClusterAddon.
+	// Note that kubernetes release [1.12, 1.18)'s beta CSR api doesn't have the "signerName" field which
+	// means that all the approved CSR objects will be signed by the built-in CSR controller in
+	// kube-controller-manager.
+	V1beta1CSRAPICompatibility featuregate.Feature = "V1beta1CSRAPICompatibility"
 )
 
 var (
@@ -53,8 +61,9 @@ func init() {
 // feature keys for registration agent.  To add a new feature, define a key for it above and
 // add it here.
 var defaultSpokeRegistrationFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	ClusterClaim:    {Default: true, PreRelease: featuregate.Beta},
-	AddonManagement: {Default: false, PreRelease: featuregate.Alpha},
+	ClusterClaim:               {Default: true, PreRelease: featuregate.Beta},
+	AddonManagement:            {Default: false, PreRelease: featuregate.Alpha},
+	V1beta1CSRAPICompatibility: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 // defaultHubRegistrationFeatureGates consists of all known ocm-registration

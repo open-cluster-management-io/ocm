@@ -26,9 +26,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -289,4 +292,29 @@ func FindTaint(taints []clusterv1.Taint, taint clusterv1.Taint) *clusterv1.Taint
 	}
 
 	return nil
+}
+
+// IsCSRSupported checks whether the cluster supports v1 or v1beta1 csr api.
+func IsCSRSupported(nativeClient kubernetes.Interface) (bool, bool, error) {
+	mapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(nativeClient.Discovery()))
+	mappings, err := mapper.RESTMappings(schema.GroupKind{
+		Group: certificatesv1.GroupName,
+		Kind:  "CertificateSigningRequest",
+	})
+	if err != nil {
+		return false, false, err
+	}
+	v1CSRSupported := false
+	for _, mapping := range mappings {
+		if mapping.GroupVersionKind.Version == "v1" {
+			v1CSRSupported = true
+		}
+	}
+	v1beta1CSRSupported := false
+	for _, mapping := range mappings {
+		if mapping.GroupVersionKind.Version == "v1beta1" {
+			v1beta1CSRSupported = true
+		}
+	}
+	return v1CSRSupported, v1beta1CSRSupported, nil
 }

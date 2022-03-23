@@ -10,10 +10,9 @@ import (
 	certificates "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	certificatesinformers "k8s.io/client-go/informers/certificates/v1"
+	certificatesinformers "k8s.io/client-go/informers/certificates"
 	corev1informers "k8s.io/client-go/informers/core/v1"
-	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1"
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
 
 	"open-cluster-management.io/registration/pkg/clientcert"
@@ -29,17 +28,17 @@ func NewClientCertForHubController(
 	clientCertSecretNamespace string,
 	clientCertSecretName string,
 	kubeconfigData []byte,
-	spokeCoreClient corev1client.CoreV1Interface,
 	spokeSecretInformer corev1informers.SecretInformer,
-	hubCSRClient csrclient.CertificateSigningRequestInterface,
-	hubCSRInformer certificatesinformers.CertificateSigningRequestInformer,
+	hubCSRInformer certificatesinformers.Interface,
+	spokeKubeClient kubernetes.Interface,
+	hubKubeClient kubernetes.Interface,
 	recorder events.Recorder,
 	controllerName string,
-) factory.Controller {
+) (factory.Controller, error) {
 	clientCertOption := clientcert.ClientCertOption{
 		SecretNamespace: clientCertSecretNamespace,
 		SecretName:      clientCertSecretName,
-		AdditonalSecretData: map[string][]byte{
+		AdditionalSecretData: map[string][]byte{
 			clientcert.ClusterNameFile: []byte(clusterName),
 			clientcert.AgentNameFile:   []byte(agentName),
 			clientcert.KubeconfigFile:  kubeconfigData,
@@ -81,9 +80,9 @@ func NewClientCertForHubController(
 		clientCertOption,
 		csrOption,
 		hubCSRInformer,
-		hubCSRClient,
 		spokeSecretInformer,
-		spokeCoreClient,
+		spokeKubeClient,
+		hubKubeClient,
 		recorder,
 		controllerName,
 	)

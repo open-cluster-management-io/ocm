@@ -5,8 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	certificates "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/client-go/listers/certificates/v1"
+	"k8s.io/client-go/tools/cache"
 	certutil "k8s.io/client-go/util/cert"
 
 	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
@@ -14,8 +18,9 @@ import (
 
 func TestIsCSRApproved(t *testing.T) {
 	cases := []struct {
-		name        string
-		csr         *certificates.CertificateSigningRequest
+		name string
+		csr  *certificates.CertificateSigningRequest
+
 		csrApproved bool
 	}{
 		{
@@ -34,7 +39,18 @@ func TestIsCSRApproved(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			csrApproved := isCSRApproved(c.csr)
+			indexer := cache.NewIndexer(
+				cache.MetaNamespaceKeyFunc,
+				cache.Indexers{
+					cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
+				})
+			require.NoError(t, indexer.Add(c.csr))
+			lister := v1.NewCertificateSigningRequestLister(indexer)
+			ctrl := &v1CSRControl{
+				hubCSRLister: lister,
+			}
+			csrApproved, err := ctrl.isApproved(c.csr.Name)
+			assert.NoError(t, err)
 			if csrApproved != c.csrApproved {
 				t.Errorf("expected %t, but got %t", c.csrApproved, csrApproved)
 			}

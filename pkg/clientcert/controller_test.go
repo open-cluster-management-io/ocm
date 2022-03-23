@@ -7,13 +7,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openshift/library-go/pkg/operator/events"
 	certificates "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/informers"
+	"k8s.io/apimachinery/pkg/util/rand"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 
 	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 	"open-cluster-management.io/registration/pkg/hub/user"
@@ -52,10 +55,9 @@ func TestSync(t *testing.T) {
 			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, hubActions, "create")
 				actual := hubActions[0].(clienttesting.CreateActionImpl).Object
-				if _, ok := actual.(*certificates.CertificateSigningRequest); !ok {
+				if _, ok := actual.(*unstructured.Unstructured); !ok {
 					t.Errorf("expected csr was created, but failed")
 				}
-
 				testinghelpers.AssertActions(t, agentActions, "get")
 			},
 		},
@@ -71,7 +73,7 @@ func TestSync(t *testing.T) {
 			},
 			approvedCSRCert: testinghelpers.NewTestCert(commonName, 10*time.Second),
 			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, hubActions, "get")
+				testinghelpers.AssertActions(t, hubActions, "get", "get")
 				testinghelpers.AssertActions(t, agentActions, "get", "update")
 				actual := agentActions[1].(clienttesting.UpdateActionImpl).Object
 				secret := actual.(*corev1.Secret)
@@ -114,7 +116,7 @@ func TestSync(t *testing.T) {
 			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, hubActions, "create")
 				actual := hubActions[0].(clienttesting.CreateActionImpl).Object
-				if _, ok := actual.(*certificates.CertificateSigningRequest); !ok {
+				if _, ok := actual.(*unstructured.Unstructured); !ok {
 					t.Errorf("expected csr was created, but failed")
 				}
 				testinghelpers.AssertActions(t, agentActions, "get")
@@ -135,7 +137,7 @@ func TestSync(t *testing.T) {
 			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, hubActions, "create")
 				actual := hubActions[0].(clienttesting.CreateActionImpl).Object
-				if _, ok := actual.(*certificates.CertificateSigningRequest); !ok {
+				if _, ok := actual.(*unstructured.Unstructured); !ok {
 					t.Errorf("expected csr was created, but failed")
 				}
 				testinghelpers.AssertActions(t, agentActions, "get")
@@ -144,13 +146,17 @@ func TestSync(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			ctrl := &mockCSRControl{}
 			csrs := []runtime.Object{}
 			if c.approvedCSRCert != nil {
 				csr := testinghelpers.NewApprovedCSR(testinghelpers.CSRHolder{Name: testCSRName})
 				csr.Status.Certificate = c.approvedCSRCert.Cert
 				csrs = append(csrs, csr)
+				ctrl.approved = true
+				ctrl.issuedCertData = c.approvedCSRCert.Cert
 			}
 			hubKubeClient := kubefake.NewSimpleClientset(csrs...)
+			ctrl.csrClient = &hubKubeClient.Fake
 
 			// GenerateName is not working for fake clent, we set the name with prepend reactor
 			hubKubeClient.PrependReactor(
@@ -160,17 +166,16 @@ func TestSync(t *testing.T) {
 					return true, testinghelpers.NewCSR(testinghelpers.CSRHolder{Name: testCSRName}), nil
 				},
 			)
-			hubInformerFactory := informers.NewSharedInformerFactory(hubKubeClient, 3*time.Minute)
 			agentKubeClient := kubefake.NewSimpleClientset(c.secrets...)
 
 			clientCertOption := ClientCertOption{
 				SecretNamespace: testNamespace,
 				SecretName:      testSecretName,
-				AdditonalSecretData: map[string][]byte{
+				AdditionalSecretData: map[string][]byte{
 					ClusterNameFile: []byte(testinghelpers.TestManagedClusterName),
 					AgentNameFile:   []byte(testAgentName),
 				},
-				AdditonalSecretDataSensitive: c.additonalSecretDataSensitive,
+				AdditionalSecretDataSensitive: c.additonalSecretDataSensitive,
 			}
 			csrOption := CSROption{
 				ObjectMeta: metav1.ObjectMeta{
@@ -183,8 +188,7 @@ func TestSync(t *testing.T) {
 			controller := &clientCertificateController{
 				ClientCertOption: clientCertOption,
 				CSROption:        csrOption,
-				hubCSRLister:     hubInformerFactory.Certificates().V1().CertificateSigningRequests().Lister(),
-				hubCSRClient:     hubKubeClient.CertificatesV1().CertificateSigningRequests(),
+				csrControl:       ctrl,
 				spokeCoreClient:  agentKubeClient.CoreV1(),
 				controllerName:   "test-agent",
 			}
@@ -212,4 +216,45 @@ func TestSync(t *testing.T) {
 			c.validateActions(t, hubKubeClient.Actions(), agentKubeClient.Actions())
 		})
 	}
+}
+
+var _ csrControl = &mockCSRControl{}
+
+type mockCSRControl struct {
+	approved       bool
+	issuedCertData []byte
+	csrClient      *clienttesting.Fake
+}
+
+func (m *mockCSRControl) create(ctx context.Context, recorder events.Recorder, objMeta metav1.ObjectMeta, csrData []byte, signerName string) (string, error) {
+	mockCSR := &unstructured.Unstructured{}
+	m.csrClient.Invokes(clienttesting.CreateActionImpl{
+		ActionImpl: clienttesting.ActionImpl{
+			Verb: "create",
+		},
+		Object: mockCSR,
+	}, nil)
+	return objMeta.Name + rand.String(4), nil
+}
+
+func (m *mockCSRControl) isApproved(name string) (bool, error) {
+	m.csrClient.Invokes(clienttesting.GetActionImpl{
+		ActionImpl: clienttesting.ActionImpl{
+			Verb: "get",
+		},
+	}, nil)
+	return m.approved, nil
+}
+
+func (m *mockCSRControl) getIssuedCertificate(name string) ([]byte, error) {
+	m.csrClient.Invokes(clienttesting.GetActionImpl{
+		ActionImpl: clienttesting.ActionImpl{
+			Verb: "get",
+		},
+	}, nil)
+	return m.issuedCertData, nil
+}
+
+func (m *mockCSRControl) informer() cache.SharedIndexInformer {
+	panic("implement me")
 }

@@ -12,21 +12,22 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 
-	certificates "k8s.io/api/certificates/v1"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	certificatesinformers "k8s.io/client-go/informers/certificates/v1"
+	certificatesinformers "k8s.io/client-go/informers/certificates"
 	corev1informers "k8s.io/client-go/informers/core/v1"
-	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1"
+	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	certificateslisters "k8s.io/client-go/listers/certificates/v1"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/cache"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog/v2"
+	"open-cluster-management.io/registration/pkg/features"
+	"open-cluster-management.io/registration/pkg/helpers"
 )
 
 const (
@@ -72,10 +73,10 @@ type ClientCertOption struct {
 	// it does not exist.
 	SecretName string
 	// AdditonalSecretData contains data that will be added into client certificate secret besides tls.key/tls.crt
-	AdditonalSecretData map[string][]byte
+	AdditionalSecretData map[string][]byte
 	// AdditonalSecretDataSensitive is true indicates the client cert is sensitive to the AdditonalSecretData.
 	// That means once AdditonalSecretData changes, the client cert will be recreated.
-	AdditonalSecretDataSensitive bool
+	AdditionalSecretDataSensitive bool
 }
 
 // clientCertificateController implements the common logic of hub client certification creation/rotation. It
@@ -86,9 +87,7 @@ type ClientCertOption struct {
 type clientCertificateController struct {
 	ClientCertOption
 	CSROption
-
-	hubCSRLister    certificateslisters.CertificateSigningRequestLister
-	hubCSRClient    csrclient.CertificateSigningRequestInterface
+	csrControl
 	spokeCoreClient corev1client.CoreV1Interface
 	controllerName  string
 
@@ -109,8 +108,49 @@ type clientCertificateController struct {
 func NewClientCertificateController(
 	clientCertOption ClientCertOption,
 	csrOption CSROption,
-	hubCSRInformer certificatesinformers.CertificateSigningRequestInformer,
-	hubCSRClient csrclient.CertificateSigningRequestInterface,
+	hubCSRInformer certificatesinformers.Interface,
+	spokeSecretInformer corev1informers.SecretInformer,
+	spokeKubeClient kubernetes.Interface,
+	hubKubeClient kubernetes.Interface,
+	recorder events.Recorder,
+	controllerName string,
+) (factory.Controller, error) {
+	var csrCtrl csrControl = nil
+	if features.DefaultSpokeMutableFeatureGate.Enabled(features.V1beta1CSRAPICompatibility) {
+		v1CSRSupported, v1beta1CSRSupported, err := helpers.IsCSRSupported(hubKubeClient)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed CSR api discovery")
+		}
+		if !v1CSRSupported && v1beta1CSRSupported {
+			csrCtrl = &v1beta1CSRControl{
+				hubCSRInformer: hubCSRInformer.V1beta1().CertificateSigningRequests(),
+				hubCSRLister:   hubCSRInformer.V1beta1().CertificateSigningRequests().Lister(),
+				hubCSRClient:   hubKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
+			}
+			klog.Info("Using v1beta1 CSR api to manage spoke client certificate")
+		}
+	}
+	if csrCtrl == nil {
+		csrCtrl = &v1CSRControl{
+			hubCSRInformer: hubCSRInformer.V1().CertificateSigningRequests(),
+			hubCSRLister:   hubCSRInformer.V1().CertificateSigningRequests().Lister(),
+			hubCSRClient:   hubKubeClient.CertificatesV1().CertificateSigningRequests(),
+		}
+	}
+	return newClientCertificateController(
+		clientCertOption,
+		csrOption,
+		csrCtrl,
+		spokeSecretInformer,
+		spokeKubeClient.CoreV1(),
+		recorder,
+		controllerName), nil
+}
+
+func newClientCertificateController(
+	clientCertOption ClientCertOption,
+	csrOption CSROption,
+	csrControl csrControl,
 	spokeSecretInformer corev1informers.SecretInformer,
 	spokeCoreClient corev1client.CoreV1Interface,
 	recorder events.Recorder,
@@ -119,8 +159,7 @@ func NewClientCertificateController(
 	c := clientCertificateController{
 		ClientCertOption: clientCertOption,
 		CSROption:        csrOption,
-		hubCSRLister:     hubCSRInformer.Lister(),
-		hubCSRClient:     hubCSRClient,
+		csrControl:       csrControl,
 		spokeCoreClient:  spokeCoreClient,
 		controllerName:   controllerName,
 	}
@@ -143,7 +182,7 @@ func NewClientCertificateController(
 		WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
 			accessor, _ := meta.Accessor(obj)
 			return accessor.GetName()
-		}, c.EventFilterFunc, hubCSRInformer.Informer()).
+		}, c.EventFilterFunc, csrControl.informer()).
 		WithSync(c.sync).
 		ResyncEvery(ControllerResyncInterval).
 		ToController(controllerName, recorder)
@@ -153,7 +192,7 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 	// get secret containing client certificate
 	secret, err := c.spokeCoreClient.Secrets(c.SecretNamespace).Get(ctx, c.SecretName, metav1.GetOptions{})
 	switch {
-	case errors.IsNotFound(err):
+	case apierrors.IsNotFound(err):
 		secret = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: c.SecretNamespace,
@@ -166,7 +205,49 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 
 	// reconcile pending csr if exists
 	if len(c.csrName) > 0 {
-		newSecretConfig, err := c.syncCSR()
+		// build a secret data map if the csr is approved
+		newSecretConfig, err := func() (map[string][]byte, error) {
+			// skip if there is no ongoing csr
+			if len(c.csrName) == 0 {
+				return nil, fmt.Errorf("no ongoing csr")
+			}
+
+			// skip if csr is not approved yet
+			isApproved, err := c.csrControl.isApproved(c.csrName)
+			if err != nil {
+				return nil, err
+			}
+			if !isApproved {
+				return nil, nil
+			}
+
+			// skip if csr is not issued
+			certData, err := c.csrControl.getIssuedCertificate(c.csrName)
+			if err != nil {
+				return nil, err
+			}
+			if len(certData) == 0 {
+				return nil, nil
+			}
+
+			klog.V(4).Infof("Sync csr %v", c.csrName)
+			// check if cert in csr status matches with the corresponding private key
+			if c.keyData == nil {
+				return nil, fmt.Errorf("No private key found for certificate in csr: %s", c.csrName)
+			}
+			_, err = tls.X509KeyPair(certData, c.keyData)
+			if err != nil {
+				return nil, fmt.Errorf("Private key does not match with the certificate in csr: %s", c.csrName)
+			}
+
+			data := map[string][]byte{
+				TLSCertFile: certData,
+				TLSKeyFile:  c.keyData,
+			}
+
+			return data, nil
+		}()
+
 		if err != nil {
 			c.reset()
 			return err
@@ -175,12 +256,12 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 			return nil
 		}
 		// append additional data into client certificate secret
-		for k, v := range c.AdditonalSecretData {
+		for k, v := range c.AdditionalSecretData {
 			newSecretConfig[k] = v
 		}
 		secret.Data = newSecretConfig
 		// save the changes into secret
-		if err := c.saveSecret(secret); err != nil {
+		if err := saveSecret(c.spokeCoreClient, c.SecretNamespace, secret); err != nil {
 			return err
 		}
 		syncCtx.Recorder().Eventf("ClientCertificateCreated", "A new client certificate for %s is available", c.controllerName)
@@ -192,135 +273,51 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 	// a. there is no valid client certificate issued for the current cluster/agent;
 	// b. client certificate is sensitive to the additional secret data and the data changes;
 	// c. client certificate exists and has less than a random percentage range from 20% to 25% of its life remaining;
-	switch {
-	case !c.hasValidClientCertificate(secret):
-		syncCtx.Recorder().Eventf("NoValidCertificateFound", "No valid client certificate for %s is found. Bootstrap is required", c.controllerName)
-	case c.AdditonalSecretDataSensitive && !c.hasAdditonalSecretData(secret):
-		syncCtx.Recorder().Eventf("AdditonalSecretDataChanged", "The additonal secret data is changed. Re-create the client certificate for %s", c.controllerName)
-	default:
-		notBefore, notAfter, err := getCertValidityPeriod(secret)
-		if err != nil {
-			return err
-		}
-
-		total := notAfter.Sub(*notBefore)
-		remaining := notAfter.Sub(time.Now())
-		klog.V(4).Infof("Client certificate for %s: time total=%v, remaining=%v, remaining/total=%v", c.controllerName, total, remaining, remaining.Seconds()/total.Seconds())
-		threshold := jitter(0.2, 0.25)
-		if remaining.Seconds()/total.Seconds() > threshold {
-			// Do nothing if the client certificate is valid and has more than a random percentage range from 20% to 25% of its life remaining
-			klog.V(4).Infof("Client certificate for %s is valid and has more than %.2f%% of its life remaining", c.controllerName, threshold*100)
-			return nil
-		}
-		syncCtx.Recorder().Eventf("CertificateRotationStarted", "The current client certificate for %s expires in %v. Start certificate rotation", c.controllerName, remaining.Round(time.Second))
+	shouldCreate, err := shouldCreateCSR(
+		c.controllerName,
+		secret,
+		syncCtx.Recorder(),
+		c.Subject,
+		c.AdditionalSecretDataSensitive,
+		c.AdditionalSecretData)
+	if err != nil {
+		return err
+	}
+	if !shouldCreate {
+		return nil
 	}
 
 	// create a new private key
-	c.keyData, err = keyutil.MakeEllipticPrivateKeyPEM()
+	keyData, err := keyutil.MakeEllipticPrivateKeyPEM()
 	if err != nil {
 		return err
 	}
 
-	// create a csr
-	c.csrName, err = c.createCSR(ctx)
+	privateKey, err := keyutil.ParsePrivateKeyPEM(keyData)
 	if err != nil {
-		c.reset()
-		return err
-	}
-	syncCtx.Recorder().Eventf("CSRCreated", "A csr %q is created for %s", c.csrName, c.controllerName)
-	return nil
-}
-
-func (c *clientCertificateController) syncCSR() (map[string][]byte, error) {
-	// skip if there is no ongoing csr
-	if len(c.csrName) == 0 {
-		return nil, fmt.Errorf("no ongoing csr")
-	}
-
-	// skip if csr no longer exists
-	csr, err := c.hubCSRLister.Get(c.csrName)
-	switch {
-	case errors.IsNotFound(err):
-		// fallback to fetching csr from hub apiserver in case it is not cached by informer yet
-		csr, err = c.hubCSRClient.Get(context.Background(), c.csrName, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			return nil, fmt.Errorf("unable to get csr %q. It might have already been deleted.", c.csrName)
-		}
-	case err != nil:
-		return nil, err
-	}
-
-	// skip if csr is not approved yet
-	if !isCSRApproved(csr) {
-		return nil, nil
-	}
-
-	// skip if csr has no certificate in its status yet
-	if len(csr.Status.Certificate) == 0 {
-		return nil, nil
-	}
-
-	klog.V(4).Infof("Sync csr %v", c.csrName)
-	// check if cert in csr status matches with the corresponding private key
-	if c.keyData == nil {
-		return nil, fmt.Errorf("No private key found for certificate in csr: %s", c.csrName)
-	}
-	_, err = tls.X509KeyPair(csr.Status.Certificate, c.keyData)
-	if err != nil {
-		return nil, fmt.Errorf("Private key does not match with the certificate in csr: %s", c.csrName)
-	}
-
-	data := map[string][]byte{
-		TLSCertFile: csr.Status.Certificate,
-		TLSKeyFile:  c.keyData,
-	}
-
-	return data, nil
-}
-
-func (c *clientCertificateController) createCSR(ctx context.Context) (string, error) {
-	privateKey, err := keyutil.ParsePrivateKeyPEM(c.keyData)
-	if err != nil {
-		return "", fmt.Errorf("invalid private key for certificate request: %w", err)
+		return fmt.Errorf("invalid private key for certificate request: %w", err)
 	}
 	csrData, err := certutil.MakeCSR(privateKey, c.Subject, c.DNSNames, nil)
 	if err != nil {
-		return "", fmt.Errorf("unable to generate certificate request: %w", err)
+		return fmt.Errorf("unable to generate certificate request: %w", err)
 	}
-
-	csr := &certificates.CertificateSigningRequest{
-		ObjectMeta: c.ObjectMeta,
-		Spec: certificates.CertificateSigningRequestSpec{
-			Request: csrData,
-			Usages: []certificates.KeyUsage{
-				certificates.UsageDigitalSignature,
-				certificates.UsageKeyEncipherment,
-				certificates.UsageClientAuth,
-			},
-			SignerName: c.SignerName,
-		},
-	}
-
-	req, err := c.hubCSRClient.Create(ctx, csr, metav1.CreateOptions{})
+	createdCSRName, err := c.csrControl.create(ctx, syncCtx.Recorder(), c.ObjectMeta, csrData, c.SignerName)
 	if err != nil {
-		return "", err
-	}
-	return req.Name, nil
-}
-
-func (c *clientCertificateController) saveSecret(secret *corev1.Secret) error {
-	var err error
-	if secret.ResourceVersion == "" {
-		_, err = c.spokeCoreClient.Secrets(c.SecretNamespace).Create(context.Background(), secret, metav1.CreateOptions{})
 		return err
 	}
-	_, err = c.spokeCoreClient.Secrets(c.SecretNamespace).Update(context.Background(), secret, metav1.UpdateOptions{})
-	return err
+	c.keyData = keyData
+	c.csrName = createdCSRName
+	return nil
 }
 
-func (c *clientCertificateController) reset() {
-	c.csrName = ""
-	c.keyData = nil
+func saveSecret(spokeCoreClient corev1client.CoreV1Interface, secretNamespace string, secret *corev1.Secret) error {
+	var err error
+	if secret.ResourceVersion == "" {
+		_, err = spokeCoreClient.Secrets(secretNamespace).Create(context.Background(), secret, metav1.CreateOptions{})
+		return err
+	}
+	_, err = spokeCoreClient.Secrets(secretNamespace).Update(context.Background(), secret, metav1.UpdateOptions{})
+	return err
 }
 
 func (c *clientCertificateController) hasValidClientCertificate(secret *corev1.Secret) bool {
@@ -330,9 +327,46 @@ func (c *clientCertificateController) hasValidClientCertificate(secret *corev1.S
 	return false
 }
 
+func (c *clientCertificateController) reset() {
+	c.csrName = ""
+	c.keyData = nil
+}
+
+func shouldCreateCSR(
+	controllerName string,
+	secret *corev1.Secret,
+	recorder events.Recorder,
+	subject *pkix.Name,
+	additionalSecretDataSensitive bool,
+	additionalSecretData map[string][]byte) (bool, error) {
+	switch {
+	case !hasValidClientCertificate(subject, secret):
+		recorder.Eventf("NoValidCertificateFound", "No valid client certificate for %s is found. Bootstrap is required", controllerName)
+	case additionalSecretDataSensitive && !hasAdditionalSecretData(additionalSecretData, secret):
+		recorder.Eventf("AdditonalSecretDataChanged", "The additonal secret data is changed. Re-create the client certificate for %s", controllerName)
+	default:
+		notBefore, notAfter, err := getCertValidityPeriod(secret)
+		if err != nil {
+			return false, err
+		}
+
+		total := notAfter.Sub(*notBefore)
+		remaining := notAfter.Sub(time.Now())
+		klog.V(4).Infof("Client certificate for %s: time total=%v, remaining=%v, remaining/total=%v", controllerName, total, remaining, remaining.Seconds()/total.Seconds())
+		threshold := jitter(0.2, 0.25)
+		if remaining.Seconds()/total.Seconds() > threshold {
+			// Do nothing if the client certificate is valid and has more than a random percentage range from 20% to 25% of its life remaining
+			klog.V(4).Infof("Client certificate for %s is valid and has more than %.2f%% of its life remaining", controllerName, threshold*100)
+			return false, nil
+		}
+		recorder.Eventf("CertificateRotationStarted", "The current client certificate for %s expires in %v. Start certificate rotation", controllerName, remaining.Round(time.Second))
+	}
+	return true, nil
+}
+
 // hasAdditonalSecretData checks if the secret includes the expected additional secret data.
-func (c *clientCertificateController) hasAdditonalSecretData(secret *corev1.Secret) bool {
-	for k, v := range c.AdditonalSecretData {
+func hasAdditionalSecretData(additionalSecretData map[string][]byte, secret *corev1.Secret) bool {
+	for k, v := range additionalSecretData {
 		value, ok := secret.Data[k]
 		if !ok {
 			return false
@@ -351,4 +385,11 @@ func jitter(percentage float64, maxFactor float64) float64 {
 	}
 	newPercentage := percentage + percentage*rand.Float64()*maxFactor
 	return newPercentage
+}
+
+func hasValidClientCertificate(subject *pkix.Name, secret *corev1.Secret) bool {
+	if valid, err := IsCertificateValid(secret.Data[TLSCertFile], subject); err == nil {
+		return valid
+	}
+	return false
 }
