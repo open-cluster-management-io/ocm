@@ -14,6 +14,7 @@ import (
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"open-cluster-management.io/registration/pkg/features"
 	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 )
@@ -151,7 +152,7 @@ func TestManagedClusterMutate(t *testing.T) {
 			expectedResponse: newAdmissionResponse(true).
 				addJsonPatch(jsonPatchOperation{
 					Operation: "add",
-					Path:      fmt.Sprintf("/metadata/labels"),
+					Path:      "/metadata/labels",
 					Value: map[string]string{
 						clusterSetLabel: defaultClusterSetName,
 					},
@@ -207,7 +208,7 @@ func TestManagedClusterMutate(t *testing.T) {
 	nowFunc = func() time.Time {
 		return now
 	}
-	features.DefaultHubMutableFeatureGate.Set("DefaultClusterSet=true")
+	utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=true", string(features.DefaultClusterSet)))
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			admissionHook := &ManagedClusterMutatingAdmissionHook{}

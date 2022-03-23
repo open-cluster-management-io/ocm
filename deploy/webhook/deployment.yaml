@@ -24,6 +24,8 @@ spec:
           - "webhook"
           - "--cert-dir=/tmp"
           - "--secure-port=6443"
+          # webhook is not hosting any k8s api resource, so it is not subjected to APF feature
+          - "--feature-gates=DefaultClusterSet=true,APIPriorityAndFairness=false"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

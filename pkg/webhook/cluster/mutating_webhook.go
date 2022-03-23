@@ -10,6 +10,7 @@ import (
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -78,7 +79,7 @@ func (a *ManagedClusterMutatingAdmissionHook) Admit(req *admissionv1beta1.Admiss
 	}
 	jsonPatches = append(jsonPatches, taintJsonPatches...)
 
-	if features.DefaultHubMutableFeatureGate.Enabled(features.DefaultClusterSet) {
+	if utilfeature.DefaultMutableFeatureGate.Enabled(features.DefaultClusterSet) {
 		labelJsonPatches, status := a.addDefaultClusterSetLabel(managedCluster, req.Object.Raw)
 		if !status.Allowed {
 			return status
@@ -118,7 +119,7 @@ func (a *ManagedClusterMutatingAdmissionHook) addDefaultClusterSetLabel(managedC
 		jsonPatches = []jsonPatchOperation{
 			{
 				Operation: "add",
-				Path:      fmt.Sprintf("/metadata/labels"),
+				Path:      "/metadata/labels",
 				Value: map[string]string{
 					clusterSetLabel: defaultClusterSetName,
 				},

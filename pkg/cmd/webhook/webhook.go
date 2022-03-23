@@ -6,7 +6,7 @@ import (
 	admissionserver "github.com/openshift/generic-admission-server/pkg/cmd/server"
 	"github.com/spf13/cobra"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"open-cluster-management.io/registration/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clusterwebhook "open-cluster-management.io/registration/pkg/webhook/cluster"
 	clustersetbindingwebhook "open-cluster-management.io/registration/pkg/webhook/clustersetbinding"
 )
@@ -38,10 +38,12 @@ func NewAdmissionHook() *cobra.Command {
 		},
 	}
 
-	o.RecommendedOptions.AddFlags(cmd.Flags())
-
 	flags := cmd.Flags()
-	features.DefaultHubMutableFeatureGate.AddFlag(flags)
+	featureGate := utilfeature.DefaultMutableFeatureGate
+	featureGate.AddFlag(flags)
+	o.RecommendedOptions.FeatureGate = featureGate
+
+	o.RecommendedOptions.AddFlags(cmd.Flags())
 
 	return cmd
 }

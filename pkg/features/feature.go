@@ -1,8 +1,9 @@
 package features
 
 import (
+	"k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -43,12 +44,9 @@ var (
 )
 
 func init() {
-	if err := DefaultSpokeMutableFeatureGate.Add(defaultSpokeRegistrationFeatureGates); err != nil {
-		klog.Fatalf("Unexpected error: %v", err)
-	}
-	if err := DefaultHubMutableFeatureGate.Add(defaultHubRegistrationFeatureGates); err != nil {
-		klog.Fatalf("Unexpected error: %v", err)
-	}
+	runtime.Must(DefaultSpokeMutableFeatureGate.Add(defaultSpokeRegistrationFeatureGates))
+	runtime.Must(DefaultHubMutableFeatureGate.Add(defaultHubRegistrationFeatureGates))
+	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultHubRegistrationFeatureGates))
 }
 
 // defaultSpokeRegistrationFeatureGates consists of all known ocm-registration
