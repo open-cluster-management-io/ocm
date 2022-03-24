@@ -29,7 +29,7 @@ const (
 	// registration and maintains the status of managed cluster addons through watching their leases.
 	AddonManagement featuregate.Feature = "AddonManagement"
 
-	// DefaultCluster will make registration hub controller to maintain a default cluster set. All clusters
+	// DefaultClusterSet will make registration hub controller to maintain a default cluster set. All clusters
 	// without clusterset label will be automatically added into the default cluster set by adding a label
 	// "cluster.open-cluster-management.io/clusterset=default" to the clusters.
 	DefaultClusterSet featuregate.Feature = "DefaultClusterSet"
