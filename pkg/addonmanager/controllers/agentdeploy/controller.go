@@ -166,7 +166,7 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 	c.setStatusFeedbackRule(work, agentAddon)
 
 	// apply work
-	work, err = applyWork(c.workClient, c.workLister, c.cache, c.eventRecorder, ctx, work)
+	work, err = applyWork(ctx, c.workClient, c.workLister, c.cache, c.eventRecorder, work)
 	if err != nil {
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
 			Type:    "ManifestApplied",
