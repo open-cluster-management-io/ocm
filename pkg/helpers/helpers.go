@@ -735,19 +735,24 @@ func UpdateKlusterletRelatedResourcesFn(relatedResources ...operatorapiv1.Relate
 	}
 }
 
-// KlusterletNamespace returns the klusterletNamespace to deploy the agents.
-// Note in Hosted mode, the specNamespace will be ignored.
+// KlusterletNamespace returns the klusterlet namespace on the managed cluster.
 func KlusterletNamespace(klusterlet *operatorapiv1.Klusterlet) string {
-	if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeDetached || klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeHosted {
-		return klusterlet.GetName()
-	}
-
 	if len(klusterlet.Spec.Namespace) == 0 {
 		// If namespace is not set, use the default namespace
 		return KlusterletDefaultNamespace
 	}
 
 	return klusterlet.Spec.Namespace
+}
+
+// AgentNamespace returns the namespace to deploy the agents.
+// It is on the managed cluster in the Default mode, and on the management cluster in the Hosted mode.
+func AgentNamespace(klusterlet *operatorapiv1.Klusterlet) string {
+	if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeDetached || klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeHosted {
+		return klusterlet.GetName()
+	}
+
+	return KlusterletNamespace(klusterlet)
 }
 
 // SyncSecret forked from https://github.com/openshift/library-go/blob/d9cdfbd844ea08465b938c46a16bed2ea23207e4/pkg/operator/resource/resourceapply/core.go#L357,

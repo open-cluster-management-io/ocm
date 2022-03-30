@@ -16,12 +16,12 @@ import (
 var _ = Describe("Create klusterlet CR", func() {
 	var klusterletName string
 	var clusterName string
-	var agentNamespace string
+	var klusterletNamespace string
 
 	BeforeEach(func() {
 		klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
 		clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
-		agentNamespace = fmt.Sprintf("e2e-agent-%s", rand.String(6))
+		klusterletNamespace = fmt.Sprintf("e2e-agent-%s", rand.String(6))
 	})
 
 	AfterEach(func() {
@@ -33,7 +33,7 @@ var _ = Describe("Create klusterlet CR", func() {
 	It("Create klusterlet CR with install mode empty", func() {
 		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v", klusterletName, clusterName))
 		// Set install mode empty
-		_, err := t.CreateKlusterlet(klusterletName, clusterName, agentNamespace, "")
+		_, err := t.CreateKlusterlet(klusterletName, clusterName, klusterletNamespace, "")
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("waiting for the managed cluster %v to be created", clusterName))
@@ -72,7 +72,7 @@ var _ = Describe("Create klusterlet CR", func() {
 
 	It("Create klusterlet CR with managed cluster name", func() {
 		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v", klusterletName, clusterName))
-		_, err := t.CreateKlusterlet(klusterletName, clusterName, agentNamespace, operatorapiv1.InstallModeDefault)
+		_, err := t.CreateKlusterlet(klusterletName, clusterName, klusterletNamespace, operatorapiv1.InstallModeDefault)
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("waiting for the managed cluster %v to be created", clusterName))
@@ -111,10 +111,10 @@ var _ = Describe("Create klusterlet CR", func() {
 
 	It("Created klusterlet without managed cluster name", func() {
 		clusterName = ""
-		agentNamespace = ""
+		klusterletNamespace = ""
 		var err error
 		By(fmt.Sprintf("create klusterlet %v without managed cluster name", klusterletName))
-		_, err = t.CreateKlusterlet(klusterletName, clusterName, agentNamespace, operatorapiv1.InstallModeDefault)
+		_, err = t.CreateKlusterlet(klusterletName, clusterName, klusterletNamespace, operatorapiv1.InstallModeDefault)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("waiting for the managed cluster to be created")
@@ -154,7 +154,7 @@ var _ = Describe("Create klusterlet CR", func() {
 	// TODO: remove this after the detached mode is not used in klusterlet
 	It("Create klusterlet CR in Detached mode", func() {
 		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v", klusterletName, clusterName))
-		_, err := t.CreateKlusterlet(klusterletName, clusterName, agentNamespace, operatorapiv1.InstallModeDetached)
+		_, err := t.CreateKlusterlet(klusterletName, clusterName, klusterletNamespace, operatorapiv1.InstallModeDetached)
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("waiting for the managed cluster %v to be created", clusterName))
@@ -193,7 +193,7 @@ var _ = Describe("Create klusterlet CR", func() {
 
 	It("Create klusterlet CR in Hosted mode", func() {
 		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v", klusterletName, clusterName))
-		_, err := t.CreateKlusterlet(klusterletName, clusterName, agentNamespace, operatorapiv1.InstallModeHosted)
+		_, err := t.CreateKlusterlet(klusterletName, clusterName, klusterletNamespace, operatorapiv1.InstallModeHosted)
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("waiting for the managed cluster %v to be created", clusterName))

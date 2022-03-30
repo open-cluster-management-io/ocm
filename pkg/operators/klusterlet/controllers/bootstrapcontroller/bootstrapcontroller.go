@@ -69,21 +69,21 @@ func (k *bootstrapController) sync(ctx context.Context, controllerContext factor
 
 	klog.V(4).Infof("Reconciling klusterlet kubeconfig secrets %q", queueKey)
 
-	klusterletNamespace, klusterletName, err := cache.SplitMetaNamespaceKey(queueKey)
+	agentNamespace, klusterletName, err := cache.SplitMetaNamespaceKey(queueKey)
 	if err != nil {
 		// ignore bad format key
 		return nil
 	}
 
 	// triggered by resync, checking whether the hub kubeconfig secret is expired
-	if klusterletNamespace == "" && klusterletName == factory.DefaultQueueKey {
+	if agentNamespace == "" && klusterletName == factory.DefaultQueueKey {
 		klusterlets, err := k.klusterletLister.List(labels.Everything())
 		if err != nil {
 			return err
 		}
 
 		for _, klusterlet := range klusterlets {
-			namespace := helpers.KlusterletNamespace(klusterlet)
+			namespace := helpers.AgentNamespace(klusterlet)
 			// enqueue the klusterlet to reconcile
 			controllerContext.Queue().Add(fmt.Sprintf("%s/%s", namespace, klusterlet.Name))
 		}
@@ -91,7 +91,7 @@ func (k *bootstrapController) sync(ctx context.Context, controllerContext factor
 		return nil
 	}
 
-	bootstrapHubKubeconfigSecret, err := k.secretLister.Secrets(klusterletNamespace).Get(helpers.BootstrapHubKubeConfig)
+	bootstrapHubKubeconfigSecret, err := k.secretLister.Secrets(agentNamespace).Get(helpers.BootstrapHubKubeConfig)
 	switch {
 	case errors.IsNotFound(err):
 		// the bootstrap hub kubeconfig secret not found, do nothing
@@ -104,11 +104,11 @@ func (k *bootstrapController) sync(ctx context.Context, controllerContext factor
 	if err != nil {
 		// a bad bootstrap secret, ignore it
 		controllerContext.Recorder().Warningf("BadBootstrapSecret",
-			fmt.Sprintf("unable to load hub kubeconfig from secret %s/%s: %v", klusterletNamespace, helpers.BootstrapHubKubeConfig, err))
+			fmt.Sprintf("unable to load hub kubeconfig from secret %s/%s: %v", agentNamespace, helpers.BootstrapHubKubeConfig, err))
 		return nil
 	}
 
-	hubKubeconfigSecret, err := k.secretLister.Secrets(klusterletNamespace).Get(helpers.HubKubeConfig)
+	hubKubeconfigSecret, err := k.secretLister.Secrets(agentNamespace).Get(helpers.HubKubeConfig)
 	switch {
 	case errors.IsNotFound(err):
 		// the hub kubeconfig secret not found, could not have bootstrap yet, do nothing currently
@@ -125,22 +125,22 @@ func (k *bootstrapController) sync(ctx context.Context, controllerContext factor
 	if err != nil {
 		// the hub kubeconfig secret has errors, do nothing
 		controllerContext.Recorder().Warningf("BadHubKubeConfigSecret",
-			fmt.Sprintf("unable to load hub kubeconfig from secret %s/%s: %v", klusterletNamespace, helpers.BootstrapHubKubeConfig, err))
+			fmt.Sprintf("unable to load hub kubeconfig from secret %s/%s: %v", agentNamespace, helpers.BootstrapHubKubeConfig, err))
 		return nil
 	}
 
 	if bootstrapKubeconfig.Server != hubKubeconfig.Server ||
 		!bytes.Equal(bootstrapKubeconfig.CertificateAuthorityData, hubKubeconfig.CertificateAuthorityData) {
 		// the bootstrap kubeconfig secret is changed, reload the klusterlet agents
-		reloadReason := fmt.Sprintf("the bootstrap secret %s/%s is changed", klusterletNamespace, helpers.BootstrapHubKubeConfig)
-		return k.reloadAgents(ctx, controllerContext, klusterletNamespace, klusterletName, reloadReason)
+		reloadReason := fmt.Sprintf("the bootstrap secret %s/%s is changed", agentNamespace, helpers.BootstrapHubKubeConfig)
+		return k.reloadAgents(ctx, controllerContext, agentNamespace, klusterletName, reloadReason)
 	}
 
 	expired, err := isHubKubeconfigSecretExpired(hubKubeconfigSecret)
 	if err != nil {
 		// the hub kubeconfig secret has errors, do nothing
 		controllerContext.Recorder().Warningf("BadHubKubeConfigSecret",
-			fmt.Sprintf("the hub kubeconfig secret %s/%s is invalid: %v", klusterletNamespace, helpers.HubKubeConfig, err))
+			fmt.Sprintf("the hub kubeconfig secret %s/%s is invalid: %v", agentNamespace, helpers.HubKubeConfig, err))
 		return nil
 	}
 
@@ -150,8 +150,8 @@ func (k *bootstrapController) sync(ctx context.Context, controllerContext factor
 	}
 
 	// the hub kubeconfig secret cert is expired, reload klusterlet to restart bootstrap
-	reloadReason := fmt.Sprintf("the hub kubeconfig secret %s/%s is expired", klusterletNamespace, helpers.HubKubeConfig)
-	return k.reloadAgents(ctx, controllerContext, klusterletNamespace, klusterletName, reloadReason)
+	reloadReason := fmt.Sprintf("the hub kubeconfig secret %s/%s is expired", agentNamespace, helpers.HubKubeConfig)
+	return k.reloadAgents(ctx, controllerContext, agentNamespace, klusterletName, reloadReason)
 }
 
 // reloadAgents reload klusterlet agents by

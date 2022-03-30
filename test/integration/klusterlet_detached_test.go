@@ -18,6 +18,7 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 	var cancel context.CancelFunc
 	var klusterlet *operatorapiv1.Klusterlet
 	var klusterletNamespace string
+	var agentNamespace string
 	var registrationManagementRoleName string
 	var registrationManagedRoleName string
 	var registrationDeploymentName string
@@ -47,11 +48,11 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 				},
 			},
 		}
-
 		klusterletNamespace = helpers.KlusterletNamespace(klusterlet)
+		agentNamespace = helpers.AgentNamespace(klusterlet)
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: klusterletNamespace,
+				Name: agentNamespace,
 			},
 		}
 		_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
@@ -61,13 +62,13 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 		managedKubeconfigSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      helpers.ExternalManagedKubeConfig,
-				Namespace: klusterletNamespace,
+				Namespace: agentNamespace,
 			},
 			Data: map[string][]byte{
 				"kubeconfig": util.NewKubeConfig(hostedRestConfig),
 			},
 		}
-		_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(), managedKubeconfigSecret, metav1.CreateOptions{})
+		_, err = kubeClient.CoreV1().Secrets(agentNamespace).Create(context.Background(), managedKubeconfigSecret, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ctx, cancel = context.WithCancel(context.Background())
@@ -75,7 +76,7 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		err := kubeClient.CoreV1().Namespaces().Delete(context.Background(), klusterletNamespace, metav1.DeleteOptions{})
+		err := kubeClient.CoreV1().Namespaces().Delete(context.Background(), agentNamespace, metav1.DeleteOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		if cancel != nil {
@@ -160,25 +161,25 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 
 			// Check role/rolebinding
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().Roles(klusterletNamespace).Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().Roles(agentNamespace).Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().Roles(klusterletNamespace).Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().Roles(agentNamespace).Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().RoleBindings(klusterletNamespace).Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().RoleBindings(agentNamespace).Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().RoleBindings(klusterletNamespace).Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().RoleBindings(agentNamespace).Get(context.Background(), workManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -199,13 +200,13 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 
 			// Check service account
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.CoreV1().ServiceAccounts(klusterletNamespace).Get(context.Background(), registrationSAName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.CoreV1().ServiceAccounts(agentNamespace).Get(context.Background(), registrationSAName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.CoreV1().ServiceAccounts(klusterletNamespace).Get(context.Background(), workSAName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.CoreV1().ServiceAccounts(agentNamespace).Get(context.Background(), workSAName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -225,13 +226,13 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 
 			// Check deployment
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.AppsV1().Deployments(agentNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true

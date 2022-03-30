@@ -143,8 +143,19 @@ func NewKlusterletController(
 
 // klusterletConfig is used to render the template of hub manifests
 type klusterletConfig struct {
-	KlusterletName            string
-	KlusterletNamespace       string
+	KlusterletName string
+	// KlusterletNamespace is the namespace created on the managed cluster for each
+	// klusterlet.
+	// 1). In the Default mode, it refers to the same namespace as AgentNamespace;
+	// 2). In the Hosted mode, the namespace still exists and contains some necessary
+	//     resources for agents, like service accounts, roles and rolebindings.
+	KlusterletNamespace string
+	// AgentNamespace is the namespace to deploy the agents.
+	// 1). In the Default mode, it is on the managed cluster and refers to the same
+	//     namespace as KlusterletNamespace;
+	// 2). In the Hosted mode, it is on the management cluster and has the same name as
+	//     the klusterlet.
+	AgentNamespace            string
 	RegistrationImage         string
 	WorkImage                 string
 	ClusterName               string
@@ -187,6 +198,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	config := klusterletConfig{
 		KlusterletName:            klusterlet.Name,
 		KlusterletNamespace:       helpers.KlusterletNamespace(klusterlet),
+		AgentNamespace:            helpers.AgentNamespace(klusterlet),
 		RegistrationImage:         klusterlet.Spec.RegistrationImagePullSpec,
 		WorkImage:                 klusterlet.Spec.WorkImagePullSpec,
 		ClusterName:               klusterlet.Spec.ClusterName,
@@ -215,7 +227,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 
 	if config.InstallMode == operatorapiv1.InstallModeHosted {
-		managedClusterClients, err = n.buildManagedClusterClientsHostedMode(ctx, n.kubeClient, config.KlusterletNamespace, config.ExternalManagedKubeConfigSecret)
+		managedClusterClients, err = n.buildManagedClusterClientsHostedMode(ctx, n.kubeClient, config.AgentNamespace, config.ExternalManagedKubeConfigSecret)
 		if err != nil {
 			_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
 				Type: klusterletReadyToApply, Status: metav1.ConditionFalse, Reason: "KlusterletPrepareFailed",
@@ -256,13 +268,13 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 
 	// Start deploy klusterlet components
-	// Ensure the klusterlet namespace
-	err = n.ensureNamespace(ctx, n.kubeClient, klusterletName, config.KlusterletNamespace)
+	// Ensure the agent namespace
+	err = n.ensureNamespace(ctx, n.kubeClient, klusterletName, config.AgentNamespace)
 	if err != nil {
 		return err
 	}
-	// Sync pull secret to the klusterlet namespace
-	err = n.syncPullSecret(ctx, n.kubeClient, n.kubeClient, klusterlet.Name, config.KlusterletNamespace, controllerContext.Recorder())
+	// Sync pull secret to the agent namespace
+	err = n.syncPullSecret(ctx, n.kubeClient, n.kubeClient, klusterlet.Name, config.AgentNamespace, controllerContext.Recorder())
 	if err != nil {
 		return err
 	}
@@ -270,7 +282,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	// sync image pull secret from management cluster to managed cluster for addon namespace
 	// TODO(zhujian7): In the future, we may consider deploy addons on the management cluster in Hosted mode.
 	addonNamespace := fmt.Sprintf("%s-addon", config.KlusterletNamespace)
-	// Ensure the klusterlet addon namespace
+	// Ensure the addon namespace on the managed cluster
 	err = n.ensureNamespace(ctx, managedClusterClients.kubeClient, klusterletName, addonNamespace)
 	if err != nil {
 		return err
@@ -328,12 +340,12 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 	if config.InstallMode == operatorapiv1.InstallModeHosted {
 		// Create managed config secret for registration and work.
-		err = n.createManagedClusterKubeconfig(ctx, klusterletName, config.KlusterletNamespace, registrationServiceAccountName(klusterletName), config.ExternalManagedKubeConfigRegistrationSecret,
+		err = n.createManagedClusterKubeconfig(ctx, klusterletName, config.KlusterletNamespace, config.AgentNamespace, registrationServiceAccountName(klusterletName), config.ExternalManagedKubeConfigRegistrationSecret,
 			managedClusterClients.kubeconfig, managedClusterClients.kubeClient, n.kubeClient.CoreV1(), controllerContext.Recorder())
 		if err != nil {
 			return err
 		}
-		err := n.createManagedClusterKubeconfig(ctx, klusterletName, config.KlusterletNamespace, workServiceAccountName(klusterletName), config.ExternalManagedKubeConfigWorkSecret,
+		err := n.createManagedClusterKubeconfig(ctx, klusterletName, config.KlusterletNamespace, config.AgentNamespace, workServiceAccountName(klusterletName), config.ExternalManagedKubeConfigWorkSecret,
 			managedClusterClients.kubeconfig, managedClusterClients.kubeClient, n.kubeClient.CoreV1(), controllerContext.Recorder())
 		if err != nil {
 			return err
@@ -391,7 +403,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 // getClusterNameFromHubKubeConfigSecret gets cluster name from hub kubeConfig secret
 func (n *klusterletController) getClusterNameFromHubKubeConfigSecret(ctx context.Context, config *klusterletConfig) error {
-	hubSecret, err := n.kubeClient.CoreV1().Secrets(config.KlusterletNamespace).Get(ctx, helpers.HubKubeConfig, metav1.GetOptions{})
+	hubSecret, err := n.kubeClient.CoreV1().Secrets(config.AgentNamespace).Get(ctx, helpers.HubKubeConfig, metav1.GetOptions{})
 	if err != nil {
 		_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, config.KlusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
 			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
@@ -507,7 +519,7 @@ func workServiceAccountName(klusterletName string) string {
 // by fetching token from the managed cluster service account.
 func (n *klusterletController) createManagedClusterKubeconfig(
 	ctx context.Context,
-	klusterletName, klusterletNamespace string,
+	klusterletName, klusterletNamespace, agentNamespace string,
 	saName, secretName string,
 	kubeconfigTemplate *rest.Config,
 	saClient kubernetes.Interface, secretClient coreclientv1.SecretsGetter,
@@ -518,7 +530,7 @@ func (n *klusterletController) createManagedClusterKubeconfig(
 		},
 		func() error {
 			return helpers.EnsureSAToken(ctx, saName, klusterletNamespace, saClient,
-				helpers.RenderToKubeconfigSecret(ctx, secretName, klusterletNamespace, kubeconfigTemplate, n.kubeClient.CoreV1(), recorder))
+				helpers.RenderToKubeconfigSecret(ctx, secretName, agentNamespace, kubeconfigTemplate, n.kubeClient.CoreV1(), recorder))
 		})
 	if err != nil {
 		_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
@@ -594,7 +606,7 @@ func (n *klusterletController) cleanUp(
 		fmt.Sprintf("%s-work-agent", config.KlusterletName),
 	}
 	for _, deployment := range deployments {
-		err := n.kubeClient.AppsV1().Deployments(config.KlusterletNamespace).Delete(ctx, deployment, metav1.DeleteOptions{})
+		err := n.kubeClient.AppsV1().Deployments(config.AgentNamespace).Delete(ctx, deployment, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -603,12 +615,12 @@ func (n *klusterletController) cleanUp(
 
 	// get hub host from bootstrap kubeconfig
 	var hubHost string
-	bootstrapKubeConfigSecret, err := n.kubeClient.CoreV1().Secrets(config.KlusterletNamespace).Get(ctx, config.BootStrapKubeConfigSecret, metav1.GetOptions{})
+	bootstrapKubeConfigSecret, err := n.kubeClient.CoreV1().Secrets(config.AgentNamespace).Get(ctx, config.BootStrapKubeConfigSecret, metav1.GetOptions{})
 	switch {
 	case err == nil:
 		restConfig, err := helpers.LoadClientConfigFromSecret(bootstrapKubeConfigSecret)
 		if err != nil {
-			return fmt.Errorf("unable to load kubeconfig from secret %q %q: %w", config.KlusterletNamespace, config.BootStrapKubeConfigSecret, err)
+			return fmt.Errorf("unable to load kubeconfig from secret %q %q: %w", config.AgentNamespace, config.BootStrapKubeConfigSecret, err)
 		}
 		hubHost = restConfig.Host
 	case !errors.IsNotFound(err):
@@ -629,7 +641,7 @@ func (n *klusterletController) cleanUp(
 		secrets = append(secrets, []string{config.ExternalManagedKubeConfigRegistrationSecret, config.ExternalManagedKubeConfigWorkSecret}...)
 	}
 	for _, secret := range secrets {
-		err = n.kubeClient.CoreV1().Secrets(config.KlusterletNamespace).Delete(ctx, secret, metav1.DeleteOptions{})
+		err = n.kubeClient.CoreV1().Secrets(config.AgentNamespace).Delete(ctx, secret, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -685,12 +697,12 @@ func (n *klusterletController) cleanUp(
 		return err
 	}
 
-	// The klusterlet namespace on the management cluster should be removed **at the end**. Otherwise if any failure occurred,
+	// The agent namespace on the management cluster should be removed **at the end**. Otherwise if any failure occurred,
 	// the managed-external-kubeconfig secret would be removed and the next reconcile will fail due to can not build the
 	// managed cluster clients.
 	if config.InstallMode == operatorapiv1.InstallModeHosted {
-		// remove the klusterlet namespace on the management cluster
-		err = n.kubeClient.CoreV1().Namespaces().Delete(ctx, config.KlusterletNamespace, metav1.DeleteOptions{})
+		// remove the agent namespace on the management cluster
+		err = n.kubeClient.CoreV1().Namespaces().Delete(ctx, config.AgentNamespace, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -826,16 +838,16 @@ func getManagedKubeConfig(ctx context.Context, kubeClient kubernetes.Interface, 
 }
 
 // buildManagedClusterClientsFromSecret builds variety of clients for managed cluster from managed cluster kubeconfig secret.
-func buildManagedClusterClientsFromSecret(ctx context.Context, client kubernetes.Interface, klusterletNamespace, secretName string) (
+func buildManagedClusterClientsFromSecret(ctx context.Context, client kubernetes.Interface, agentNamespace, secretName string) (
 	*managedClusterClients, error) {
-	// Ensure the klusterlet namespace for users to create the external-managed-kubeconfig secret in this namespace,
+	// Ensure the agent namespace for users to create the external-managed-kubeconfig secret in this namespace,
 	// so that in the next reconcile look the controller can get the secret successfully after the secret created.
-	err := ensureKlusterletNamespace(ctx, client, klusterletNamespace)
+	err := ensureAgentNamespace(ctx, client, agentNamespace)
 	if err != nil {
 		return nil, err
 	}
 
-	managedKubeConfig, err := getManagedKubeConfig(ctx, client, klusterletNamespace, secretName)
+	managedKubeConfig, err := getManagedKubeConfig(ctx, client, agentNamespace, secretName)
 	if err != nil {
 		return nil, err
 	}
@@ -866,8 +878,8 @@ func buildManagedClusterClientsFromSecret(ctx context.Context, client kubernetes
 		kubeconfig:                managedKubeConfig}, nil
 }
 
-// ensureKlusterletNamespace create klusterlet namespace if it is not exist
-func ensureKlusterletNamespace(ctx context.Context, kubeClient kubernetes.Interface, namespace string) error {
+// ensureAgentNamespace create agent namespace if it is not exist
+func ensureAgentNamespace(ctx context.Context, kubeClient kubernetes.Interface, namespace string) error {
 	_, err := kubeClient.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		_, createErr := kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{

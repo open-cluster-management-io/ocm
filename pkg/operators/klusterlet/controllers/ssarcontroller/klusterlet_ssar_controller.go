@@ -121,14 +121,14 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 		defer c.deleteSSARChecking(klusterletName)
 
 		klog.V(4).Infof("Checking hub kubeconfig for klusterlet %q", klusterletName)
-		klusterletNS := helpers.KlusterletNamespace(klusterlet)
+		agentNamespace := helpers.AgentNamespace(klusterlet)
 
 		hubConfigDegradedCondition := checkAgentDegradedCondition(
 			ctx, c.kubeClient,
 			hubConnectionDegraded,
 			klusterletAgent{
 				clusterName: klusterlet.Spec.ClusterName,
-				namespace:   klusterletNS,
+				namespace:   agentNamespace,
 			},
 			klusterlet.Generation,
 			checkHubConfigSecret,
@@ -157,7 +157,7 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 			hubConnectionDegraded,
 			klusterletAgent{
 				clusterName: klusterlet.Spec.ClusterName,
-				namespace:   klusterletNS,
+				namespace:   agentNamespace,
 			},
 			klusterlet.Generation,
 			checkBootstrapSecret,

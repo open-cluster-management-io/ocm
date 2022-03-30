@@ -2,7 +2,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: {{ .KlusterletName }}-work-agent
-  namespace: {{ .KlusterletNamespace }}
+  namespace: {{ .AgentNamespace }}
   labels:
     app: klusterlet-manifestwork-agent
 spec:

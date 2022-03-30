@@ -141,12 +141,12 @@ func (t *Tester) SetBootstrapHubSecret(bootstrapHubSecret string) error {
 	return nil
 }
 
-func (t *Tester) CreateKlusterlet(name, clusterName, agentNamespace string, mode operatorapiv1.InstallMode) (*operatorapiv1.Klusterlet, error) {
+func (t *Tester) CreateKlusterlet(name, clusterName, klusterletNamespace string, mode operatorapiv1.InstallMode) (*operatorapiv1.Klusterlet, error) {
 	if name == "" {
 		return nil, fmt.Errorf("the name should not be null")
 	}
-	if agentNamespace == "" {
-		agentNamespace = t.klusterletDefaultNamespace
+	if klusterletNamespace == "" {
+		klusterletNamespace = t.klusterletDefaultNamespace
 	}
 
 	var klusterlet = &operatorapiv1.Klusterlet{
@@ -162,14 +162,14 @@ func (t *Tester) CreateKlusterlet(name, clusterName, agentNamespace string, mode
 				},
 			},
 			ClusterName: clusterName,
-			Namespace:   agentNamespace,
+			Namespace:   klusterletNamespace,
 			DeployOption: operatorapiv1.KlusterletDeployOption{
 				Mode: mode,
 			},
 		},
 	}
 
-	agentNamespace = helpers.KlusterletNamespace(klusterlet)
+	agentNamespace := helpers.AgentNamespace(klusterlet)
 	klog.Infof("klusterlet: %s/%s, \t mode: %v, \t agent namespace: %s", klusterlet.Name, klusterlet.Namespace, mode, agentNamespace)
 
 	// create agentNamespace

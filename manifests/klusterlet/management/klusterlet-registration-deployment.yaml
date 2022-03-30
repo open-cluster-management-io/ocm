@@ -2,7 +2,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: {{ .KlusterletName }}-registration-agent
-  namespace: {{ .KlusterletNamespace }}
+  namespace: {{ .AgentNamespace }}
   labels:
     app: klusterlet-registration-agent
 spec:

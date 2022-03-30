@@ -1302,6 +1302,74 @@ func TestKlusterletNamespace(t *testing.T) {
 					DeployOption: operatorapiv1.KlusterletDeployOption{Mode: operatorapiv1.InstallModeHosted},
 				},
 			},
+			expect: "open-cluster-management-test",
+		},
+		{
+			name: "Hosted mode without spec namespace",
+			klusterlet: &operatorapiv1.Klusterlet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "klusterlet",
+				},
+				Spec: operatorapiv1.KlusterletSpec{
+					Namespace:    "",
+					DeployOption: operatorapiv1.KlusterletDeployOption{Mode: operatorapiv1.InstallModeHosted},
+				},
+			},
+			expect: KlusterletDefaultNamespace,
+		},
+	}
+
+	for _, c := range testcases {
+		t.Run(c.name, func(t *testing.T) {
+			namespace := KlusterletNamespace(c.klusterlet)
+			if namespace != c.expect {
+				t.Errorf("Expect namespace %v, got %v", c.expect, namespace)
+			}
+		})
+	}
+}
+
+func TestAgentNamespace(t *testing.T) {
+	testcases := []struct {
+		name       string
+		klusterlet *operatorapiv1.Klusterlet
+		expect     string
+	}{
+		{
+			name: "Default mode without spec namespace",
+			klusterlet: &operatorapiv1.Klusterlet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "klusterlet",
+				},
+				Spec: operatorapiv1.KlusterletSpec{
+					Namespace:    "",
+					DeployOption: operatorapiv1.KlusterletDeployOption{},
+				}},
+			expect: KlusterletDefaultNamespace,
+		},
+		{
+			name: "Default mode with spec namespace",
+			klusterlet: &operatorapiv1.Klusterlet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "klusterlet",
+				},
+				Spec: operatorapiv1.KlusterletSpec{
+					Namespace:    "open-cluster-management-test",
+					DeployOption: operatorapiv1.KlusterletDeployOption{},
+				}},
+			expect: "open-cluster-management-test",
+		},
+		{
+			name: "Hosted mode with spec namespace",
+			klusterlet: &operatorapiv1.Klusterlet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "klusterlet",
+				},
+				Spec: operatorapiv1.KlusterletSpec{
+					Namespace:    "open-cluster-management-test",
+					DeployOption: operatorapiv1.KlusterletDeployOption{Mode: operatorapiv1.InstallModeHosted},
+				},
+			},
 			expect: "klusterlet",
 		},
 		{
@@ -1321,7 +1389,7 @@ func TestKlusterletNamespace(t *testing.T) {
 
 	for _, c := range testcases {
 		t.Run(c.name, func(t *testing.T) {
-			namespace := KlusterletNamespace(c.klusterlet)
+			namespace := AgentNamespace(c.klusterlet)
 			if namespace != c.expect {
 				t.Errorf("Expect namespace %v, got %v", c.expect, namespace)
 			}

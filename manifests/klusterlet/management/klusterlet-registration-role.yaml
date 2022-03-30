@@ -3,7 +3,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: open-cluster-management:management:{{ .KlusterletName }}-registration:agent
-  namespace: {{ .KlusterletNamespace }}
+  namespace: {{ .AgentNamespace }}
 rules:
 # leader election needs to operate configmaps, create hub-kubeconfig external-managed-registration/work secrets
 # TODO(zhujian7): may be replaced by a clusterrole to grant secret operation for others namespaces when addon

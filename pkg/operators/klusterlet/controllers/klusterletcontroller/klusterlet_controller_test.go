@@ -170,7 +170,7 @@ func newTestControllerHosted(klusterlet *opratorapiv1.Klusterlet, appliedManifes
 	operatorInformers := operatorinformers.NewSharedInformerFactory(fakeOperatorClient, 5*time.Minute)
 	kubeVersion, _ := version.ParseGeneric("v1.18.0")
 
-	installedNamespace := helpers.KlusterletNamespace(klusterlet)
+	klusterletNamespace := helpers.KlusterletNamespace(klusterlet)
 	saRegistrationSecret := newServiceAccountSecret(fmt.Sprintf("%s-token", registrationServiceAccountName(klusterlet.Name)), klusterlet.Name)
 	saWorkSecret := newServiceAccountSecret(fmt.Sprintf("%s-token", workServiceAccountName(klusterlet.Name)), klusterlet.Name)
 	fakeManagedKubeClient := fakekube.NewSimpleClientset()
@@ -183,20 +183,20 @@ func newTestControllerHosted(klusterlet *opratorapiv1.Klusterlet, appliedManifes
 	fakeManagedKubeClient.PrependReactor("get", "serviceaccounts", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 		name := action.(clienttesting.GetAction).GetName()
 		namespace := action.(clienttesting.GetAction).GetNamespace()
-		if namespace == installedNamespace && name == registrationServiceAccountName(klusterlet.Name) {
+		if namespace == klusterletNamespace && name == registrationServiceAccountName(klusterlet.Name) {
 			getRegistrationServiceAccountCount++
 			if getRegistrationServiceAccountCount > 1 {
-				sa := newServiceAccount(name, installedNamespace, saRegistrationSecret.Name)
-				klog.Infof("return service account %s/%s, secret: %v", installedNamespace, name, sa.Secrets)
+				sa := newServiceAccount(name, klusterletNamespace, saRegistrationSecret.Name)
+				klog.Infof("return service account %s/%s, secret: %v", klusterletNamespace, name, sa.Secrets)
 				return true, sa, nil
 			}
 		}
 
-		if namespace == installedNamespace && name == workServiceAccountName(klusterlet.Name) {
+		if namespace == klusterletNamespace && name == workServiceAccountName(klusterlet.Name) {
 			getWorkServiceAccountCount++
 			if getWorkServiceAccountCount > 1 {
-				sa := newServiceAccount(name, installedNamespace, saWorkSecret.Name)
-				klog.Infof("return service account %s/%s, secret: %v", installedNamespace, name, sa.Secrets)
+				sa := newServiceAccount(name, klusterletNamespace, saWorkSecret.Name)
+				klog.Infof("return service account %s/%s, secret: %v", klusterletNamespace, name, sa.Secrets)
 				return true, sa, nil
 			}
 		}
@@ -205,10 +205,10 @@ func newTestControllerHosted(klusterlet *opratorapiv1.Klusterlet, appliedManifes
 	fakeManagedKubeClient.PrependReactor("get", "secrets", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 		name := action.(clienttesting.GetAction).GetName()
 		namespace := action.(clienttesting.GetAction).GetNamespace()
-		if namespace == installedNamespace && name == saRegistrationSecret.Name {
+		if namespace == klusterletNamespace && name == saRegistrationSecret.Name {
 			return true, saRegistrationSecret, nil
 		}
-		if namespace == installedNamespace && name == saWorkSecret.Name {
+		if namespace == klusterletNamespace && name == saWorkSecret.Name {
 			return true, saWorkSecret, nil
 		}
 		return false, nil, nil
@@ -358,7 +358,7 @@ func ensureObject(t *testing.T, object runtime.Object, klusterlet *opratorapiv1.
 		t.Errorf("Unable to access objectmeta: %v", err)
 	}
 
-	namespace := helpers.KlusterletNamespace(klusterlet)
+	namespace := helpers.AgentNamespace(klusterlet)
 	switch o := object.(type) {
 	case *appsv1.Deployment:
 		if strings.Contains(access.GetName(), "registration") {
@@ -441,14 +441,14 @@ func TestSyncDeploy(t *testing.T) {
 
 // TestSyncDeployHosted test deployment of klusterlet components in hosted mode
 func TestSyncDeployHosted(t *testing.T) {
-	installedNamespace := "klusterlet"
 	klusterlet := newKlusterletHosted("klusterlet", "testns", "cluster1")
-	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, installedNamespace)
-	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, installedNamespace)
+	agentNamespace := helpers.AgentNamespace(klusterlet)
+	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, agentNamespace)
+	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, agentNamespace)
 	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
-	// externalManagedSecret := newSecret(helpers.ExternalManagedKubeConfig, installedNamespace)
+	// externalManagedSecret := newSecret(helpers.ExternalManagedKubeConfig, agentNamespace)
 	// externalManagedSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
-	namespace := newNamespace(installedNamespace)
+	namespace := newNamespace(agentNamespace)
 	pullSecret := newSecret(imagePullSecret, "open-cluster-management")
 	controller := newTestControllerHosted(klusterlet, nil, bootStrapSecret, hubKubeConfigSecret, namespace, pullSecret /*externalManagedSecret*/)
 	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
@@ -608,12 +608,12 @@ func TestSyncDeleteHosted(t *testing.T) {
 	klusterlet := newKlusterletHosted("klusterlet", "testns", "cluster1")
 	now := metav1.Now()
 	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
-	installedNamespace := helpers.KlusterletNamespace(klusterlet)
-	bootstrapKubeConfigSecret := newSecret(helpers.BootstrapHubKubeConfig, installedNamespace)
+	agentNamespace := helpers.AgentNamespace(klusterlet)
+	bootstrapKubeConfigSecret := newSecret(helpers.BootstrapHubKubeConfig, agentNamespace)
 	bootstrapKubeConfigSecret.Data["kubeconfig"] = newKubeConfig("testhost")
-	// externalManagedSecret := newSecret(helpers.ExternalManagedKubeConfig, installedNamespace)
+	// externalManagedSecret := newSecret(helpers.ExternalManagedKubeConfig, agentNamespace)
 	// externalManagedSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
-	namespace := newNamespace(installedNamespace)
+	namespace := newNamespace(agentNamespace)
 	appliedManifestWorks := []runtime.Object{
 		newAppliedManifestWorks("testhost", nil, false),
 		newAppliedManifestWorks("testhost", []string{appliedManifestWorkFinalizer}, true),
