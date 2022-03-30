@@ -318,17 +318,23 @@ func (m *ManifestWorkController) applyUnstructured(
 		return nil, false, err
 	}
 
-	// Merge OwnerRefs.
+	// Merge OwnerRefs, Labels, and Annotations.
 	existingOwners := existing.GetOwnerReferences()
+	existingLabels := existing.GetLabels()
+	existingAnnotations := existing.GetAnnotations()
 	modified := resourcemerge.BoolPtr(false)
 
+	resourcemerge.MergeMap(modified, &existingLabels, required.GetLabels())
+	resourcemerge.MergeMap(modified, &existingAnnotations, required.GetAnnotations())
 	resourcemerge.MergeOwnerRefs(modified, &existingOwners, required.GetOwnerReferences())
 
-	// Always overwrite required ownerrefs from existing, since ownerrefs of required has been merged to existing
+	// Always overwrite required from existing, since required has been merged to existing
 	required.SetOwnerReferences(existingOwners)
+	required.SetLabels(existingLabels)
+	required.SetAnnotations(existingAnnotations)
 
 	// Compare and update the unstrcuctured.
-	if isSameUnstructured(required, existing) {
+	if !*modified && isSameUnstructured(required, existing) {
 		return existing, false, nil
 	}
 	required.SetResourceVersion(existing.GetResourceVersion())
@@ -459,17 +465,6 @@ func isSameUnstructured(obj1, obj2 *unstructured.Unstructured) bool {
 		return false
 	}
 	if obj1Copy.GetNamespace() != obj2Copy.GetNamespace() {
-		return false
-	}
-
-	// Compare label and annotations
-	if !equality.Semantic.DeepEqual(obj1Copy.GetLabels(), obj2Copy.GetLabels()) {
-		return false
-	}
-	if !equality.Semantic.DeepEqual(obj1Copy.GetAnnotations(), obj2Copy.GetAnnotations()) {
-		return false
-	}
-	if !equality.Semantic.DeepEqual(obj1Copy.GetOwnerReferences(), obj2Copy.GetOwnerReferences()) {
 		return false
 	}
 

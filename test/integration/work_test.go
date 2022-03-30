@@ -255,6 +255,56 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			util.AssertAppliedResources(hubHash, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
 		})
 
+		ginkgo.It("should merge annotation of existing CR", func() {
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			var namespaces, names []string
+			for _, obj := range objects {
+				namespaces = append(namespaces, obj.GetNamespace())
+				names = append(names, obj.GetName())
+			}
+
+			util.AssertExistenceOfResources(gvrs, namespaces, names, spokeDynamicClient, eventuallyTimeout, eventuallyInterval)
+			util.AssertAppliedResources(hubHash, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
+
+			// update object label
+			obj, gvr, err := util.GuestbookCr(o.SpokeClusterName, "guestbook1")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			cr, err := util.GetResource(obj.GetNamespace(), obj.GetName(), gvr, spokeDynamicClient)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			cr.SetAnnotations(map[string]string{"foo": "bar"})
+			_, err = spokeDynamicClient.Resource(gvr).Namespace(obj.GetNamespace()).Update(context.TODO(), cr, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Update manifestwork
+			obj.SetAnnotations(map[string]string{"foo1": "bar1"})
+			updatework, err := hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Get(context.TODO(), work.Name, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			updatework.Spec.Workload.Manifests[1] = util.ToManifest(obj)
+			_, err = hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Update(context.TODO(), updatework, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// wait for annotation merge
+			gomega.Eventually(func() error {
+				cr, err := util.GetResource(obj.GetNamespace(), obj.GetName(), gvr, spokeDynamicClient)
+				if err != nil {
+					return err
+				}
+
+				if len(cr.GetAnnotations()) != 2 {
+					return fmt.Errorf("expect 2 annotation but get %v", cr.GetAnnotations())
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+		})
+
 		ginkgo.It("should delete CRD and CR successfully", func() {
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)

@@ -317,7 +317,7 @@ func TestSync(t *testing.T) {
 				withKubeObject(c.spokeObject...).
 				withUnstructuredObject(c.spokeDynamicObject...)
 			syncContext := spoketesting.NewFakeSyncContext(t, workKey)
-			err := controller.controller.sync(nil, syncContext)
+			err := controller.controller.sync(context.TODO(), syncContext)
 			if err != nil {
 				t.Errorf("Should be success with no err: %v", err)
 			}
@@ -357,7 +357,7 @@ func TestFailedToApplyResource(t *testing.T) {
 		return true, &corev1.Secret{}, fmt.Errorf("Fake error")
 	})
 	syncContext := spoketesting.NewFakeSyncContext(t, workKey)
-	err := controller.controller.sync(nil, syncContext)
+	err := controller.controller.sync(context.TODO(), syncContext)
 	if err == nil {
 		t.Errorf("Should return an err")
 	}
@@ -750,7 +750,7 @@ func TestApplyUnstructred(t *testing.T) {
 		{
 			name:           "create a new object with owner",
 			existingObject: []runtime.Object{},
-			owner:          metav1.OwnerReference{Name: "test", UID: "testowner"},
+			owner:          metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"},
 			required:       spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:            schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -775,7 +775,7 @@ func TestApplyUnstructred(t *testing.T) {
 		{
 			name:           "create a new object without owner",
 			existingObject: []runtime.Object{},
-			owner:          metav1.OwnerReference{Name: "test", UID: "testowner-"},
+			owner:          metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner-"},
 			required:       spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:            schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -794,11 +794,12 @@ func TestApplyUnstructred(t *testing.T) {
 			},
 		},
 		{
-			name:           "update an object owner",
-			existingObject: []runtime.Object{spoketesting.NewUnstructured("v1", "Secret", "ns1", "test", metav1.OwnerReference{Name: "test1", UID: "testowner1"})},
-			owner:          metav1.OwnerReference{Name: "test", UID: "testowner"},
-			required:       spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
-			gvr:            schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
+			name: "update an object owner",
+			existingObject: []runtime.Object{spoketesting.NewUnstructured(
+				"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})},
+			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"},
+			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
 					t.Errorf("Expect 2 actions, but have %d", len(actions))
@@ -822,11 +823,12 @@ func TestApplyUnstructred(t *testing.T) {
 			},
 		},
 		{
-			name:           "update an object without owner",
-			existingObject: []runtime.Object{spoketesting.NewUnstructured("v1", "Secret", "ns1", "test", metav1.OwnerReference{Name: "test1", UID: "testowner1"})},
-			owner:          metav1.OwnerReference{Name: "test", UID: "testowner-"},
-			required:       spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
-			gvr:            schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
+			name: "update an object without owner",
+			existingObject: []runtime.Object{spoketesting.NewUnstructured(
+				"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})},
+			owner:    metav1.OwnerReference{Name: "test", UID: "testowner-"},
+			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 1 {
 					t.Errorf("Expect 1 actions, but have %d", len(actions))
@@ -836,11 +838,12 @@ func TestApplyUnstructred(t *testing.T) {
 			},
 		},
 		{
-			name:           "remove an object owner",
-			existingObject: []runtime.Object{spoketesting.NewUnstructured("v1", "Secret", "ns1", "test", metav1.OwnerReference{Name: "test", UID: "testowner"})},
-			owner:          metav1.OwnerReference{Name: "test", UID: "testowner-"},
-			required:       spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
-			gvr:            schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
+			name: "remove an object owner",
+			existingObject: []runtime.Object{spoketesting.NewUnstructured(
+				"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"})},
+			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner-"},
+			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
 					t.Errorf("Expect 2 actions, but have %d", len(actions))
@@ -854,6 +857,100 @@ func TestApplyUnstructred(t *testing.T) {
 				if len(owners) != 0 {
 					t.Errorf("Expect 0 owner, but have %d", len(owners))
 				}
+			},
+		},
+		{
+			name: "merge labels",
+			existingObject: []runtime.Object{
+				func() runtime.Object {
+					obj := spoketesting.NewUnstructured(
+						"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
+					obj.SetLabels(map[string]string{"foo": "bar"})
+					return obj
+				}(),
+			},
+			owner: metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"},
+			required: func() *unstructured.Unstructured {
+				obj := spoketesting.NewUnstructured(
+					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
+				obj.SetLabels(map[string]string{"foo1": "bar1"})
+				return obj
+			}(),
+			gvr: schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 2 {
+					t.Errorf("Expect 2 actions, but have %d", len(actions))
+				}
+
+				spoketesting.AssertAction(t, actions[0], "get")
+				spoketesting.AssertAction(t, actions[1], "update")
+
+				obj := actions[1].(clienttesting.UpdateActionImpl).Object.(*unstructured.Unstructured)
+				labels := obj.GetLabels()
+				if len(labels) != 2 {
+					t.Errorf("Expect 2 labels, but have %d", len(labels))
+				}
+			},
+		},
+		{
+			name: "merge annotation",
+			existingObject: []runtime.Object{
+				func() runtime.Object {
+					obj := spoketesting.NewUnstructured(
+						"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
+					obj.SetAnnotations(map[string]string{"foo": "bar"})
+					return obj
+				}(),
+			},
+			owner: metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"},
+			required: func() *unstructured.Unstructured {
+				obj := spoketesting.NewUnstructured(
+					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
+				obj.SetAnnotations(map[string]string{"foo1": "bar1"})
+				return obj
+			}(),
+			gvr: schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 2 {
+					t.Errorf("Expect 2 actions, but have %d", len(actions))
+				}
+
+				spoketesting.AssertAction(t, actions[0], "get")
+				spoketesting.AssertAction(t, actions[1], "update")
+
+				obj := actions[1].(clienttesting.UpdateActionImpl).Object.(*unstructured.Unstructured)
+				annotations := obj.GetAnnotations()
+				if len(annotations) != 2 {
+					t.Errorf("Expect 2 annotations, but have %d", len(annotations))
+				}
+			},
+		},
+		{
+			name: "nothing to update",
+			existingObject: []runtime.Object{
+				func() runtime.Object {
+					obj := spoketesting.NewUnstructured(
+						"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
+					obj.SetLabels(map[string]string{"foo": "bar"})
+					obj.SetAnnotations(map[string]string{"foo": "bar"})
+					return obj
+				}(),
+			},
+			owner: metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"},
+			required: func() *unstructured.Unstructured {
+				obj := spoketesting.NewUnstructured(
+					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
+				obj.SetLabels(map[string]string{"foo": "bar"})
+				obj.SetAnnotations(map[string]string{"foo": "bar"})
+				return obj
+			}(),
+			gvr: schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 1 {
+					t.Errorf("Expect 1 actions, but have %v", actions)
+				}
+
+				spoketesting.AssertAction(t, actions[0], "get")
 			},
 		},
 	}
