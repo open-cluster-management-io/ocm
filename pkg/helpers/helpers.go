@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -595,14 +596,28 @@ func LoadClientConfigFromSecret(secret *corev1.Secret) (*rest.Config, error) {
 
 // DetermineReplica determines the replica of deployment based on:
 // - mode: if it is Hosted mode will return 1
+// - kube version: if the kube version is less than v1.14 reutn 1
 // - node: list master nodes in the cluster and return 1 if the
 // number of master nodes is equal or less than 1. Return 3 otherwise.
-func DetermineReplica(ctx context.Context, kubeClient kubernetes.Interface, mode operatorapiv1.InstallMode) int32 {
+func DetermineReplica(ctx context.Context, kubeClient kubernetes.Interface, mode operatorapiv1.InstallMode, kubeVersion *version.Version) int32 {
 	// For hosted mode, there may be many cluster-manager/klusterlet running on the management cluster,
 	// set the replica to 1 to reduce the footprint of the management cluster.
 	if mode == operatorapiv1.InstallModeDetached || mode == operatorapiv1.InstallModeHosted {
 		return singleReplica
 	}
+
+	if kubeVersion != nil {
+		// If the cluster does not support lease.coordination.k8s.io/v1, set the replica to 1.
+		// And then the leader election of agent running on this cluster should be disabled, because
+		// it leverages the lease API. Kubernetes starts support lease/v1 from v1.14.
+		if cnt, err := kubeVersion.Compare("v1.14.0"); err != nil {
+			klog.Warningf("set replica to %d because it's failed to check whether the cluster supports lease/v1 or not: %v", singleReplica, err)
+			return singleReplica
+		} else if cnt == -1 {
+			return singleReplica
+		}
+	}
+
 	return DetermineReplicaByNodes(ctx, kubeClient)
 }
 

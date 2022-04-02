@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/version"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
@@ -786,10 +787,15 @@ func newKubeConfigSecret(namespace, name string, kubeConfigData, certData, keyDa
 }
 
 func TestDeterminReplica(t *testing.T) {
+	kubeVersionV113, _ := version.ParseGeneric("v1.13.0")
+	kubeVersionV114, _ := version.ParseGeneric("v1.14.0")
+	kubeVersionV122, _ := version.ParseGeneric("v1.22.5+5c84e52")
+
 	cases := []struct {
 		name            string
 		mode            operatorapiv1.InstallMode
 		existingNodes   []runtime.Object
+		kubeVersion     *version.Version
 		expectedReplica int32
 	}{
 		{
@@ -814,12 +820,30 @@ func TestDeterminReplica(t *testing.T) {
 			existingNodes:   []runtime.Object{newNode("node1"), newNode("node2"), newNode("node3")},
 			expectedReplica: singleReplica,
 		},
+		{
+			name:            "kube v1.13",
+			existingNodes:   []runtime.Object{newNode("node1"), newNode("node2"), newNode("node3")},
+			kubeVersion:     kubeVersionV113,
+			expectedReplica: singleReplica,
+		},
+		{
+			name:            "kube v1.14",
+			existingNodes:   []runtime.Object{newNode("node1"), newNode("node2"), newNode("node3")},
+			kubeVersion:     kubeVersionV114,
+			expectedReplica: defaultReplica,
+		},
+		{
+			name:            "kube v1.22.5+5c84e52",
+			existingNodes:   []runtime.Object{newNode("node1"), newNode("node2"), newNode("node3")},
+			kubeVersion:     kubeVersionV122,
+			expectedReplica: defaultReplica,
+		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fakeKubeClient := fakekube.NewSimpleClientset(c.existingNodes...)
-			replica := DetermineReplica(context.Background(), fakeKubeClient, c.mode)
+			replica := DetermineReplica(context.Background(), fakeKubeClient, c.mode, c.kubeVersion)
 			if replica != c.expectedReplica {
 				t.Errorf("Unexpected replica, actual: %d, expected: %d", replica, c.expectedReplica)
 			}

@@ -206,7 +206,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		HubKubeConfigSecret:       helpers.HubKubeConfig,
 		ExternalServerURL:         getServersFromKlusterlet(klusterlet),
 		OperatorNamespace:         n.operatorNamespace,
-		Replica:                   helpers.DetermineReplica(ctx, n.kubeClient, klusterlet.Spec.DeployOption.Mode),
+		Replica:                   helpers.DetermineReplica(ctx, n.kubeClient, klusterlet.Spec.DeployOption.Mode, n.kubeVersion),
 
 		ExternalManagedKubeConfigSecret:             helpers.ExternalManagedKubeConfig,
 		ExternalManagedKubeConfigRegistrationSecret: helpers.ExternalManagedKubeConfigRegistration,

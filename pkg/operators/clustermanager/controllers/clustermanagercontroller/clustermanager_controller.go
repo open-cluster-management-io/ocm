@@ -200,7 +200,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		RegistrationImage:       clusterManager.Spec.RegistrationImagePullSpec,
 		WorkImage:               clusterManager.Spec.WorkImagePullSpec,
 		PlacementImage:          clusterManager.Spec.PlacementImagePullSpec,
-		Replica:                 helpers.DetermineReplica(ctx, n.operatorKubeClient, clusterManagerMode),
+		Replica:                 helpers.DetermineReplica(ctx, n.operatorKubeClient, clusterManagerMode, nil),
 		HostedMode:              clusterManager.Spec.DeployOption.Mode == operatorapiv1.InstallModeHosted,
 	}
 	// If we are deploying in the hosted mode, it requires us to create webhook in a different way with the default mode.
