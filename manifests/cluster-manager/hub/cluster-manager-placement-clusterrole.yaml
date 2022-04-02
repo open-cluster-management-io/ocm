@@ -11,6 +11,10 @@ rules:
 - apiGroups: ["", "events.k8s.io"]
   resources: ["events"]
   verbs: ["create", "patch", "update"]
+# Allow controller to get/list/create/update/patch leases
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["create", "get", "list", "update", "watch", "patch"]
 # Allow controller to view managedclusters/managedclustersets/managedclustersetbindings
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["managedclusters", "managedclustersets", "managedclustersetbindings"]
