@@ -1,6 +1,7 @@
 package util
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/onsi/ginkgo"
@@ -14,6 +15,7 @@ func NewIntegrationTestEventRecorder(componet string) events.Recorder {
 
 type IntegrationTestEventRecorder struct {
 	component string
+	ctx       context.Context
 }
 
 func (r *IntegrationTestEventRecorder) ComponentName() string {
@@ -26,6 +28,11 @@ func (r *IntegrationTestEventRecorder) ForComponent(c string) events.Recorder {
 
 func (r *IntegrationTestEventRecorder) WithComponentSuffix(suffix string) events.Recorder {
 	return r.ForComponent(fmt.Sprintf("%s-%s", r.ComponentName(), suffix))
+}
+
+func (r *IntegrationTestEventRecorder) WithContext(ctx context.Context) events.Recorder {
+	r.ctx = ctx
+	return r
 }
 
 func (r *IntegrationTestEventRecorder) Event(reason, message string) {
@@ -48,7 +55,11 @@ func (r *IntegrationTestEventRecorder) Shutdown() {
 	return
 }
 
-func HasCondition(conditions []metav1.Condition, expectedType, expectedReason string, expectedStatus metav1.ConditionStatus) bool {
+func HasCondition(
+	conditions []metav1.Condition,
+	expectedType, expectedReason string,
+	expectedStatus metav1.ConditionStatus,
+) bool {
 	found := false
 	for _, condition := range conditions {
 		if condition.Type != expectedType {

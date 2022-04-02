@@ -101,7 +101,7 @@ func (c *FakePlacements) UpdateStatus(ctx context.Context, placement *v1beta1.Pl
 // Delete takes name of the placement and deletes it. Returns an error if one occurs.
 func (c *FakePlacements) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(placementsResource, c.ns, name), &v1beta1.Placement{})
+		Invokes(testing.NewDeleteActionWithOptions(placementsResource, c.ns, name, opts), &v1beta1.Placement{})
 
 	return err
 }

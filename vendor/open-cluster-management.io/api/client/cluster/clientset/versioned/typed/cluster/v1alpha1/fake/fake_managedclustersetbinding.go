@@ -89,7 +89,7 @@ func (c *FakeManagedClusterSetBindings) Update(ctx context.Context, managedClust
 // Delete takes name of the managedClusterSetBinding and deletes it. Returns an error if one occurs.
 func (c *FakeManagedClusterSetBindings) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(managedclustersetbindingsResource, c.ns, name), &v1alpha1.ManagedClusterSetBinding{})
+		Invokes(testing.NewDeleteActionWithOptions(managedclustersetbindingsResource, c.ns, name, opts), &v1alpha1.ManagedClusterSetBinding{})
 
 	return err
 }
