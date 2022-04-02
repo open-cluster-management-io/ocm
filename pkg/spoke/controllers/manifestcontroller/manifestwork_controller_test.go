@@ -926,6 +926,32 @@ func TestApplyUnstructred(t *testing.T) {
 			},
 		},
 		{
+			name: "set existing finalizer",
+			existingObject: []runtime.Object{
+				func() runtime.Object {
+					obj := spoketesting.NewUnstructured(
+						"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
+					obj.SetFinalizers([]string{"foo"})
+					return obj
+				}(),
+			},
+			owner: metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"},
+			required: func() *unstructured.Unstructured {
+				obj := spoketesting.NewUnstructured(
+					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
+				obj.SetFinalizers([]string{"foo1"})
+				return obj
+			}(),
+			gvr: schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 1 {
+					t.Errorf("Expect 1 actions, but have %d", len(actions))
+				}
+
+				spoketesting.AssertAction(t, actions[0], "get")
+			},
+		},
+		{
 			name: "nothing to update",
 			existingObject: []runtime.Object{
 				func() runtime.Object {

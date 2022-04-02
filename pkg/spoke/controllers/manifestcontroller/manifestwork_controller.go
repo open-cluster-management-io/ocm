@@ -333,6 +333,9 @@ func (m *ManifestWorkController) applyUnstructured(
 	required.SetLabels(existingLabels)
 	required.SetAnnotations(existingAnnotations)
 
+	// Keep the finalizers unchanged
+	required.SetFinalizers(existing.GetFinalizers())
+
 	// Compare and update the unstrcuctured.
 	if !*modified && isSameUnstructured(required, existing) {
 		return existing, false, nil
