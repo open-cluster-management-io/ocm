@@ -128,18 +128,34 @@ func (a *ManagedClusterMutatingAdmissionHook) addDefaultClusterSetLabel(managedC
 		return jsonPatches, status
 	}
 
-	if _, ok := managedCluster.Labels[clusterSetLabel]; ok {
-		return nil, status
+	clusterSetName, ok := managedCluster.Labels[clusterSetLabel]
+	// Clusterset label do not exist
+	if !ok {
+		jsonPatches = []jsonPatchOperation{
+			{
+				Operation: "add",
+				// there is a "/" in clusterset label. So need to transfer the "/" to "~1".
+				Path:  "/metadata/labels/cluster.open-cluster-management.io~1clusterset",
+				Value: defaultClusterSetName,
+			},
+		}
+		return jsonPatches, status
 	}
-	jsonPatches = []jsonPatchOperation{
-		{
-			Operation: "add",
-			// there is a "/" in clusterset label. So need to transfer the "/" to "~1".
-			Path:  "/metadata/labels/cluster.open-cluster-management.io~1clusterset",
-			Value: defaultClusterSetName,
-		},
+
+	// The clusterset label's value is "", update it to "default"
+	if len(clusterSetName) == 0 {
+		jsonPatches = []jsonPatchOperation{
+			{
+				Operation: "update",
+				// there is a "/" in clusterset label. So need to transfer the "/" to "~1".
+				Path:  "/metadata/labels/cluster.open-cluster-management.io~1clusterset",
+				Value: defaultClusterSetName,
+			},
+		}
+		return jsonPatches, status
 	}
-	return jsonPatches, status
+
+	return nil, status
 }
 
 // processTaints generates json patched for cluster taints

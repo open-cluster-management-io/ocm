@@ -186,6 +186,24 @@ func TestManagedClusterMutate(t *testing.T) {
 				build(),
 		},
 		{
+			name: "has null clusterset label",
+			request: &admissionv1beta1.AdmissionRequest{
+				Resource:  managedclustersSchema,
+				Operation: admissionv1beta1.Create,
+				Object: newManagedCluster().
+					withLeaseDurationSeconds(60).
+					addLabels(map[string]string{clusterSetLabel: ""}).
+					build(),
+			},
+			expectedResponse: newAdmissionResponse(true).
+				addJsonPatch(jsonPatchOperation{
+					Operation: "update",
+					Path:      "/metadata/labels/cluster.open-cluster-management.io~1clusterset",
+					Value:     defaultClusterSetName,
+				}).
+				build(),
+		},
+		{
 			name: "has other label in cluster",
 			request: &admissionv1beta1.AdmissionRequest{
 				Resource:  managedclustersSchema,
