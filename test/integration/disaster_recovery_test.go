@@ -138,10 +138,10 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 
 		ginkgo.By("Accept and approve the ManagedCluster")
 		// simulate hub cluster admin to accept the managedcluster and approve the csr
-		err := util.AcceptManagedCluster(hubClusterClient, managedClusterName)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-		err = auth.ApproveSpokeClusterCSR(hubKubeClient, managedClusterName, time.Hour*24)
+		gomega.Eventually(func() error {
+			return util.AcceptManagedCluster(hubClusterClient, managedClusterName)
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		err := auth.ApproveSpokeClusterCSR(hubKubeClient, managedClusterName, time.Hour*24)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// the managed cluster should have accepted condition after it is accepted

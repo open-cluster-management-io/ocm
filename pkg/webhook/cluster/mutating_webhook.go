@@ -188,20 +188,35 @@ func (a *ManagedClusterMutatingAdmissionHook) processTaints(managedCluster *clus
 	for index, taint := range managedCluster.Spec.Taints {
 		originalTaint := helpers.FindTaintByKey(oldManagedCluster, taint.Key)
 		switch {
+		case oldManagedCluster == nil:
+			// handle CREATE operation.
+			// The request will not be denied if it has taints with timeAdded specified,
+			// while the specified values will be ignored.
+			if !taint.TimeAdded.IsZero() {
+				status.Warnings = append(status.Warnings,
+					fmt.Sprintf("The specified TimeAdded value of Taint %q is ignored: %s.", taint.Key, taint.TimeAdded.UTC().Format(time.RFC3339)))
+			}
+			jsonPatches = append(jsonPatches, newTaintTimeAddedJsonPatch(index, now.Time))
 		case originalTaint == nil:
+			// handle UPDATE operation.
 			// new taint
+			// The request will be denied if it has any taint with timeAdded specified.
 			if !taint.TimeAdded.IsZero() {
 				invalidTaints = append(invalidTaints, taint.Key)
 				continue
 			}
 			jsonPatches = append(jsonPatches, newTaintTimeAddedJsonPatch(index, now.Time))
 		case originalTaint.Value == taint.Value && originalTaint.Effect == taint.Effect:
+			// handle UPDATE operation.
 			// no change
+			// The request will be denied if it has any taint with different timeAdded specified.
 			if !originalTaint.TimeAdded.Equal(&taint.TimeAdded) {
 				invalidTaints = append(invalidTaints, taint.Key)
 			}
 		default:
+			// handle UPDATE operation.
 			// taint's value/effect has changed
+			// The request will be denied if it has any taint with timeAdded specified.
 			if !taint.TimeAdded.IsZero() {
 				invalidTaints = append(invalidTaints, taint.Key)
 				continue

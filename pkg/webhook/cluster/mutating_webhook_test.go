@@ -64,19 +64,21 @@ func TestManagedClusterMutate(t *testing.T) {
 				build(),
 		},
 		{
-			name: "new taint request denied",
+			name: "new taint with timeAdded specified",
 			request: &admissionv1beta1.AdmissionRequest{
 				Resource:  managedclustersSchema,
 				Operation: admissionv1beta1.Create,
 				Object: newManagedCluster().
 					withLeaseDurationSeconds(60).
-					addTaint(newTaint("a", "b", clusterv1.TaintEffectNoSelect, newTime(now, 0))).
+					addTaint(newTaint("a", "b", clusterv1.TaintEffectNoSelect, nil)).
 					addTaint(newTaint("c", "d", clusterv1.TaintEffectPreferNoSelect, newTime(now, 0))).
 					addLabels(map[string]string{clusterSetLabel: defaultClusterSetName}).
 					build(),
 			},
-			expectedResponse: newAdmissionResponse(false).
-				withResult(metav1.StatusFailure, http.StatusBadRequest, metav1.StatusReasonBadRequest, "It is not allowed to set TimeAdded of Taint \"a,c\".").
+			expectedResponse: newAdmissionResponse(true).
+				addJsonPatch(newTaintTimeAddedJsonPatch(0, now)).
+				addJsonPatch(newTaintTimeAddedJsonPatch(1, now)).
+				addWarning(fmt.Sprintf("The specified TimeAdded value of Taint %q is ignored: %s.", "c", newTime(now, 0).UTC().Format(time.RFC3339))).
 				build(),
 		},
 		{
@@ -265,6 +267,11 @@ func (b *admissionResponseBuilder) withResult(status string, code int32, reason 
 		Reason:  reason,
 		Message: message,
 	}
+	return b
+}
+
+func (b *admissionResponseBuilder) addWarning(warning string) *admissionResponseBuilder {
+	b.response.Warnings = append(b.response.Warnings, warning)
 	return b
 }
 
