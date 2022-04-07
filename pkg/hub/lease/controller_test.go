@@ -87,6 +87,14 @@ func TestSync(t *testing.T) {
 				testinghelpers.AssertManagedClusterCondition(t, actual.(*clusterv1.ManagedCluster).Status.Conditions, expected)
 			},
 		},
+		{
+			name:          "managed cluster is unknown",
+			clusters:      []runtime.Object{testinghelpers.NewUnknownManagedCluster()},
+			clusterLeases: []runtime.Object{testinghelpers.NewManagedClusterLease("managed-cluster-lease", now.Add(-5*time.Minute))},
+			validateActions: func(t *testing.T, leaseActions, clusterActions []clienttesting.Action) {
+				testinghelpers.AssertNoActions(t, clusterActions)
+			},
+		},
 	}
 
 	for _, c := range cases {

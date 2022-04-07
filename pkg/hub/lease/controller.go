@@ -25,6 +25,7 @@ import (
 )
 
 const leaseDurationTimes = 5
+const leaseName = "managed-cluster-lease"
 
 var (
 	// LeaseDurationSeconds is lease update time interval
@@ -54,7 +55,20 @@ func NewClusterLeaseController(
 		leaseLister:   leaseInformer.Lister(),
 	}
 	return factory.New().
-		WithInformers(clusterInformer.Informer(), leaseInformer.Informer()).
+		WithFilteredEventsInformers(
+			func(obj interface{}) bool {
+				metaObj, ok := obj.(metav1.ObjectMetaAccessor)
+				if !ok {
+					return false
+				}
+				// only handle the managed cluster lease
+				// TODO instead of this by adding label filter in the SharedInformerFactory
+				// see https://github.com/open-cluster-management-io/registration/issues/225
+				return metaObj.GetObjectMeta().GetName() == leaseName
+			},
+			leaseInformer.Informer(),
+		).
+		WithInformers(clusterInformer.Informer()).
 		WithSync(c.sync).
 		ResyncEvery(resyncInterval).
 		ToController("ManagedClusterLeaseController", recorder)
@@ -73,7 +87,6 @@ func (c *leaseController) sync(ctx context.Context, syncCtx factory.SyncContext)
 		}
 
 		// get the lease of a cluster, if the lease is not found, create it
-		leaseName := "managed-cluster-lease"
 		observedLease, err := c.leaseLister.Leases(cluster.Name).Get(leaseName)
 		switch {
 		case errors.IsNotFound(err):
@@ -109,6 +122,11 @@ func (c *leaseController) sync(ctx context.Context, syncCtx factory.SyncContext)
 			if now.Before(observedLease.Spec.RenewTime.Add(gracePeriod)) {
 				continue
 			}
+		}
+
+		if meta.IsStatusConditionPresentAndEqual(cluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable, metav1.ConditionUnknown) {
+			// the managed cluster available condition alreay is unknown, do nothing
+			continue
 		}
 
 		// the lease is not constantly updated, update it to unknown
