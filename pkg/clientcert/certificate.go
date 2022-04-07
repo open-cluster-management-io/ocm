@@ -9,7 +9,6 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	certificates "k8s.io/api/certificates/v1"
-	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,7 +69,7 @@ func IsCertificateValid(certData []byte, subject *pkix.Name) (bool, error) {
 	}
 
 	if len(certs) == 0 {
-		return false, errors.New("No cert found in certificate")
+		return false, errors.New("no cert found in certificate")
 	}
 
 	now := time.Now()
@@ -115,7 +114,7 @@ func getCertValidityPeriod(secret *corev1.Secret) (*time.Time, *time.Time, error
 	}
 
 	if len(certs) == 0 {
-		return nil, nil, errors.New("No cert found in certificate")
+		return nil, nil, errors.New("no cert found in certificate")
 	}
 
 	// find out the validity period for all certs in the certificate chain
@@ -189,9 +188,9 @@ func (v *v1CSRControl) isApproved(name string) (bool, error) {
 	v1CSR := csr.(*certificates.CertificateSigningRequest)
 	approved := false
 	for _, condition := range v1CSR.Status.Conditions {
-		if condition.Type == certificatesv1.CertificateDenied {
+		if condition.Type == certificates.CertificateDenied {
 			return false, nil
-		} else if condition.Type == certificatesv1.CertificateApproved {
+		} else if condition.Type == certificates.CertificateApproved {
 			approved = true
 		}
 	}
@@ -240,7 +239,7 @@ func (v *v1CSRControl) get(name string) (metav1.Object, error) {
 		// fallback to fetching csr from hub apiserver in case it is not cached by informer yet
 		csr, err = v.hubCSRClient.Get(context.Background(), name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("unable to get csr %q. It might have already been deleted.", name)
+			return nil, fmt.Errorf("unable to get csr %q. It might have already been deleted", name)
 		}
 	case err != nil:
 		return nil, err

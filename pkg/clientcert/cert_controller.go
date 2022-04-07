@@ -22,7 +22,6 @@ import (
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/cache"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog/v2"
@@ -166,8 +165,7 @@ func newClientCertificateController(
 
 	return factory.New().
 		WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
-			key, _ := cache.MetaNamespaceKeyFunc(obj)
-			return key
+			return factory.DefaultQueueKey
 		}, func(obj interface{}) bool {
 			accessor, err := meta.Accessor(obj)
 			if err != nil {
@@ -180,8 +178,7 @@ func newClientCertificateController(
 			return false
 		}, spokeSecretInformer.Informer()).
 		WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
-			accessor, _ := meta.Accessor(obj)
-			return accessor.GetName()
+			return factory.DefaultQueueKey
 		}, c.EventFilterFunc, csrControl.informer()).
 		WithSync(c.sync).
 		ResyncEvery(ControllerResyncInterval).
@@ -233,11 +230,11 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 			klog.V(4).Infof("Sync csr %v", c.csrName)
 			// check if cert in csr status matches with the corresponding private key
 			if c.keyData == nil {
-				return nil, fmt.Errorf("No private key found for certificate in csr: %s", c.csrName)
+				return nil, fmt.Errorf("no private key found for certificate in csr: %s", c.csrName)
 			}
 			_, err = tls.X509KeyPair(certData, c.keyData)
 			if err != nil {
-				return nil, fmt.Errorf("Private key does not match with the certificate in csr: %s", c.csrName)
+				return nil, fmt.Errorf("private key does not match with the certificate in csr: %s", c.csrName)
 			}
 
 			data := map[string][]byte{
@@ -320,13 +317,6 @@ func saveSecret(spokeCoreClient corev1client.CoreV1Interface, secretNamespace st
 	return err
 }
 
-func (c *clientCertificateController) hasValidClientCertificate(secret *corev1.Secret) bool {
-	if valid, err := IsCertificateValid(secret.Data[TLSCertFile], c.Subject); err == nil {
-		return valid
-	}
-	return false
-}
-
 func (c *clientCertificateController) reset() {
 	c.csrName = ""
 	c.keyData = nil
@@ -351,7 +341,7 @@ func shouldCreateCSR(
 		}
 
 		total := notAfter.Sub(*notBefore)
-		remaining := notAfter.Sub(time.Now())
+		remaining := time.Until(*notAfter)
 		klog.V(4).Infof("Client certificate for %s: time total=%v, remaining=%v, remaining/total=%v", controllerName, total, remaining, remaining.Seconds()/total.Seconds())
 		threshold := jitter(0.2, 0.25)
 		if remaining.Seconds()/total.Seconds() > threshold {

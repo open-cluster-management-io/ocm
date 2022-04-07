@@ -254,7 +254,13 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		return err
 	}
 
-	hubKubeInformerFactory := informers.NewSharedInformerFactory(hubKubeClient, 10*time.Minute)
+	hubKubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(
+		hubKubeClient,
+		10*time.Minute,
+		informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
+			listOptions.LabelSelector = fmt.Sprintf("%s=%s", clientcert.ClusterNameLabel, o.ClusterName)
+		}),
+	)
 	addOnInformerFactory := addoninformers.NewSharedInformerFactoryWithOptions(
 		addOnClient, 10*time.Minute, addoninformers.WithNamespace(o.ClusterName))
 	// create a cluster informer factory with name field selector because we just need to handle the current spoke cluster
@@ -426,7 +432,7 @@ func (o *SpokeAgentOptions) Validate() error {
 	if len(o.SpokeExternalServerURLs) != 0 {
 		for _, serverURL := range o.SpokeExternalServerURLs {
 			if !helpers.IsValidHTTPSURL(serverURL) {
-				return errors.New(fmt.Sprintf("%q is invalid", serverURL))
+				return fmt.Errorf("%q is invalid", serverURL)
 			}
 		}
 	}
