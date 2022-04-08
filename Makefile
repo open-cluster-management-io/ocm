@@ -8,6 +8,7 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
 	targets/openshift/deps.mk \
 	targets/openshift/images.mk \
+	targets/openshift/kustomize.mk \
 	lib/tmp.mk \
 )
 
@@ -21,10 +22,6 @@ HUB_KUBECONFIG_CONTEXT?=$(shell $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) config
 SPOKE_KUBECONFIG?=$(KUBECONFIG)
 SPOKE_KUBECONFIG_CONTEXT?=$(shell $(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) config current-context)
 PWD=$(shell pwd)
-KUSTOMIZE?=$(PWD)/$(PERMANENT_TMP_GOPATH)/bin/kustomize
-KUSTOMIZE_VERSION?=v3.5.4
-KUSTOMIZE_ARCHIVE_NAME?=kustomize_$(KUSTOMIZE_VERSION)_$(GOHOSTOS)_$(GOHOSTARCH).tar.gz
-kustomize_dir:=$(dir $(KUSTOMIZE))
 
 # This will call a macro called "build-image" which will generate image specific targets based on the parameters:
 # $0 - macro name
@@ -32,7 +29,7 @@ kustomize_dir:=$(dir $(KUSTOMIZE))
 # $2 - Dockerfile path
 # $3 - context directory for image build
 # It will generate target "image-$(1)" for builing the image an binding it as a prerequisite to target "images".
-$(call build-image,work,$(IMAGE_REGISTRY)/work,./Dockerfile,.)
+$(call build-image,work,$(IMAGE_REGISTRY)/work:$(IMAGE_TAG),./Dockerfile,.)
 
 clean:
 	$(RM) ./work
@@ -70,14 +67,14 @@ create-cluster-ns:
 
 deploy-work-agent: ensure-kustomize create-cluster-ns hub-kubeconfig-secret
 	cp deploy/spoke/kustomization.yaml deploy/spoke/kustomization.yaml.tmp
-	cd deploy/spoke && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/work:latest=$(IMAGE_NAME)
+	cd deploy/spoke && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/work:latest=$(IMAGE_NAME)
 	$(KUBECTL) config use-context $(SPOKE_KUBECONFIG_CONTEXT) --kubeconfig $(SPOKE_KUBECONFIG)
 	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) apply -f -
 	mv deploy/spoke/kustomization.yaml.tmp deploy/spoke/kustomization.yaml
 
 deploy-webhook: ensure-kustomize
 	cp deploy/webhook/kustomization.yaml deploy/webhook/kustomization.yaml.tmp
-	cd deploy/webhook && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/work:latest=$(IMAGE_NAME)
+	cd deploy/webhook && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/work:latest=$(IMAGE_NAME)
 	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
 	$(KUSTOMIZE) build deploy/webhook | $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) apply -f -
 	mv deploy/webhook/kustomization.yaml.tmp deploy/webhook/kustomization.yaml
@@ -97,17 +94,6 @@ remove-cluster-ns:
 deploy: deploy-webhook deploy-work-agent
 
 undeploy: remove-cluster-ns clean-work-agent clean-webhook
-
-ensure-kustomize:
-ifeq "" "$(wildcard $(KUSTOMIZE))"
-	$(info Installing kustomize into '$(KUSTOMIZE)')
-	mkdir -p '$(kustomize_dir)'
-	curl -s -f -L https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F$(KUSTOMIZE_VERSION)/$(KUSTOMIZE_ARCHIVE_NAME) -o '$(kustomize_dir)$(KUSTOMIZE_ARCHIVE_NAME)'
-	tar -C '$(kustomize_dir)' -zvxf '$(kustomize_dir)$(KUSTOMIZE_ARCHIVE_NAME)'
-	chmod +x '$(KUSTOMIZE)';
-else
-	$(info Using existing kustomize from "$(KUSTOMIZE)")
-endif
 
 build-e2e:
 	go test -c ./test/e2e -mod=vendor
