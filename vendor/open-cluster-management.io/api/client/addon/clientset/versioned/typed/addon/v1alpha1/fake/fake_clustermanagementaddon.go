@@ -94,7 +94,7 @@ func (c *FakeClusterManagementAddOns) UpdateStatus(ctx context.Context, clusterM
 // Delete takes name of the clusterManagementAddOn and deletes it. Returns an error if one occurs.
 func (c *FakeClusterManagementAddOns) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(clustermanagementaddonsResource, name), &v1alpha1.ClusterManagementAddOn{})
+		Invokes(testing.NewRootDeleteActionWithOptions(clustermanagementaddonsResource, name, opts), &v1alpha1.ClusterManagementAddOn{})
 	return err
 }
 
