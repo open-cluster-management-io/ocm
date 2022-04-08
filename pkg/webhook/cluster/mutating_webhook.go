@@ -146,7 +146,7 @@ func (a *ManagedClusterMutatingAdmissionHook) addDefaultClusterSetLabel(managedC
 	if len(clusterSetName) == 0 {
 		jsonPatches = []jsonPatchOperation{
 			{
-				Operation: "update",
+				Operation: "replace",
 				// there is a "/" in clusterset label. So need to transfer the "/" to "~1".
 				Path:  "/metadata/labels/cluster.open-cluster-management.io~1clusterset",
 				Value: defaultClusterSetName,

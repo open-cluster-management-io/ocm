@@ -116,6 +116,22 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				gomega.Expect(len(managedCluster.Labels)).To(gomega.Equal(len(oriManagedCluster.Labels) + 1))
 				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 			})
+			ginkgo.It("Should have the default Clusterset Label when clusterset label is a null string", func() {
+				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
+				ginkgo.By(fmt.Sprintf("create a managed cluster %q", clusterName))
+				oriManagedCluster := newManagedCluster(clusterName, false, validURL)
+
+				oriManagedCluster.Labels = map[string]string{
+					clusterSetLabel: "",
+				}
+				_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.TODO(), oriManagedCluster, metav1.CreateOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				gomega.Expect(managedCluster.Labels[clusterSetLabel]).To(gomega.Equal(string(defaultClusterSetName)))
+			})
 			ginkgo.It("Should have the timeAdded for taints", func() {
 				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
 				ginkgo.By(fmt.Sprintf("create a managed cluster %q with taint", clusterName))

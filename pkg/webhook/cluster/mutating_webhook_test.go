@@ -199,7 +199,7 @@ func TestManagedClusterMutate(t *testing.T) {
 			},
 			expectedResponse: newAdmissionResponse(true).
 				addJsonPatch(jsonPatchOperation{
-					Operation: "update",
+					Operation: "replace",
 					Path:      "/metadata/labels/cluster.open-cluster-management.io~1clusterset",
 					Value:     defaultClusterSetName,
 				}).
