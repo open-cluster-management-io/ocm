@@ -71,6 +71,7 @@ var (
 	}
 
 	managementStaticResourceFiles = []string{
+		"klusterlet/management/klusterlet-role-extension-apiserver.yaml",
 		"klusterlet/management/klusterlet-registration-serviceaccount.yaml",
 		"klusterlet/management/klusterlet-registration-role.yaml",
 		"klusterlet/management/klusterlet-registration-rolebinding.yaml",

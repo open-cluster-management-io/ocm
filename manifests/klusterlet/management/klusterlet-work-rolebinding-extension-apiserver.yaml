@@ -6,7 +6,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: extension-apiserver-authentication-reader
+  name: open-cluster-management:management:{{ .KlusterletName }}:extension-apiserver
 subjects:
   - kind: ServiceAccount
     name: {{ .KlusterletName }}-work-sa
