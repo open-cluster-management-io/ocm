@@ -30,7 +30,7 @@ rules:
 # Allow hub to manage coordination.k8s.io/lease
 - apiGroups: ["coordination.k8s.io"]
   resources: ["leases"]
-  verbs: ["get", "list", "watch", "create", "delete", "update"]
+  verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]
 # Allow hub to manage managedclusters
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["managedclusters"]
