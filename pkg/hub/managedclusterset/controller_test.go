@@ -2,7 +2,6 @@ package managedclusterset
 
 import (
 	"context"
-	"reflect"
 	"testing"
 	"time"
 
@@ -19,12 +18,11 @@ import (
 
 func TestSyncClusterSet(t *testing.T) {
 	cases := []struct {
-		name                   string
-		clusterSetName         string
-		existingClusterSet     *clusterv1beta1.ManagedClusterSet
-		existingClusters       []*clusterv1.ManagedCluster
-		expectedClusterSetsMap map[string]string
-		validateActions        func(t *testing.T, actions []clienttesting.Action)
+		name               string
+		clusterSetName     string
+		existingClusterSet *clusterv1beta1.ManagedClusterSet
+		existingClusters   []*clusterv1.ManagedCluster
+		validateActions    func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
 			name:           "sync a deleted cluster set",
@@ -66,10 +64,6 @@ func TestSyncClusterSet(t *testing.T) {
 				newManagedCluster("cluster1", "mcs1"),
 				newManagedCluster("cluster2", "mcs2"),
 				newManagedCluster("cluster3", "mcs1"),
-			},
-			expectedClusterSetsMap: map[string]string{
-				"cluster1": "mcs1",
-				"cluster3": "mcs1",
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, actions, "update")
@@ -145,7 +139,6 @@ func TestSyncClusterSet(t *testing.T) {
 				clusterLister:    informerFactory.Cluster().V1().ManagedClusters().Lister(),
 				clusterSetLister: informerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
 				eventRecorder:    eventstesting.NewTestingEventRecorder(t),
-				clusterSetsMap:   map[string]string{},
 			}
 
 			syncErr := ctrl.sync(context.Background(), testinghelpers.NewFakeSyncContext(t, c.clusterSetName))
@@ -154,14 +147,6 @@ func TestSyncClusterSet(t *testing.T) {
 			}
 
 			c.validateActions(t, clusterClient.Actions())
-
-			if c.expectedClusterSetsMap == nil {
-				c.expectedClusterSetsMap = map[string]string{}
-			}
-
-			if !reflect.DeepEqual(ctrl.clusterSetsMap, c.expectedClusterSetsMap) {
-				t.Errorf("expected mappings %v, but got %v", c.expectedClusterSetsMap, ctrl.clusterSetsMap)
-			}
 		})
 	}
 }
