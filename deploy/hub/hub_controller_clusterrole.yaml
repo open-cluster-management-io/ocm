@@ -54,6 +54,11 @@ rules:
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["managedclustersets/status"]
   verbs: ["update", "patch"]
+# Allow hub to move managedclusters without clusterset label to the default managedclustersets
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclustersets/join"]
+  resourceNames: ["default"]
+  verbs: ["create"]
 # Allow to access metrics API
 - apiGroups: ["authentication.k8s.io"]
   resources: ["tokenreviews"]
