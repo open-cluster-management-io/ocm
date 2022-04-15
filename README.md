@@ -25,7 +25,7 @@ Contains controllers that support:
 
 2. Prepare a [kind](https://kind.sigs.k8s.io/) cluster, like:
   ```
-  kind create cluster # if you want to deploy on two clusters, you can exec `kind create cluster name=<cluster-name> to prepare another cluster`
+  kind create cluster # if you want to deploy on two clusters, you can exec `kind create cluster --name=<cluster-name> to prepare another cluster`
   ```
 
   > Note: The Kubernetes cluster needs v1.19 or greater
