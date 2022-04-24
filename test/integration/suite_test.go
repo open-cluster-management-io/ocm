@@ -8,6 +8,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -33,6 +34,7 @@ var hubClusterClient clusterv1client.Interface
 var hubAddonClient addonv1alpha1client.Interface
 var hubKubeClient kubernetes.Interface
 var testAddonImpl *testAddon
+var testInstallByLableAddonImpl *testAddon
 var cancel context.CancelFunc
 var mgrContext context.Context
 
@@ -73,12 +75,29 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		registrations: map[string][]addonapiv1alpha1.RegistrationConfig{},
 	}
 
+	testInstallByLableAddonImpl = &testAddon{
+		name:          "test-install-all",
+		manifests:     map[string][]runtime.Object{},
+		registrations: map[string][]addonapiv1alpha1.RegistrationConfig{},
+		installStrategy: &agent.InstallStrategy{
+			Type:             agent.InstallByLabel,
+			InstallNamespace: "default",
+			LabelSelector: &v1.LabelSelector{
+				MatchLabels: map[string]string{
+					"test": "test",
+				},
+			},
+		},
+	}
+
 	mgrContext, cancel = context.WithCancel(context.TODO())
 	// start hub controller
 	go func() {
 		mgr, err := addonmanager.New(cfg)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		err = mgr.AddAgent(testAddonImpl)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		err = mgr.AddAgent(testInstallByLableAddonImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		mgr.Start(mgrContext)
 	}()
@@ -95,12 +114,13 @@ var _ = ginkgo.AfterSuite(func() {
 })
 
 type testAddon struct {
-	name          string
-	manifests     map[string][]runtime.Object
-	registrations map[string][]addonapiv1alpha1.RegistrationConfig
-	approveCSR    bool
-	cert          []byte
-	prober        *agent.HealthProber
+	name            string
+	manifests       map[string][]runtime.Object
+	registrations   map[string][]addonapiv1alpha1.RegistrationConfig
+	approveCSR      bool
+	cert            []byte
+	prober          *agent.HealthProber
+	installStrategy *agent.InstallStrategy
 }
 
 func (t *testAddon) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
@@ -109,8 +129,9 @@ func (t *testAddon) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapi
 
 func (t *testAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 	option := agent.AgentAddonOptions{
-		AddonName:    t.name,
-		HealthProber: t.prober,
+		AddonName:       t.name,
+		HealthProber:    t.prober,
+		InstallStrategy: t.installStrategy,
 	}
 
 	if len(t.registrations) > 0 {

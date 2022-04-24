@@ -3,6 +3,7 @@ package addontesting
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
@@ -102,6 +103,13 @@ func NewManagedCluster(name string) *clusterv1.ManagedCluster {
 			Name: name,
 		},
 	}
+}
+
+func DeleteManagedCluster(c *clusterv1.ManagedCluster) *clusterv1.ManagedCluster {
+	c.DeletionTimestamp = &metav1.Time{
+		Time: time.Now(),
+	}
+	return c
 }
 
 func NewCSR(addon, cluster string) *certv1.CertificateSigningRequest {

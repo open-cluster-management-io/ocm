@@ -84,6 +84,16 @@ func TestReconcile(t *testing.T) {
 				}
 			},
 			testaddon: &testAgent{name: "test", strategy: agent.InstallAllStrategy("test")},
+		}, {
+			name:    "install addon when cluster is deleting",
+			addon:   []runtime.Object{addontesting.NewAddon("test", "cluster1")},
+			cluster: []runtime.Object{addontesting.DeleteManagedCluster(addontesting.NewManagedCluster("cluster1"))},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 0 {
+					t.Errorf("Should not install addon when controller is deleting")
+				}
+			},
+			testaddon: &testAgent{name: "test", strategy: agent.InstallAllStrategy("test")},
 		},
 		{
 			name:                 "selector install strategy with unmatched cluster",
