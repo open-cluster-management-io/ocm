@@ -399,8 +399,6 @@ var _ = ginkgo.Describe("Work agent", func() {
 					return false
 				}
 
-				fmt.Printf("work status %v", work.Status.ResourceStatus)
-
 				// check work status condition
 				return meta.IsStatusConditionTrue(work.Status.Conditions, workapiv1.WorkApplied) &&
 					meta.IsStatusConditionTrue(work.Status.Conditions, workapiv1.WorkAvailable)
@@ -567,7 +565,7 @@ var _ = ginkgo.Describe("Work agent", func() {
 		})
 
 		ginkgo.It("should return wellkown status of deployment", func() {
-			deployment := newDeployment("nginx")
+			deployment := newDeployment("busybox")
 			objects := []runtime.Object{deployment}
 			work := newManifestWork(clusterName, workName, objects...)
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
@@ -575,7 +573,7 @@ var _ = ginkgo.Describe("Work agent", func() {
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "apps",
 						Resource:  "deployments",
-						Name:      "nginx",
+						Name:      "busybox",
 						Namespace: "default",
 					},
 					FeedbackRules: []workapiv1.FeedbackRule{
@@ -755,25 +753,26 @@ func newDeployment(name string) *appsv1.Deployment {
 			Replicas: &replica,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": "nginx",
+					"app": "busybox",
 				},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app": "nginx",
+						"app": "busybox",
 					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "nginx",
-							Image: "quay.io/bitnami/nginx:1.14.2",
+							Name:  "busybox",
+							Image: "quay.io/asmacdo/busybox",
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 80,
 								},
 							},
+							Command: []string{"sh", "-c", "sleep 3600"},
 						},
 					},
 				},
