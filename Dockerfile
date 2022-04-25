@@ -1,4 +1,4 @@
-FROM quay.io/bitnami/golang:1.17 AS builder
+FROM golang:1.17 AS builder
 WORKDIR /go/src/open-cluster-management.io/registration-operator
 COPY . .
 ENV GO_PACKAGE open-cluster-management.io/registration-operator
