@@ -1,4 +1,4 @@
-FROM quay.io/bitnami/golang:1.17 AS builder
+FROM golang:1.17 AS builder
 ARG OS=linux
 ARG ARCH=amd64
 WORKDIR /go/src/open-cluster-management.io/registration
