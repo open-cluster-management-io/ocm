@@ -8,6 +8,5 @@ FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
 ENV USER_UID=10001
 
 COPY --from=builder /go/src/open-cluster-management.io/registration-operator/registration-operator /
-RUN microdnf update && microdnf clean all
 
 USER ${USER_UID}
