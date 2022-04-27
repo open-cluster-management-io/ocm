@@ -245,7 +245,7 @@ endif
 # $2 - Dockerfile path
 # $3 - context directory for image build
 # It will generate target "image-$(1)" for building the image an binding it as a prerequisite to target "images".
-$(call build-image,registration-operator,$(IMAGE_REGISTRY)/registration-operator,./Dockerfile,.)
+$(call build-image,registration-operator,$(IMAGE_REGISTRY)/registration-operator:$(IMAGE_TAG),./Dockerfile,.)
 
 clean:
 	$(RM) ./registration-operator
