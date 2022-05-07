@@ -281,10 +281,6 @@ func (m *ManifestWorkController) decodeUnstructured(data []byte) (*unstructured.
 		return nil, fmt.Errorf("failed to decode object: %w", err)
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to find gvr from restmapping: %w", err)
-	}
-
 	return unstructuredObj, nil
 }
 
