@@ -37,7 +37,9 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		hubKubeconfigDir = path.Join(util.TestDir, fmt.Sprintf("addontest-%s", suffix), "hub-kubeconfig")
 		addOnName = fmt.Sprintf("addon-%s", suffix)
 
-		features.DefaultSpokeMutableFeatureGate.Set("AddonManagement=true")
+		err := features.DefaultSpokeMutableFeatureGate.Set("AddonManagement=true")
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 		agentOptions := spoke.SpokeAgentOptions{
 			ClusterName:              managedClusterName,
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,

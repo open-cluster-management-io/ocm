@@ -59,10 +59,7 @@ func NewManagedClusterClusterroleController(
 			func(obj interface{}) bool {
 				clusterRoles := sets.NewString(registrationClusterRole, workClusterRole)
 				metaObj := obj.(metav1.Object)
-				if clusterRoles.Has(metaObj.GetName()) {
-					return true
-				}
-				return false
+				return clusterRoles.Has(metaObj.GetName())
 			}, clusterRoleInformer.Informer()).
 		WithInformers(clusterInformer.Informer()).
 		WithSync(c.sync).

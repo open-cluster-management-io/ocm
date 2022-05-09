@@ -55,7 +55,7 @@ func TestSync(t *testing.T) {
 			roles:        []runtime.Object{testinghelpers.NewRole(testinghelpers.TestManagedClusterName, roleName, []string{manifestWorkFinalizer}, true)},
 			roleBindings: []runtime.Object{testinghelpers.NewRoleBinding(testinghelpers.TestManagedClusterName, roleName, []string{manifestWorkFinalizer}, true)},
 			works:        []runtime.Object{testinghelpers.NewManifestWork(testinghelpers.TestManagedClusterName, "work1", []string{manifestWorkFinalizer}, nil)},
-			expectedErr:  "Still having 1 works in the cluster namespace testmanagedcluster",
+			expectedErr:  "still having 1 works in the cluster namespace testmanagedcluster",
 		},
 	}
 	for _, c := range cases {
@@ -64,15 +64,21 @@ func TestSync(t *testing.T) {
 			kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Minute*10)
 			nsStore := kubeInformerFactory.Core().V1().Namespaces().Informer().GetStore()
 			for _, ns := range c.namespaces {
-				nsStore.Add(ns)
+				if err := nsStore.Add(ns); err != nil {
+					t.Fatal(err)
+				}
 			}
 			roleStore := kubeInformerFactory.Rbac().V1().Roles().Informer().GetStore()
 			for _, role := range c.roles {
-				roleStore.Add(role)
+				if err := roleStore.Add(role); err != nil {
+					t.Fatal(err)
+				}
 			}
 			roleBindingStore := kubeInformerFactory.Rbac().V1().RoleBindings().Informer().GetStore()
 			for _, roleBinding := range c.roleBindings {
-				roleBindingStore.Add(roleBinding)
+				if err := roleBindingStore.Add(roleBinding); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			clusterClient := fakeclusterclient.NewSimpleClientset()
@@ -82,7 +88,9 @@ func TestSync(t *testing.T) {
 			workInformerFactory := workinformers.NewSharedInformerFactory(workClient, 5*time.Minute)
 			workStore := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore()
 			for _, work := range c.works {
-				workStore.Add(work)
+				if err := workStore.Add(work); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			ctrl := &finalizeController{
@@ -201,7 +209,9 @@ func TestSyncRoleAndRoleBinding(t *testing.T) {
 				workInformerFactory.Start(ctx.Done())
 				workInformerFactory.WaitForCacheSync(ctx.Done())
 
-				controller.syncRoleAndRoleBinding(context.TODO(), controllerContext, c.role, c.roleBinding, c.namespace, c.cluster)
+				if err := controller.syncRoleAndRoleBinding(context.TODO(), controllerContext, c.role, c.roleBinding, c.namespace, c.cluster); err != nil {
+					t.Fatal(err)
+				}
 
 				c.validateRbacActions(t, fakeClient.Actions())
 

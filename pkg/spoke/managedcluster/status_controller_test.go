@@ -48,12 +48,16 @@ func TestHealthCheck(t *testing.T) {
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write(output)
+			if _, err := w.Write(output); err != nil {
+				t.Fatal(err)
+			}
 			return
 		}
 
 		w.WriteHeader(serverResponse.httpStatus)
-		w.Write([]byte(serverResponse.responseMsg))
+		if _, err := w.Write([]byte(serverResponse.responseMsg)); err != nil {
+			t.Fatal(err)
+		}
 	}))
 	defer apiServer.Close()
 
@@ -208,14 +212,18 @@ func TestHealthCheck(t *testing.T) {
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
 			clusterStore := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore()
 			for _, cluster := range c.clusters {
-				clusterStore.Add(cluster)
+				if err := clusterStore.Add(cluster); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			kubeClient := kubefake.NewSimpleClientset(c.nodes...)
 			kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Minute*10)
 			nodeStore := kubeInformerFactory.Core().V1().Nodes().Informer().GetStore()
 			for _, node := range c.nodes {
-				nodeStore.Add(node)
+				if err := nodeStore.Add(node); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			serverResponse.httpStatus = c.httpStatus

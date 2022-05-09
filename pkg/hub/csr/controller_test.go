@@ -142,7 +142,9 @@ func TestSync(t *testing.T) {
 			informerFactory := informers.NewSharedInformerFactory(kubeClient, 3*time.Minute)
 			csrStore := informerFactory.Certificates().V1().CertificateSigningRequests().Informer().GetStore()
 			for _, csr := range c.startingCSRs {
-				csrStore.Add(csr)
+				if err := csrStore.Add(csr); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			ctrl := &csrApprovingController{kubeClient, informerFactory.Certificates().V1().CertificateSigningRequests().Lister(), eventstesting.NewTestingEventRecorder(t)}

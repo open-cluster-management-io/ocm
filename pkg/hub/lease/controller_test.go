@@ -103,14 +103,18 @@ func TestSync(t *testing.T) {
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
 			clusterStore := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore()
 			for _, cluster := range c.clusters {
-				clusterStore.Add(cluster)
+				if err := clusterStore.Add(cluster); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			leaseClient := kubefake.NewSimpleClientset(c.clusterLeases...)
 			leaseInformerFactory := kubeinformers.NewSharedInformerFactory(leaseClient, time.Minute*10)
 			leaseStore := leaseInformerFactory.Coordination().V1().Leases().Informer().GetStore()
 			for _, lease := range c.clusterLeases {
-				leaseStore.Add(lease)
+				if err := leaseStore.Add(lease); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			ctrl := &leaseController{

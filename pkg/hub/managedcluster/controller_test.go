@@ -98,7 +98,9 @@ func TestSyncManagedCluster(t *testing.T) {
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
 			clusterStore := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore()
 			for _, cluster := range c.startingObjects {
-				clusterStore.Add(cluster)
+				if err := clusterStore.Add(cluster); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			ctrl := managedClusterController{kubeClient, clusterClient, clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(), resourceapply.NewResourceCache(), eventstesting.NewTestingEventRecorder(t)}

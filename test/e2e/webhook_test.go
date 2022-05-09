@@ -56,16 +56,15 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 			admissionName = "managedclustervalidators.admission.cluster.open-cluster-management.io"
 
 			// make sure the managedcluster can be created successfully
-			gomega.Eventually(func() bool {
+			gomega.Eventually(func() error {
 				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
 				managedCluster := newManagedCluster(clusterName, false, validURL)
 				_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.TODO(), managedCluster, metav1.CreateOptions{})
 				if err != nil {
-					return false
+					return err
 				}
-				clusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
-				return true
-			}, 60*time.Second, 1*time.Second).Should(gomega.BeTrue())
+				return clusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
+			}, 60*time.Second, 1*time.Second).Should(gomega.Succeed())
 		})
 
 		ginkgo.Context("Creating a managed cluster", func() {
@@ -608,20 +607,23 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			// make sure the managedclusterset can be created successfully
-			gomega.Eventually(func() bool {
+			gomega.Eventually(func() error {
 				clusterSetName := fmt.Sprintf("clusterset-%s", rand.String(6))
 				managedClusterSetBinding := newManagedClusterSetBinding(namespace, clusterSetName, clusterSetName)
 				_, err := clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Create(context.TODO(), managedClusterSetBinding, metav1.CreateOptions{})
 				if err != nil {
-					return false
+					return err
 				}
-				clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Delete(context.TODO(), clusterSetName, metav1.DeleteOptions{})
-				return true
-			}, 60*time.Second, 1*time.Second).Should(gomega.BeTrue())
+				return clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Delete(context.TODO(), clusterSetName, metav1.DeleteOptions{})
+			}, 60*time.Second, 1*time.Second).Should(gomega.Succeed())
 		})
 
 		ginkgo.AfterEach(func() {
-			hubClient.CoreV1().Namespaces().Delete(context.TODO(), namespace, metav1.DeleteOptions{})
+			err := hubClient.CoreV1().Namespaces().Delete(context.TODO(), namespace, metav1.DeleteOptions{})
+			if errors.IsNotFound(err) {
+				return
+			}
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
 		ginkgo.Context("Creating a ManagedClusterSetBinding", func() {

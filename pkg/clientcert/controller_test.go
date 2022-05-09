@@ -228,31 +228,36 @@ type mockCSRControl struct {
 
 func (m *mockCSRControl) create(ctx context.Context, recorder events.Recorder, objMeta metav1.ObjectMeta, csrData []byte, signerName string) (string, error) {
 	mockCSR := &unstructured.Unstructured{}
-	m.csrClient.Invokes(clienttesting.CreateActionImpl{
+	_, err := m.csrClient.Invokes(clienttesting.CreateActionImpl{
 		ActionImpl: clienttesting.ActionImpl{
 			Verb: "create",
 		},
 		Object: mockCSR,
 	}, nil)
-	return objMeta.Name + rand.String(4), nil
+	return objMeta.Name + rand.String(4), err
 }
 
 func (m *mockCSRControl) isApproved(name string) (bool, error) {
-	m.csrClient.Invokes(clienttesting.GetActionImpl{
+	_, err := m.csrClient.Invokes(clienttesting.GetActionImpl{
 		ActionImpl: clienttesting.ActionImpl{
-			Verb: "get",
+			Verb:     "get",
+			Resource: certificates.SchemeGroupVersion.WithResource("certificatesigningrequests"),
 		},
+		Name: name,
 	}, nil)
-	return m.approved, nil
+
+	return m.approved, err
 }
 
 func (m *mockCSRControl) getIssuedCertificate(name string) ([]byte, error) {
-	m.csrClient.Invokes(clienttesting.GetActionImpl{
+	_, err := m.csrClient.Invokes(clienttesting.GetActionImpl{
 		ActionImpl: clienttesting.ActionImpl{
-			Verb: "get",
+			Verb:     "get",
+			Resource: certificates.SchemeGroupVersion.WithResource("certificatesigningrequests"),
 		},
+		Name: name,
 	}, nil)
-	return m.issuedCertData, nil
+	return m.issuedCertData, err
 }
 
 func (m *mockCSRControl) informer() cache.SharedIndexInformer {

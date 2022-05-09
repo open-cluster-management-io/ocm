@@ -37,9 +37,8 @@ const (
 	// TLSCertFile is the name of the tls cert file in kubeconfigSecret
 	TLSCertFile = "tls.crt"
 
-	clusterNameAnnotation = "open-cluster-management.io/cluster-name"
-	ClusterNameFile       = "cluster-name"
-	AgentNameFile         = "agent-name"
+	ClusterNameFile = "cluster-name"
+	AgentNameFile   = "agent-name"
 
 	ClusterNameLabel = "open-cluster-management.io/cluster-name"
 	AddonNameLabel   = "open-cluster-management.io/addon-name"

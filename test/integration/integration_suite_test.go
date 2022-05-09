@@ -152,8 +152,8 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	// enable DefaultClusterSet feature gate
-	features.DefaultHubMutableFeatureGate.Set("DefaultClusterSet=true")
-	features.DefaultHubMutableFeatureGate.Set("V1beta1CSRAPICompatibility=true")
+	err = features.DefaultHubMutableFeatureGate.Set("DefaultClusterSet=true")
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	// start hub controller
 	go func() {

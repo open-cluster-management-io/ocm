@@ -35,6 +35,10 @@ clean:
 	$(RM) ./registration
 .PHONY: clean
 
+verify-gocilint:
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
+	golangci-lint run --timeout=3m --modules-download-mode vendor ./...
+
 update-crds:
 	bash -x hack/copy-crds.sh
 
@@ -43,7 +47,7 @@ update: update-crds
 verify-crds:
 	bash -x hack/verify-crds.sh
 
-verify: verify-crds
+verify: verify-crds verify-gocilint
 
 deploy-hub: ensure-kustomize
 	cp deploy/hub/kustomization.yaml deploy/hub/kustomization.yaml.tmp

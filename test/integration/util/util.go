@@ -602,10 +602,15 @@ func (r *IntegrationTestEventRecorder) Shutdown() {}
 
 func RunAgent(name string, opt spoke.SpokeAgentOptions, cfg *rest.Config) context.CancelFunc {
 	ctx, cancel := context.WithCancel(context.Background())
-	go opt.RunSpokeAgent(ctx, &controllercmd.ControllerContext{
-		KubeConfig:    cfg,
-		EventRecorder: NewIntegrationTestEventRecorder(name),
-	})
+	go func() {
+		err := opt.RunSpokeAgent(ctx, &controllercmd.ControllerContext{
+			KubeConfig:    cfg,
+			EventRecorder: NewIntegrationTestEventRecorder(name),
+		})
+		if err != nil {
+			return
+		}
+	}()
 
 	return cancel
 }

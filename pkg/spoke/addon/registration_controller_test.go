@@ -202,7 +202,9 @@ func TestRegistrationSync(t *testing.T) {
 			addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, time.Minute*10)
 			addonStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
 			if c.addOn != nil {
-				addonStore.Add(c.addOn)
+				if err := addonStore.Add(c.addOn); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			if c.addOnRegistrationConfigs == nil {

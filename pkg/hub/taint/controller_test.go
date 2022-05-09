@@ -2,10 +2,11 @@ package taint
 
 import (
 	"context"
-	v1 "open-cluster-management.io/api/cluster/v1"
 	"reflect"
 	"testing"
 	"time"
+
+	v1 "open-cluster-management.io/api/cluster/v1"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
@@ -81,7 +82,9 @@ func TestSyncTaintCluster(t *testing.T) {
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
 			clusterStore := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore()
 			for _, cluster := range c.startingObjects {
-				clusterStore.Add(cluster)
+				if err := clusterStore.Add(cluster); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			ctrl := taintController{clusterClient, clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(), eventstesting.NewTestingEventRecorder(t)}

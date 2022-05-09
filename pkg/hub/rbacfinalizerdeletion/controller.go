@@ -120,7 +120,7 @@ func (m *finalizeController) syncRoleAndRoleBinding(ctx context.Context, control
 		}
 
 		if len(works) != 0 {
-			return fmt.Errorf("Still having %d works in the cluster namespace %s", len(works), ns.Name)
+			return fmt.Errorf("still having %d works in the cluster namespace %s", len(works), ns.Name)
 		}
 	}
 

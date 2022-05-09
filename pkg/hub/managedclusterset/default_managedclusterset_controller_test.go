@@ -88,7 +88,9 @@ func TestSyncDefaultClusterSet(t *testing.T) {
 			informerFactory := clusterinformers.NewSharedInformerFactory(clusterSetClient, 5*time.Minute)
 
 			if c.existingClusterSet != nil {
-				informerFactory.Cluster().V1beta1().ManagedClusterSets().Informer().GetStore().Add(c.existingClusterSet)
+				if err := informerFactory.Cluster().V1beta1().ManagedClusterSets().Informer().GetStore().Add(c.existingClusterSet); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			ctrl := defaultManagedClusterSetController{

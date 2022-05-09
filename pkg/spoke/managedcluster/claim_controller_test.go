@@ -75,11 +75,15 @@ func TestSync(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(objects...)
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
 			if c.cluster != nil {
-				clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore().Add(c.cluster)
+				if err := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore().Add(c.cluster); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			for _, claim := range c.claims {
-				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims().Informer().GetStore().Add(claim)
+				if err := clusterInformerFactory.Cluster().V1alpha1().ClusterClaims().Informer().GetStore().Add(claim); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			ctrl := managedClusterClaimController{
@@ -262,11 +266,15 @@ func TestExposeClaims(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(objects...)
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
 			if c.cluster != nil {
-				clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore().Add(c.cluster)
+				if err := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore().Add(c.cluster); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			for _, claim := range c.claims {
-				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims().Informer().GetStore().Add(claim)
+				if err := clusterInformerFactory.Cluster().V1alpha1().ClusterClaims().Informer().GetStore().Add(claim); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			if c.maxCustomClusterClaims == 0 {

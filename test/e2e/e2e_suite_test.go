@@ -95,8 +95,14 @@ var _ = ginkgo.BeforeSuite(func() {
 		}
 
 		clusterClient, err = clusterclient.NewForConfig(clusterCfg)
+		if err != nil {
+			return err
+		}
 		//Enable DefaultClusterSet feature gates in mutatingWebhook
 		mutatingWebhookDeployment, err := hubClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), mutatingWebhookName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
 		webhookContainers := mutatingWebhookDeployment.Spec.Template.Spec.Containers
 		var updatedContainer []v1.Container
 		for _, webhookContainer := range webhookContainers {

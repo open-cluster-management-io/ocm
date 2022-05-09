@@ -72,7 +72,9 @@ func TestSyncClusterSetLabel(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(objects...)
 			informerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, 5*time.Minute)
 			for _, cluster := range c.existingClusters {
-				informerFactory.Cluster().V1().ManagedClusters().Informer().GetStore().Add(cluster)
+				if err := informerFactory.Cluster().V1().ManagedClusters().Informer().GetStore().Add(cluster); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			ctrl := defaultManagedClusterSetLabelController{

@@ -228,7 +228,9 @@ func TestManagedClusterMutate(t *testing.T) {
 	nowFunc = func() time.Time {
 		return now
 	}
-	utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=true", string(features.DefaultClusterSet)))
+	if err := utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=true", string(features.DefaultClusterSet))); err != nil {
+		t.Fatal(err)
+	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			admissionHook := &ManagedClusterMutatingAdmissionHook{}

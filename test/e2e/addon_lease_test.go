@@ -728,8 +728,7 @@ func cleanupManagedCluster(clusterName, suffix string) error {
 	nsName := fmt.Sprintf("loopback-spoke-%v", suffix)
 
 	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-		var err error
-		err = hubClient.CoreV1().Namespaces().Delete(context.TODO(), nsName, metav1.DeleteOptions{})
+		err := hubClient.CoreV1().Namespaces().Delete(context.TODO(), nsName, metav1.DeleteOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -757,8 +756,7 @@ func cleanupManagedCluster(clusterName, suffix string) error {
 		return err
 	}
 	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-		var err error
-		err = hubDynamicClient.Resource(crResource).Delete(context.TODO(), cr.GetName(), metav1.DeleteOptions{})
+		err := hubDynamicClient.Resource(crResource).Delete(context.TODO(), cr.GetName(), metav1.DeleteOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -781,8 +779,7 @@ func cleanupManagedCluster(clusterName, suffix string) error {
 		return err
 	}
 	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-		var err error
-		err = hubDynamicClient.Resource(crbResource).Delete(context.TODO(), crb.GetName(), metav1.DeleteOptions{})
+		err := hubDynamicClient.Resource(crbResource).Delete(context.TODO(), crb.GetName(), metav1.DeleteOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -797,8 +794,7 @@ func cleanupManagedCluster(clusterName, suffix string) error {
 
 func deleteManageClusterAndRelatedNamespace(clusterName string) error {
 	if err := wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
-		var err error
-		err = clusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
+		err := clusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			return false, err
 		}
@@ -809,8 +805,7 @@ func deleteManageClusterAndRelatedNamespace(clusterName string) error {
 
 	// delete namespace created by hub automaticly
 	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-		var err error
-		err = hubClient.CoreV1().Namespaces().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
+		err := hubClient.CoreV1().Namespaces().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
 		// some managed cluster just created, but the csr is not approved,
 		// so there is not a related namespace
 		if err != nil && !errors.IsNotFound(err) {

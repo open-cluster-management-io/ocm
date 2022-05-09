@@ -25,7 +25,6 @@ const leaseUpdateJitterFactor = 0.25
 // managedClusterLeaseController periodically updates the lease of a managed cluster on hub cluster to keep the heartbeat of a managed cluster.
 type managedClusterLeaseController struct {
 	clusterName              string
-	hubClient                clientset.Interface
 	hubClusterLister         clusterv1listers.ManagedClusterLister
 	lastLeaseDurationSeconds int32
 	leaseUpdater             *leaseUpdater

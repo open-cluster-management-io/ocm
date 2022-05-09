@@ -128,10 +128,14 @@ func TestSyncClusterSet(t *testing.T) {
 
 			informerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, 5*time.Minute)
 			for _, cluster := range c.existingClusters {
-				informerFactory.Cluster().V1().ManagedClusters().Informer().GetStore().Add(cluster)
+				if err := informerFactory.Cluster().V1().ManagedClusters().Informer().GetStore().Add(cluster); err != nil {
+					t.Fatal(err)
+				}
 			}
 			if c.existingClusterSet != nil {
-				informerFactory.Cluster().V1beta1().ManagedClusterSets().Informer().GetStore().Add(c.existingClusterSet)
+				if err := informerFactory.Cluster().V1beta1().ManagedClusterSets().Informer().GetStore().Add(c.existingClusterSet); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			ctrl := managedClusterSetController{

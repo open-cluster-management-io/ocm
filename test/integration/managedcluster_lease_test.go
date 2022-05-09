@@ -66,14 +66,12 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 		// after two grace period, make sure the managed cluster is available
-		select {
-		case <-time.After(time.Duration(2*5*util.TestLeaseDurationSeconds) * time.Second):
-			managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			availableCond := meta.FindStatusCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
-			gomega.Expect(availableCond).ShouldNot(gomega.BeNil())
-			gomega.Expect(availableCond.Status).Should(gomega.Equal(metav1.ConditionTrue))
-		}
+		<-time.After(time.Duration(2*5*util.TestLeaseDurationSeconds) * time.Second)
+		managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		availableCond := meta.FindStatusCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
+		gomega.Expect(availableCond).ShouldNot(gomega.BeNil())
+		gomega.Expect(availableCond.Status).Should(gomega.Equal(metav1.ConditionTrue))
 	})
 
 	ginkgo.It("managed cluster available condition should be recovered after its lease update is recovered", func() {
@@ -128,32 +126,30 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 		stop()
 
 		// after one grace period, make sure the managed available condition is cluster unknown
-		select {
-		case <-time.After(time.Duration(5*util.TestLeaseDurationSeconds) * time.Second):
-			gomega.Eventually(func() error {
-				managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
-				if err != nil {
-					return err
-				}
+		<-time.After(time.Duration(5*util.TestLeaseDurationSeconds) * time.Second)
+		gomega.Eventually(func() error {
+			managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
+			if err != nil {
+				return err
+			}
 
-				// update the cluster to trigger condition update
-				managedCluster.Labels = map[string]string{"foo": "bar"}
-				_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.Background(), managedCluster, metav1.UpdateOptions{})
-				if err != nil {
-					return err
-				}
+			// update the cluster to trigger condition update
+			managedCluster.Labels = map[string]string{"foo": "bar"}
+			_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.Background(), managedCluster, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
 
-				availableCond := meta.FindStatusCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
-				if availableCond == nil {
-					return fmt.Errorf("available condition is not found")
-				}
+			availableCond := meta.FindStatusCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
+			if availableCond == nil {
+				return fmt.Errorf("available condition is not found")
+			}
 
-				if availableCond.Status != metav1.ConditionUnknown {
-					return fmt.Errorf("avaibale condition should be unknown")
-				}
-				return nil
-			}, 10, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
-		}
+			if availableCond.Status != metav1.ConditionUnknown {
+				return fmt.Errorf("avaibale condition should be unknown")
+			}
+			return nil
+		}, 10, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		agentOptions = spoke.SpokeAgentOptions{
 			ClusterName:              managedClusterName,
@@ -167,13 +163,12 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 		defer stop()
 
 		// after one grace period, make sure the managed cluster available condition is recovered
-		select {
-		case <-time.After(time.Duration(5*util.TestLeaseDurationSeconds+1) * time.Second):
-			managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			availableCond := meta.FindStatusCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
-			gomega.Expect(availableCond).ShouldNot(gomega.BeNil())
-			gomega.Expect(availableCond.Status).Should(gomega.Equal(metav1.ConditionTrue))
-		}
+		<-time.After(time.Duration(5*util.TestLeaseDurationSeconds+1) * time.Second)
+		managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		availableCond := meta.FindStatusCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
+		gomega.Expect(availableCond).ShouldNot(gomega.BeNil())
+		gomega.Expect(availableCond.Status).Should(gomega.Equal(metav1.ConditionTrue))
+
 	})
 })

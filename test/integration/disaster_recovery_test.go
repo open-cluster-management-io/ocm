@@ -91,7 +91,9 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 	}
 
 	startRegistrationAgent := func(managedClusterName, bootstrapKubeConfigFile, hubKubeconfigSecret, hubKubeconfigDir string) context.CancelFunc {
-		features.DefaultSpokeMutableFeatureGate.Set("AddonManagement=true")
+		err := features.DefaultSpokeMutableFeatureGate.Set("AddonManagement=true")
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 		agentOptions := spoke.SpokeAgentOptions{
 			ClusterName:              managedClusterName,
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
@@ -320,7 +322,10 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 		ginkgo.By("start hub B")
 		ctx, stopHub := context.WithCancel(context.Background())
 		hubBootstrapKubeConfigFile, hubKubeClient, hubClusterClient, hubAddOnClient, testHubEnv, testAuthn := startHub(ctx)
-		defer testHubEnv.Stop()
+		defer func() {
+			err := testHubEnv.Stop()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		}()
 		defer stopHub()
 
 		ginkgo.By("simulate klusterlet to restart registation agent and connect to hub B")

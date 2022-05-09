@@ -77,7 +77,9 @@ func TestQueueKeyFunc(t *testing.T) {
 			addOnInformerFactory := addoninformers.NewSharedInformerFactory(addOnClient, time.Minute*10)
 			addOnStroe := addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
 			for _, addOn := range c.addOns {
-				addOnStroe.Add(addOn)
+				if err := addOnStroe.Add(addOn); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			ctrl := &managedClusterAddOnLeaseController{
@@ -142,6 +144,7 @@ func TestSync(t *testing.T) {
 				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 				if addOnCond == nil {
 					t.Errorf("expected addon available condition, but failed")
+					return
 				}
 				if addOnCond.Status != metav1.ConditionUnknown {
 					t.Errorf("expected addon available condition is unknown, but failed")
@@ -171,6 +174,7 @@ func TestSync(t *testing.T) {
 				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 				if addOnCond == nil {
 					t.Errorf("expected addon available condition, but failed")
+					return
 				}
 				if addOnCond.Status != metav1.ConditionFalse {
 					t.Errorf("expected addon available condition is unavailable, but failed")
@@ -200,6 +204,7 @@ func TestSync(t *testing.T) {
 				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 				if addOnCond == nil {
 					t.Errorf("expected addon available condition, but failed")
+					return
 				}
 				if addOnCond.Status != metav1.ConditionTrue {
 					t.Errorf("expected addon available condition is available, but failed")
@@ -284,6 +289,7 @@ func TestSync(t *testing.T) {
 				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 				if addOnCond == nil {
 					t.Errorf("expected addon available condition, but failed")
+					return
 				}
 				if addOnCond.Status != metav1.ConditionTrue {
 					t.Errorf("expected addon available condition is available, but failed")
@@ -318,7 +324,9 @@ func TestSync(t *testing.T) {
 			addOnInformerFactory := addoninformers.NewSharedInformerFactory(addOnClient, time.Minute*10)
 			addOnStroe := addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
 			for _, addOn := range c.addOns {
-				addOnStroe.Add(addOn)
+				if err := addOnStroe.Add(addOn); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			hubClient := kubefake.NewSimpleClientset(c.hubLeases...)

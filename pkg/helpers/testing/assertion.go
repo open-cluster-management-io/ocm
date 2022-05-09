@@ -197,6 +197,7 @@ func AssertCSRCondition(
 func AssertLeaseUpdated(t *testing.T, lease, lastLease *coordinationv1.Lease) {
 	if lease == nil || lastLease == nil {
 		t.Errorf("expected lease objects are not nil, but failed")
+		return
 	}
 	if (lease.Namespace != lastLease.Namespace) || (lease.Name != lastLease.Name) {
 		t.Errorf("expected two lease objects are same lease, but failed")

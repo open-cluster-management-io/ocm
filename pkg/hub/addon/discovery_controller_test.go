@@ -195,7 +195,9 @@ func TestDiscoveryController_SyncAddOn(t *testing.T) {
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
 			if c.cluster != nil {
 				clusterStore := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore()
-				clusterStore.Add(c.cluster)
+				if err := clusterStore.Add(c.cluster); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			objs = []runtime.Object{}
@@ -206,7 +208,9 @@ func TestDiscoveryController_SyncAddOn(t *testing.T) {
 			addOnInformerFactory := addoninformers.NewSharedInformerFactoryWithOptions(addOnClient, 10*time.Minute)
 			if c.addOn != nil {
 				addOnStore := addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
-				addOnStore.Add(c.addOn)
+				if err := addOnStore.Add(c.addOn); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			controller := addOnFeatureDiscoveryController{
@@ -346,7 +350,9 @@ func TestDiscoveryController_Sync(t *testing.T) {
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
 			if c.cluster != nil {
 				clusterStore := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore()
-				clusterStore.Add(c.cluster)
+				if err := clusterStore.Add(c.cluster); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			objs = []runtime.Object{}
@@ -357,7 +363,9 @@ func TestDiscoveryController_Sync(t *testing.T) {
 			addOnInformerFactory := addoninformers.NewSharedInformerFactoryWithOptions(addOnClient, 10*time.Minute)
 			addOnStore := addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
 			for _, addOn := range c.addOns {
-				addOnStore.Add(addOn)
+				if err := addOnStore.Add(addOn); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			controller := addOnFeatureDiscoveryController{

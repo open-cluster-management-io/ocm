@@ -63,6 +63,7 @@ func TestSync(t *testing.T) {
 				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 				if addOnCond == nil {
 					t.Errorf("expected addon available condition, but failed")
+					return
 				}
 				if addOnCond.Status != metav1.ConditionUnknown {
 					t.Errorf("expected addon available condition is unknown, but failed")
@@ -77,14 +78,18 @@ func TestSync(t *testing.T) {
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
 			clusterStore := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore()
 			for _, cluster := range c.managedClusters {
-				clusterStore.Add(cluster)
+				if err := clusterStore.Add(cluster); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			addOnClient := addonfake.NewSimpleClientset(c.addOns...)
 			addOnInformerFactory := addoninformers.NewSharedInformerFactory(addOnClient, time.Minute*10)
 			addOnStroe := addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
 			for _, addOn := range c.addOns {
-				addOnStroe.Add(addOn)
+				if err := addOnStroe.Add(addOn); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			ctrl := &managedClusterAddOnHealthCheckController{

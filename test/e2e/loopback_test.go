@@ -35,8 +35,6 @@ import (
 	"open-cluster-management.io/registration/pkg/helpers"
 )
 
-var spokeNamespace string = ""
-
 var _ = ginkgo.Describe("Loopback registration [development]", func() {
 	var clusterId string
 	ginkgo.BeforeEach(func() {
@@ -573,11 +571,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 
 		gomega.Eventually(func() bool {
 			_, err = hubClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
-			if errors.IsNotFound(err) {
-				return true
-			}
-
-			return false
+			return errors.IsNotFound(err)
 		}, 90*time.Second, 1*time.Second).Should(gomega.BeTrue())
 
 		ginkgo.By(fmt.Sprintf("Cleaning managed cluster %q", clusterName))
