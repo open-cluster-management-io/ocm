@@ -48,6 +48,7 @@ var map_ClusterManagerSpec = map[string]string{
 	"placementImagePullSpec":    "PlacementImagePullSpec represents the desired image configuration of placement controller/webhook installed on hub.",
 	"nodePlacement":             "NodePlacement enables explicit control over the scheduling of the deployed pods.",
 	"deployOption":              "DeployOption contains the options of deploying a cluster-manager Default mode is used if DeployOption is not set.",
+	"registrationConfiguration": "RegistrationConfiguration contains the configuration of registration",
 }
 
 func (ClusterManagerSpec) SwaggerDoc() map[string]string {
@@ -64,6 +65,15 @@ var map_ClusterManagerStatus = map[string]string{
 
 func (ClusterManagerStatus) SwaggerDoc() map[string]string {
 	return map_ClusterManagerStatus
+}
+
+var map_FeatureGate = map[string]string{
+	"feature": "Feature is the key of feature gate. e.g. featuregate/Foo.",
+	"mode":    "Mode is either Enable, Disable, \"\" where \"\" is Disable by default. In Enable mode, a valid feature gate `featuregate/Foo` will be set to \"--featuregate/Foo=true\". In Disable mode, a valid feature gate `featuregate/Foo` will be set to \"--featuregate/Foo=false\".",
+}
+
+func (FeatureGate) SwaggerDoc() map[string]string {
+	return map_FeatureGate
 }
 
 var map_GenerationStatus = map[string]string{
@@ -121,13 +131,14 @@ func (KlusterletList) SwaggerDoc() map[string]string {
 
 var map_KlusterletSpec = map[string]string{
 	"":                          "KlusterletSpec represents the desired deployment configuration of Klusterlet agent.",
-	"namespace":                 "Namespace is the namespace to deploy the agent. The namespace must have a prefix of \"open-cluster-management-\", and if it is not set, the namespace of \"open-cluster-management-agent\" is used to deploy agent. Note: in Detach mode, this field will be **ignored**, the agent will be deployed to the namespace with the same name as klusterlet.",
+	"namespace":                 "Namespace is the namespace to deploy the agent on the managed cluster. The namespace must have a prefix of \"open-cluster-management-\", and if it is not set, the namespace of \"open-cluster-management-agent\" is used to deploy agent. In addition, the add-ons are deployed to the namespace of \"{Namespace}-addon\". In the Hosted mode, this namespace still exists on the managed cluster to contain necessary resources, like service accounts, roles and rolebindings, while the agent is deployed to the namespace with the same name as klusterlet on the management cluster.",
 	"registrationImagePullSpec": "RegistrationImagePullSpec represents the desired image configuration of registration agent. quay.io/open-cluster-management.io/registration:latest will be used if unspecified.",
 	"workImagePullSpec":         "WorkImagePullSpec represents the desired image configuration of work agent. quay.io/open-cluster-management.io/work:latest will be used if unspecified.",
 	"clusterName":               "ClusterName is the name of the managed cluster to be created on hub. The Klusterlet agent generates a random name if it is not set, or discovers the appropriate cluster name on OpenShift.",
 	"externalServerURLs":        "ExternalServerURLs represents the a list of apiserver urls and ca bundles that is accessible externally If it is set empty, managed cluster has no externally accessible url that hub cluster can visit.",
 	"nodePlacement":             "NodePlacement enables explicit control over the scheduling of the deployed pods.",
 	"deployOption":              "DeployOption contains the options of deploying a klusterlet",
+	"registrationConfiguration": "RegistrationConfiguration contains the configuration of registration",
 }
 
 func (KlusterletSpec) SwaggerDoc() map[string]string {
@@ -154,6 +165,14 @@ var map_NodePlacement = map[string]string{
 
 func (NodePlacement) SwaggerDoc() map[string]string {
 	return map_NodePlacement
+}
+
+var map_RegistrationConfiguration = map[string]string{
+	"featureGates": "FeatureGates represents the list of feature gates for registration If it is set empty, default feature gates will be used. If it is set, featuregate/Foo is an example of one item in FeatureGates:\n  1. If featuregate/Foo does not exist, registration-operator will discard it\n  2. If featuregate/Foo exists and is false by default. It is now possible to set featuregate/Foo=[false|true]\n  3. If featuregate/Foo exists and is true by default. If a cluster-admin upgrading from 1 to 2 wants to continue having featuregate/Foo=false,\n \the can set featuregate/Foo=false before upgrading. Let's say the cluster-admin wants featuregate/Foo=false.",
+}
+
+func (RegistrationConfiguration) SwaggerDoc() map[string]string {
+	return map_RegistrationConfiguration
 }
 
 var map_RelatedResourceMeta = map[string]string{
