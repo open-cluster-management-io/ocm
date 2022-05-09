@@ -199,8 +199,14 @@ func TestSyncManifestWork(t *testing.T) {
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), c.existingResources...)
 			fakeClient := fakeworkclient.NewSimpleClientset(testingWork, testingAppliedWork)
 			informerFactory := workinformers.NewSharedInformerFactory(fakeClient, 5*time.Minute)
-			informerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(testingWork)
-			informerFactory.Work().V1().AppliedManifestWorks().Informer().GetStore().Add(testingAppliedWork)
+			if err := informerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(testingWork); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := informerFactory.Work().V1().AppliedManifestWorks().Informer().GetStore().Add(testingAppliedWork); err != nil {
+				t.Fatal(err)
+			}
+
 			controller := AppliedManifestWorkController{
 				manifestWorkClient:        fakeClient.WorkV1().ManifestWorks(testingWork.Namespace),
 				manifestWorkLister:        informerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks("cluster1"),

@@ -129,7 +129,7 @@ func NewManifestWork(index int, objects ...*unstructured.Unstructured) (*workapi
 		work.Spec.Workload.Manifests = append(work.Spec.Workload.Manifests, manifest)
 	}
 
-	return work, fmt.Sprintf("%s", work.Name)
+	return work, work.Name
 }
 
 func NewAppliedManifestWork(hash string, index int, uid types.UID) *workapiv1.AppliedManifestWork {

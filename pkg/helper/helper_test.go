@@ -412,7 +412,9 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 	}
 
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

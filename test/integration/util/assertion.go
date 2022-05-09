@@ -9,7 +9,6 @@ import (
 	"github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,11 +64,7 @@ func AssertWorkDeleted(namespace, name, hubhash string, manifests []workapiv1.Ma
 	// wait for deletion of manifest work
 	gomega.Eventually(func() bool {
 		_, err := workClient.WorkV1().ManifestWorks(namespace).Get(context.Background(), name, metav1.GetOptions{})
-		if !apierrors.IsNotFound(err) {
-			return false
-		}
-
-		return true
+		return apierrors.IsNotFound(err)
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 	// wait for deletion of appliedmanifestwork
@@ -80,18 +75,14 @@ func AssertWorkDeleted(namespace, name, hubhash string, manifests []workapiv1.Ma
 	for _, manifest := range manifests {
 		expected := manifest.Object.(*corev1.ConfigMap)
 		_, err := kubeClient.CoreV1().ConfigMaps(expected.Namespace).Get(context.Background(), expected.Name, metav1.GetOptions{})
-		gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+		gomega.Expect(apierrors.IsNotFound(err)).To(gomega.BeTrue())
 	}
 }
 
 func AssertAppliedManifestWorkDeleted(name string, workClient workclientset.Interface, eventuallyTimeout, eventuallyInterval int) {
 	gomega.Eventually(func() bool {
 		_, err := workClient.WorkV1().AppliedManifestWorks().Get(context.Background(), name, metav1.GetOptions{})
-		if !apierrors.IsNotFound(err) {
-			return false
-		}
-
-		return true
+		return apierrors.IsNotFound(err)
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }
 

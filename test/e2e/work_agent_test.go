@@ -204,11 +204,7 @@ var _ = ginkgo.Describe("Work agent", func() {
 				}
 
 				_, err = spokeKubeClient.CoreV1().ConfigMaps(ns2).Get(context.Background(), "cm3", metav1.GetOptions{})
-				if err != nil {
-					return false
-				}
-
-				return true
+				return err == nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// check status conditions in manifestwork status
@@ -358,11 +354,7 @@ var _ = ginkgo.Describe("Work agent", func() {
 			// wait for deletion of manifest work
 			gomega.Eventually(func() bool {
 				_, err := hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Get(context.Background(), work.Name, metav1.GetOptions{})
-				if !errors.IsNotFound(err) {
-					return false
-				}
-
-				return true
+				return errors.IsNotFound(err)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Once manifest work is deleted, its corresponding appliedManifestWorks should be deleted as well

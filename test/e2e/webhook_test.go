@@ -19,7 +19,6 @@ import (
 const (
 	apiserviceName = "v1.admission.work.open-cluster-management.io"
 	admissionName  = "manifestworkvalidators.admission.work.open-cluster-management.io"
-	saNamespace    = "default"
 )
 
 var _ = ginkgo.Describe("ManifestWork admission webhook", func() {

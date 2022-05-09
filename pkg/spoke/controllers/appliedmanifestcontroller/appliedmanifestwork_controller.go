@@ -135,7 +135,7 @@ func (m *AppliedManifestWorkController) syncManifestWork(
 
 		if err != nil {
 			errs = append(errs, fmt.Errorf(
-				"Failed to get resource %v with key %s/%s: %w",
+				"failed to get resource %v with key %s/%s: %w",
 				gvr, resourceStatus.ResourceMeta.Namespace, resourceStatus.ResourceMeta.Name, err))
 			continue
 		}

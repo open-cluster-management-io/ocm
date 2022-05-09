@@ -160,7 +160,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	errs := []error{}
 	// Apply resources on spoke cluster.
 	resourceResults := make([]applyResult, len(manifestWork.Spec.Workload.Manifests))
-	retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		resourceResults = m.applyManifests(
 			ctx, manifestWork.Spec.Workload.Manifests, manifestWork.Spec.DeleteOption, controllerContext.Recorder(), *owner, resourceResults)
 
@@ -172,6 +172,9 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 
 		return nil
 	})
+	if err != nil {
+		klog.Errorf("failed to apply resource with error %v", err)
+	}
 
 	newManifestConditions := []workapiv1.ManifestCondition{}
 	for _, result := range resourceResults {

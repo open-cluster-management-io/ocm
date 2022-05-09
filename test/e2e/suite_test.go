@@ -25,17 +25,15 @@ import (
 )
 
 var (
-	nameSuffix                   string
-	clusterName                  string
-	workImage                    string
-	restConfig                   *rest.Config
-	spokeKubeClient              kubernetes.Interface
-	spokeDynamicClient           dynamic.Interface
-	hubWorkClient                workclientset.Interface
-	hubAPIServiceClient          *apiregistrationclient.ApiregistrationV1Client
-	hubKubeconfigSecretNamespace string
-	hubKubeconfigSecretName      string
-	agentDeployer                workAgentDeployer
+	nameSuffix          string
+	clusterName         string
+	workImage           string
+	restConfig          *rest.Config
+	spokeKubeClient     kubernetes.Interface
+	spokeDynamicClient  dynamic.Interface
+	hubWorkClient       workclientset.Interface
+	hubAPIServiceClient *apiregistrationclient.ApiregistrationV1Client
+	agentDeployer       workAgentDeployer
 )
 
 func TestE2e(t *testing.T) {

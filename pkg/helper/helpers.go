@@ -124,10 +124,7 @@ func mergeManifestCondition(condition, newCondition workapiv1.ManifestCondition)
 func MergeStatusConditions(conditions []metav1.Condition, newConditions []metav1.Condition) []metav1.Condition {
 	merged := []metav1.Condition{}
 
-	for _, condition := range conditions {
-		merged = append(merged, condition)
-	}
-
+	merged = append(merged, conditions...)
 	for _, condition := range newConditions {
 		// merge two conditions if necessary
 		meta.SetStatusCondition(&merged, condition)
@@ -223,7 +220,7 @@ func DeleteAppliedResources(
 
 		if err != nil {
 			errs = append(errs, fmt.Errorf(
-				"Failed to get resource %v with key %s/%s: %w",
+				"failed to get resource %v with key %s/%s: %w",
 				gvr, resource.Namespace, resource.Name, err))
 			continue
 		}
@@ -249,7 +246,7 @@ func DeleteAppliedResources(
 			_, err = dynamicClient.Resource(gvr).Namespace(resource.Namespace).Update(ctx, u, metav1.UpdateOptions{})
 			if err != nil {
 				errs = append(errs, fmt.Errorf(
-					"Failed to remove owner from resource %v with key %s/%s: %w",
+					"failed to remove owner from resource %v with key %s/%s: %w",
 					gvr, resource.Namespace, resource.Name, err))
 			}
 
@@ -286,7 +283,7 @@ func DeleteAppliedResources(
 		}
 		if err != nil {
 			errs = append(errs, fmt.Errorf(
-				"Failed to delete resource %v with key %s/%s: %w",
+				"failed to delete resource %v with key %s/%s: %w",
 				gvr, resource.Namespace, resource.Name, err))
 			continue
 		}

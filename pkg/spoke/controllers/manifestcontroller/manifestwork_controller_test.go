@@ -33,7 +33,7 @@ type testController struct {
 	kubeClient    *fakekube.Clientset
 }
 
-func newController(work *workapiv1.ManifestWork, appliedWork *workapiv1.AppliedManifestWork, mapper meta.RESTMapper) *testController {
+func newController(t *testing.T, work *workapiv1.ManifestWork, appliedWork *workapiv1.AppliedManifestWork, mapper meta.RESTMapper) *testController {
 	fakeWorkClient := fakeworkclient.NewSimpleClientset(work)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fakeWorkClient, 5*time.Minute, workinformers.WithNamespace("cluster1"))
 
@@ -46,9 +46,13 @@ func newController(work *workapiv1.ManifestWork, appliedWork *workapiv1.AppliedM
 		staticResourceCache:       resourceapply.NewResourceCache(),
 	}
 
-	workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(work)
+	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(work); err != nil {
+		t.Fatal(err)
+	}
 	if appliedWork != nil {
-		workInformerFactory.Work().V1().AppliedManifestWorks().Informer().GetStore().Add(appliedWork)
+		if err := workInformerFactory.Work().V1().AppliedManifestWorks().Informer().GetStore().Add(appliedWork); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	return &testController{
@@ -85,6 +89,7 @@ func assertManifestCondition(
 	cond := findManifestConditionByIndex(index, conds)
 	if cond == nil {
 		t.Errorf("expected to find the condition with index %d", index)
+		return
 	}
 
 	assertCondition(t, cond.Conditions, expectedCondition, expectedStatus)
@@ -313,7 +318,7 @@ func TestSync(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			work, workKey := spoketesting.NewManifestWork(0, c.workManifest...)
 			work.Finalizers = []string{controllers.ManifestWorkFinalizer}
-			controller := newController(work, nil, spoketesting.NewFakeRestMapper()).
+			controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
 				withKubeObject(c.spokeObject...).
 				withUnstructuredObject(c.spokeDynamicObject...)
 			syncContext := spoketesting.NewFakeSyncContext(t, workKey)
@@ -340,7 +345,7 @@ func TestFailedToApplyResource(t *testing.T) {
 
 	work, workKey := spoketesting.NewManifestWork(0, tc.workManifest...)
 	work.Finalizers = []string{controllers.ManifestWorkFinalizer}
-	controller := newController(work, nil, spoketesting.NewFakeRestMapper()).withKubeObject(tc.spokeObject...).withUnstructuredObject()
+	controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).withKubeObject(tc.spokeObject...).withUnstructuredObject()
 
 	// Add a reactor on fake client to throw error when creating secret on namespace ns2
 	controller.kubeClient.PrependReactor("create", "secrets", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -985,7 +990,7 @@ func TestApplyUnstructred(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			work, workKey := spoketesting.NewManifestWork(0)
 			work.Finalizers = []string{controllers.ManifestWorkFinalizer}
-			controller := newController(work, nil, spoketesting.NewFakeRestMapper()).
+			controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
 				withUnstructuredObject(c.existingObject...)
 			syncContext := spoketesting.NewFakeSyncContext(t, workKey)
 

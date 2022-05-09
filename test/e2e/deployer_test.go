@@ -128,12 +128,12 @@ func (d *defaultWorkAgentDeployer) Deploy() error {
 			},
 			Data: data,
 		}
-		secret, err = d.spokeKubeClient.CoreV1().Secrets(secret.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+		_, err = d.spokeKubeClient.CoreV1().Secrets(secret.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	case err != nil:
 		return err
 	default:
 		secret.Data = data
-		secret, err = d.spokeKubeClient.CoreV1().Secrets(secret.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
+		_, err = d.spokeKubeClient.CoreV1().Secrets(secret.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
 	}
 	if err != nil {
 		return err
