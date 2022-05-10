@@ -43,11 +43,7 @@ type klusterletLocker struct {
 }
 
 const (
-	bootstrapSecret         = "BootstrapSecret"
-	bootstrapSecretDegraded = "BootstrapSecretDegraded"
-	hubConfigSecret         = "HubConfigSecret"
-	hubConfigSecretDegraded = "HubConfigSecretDegraded"
-	hubConnectionDegraded   = "HubConnectionDegraded"
+	hubConnectionDegraded = "HubConnectionDegraded"
 )
 
 func NewKlusterletSSARController(

@@ -155,14 +155,18 @@ func TestSyncStatus(t *testing.T) {
 			kubeInformers := kubeinformers.NewSharedInformerFactory(fakeKubeClient, 5*time.Minute)
 			deployStore := kubeInformers.Apps().V1().Deployments().Informer().GetStore()
 			for _, deployment := range c.deployments {
-				deployStore.Add(deployment)
+				if err := deployStore.Add(deployment); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			fakeOperatorClient := fakeoperatorclient.NewSimpleClientset(c.clusterManagers...)
 			operatorInformers := operatorinformers.NewSharedInformerFactory(fakeOperatorClient, 5*time.Minute)
 			clusterManagerStore := operatorInformers.Operator().V1().ClusterManagers().Informer().GetStore()
 			for _, clusterManager := range c.clusterManagers {
-				clusterManagerStore.Add(clusterManager)
+				if err := clusterManagerStore.Add(clusterManager); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			controller := &clusterManagerStatusController{

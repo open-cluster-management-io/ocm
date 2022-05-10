@@ -112,7 +112,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})
+			gomega.Expect(operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})).To(gomega.BeNil())
 		})
 
 		ginkgo.It("should have expected resource created successfully", func() {
@@ -584,7 +584,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			workDeploymentName = fmt.Sprintf("%s-work-agent", klusterlet.Name)
 		})
 		ginkgo.AfterEach(func() {
-			operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})
+			gomega.Expect(operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})).To(gomega.BeNil())
 		})
 		ginkgo.It("should have correct degraded conditions", func() {
 			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
@@ -701,7 +701,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			workDeploymentName = fmt.Sprintf("%s-work-agent", klusterlet.Name)
 		})
 		ginkgo.AfterEach(func() {
-			operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})
+			gomega.Expect(operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})).To(gomega.BeNil())
 		})
 
 		ginkgo.It("should reload the klusterlet after the bootstrap secret is changed", func() {

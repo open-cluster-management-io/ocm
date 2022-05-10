@@ -21,7 +21,7 @@ var _ = Describe("Manage the managed cluster addons", func() {
 	})
 	AfterEach(func() {
 		By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
-		t.cleanKlusterletResources(klusterletName, clusterName)
+		Expect(t.cleanKlusterletResources(klusterletName, clusterName)).To(BeNil())
 	})
 
 	It("Create one managed cluster addon and make sure it is available", func() {

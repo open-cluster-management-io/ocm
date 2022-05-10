@@ -156,7 +156,9 @@ func TestCertRotation(t *testing.T) {
 			operatorInformers := operatorinformers.NewSharedInformerFactory(operatorClient, 5*time.Minute)
 			clusterManagerStore := operatorInformers.Operator().V1().ClusterManagers().Informer().GetStore()
 			for _, clusterManager := range clusterManagers {
-				clusterManagerStore.Add(clusterManager)
+				if err := clusterManagerStore.Add(clusterManager); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			syncContext := testinghelper.NewFakeSyncContext(t, c.queueKey)

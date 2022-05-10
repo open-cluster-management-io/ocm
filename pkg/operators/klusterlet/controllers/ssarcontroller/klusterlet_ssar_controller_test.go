@@ -82,7 +82,7 @@ func newKlusterlet(name, namespace, clustername string) *operatorapiv1.Klusterle
 	}
 }
 
-func newTestController(klusterlet *operatorapiv1.Klusterlet, objects ...runtime.Object) *testController {
+func newTestController(t *testing.T, klusterlet *operatorapiv1.Klusterlet, objects ...runtime.Object) *testController {
 	fakeKubeClient := fakekube.NewSimpleClientset(objects...)
 	fakeOperatorClient := fakeoperatorclient.NewSimpleClientset(klusterlet)
 	operatorInformers := operatorinformers.NewSharedInformerFactory(fakeOperatorClient, 5*time.Minute)
@@ -99,7 +99,9 @@ func newTestController(klusterlet *operatorapiv1.Klusterlet, objects ...runtime.
 	}
 
 	store := operatorInformers.Operator().V1().Klusterlets().Informer().GetStore()
-	store.Add(klusterlet)
+	if err := store.Add(klusterlet); err != nil {
+		t.Fatal(err)
+	}
 
 	return &testController{
 		controller:     klusterletController,
@@ -121,7 +123,9 @@ func TestSync(t *testing.T) {
 			return
 		}
 		ssar := &authorizationv1.SelfSubjectAccessReview{}
-		json.Unmarshal(data, ssar)
+		if err := json.Unmarshal(data, ssar); err != nil {
+			t.Fatal(err)
+		}
 		if ssar.Spec.ResourceAttributes.Resource == "managedclusters" {
 			if ssar.Spec.ResourceAttributes.Subresource == "status" {
 				ssar.Status.Allowed = response.allowToOperateManagedClusterStatus
@@ -136,7 +140,9 @@ func TestSync(t *testing.T) {
 
 		w.Header().Set("Content-type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(ssar)
+		if err := json.NewEncoder(w).Encode(ssar); err != nil {
+			t.Fatal(err)
+		}
 	}))
 	defer apiServer.Close()
 
@@ -237,7 +243,7 @@ func TestSync(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			controller := newTestController(c.klusterlet, c.object...)
+			controller := newTestController(t, c.klusterlet, c.object...)
 			syncContext := testinghelper.NewFakeSyncContext(t, c.klusterlet.Name)
 
 			response.allowToOperateManagedClusters = c.allowToOperateManagedClusters

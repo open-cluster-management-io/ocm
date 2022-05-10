@@ -65,12 +65,10 @@ func (r *IntegrationTestEventRecorder) Warningf(reason, messageFmt string, args 
 func (r *IntegrationTestEventRecorder) Shutdown() {}
 
 func HasCondition(conditions []metav1.Condition, expectedType, expectedReason string, expectedStatus metav1.ConditionStatus) bool {
-	found := false
 	for _, condition := range conditions {
 		if condition.Type != expectedType {
 			continue
 		}
-		found = true
 
 		if condition.Status != expectedStatus {
 			return false
@@ -83,7 +81,7 @@ func HasCondition(conditions []metav1.Condition, expectedType, expectedReason st
 		return true
 	}
 
-	return found
+	return false
 }
 
 func NewKubeConfig(config *rest.Config) []byte {

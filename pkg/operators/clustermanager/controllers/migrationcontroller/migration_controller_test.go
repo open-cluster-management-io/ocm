@@ -178,11 +178,6 @@ func assertActions(t *testing.T, actualActions []clienttesting.Action, expectedV
 	}
 }
 
-// AssertNoActions asserts no actions are happened
-func assertNoActions(t *testing.T, actualActions []clienttesting.Action) {
-	assertActions(t, actualActions)
-}
-
 func assertStorageVersionMigration(t *testing.T, name string, object runtime.Object) {
 	migration, ok := object.(*migrationv1alpha1.StorageVersionMigration)
 	if !ok {

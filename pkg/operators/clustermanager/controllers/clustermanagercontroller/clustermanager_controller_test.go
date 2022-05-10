@@ -61,7 +61,7 @@ func newClusterManager(name string) *operatorapiv1.ClusterManager {
 	}
 }
 
-func newTestController(clustermanager *operatorapiv1.ClusterManager) *testController {
+func newTestController(t *testing.T, clustermanager *operatorapiv1.ClusterManager) *testController {
 	kubeClient := fakekube.NewSimpleClientset()
 	kubeInfomers := kubeinformers.NewSharedInformerFactory(kubeClient, 5*time.Minute)
 	fakeOperatorClient := fakeoperatorlient.NewSimpleClientset(clustermanager)
@@ -75,7 +75,9 @@ func newTestController(clustermanager *operatorapiv1.ClusterManager) *testContro
 	}
 
 	store := operatorInformers.Operator().V1().ClusterManagers().Informer().GetStore()
-	store.Add(clustermanager)
+	if err := store.Add(clustermanager); err != nil {
+		t.Fatal(err)
+	}
 
 	return &testController{
 		clusterManagerController: clusterManagerController,
@@ -128,7 +130,7 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.Cl
 // TestSyncDeploy tests sync manifests of hub component
 func TestSyncDeploy(t *testing.T) {
 	clusterManager := newClusterManager("testhub")
-	tc := newTestController(clusterManager)
+	tc := newTestController(t, clusterManager)
 	setup(t, tc)
 
 	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
@@ -190,7 +192,7 @@ func TestSyncDelete(t *testing.T) {
 	now := metav1.Now()
 	clusterManager.ObjectMeta.SetDeletionTimestamp(&now)
 
-	tc := newTestController(clusterManager)
+	tc := newTestController(t, clusterManager)
 	setup(t, tc)
 
 	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
@@ -252,7 +254,7 @@ func TestDeleteCRD(t *testing.T) {
 		},
 	}
 
-	tc := newTestController(clusterManager)
+	tc := newTestController(t, clusterManager)
 	setup(t, tc, crd)
 
 	// Return crd with the first get, and return not found with the 2nd get

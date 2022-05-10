@@ -90,8 +90,9 @@ func needNewTargetCertKeyPair(secret *corev1.Secret, caBundleCerts []*x509.Certi
 
 	maxWait := cert.NotAfter.Sub(cert.NotBefore) / 5
 	latestTime := cert.NotAfter.Add(-maxWait)
-	if time.Now().After(latestTime) {
-		return fmt.Sprintf("expired in %6.3f seconds", cert.NotAfter.Sub(time.Now()).Seconds())
+	now := time.Now()
+	if now.After(latestTime) {
+		return fmt.Sprintf("expired in %6.3f seconds", cert.NotAfter.Sub(now).Seconds())
 	}
 
 	// check the signer common name against all the common names in our ca bundle so we don't refresh early

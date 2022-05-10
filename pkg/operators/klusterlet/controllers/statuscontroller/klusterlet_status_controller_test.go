@@ -53,7 +53,7 @@ func newDeployment(name, namespace string, desiredReplica, availableReplica int3
 	}
 }
 
-func newTestController(klusterlet *operatorapiv1.Klusterlet, objects ...runtime.Object) *testController {
+func newTestController(t *testing.T, klusterlet *operatorapiv1.Klusterlet, objects ...runtime.Object) *testController {
 	fakeKubeClient := fakekube.NewSimpleClientset(objects...)
 	fakeOperatorClient := fakeoperatorclient.NewSimpleClientset(klusterlet)
 	operatorInformers := operatorinformers.NewSharedInformerFactory(fakeOperatorClient, 5*time.Minute)
@@ -67,7 +67,9 @@ func newTestController(klusterlet *operatorapiv1.Klusterlet, objects ...runtime.
 	}
 
 	store := operatorInformers.Operator().V1().Klusterlets().Informer().GetStore()
-	store.Add(klusterlet)
+	if err := store.Add(klusterlet); err != nil {
+		t.Fatal(err)
+	}
 
 	return &testController{
 		controller:     klusterletController,
@@ -153,7 +155,7 @@ func TestSync(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			controller := newTestController(c.klusterlet, c.object...)
+			controller := newTestController(t, c.klusterlet, c.object...)
 			syncContext := testinghelper.NewFakeSyncContext(t, c.klusterlet.Name)
 
 			err := controller.controller.sync(context.TODO(), syncContext)

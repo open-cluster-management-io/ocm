@@ -74,7 +74,11 @@ update: copy-crd
 verify-crds:
 	bash -x hack/verify-crds.sh
 
-verify: verify-crds
+verify-gocilint:
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
+	golangci-lint run --timeout=3m --modules-download-mode vendor ./...
+
+verify: verify-crds verify-gocilint
 
 update-csv: ensure-operator-sdk
 	cd deploy/cluster-manager && ../../$(OPERATOR_SDK) generate bundle --manifests --deploy-dir config/ --crds-dir config/crds/ --output-dir olm-catalog/cluster-manager/ --version $(CSV_VERSION)
