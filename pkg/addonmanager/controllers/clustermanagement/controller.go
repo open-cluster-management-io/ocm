@@ -2,7 +2,6 @@ package clustermanagement
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -50,7 +49,7 @@ func NewClusterManagementController(
 		managedClusterAddonLister:    addonInformers.Lister(),
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
 		agentAddons:                  agentAddons,
-		eventRecorder:                recorder.WithComponentSuffix(fmt.Sprintf("cluster-management-addon-controller")),
+		eventRecorder:                recorder.WithComponentSuffix("cluster-management-addon-controller"),
 	}
 
 	return factory.New().WithFilteredEventsInformersQueueKeyFunc(
@@ -67,7 +66,7 @@ func NewClusterManagementController(
 			return true
 		},
 		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
-		WithSync(c.sync).ToController(fmt.Sprintf("cluster-management-addon-controller"), recorder)
+		WithSync(c.sync).ToController("cluster-management-addon-controller", recorder)
 }
 
 func (c *clusterManagementController) sync(ctx context.Context, syncCtx factory.SyncContext) error {

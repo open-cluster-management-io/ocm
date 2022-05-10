@@ -2,7 +2,6 @@ package certificate
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -112,13 +111,19 @@ func TestSignReconcile(t *testing.T) {
 			kubeInfomers := kubeinformers.NewSharedInformerFactory(fakeKubeClient, 10*time.Minute)
 
 			for _, obj := range c.cluster {
-				clusterInformers.Cluster().V1().ManagedClusters().Informer().GetStore().Add(obj)
+				if err := clusterInformers.Cluster().V1().ManagedClusters().Informer().GetStore().Add(obj); err != nil {
+					t.Fatal(err)
+				}
 			}
 			for _, obj := range c.addon {
-				addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj)
+				if err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
+					t.Fatal(err)
+				}
 			}
 			for _, csr := range c.csr {
-				kubeInfomers.Certificates().V1().CertificateSigningRequests().Informer().GetStore().Add(csr)
+				if err := kubeInfomers.Certificates().V1().CertificateSigningRequests().Informer().GetStore().Add(csr); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			controller := &csrSignController{
@@ -132,7 +137,7 @@ func TestSignReconcile(t *testing.T) {
 
 			for _, obj := range c.csr {
 				csr := obj.(*certv1.CertificateSigningRequest)
-				syncContext := addontesting.NewFakeSyncContext(t, fmt.Sprintf("%s", csr.Name))
+				syncContext := addontesting.NewFakeSyncContext(t, csr.Name)
 				err := controller.sync(context.TODO(), syncContext)
 				if err != nil {
 					t.Errorf("expected no error when sync: %v", err)

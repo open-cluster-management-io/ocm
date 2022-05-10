@@ -49,7 +49,7 @@ func NewCSRSignController(
 		managedClusterLister:      clusterInformers.Lister(),
 		managedClusterAddonLister: addonInformers.Lister(),
 		csrLister:                 csrInformer.Lister(),
-		eventRecorder:             recorder.WithComponentSuffix(fmt.Sprintf("csr-signing-controller")),
+		eventRecorder:             recorder.WithComponentSuffix("csr-signing-controller"),
 	}
 	return factory.New().
 		WithFilteredEventsInformersQueueKeyFunc(

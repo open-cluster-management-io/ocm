@@ -2,7 +2,6 @@ package registration
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -42,7 +41,7 @@ func NewAddonConfigurationController(
 		managedClusterLister:      clusterInformers.Lister(),
 		managedClusterAddonLister: addonInformers.Lister(),
 		agentAddons:               agentAddons,
-		eventRecorder:             recorder.WithComponentSuffix(fmt.Sprintf("addon-registration-controller")),
+		eventRecorder:             recorder.WithComponentSuffix("addon-registration-controller"),
 	}
 
 	return factory.New().WithFilteredEventsInformersQueueKeyFunc(
@@ -59,7 +58,7 @@ func NewAddonConfigurationController(
 			return true
 		},
 		addonInformers.Informer()).
-		WithSync(c.sync).ToController(fmt.Sprintf("addon-registration-controller"), recorder)
+		WithSync(c.sync).ToController("addon-registration-controller", recorder)
 }
 
 func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory.SyncContext) error {

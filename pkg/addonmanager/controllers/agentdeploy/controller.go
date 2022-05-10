@@ -174,8 +174,10 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 			Reason:  "ManifestWorkApplyFailed",
 			Message: fmt.Sprintf("failed to apply manifestwork: %v", err),
 		})
-		c.addonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterAddonCopy.Namespace).UpdateStatus(
-			ctx, managedClusterAddonCopy, metav1.UpdateOptions{})
+		if _, updateErr := c.addonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterAddonCopy.Namespace).UpdateStatus(
+			ctx, managedClusterAddonCopy, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("failed to update managedclusteraddon status: %v; the err should be %v", updateErr, err)
+		}
 		return err
 	}
 

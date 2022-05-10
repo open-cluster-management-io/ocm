@@ -83,8 +83,9 @@ func needNewSigningCertKeyPair(secret *corev1.Secret) string {
 
 	maxWait := cert.NotAfter.Sub(cert.NotBefore) / 5
 	latestTime := cert.NotAfter.Add(-maxWait)
-	if time.Now().After(latestTime) {
-		return fmt.Sprintf("expired in %6.3f seconds", cert.NotAfter.Sub(time.Now()).Seconds())
+	now := time.Now()
+	if now.After(latestTime) {
+		return fmt.Sprintf("expired in %6.3f seconds", cert.NotAfter.Sub(now).Seconds())
 	}
 
 	return ""

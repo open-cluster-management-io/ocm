@@ -112,7 +112,9 @@ func TestReconcile(t *testing.T) {
 			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
 
 			for _, obj := range c.addon {
-				addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj)
+				if err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			controller := addonHealthCheckController{
@@ -151,7 +153,9 @@ func TestReconcileWithWork(t *testing.T) {
 	addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
 	workInformers := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
 
-	addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(addon)
+	if err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(addon); err != nil {
+		t.Errorf("failed to add addon to informer: %v", err)
+	}
 
 	testaddon := &testAgent{
 		name: "test",
@@ -190,7 +194,9 @@ func TestReconcileWithWork(t *testing.T) {
 		},
 	}
 
-	workInformers.Work().V1().ManifestWorks().Informer().GetStore().Add(work)
+	if err := workInformers.Work().V1().ManifestWorks().Informer().GetStore().Add(work); err != nil {
+		t.Errorf("failed to add work to informer: %v", err)
+	}
 
 	err = controller.sync(context.TODO(), syncContext)
 	if err != nil {
@@ -216,7 +222,9 @@ func TestReconcileWithWork(t *testing.T) {
 	}
 
 	fakeAddonClient.ClearActions()
-	workInformers.Work().V1().ManifestWorks().Informer().GetStore().Update(work)
+	if err := workInformers.Work().V1().ManifestWorks().Informer().GetStore().Update(work); err != nil {
+		t.Fatal(err)
+	}
 
 	err = controller.sync(context.TODO(), syncContext)
 	if err != nil {
@@ -282,8 +290,12 @@ func TestReconcileWithProbe(t *testing.T) {
 	addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
 	workInformers := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
 
-	addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(addon)
-	workInformers.Work().V1().ManifestWorks().Informer().GetStore().Add(work)
+	if err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(addon); err != nil {
+		t.Errorf("failed to add addon to informer: %v", err)
+	}
+	if err := workInformers.Work().V1().ManifestWorks().Informer().GetStore().Add(work); err != nil {
+		t.Errorf("failed to add work to informer: %v", err)
+	}
 
 	prober := &testProbe{
 		checkError: fmt.Errorf("health check fails"),
@@ -344,7 +356,9 @@ func TestReconcileWithProbe(t *testing.T) {
 	}
 
 	fakeAddonClient.ClearActions()
-	workInformers.Work().V1().ManifestWorks().Informer().GetStore().Update(work)
+	if err = workInformers.Work().V1().ManifestWorks().Informer().GetStore().Update(work); err != nil {
+		t.Fatal(err)
+	}
 
 	err = controller.sync(context.TODO(), syncContext)
 	if err != nil {

@@ -99,7 +99,8 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		err = mgr.AddAgent(testInstallByLableAddonImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		mgr.Start(mgrContext)
+		err = mgr.Start(mgrContext)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	}()
 
 	close(done)

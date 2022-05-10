@@ -114,7 +114,9 @@ var _ = ginkgo.Describe("Addon CSR", func() {
 		ca, _ := crypto.MakeSelfSignedCAConfigForDuration(signerName, 1*time.Hour)
 		certBytes := &bytes.Buffer{}
 		keyBytes := &bytes.Buffer{}
-		ca.WriteCertConfig(certBytes, keyBytes)
+		err = ca.WriteCertConfig(certBytes, keyBytes)
+		gomega.Expect(err).To(gomega.BeNil())
+
 		testAddonImpl.cert = certBytes.Bytes()
 
 		csr := newCSR(managedClusterName, testAddonImpl.name, "open-cluster-management.io/test")

@@ -80,7 +80,7 @@ func NewCSRApprovingController(
 		agentAddons:               agentAddons,
 		managedClusterLister:      clusterInformers.Lister(),
 		managedClusterAddonLister: addonInformers.Lister(),
-		eventRecorder:             recorder.WithComponentSuffix(fmt.Sprintf("csr-approving-controller")),
+		eventRecorder:             recorder.WithComponentSuffix("csr-approving-controller"),
 	}
 	var csrInformer cache.SharedIndexInformer
 	if csrV1Informer != nil {

@@ -30,7 +30,9 @@ func TestApplyWork(t *testing.T) {
 	// IF work is not changed, we should not update
 	newWorkCopy := work.DeepCopy()
 	fakeWorkClient.ClearActions()
-	workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(work)
+	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(work); err != nil {
+		t.Errorf("failed to add work to store with err %v", err)
+	}
 	_, err = applyWork(context.TODO(), fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister(), cache, syncContext.Recorder(), newWorkCopy)
 	if err != nil {
 		t.Errorf("failed to apply work with err %v", err)
@@ -49,10 +51,14 @@ func TestApplyWork(t *testing.T) {
 
 	// Do not update if generation is not changed
 	work.Spec.DeleteOption = &workapiv1.DeleteOption{PropagationPolicy: workapiv1.DeletePropagationPolicyTypeForeground}
-	workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Update(work)
+	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Update(work); err != nil {
+		t.Errorf("failed to update work with err %v", err)
+	}
 
 	fakeWorkClient.ClearActions()
-	workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Update(work)
+	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Update(work); err != nil {
+		t.Errorf("failed to update work with err %v", err)
+	}
 	_, err = applyWork(context.TODO(), fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister(), cache, syncContext.Recorder(), newWork)
 	if err != nil {
 		t.Errorf("failed to apply work with err %v", err)
@@ -61,10 +67,14 @@ func TestApplyWork(t *testing.T) {
 
 	// change generation will cause update
 	work.Generation = 1
-	workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Update(work)
+	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Update(work); err != nil {
+		t.Errorf("failed to update work with err %v", err)
+	}
 
 	fakeWorkClient.ClearActions()
-	workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Update(work)
+	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Update(work); err != nil {
+		t.Errorf("failed to update work with err %v", err)
+	}
 	_, err = applyWork(context.TODO(), fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister(), cache, syncContext.Recorder(), newWork)
 	if err != nil {
 		t.Errorf("failed to apply work with err %v", err)

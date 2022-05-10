@@ -42,6 +42,12 @@ GO_TEST_PACKAGES :=./pkg/...
 # It will generate target "image-$(1)" for building the image and binding it as a prerequisite to target "images".
 $(call build-image,$(IMAGE),$(IMAGE_REGISTRY)/$(IMAGE),./Dockerfile,.)
 
+verify-gocilint:
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
+	golangci-lint run --timeout=3m --modules-download-mode vendor ./...
+
+verify: verify-gocilint
+
 deploy-ocm:
 	examples/deploy/ocm/install.sh
 

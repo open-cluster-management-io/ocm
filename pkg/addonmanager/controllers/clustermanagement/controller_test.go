@@ -211,13 +211,19 @@ func TestReconcile(t *testing.T) {
 			clusterInformers := clusterv1informers.NewSharedInformerFactory(fakeClusterClient, 10*time.Minute)
 
 			for _, obj := range c.cluster {
-				clusterInformers.Cluster().V1().ManagedClusters().Informer().GetStore().Add(obj)
+				if err := clusterInformers.Cluster().V1().ManagedClusters().Informer().GetStore().Add(obj); err != nil {
+					t.Fatal(err)
+				}
 			}
 			for _, obj := range c.managedClusteraddon {
-				addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj)
+				if err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
+					t.Fatal(err)
+				}
 			}
 			for _, obj := range c.clusterManagementAddon {
-				addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetStore().Add(obj)
+				if err := addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetStore().Add(obj); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			controller := clusterManagementController{
