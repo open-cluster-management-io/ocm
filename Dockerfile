@@ -12,6 +12,5 @@ ENV USER_UID=10001
 # or the codes will use it and cause an error, the container cannot be started.
 COPY --from=builder /go/src/open-cluster-management.io/placement/placement /
 COPY --from=builder /go/src/open-cluster-management.io/placement/e2e.test /
-RUN microdnf update && microdnf clean all
 
 USER ${USER_UID}
