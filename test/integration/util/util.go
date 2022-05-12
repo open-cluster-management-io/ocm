@@ -35,6 +35,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
+	"k8s.io/client-go/util/retry"
 	"open-cluster-management.io/registration/pkg/spoke"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
@@ -503,14 +504,16 @@ func GetManagedCluster(clusterClient clusterclientset.Interface, spokeClusterNam
 }
 
 func AcceptManagedCluster(clusterClient clusterclientset.Interface, spokeClusterName string) error {
-	spokeCluster, err := GetManagedCluster(clusterClient, spokeClusterName)
-	if err != nil {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		spokeCluster, err := GetManagedCluster(clusterClient, spokeClusterName)
+		if err != nil {
+			return err
+		}
+		spokeCluster.Spec.HubAcceptsClient = true
+		spokeCluster.Spec.LeaseDurationSeconds = TestLeaseDurationSeconds
+		_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), spokeCluster, metav1.UpdateOptions{})
 		return err
-	}
-	spokeCluster.Spec.HubAcceptsClient = true
-	spokeCluster.Spec.LeaseDurationSeconds = TestLeaseDurationSeconds
-	_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), spokeCluster, metav1.UpdateOptions{})
-	return err
+	})
 }
 
 func CreateNode(kubeClient kubernetes.Interface, name string, capacity, allocatable corev1.ResourceList) error {

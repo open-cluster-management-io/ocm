@@ -2,6 +2,7 @@ package managedcluster
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -43,9 +44,14 @@ func TestSyncManagedCluster(t *testing.T) {
 					Reason:  "ManagedClusterJoined",
 					Message: "Managed cluster joined",
 				}
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				testinghelpers.AssertManagedClusterCondition(t, actual.(*clusterv1.ManagedCluster).Status.Conditions, expectedCondition)
+				testinghelpers.AssertActions(t, actions, "get", "patch")
+				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				testinghelpers.AssertManagedClusterCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
 		},
 	}

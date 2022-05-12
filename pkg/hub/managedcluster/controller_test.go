@@ -2,6 +2,7 @@ package managedcluster
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -36,8 +37,13 @@ func TestSyncManagedCluster(t *testing.T) {
 			name:            "create a new spoke cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "update")
-				managedCluster := (actions[0].(clienttesting.UpdateActionImpl).Object).(*v1.ManagedCluster)
+				testinghelpers.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &v1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
 				testinghelpers.AssertFinalizers(t, managedCluster, []string{managedClusterFinalizer})
 			},
 		},
@@ -51,9 +57,13 @@ func TestSyncManagedCluster(t *testing.T) {
 					Reason:  "HubClusterAdminAccepted",
 					Message: "Accepted by hub cluster admin",
 				}
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				managedCluster := actual.(*v1.ManagedCluster)
+				testinghelpers.AssertActions(t, actions, "get", "patch")
+				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &v1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
 				testinghelpers.AssertManagedClusterCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
 		},
@@ -74,9 +84,13 @@ func TestSyncManagedCluster(t *testing.T) {
 					Reason:  "HubClusterAdminDenied",
 					Message: "Denied by hub cluster admin",
 				}
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				managedCluster := actual.(*v1.ManagedCluster)
+				testinghelpers.AssertActions(t, actions, "get", "patch")
+				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &v1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
 				testinghelpers.AssertManagedClusterCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
 		},
@@ -84,8 +98,13 @@ func TestSyncManagedCluster(t *testing.T) {
 			name:            "delete a spoke cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewDeletingManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "update")
-				managedCluster := (actions[0].(clienttesting.UpdateActionImpl).Object).(*v1.ManagedCluster)
+				testinghelpers.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &v1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
 				testinghelpers.AssertFinalizers(t, managedCluster, []string{})
 			},
 		},

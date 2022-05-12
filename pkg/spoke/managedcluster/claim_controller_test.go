@@ -2,6 +2,7 @@ package managedcluster
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
@@ -49,15 +50,20 @@ func TestSync(t *testing.T) {
 				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				cluster := actions[1].(clienttesting.UpdateActionImpl).Object
+				testinghelpers.AssertActions(t, actions, "get", "patch")
+				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				cluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, cluster)
+				if err != nil {
+					t.Fatal(err)
+				}
 				expected := []clusterv1.ManagedClusterClaim{
 					{
 						Name:  "a",
 						Value: "b",
 					},
 				}
-				actual := cluster.(*clusterv1.ManagedCluster).Status.ClusterClaims
+				actual := cluster.Status.ClusterClaims
 				if !reflect.DeepEqual(actual, expected) {
 					t.Errorf("expected cluster claim %v but got: %v", expected, actual)
 				}
@@ -125,15 +131,20 @@ func TestExposeClaims(t *testing.T) {
 				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				cluster := actions[1].(clienttesting.UpdateActionImpl).Object
+				testinghelpers.AssertActions(t, actions, "get", "patch")
+				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				cluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, cluster)
+				if err != nil {
+					t.Fatal(err)
+				}
 				expected := []clusterv1.ManagedClusterClaim{
 					{
 						Name:  "a",
 						Value: "b",
 					},
 				}
-				actual := cluster.(*clusterv1.ManagedCluster).Status.ClusterClaims
+				actual := cluster.Status.ClusterClaims
 				if !reflect.DeepEqual(actual, expected) {
 					t.Errorf("expected cluster claim %v but got: %v", expected, actual)
 				}
@@ -178,8 +189,13 @@ func TestExposeClaims(t *testing.T) {
 			},
 			maxCustomClusterClaims: 2,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				cluster := actions[1].(clienttesting.UpdateActionImpl).Object
+				testinghelpers.AssertActions(t, actions, "get", "patch")
+				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				cluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, cluster)
+				if err != nil {
+					t.Fatal(err)
+				}
 				expected := []clusterv1.ManagedClusterClaim{
 					{
 						Name:  "id.k8s.io",
@@ -194,7 +210,7 @@ func TestExposeClaims(t *testing.T) {
 						Value: "d",
 					},
 				}
-				actual := cluster.(*clusterv1.ManagedCluster).Status.ClusterClaims
+				actual := cluster.Status.ClusterClaims
 				if !reflect.DeepEqual(actual, expected) {
 					t.Errorf("expected cluster claim %v but got: %v", expected, actual)
 				}
@@ -209,9 +225,14 @@ func TestExposeClaims(t *testing.T) {
 				},
 			}),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				cluster := actions[1].(clienttesting.UpdateActionImpl).Object
-				actual := cluster.(*clusterv1.ManagedCluster).Status.ClusterClaims
+				testinghelpers.AssertActions(t, actions, "get", "patch")
+				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				cluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, cluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				actual := cluster.Status.ClusterClaims
 				if len(actual) > 0 {
 					t.Errorf("expected no cluster claim but got: %v", actual)
 				}
@@ -240,15 +261,20 @@ func TestExposeClaims(t *testing.T) {
 				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				cluster := actions[1].(clienttesting.UpdateActionImpl).Object
+				testinghelpers.AssertActions(t, actions, "get", "patch")
+				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				cluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, cluster)
+				if err != nil {
+					t.Fatal(err)
+				}
 				expected := []clusterv1.ManagedClusterClaim{
 					{
 						Name:  "c",
 						Value: "d",
 					},
 				}
-				actual := cluster.(*clusterv1.ManagedCluster).Status.ClusterClaims
+				actual := cluster.Status.ClusterClaims
 				if !reflect.DeepEqual(actual, expected) {
 					t.Errorf("expected cluster claim %v but got: %v", expected, actual)
 				}

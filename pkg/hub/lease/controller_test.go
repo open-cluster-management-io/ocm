@@ -2,6 +2,7 @@ package lease
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -9,6 +10,7 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	v1 "open-cluster-management.io/api/cluster/v1"
 	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,9 +61,14 @@ func TestSync(t *testing.T) {
 					Reason:  "ManagedClusterLeaseUpdateStopped",
 					Message: "Registration agent stopped updating its lease.",
 				}
-				testinghelpers.AssertActions(t, clusterActions, "get", "update")
-				actual := clusterActions[1].(clienttesting.UpdateActionImpl).Object
-				testinghelpers.AssertManagedClusterCondition(t, actual.(*clusterv1.ManagedCluster).Status.Conditions, expected)
+				testinghelpers.AssertActions(t, clusterActions, "get", "patch")
+				patch := clusterActions[1].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &v1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				testinghelpers.AssertManagedClusterCondition(t, managedCluster.Status.Conditions, expected)
 			},
 		},
 		{
@@ -82,9 +89,14 @@ func TestSync(t *testing.T) {
 					Reason:  "ManagedClusterLeaseUpdateStopped",
 					Message: "Registration agent stopped updating its lease.",
 				}
-				testinghelpers.AssertActions(t, clusterActions, "get", "update")
-				actual := clusterActions[1].(clienttesting.UpdateActionImpl).Object
-				testinghelpers.AssertManagedClusterCondition(t, actual.(*clusterv1.ManagedCluster).Status.Conditions, expected)
+				testinghelpers.AssertActions(t, clusterActions, "get", "patch")
+				patch := clusterActions[1].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &v1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				testinghelpers.AssertManagedClusterCondition(t, managedCluster.Status.Conditions, expected)
 			},
 		},
 		{

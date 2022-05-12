@@ -2,6 +2,7 @@ package addon
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -56,10 +57,14 @@ func TestSync(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Namespace: testinghelpers.TestManagedClusterName, Name: "test"},
 			}},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get", "update")
+				testinghelpers.AssertActions(t, actions, "get", "patch")
 
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				addOn := actual.(*addonv1alpha1.ManagedClusterAddOn)
+				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				addOn := &addonv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
 				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 				if addOnCond == nil {
 					t.Errorf("expected addon available condition, but failed")

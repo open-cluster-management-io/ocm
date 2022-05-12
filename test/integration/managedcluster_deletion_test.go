@@ -34,12 +34,10 @@ var _ = ginkgo.Describe("Cluster deleting", func() {
 		_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), managedCluster, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		gomega.Eventually(func() bool {
-			if _, err := kubeClient.CoreV1().Namespaces().Get(context.Background(), managedCluster.Name, metav1.GetOptions{}); err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		gomega.Eventually(func() error {
+			_, err := kubeClient.CoreV1().Namespaces().Get(context.Background(), managedCluster.Name, metav1.GetOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 		manifestWork := testinghelpers.NewManifestWork(managedCluster.Name, "work1", []string{}, nil)
 		_, err = workClient.WorkV1().ManifestWorks(managedCluster.Name).Create(context.Background(), manifestWork, metav1.CreateOptions{})
@@ -76,17 +74,12 @@ var _ = ginkgo.Describe("Cluster deleting", func() {
 
 		gomega.Eventually(func() bool {
 			_, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).Get(context.Background(), roleBindingName, metav1.GetOptions{})
-			if errors.IsNotFound(err) {
-				return true
-			}
-			return true
+			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 		gomega.Eventually(func() bool {
-			if _, err := clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedCluster.Name, metav1.GetOptions{}); !errors.IsNotFound(err) {
-				return false
-			}
-			return true
+			_, err := clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedCluster.Name, metav1.GetOptions{})
+			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	})
 })

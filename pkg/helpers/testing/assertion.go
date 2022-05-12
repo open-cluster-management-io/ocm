@@ -146,16 +146,16 @@ func AssertManagedClusterStatus(t *testing.T, actual, expected clusterv1.Managed
 	if !reflect.DeepEqual(actual.Version, expected.Version) {
 		t.Errorf("expected version %#v but got: %#v", expected.Version, actual.Version)
 	}
-	if !reflect.DeepEqual(actual.Capacity["cpu"], expected.Capacity["cpu"]) {
+	if !actual.Capacity["cpu"].Equal(expected.Capacity["cpu"]) {
 		t.Errorf("expected cpu capacity %#v but got: %#v", expected.Capacity["cpu"], actual.Capacity["cpu"])
 	}
-	if !reflect.DeepEqual(actual.Capacity["memory"], expected.Capacity["memory"]) {
+	if !actual.Capacity["memory"].Equal(expected.Capacity["memory"]) {
 		t.Errorf("expected memory capacity %#v but got: %#v", expected.Capacity["memory"], actual.Capacity["memory"])
 	}
-	if !reflect.DeepEqual(actual.Allocatable["cpu"], expected.Allocatable["cpu"]) {
+	if !actual.Allocatable["cpu"].Equal(expected.Allocatable["cpu"]) {
 		t.Errorf("expected cpu allocatable %#v but got: %#v", expected.Allocatable["cpu"], actual.Allocatable["cpu"])
 	}
-	if !reflect.DeepEqual(actual.Allocatable["memory"], expected.Allocatable["memory"]) {
+	if !actual.Allocatable["memory"].Equal(expected.Allocatable["memory"]) {
 		t.Errorf("expected memory alocatabel %#v but got: %#v", expected.Allocatable["memory"], actual.Allocatable["memory"])
 	}
 }

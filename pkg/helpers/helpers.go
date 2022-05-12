@@ -3,6 +3,7 @@ package helpers
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"net/url"
 
@@ -11,6 +12,7 @@ import (
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/openshift/api"
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -28,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/kubernetes"
@@ -74,11 +77,32 @@ func UpdateManagedClusterStatus(
 			return nil
 		}
 
-		managedCluster.Status = *newStatus
-		updatedManagedCluster, err := client.ClusterV1().ManagedClusters().UpdateStatus(ctx, managedCluster, metav1.UpdateOptions{})
+		oldData, err := json.Marshal(clusterv1.ManagedCluster{
+			Status: *oldStatus,
+		})
+
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to Marshal old data for cluster status %s: %w", managedCluster.Name, err)
 		}
+
+		newData, err := json.Marshal(clusterv1.ManagedCluster{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:             managedCluster.UID,
+				ResourceVersion: managedCluster.ResourceVersion,
+			}, // to ensure they appear in the patch as preconditions
+			Status: *newStatus,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to Marshal new data for cluster status %s: %w", managedCluster.Name, err)
+		}
+
+		patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
+		if err != nil {
+			return fmt.Errorf("failed to create patch for cluster %s: %w", managedCluster.Name, err)
+		}
+
+		updatedManagedCluster, err := client.ClusterV1().ManagedClusters().Patch(ctx, managedCluster.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+
 		updatedManagedClusterStatus = &updatedManagedCluster.Status
 		updated = err == nil
 		return err
@@ -123,8 +147,31 @@ func UpdateManagedClusterAddOnStatus(
 			return nil
 		}
 
-		addOn.Status = *newStatus
-		updatedAddOn, err := client.AddonV1alpha1().ManagedClusterAddOns(addOnNamespace).UpdateStatus(ctx, addOn, metav1.UpdateOptions{})
+		oldData, err := json.Marshal(addonv1alpha1.ManagedClusterAddOn{
+			Status: *oldStatus,
+		})
+
+		if err != nil {
+			return fmt.Errorf("failed to Marshal old data for addon status %s: %w", addOn.Name, err)
+		}
+
+		newData, err := json.Marshal(addonv1alpha1.ManagedClusterAddOn{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:             addOn.UID,
+				ResourceVersion: addOn.ResourceVersion,
+			}, // to ensure they appear in the patch as preconditions
+			Status: *newStatus,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to Marshal new data for addon status %s: %w", addOn.Name, err)
+		}
+
+		patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
+		if err != nil {
+			return fmt.Errorf("failed to create patch for cluster %s: %w", addOn.Name, err)
+		}
+
+		updatedAddOn, err := client.AddonV1alpha1().ManagedClusterAddOns(addOnNamespace).Patch(ctx, addOn.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 		if err != nil {
 			return err
 		}

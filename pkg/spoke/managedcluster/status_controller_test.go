@@ -90,9 +90,14 @@ func TestHealthCheck(t *testing.T) {
 					Reason:  "ManagedClusterKubeAPIServerUnavailable",
 					Message: "The kube-apiserver is not ok, status code: 500, an error on the server (\"internal server error\") has prevented the request from succeeding",
 				}
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				testinghelpers.AssertManagedClusterCondition(t, actual.(*clusterv1.ManagedCluster).Status.Conditions, expectedCondition)
+				testinghelpers.AssertActions(t, actions, "get", "patch")
+				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				testinghelpers.AssertManagedClusterCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
 		},
 		{
@@ -122,10 +127,15 @@ func TestHealthCheck(t *testing.T) {
 						clusterv1.ResourceMemory: *resource.NewQuantity(int64(1024*1024*32), resource.BinarySI),
 					},
 				}
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				testinghelpers.AssertManagedClusterCondition(t, actual.(*clusterv1.ManagedCluster).Status.Conditions, expectedCondition)
-				testinghelpers.AssertManagedClusterStatus(t, actual.(*clusterv1.ManagedCluster).Status, expectedStatus)
+				testinghelpers.AssertActions(t, actions, "get", "patch")
+				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				testinghelpers.AssertManagedClusterCondition(t, managedCluster.Status.Conditions, expectedCondition)
+				testinghelpers.AssertManagedClusterStatus(t, managedCluster.Status, expectedStatus)
 			},
 		},
 		{
@@ -140,9 +150,14 @@ func TestHealthCheck(t *testing.T) {
 					Reason:  "ManagedClusterAvailable",
 					Message: "Managed cluster is available",
 				}
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				testinghelpers.AssertManagedClusterCondition(t, actual.(*clusterv1.ManagedCluster).Status.Conditions, expectedCondition)
+				testinghelpers.AssertActions(t, actions, "get", "patch")
+				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				testinghelpers.AssertManagedClusterCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
 		},
 		{
@@ -157,9 +172,14 @@ func TestHealthCheck(t *testing.T) {
 					Reason:  "ManagedClusterAvailable",
 					Message: "Managed cluster is available",
 				}
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				testinghelpers.AssertManagedClusterCondition(t, actual.(*clusterv1.ManagedCluster).Status.Conditions, expectedCondition)
+				testinghelpers.AssertActions(t, actions, "get", "patch")
+				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				testinghelpers.AssertManagedClusterCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
 		},
 		{
@@ -199,10 +219,15 @@ func TestHealthCheck(t *testing.T) {
 						clusterv1.ResourceMemory: *resource.NewQuantity(int64(1024*1024*64), resource.BinarySI),
 					},
 				}
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				testinghelpers.AssertManagedClusterCondition(t, actual.(*clusterv1.ManagedCluster).Status.Conditions, expectedCondition)
-				testinghelpers.AssertManagedClusterStatus(t, actual.(*clusterv1.ManagedCluster).Status, expectedStatus)
+				testinghelpers.AssertActions(t, actions, "get", "patch")
+				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				testinghelpers.AssertManagedClusterCondition(t, managedCluster.Status.Conditions, expectedCondition)
+				testinghelpers.AssertManagedClusterStatus(t, managedCluster.Status, expectedStatus)
 			},
 		},
 	}

@@ -3,6 +3,7 @@ package managedcluster
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"fmt"
 
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
@@ -20,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 )
@@ -91,8 +93,14 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 			}
 		}
 		if !hasFinalizer {
-			managedCluster.Finalizers = append(managedCluster.Finalizers, managedClusterFinalizer)
-			_, err := c.clusterClient.ClusterV1().ManagedClusters().Update(ctx, managedCluster, metav1.UpdateOptions{})
+			finalizerBytes, err := json.Marshal(append(managedCluster.Finalizers, managedClusterFinalizer))
+			if err != nil {
+				return err
+			}
+			patch := fmt.Sprintf("{\"metadata\": {\"finalizers\": %s}}", string(finalizerBytes))
+
+			_, err = c.clusterClient.ClusterV1().ManagedClusters().Patch(
+				ctx, managedCluster.Name, types.MergePatchType, []byte(patch), metav1.PatchOptions{})
 			return err
 		}
 	}
@@ -206,8 +214,14 @@ func (c *managedClusterController) removeManagedClusterFinalizer(ctx context.Con
 	}
 
 	if len(managedCluster.Finalizers) != len(copiedFinalizers) {
-		managedCluster.Finalizers = copiedFinalizers
-		_, err := c.clusterClient.ClusterV1().ManagedClusters().Update(ctx, managedCluster, metav1.UpdateOptions{})
+		finalizerBytes, err := json.Marshal(copiedFinalizers)
+		if err != nil {
+			return err
+		}
+		patch := fmt.Sprintf("{\"metadata\": {\"finalizers\": %s}}", string(finalizerBytes))
+
+		_, err = c.clusterClient.ClusterV1().ManagedClusters().Patch(
+			ctx, managedCluster.Name, types.MergePatchType, []byte(patch), metav1.PatchOptions{})
 		return err
 	}
 

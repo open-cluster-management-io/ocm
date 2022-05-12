@@ -2,6 +2,7 @@ package addon
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -138,9 +139,13 @@ func TestSync(t *testing.T) {
 			hubLeases: []runtime.Object{},
 			leases:    []runtime.Object{},
 			validateActions: func(t *testing.T, ctx *testinghelpers.FakeSyncContext, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				addOn := actual.(*addonv1alpha1.ManagedClusterAddOn)
+				testinghelpers.AssertActions(t, actions, "get", "patch")
+				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				addOn := &addonv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
 				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 				if addOnCond == nil {
 					t.Errorf("expected addon available condition, but failed")
@@ -168,9 +173,13 @@ func TestSync(t *testing.T) {
 				testinghelpers.NewAddOnLease("test", "test", now.Add(-5*time.Minute)),
 			},
 			validateActions: func(t *testing.T, ctx *testinghelpers.FakeSyncContext, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				addOn := actual.(*addonv1alpha1.ManagedClusterAddOn)
+				testinghelpers.AssertActions(t, actions, "get", "patch")
+				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				addOn := &addonv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
 				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 				if addOnCond == nil {
 					t.Errorf("expected addon available condition, but failed")
@@ -198,9 +207,13 @@ func TestSync(t *testing.T) {
 				testinghelpers.NewAddOnLease("test", "test", now),
 			},
 			validateActions: func(t *testing.T, ctx *testinghelpers.FakeSyncContext, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				addOn := actual.(*addonv1alpha1.ManagedClusterAddOn)
+				testinghelpers.AssertActions(t, actions, "get", "patch")
+				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				addOn := &addonv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
 				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 				if addOnCond == nil {
 					t.Errorf("expected addon available condition, but failed")
@@ -283,9 +296,13 @@ func TestSync(t *testing.T) {
 			hubLeases: []runtime.Object{testinghelpers.NewAddOnLease(testinghelpers.TestManagedClusterName, "test", now)},
 			leases:    []runtime.Object{},
 			validateActions: func(t *testing.T, ctx *testinghelpers.FakeSyncContext, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get", "update")
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				addOn := actual.(*addonv1alpha1.ManagedClusterAddOn)
+				testinghelpers.AssertActions(t, actions, "get", "patch")
+				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				addOn := &addonv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
 				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 				if addOnCond == nil {
 					t.Errorf("expected addon available condition, but failed")
