@@ -8,10 +8,9 @@ hubctx="kind-hub"
 
 kubectl config use ${hubctx}
 
-echo "Add cluster1, cluster2 to the clusterset"
+echo "Bind clusterset to default namespace"
 
-kubectl label managedcluster cluster1 cluster.open-cluster-management.io/clusterset=app-demo --overwrite
-kubectl label managedcluster cluster2 cluster.open-cluster-management.io/clusterset=app-demo --overwrite
+clusteradm clusterset bind default --namespace default
 
 echo "Label cluster1 so placement will select cluster1 only"
 

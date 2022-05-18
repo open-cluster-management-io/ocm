@@ -6,7 +6,7 @@ metadata:
 spec:
   numberOfClusters: 1
   clusterSets:
-    - app-demo
+    - default
   predicates:
     - requiredClusterSelector:
         labelSelector:
