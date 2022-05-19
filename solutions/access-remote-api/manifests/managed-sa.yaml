@@ -1,0 +1,7 @@
+apiVersion: authentication.open-cluster-management.io/v1alpha1
+kind: ManagedServiceAccount
+metadata:
+  name: test
+  namespace: cluster1
+spec:
+  rotation: {}
