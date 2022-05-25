@@ -60,8 +60,9 @@ func (ManagedClusterSetStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ManagedClusterSetBinding = map[string]string{
-	"":     "ManagedClusterSetBinding projects a ManagedClusterSet into a certain namespace. User is able to create a ManagedClusterSetBinding in a namespace and bind it to a ManagedClusterSet if they have an RBAC rule to CREATE on the virtual subresource of managedclustersets/bind. Workloads created in the same namespace can only be distributed to ManagedClusters in ManagedClusterSets bound in this namespace by higher level controllers.",
-	"spec": "Spec defines the attributes of ManagedClusterSetBinding.",
+	"":       "ManagedClusterSetBinding projects a ManagedClusterSet into a certain namespace. User is able to create a ManagedClusterSetBinding in a namespace and bind it to a ManagedClusterSet if they have an RBAC rule to CREATE on the virtual subresource of managedclustersets/bind. Workloads created in the same namespace can only be distributed to ManagedClusters in ManagedClusterSets bound in this namespace by higher level controllers.",
+	"spec":   "Spec defines the attributes of ManagedClusterSetBinding.",
+	"status": "Status represents the current status of the ManagedClusterSetBinding",
 }
 
 func (ManagedClusterSetBinding) SwaggerDoc() map[string]string {
@@ -85,6 +86,15 @@ var map_ManagedClusterSetBindingSpec = map[string]string{
 
 func (ManagedClusterSetBindingSpec) SwaggerDoc() map[string]string {
 	return map_ManagedClusterSetBindingSpec
+}
+
+var map_ManagedClusterSetBindingStatus = map[string]string{
+	"":           "ManagedClusterSetBindingStatus represents the current status of the ManagedClusterSetBinding.",
+	"conditions": "Conditions contains the different condition statuses for this ManagedClusterSetBinding.",
+}
+
+func (ManagedClusterSetBindingStatus) SwaggerDoc() map[string]string {
+	return map_ManagedClusterSetBindingStatus
 }
 
 var map_AddOnScore = map[string]string{

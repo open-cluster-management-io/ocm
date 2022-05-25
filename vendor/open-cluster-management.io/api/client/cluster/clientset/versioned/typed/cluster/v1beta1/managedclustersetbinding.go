@@ -24,6 +24,7 @@ type ManagedClusterSetBindingsGetter interface {
 type ManagedClusterSetBindingInterface interface {
 	Create(ctx context.Context, managedClusterSetBinding *v1beta1.ManagedClusterSetBinding, opts v1.CreateOptions) (*v1beta1.ManagedClusterSetBinding, error)
 	Update(ctx context.Context, managedClusterSetBinding *v1beta1.ManagedClusterSetBinding, opts v1.UpdateOptions) (*v1beta1.ManagedClusterSetBinding, error)
+	UpdateStatus(ctx context.Context, managedClusterSetBinding *v1beta1.ManagedClusterSetBinding, opts v1.UpdateOptions) (*v1beta1.ManagedClusterSetBinding, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.ManagedClusterSetBinding, error)
@@ -112,6 +113,22 @@ func (c *managedClusterSetBindings) Update(ctx context.Context, managedClusterSe
 		Namespace(c.ns).
 		Resource("managedclustersetbindings").
 		Name(managedClusterSetBinding.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(managedClusterSetBinding).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *managedClusterSetBindings) UpdateStatus(ctx context.Context, managedClusterSetBinding *v1beta1.ManagedClusterSetBinding, opts v1.UpdateOptions) (result *v1beta1.ManagedClusterSetBinding, err error) {
+	result = &v1beta1.ManagedClusterSetBinding{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("managedclustersetbindings").
+		Name(managedClusterSetBinding.Name).
+		SubResource("status").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(managedClusterSetBinding).
 		Do(ctx).
