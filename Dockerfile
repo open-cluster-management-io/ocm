@@ -1,4 +1,4 @@
-FROM golang:1.17 AS builder
+FROM golang:1.18 AS builder
 WORKDIR /go/src/open-cluster-management.io/placement
 COPY . .
 ENV GO_PACKAGE open-cluster-management.io/placement
