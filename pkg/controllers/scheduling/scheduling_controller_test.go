@@ -369,19 +369,64 @@ func TestGetAvailableClusters(t *testing.T) {
 			expectedClusterNames: []string{"cluster1"},
 		},
 		{
-			name:            "clusterset has valid ClusterSelector",
+			name:            "clusterset has default ClusterSelector",
 			clusterSetNames: []string{"clusterset1"},
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta1.LegacyClusterSetLabel).Build(),
+				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{}).Build(),
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset1").Build(),
 			},
 			expectedClusterNames: []string{"cluster1"},
 		},
 		{
+			name:            "clusterset has Legacy set label ClusterSelector",
+			clusterSetNames: []string{"clusterset1"},
+			initObjs: []runtime.Object{
+				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{
+					SelectorType: clusterapiv1beta1.LegacyClusterSetLabel,
+				}).Build(),
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset1").Build(),
+			},
+			expectedClusterNames: []string{"cluster1"},
+		},
+		{
+			name:            "clusterset has labelSelector type ClusterSelector",
+			clusterSetNames: []string{"clusterset1"},
+			initObjs: []runtime.Object{
+				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{
+					SelectorType: clusterapiv1beta1.LabelSelector,
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"vendor": "openShift",
+						},
+					},
+				}).Build(),
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset1").Build(),
+				testinghelpers.NewManagedCluster("cluster2").WithLabel("vendor", "openShift").Build(),
+			},
+			expectedClusterNames: []string{"cluster2"},
+		},
+		{
+			name:            "clusterset has labelSelector type ClusterSelector(select everything)",
+			clusterSetNames: []string{"clusterset1"},
+			initObjs: []runtime.Object{
+				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{
+					SelectorType:  clusterapiv1beta1.LabelSelector,
+					LabelSelector: &metav1.LabelSelector{},
+				}).Build(),
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset1").Build(),
+				testinghelpers.NewManagedCluster("cluster2").Build(),
+			},
+			expectedClusterNames: []string{"cluster1", "cluster2"},
+		},
+		{
 			name:            "clusterset has invalid ClusterSelector",
 			clusterSetNames: []string{"clusterset1"},
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector("FutureClusterSetLabel").Build(),
+				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(
+					clusterapiv1beta1.ManagedClusterSelector{
+						SelectorType: "errorType",
+					},
+				).Build(),
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset1").Build(),
 			},
 			expectedClusterNames: []string{},

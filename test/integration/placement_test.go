@@ -235,6 +235,25 @@ var _ = ginkgo.Describe("Placement", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 
+	assertCreatingLabelSelectorClusterSet := func(clusterSetName string, matchLabel map[string]string) {
+		ginkgo.By(fmt.Sprintf("Create clusterset %s", clusterSetName))
+		clusterset := &clusterapiv1beta1.ManagedClusterSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: clusterSetName,
+			},
+			Spec: clusterapiv1beta1.ManagedClusterSetSpec{
+				ClusterSelector: clusterapiv1beta1.ManagedClusterSelector{
+					SelectorType: clusterapiv1beta1.LabelSelector,
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: matchLabel,
+					},
+				},
+			},
+		}
+		_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	}
+
 	assertDeletingClusterSet := func(clusterSetName string) {
 		ginkgo.By(fmt.Sprintf("Delete clusterset %s", clusterSetName))
 		err = clusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.Background(), clusterSetName, metav1.DeleteOptions{})
@@ -278,6 +297,20 @@ var _ = ginkgo.Describe("Placement", func() {
 			}
 			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+	}
+
+	assertCreatingClusterWithLabel := func(clusterName string, labels map[string]string) {
+		ginkgo.By(fmt.Sprintf("Create cluster %v", clusterName))
+		cluster := &clusterapiv1.ManagedCluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   clusterName,
+				Labels: labels,
+			},
+		}
+
+		_, err = clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 	}
 
 	assertCreatingClusters := func(clusterSetName string, num int, labels ...string) {
@@ -953,6 +986,34 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertPlacementStatus(placementName, 5, false)
 		})
 
+		ginkgo.It("Should re-schedule successfully once a labelselector type clusterset deleted/added", func() {
+			assertCreatingLabelSelectorClusterSet(clusterSet1Name, map[string]string{
+				"vendor": "openShift",
+			})
+			assertCreatingClusterSetBinding(clusterSet1Name)
+			assertCreatingClusterWithLabel("cluster1", map[string]string{
+				"vendor": "openShift",
+			})
+			assertCreatingClusterWithLabel("cluster2", map[string]string{
+				"vendor": "IKS",
+			})
+			assertCreatingPlacement(placementName, noc(10), 1, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
+
+			assertNumberOfDecisions(placementName, 1)
+			assertPlacementStatus(placementName, 1, false)
+
+			ginkgo.By("Delete the clusterset")
+			assertDeletingClusterSet(clusterSet1Name)
+
+			assertNumberOfDecisions(placementName, 0)
+
+			ginkgo.By("Add the clusterset back")
+			assertCreatingLabelSelectorClusterSet(clusterSet1Name, map[string]string{
+				"vendor": "openShift",
+			})
+			assertNumberOfDecisions(placementName, 1)
+			assertPlacementStatus(placementName, 1, false)
+		})
 		ginkgo.It("Should re-schedule successfully once a clustersetbinding deleted/added", func() {
 			assertBindingClusterSet(clusterSet1Name)
 			assertCreatingClusters(clusterSet1Name, 5)

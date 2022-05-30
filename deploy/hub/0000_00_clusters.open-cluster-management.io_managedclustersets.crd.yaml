@@ -120,12 +120,43 @@ spec:
                   default:
                     selectorType: LegacyClusterSetLabel
                   properties:
+                    labelSelector:
+                      description: LabelSelector define the general labelSelector which clusterset will use to select target managedClusters
+                      type: object
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
+                          type: array
+                          items:
+                            description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+                            type: object
+                            required:
+                              - key
+                              - operator
+                            properties:
+                              key:
+                                description: key is the label key that the selector applies to.
+                                type: string
+                              operator:
+                                description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
+                                type: array
+                                items:
+                                  type: string
+                        matchLabels:
+                          description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
+                          type: object
+                          additionalProperties:
+                            type: string
                     selectorType:
-                      description: SelectorType could only be "LegacyClusterSetLabel" now, will support more SelectorType later "LegacyClusterSetLabel" means to use label "cluster.open-cluster-management.io/clusterset:<ManagedClusterSet Name>"" to select target clusters.
+                      description: SelectorType could only be "LegacyClusterSetLabel" or "LabelSelector" "LegacyClusterSetLabel" means to use label "cluster.open-cluster-management.io/clusterset:<ManagedClusterSet Name>"" to select target clusters. "LabelSelector" means use labelSelector to select target managedClusters
                       type: string
                       default: LegacyClusterSetLabel
                       enum:
                         - LegacyClusterSetLabel
+                        - LabelSelector
             status:
               description: Status represents the current status of the ManagedClusterSet
               type: object

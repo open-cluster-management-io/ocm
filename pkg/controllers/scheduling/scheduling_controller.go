@@ -352,58 +352,37 @@ func (c *schedulingController) getAvailableClusters(clusterSetNames []string) ([
 	if len(clusterSetNames) == 0 {
 		return nil, nil
 	}
+	//all available clusters
+	availableClusters := map[string]*clusterapiv1.ManagedCluster{}
 
-	// filter avilable cluserset label and values
-	avilableClusterSetsLabels := map[string]sets.String{}
 	for _, name := range clusterSetNames {
 		// ignore clusterset if failed to get
 		clusterSet, err := c.clusterSetLister.Get(name)
-		if err != nil {
+		if errors.IsNotFound(err) {
 			continue
 		}
-
-		// clusterset ClusterSelector type is empty or LegacyClusterSetLabel is treated as avaliable
-		selectorType := clusterSet.Spec.ClusterSelector.SelectorType
-		if len(selectorType) == 0 || selectorType == clusterapiv1beta1.LegacyClusterSetLabel {
-			if avilableClusterSetsLabels[clusterSetLabel] == nil {
-				avilableClusterSetsLabels[clusterSetLabel] = sets.NewString()
-			}
-			// store label and values
-			avilableClusterSetsLabels[clusterSetLabel].Insert(name)
-		}
-	}
-
-	// list all avilable clusters
-	avilableClusters := map[string]*clusterapiv1.ManagedCluster{}
-	for label, vals := range avilableClusterSetsLabels {
-		requirement, err := labels.NewRequirement(label, selection.In, vals.List())
 		if err != nil {
-			klog.Warning(err)
-			continue
+			return nil, err
 		}
-
-		labelSelector := labels.NewSelector().Add(*requirement)
-		clusters, err := c.clusterLister.List(labelSelector)
+		clusters, err := clusterapiv1beta1.GetClustersFromClusterSet(clusterSet, c.clusterLister)
 		if err != nil {
-			klog.Warning(err)
-			continue
+			return nil, fmt.Errorf("failed to get clusterset: %v, clusters, Error: %v", clusterSet.Name, err)
 		}
 		for i := range clusters {
-			avilableClusters[clusters[i].Name] = clusters[i]
+			availableClusters[clusters[i].Name] = clusters[i]
 		}
 	}
 
-	if len(avilableClusters) == 0 {
+	if len(availableClusters) == 0 {
 		return nil, nil
 	}
 
 	result := []*clusterapiv1.ManagedCluster{}
-	for _, c := range avilableClusters {
+	for _, c := range availableClusters {
 		result = append(result, c)
 	}
 
 	return result, nil
-
 }
 
 // updateStatus updates the status of the placement according to intermediate scheduling data.

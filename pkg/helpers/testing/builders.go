@@ -281,8 +281,8 @@ func NewClusterSet(clusterSetName string) *managedClusterSetBuilder {
 	}
 }
 
-func (b *managedClusterSetBuilder) WithClusterSelector(SelectorType clusterapiv1beta1.SelectorType) *managedClusterSetBuilder {
-	b.clusterset.Spec.ClusterSelector.SelectorType = SelectorType
+func (b *managedClusterSetBuilder) WithClusterSelector(clusterSelector clusterapiv1beta1.ManagedClusterSelector) *managedClusterSetBuilder {
+	b.clusterset.Spec.ClusterSelector = clusterSelector
 	return b
 }
 
