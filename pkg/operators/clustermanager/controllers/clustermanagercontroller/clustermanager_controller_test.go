@@ -196,7 +196,7 @@ func TestSyncDelete(t *testing.T) {
 	setup(t, tc)
 
 	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
-	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.ClusterName, clusterManager.Spec.DeployOption.Mode)
+	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
 
 	err := tc.clusterManagerController.sync(ctx, syncContext)
 	if err != nil {

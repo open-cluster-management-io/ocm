@@ -59,6 +59,13 @@ rules:
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["managedclustersets/join"]
   verbs: ["create"]
+# Allow hub to manage managedclustersetbindings
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclustersetbindings"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclustersetbindings/status"]
+  verbs: ["update", "patch"]
 # Allow to access metrics API
 - apiGroups: ["authentication.k8s.io"]
   resources: ["tokenreviews"]
