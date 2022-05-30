@@ -142,7 +142,8 @@ func getFiles(manifestFS embed.FS) ([]string, error) {
 }
 
 func stripPrefix(chartPrefix, path string) string {
-	chartPrefixLen := len(strings.Split(chartPrefix, string(filepath.Separator)))
+	prefixNoPathSeparatorSuffix := strings.TrimSuffix(chartPrefix, string(filepath.Separator))
+	chartPrefixLen := len(strings.Split(prefixNoPathSeparatorSuffix, string(filepath.Separator)))
 	pathValues := strings.Split(path, string(filepath.Separator))
 	return strings.Join(pathValues[chartPrefixLen:], string(filepath.Separator))
 }

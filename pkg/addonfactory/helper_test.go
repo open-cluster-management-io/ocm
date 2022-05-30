@@ -88,3 +88,46 @@ func TestMergeStructValues(t *testing.T) {
 		})
 	}
 }
+
+func TestStripPrefix(t *testing.T) {
+	cases := []struct {
+		name   string
+		prefix string
+		path   string
+		expect string
+	}{
+		{
+			name:   "path file prefix without / suffix",
+			prefix: "manifests/chart-management",
+			path:   "manifests/chart-management/values.yaml",
+			expect: "values.yaml",
+		},
+		{
+			name:   "path file prefix with / suffix",
+			prefix: "manifests/chart-management/",
+			path:   "manifests/chart-management/values.yaml",
+			expect: "values.yaml",
+		},
+		{
+			name:   "path folder prefix without / suffix",
+			prefix: "manifests/chart-management",
+			path:   "manifests/chart-management/templates/service_account.yaml",
+			expect: "templates/service_account.yaml",
+		},
+		{
+			name:   "path folder prefix with / suffix",
+			prefix: "manifests/chart-management/",
+			path:   "manifests/chart-management/templates/service_account.yaml",
+			expect: "templates/service_account.yaml",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := stripPrefix(c.prefix, c.path)
+			if result != c.expect {
+				t.Errorf("name %s: expected values %v, but got values %v", c.name, c.expect, result)
+			}
+		})
+	}
+}
