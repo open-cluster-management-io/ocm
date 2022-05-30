@@ -207,6 +207,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			bootstrapInformerFactory.Certificates(),
 			managementKubeClient,
 			bootstrapKubeClient,
+			managedcluster.GenerateBootstrapStatusUpdater(),
 			controllerContext.EventRecorder,
 			controllerName,
 		)
@@ -290,6 +291,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		hubKubeInformerFactory.Certificates(),
 		managementKubeClient,
 		hubKubeClient,
+		managedcluster.GenerateStatusUpdater(hubClusterClient, o.ClusterName),
 		controllerContext.EventRecorder,
 		controllerName,
 	)
@@ -363,6 +365,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			// In the future we need to maintain the hub cluster kubeconfig secret on the **management**
 			// cluster when there is an appropriate way to deploy addon agents on the management cluster.
 			spokeKubeClient,
+			addOnClient,
 			hubKubeInformerFactory.Certificates(),
 			addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
 			hubKubeClient,

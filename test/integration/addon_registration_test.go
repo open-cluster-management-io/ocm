@@ -187,6 +187,17 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	}
 
+	assertClientCertCondition := func(clusterName, addonName string) {
+		ginkgo.By("Check clientcert addon status condition")
+		gomega.Eventually(func() bool {
+			addon, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+			if err != nil {
+				return false
+			}
+			return meta.IsStatusConditionTrue(addon.Status.Conditions, clientcert.ClusterCertificateRotatedCondition)
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+	}
+
 	assertHasNoAddonLabel := func(clusterName, addonName string) {
 		ginkgo.By("Check if addon status label on managed cluster deleted")
 		gomega.Eventually(func() bool {
@@ -242,6 +253,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		assertSuccessCSRApproval()
 		assertValidClientCertificate(addOnName, getSecretName(addOnName, signerName), signerName)
 		assertAddonLabel(managedClusterName, addOnName, "unreachable")
+		assertClientCertCondition(managedClusterName, addOnName)
 	}
 
 	assertSecretGone := func(secretNamespace, secretName string) {

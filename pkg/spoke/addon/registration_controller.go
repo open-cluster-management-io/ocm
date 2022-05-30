@@ -18,9 +18,11 @@ import (
 	certificatesinformers "k8s.io/client-go/informers/certificates"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	"open-cluster-management.io/registration/pkg/clientcert"
+	"open-cluster-management.io/registration/pkg/helpers"
 )
 
 // addOnRegistrationController monitors ManagedClusterAddOns on hub and starts addOn registration
@@ -35,6 +37,7 @@ type addOnRegistrationController struct {
 	hubAddOnLister  addonlisterv1alpha1.ManagedClusterAddOnLister
 	hubCSRInformer  certificatesinformers.Interface
 	hubKubeClient   kubernetes.Interface
+	addOnClient     addonclient.Interface
 	recorder        events.Recorder
 
 	startRegistrationFunc func(ctx context.Context, config registrationConfig) context.CancelFunc
@@ -50,6 +53,7 @@ func NewAddOnRegistrationController(
 	agentName string,
 	kubeconfigData []byte,
 	kubeClient kubernetes.Interface,
+	addOnClient addonclient.Interface,
 	hubCSRInformer certificatesinformers.Interface,
 	hubAddOnInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	hubCSRClient kubernetes.Interface,
@@ -63,6 +67,7 @@ func NewAddOnRegistrationController(
 		hubAddOnLister:           hubAddOnInformers.Lister(),
 		hubCSRInformer:           hubCSRInformer,
 		hubKubeClient:            hubCSRClient,
+		addOnClient:              addOnClient,
 		recorder:                 recorder,
 		addOnRegistrationConfigs: map[string]map[string]registrationConfig{},
 	}
@@ -201,6 +206,9 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 	}
 
 	controllerName := fmt.Sprintf("ClientCertController@addon:%s:signer:%s", config.addOnName, config.registration.SignerName)
+
+	statusUpdater := c.generateStatusUpdate(c.clusterName, config.addOnName)
+
 	clientCertController, err := clientcert.NewClientCertificateController(
 		clientCertOption,
 		csrOption,
@@ -208,6 +216,7 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 		kubeInformerFactory.Core().V1().Secrets(),
 		c.spokeKubeClient,
 		c.hubKubeClient,
+		statusUpdater,
 		c.recorder,
 		controllerName,
 	)
@@ -219,6 +228,16 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 	go clientCertController.Run(ctx, 1)
 
 	return stopFunc
+}
+
+func (c *addOnRegistrationController) generateStatusUpdate(clusterName, addonName string) clientcert.StatusUpdateFunc {
+	return func(ctx context.Context, cond metav1.Condition) error {
+		_, _, updatedErr := helpers.UpdateManagedClusterAddOnStatus(
+			ctx, c.addOnClient, clusterName, addonName, helpers.UpdateManagedClusterAddOnStatusFn(cond),
+		)
+
+		return updatedErr
+	}
 }
 
 // stopRegistration stops the client certificate controller for the given config

@@ -565,6 +565,20 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 			return true
 		}, 90*time.Second, 1*time.Second).Should(gomega.BeTrue())
 
+		ginkgo.By("Check addon status")
+		gomega.Eventually(func() error {
+			found, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(context.TODO(), addOn.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			if !meta.IsStatusConditionTrue(found.Status.Conditions, clientcert.ClusterCertificateRotatedCondition) {
+				return fmt.Errorf("Client cert condition is not correct")
+			}
+
+			return nil
+		}, 90*time.Second, 1*time.Second).Should(gomega.Succeed())
+
 		ginkgo.By("Delete the addon and check if secret is gone")
 		err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Delete(context.TODO(), addOnName, metav1.DeleteOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())

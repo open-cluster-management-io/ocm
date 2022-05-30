@@ -84,21 +84,22 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 			}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			err = wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
+			err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
 				found, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Get(context.TODO(), addOn.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
 				}
-				if found.Status.Conditions == nil {
+
+				if !meta.IsStatusConditionTrue(found.Status.Conditions, "Available") {
 					return false, nil
 				}
-				cond := meta.FindStatusCondition(found.Status.Conditions, "Available")
-				return cond.Status == metav1.ConditionTrue, nil
+
+				return true, nil
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// check if the cluster has a label for addon with expected value
-			err = wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
+			err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
 				cluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), managedCluster.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
@@ -236,11 +237,11 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 				if err != nil {
 					return false, err
 				}
-				if found.Status.Conditions == nil {
+				if !meta.IsStatusConditionTrue(found.Status.Conditions, "Available") {
 					return false, nil
 				}
-				cond := meta.FindStatusCondition(found.Status.Conditions, "Available")
-				return cond.Status == metav1.ConditionUnknown, nil
+
+				return true, nil
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 

@@ -44,6 +44,7 @@ func TestSync(t *testing.T) {
 		keyDataExpected              bool
 		csrNameExpected              bool
 		additonalSecretDataSensitive bool
+		expectedCondition            *metav1.Condition
 		validateActions              func(t *testing.T, hubActions, agentActions []clienttesting.Action)
 	}{
 		{
@@ -70,6 +71,10 @@ func TestSync(t *testing.T) {
 					AgentNameFile:   []byte(testAgentName),
 				},
 				),
+			},
+			expectedCondition: &metav1.Condition{
+				Type:   ClusterCertificateRotatedCondition,
+				Status: metav1.ConditionTrue,
 			},
 			approvedCSRCert: testinghelpers.NewTestCert(commonName, 10*time.Second),
 			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
@@ -185,12 +190,15 @@ func TestSync(t *testing.T) {
 				SignerName: certificates.KubeAPIServerClientSignerName,
 			}
 
+			updater := &fakeStatusUpdater{}
+
 			controller := &clientCertificateController{
 				ClientCertOption: clientCertOption,
 				CSROption:        csrOption,
 				csrControl:       ctrl,
 				spokeCoreClient:  agentKubeClient.CoreV1(),
 				controllerName:   "test-agent",
+				statusUpdater:    updater.update,
 			}
 
 			if c.approvedCSRCert != nil {
@@ -213,12 +221,45 @@ func TestSync(t *testing.T) {
 				t.Error("controller.csrName should be set")
 			}
 
+			if !conditionEqual(c.expectedCondition, updater.cond) {
+				t.Errorf("conditon is not correct, expected %v, got %v", c.expectedCondition, updater.cond)
+			}
+
 			c.validateActions(t, hubKubeClient.Actions(), agentKubeClient.Actions())
 		})
 	}
 }
 
 var _ csrControl = &mockCSRControl{}
+
+func conditionEqual(expected, actual *metav1.Condition) bool {
+	if expected == nil && actual == nil {
+		return true
+	}
+
+	if expected == nil || actual == nil {
+		return false
+	}
+
+	if expected.Type != actual.Type {
+		return false
+	}
+
+	if string(expected.Status) != string(actual.Status) {
+		return false
+	}
+
+	return true
+}
+
+type fakeStatusUpdater struct {
+	cond *metav1.Condition
+}
+
+func (f *fakeStatusUpdater) update(ctx context.Context, cond metav1.Condition) error {
+	f.cond = cond.DeepCopy()
+	return nil
+}
 
 type mockCSRControl struct {
 	approved       bool

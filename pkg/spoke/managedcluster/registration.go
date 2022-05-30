@@ -7,6 +7,7 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	"golang.org/x/net/context"
 	certificates "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,8 +15,10 @@ import (
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
+	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 
 	"open-cluster-management.io/registration/pkg/clientcert"
+	"open-cluster-management.io/registration/pkg/helpers"
 	"open-cluster-management.io/registration/pkg/hub/user"
 )
 
@@ -32,6 +35,7 @@ func NewClientCertForHubController(
 	hubCSRInformer certificatesinformers.Interface,
 	spokeKubeClient kubernetes.Interface,
 	hubKubeClient kubernetes.Interface,
+	statusUpdater clientcert.StatusUpdateFunc,
 	recorder events.Recorder,
 	controllerName string,
 ) (factory.Controller, error) {
@@ -83,9 +87,27 @@ func NewClientCertForHubController(
 		spokeSecretInformer,
 		spokeKubeClient,
 		hubKubeClient,
+		statusUpdater,
 		recorder,
 		controllerName,
 	)
+}
+
+func GenerateBootstrapStatusUpdater() clientcert.StatusUpdateFunc {
+	return func(ctx context.Context, cond metav1.Condition) error {
+		return nil
+	}
+}
+
+// GenerateStatusUpdater generates status update func for the certificate management
+func GenerateStatusUpdater(hubClusterClient clientset.Interface, clusterName string) clientcert.StatusUpdateFunc {
+	return func(ctx context.Context, cond metav1.Condition) error {
+		_, _, updatedErr := helpers.UpdateManagedClusterStatus(
+			ctx, hubClusterClient, clusterName, helpers.UpdateManagedClusterConditionFn(cond),
+		)
+
+		return updatedErr
+	}
 }
 
 // GetClusterAgentNamesFromCertificate returns the cluster name and agent name by parsing

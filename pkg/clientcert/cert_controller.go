@@ -42,6 +42,17 @@ const (
 
 	ClusterNameLabel = "open-cluster-management.io/cluster-name"
 	AddonNameLabel   = "open-cluster-management.io/addon-name"
+
+	// ClusterCertificateRotatedCondition is a condition type that client certificate is rotated
+	ClusterCertificateRotatedCondition = "ClusterCertificateRotated"
+
+	// ClientCertificateUpdateFailedReason is a reason of condition ClusterCertificateRotatedCondition that
+	// the client certificate rotation fails.
+	ClientCertificateUpdateFailedReason = "ClientCertificateUpdateFailed"
+
+	// ClientCertificateUpdatedReason is a reason of condition ClusterCertificateRotatedCondition that
+	// the the client certificate succeeds
+	ClientCertificateUpdatedReason = "ClientCertificateUpdated"
 )
 
 // ControllerResyncInterval is exposed so that integration tests can crank up the constroller sync speed.
@@ -77,6 +88,8 @@ type ClientCertOption struct {
 	AdditionalSecretDataSensitive bool
 }
 
+type StatusUpdateFunc func(ctx context.Context, cond metav1.Condition) error
+
 // clientCertificateController implements the common logic of hub client certification creation/rotation. It
 // creates a client certificate and rotates it before it becomes expired by using csrs. The client
 // certificate generated is stored in a specific secret with the keys below:
@@ -100,6 +113,8 @@ type clientCertificateController struct {
 	//   3. csrName set, keyData set: we are waiting for a new cert to be signed.
 	//   4. csrName empty, keydata set: the CSR failed to create, this shouldn't happen, it's a bug.
 	keyData []byte
+
+	statusUpdater StatusUpdateFunc
 }
 
 // NewClientCertificateController return an instance of clientCertificateController
@@ -110,6 +125,7 @@ func NewClientCertificateController(
 	spokeSecretInformer corev1informers.SecretInformer,
 	spokeKubeClient kubernetes.Interface,
 	hubKubeClient kubernetes.Interface,
+	statusUpdater StatusUpdateFunc,
 	recorder events.Recorder,
 	controllerName string,
 ) (factory.Controller, error) {
@@ -141,6 +157,7 @@ func NewClientCertificateController(
 		csrCtrl,
 		spokeSecretInformer,
 		spokeKubeClient.CoreV1(),
+		statusUpdater,
 		recorder,
 		controllerName), nil
 }
@@ -151,6 +168,7 @@ func newClientCertificateController(
 	csrControl csrControl,
 	spokeSecretInformer corev1informers.SecretInformer,
 	spokeCoreClient corev1client.CoreV1Interface,
+	statusUpdater StatusUpdateFunc,
 	recorder events.Recorder,
 	controllerName string,
 ) factory.Controller {
@@ -160,6 +178,7 @@ func newClientCertificateController(
 		csrControl:       csrControl,
 		spokeCoreClient:  spokeCoreClient,
 		controllerName:   controllerName,
+		statusUpdater:    statusUpdater,
 	}
 
 	return factory.New().
@@ -246,6 +265,14 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 
 		if err != nil {
 			c.reset()
+			if updateErr := c.statusUpdater(ctx, metav1.Condition{
+				Type:    "ClusterCertificateRotated",
+				Status:  metav1.ConditionFalse,
+				Reason:  "ClientCertificateUpdateFailed",
+				Message: fmt.Sprintf("Failed to rotated client certificate %v", err),
+			}); updateErr != nil {
+				return updateErr
+			}
 			return err
 		}
 		if len(newSecretConfig) == 0 {
@@ -258,8 +285,43 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 		secret.Data = newSecretConfig
 		// save the changes into secret
 		if err := saveSecret(c.spokeCoreClient, c.SecretNamespace, secret); err != nil {
+			if updateErr := c.statusUpdater(ctx, metav1.Condition{
+				Type:    "ClusterCertificateRotated",
+				Status:  metav1.ConditionFalse,
+				Reason:  "ClientCertificateUpdateFailed",
+				Message: fmt.Sprintf("Failed to rotated client certificate %v", err),
+			}); updateErr != nil {
+				return updateErr
+			}
 			return err
 		}
+
+		notBefore, notAfter, err := getCertValidityPeriod(secret)
+
+		cond := metav1.Condition{
+			Type:    "ClusterCertificateRotated",
+			Status:  metav1.ConditionTrue,
+			Reason:  "ClientCertificateUpdated",
+			Message: fmt.Sprintf("client certificate rotated starting from %v to %v", *notBefore, *notAfter),
+		}
+
+		if err != nil {
+			cond = metav1.Condition{
+				Type:    "ClusterCertificateRotated",
+				Status:  metav1.ConditionFalse,
+				Reason:  "ClientCertificateUpdateFailed",
+				Message: fmt.Sprintf("Failed to rotated client certificate %v", err),
+			}
+		}
+		if updateErr := c.statusUpdater(ctx, cond); updateErr != nil {
+			return updateErr
+		}
+
+		if err != nil {
+			c.reset()
+			return err
+		}
+
 		syncCtx.Recorder().Eventf("ClientCertificateCreated", "A new client certificate for %s is available", c.controllerName)
 		c.reset()
 		return nil
