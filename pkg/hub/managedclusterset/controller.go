@@ -24,10 +24,6 @@ import (
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
-const (
-	clusterSetLabel = "cluster.open-cluster-management.io/clusterset"
-)
-
 // managedClusterSetController reconciles instances of ManagedClusterSet on the hub.
 type managedClusterSetController struct {
 	clusterClient    clientset.Interface
@@ -145,7 +141,7 @@ func (c *managedClusterSetController) syncClusterSet(ctx context.Context, cluste
 
 	// find out the containing clusters of clusterset
 	selector := labels.SelectorFromSet(labels.Set{
-		clusterSetLabel: clusterSetCopy.Name,
+		clusterv1beta1.ClusterSetLabel: clusterSetCopy.Name,
 	})
 	clusters, err := c.clusterLister.List(selector)
 	if err != nil {
@@ -191,7 +187,7 @@ func getClusterSet(obj interface{}) string {
 		return ""
 	}
 
-	if clusterSetName := labels[clusterSetLabel]; len(clusterSetName) > 0 {
+	if clusterSetName := labels[clusterv1beta1.ClusterSetLabel]; len(clusterSetName) > 0 {
 		return clusterSetName
 	}
 

@@ -97,7 +97,7 @@ func TestHealthCheck(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				testinghelpers.AssertManagedClusterCondition(t, managedCluster.Status.Conditions, expectedCondition)
+				testinghelpers.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
 		},
 		{
@@ -134,7 +134,7 @@ func TestHealthCheck(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				testinghelpers.AssertManagedClusterCondition(t, managedCluster.Status.Conditions, expectedCondition)
+				testinghelpers.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
 				testinghelpers.AssertManagedClusterStatus(t, managedCluster.Status, expectedStatus)
 			},
 		},
@@ -157,7 +157,7 @@ func TestHealthCheck(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				testinghelpers.AssertManagedClusterCondition(t, managedCluster.Status.Conditions, expectedCondition)
+				testinghelpers.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
 		},
 		{
@@ -179,7 +179,7 @@ func TestHealthCheck(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				testinghelpers.AssertManagedClusterCondition(t, managedCluster.Status.Conditions, expectedCondition)
+				testinghelpers.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
 		},
 		{
@@ -226,7 +226,7 @@ func TestHealthCheck(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				testinghelpers.AssertManagedClusterCondition(t, managedCluster.Status.Conditions, expectedCondition)
+				testinghelpers.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
 				testinghelpers.AssertManagedClusterStatus(t, managedCluster.Status, expectedStatus)
 			},
 		},

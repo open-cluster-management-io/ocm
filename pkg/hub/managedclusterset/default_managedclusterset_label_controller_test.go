@@ -12,6 +12,7 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 )
 
@@ -40,7 +41,7 @@ func TestSyncClusterSetLabel(t *testing.T) {
 		{
 			name: "sync a labeled cluster",
 			existingClusters: []*clusterv1.ManagedCluster{
-				newClusterWithLabel(testinghelpers.TestManagedClusterName, clusterSetLabel, defaultManagedClusterSetValue),
+				newClusterWithLabel(testinghelpers.TestManagedClusterName, clusterv1beta1.ClusterSetLabel, defaultManagedClusterSetValue),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testinghelpers.AssertNoActions(t, actions)
@@ -54,8 +55,8 @@ func TestSyncClusterSetLabel(t *testing.T) {
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, actions, "update")
 				cluster := actions[0].(clienttesting.UpdateAction).GetObject().(*clusterv1.ManagedCluster)
-				if !hasLabel(cluster, clusterSetLabel, defaultManagedClusterSetValue) {
-					t.Errorf("expected label %v:%v is not found", clusterSetLabel, defaultManagedClusterSetValue)
+				if !hasLabel(cluster, clusterv1beta1.ClusterSetLabel, defaultManagedClusterSetValue) {
+					t.Errorf("expected label %v:%v is not found", clusterv1beta1.ClusterSetLabel, defaultManagedClusterSetValue)
 				}
 
 			},

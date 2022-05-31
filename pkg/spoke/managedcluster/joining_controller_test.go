@@ -51,7 +51,7 @@ func TestSyncManagedCluster(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				testinghelpers.AssertManagedClusterCondition(t, managedCluster.Status.Conditions, expectedCondition)
+				testinghelpers.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
 		},
 	}

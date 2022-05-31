@@ -10,6 +10,7 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,7 +56,7 @@ func TestManagedClusterMutate(t *testing.T) {
 					withLeaseDurationSeconds(60).
 					addTaint(newTaint("a", "b", clusterv1.TaintEffectNoSelect, nil)).
 					addTaint(newTaint("c", "d", clusterv1.TaintEffectPreferNoSelect, nil)).
-					addLabels(map[string]string{clusterSetLabel: defaultClusterSetName}).
+					addLabels(map[string]string{clusterv1beta1.ClusterSetLabel: defaultClusterSetName}).
 					build(),
 			},
 			expectedResponse: newAdmissionResponse(true).
@@ -72,7 +73,7 @@ func TestManagedClusterMutate(t *testing.T) {
 					withLeaseDurationSeconds(60).
 					addTaint(newTaint("a", "b", clusterv1.TaintEffectNoSelect, nil)).
 					addTaint(newTaint("c", "d", clusterv1.TaintEffectPreferNoSelect, newTime(now, 0))).
-					addLabels(map[string]string{clusterSetLabel: defaultClusterSetName}).
+					addLabels(map[string]string{clusterv1beta1.ClusterSetLabel: defaultClusterSetName}).
 					build(),
 			},
 			expectedResponse: newAdmissionResponse(true).
@@ -90,13 +91,13 @@ func TestManagedClusterMutate(t *testing.T) {
 					withLeaseDurationSeconds(60).
 					addTaint(newTaint("a", "b", clusterv1.TaintEffectNoSelect, newTime(now, -10*time.Second))).
 					addTaint(newTaint("c", "d", clusterv1.TaintEffectNoSelect, newTime(now, -10*time.Second))).
-					addLabels(map[string]string{clusterSetLabel: defaultClusterSetName}).
+					addLabels(map[string]string{clusterv1beta1.ClusterSetLabel: defaultClusterSetName}).
 					build(),
 				Object: newManagedCluster().
 					withLeaseDurationSeconds(60).
 					addTaint(newTaint("a", "b", clusterv1.TaintEffectNoSelect, newTime(now, -10*time.Second))). // no change
 					addTaint(newTaint("c", "d", clusterv1.TaintEffectNoSelectIfNew, nil)).                      // effect modified
-					addLabels(map[string]string{clusterSetLabel: defaultClusterSetName}).
+					addLabels(map[string]string{clusterv1beta1.ClusterSetLabel: defaultClusterSetName}).
 					build(),
 			},
 			expectedResponse: newAdmissionResponse(true).
@@ -132,12 +133,12 @@ func TestManagedClusterMutate(t *testing.T) {
 					withLeaseDurationSeconds(60).
 					addTaint(newTaint("a", "b", clusterv1.TaintEffectNoSelect, newTime(now, -10*time.Second))).
 					addTaint(newTaint("c", "d", clusterv1.TaintEffectNoSelect, newTime(now, -10*time.Second))).
-					addLabels(map[string]string{clusterSetLabel: defaultClusterSetName}).
+					addLabels(map[string]string{clusterv1beta1.ClusterSetLabel: defaultClusterSetName}).
 					build(),
 				Object: newManagedCluster().
 					withLeaseDurationSeconds(60).
 					addTaint(newTaint("a", "b", clusterv1.TaintEffectNoSelect, newTime(now, -10*time.Second))).
-					addLabels(map[string]string{clusterSetLabel: defaultClusterSetName}).
+					addLabels(map[string]string{clusterv1beta1.ClusterSetLabel: defaultClusterSetName}).
 					build(),
 			},
 			expectedResponse: newAdmissionResponse(true).build(),
@@ -156,7 +157,7 @@ func TestManagedClusterMutate(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/labels",
 					Value: map[string]string{
-						clusterSetLabel: defaultClusterSetName,
+						clusterv1beta1.ClusterSetLabel: defaultClusterSetName,
 					},
 				}).
 				build(),
@@ -168,7 +169,7 @@ func TestManagedClusterMutate(t *testing.T) {
 				Operation: admissionv1beta1.Create,
 				Object: newManagedCluster().
 					withLeaseDurationSeconds(60).
-					addLabels(map[string]string{clusterSetLabel: "c1"}).
+					addLabels(map[string]string{clusterv1beta1.ClusterSetLabel: "c1"}).
 					build(),
 			},
 			expectedResponse: newAdmissionResponse(true).
@@ -181,7 +182,7 @@ func TestManagedClusterMutate(t *testing.T) {
 				Operation: admissionv1beta1.Create,
 				Object: newManagedCluster().
 					withLeaseDurationSeconds(60).
-					addLabels(map[string]string{clusterSetLabel: defaultClusterSetName}).
+					addLabels(map[string]string{clusterv1beta1.ClusterSetLabel: defaultClusterSetName}).
 					build(),
 			},
 			expectedResponse: newAdmissionResponse(true).
@@ -194,7 +195,7 @@ func TestManagedClusterMutate(t *testing.T) {
 				Operation: admissionv1beta1.Create,
 				Object: newManagedCluster().
 					withLeaseDurationSeconds(60).
-					addLabels(map[string]string{clusterSetLabel: ""}).
+					addLabels(map[string]string{clusterv1beta1.ClusterSetLabel: ""}).
 					build(),
 			},
 			expectedResponse: newAdmissionResponse(true).

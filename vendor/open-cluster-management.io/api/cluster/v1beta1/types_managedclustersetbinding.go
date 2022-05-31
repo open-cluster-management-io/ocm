@@ -6,6 +6,7 @@ import (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:subresource:status
 // +kubebuilder:resource:scope="Namespaced",shortName={"mclsetbinding","mclsetbindings"}
 // +kubebuilder:storageversion
 
@@ -21,6 +22,10 @@ type ManagedClusterSetBinding struct {
 
 	// Spec defines the attributes of ManagedClusterSetBinding.
 	Spec ManagedClusterSetBindingSpec `json:"spec"`
+
+	// Status represents the current status of the ManagedClusterSetBinding
+	// +optional
+	Status ManagedClusterSetBindingStatus `json:"status,omitempty"`
 }
 
 // ManagedClusterSetBindingSpec defines the attributes of ManagedClusterSetBinding.
@@ -31,6 +36,18 @@ type ManagedClusterSetBindingSpec struct {
 	// virtual subresource of managedclustersets/bind.
 	// +kubebuilder:validation:MinLength=1
 	ClusterSet string `json:"clusterSet"`
+}
+
+const (
+	// ClusterSetBindingBoundType is a condition type of clustersetbinding representing
+	// whether the ClusterSetBinding is bound to a clusterset.
+	ClusterSetBindingBoundType = "Bound"
+)
+
+// ManagedClusterSetBindingStatus represents the current status of the ManagedClusterSetBinding.
+type ManagedClusterSetBindingStatus struct {
+	// Conditions contains the different condition statuses for this ManagedClusterSetBinding.
+	Conditions []metav1.Condition `json:"conditions"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

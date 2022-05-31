@@ -16,6 +16,7 @@ import (
 	clusterinformerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
 const (
@@ -83,11 +84,11 @@ func (c *defaultManagedClusterSetLabelController) sync(ctx context.Context, sync
 func (c *defaultManagedClusterSetLabelController) syncClusterSetLabel(ctx context.Context, managedCluster *clusterv1.ManagedCluster) error {
 	cluster := managedCluster.DeepCopy()
 
-	if v, ok := cluster.Labels[clusterSetLabel]; !ok || v == "" {
+	if v, ok := cluster.Labels[clusterv1beta1.ClusterSetLabel]; !ok || v == "" {
 		modified := false
 
 		clusterSetLabels := map[string]string{}
-		clusterSetLabels[clusterSetLabel] = defaultManagedClusterSetValue
+		clusterSetLabels[clusterv1beta1.ClusterSetLabel] = defaultManagedClusterSetValue
 		// merge clusterSetLabel into ManagedCluster.Labels
 		resourcemerge.MergeMap(&modified, &cluster.Labels, clusterSetLabels)
 

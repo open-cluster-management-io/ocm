@@ -108,9 +108,9 @@ func AssertFinalizers(t *testing.T, obj runtime.Object, finalizers []string) {
 	}
 }
 
-// AssertManagedClusterCondition asserts the actual managed cluster conditions has
+// AssertCondition asserts the actual conditions has
 // the expected condition
-func AssertManagedClusterCondition(
+func AssertCondition(
 	t *testing.T,
 	actualConditions []metav1.Condition,
 	expectedCondition metav1.Condition) {

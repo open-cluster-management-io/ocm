@@ -39,6 +39,14 @@ type ManifestWorkSpec struct {
 	// ManifestConfigs represents the configurations of manifests defined in workload field.
 	// +optional
 	ManifestConfigs []ManifestConfigOption `json:"manifestConfigs,omitempty"`
+
+	// Executor is the configuration that makes the work agent to perform some pre-request processing/checking.
+	// e.g. the executor identity tells the work agent to check the executor has sufficient permission to write
+	// the workloads to the local managed cluster.
+	// Note that nil executor is still supported for backward-compatibility which indicates that the work agent
+	// will not perform any additional actions before applying resources.
+	// +optional
+	Executor *ManifestWorkExecutor `json:"executor,omitempty"`
 }
 
 // Manifest represents a resource to be deployed on managed cluster.
@@ -82,6 +90,57 @@ type ManifestConfigOption struct {
 	// +kubebuilder:validation:Required
 	// +required
 	FeedbackRules []FeedbackRule `json:"feedbackRules"`
+}
+
+// ManifestWorkExecutor is the executor that applies the resources to the managed cluster. i.e. the
+// work agent.
+type ManifestWorkExecutor struct {
+	// Subject is the subject identity which the work agent uses to talk to the
+	// local cluster when applying the resources.
+	Subject ManifestWorkExecutorSubject `json:"subject"`
+}
+
+// ManifestWorkExecutorSubject is the subject identity used by the work agent to apply the resources.
+// The work agent should check whether the applying resources are out-of-scope of the permission held
+// by the executor identity.
+type ManifestWorkExecutorSubject struct {
+	// Type is the type of the subject identity.
+	// Supported types are: "ServiceAccount".
+	// +kubebuilder:validation:Enum=ServiceAccount
+	// +kubebuilder:validation:Required
+	// +required
+	Type ManifestWorkExecutorSubjectType `json:"type"`
+	// ServiceAccount is for identifying which service account to use by the work agent.
+	// Only required if the type is "ServiceAccount".
+	// +optional
+	ServiceAccount *ManifestWorkSubjectServiceAccount `json:"serviceAccount,omitempty"`
+}
+
+// ManifestWorkExecutorSubjectType is the type of the subject.
+type ManifestWorkExecutorSubjectType string
+
+const (
+	// ExecutorSubjectTypeServiceAccount indicates that the workload resources belong to a ServiceAccount
+	// in the managed cluster.
+	ExecutorSubjectTypeServiceAccount ManifestWorkExecutorSubjectType = "ServiceAccount"
+)
+
+// ManifestWorkSubjectServiceAccount references service account in the managed clusters.
+type ManifestWorkSubjectServiceAccount struct {
+	// Namespace is the namespace of the service account.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)$`
+	// +required
+	Namespace string `json:"namespace"`
+	// Name is the name of the service account.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)$`
+	// +required
+	Name string `json:"name"`
 }
 
 type FeedbackRule struct {

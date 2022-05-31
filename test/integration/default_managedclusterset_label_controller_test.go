@@ -9,6 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
 const (
@@ -27,7 +28,7 @@ var _ = ginkgo.Describe("DefaultManagedClusterSetLabel", func() {
 			if err != nil {
 				return false
 			}
-			if hasLabel(cluster1, clusterSetLabel, defaultManagedClusterSetValue) {
+			if hasLabel(cluster1, clusterv1beta1.ClusterSetLabel, defaultManagedClusterSetValue) {
 				return true
 			}
 			return false
@@ -37,7 +38,7 @@ var _ = ginkgo.Describe("DefaultManagedClusterSetLabel", func() {
 
 	ginkgo.It("should ensure managed cluster label is not \"\"", func() {
 		ginkgo.By("Create a ManagedCluster with empty-valued label")
-		mcl2, err := newManagedClusterWithLabel(clusterSetLabel, "")
+		mcl2, err := newManagedClusterWithLabel(clusterv1beta1.ClusterSetLabel, "")
 		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "create managed cluster failed")
 
 		ginkgo.By("Check whether DefaultManagedClusterSetLabel value is empty")
@@ -46,7 +47,7 @@ var _ = ginkgo.Describe("DefaultManagedClusterSetLabel", func() {
 			if err != nil {
 				return false
 			}
-			if hasLabel(cluster2, clusterSetLabel, defaultManagedClusterSetValue) {
+			if hasLabel(cluster2, clusterv1beta1.ClusterSetLabel, defaultManagedClusterSetValue) {
 				return true
 			}
 			return false
@@ -56,7 +57,7 @@ var _ = ginkgo.Describe("DefaultManagedClusterSetLabel", func() {
 
 	ginkgo.It("should ensure managed cluster label is default", func() {
 		ginkgo.By("Create a ManagedCluster with default label")
-		mcl2, err := newManagedClusterWithLabel(clusterSetLabel, defaultManagedClusterSetValue)
+		mcl2, err := newManagedClusterWithLabel(clusterv1beta1.ClusterSetLabel, defaultManagedClusterSetValue)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "create managed cluster failed")
 
 		ginkgo.By("Check whether DefaultManagedClusterSetLabel value is default")
@@ -65,7 +66,7 @@ var _ = ginkgo.Describe("DefaultManagedClusterSetLabel", func() {
 			if err != nil {
 				return false
 			}
-			if hasLabel(cluster2, clusterSetLabel, defaultManagedClusterSetValue) {
+			if hasLabel(cluster2, clusterv1beta1.ClusterSetLabel, defaultManagedClusterSetValue) {
 				return true
 			}
 			return false

@@ -86,6 +86,18 @@ func (c *FakeManagedClusterSetBindings) Update(ctx context.Context, managedClust
 	return obj.(*v1beta1.ManagedClusterSetBinding), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeManagedClusterSetBindings) UpdateStatus(ctx context.Context, managedClusterSetBinding *v1beta1.ManagedClusterSetBinding, opts v1.UpdateOptions) (*v1beta1.ManagedClusterSetBinding, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(managedclustersetbindingsResource, "status", c.ns, managedClusterSetBinding), &v1beta1.ManagedClusterSetBinding{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.ManagedClusterSetBinding), err
+}
+
 // Delete takes name of the managedClusterSetBinding and deletes it. Returns an error if one occurs.
 func (c *FakeManagedClusterSetBindings) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.

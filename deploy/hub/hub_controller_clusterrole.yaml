@@ -47,10 +47,17 @@ rules:
   resources: ["signers"]
   resourceNames: ["kubernetes.io/kube-apiserver-client"]
   verbs: ["approve"]
+# Allow hub to manage managedclustersetbindings
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclustersetbindings"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclustersetbindings/status"]
+  verbs: ["update", "patch"]
 # Allow hub to manage managedclustersets
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["managedclustersets"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  verbs: ["get", "list", "watch"]
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["managedclustersets/status"]
   verbs: ["update", "patch"]

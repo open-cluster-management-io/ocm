@@ -13,10 +13,6 @@ import (
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
-const (
-	clusterSetLabel = "cluster.open-cluster-management.io/clusterset"
-)
-
 var _ = ginkgo.Describe("ManagedClusterSet", func() {
 	ginkgo.It("should create cluster set and keep it synced successfully ", func() {
 		for i := 0; i < 10; i++ {
@@ -60,7 +56,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: managedClusterName,
 					Labels: map[string]string{
-						clusterSetLabel: managedClusterSetName,
+						clusterv1beta1.ClusterSetLabel: managedClusterSetName,
 					},
 				},
 				Spec: clusterv1.ManagedClusterSpec{
@@ -109,7 +105,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 					return err
 				}
 				managedCluster.Labels = map[string]string{
-					clusterSetLabel: managedClusterSet.Name,
+					clusterv1beta1.ClusterSetLabel: managedClusterSet.Name,
 				}
 				_, err := clusterClient.ClusterV1().ManagedClusters().Update(context.Background(), managedCluster, metav1.UpdateOptions{})
 				return err

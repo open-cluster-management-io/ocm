@@ -68,6 +68,40 @@ spec:
                               resource:
                                 description: Resource is the resource name of the Kubernetes resource.
                                 type: string
+                executor:
+                  description: Executor is the configuration that makes the work agent to perform some pre-request processing/checking. e.g. the executor identity tells the work agent to check the executor has sufficient permission to write the workloads to the local managed cluster. Note that nil executor is still supported for backward-compatibility which indicates that the work agent will not perform any additional actions before applying resources.
+                  type: object
+                  properties:
+                    subject:
+                      description: Subject is the subject identity which the work agent uses to talk to the local cluster when applying the resources.
+                      type: object
+                      required:
+                        - type
+                      properties:
+                        serviceAccount:
+                          description: ServiceAccount is for identifying which service account to use by the work agent. Only required if the type is "ServiceAccount".
+                          type: object
+                          required:
+                            - name
+                            - namespace
+                          properties:
+                            name:
+                              description: Name is the name of the service account.
+                              type: string
+                              maxLength: 253
+                              minLength: 1
+                              pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)$
+                            namespace:
+                              description: Namespace is the namespace of the service account.
+                              type: string
+                              maxLength: 253
+                              minLength: 1
+                              pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)$
+                        type:
+                          description: 'Type is the type of the subject identity. Supported types are: "ServiceAccount".'
+                          type: string
+                          enum:
+                            - ServiceAccount
                 manifestConfigs:
                   description: ManifestConfigs represents the configurations of manifests defined in workload field.
                   type: array

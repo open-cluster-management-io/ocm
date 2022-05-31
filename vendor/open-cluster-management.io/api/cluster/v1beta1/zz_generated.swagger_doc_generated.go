@@ -12,8 +12,9 @@ package v1beta1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_ManagedClusterSelector = map[string]string{
-	"":             "ManagedClusterSelector represents a selector of ManagedClusters",
-	"selectorType": "SelectorType could only be \"LegacyClusterSetLabel\" now, will support more SelectorType later \"LegacyClusterSetLabel\" means to use label \"cluster.open-cluster-management.io/clusterset:<ManagedClusterSet Name>\"\" to select target clusters.",
+	"":              "ManagedClusterSelector represents a selector of ManagedClusters",
+	"selectorType":  "SelectorType could only be \"LegacyClusterSetLabel\" or \"LabelSelector\" \"LegacyClusterSetLabel\" means to use label \"cluster.open-cluster-management.io/clusterset:<ManagedClusterSet Name>\"\" to select target clusters. \"LabelSelector\" means use labelSelector to select target managedClusters",
+	"labelSelector": "LabelSelector define the general labelSelector which clusterset will use to select target managedClusters",
 }
 
 func (ManagedClusterSelector) SwaggerDoc() map[string]string {
@@ -59,8 +60,9 @@ func (ManagedClusterSetStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ManagedClusterSetBinding = map[string]string{
-	"":     "ManagedClusterSetBinding projects a ManagedClusterSet into a certain namespace. User is able to create a ManagedClusterSetBinding in a namespace and bind it to a ManagedClusterSet if they have an RBAC rule to CREATE on the virtual subresource of managedclustersets/bind. Workloads created in the same namespace can only be distributed to ManagedClusters in ManagedClusterSets bound in this namespace by higher level controllers.",
-	"spec": "Spec defines the attributes of ManagedClusterSetBinding.",
+	"":       "ManagedClusterSetBinding projects a ManagedClusterSet into a certain namespace. User is able to create a ManagedClusterSetBinding in a namespace and bind it to a ManagedClusterSet if they have an RBAC rule to CREATE on the virtual subresource of managedclustersets/bind. Workloads created in the same namespace can only be distributed to ManagedClusters in ManagedClusterSets bound in this namespace by higher level controllers.",
+	"spec":   "Spec defines the attributes of ManagedClusterSetBinding.",
+	"status": "Status represents the current status of the ManagedClusterSetBinding",
 }
 
 func (ManagedClusterSetBinding) SwaggerDoc() map[string]string {
@@ -84,6 +86,15 @@ var map_ManagedClusterSetBindingSpec = map[string]string{
 
 func (ManagedClusterSetBindingSpec) SwaggerDoc() map[string]string {
 	return map_ManagedClusterSetBindingSpec
+}
+
+var map_ManagedClusterSetBindingStatus = map[string]string{
+	"":           "ManagedClusterSetBindingStatus represents the current status of the ManagedClusterSetBinding.",
+	"conditions": "Conditions contains the different condition statuses for this ManagedClusterSetBinding.",
+}
+
+func (ManagedClusterSetBindingStatus) SwaggerDoc() map[string]string {
+	return map_ManagedClusterSetBindingStatus
 }
 
 var map_AddOnScore = map[string]string{

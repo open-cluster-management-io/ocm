@@ -17,6 +17,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	restclient "k8s.io/client-go/rest"
@@ -30,7 +31,6 @@ const (
 	invalidURL            = "127.0.0.1:8001"
 	validURL              = "https://127.0.0.1:8443"
 	saNamespace           = "default"
-	clusterSetLabel       = "cluster.open-cluster-management.io/clusterset"
 )
 
 var _ = ginkgo.Describe("Admission webhook", func() {
@@ -91,7 +91,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-				gomega.Expect(managedCluster.Labels[clusterSetLabel]).To(gomega.Equal(string(defaultClusterSetName)))
+				gomega.Expect(managedCluster.Labels[clusterv1beta1.ClusterSetLabel]).To(gomega.Equal(string(defaultClusterSetName)))
 
 				gomega.Expect(len(managedCluster.Labels)).To(gomega.Equal(len(oriManagedCluster.Labels) + 1))
 				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
@@ -110,7 +110,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-				gomega.Expect(managedCluster.Labels[clusterSetLabel]).To(gomega.Equal(string(defaultClusterSetName)))
+				gomega.Expect(managedCluster.Labels[clusterv1beta1.ClusterSetLabel]).To(gomega.Equal(string(defaultClusterSetName)))
 
 				gomega.Expect(len(managedCluster.Labels)).To(gomega.Equal(len(oriManagedCluster.Labels) + 1))
 				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
@@ -121,7 +121,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				oriManagedCluster := newManagedCluster(clusterName, false, validURL)
 
 				oriManagedCluster.Labels = map[string]string{
-					clusterSetLabel: "",
+					clusterv1beta1.ClusterSetLabel: "",
 				}
 				_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.TODO(), oriManagedCluster, metav1.CreateOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -129,7 +129,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-				gomega.Expect(managedCluster.Labels[clusterSetLabel]).To(gomega.Equal(string(defaultClusterSetName)))
+				gomega.Expect(managedCluster.Labels[clusterv1beta1.ClusterSetLabel]).To(gomega.Equal(string(defaultClusterSetName)))
 			})
 			ginkgo.It("Should have the timeAdded for taints", func() {
 				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
@@ -307,7 +307,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 
 				managedCluster := newManagedCluster(clusterName, false, validURL)
 				managedCluster.Labels = map[string]string{
-					clusterSetLabel: clusterSetName,
+					clusterv1beta1.ClusterSetLabel: clusterSetName,
 				}
 				_, err = authorizedClient.ClusterV1().ManagedClusters().Create(context.TODO(), managedCluster, metav1.CreateOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -347,7 +347,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 
 				managedCluster := newManagedCluster(clusterName, false, validURL)
 				managedCluster.Labels = map[string]string{
-					clusterSetLabel: clusterSetName,
+					clusterv1beta1.ClusterSetLabel: clusterSetName,
 				}
 				_, err = unauthorizedClient.ClusterV1().ManagedClusters().Create(context.TODO(), managedCluster, metav1.CreateOptions{})
 				gomega.Expect(err).To(gomega.HaveOccurred())
@@ -403,7 +403,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-					delete(managedCluster.Labels, clusterSetLabel)
+					delete(managedCluster.Labels, clusterv1beta1.ClusterSetLabel)
 					_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
 					return err
 				})
@@ -411,7 +411,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 
 				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-				gomega.Expect(managedCluster.Labels[clusterSetLabel]).To(gomega.Equal(string(defaultClusterSetName)))
+				gomega.Expect(managedCluster.Labels[clusterv1beta1.ClusterSetLabel]).To(gomega.Equal(string(defaultClusterSetName)))
 			})
 
 			ginkgo.It("Should not update the other ClusterSet Label", func() {
@@ -420,7 +420,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-					managedCluster.Labels[clusterSetLabel] = "s1"
+					managedCluster.Labels[clusterv1beta1.ClusterSetLabel] = "s1"
 
 					_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
 					return err
@@ -429,7 +429,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 
 				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-				gomega.Expect(managedCluster.Labels[clusterSetLabel]).To(gomega.Equal("s1"))
+				gomega.Expect(managedCluster.Labels[clusterv1beta1.ClusterSetLabel]).To(gomega.Equal("s1"))
 			})
 
 			ginkgo.It("Should respond bad request when updating a managed cluster with invalid external server URLs", func() {
@@ -522,7 +522,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 					managedCluster.Labels = map[string]string{
-						clusterSetLabel: clusterSetName,
+						clusterv1beta1.ClusterSetLabel: clusterSetName,
 					}
 					_, err = authorizedClient.ClusterV1().ManagedClusters().Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
 					return err
@@ -570,7 +570,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 					managedCluster.Labels = map[string]string{
-						clusterSetLabel: clusterSetName,
+						clusterv1beta1.ClusterSetLabel: clusterSetName,
 					}
 					_, err = unauthorizedClient.ClusterV1().ManagedClusters().Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
 					return err
@@ -654,7 +654,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					{
 						APIGroups: []string{"cluster.open-cluster-management.io"},
 						Resources: []string{"managedclustersetbindings"},
-						Verbs:     []string{"create", "get", "update"},
+						Verbs:     []string{"create", "get", "update", "patch"},
 					},
 				})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -676,7 +676,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					{
 						APIGroups: []string{"cluster.open-cluster-management.io"},
 						Resources: []string{"managedclustersetbindings"},
-						Verbs:     []string{"create", "get", "update"},
+						Verbs:     []string{"create", "get", "update", "patch"},
 					},
 				})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -707,8 +707,8 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 
 				// update the cluster set binding
 				clusterSetName = fmt.Sprintf("clusterset-%s", rand.String(6))
-				managedClusterSetBinding.Spec.ClusterSet = clusterSetName
-				_, err = clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Update(context.TODO(), managedClusterSetBinding, metav1.UpdateOptions{})
+				patch := fmt.Sprintf("{\"spec\": {\"clusterSet\": %q}}", clusterSetName)
+				_, err = clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Patch(context.TODO(), managedClusterSetBinding.Name, types.MergePatchType, []byte(patch), metav1.PatchOptions{})
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(errors.IsBadRequest(err)).Should(gomega.BeTrue())
 				gomega.Expect(err.Error()).Should(gomega.Equal(fmt.Sprintf(
@@ -721,7 +721,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				// create a cluster set binding
 				clusterSetName := fmt.Sprintf("clusterset-%s", rand.String(6))
 				managedClusterSetBinding := newManagedClusterSetBinding(namespace, clusterSetName, clusterSetName)
-				managedClusterSetBinding, err := clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Create(context.TODO(), managedClusterSetBinding, metav1.CreateOptions{})
+				_, err := clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Create(context.TODO(), managedClusterSetBinding, metav1.CreateOptions{})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 				// create a client without clusterset binding permission
@@ -735,14 +735,16 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-				// update the cluster set binding by authorized user
-				managedClusterSetBinding.Labels = map[string]string{
-					"owner": "user1",
-				}
-				_, err = unauthorizedClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Update(context.TODO(), managedClusterSetBinding, metav1.UpdateOptions{})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-				gomega.Expect(cleanupClusterClient(namespace, sa)).ToNot(gomega.HaveOccurred())
+				// update the cluster set binding by unauthorized user
+				gomega.Eventually(func() error {
+					binding, err := unauthorizedClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Get(context.TODO(), clusterSetName, metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+					binding.Labels = map[string]string{"owner": "user"}
+					_, err = unauthorizedClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Update(context.TODO(), binding, metav1.UpdateOptions{})
+					return err
+				}, 60*time.Second, 1*time.Second).Should(gomega.Succeed())
 			})
 		})
 	})

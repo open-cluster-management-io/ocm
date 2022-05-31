@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"open-cluster-management.io/registration/pkg/features"
+	"open-cluster-management.io/registration/pkg/hub/managedclustersetbinding"
 	"open-cluster-management.io/registration/pkg/hub/taint"
 
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -112,6 +113,13 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		controllerContext.EventRecorder,
 	)
 
+	managedClusterSetBindingController := managedclustersetbinding.NewManagedClusterSetBindingController(
+		clusterClient,
+		clusterInformers.Cluster().V1beta1().ManagedClusterSets(),
+		clusterInformers.Cluster().V1beta1().ManagedClusterSetBindings(),
+		controllerContext.EventRecorder,
+	)
+
 	clusterroleController := clusterrole.NewManagedClusterClusterroleController(
 		kubeClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
@@ -159,6 +167,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	go leaseController.Run(ctx, 1)
 	go rbacFinalizerController.Run(ctx, 1)
 	go managedClusterSetController.Run(ctx, 1)
+	go managedClusterSetBindingController.Run(ctx, 1)
 	go clusterroleController.Run(ctx, 1)
 	go addOnHealthCheckController.Run(ctx, 1)
 	go addOnFeatureDiscoveryController.Run(ctx, 1)

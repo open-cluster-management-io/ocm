@@ -20,10 +20,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-)
-
-const (
-	clusterSetLabel = "cluster.open-cluster-management.io/clusterset"
+	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
 // ManagedClusterValidatingAdmissionHook will validate the creating/updating managedcluster request.
@@ -99,7 +96,7 @@ func (a *ManagedClusterValidatingAdmissionHook) validateCreateRequest(request *a
 	// check whether the request user has been allowed to set clusterset label
 	var clusterSetName string
 	if len(managedCluster.Labels) > 0 {
-		clusterSetName = managedCluster.Labels[clusterSetLabel]
+		clusterSetName = managedCluster.Labels[clusterv1beta1.ClusterSetLabel]
 	}
 
 	return a.allowSetClusterSetLabel(request.UserInfo, "", clusterSetName)
@@ -141,10 +138,10 @@ func (a *ManagedClusterValidatingAdmissionHook) validateUpdateRequest(request *a
 	// check whether the request user has been allowed to set clusterset label
 	var originalClusterSetName, currentClusterSetName string
 	if len(oldManagedCluster.Labels) > 0 {
-		originalClusterSetName = oldManagedCluster.Labels[clusterSetLabel]
+		originalClusterSetName = oldManagedCluster.Labels[clusterv1beta1.ClusterSetLabel]
 	}
 	if len(newManagedCluster.Labels) > 0 {
-		currentClusterSetName = newManagedCluster.Labels[clusterSetLabel]
+		currentClusterSetName = newManagedCluster.Labels[clusterv1beta1.ClusterSetLabel]
 	}
 
 	return a.allowSetClusterSetLabel(request.UserInfo, originalClusterSetName, currentClusterSetName)

@@ -164,7 +164,7 @@ func newManagedCluster(name, clusterSet string) *clusterv1.ManagedCluster {
 
 	if len(clusterSet) > 0 {
 		cluster.Labels = map[string]string{
-			clusterSetLabel: clusterSet,
+			clusterv1beta1.ClusterSetLabel: clusterSet,
 		}
 	}
 
