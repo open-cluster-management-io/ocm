@@ -243,7 +243,13 @@ func (m *ManifestWorkController) applyOneManifest(
 
 	result := applyResult{}
 
-	resMeta, gvr, err := buildManifestResourceMeta(index, manifest, m.restMapper)
+	unstructuredObj := &unstructured.Unstructured{}
+	if err := unstructuredObj.UnmarshalJSON(manifest.Raw); err != nil {
+		result.Error = err
+		return result
+	}
+
+	resMeta, gvr, err := buildResourceMeta(index, unstructuredObj, m.restMapper)
 	result.resourceMeta = resMeta
 	if err != nil {
 		result.Error = err
@@ -251,15 +257,9 @@ func (m *ManifestWorkController) applyOneManifest(
 	}
 
 	owner = manageOwnerRef(gvr, resMeta.Namespace, resMeta.Name, deleteOption, owner)
+	unstructuredObj.SetOwnerReferences([]metav1.OwnerReference{owner})
 
 	results := resourceapply.ApplyDirectly(ctx, clientHolder, recorder, m.staticResourceCache, func(name string) ([]byte, error) {
-		unstructuredObj := &unstructured.Unstructured{}
-		err := unstructuredObj.UnmarshalJSON(manifest.Raw)
-		if err != nil {
-			return nil, err
-		}
-
-		unstructuredObj.SetOwnerReferences([]metav1.OwnerReference{owner})
 		return unstructuredObj.MarshalJSON()
 	}, "manifest")
 
@@ -271,36 +271,17 @@ func (m *ManifestWorkController) applyOneManifest(
 	// TODO we should check the certain error.
 	// Use dynamic client when scheme cannot decode manifest or typed client cannot handle the object
 	if isDecodeError(result.Error) || isUnhandledError(result.Error) || isUnsupportedError(result.Error) {
-		result.Result, result.Changed, result.Error = m.applyUnstructured(ctx, manifest.Raw, owner, gvr, recorder)
+		result.Result, result.Changed, result.Error = m.applyUnstructured(ctx, unstructuredObj, gvr, recorder)
 	}
 
 	return result
 }
 
-func (m *ManifestWorkController) decodeUnstructured(data []byte) (*unstructured.Unstructured, error) {
-	unstructuredObj := &unstructured.Unstructured{}
-	err := unstructuredObj.UnmarshalJSON(data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode object: %w", err)
-	}
-
-	return unstructuredObj, nil
-}
-
 func (m *ManifestWorkController) applyUnstructured(
 	ctx context.Context,
-	data []byte,
-	owner metav1.OwnerReference,
+	required *unstructured.Unstructured,
 	gvr schema.GroupVersionResource,
 	recorder events.Recorder) (*unstructured.Unstructured, bool, error) {
-
-	required, err := m.decodeUnstructured(data)
-	if err != nil {
-		return nil, false, err
-	}
-
-	required.SetOwnerReferences([]metav1.OwnerReference{owner})
-
 	existing, err := m.spokeDynamicClient.
 		Resource(gvr).
 		Namespace(required.GetNamespace()).
@@ -513,37 +494,6 @@ func buildAppliedStatusCondition(result applyResult) metav1.Condition {
 		Reason:  "AppliedManifestComplete",
 		Message: "Apply manifest complete",
 	}
-}
-
-// buildManifestResourceMeta returns resource meta for manifest. It tries to get the resource
-// meta from the result object in ApplyResult struct. If the resource meta is incompleted, fall
-// back to manifest template for the meta info.
-func buildManifestResourceMeta(
-	index int,
-	manifest workapiv1.Manifest,
-	restMapper meta.RESTMapper) (resourceMeta workapiv1.ManifestResourceMeta, gvr schema.GroupVersionResource, err error) {
-	errs := []error{}
-
-	var object runtime.Object
-
-	// try to get resource meta from manifest if the one got from apply result is incompleted
-	switch {
-	case manifest.Object != nil:
-		object = manifest.Object
-	default:
-		unstructuredObj := &unstructured.Unstructured{}
-		if err = unstructuredObj.UnmarshalJSON(manifest.Raw); err != nil {
-			errs = append(errs, err)
-			return resourceMeta, gvr, utilerrors.NewAggregate(errs)
-		}
-		object = unstructuredObj
-	}
-	resourceMeta, gvr, err = buildResourceMeta(index, object, restMapper)
-	if err == nil {
-		return resourceMeta, gvr, nil
-	}
-
-	return resourceMeta, gvr, utilerrors.NewAggregate(errs)
 }
 
 func buildResourceMeta(
