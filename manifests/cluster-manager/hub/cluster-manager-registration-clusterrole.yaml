@@ -54,11 +54,6 @@ rules:
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["managedclustersets/status"]
   verbs: ["update", "patch"]
-# Allow hub to move managedclusters without clusterset label to the default managedclustersets
-# which need all clusterset join permission
-- apiGroups: ["cluster.open-cluster-management.io"]
-  resources: ["managedclustersets/join"]
-  verbs: ["create"]
 # Allow hub to manage managedclustersetbindings
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["managedclustersetbindings"]
