@@ -1,0 +1,58 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: reviews
+  namespace: bookinfo
+spec:
+  hosts:
+  - reviews.bookinfo.svc.cluster.local
+  http:
+  - match:
+    - port: 9080
+    route:
+    - destination:
+        host: reviews.bookinfo.svc.cluster2.global
+        port:
+          number: 9080
+      weight: 75
+    - destination:
+        host: reviews.bookinfo.svc.cluster.local
+        port:
+          number: 9080
+        subset: version-v1
+      weight: 15
+    - destination:
+        host: reviews.bookinfo.svc.cluster.local
+        port:
+          number: 9080
+        subset: version-v2
+      weight: 10
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: reviews
+  namespace: bookinfo
+spec:
+  host: reviews.bookinfo.svc.cluster.local
+  subsets:
+  - labels:
+      version: v1
+    name: version-v1
+  - labels:
+      version: v2
+    name: version-v2
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: reviews-bookinfo-cluster2
+  namespace: istio-system
+spec:
+  host: reviews.bookinfo.svc.cluster2.global
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
