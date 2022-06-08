@@ -72,19 +72,6 @@ func TestReconcile(t *testing.T) {
 			testaddon: &testAgent{name: "test", strategy: agent.InstallAllStrategy("test")},
 		},
 		{
-			name:    "update addon with all install strategy",
-			addon:   []runtime.Object{addontesting.NewAddon("test", "cluster1")},
-			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
-			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "update")
-				actual := actions[0].(clienttesting.UpdateActionImpl).Object
-				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
-				if addOn.Spec.InstallNamespace != "test" {
-					t.Errorf("Install namespace is not correct, expected test but got %s", addOn.Spec.InstallNamespace)
-				}
-			},
-			testaddon: &testAgent{name: "test", strategy: agent.InstallAllStrategy("test")},
-		}, {
 			name:    "install addon when cluster is deleting",
 			addon:   []runtime.Object{addontesting.NewAddon("test", "cluster1")},
 			cluster: []runtime.Object{addontesting.DeleteManagedCluster(addontesting.NewManagedCluster("cluster1"))},

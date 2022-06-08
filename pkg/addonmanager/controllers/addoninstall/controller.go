@@ -119,10 +119,11 @@ func (c *addonInstallController) sync(ctx context.Context, syncCtx factory.SyncC
 }
 
 func (c *addonInstallController) applyAddon(ctx context.Context, addonName, clusterName, installNamespace string) error {
-	addon, err := c.managedClusterAddonLister.ManagedClusterAddOns(clusterName).Get(addonName)
-	switch {
-	case errors.IsNotFound(err):
-		addon = &addonapiv1alpha1.ManagedClusterAddOn{
+	_, err := c.managedClusterAddonLister.ManagedClusterAddOns(clusterName).Get(addonName)
+
+	// only create addon when it is missing, if user update the addon resource ,it should not be reverted
+	if errors.IsNotFound(err) {
+		addon := &addonapiv1alpha1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      addonName,
 				Namespace: clusterName,
@@ -133,17 +134,7 @@ func (c *addonInstallController) applyAddon(ctx context.Context, addonName, clus
 		}
 		_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Create(ctx, addon, metav1.CreateOptions{})
 		return err
-	case err != nil:
-		return err
 	}
-
-	if addon.Spec.InstallNamespace == installNamespace {
-		return nil
-	}
-
-	addon = addon.DeepCopy()
-	addon.Spec.InstallNamespace = installNamespace
-	_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Update(ctx, addon, metav1.UpdateOptions{})
 
 	return err
 }
