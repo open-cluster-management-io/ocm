@@ -16,9 +16,9 @@ import (
 	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 )
 
-func TestSyncDefaultClusterSet(t *testing.T) {
+func TestSyncGlobalClusterSet(t *testing.T) {
 
-	var editedDefaultManagedClusterSetSpec = clusterv1beta1.ManagedClusterSetSpec{
+	var editedGlobalManagedClusterSetSpec = clusterv1beta1.ManagedClusterSetSpec{
 		ClusterSelector: clusterv1beta1.ManagedClusterSelector{
 			SelectorType: "non-LegacyClusterSetLabel",
 		},
@@ -30,46 +30,39 @@ func TestSyncDefaultClusterSet(t *testing.T) {
 		validateActions    func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
-			name:               "sync default cluster set",
-			existingClusterSet: newDefaultManagedClusterSet(DefaultManagedClusterSetName, DefaultManagedClusterSet.Spec, false),
+			name:               "sync global cluster set",
+			existingClusterSet: newGlobalManagedClusterSet(GlobalManagedClusterSetName, GlobalManagedClusterSet.Spec, false),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testinghelpers.AssertNoActions(t, actions)
 			},
 		},
 		{
-			name:               "sync edited default cluster set",
-			existingClusterSet: newDefaultManagedClusterSet(DefaultManagedClusterSetName, editedDefaultManagedClusterSetSpec, false),
+			name:               "sync edited global cluster set",
+			existingClusterSet: newGlobalManagedClusterSet(GlobalManagedClusterSetName, editedGlobalManagedClusterSetSpec, false),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 
 				testinghelpers.AssertActions(t, actions, "update")
 				clusterset := actions[0].(clienttesting.UpdateAction).GetObject().(*clusterv1beta1.ManagedClusterSet)
 				// if spec not rollbacked, error
-				if !equality.Semantic.DeepEqual(clusterset.Spec, DefaultManagedClusterSet.Spec) {
-					t.Errorf("Failed to rollback default managed cluster set spec after it is edited")
+				if !equality.Semantic.DeepEqual(clusterset.Spec, GlobalManagedClusterSet.Spec) {
+					t.Errorf("Failed to rollback global managed cluster set spec after it is edited")
 				}
 			},
 		},
 		{
-			name:               "sync deleting default cluster set",
-			existingClusterSet: newDefaultManagedClusterSet(DefaultManagedClusterSetName, DefaultManagedClusterSet.Spec, true),
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
-			},
-		},
-		{
-			name: "sync deleted default cluster set",
-			// default cluster set should be created if it is deleted.
+			name: "sync deleted global cluster set",
+			// global cluster set should be created if it is deleted.
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, actions, "create")
 				clusterset := actions[0].(clienttesting.CreateAction).GetObject().(*clusterv1beta1.ManagedClusterSet)
-				if clusterset.ObjectMeta.Name != DefaultManagedClusterSetName {
-					t.Errorf("Failed to create default managed cluster set")
+				if clusterset.ObjectMeta.Name != GlobalManagedClusterSetName {
+					t.Errorf("Failed to create global managed cluster set")
 				}
 			},
 		},
 		{
-			name:               "sync default cluster set with disabled annotation",
-			existingClusterSet: newDefaultManagedClusterSetWithAnnotation(DefaultManagedClusterSetName, autoUpdateAnnotation, "false", DefaultManagedClusterSet.Spec, false),
+			name:               "sync global cluster set with disabled annotation",
+			existingClusterSet: newGlobalManagedClusterSetWithAnnotation(GlobalManagedClusterSetName, autoUpdateAnnotation, "false", GlobalManagedClusterSet.Spec, false),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testinghelpers.AssertNoActions(t, actions)
 			},
@@ -93,7 +86,7 @@ func TestSyncDefaultClusterSet(t *testing.T) {
 				}
 			}
 
-			ctrl := defaultManagedClusterSetController{
+			ctrl := globalManagedClusterSetController{
 				clusterSetClient: clusterSetClient.ClusterV1beta1(),
 				clusterSetLister: informerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
 				eventRecorder:    eventstesting.NewTestingEventRecorder(t),
@@ -105,12 +98,11 @@ func TestSyncDefaultClusterSet(t *testing.T) {
 			}
 
 			c.validateActions(t, clusterSetClient.Actions())
-
 		})
 	}
 }
 
-func newDefaultManagedClusterSet(name string, spec clusterv1beta1.ManagedClusterSetSpec, terminating bool) *clusterv1beta1.ManagedClusterSet {
+func newGlobalManagedClusterSet(name string, spec clusterv1beta1.ManagedClusterSetSpec, terminating bool) *clusterv1beta1.ManagedClusterSet {
 	clusterSet := &clusterv1beta1.ManagedClusterSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -125,7 +117,7 @@ func newDefaultManagedClusterSet(name string, spec clusterv1beta1.ManagedCluster
 	return clusterSet
 }
 
-func newDefaultManagedClusterSetWithAnnotation(name string, k, v string, spec clusterv1beta1.ManagedClusterSetSpec, terminating bool) *clusterv1beta1.ManagedClusterSet {
+func newGlobalManagedClusterSetWithAnnotation(name string, k, v string, spec clusterv1beta1.ManagedClusterSetSpec, terminating bool) *clusterv1beta1.ManagedClusterSet {
 	clusterSet := &clusterv1beta1.ManagedClusterSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,

@@ -21,20 +21,18 @@ import (
 
 const (
 	autoUpdateAnnotation         = "cluster.open-cluster-management.io/autoupdate"
-	defaultManagedClusterSetName = "default"
+	DefaultManagedClusterSetName = "default"
 )
 
-var defaultManagedClusterSetSpec = clusterv1beta1.ManagedClusterSetSpec{
-	ClusterSelector: clusterv1beta1.ManagedClusterSelector{
-		SelectorType: clusterv1beta1.LegacyClusterSetLabel,
-	},
-}
-
-var defaultManagedClusterSet = &clusterv1beta1.ManagedClusterSet{
+var DefaultManagedClusterSet = &clusterv1beta1.ManagedClusterSet{
 	ObjectMeta: metav1.ObjectMeta{
-		Name: defaultManagedClusterSetName,
+		Name: DefaultManagedClusterSetName,
 	},
-	Spec: defaultManagedClusterSetSpec,
+	Spec: clusterv1beta1.ManagedClusterSetSpec{
+		ClusterSelector: clusterv1beta1.ManagedClusterSelector{
+			SelectorType: clusterv1beta1.LegacyClusterSetLabel,
+		},
+	},
 }
 
 type defaultManagedClusterSetController struct {
@@ -66,7 +64,7 @@ func NewDefaultManagedClusterSetController(
 					return false
 				}
 				// filter clustersets except defaultManagedClusterSet.
-				return defaultManagedClusterSetName != metaObj.GetObjectMeta().GetName()
+				return DefaultManagedClusterSetName != metaObj.GetObjectMeta().GetName()
 			},
 			clusterSetInformer.Informer(),
 		).
@@ -79,31 +77,23 @@ func NewDefaultManagedClusterSetController(
 }
 
 func (c *defaultManagedClusterSetController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	defaultClusterSetName := defaultManagedClusterSetName
 	klog.V(4).Infof("Reconciling DefaultManagedClusterSet")
 
-	defaultClusterSet, err := c.clusterSetLister.Get(defaultClusterSetName)
-
-	// if the defaultClusterSet not found, apply it.
-	if errors.IsNotFound(err) {
-		_, err := c.clusterSetClient.ManagedClusterSets().Create(ctx, defaultManagedClusterSet, metav1.CreateOptions{})
-		if err == nil {
-			c.eventRecorder.Eventf("DefaultManagedClusterSetCreated", "Set the DefaultManagedClusterSet name to %+v. spec to %+v", defaultClusterSetName, defaultManagedClusterSetSpec)
+	defaultClusterSet, err := c.clusterSetLister.Get(DefaultManagedClusterSetName)
+	if err != nil {
+		// if the defaultClusterSet not found, apply it.
+		if errors.IsNotFound(err) {
+			_, err := c.clusterSetClient.ManagedClusterSets().Create(ctx, DefaultManagedClusterSet, metav1.CreateOptions{})
+			if err == nil {
+				c.eventRecorder.Eventf("DefaultManagedClusterSetCreated", "Set the DefaultManagedClusterSet name to %+v. spec to %+v", DefaultManagedClusterSetName, DefaultManagedClusterSet.Spec)
+			}
+			return err
 		}
 		return err
-
-	} else if err != nil {
-		return err
-	}
-
-	// if defaultClusterSet is terminating, add the key to the controller queue with a second-long delay
-	if !defaultClusterSet.DeletionTimestamp.IsZero() {
-		syncCtx.Queue().AddAfter(defaultClusterSetName, 5*time.Second)
-		return nil
 	}
 
 	if err := c.syncDefaultClusterSet(ctx, defaultClusterSet); err != nil {
-		return fmt.Errorf("failed to sync DefaultManagedClusterSet %q: %w", defaultClusterSetName, err)
+		return fmt.Errorf("failed to sync DefaultManagedClusterSet %q: %w", DefaultManagedClusterSetName, err)
 	}
 
 	return nil
@@ -120,8 +110,8 @@ func (c *defaultManagedClusterSetController) syncDefaultClusterSet(ctx context.C
 	}
 
 	// if defaultClusterSet.Spec is changed, rollback the change by update it to the original value.
-	if !equality.Semantic.DeepEqual(defaultClusterSet.Spec, defaultManagedClusterSetSpec) {
-		defaultClusterSet.Spec = defaultManagedClusterSetSpec
+	if !equality.Semantic.DeepEqual(defaultClusterSet.Spec, DefaultManagedClusterSet.Spec) {
+		defaultClusterSet.Spec = DefaultManagedClusterSet.Spec
 
 		_, err := c.clusterSetClient.ManagedClusterSets().Update(ctx, defaultClusterSet, metav1.UpdateOptions{})
 		if err != nil {
