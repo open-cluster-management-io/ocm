@@ -2,6 +2,7 @@ package hub
 
 import (
 	"context"
+	ocmfeature "open-cluster-management.io/api/feature"
 	"time"
 
 	"open-cluster-management.io/registration/pkg/features"
@@ -142,7 +143,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	)
 
 	var defaultManagedClusterSetController, globalManagedClusterSetController factory.Controller
-	if features.DefaultHubMutableFeatureGate.Enabled(features.DefaultClusterSet) {
+	if features.DefaultHubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
 		defaultManagedClusterSetController = managedclusterset.NewDefaultManagedClusterSetController(
 			clusterClient.ClusterV1beta1(),
 			clusterInformers.Cluster().V1beta1().ManagedClusterSets(),
@@ -170,7 +171,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	go clusterroleController.Run(ctx, 1)
 	go addOnHealthCheckController.Run(ctx, 1)
 	go addOnFeatureDiscoveryController.Run(ctx, 1)
-	if features.DefaultHubMutableFeatureGate.Enabled(features.DefaultClusterSet) {
+	if features.DefaultHubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
 		go defaultManagedClusterSetController.Run(ctx, 1)
 		go globalManagedClusterSetController.Run(ctx, 1)
 	}

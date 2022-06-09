@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	ocmfeature "open-cluster-management.io/api/feature"
 	"reflect"
 	"testing"
 	"time"
@@ -15,8 +16,8 @@ import (
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"open-cluster-management.io/registration/pkg/features"
 	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 )
 
@@ -229,7 +230,8 @@ func TestManagedClusterMutate(t *testing.T) {
 	nowFunc = func() time.Time {
 		return now
 	}
-	if err := utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=true", string(features.DefaultClusterSet))); err != nil {
+	utilruntime.Must(utilfeature.DefaultMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates))
+	if err := utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=true", string(ocmfeature.DefaultClusterSet))); err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range cases {

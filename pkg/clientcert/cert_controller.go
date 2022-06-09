@@ -6,6 +6,7 @@ import (
 	"crypto/x509/pkix"
 	"fmt"
 	"math/rand"
+	ocmfeature "open-cluster-management.io/api/feature"
 	"reflect"
 	"time"
 
@@ -130,7 +131,7 @@ func NewClientCertificateController(
 	controllerName string,
 ) (factory.Controller, error) {
 	var csrCtrl csrControl = nil
-	if features.DefaultSpokeMutableFeatureGate.Enabled(features.V1beta1CSRAPICompatibility) {
+	if features.DefaultSpokeMutableFeatureGate.Enabled(ocmfeature.V1beta1CSRAPICompatibility) {
 		v1CSRSupported, v1beta1CSRSupported, err := helpers.IsCSRSupported(hubKubeClient)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed CSR api discovery")

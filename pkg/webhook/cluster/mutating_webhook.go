@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	ocmfeature "open-cluster-management.io/api/feature"
 	"strings"
 	"time"
 
@@ -15,7 +16,6 @@ import (
 	"k8s.io/klog/v2"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
-	"open-cluster-management.io/registration/pkg/features"
 	"open-cluster-management.io/registration/pkg/helpers"
 )
 
@@ -80,7 +80,7 @@ func (a *ManagedClusterMutatingAdmissionHook) Admit(req *admissionv1beta1.Admiss
 	}
 	jsonPatches = append(jsonPatches, taintJsonPatches...)
 
-	if utilfeature.DefaultMutableFeatureGate.Enabled(features.DefaultClusterSet) {
+	if utilfeature.DefaultMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
 		labelJsonPatches, status := a.addDefaultClusterSetLabel(managedCluster, req.Object.Raw)
 		if !status.Allowed {
 			return status
