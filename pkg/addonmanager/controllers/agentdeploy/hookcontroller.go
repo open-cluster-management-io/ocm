@@ -6,7 +6,6 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -143,13 +142,33 @@ func (c *addonHookDeployController) sync(ctx context.Context, syncCtx factory.Sy
 
 	objects, err := agentAddon.Manifests(managedCluster, managedClusterAddon)
 	if err != nil {
+		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
+			Type:    constants.AddonManifestApplied,
+			Status:  metav1.ConditionFalse,
+			Reason:  constants.AddonManifestAppliedReasonWorkApplyFailed,
+			Message: fmt.Sprintf("failed to get manifest from agent interface: %v", err),
+		})
+		if updateErr := patchCondition(ctx, c.addonClient, managedClusterAddon, managedClusterAddonCopy); updateErr != nil {
+			return fmt.Errorf("failed to update managedclusteraddon status: %v; the err should be %v", updateErr, err)
+		}
 		return err
 	}
+
 	if len(objects) == 0 {
 		return nil
 	}
+
 	_, hookWork, err := buildManifestWorkFromObject(clusterName, addonName, objects)
 	if err != nil {
+		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
+			Type:    constants.AddonManifestApplied,
+			Status:  metav1.ConditionFalse,
+			Reason:  constants.AddonManifestAppliedReasonWorkApplyFailed,
+			Message: fmt.Sprintf("failed to build manifestwork: %v", err),
+		})
+		if updateErr := patchCondition(ctx, c.addonClient, managedClusterAddonCopy, managedClusterAddon); updateErr != nil {
+			return fmt.Errorf("failed to update managedclusteraddon status: %v; the err should be %v", updateErr, err)
+		}
 		return err
 	}
 
@@ -176,8 +195,23 @@ func (c *addonHookDeployController) sync(ctx context.Context, syncCtx factory.Sy
 
 	// apply hookWork when addon is deleting
 	hookWork.OwnerReferences = []metav1.OwnerReference{*owner}
-	hookWork, applyErr := applyWork(ctx, c.workClient, c.workLister, c.cache, c.eventRecorder, hookWork)
+	hookWork, err = applyWork(ctx, c.workClient, c.workLister, c.cache, c.eventRecorder, hookWork)
+	if err != nil {
+		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
+			Type:    constants.AddonManifestApplied,
+			Status:  metav1.ConditionFalse,
+			Reason:  constants.AddonManifestAppliedReasonWorkApplyFailed,
+			Message: fmt.Sprintf("failed to apply manifestwork: %v", err),
+		})
+		if updateErr := patchCondition(ctx, c.addonClient, managedClusterAddonCopy, managedClusterAddon); updateErr != nil {
+			return fmt.Errorf("failed to update managedclusteraddon status: %v; the err should be %v", updateErr, err)
+		}
+		return err
+	}
+
 	completed := hookWorkIsCompleted(hookWork)
+
+	// if the hook is completed, remove the finalizer
 	if completed && hasFinalizer(managedClusterAddonCopy.Finalizers, constants.PreDeleteHookFinalizer) {
 		finalizer := removeFinalizer(managedClusterAddonCopy.Finalizers, constants.PreDeleteHookFinalizer)
 		managedClusterAddonCopy.SetFinalizers(finalizer)
@@ -187,36 +221,23 @@ func (c *addonHookDeployController) sync(ctx context.Context, syncCtx factory.Sy
 	}
 
 	switch {
-	case applyErr != nil:
-		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-			Type:    "HookManifestCompleted",
-			Status:  metav1.ConditionFalse,
-			Reason:  "ManifestWorkApplyFailed",
-			Message: fmt.Sprintf("failed to apply hook manifestwork: %v", err),
-		})
 	case completed:
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-			Type:    "HookManifestCompleted",
+			Type:    constants.AddonHookManifestCompleted,
 			Status:  metav1.ConditionTrue,
 			Reason:  "HookManifestIsCompleted",
 			Message: fmt.Sprintf("hook manifestWork %v is completed.", hookWork.Name),
 		})
 	default:
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-			Type:    "HookManifestCompleted",
+			Type:    constants.AddonHookManifestCompleted,
 			Status:  metav1.ConditionFalse,
 			Reason:  "HookManifestIsNotCompleted",
 			Message: fmt.Sprintf("hook manifestWork %v is not completed.", hookWork.Name),
 		})
 	}
 
-	if !equality.Semantic.DeepEqual(managedClusterAddonCopy.Status, managedClusterAddon.Status) {
-		_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterAddonCopy.Namespace).UpdateStatus(
-			ctx, managedClusterAddonCopy, metav1.UpdateOptions{})
-		return err
-	}
-
-	return nil
+	return patchCondition(ctx, c.addonClient, managedClusterAddonCopy, managedClusterAddon)
 }
 
 // hookWorkIsCompleted checks the hook resources are completed.

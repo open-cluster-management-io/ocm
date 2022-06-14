@@ -2,6 +2,7 @@ package agentdeploy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
@@ -27,10 +29,11 @@ import (
 type testAgent struct {
 	name    string
 	objects []runtime.Object
+	err     error
 }
 
 func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
-	return t.objects, nil
+	return t.objects, t.err
 }
 
 func (t *testAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
@@ -78,11 +81,18 @@ func TestReconcile(t *testing.T) {
 				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
 			}},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "update")
-				actual := actions[0].(clienttesting.UpdateActionImpl).Object
-				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
-				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "ManifestApplied")
-				if addOnCond == nil || addOnCond.Reason != "AddonManifestAppliedFailed" {
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, constants.AddonManifestApplied)
+				if addOnCond == nil {
+					t.Fatal("condition should not be nil")
+				}
+				if addOnCond.Reason != constants.AddonManifestAppliedReasonManifestsApplyFailed {
 					t.Errorf("Condition Reason is not correct: %v", addOnCond.Reason)
 				}
 			},
@@ -117,10 +127,14 @@ func TestReconcile(t *testing.T) {
 				addontesting.AssertActions(t, actions, "update")
 			},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "update")
-				actual := actions[0].(clienttesting.UpdateActionImpl).Object
-				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
-				if meta.IsStatusConditionFalse(addOn.Status.Conditions, "ManifestApplied") {
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if meta.IsStatusConditionFalse(addOn.Status.Conditions, constants.AddonManifestApplied) {
 					t.Errorf("Condition Reason is not correct: %v", addOn.Status.Conditions)
 				}
 			},
@@ -150,10 +164,54 @@ func TestReconcile(t *testing.T) {
 			}()},
 			validateWorkActions: addontesting.AssertNoActions,
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "update")
-				actual := actions[0].(clienttesting.UpdateActionImpl).Object
-				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
-				if meta.IsStatusConditionFalse(addOn.Status.Conditions, "ManifestApplied") {
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if meta.IsStatusConditionFalse(addOn.Status.Conditions, constants.AddonManifestApplied) {
+					t.Errorf("Condition Reason is not correct: %v", addOn.Status.Conditions)
+				}
+			},
+		},
+		{
+			name:    "get error when run manifest from agent",
+			addon:   []runtime.Object{addontesting.NewAddon("test", "cluster1")},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{
+				name: "test",
+				objects: []runtime.Object{
+					addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+				},
+				err: fmt.Errorf("run manifest failed"),
+			},
+			existingWork: []runtime.Object{func() *workapiv1.ManifestWork {
+				work := addontesting.NewManifestWork(
+					"addon-test-deploy",
+					"cluster1",
+					addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+					addontesting.NewUnstructured("v1", "Deployment", "default", "test"),
+				)
+				work.Status.Conditions = []metav1.Condition{
+					{
+						Type:   workapiv1.WorkApplied,
+						Status: metav1.ConditionTrue,
+					},
+				}
+				return work
+			}()},
+			validateWorkActions: addontesting.AssertNoActions,
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, constants.AddonManifestApplied) {
 					t.Errorf("Condition Reason is not correct: %v", addOn.Status.Conditions)
 				}
 			},
@@ -201,8 +259,8 @@ func TestReconcile(t *testing.T) {
 				addon := obj.(*addonapiv1alpha1.ManagedClusterAddOn)
 				syncContext := addontesting.NewFakeSyncContext(t, fmt.Sprintf("%s/%s", addon.Namespace, addon.Name))
 				err := controller.sync(context.TODO(), syncContext)
-				if err != nil {
-					t.Errorf("expected no error when sync: %v", err)
+				if err != c.testaddon.err {
+					t.Errorf("expected error %v when sync got %v", c.testaddon.err, err)
 				}
 				c.validateAddonActions(t, fakeAddonClient.Actions())
 				c.validateWorkActions(t, fakeWorkClient.Actions())

@@ -2,6 +2,7 @@ package agentdeploy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/utils/pointer"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -110,10 +112,14 @@ func TestHookWorkReconcile(t *testing.T) {
 				addontesting.AssertActions(t, actions, "create")
 			},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "update")
-				actual := actions[0].(clienttesting.UpdateActionImpl).Object
-				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
-				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, "HookManifestCompleted") {
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, constants.AddonHookManifestCompleted) {
 					t.Errorf("HookManifestCompleted condition should be false,but got true.")
 				}
 			},
@@ -171,7 +177,7 @@ func TestHookWorkReconcile(t *testing.T) {
 											Name: "JobComplete",
 											Value: workapiv1.FieldValue{
 												Type:   workapiv1.String,
-												String: StringPtr("True"),
+												String: pointer.StringPtr("True"),
 											},
 										},
 									},
@@ -245,7 +251,7 @@ func TestHookWorkReconcile(t *testing.T) {
 											Name: "JobComplete",
 											Value: workapiv1.FieldValue{
 												Type:   workapiv1.String,
-												String: StringPtr("True"),
+												String: pointer.StringPtr("True"),
 											},
 										},
 									},
@@ -258,10 +264,14 @@ func TestHookWorkReconcile(t *testing.T) {
 			},
 			validateWorkActions: addontesting.AssertNoActions,
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "update")
-				actual := actions[0].(clienttesting.UpdateActionImpl).Object
-				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
-				if !meta.IsStatusConditionTrue(addOn.Status.Conditions, "HookManifestCompleted") {
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !meta.IsStatusConditionTrue(addOn.Status.Conditions, constants.AddonHookManifestCompleted) {
 					t.Errorf("HookManifestCompleted condition should be true,but got false.")
 				}
 			},

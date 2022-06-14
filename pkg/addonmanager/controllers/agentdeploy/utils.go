@@ -2,15 +2,20 @@ package agentdeploy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -225,10 +230,41 @@ func FindManifestValue(
 	return workapiv1.FieldValue{}
 }
 
-func Int64Ptr(val int64) *int64 {
-	return &val
-}
+func patchCondition(ctx context.Context, addonClient addonv1alpha1client.Interface, new, old *addonapiv1alpha1.ManagedClusterAddOn) error {
+	if equality.Semantic.DeepEqual(new.Status.Conditions, old.Status.Conditions) {
+		return nil
+	}
 
-func StringPtr(val string) *string {
-	return &val
+	oldData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
+		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+			Conditions: old.Status.Conditions,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	newData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:             new.UID,
+			ResourceVersion: new.ResourceVersion,
+		},
+		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+			Conditions: new.Status.Conditions,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
+	if err != nil {
+		return fmt.Errorf("failed to create patch for addon %s: %w", new.Name, err)
+	}
+	if err != nil {
+		return err
+	}
+
+	_, err = addonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Patch(ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	return err
 }
