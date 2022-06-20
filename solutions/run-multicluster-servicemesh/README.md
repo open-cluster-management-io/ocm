@@ -1,6 +1,6 @@
 # Set up a Multicluster Service Mesh on OCM
 
-This scripts is to setup an multicluster service mesh on top of OCM. The guide will bootstrap 3 kind clusters(hub, cluster1, and cluster2) on your local machine and then deploy the [multicluster mesh addon](https://github.com/open-cluster-management-io/multicluster-mesh). After that, creating service meshes from the hub to the managed clusters and finally federating the service mshes so that microservices deployed into different managed clusters can be access each other.
+This scripts is to setup an multicluster service mesh on top of OCM. The guide will bootstrap 3 kind clusters(hub, cluster1, and cluster2) on your local machine and then deploy the [multicluster mesh addon](https://github.com/open-cluster-management-io/multicluster-mesh). After that, creating service meshes from the hub to the managed clusters and finally federating the service meshes so that microservices deployed into different managed clusters can be access each other.
 
 ## Prerequisite
 
@@ -8,11 +8,17 @@ Set up the dev environment in your local machine following [setup dev environmen
 
 ## Install Multicluster Service Mesh Addon on OCM
 
-1. Clone the multicluster-mesh github repository and install:
+1. Install the multicluster-mesh addon with helm chart:
 
 ```bash
-git clone git@github.com:open-cluster-management-io/multicluster-mesh.git && cd multicluster-mesh
-kubectl config use-context kind-hub && make deploy && cd ..
+$ helm repo add ocm https://openclustermanagement.blob.core.windows.net/releases/
+$ helm repo update
+$ helm search repo ocm/multicluster-mesh
+NAME                 	CHART VERSION	APP VERSION	DESCRIPTION
+ocm/multicluster-mesh	0.0.1        	1.0.0      	A Helm chart for Multicluster Service Mesh OCM ...
+$ helm install \
+    -n open-cluster-management-addon --create-namespace \
+    multicluster-mesh ocm/multicluster-mesh
 ```
 
 2. You will see that all `managedclusteraddon` are available after waiting a while:
