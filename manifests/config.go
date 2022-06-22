@@ -12,6 +12,7 @@ type HubConfig struct {
 	HostedMode                     bool
 	RegistrationWebhook            Webhook
 	WorkWebhook                    Webhook
+	RegistrationFeatureGates       []string
 }
 
 type Webhook struct {

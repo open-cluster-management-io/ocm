@@ -70,6 +70,12 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				},
 				ClusterName: "testcluster",
 				Namespace:   klusterletNamespace,
+				RegistrationConfiguration: &operatorapiv1.RegistrationConfiguration{FeatureGates: []operatorapiv1.FeatureGate{
+					{
+						Feature: "AddonManagement",
+						Mode:    "Enable",
+					},
+				}},
 			},
 		}
 

@@ -109,11 +109,10 @@ spec:
                     description: ManifestConfigOption represents the configurations of a manifest defined in workload field.
                     type: object
                     required:
-                      - feedbackRules
                       - resourceIdentifier
                     properties:
                       feedbackRules:
-                        description: FeedbackRules defines what resource status field should be returned.
+                        description: FeedbackRules defines what resource status field should be returned. If it is not set or empty, no feedback rules will be honored.
                         type: array
                         items:
                           type: object
@@ -163,6 +162,32 @@ spec:
                           resource:
                             description: Resource is the resource name of the Kubernetes resource.
                             type: string
+                      updateStrategy:
+                        description: UpdateStrategy defines the strategy to update this manifest. UpdateStrategy is Update if it is not set, optional
+                        type: object
+                        required:
+                          - type
+                        properties:
+                          serverSideApply:
+                            description: serverSideApply defines the configuration for server side apply. It is honored only when type of updateStrategy is ServerSideApply
+                            type: object
+                            properties:
+                              fieldManager:
+                                description: FieldManager is the manager to apply the resource. It is work-agent by default, but can be other name with work-agent as the prefix.
+                                type: string
+                                default: work-agent
+                                pattern: ^work-agent
+                              force:
+                                description: Force represents to force apply the manifest.
+                                type: boolean
+                          type:
+                            description: type defines the strategy to update this manifest, default value is Update. Update type means to update resource by an update call. CreateOnly type means do not update resource based on current manifest. ServerSideApply type means to update resource using server side apply with work-controller as the field manager. If there is conflict, the related Applied condition of manifest will be in the status of False with the reason of ApplyConflict.
+                            type: string
+                            default: Update
+                            enum:
+                              - Update
+                              - CreateOnly
+                              - ServerSideApply
                 workload:
                   description: Workload represents the manifest workload to be deployed on a managed cluster.
                   type: object

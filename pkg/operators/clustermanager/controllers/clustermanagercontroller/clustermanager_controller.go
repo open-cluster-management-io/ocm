@@ -119,6 +119,8 @@ const (
 	clusterManagerFinalizer = "operator.open-cluster-management.io/cluster-manager-cleanup"
 	clusterManagerApplied   = "Applied"
 	caBundleConfigmap       = "ca-bundle-configmap"
+
+	hubRegistrationFeatureGatesValid = "ValidRegistrationFeatureGates"
 )
 
 type clusterManagerController struct {
@@ -202,6 +204,31 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		Replica:                 helpers.DetermineReplica(ctx, n.operatorKubeClient, clusterManagerMode, nil),
 		HostedMode:              clusterManager.Spec.DeployOption.Mode == operatorapiv1.InstallModeHosted,
 	}
+
+	conditions := &clusterManager.Status.Conditions
+
+	// If there are some invalid feature gates of registration, will output condition `InvalidRegistrationFeatureGates` in ClusterManager.
+	if clusterManager.Spec.RegistrationConfiguration != nil && len(clusterManager.Spec.RegistrationConfiguration.FeatureGates) > 0 {
+		featureGateArgs, invalidFeatureGates := helpers.FeatureGatesArgs(
+			clusterManager.Spec.RegistrationConfiguration.FeatureGates, helpers.ComponentHubKey)
+		if len(invalidFeatureGates) == 0 {
+			config.RegistrationFeatureGates = featureGateArgs
+			meta.SetStatusCondition(conditions, metav1.Condition{
+				Type:    hubRegistrationFeatureGatesValid,
+				Status:  metav1.ConditionTrue,
+				Reason:  "FeatureGatesAllValid",
+				Message: "Registration feature gates of cluster manager are all valid",
+			})
+		} else {
+			invalidFGErr := fmt.Errorf("There are some invalid feature gates of registration: %v ", invalidFeatureGates)
+			_, _, updateError := helpers.UpdateClusterManagerStatus(ctx, n.clusterManagerClient, clusterManagerName, helpers.UpdateClusterManagerConditionFn(metav1.Condition{
+				Type: hubRegistrationFeatureGatesValid, Status: metav1.ConditionFalse, Reason: "InvalidFeatureGatesExisting",
+				Message: invalidFGErr.Error(),
+			}))
+			return updateError
+		}
+	}
+
 	// If we are deploying in the hosted mode, it requires us to create webhook in a different way with the default mode.
 	// In the hosted mode, the webhook servers is running in the management cluster but the users are accessing the hub cluster.
 	// So we need to add configuration to make the apiserver of the hub cluster could access the webhook servers on the management cluster.
@@ -278,7 +305,6 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 
 	// Update status
 	errs := append(hubAppliedErrs, managementAppliedErrs...)
-	conditions := &clusterManager.Status.Conditions
 	observedGeneration := clusterManager.Status.ObservedGeneration
 	if len(errs) == 0 {
 		meta.SetStatusCondition(conditions, metav1.Condition{

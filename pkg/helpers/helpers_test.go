@@ -1649,3 +1649,62 @@ func TestGetHubKubeconfig(t *testing.T) {
 		})
 	}
 }
+
+func TestFeatureGatesArgs(t *testing.T) {
+	tt := []struct {
+		name              string
+		component         string
+		inputFeatureGates []operatorapiv1.FeatureGate
+		expect1           []string
+		expect2           []string
+	}{
+		{
+			name:              "empty input feature gates",
+			component:         ComponentHubKey,
+			inputFeatureGates: []operatorapiv1.FeatureGate{},
+			expect1:           []string{},
+			expect2:           []string{},
+		},
+		{
+			name:      "valid input feature gates",
+			component: ComponentSpokeKey,
+			inputFeatureGates: []operatorapiv1.FeatureGate{
+				{
+					Feature: "AddonManagement",
+					Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+				},
+				{
+					Feature: "V1beta1CSRAPICompatibility",
+					Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+				},
+			},
+			expect1: []string{"--feature-gates=AddonManagement=true", "--feature-gates=V1beta1CSRAPICompatibility=true"},
+			expect2: []string{},
+		},
+		{
+			name:      "invalid input feature gates",
+			component: ComponentSpokeKey,
+			inputFeatureGates: []operatorapiv1.FeatureGate{
+				{
+					Feature: "AddonManagementInvalid",
+					Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+				},
+			},
+			expect1: []string{},
+			expect2: []string{"AddonManagementInvalid"},
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			output1, output2 := FeatureGatesArgs(tc.inputFeatureGates, tc.component)
+			if len(output1) == len(tc.expect1) && len(output2) == len(tc.expect2) {
+				return
+			}
+
+			if !reflect.DeepEqual(output1, tc.expect1) || !reflect.DeepEqual(output2, tc.expect2) {
+				t.Errorf("Expect to get %v,%v, but got %v,%v", tc.expect1, tc.expect2, output1, output2)
+			}
+		})
+	}
+}

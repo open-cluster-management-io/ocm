@@ -11,3 +11,7 @@ spec:
   namespace: open-cluster-management-agent
   externalServerURLs:
   - url: https://localhost
+  registrationConfiguration:
+    featureGates:
+    - feature: AddonManagement
+      mode: Enable

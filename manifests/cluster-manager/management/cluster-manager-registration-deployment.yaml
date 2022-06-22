@@ -45,7 +45,13 @@ spec:
         args:
           - "/registration"
           - "controller"
+          {{ if gt (len .RegistrationFeatureGates) 0 }}
+          {{range .RegistrationFeatureGates}}
+          - {{ . }}
+          {{ end }}
+          {{ else }}
           - "--feature-gates=DefaultClusterSet=true"
+          {{ end }}
           {{ if .HostedMode }}
           - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
           {{ end }}

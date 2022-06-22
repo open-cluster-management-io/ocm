@@ -1190,7 +1190,7 @@ k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/strings/slices
 k8s.io/utils/trace
-# open-cluster-management.io/api v0.7.1-0.20220530034043-2b50efdde1de
+# open-cluster-management.io/api v0.7.1-0.20220609033924-5cc58e815c1a
 ## explicit; go 1.18
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/client/addon/clientset/versioned
@@ -1219,6 +1219,7 @@ open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1/fak
 open-cluster-management.io/api/cluster/v1
 open-cluster-management.io/api/cluster/v1alpha1
 open-cluster-management.io/api/cluster/v1beta1
+open-cluster-management.io/api/feature
 open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/work/v1
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.30

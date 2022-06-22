@@ -48,7 +48,14 @@ spec:
           - "--secure-port=6443"
           - "--tls-cert-file=/serving-cert/tls.crt"
           - "--tls-private-key-file=/serving-cert/tls.key"
-          - "--feature-gates=DefaultClusterSet=true,APIPriorityAndFairness=false"
+          {{ if gt (len .RegistrationFeatureGates) 0 }}
+          {{range .RegistrationFeatureGates}}
+          - {{ . }}
+          {{ end }}
+          {{ else }}
+          - "--feature-gates=DefaultClusterSet=true"
+          {{ end }}
+          - "--feature-gates=APIPriorityAndFairness=false"
           {{ if .HostedMode }}
           - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
           - "--authentication-kubeconfig=/var/run/secrets/hub/kubeconfig"

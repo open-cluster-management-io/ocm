@@ -47,6 +47,8 @@ const (
 	hubConnectionDegraded        = "HubConnectionDegraded"
 	hubKubeConfigSecretMissing   = "HubKubeConfigSecretMissing"
 	appliedManifestWorkFinalizer = "cluster.open-cluster-management.io/applied-manifest-work-cleanup"
+
+	spokeRegistrationFeatureGatesInvalid = "InvalidRegistrationFeatureGates"
 )
 
 var (
@@ -170,6 +172,8 @@ type klusterletConfig struct {
 	ExternalManagedKubeConfigRegistrationSecret string
 	ExternalManagedKubeConfigWorkSecret         string
 	InstallMode                                 operatorapiv1.InstallMode
+
+	RegistrationFeatureGates []string
 }
 
 // managedClusterClients holds variety of kube client for managed cluster
@@ -220,6 +224,26 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		apiExtensionClient:        n.apiExtensionClient,
 		dynamicClient:             n.dynamicClient,
 		appliedManifestWorkClient: n.appliedManifestWorkClient,
+	}
+
+	// If there are some invalid feature gates of registration, will output condition `InvalidRegistrationFeatureGates` in Klusterlet.
+	if klusterlet.Spec.RegistrationConfiguration != nil && len(klusterlet.Spec.RegistrationConfiguration.FeatureGates) > 0 {
+		featureGateArgs, invalidFeatureGates := helpers.FeatureGatesArgs(
+			klusterlet.Spec.RegistrationConfiguration.FeatureGates, helpers.ComponentSpokeKey)
+		if len(invalidFeatureGates) == 0 {
+			config.RegistrationFeatureGates = featureGateArgs
+			_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
+				Type: spokeRegistrationFeatureGatesInvalid, Status: metav1.ConditionTrue, Reason: "FeatureGatesAllValid",
+				Message: fmt.Sprintf("Registration feature gates of klusterlet are all valid"),
+			}))
+		} else {
+			invalidFGErr := fmt.Errorf("There are some invalid feature gates of registration: %v ", invalidFeatureGates)
+			_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
+				Type: spokeRegistrationFeatureGatesInvalid, Status: metav1.ConditionFalse, Reason: "InvalidFeatureGatesExisting",
+				Message: invalidFGErr.Error(),
+			}))
+			return invalidFGErr
+		}
 	}
 
 	// TODO: remove this when detached mode is not used in klusterlet
