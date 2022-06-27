@@ -30,6 +30,8 @@ resources:
 - ./service_account.yaml
 - ./clusterrole.yaml
 - ./clusterrole_binding.yaml
+- ./clusterrole_addon-management.yaml
+- ./clusterrole_binding_addon-management.yaml
 - ./role.yaml
 - ./role_binding.yaml
 - ./deployment.yaml

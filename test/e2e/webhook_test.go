@@ -35,8 +35,16 @@ const (
 
 var _ = ginkgo.Describe("Admission webhook", func() {
 	var admissionName string
+	var u *utilClients
 
 	ginkgo.BeforeEach(func() {
+		u = &utilClients{
+			hubClient:         hubClient,
+			hubDynamicClient:  hubDynamicClient,
+			hubAddOnClient:    hubAddOnClient,
+			clusterClient:     clusterClient,
+			registrationImage: registrationImage,
+		}
 		// make sure the api service v1.admission.cluster.open-cluster-management.io is available
 		gomega.Eventually(func() bool {
 			apiService, err := hubAPIServiceClient.APIServices().Get(context.TODO(), apiserviceName, metav1.GetOptions{})
@@ -79,7 +87,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				gomega.Expect(managedCluster.Spec.LeaseDurationSeconds).To(gomega.Equal(int32(60)))
 
-				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+				gomega.Expect(u.deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 			})
 			ginkgo.It("Should have the default Clusterset Label (no labels in cluster)", func() {
 				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
@@ -94,7 +102,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				gomega.Expect(managedCluster.Labels[clusterv1beta1.ClusterSetLabel]).To(gomega.Equal(string(defaultClusterSetName)))
 
 				gomega.Expect(len(managedCluster.Labels)).To(gomega.Equal(len(oriManagedCluster.Labels) + 1))
-				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+				gomega.Expect(u.deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 			})
 			ginkgo.It("Should have the default Clusterset Label (has labels in cluster)", func() {
 				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
@@ -113,7 +121,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				gomega.Expect(managedCluster.Labels[clusterv1beta1.ClusterSetLabel]).To(gomega.Equal(string(defaultClusterSetName)))
 
 				gomega.Expect(len(managedCluster.Labels)).To(gomega.Equal(len(oriManagedCluster.Labels) + 1))
-				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+				gomega.Expect(u.deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 			})
 			ginkgo.It("Should have the default Clusterset Label when clusterset label is a null string", func() {
 				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
@@ -186,7 +194,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				gomega.Expect(taint.TimeAdded.Equal(&updatedTaint.TimeAdded)).To(gomega.BeFalse(),
 					"timeAdded of taint should be updated (before=%s, after=%s)", taint.TimeAdded.Time.String(), updatedTaint.TimeAdded.Time.String())
 
-				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+				gomega.Expect(u.deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 			})
 
 			ginkgo.It("Should respond bad request when creating a managed cluster with invalid external server URLs", func() {
@@ -204,7 +212,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					invalidURL,
 				)))
 
-				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+				gomega.Expect(u.deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 			})
 
 			ginkgo.It("Should forbid the request when creating an accepted managed cluster by unauthorized user", func() {
@@ -236,7 +244,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					sa,
 				)))
 
-				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+				gomega.Expect(u.deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
 			})
 
@@ -269,7 +277,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				_, err = authorizedClient.ClusterV1().ManagedClusters().Create(context.TODO(), managedCluster, metav1.CreateOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+				gomega.Expect(u.deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
 			})
 
@@ -312,7 +320,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				_, err = authorizedClient.ClusterV1().ManagedClusters().Create(context.TODO(), managedCluster, metav1.CreateOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+				gomega.Expect(u.deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
 			})
 
@@ -360,7 +368,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 					clusterSetName,
 				)))
 
-				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+				gomega.Expect(u.deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
 			})
 		})
@@ -377,7 +385,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 
 			ginkgo.AfterEach(func() {
 				ginkgo.By(fmt.Sprintf("Cleaning managed cluster %q", clusterName))
-				gomega.Expect(deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+				gomega.Expect(u.deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 			})
 
 			ginkgo.It("Should not update the LeaseDurationSeconds to zero", func() {

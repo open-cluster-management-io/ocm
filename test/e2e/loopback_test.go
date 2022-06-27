@@ -1,11 +1,8 @@
 package e2e
 
 import (
-	"bytes"
 	"context"
-	goerrors "errors"
 	"fmt"
-	"io/ioutil"
 	"reflect"
 	"time"
 
@@ -23,21 +20,27 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
-	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
-	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 
-	"open-cluster-management.io/registration/deploy"
 	"open-cluster-management.io/registration/pkg/clientcert"
 	"open-cluster-management.io/registration/pkg/helpers"
 )
 
 var _ = ginkgo.Describe("Loopback registration [development]", func() {
 	var clusterId string
+	var u *utilClients
+
 	ginkgo.BeforeEach(func() {
+		u = &utilClients{
+			hubClient:         hubClient,
+			hubDynamicClient:  hubDynamicClient,
+			hubAddOnClient:    hubAddOnClient,
+			clusterClient:     clusterClient,
+			registrationImage: registrationImage,
+		}
+
 		// apply ClusterClaim crd
 		claimCrd, err := claimCrd()
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -132,88 +135,28 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		var (
-			cr         *unstructured.Unstructured
-			crResource = schema.GroupVersionResource{
-				Group:    "rbac.authorization.k8s.io",
-				Version:  "v1",
-				Resource: "clusterroles",
-			}
-		)
-		cr, err = spokeCR(suffix)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-			var err error
-			_, err = hubDynamicClient.Resource(crResource).Create(context.TODO(), cr, metav1.CreateOptions{})
-			if err != nil {
-				return false, err
-			}
-
-			return true, nil
-		})
+		err = u.createSpokeCR("spoke/clusterrole.yaml", suffix)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		var (
-			crb         *unstructured.Unstructured
-			crbResource = schema.GroupVersionResource{
-				Group:    "rbac.authorization.k8s.io",
-				Version:  "v1",
-				Resource: "clusterrolebindings",
-			}
-		)
-		crb, err = spokeCRB(nsName, suffix)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-			var err error
-			_, err = hubDynamicClient.Resource(crbResource).Create(context.TODO(), crb, metav1.CreateOptions{})
-			if err != nil {
-				return false, err
-			}
-
-			return true, nil
-		})
+		err = u.createSpokeCRB("spoke/clusterrole_binding.yaml", nsName, suffix)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		var (
-			role         *unstructured.Unstructured
-			roleResource = schema.GroupVersionResource{
-				Group:    "rbac.authorization.k8s.io",
-				Version:  "v1",
-				Resource: "roles",
-			}
-		)
-		role, err = spokeRole(nsName, suffix)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-			var err error
-			_, err = hubDynamicClient.Resource(roleResource).Namespace(nsName).Create(context.TODO(), role, metav1.CreateOptions{})
-			if err != nil {
-				return false, err
-			}
-
-			return true, nil
-		})
+		err = u.createSpokeCR("spoke/clusterrole_addon-management.yaml", suffix)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		var (
-			roleBinding         *unstructured.Unstructured
-			roleBindingResource = schema.GroupVersionResource{
-				Group:    "rbac.authorization.k8s.io",
-				Version:  "v1",
-				Resource: "rolebindings",
-			}
-		)
-		roleBinding, err = spokeRoleBinding(nsName, suffix)
+		err = u.createSpokeCRB("spoke/clusterrole_binding_addon-management.yaml", nsName, suffix)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-			var err error
-			_, err = hubDynamicClient.Resource(roleBindingResource).Namespace(nsName).Create(context.TODO(), roleBinding, metav1.CreateOptions{})
-			if err != nil {
-				return false, err
-			}
 
-			return true, nil
-		})
+		err = u.createSpokeRole("spoke/role.yaml", nsName, suffix)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		err = u.createSpokeRoleBinding("spoke/role_binding.yaml", nsName, suffix)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		err = u.createSpokeRole("spoke/role_extension-apiserver.yaml", nsName, suffix)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		err = u.createSpokeRoleBinding("spoke/role_binding_extension-apiserver.yaml", nsName, suffix)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		sa := &corev1.ServiceAccount{
@@ -589,7 +532,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		}, 90*time.Second, 1*time.Second).Should(gomega.BeTrue())
 
 		ginkgo.By(fmt.Sprintf("Cleaning managed cluster %q", clusterName))
-		err = cleanupManagedCluster(clusterName, suffix)
+		err = u.cleanupManagedCluster(clusterName, suffix)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By(fmt.Sprintf("Cleaning managed cluster addon installation namespace %q", addOnName))
@@ -601,184 +544,3 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 })
-
-func assetToUnstructured(name string) (*unstructured.Unstructured, error) {
-	yamlDecoder := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
-	raw, err := deploy.SpokeManifestFiles.ReadFile(name)
-	if err != nil {
-		return nil, err
-	}
-
-	reader := json.YAMLFramer.NewFrameReader(ioutil.NopCloser(bytes.NewReader(raw)))
-	d := streaming.NewDecoder(reader, yamlDecoder)
-	obj, _, err := d.Decode(nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	switch t := obj.(type) {
-	case *unstructured.Unstructured:
-		return t, nil
-	default:
-		return nil, fmt.Errorf("failed to convert object, unexpected type %s", reflect.TypeOf(obj))
-	}
-}
-
-func claimCrd() (*unstructured.Unstructured, error) {
-	crd, err := assetToUnstructured("spoke/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml")
-	if err != nil {
-		return nil, err
-	}
-	return crd, nil
-}
-
-func spokeCR(suffix string) (*unstructured.Unstructured, error) {
-	cr, err := assetToUnstructured("spoke/clusterrole.yaml")
-	if err != nil {
-		return nil, err
-	}
-	name := cr.GetName()
-	name = fmt.Sprintf("%v-%v", name, suffix)
-	cr.SetName(name)
-	return cr, nil
-}
-
-func spokeCRB(nsName, suffix string) (*unstructured.Unstructured, error) {
-	crb, err := assetToUnstructured("spoke/clusterrole_binding.yaml")
-	if err != nil {
-		return nil, err
-	}
-
-	name := crb.GetName()
-	name = fmt.Sprintf("%v-%v", name, suffix)
-	crb.SetName(name)
-
-	roleRef, found, err := unstructured.NestedMap(crb.Object, "roleRef")
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, goerrors.New("couldn't find CRB roleRef")
-	}
-	roleRef["name"] = name
-	err = unstructured.SetNestedMap(crb.Object, roleRef, "roleRef")
-	if err != nil {
-		return nil, err
-	}
-
-	subjects, found, err := unstructured.NestedSlice(crb.Object, "subjects")
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, goerrors.New("couldn't find CRB subjects")
-	}
-
-	err = unstructured.SetNestedField(subjects[0].(map[string]interface{}), nsName, "namespace")
-	if err != nil {
-		return nil, err
-	}
-
-	err = unstructured.SetNestedField(crb.Object, subjects, "subjects")
-	if err != nil {
-		return nil, err
-	}
-
-	return crb, nil
-}
-
-func spokeRole(nsName, suffix string) (*unstructured.Unstructured, error) {
-	r, err := assetToUnstructured("spoke/role.yaml")
-	if err != nil {
-		return nil, err
-	}
-	name := r.GetName()
-	name = fmt.Sprintf("%v-%v", name, suffix)
-	r.SetName(name)
-	r.SetNamespace(nsName)
-	return r, nil
-}
-
-func spokeRoleBinding(nsName, suffix string) (*unstructured.Unstructured, error) {
-	rb, err := assetToUnstructured("spoke/role_binding.yaml")
-	if err != nil {
-		return nil, err
-	}
-
-	name := rb.GetName()
-	name = fmt.Sprintf("%v-%v", name, suffix)
-	rb.SetName(name)
-	rb.SetNamespace(nsName)
-
-	roleRef, found, err := unstructured.NestedMap(rb.Object, "roleRef")
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, goerrors.New("couldn't find RB roleRef")
-	}
-	roleRef["name"] = name
-	err = unstructured.SetNestedMap(rb.Object, roleRef, "roleRef")
-	if err != nil {
-		return nil, err
-	}
-
-	subjects, found, err := unstructured.NestedSlice(rb.Object, "subjects")
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, goerrors.New("couldn't find RB subjects")
-	}
-
-	err = unstructured.SetNestedField(subjects[0].(map[string]interface{}), nsName, "namespace")
-	if err != nil {
-		return nil, err
-	}
-
-	err = unstructured.SetNestedField(rb.Object, subjects, "subjects")
-	if err != nil {
-		return nil, err
-	}
-
-	return rb, nil
-}
-
-func spokeDeployment(nsName, clusterName, image string) (*unstructured.Unstructured, error) {
-	deployment, err := assetToUnstructured("spoke/deployment.yaml")
-	if err != nil {
-		return nil, err
-	}
-	err = unstructured.SetNestedField(deployment.Object, nsName, "meta", "namespace")
-	if err != nil {
-		return nil, err
-	}
-
-	containers, found, err := unstructured.NestedSlice(deployment.Object, "spec", "template", "spec", "containers")
-	if err != nil || !found || containers == nil {
-		return nil, fmt.Errorf("deployment containers not found or error in spec: %v", err)
-	}
-
-	if err := unstructured.SetNestedField(containers[0].(map[string]interface{}), image, "image"); err != nil {
-		return nil, err
-	}
-
-	args, found, err := unstructured.NestedSlice(containers[0].(map[string]interface{}), "args")
-	if err != nil || !found || args == nil {
-		return nil, fmt.Errorf("container args not found or error in spec: %v", err)
-	}
-
-	clusterNameArg := fmt.Sprintf("--cluster-name=%v", clusterName)
-	args[2] = clusterNameArg
-
-	args = append(args, "--feature-gates=AddonManagement=true")
-	if err := unstructured.SetNestedField(containers[0].(map[string]interface{}), args, "args"); err != nil {
-		return nil, err
-	}
-
-	if err := unstructured.SetNestedField(deployment.Object, containers, "spec", "template", "spec", "containers"); err != nil {
-		return nil, err
-	}
-
-	return deployment, nil
-}

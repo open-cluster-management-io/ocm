@@ -10,19 +10,13 @@ import (
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	"open-cluster-management.io/registration/pkg/helpers"
 
-	certificatesv1 "k8s.io/api/certificates/v1"
 	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/util/retry"
 )
 
 var _ = ginkgo.Describe("Addon Health Check", func() {
@@ -32,21 +26,29 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 			suffix         string
 			managedCluster *clusterv1.ManagedCluster
 			addOn          *addonv1alpha1.ManagedClusterAddOn
+			u              *utilClients
 		)
 
 		ginkgo.BeforeEach(func() {
 			suffix = rand.String(6)
+			u = &utilClients{
+				hubClient:         hubClient,
+				hubDynamicClient:  hubDynamicClient,
+				hubAddOnClient:    hubAddOnClient,
+				clusterClient:     clusterClient,
+				registrationImage: registrationImage,
+			}
 
 			// create a managed cluster
 			clusterName := fmt.Sprintf("loopback-e2e-%v", suffix)
 			ginkgo.By(fmt.Sprintf("Creating managed cluster %q", clusterName))
-			managedCluster, err = createManagedCluster(clusterName, suffix)
+			managedCluster, err = u.createManagedCluster(clusterName, suffix)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// create an addon on created managed cluster
 			addOnName := fmt.Sprintf("addon-%s", suffix)
 			ginkgo.By(fmt.Sprintf("Creating managed cluster addon %q", addOnName))
-			addOn, err = createManagedClusterAddOn(managedCluster, addOnName)
+			addOn, err = u.createManagedClusterAddOn(managedCluster, addOnName)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// create addon installation namespace
@@ -62,7 +64,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 		ginkgo.AfterEach(func() {
 			clusterName := fmt.Sprintf("loopback-e2e-%v", suffix)
 			ginkgo.By(fmt.Sprintf("Cleaning managed cluster %q", clusterName))
-			err = cleanupManagedCluster(clusterName, suffix)
+			err = u.cleanupManagedCluster(clusterName, suffix)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			addOnName := fmt.Sprintf("addon-%s", suffix)
@@ -267,21 +269,29 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 			suffix         string
 			managedCluster *clusterv1.ManagedCluster
 			addOn          *addonv1alpha1.ManagedClusterAddOn
+			u              *utilClients
 		)
 
 		ginkgo.BeforeEach(func() {
 			suffix = rand.String(6)
+			u = &utilClients{
+				hubClient:         hubClient,
+				hubDynamicClient:  hubDynamicClient,
+				hubAddOnClient:    hubAddOnClient,
+				clusterClient:     clusterClient,
+				registrationImage: registrationImage,
+			}
 
 			// create a managed cluster
 			clusterName := fmt.Sprintf("loopback-e2e-%v", suffix)
 			ginkgo.By(fmt.Sprintf("Creating managed cluster %q", clusterName))
-			managedCluster, err = createManagedCluster(clusterName, suffix)
+			managedCluster, err = u.createManagedCluster(clusterName, suffix)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// create an addon on created managed cluster
 			addOnName := fmt.Sprintf("addon-%s", suffix)
 			ginkgo.By(fmt.Sprintf("Creating managed cluster addon %q", addOnName))
-			addOn, err = createManagedClusterAddOn(managedCluster, addOnName)
+			addOn, err = u.createManagedClusterAddOn(managedCluster, addOnName)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// create addon installation namespace
@@ -297,7 +307,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 		ginkgo.AfterEach(func() {
 			clusterName := fmt.Sprintf("loopback-e2e-%v", suffix)
 			ginkgo.By(fmt.Sprintf("Cleaning managed cluster %q", clusterName))
-			err = cleanupManagedCluster(clusterName, suffix)
+			err = u.cleanupManagedCluster(clusterName, suffix)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			addOnName := fmt.Sprintf("addon-%s", suffix)
@@ -370,453 +380,3 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 		})
 	})
 })
-
-func createManagedCluster(clusterName, suffix string) (*clusterv1.ManagedCluster, error) {
-	nsName := fmt.Sprintf("loopback-spoke-%v", suffix)
-	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: nsName,
-		},
-	}
-
-	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-		var err error
-		ns, err = hubClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		return true, nil
-	}); err != nil {
-		return nil, err
-	}
-
-	// This test expects a bootstrap secret to exist in open-cluster-management-agent/e2e-bootstrap-secret
-	e2eBootstrapSecret, err := hubClient.CoreV1().Secrets("open-cluster-management-agent").Get(context.TODO(), "e2e-bootstrap-secret", metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	bootstrapSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: nsName,
-			Name:      "bootstrap-secret",
-		},
-	}
-	bootstrapSecret.Data = e2eBootstrapSecret.Data
-	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-		var err error
-		_, err = hubClient.CoreV1().Secrets(nsName).Create(context.TODO(), bootstrapSecret, metav1.CreateOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		return true, nil
-	}); err != nil {
-		return nil, err
-	}
-
-	var (
-		cr         *unstructured.Unstructured
-		crResource = schema.GroupVersionResource{
-			Group:    "rbac.authorization.k8s.io",
-			Version:  "v1",
-			Resource: "clusterroles",
-		}
-	)
-	cr, err = spokeCR(suffix)
-	if err != nil {
-		return nil, err
-	}
-	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-		var err error
-		_, err = hubDynamicClient.Resource(crResource).Create(context.TODO(), cr, metav1.CreateOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		return true, nil
-	}); err != nil {
-		return nil, err
-	}
-
-	var (
-		crb         *unstructured.Unstructured
-		crbResource = schema.GroupVersionResource{
-			Group:    "rbac.authorization.k8s.io",
-			Version:  "v1",
-			Resource: "clusterrolebindings",
-		}
-	)
-	crb, err = spokeCRB(nsName, suffix)
-	if err != nil {
-		return nil, err
-	}
-	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-		var err error
-		_, err = hubDynamicClient.Resource(crbResource).Create(context.TODO(), crb, metav1.CreateOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		return true, nil
-	}); err != nil {
-		return nil, err
-	}
-
-	var (
-		role         *unstructured.Unstructured
-		roleResource = schema.GroupVersionResource{
-			Group:    "rbac.authorization.k8s.io",
-			Version:  "v1",
-			Resource: "roles",
-		}
-	)
-	role, err = spokeRole(nsName, suffix)
-	if err != nil {
-		return nil, err
-	}
-	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-		var err error
-		_, err = hubDynamicClient.Resource(roleResource).Namespace(nsName).Create(context.TODO(), role, metav1.CreateOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		return true, nil
-	}); err != nil {
-		return nil, err
-	}
-
-	var (
-		roleBinding         *unstructured.Unstructured
-		roleBindingResource = schema.GroupVersionResource{
-			Group:    "rbac.authorization.k8s.io",
-			Version:  "v1",
-			Resource: "rolebindings",
-		}
-	)
-	roleBinding, err = spokeRoleBinding(nsName, suffix)
-	if err != nil {
-		return nil, err
-	}
-	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-		var err error
-		_, err = hubDynamicClient.Resource(roleBindingResource).Namespace(nsName).Create(context.TODO(), roleBinding, metav1.CreateOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		return true, nil
-	}); err != nil {
-		return nil, err
-	}
-
-	sa := &corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: nsName,
-			Name:      "spoke-agent-sa",
-		},
-	}
-	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-		var err error
-		_, err = hubClient.CoreV1().ServiceAccounts(nsName).Create(context.TODO(), sa, metav1.CreateOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		return true, nil
-	}); err != nil {
-		return nil, err
-	}
-
-	var (
-		deployment         *unstructured.Unstructured
-		deploymentResource = schema.GroupVersionResource{
-			Group:    "apps",
-			Version:  "v1",
-			Resource: "deployments",
-		}
-	)
-	deployment, err = spokeDeploymentWithAddonManagement(nsName, clusterName, registrationImage)
-	if err != nil {
-		return nil, err
-	}
-	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-		var err error
-		_, err = hubDynamicClient.Resource(deploymentResource).Namespace(nsName).Create(context.TODO(), deployment, metav1.CreateOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		return true, nil
-	}); err != nil {
-		return nil, err
-	}
-
-	var (
-		csrs      *certificatesv1.CertificateSigningRequestList
-		csrClient = hubClient.CertificatesV1().CertificateSigningRequests()
-	)
-
-	if err := wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
-		var err error
-		csrs, err = csrClient.List(context.TODO(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("open-cluster-management.io/cluster-name = %v", clusterName),
-		})
-		if err != nil {
-			return false, err
-		}
-
-		if len(csrs.Items) >= 1 {
-			return true, nil
-		}
-
-		return false, nil
-	}); err != nil {
-		return nil, err
-	}
-
-	var csr *certificatesv1.CertificateSigningRequest
-	for i := range csrs.Items {
-		csr = &csrs.Items[i]
-
-		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			csr, err = csrClient.Get(context.TODO(), csr.Name, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-
-			if helpers.IsCSRInTerminalState(&csr.Status) {
-				return nil
-			}
-
-			csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
-				Type:    certificatesv1.CertificateApproved,
-				Status:  corev1.ConditionTrue,
-				Reason:  "Approved by E2E",
-				Message: "Approved as part of Loopback e2e",
-			})
-			_, err := csrClient.UpdateApproval(context.TODO(), csr.Name, csr, metav1.UpdateOptions{})
-			return err
-		}); err != nil {
-			return nil, err
-		}
-	}
-
-	var (
-		managedCluster  *clusterv1.ManagedCluster
-		managedClusters = clusterClient.ClusterV1().ManagedClusters()
-	)
-
-	if err := wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
-		var err error
-		managedCluster, err = managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		return true, nil
-	}); err != nil {
-		return nil, err
-	}
-
-	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		var err error
-		managedCluster, err = managedClusters.Get(context.TODO(), managedCluster.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		managedCluster.Spec.HubAcceptsClient = true
-		managedCluster.Spec.LeaseDurationSeconds = 5
-		managedCluster, err = managedClusters.Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
-		return err
-	}); err != nil {
-		return nil, err
-	}
-
-	if err := wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
-		var err error
-		managedCluster, err := managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		if meta.IsStatusConditionTrue(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted) {
-			return true, nil
-		}
-
-		return false, nil
-	}); err != nil {
-		return nil, err
-	}
-
-	if err := wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
-		var err error
-		managedCluster, err := managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		return meta.IsStatusConditionTrue(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionJoined), nil
-	}); err != nil {
-		return nil, err
-	}
-
-	err = wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
-		managedCluster, err := managedClusters.Get(context.TODO(), clusterName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		return meta.IsStatusConditionTrue(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable), nil
-	})
-	return managedCluster, err
-}
-
-func spokeDeploymentWithAddonManagement(nsName, clusterName, image string) (*unstructured.Unstructured, error) {
-	deployment, err := assetToUnstructured("spoke/deployment.yaml")
-	if err != nil {
-		return nil, err
-	}
-	err = unstructured.SetNestedField(deployment.Object, nsName, "meta", "namespace")
-	if err != nil {
-		return nil, err
-	}
-
-	containers, found, err := unstructured.NestedSlice(deployment.Object, "spec", "template", "spec", "containers")
-	if err != nil || !found || containers == nil {
-		return nil, fmt.Errorf("deployment containers not found or error in spec: %v", err)
-	}
-
-	if err := unstructured.SetNestedField(containers[0].(map[string]interface{}), image, "image"); err != nil {
-		return nil, err
-	}
-
-	args, found, err := unstructured.NestedSlice(containers[0].(map[string]interface{}), "args")
-	if err != nil || !found || args == nil {
-		return nil, fmt.Errorf("container args not found or error in spec: %v", err)
-	}
-
-	clusterNameArg := fmt.Sprintf("--cluster-name=%v", clusterName)
-	args[2] = clusterNameArg
-
-	args = append(args, "--feature-gates=AddonManagement=true")
-	if err := unstructured.SetNestedField(containers[0].(map[string]interface{}), args, "args"); err != nil {
-		return nil, err
-	}
-
-	if err := unstructured.SetNestedField(deployment.Object, containers, "spec", "template", "spec", "containers"); err != nil {
-		return nil, err
-	}
-
-	return deployment, nil
-}
-
-func createManagedClusterAddOn(managedCluster *clusterv1.ManagedCluster, addOnName string) (*addonv1alpha1.ManagedClusterAddOn, error) {
-	addOn := &addonv1alpha1.ManagedClusterAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: managedCluster.Name,
-			Name:      addOnName,
-		},
-		Spec: addonv1alpha1.ManagedClusterAddOnSpec{
-			InstallNamespace: addOnName,
-		},
-	}
-	return hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedCluster.Name).Create(context.TODO(), addOn, metav1.CreateOptions{})
-}
-
-// cleanupManagedCluster deletes the managed cluster related resources, including the namespace
-func cleanupManagedCluster(clusterName, suffix string) error {
-	nsName := fmt.Sprintf("loopback-spoke-%v", suffix)
-
-	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-		err := hubClient.CoreV1().Namespaces().Delete(context.TODO(), nsName, metav1.DeleteOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		return true, nil
-	}); err != nil {
-		return fmt.Errorf("delete ns %q failed: %v", nsName, err)
-	}
-
-	if err := deleteManageClusterAndRelatedNamespace(clusterName); err != nil {
-		return fmt.Errorf("delete manage cluster and related namespace for cluster %q failed: %v", clusterName, err)
-	}
-
-	var (
-		err        error
-		cr         *unstructured.Unstructured
-		crResource = schema.GroupVersionResource{
-			Group:    "rbac.authorization.k8s.io",
-			Version:  "v1",
-			Resource: "clusterroles",
-		}
-	)
-	cr, err = spokeCR(suffix)
-	if err != nil {
-		return err
-	}
-	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-		err := hubDynamicClient.Resource(crResource).Delete(context.TODO(), cr.GetName(), metav1.DeleteOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		return true, nil
-	}); err != nil {
-		return fmt.Errorf("delete cr %q failed: %v", cr.GetName(), err)
-	}
-
-	var (
-		crb         *unstructured.Unstructured
-		crbResource = schema.GroupVersionResource{
-			Group:    "rbac.authorization.k8s.io",
-			Version:  "v1",
-			Resource: "clusterrolebindings",
-		}
-	)
-	crb, err = spokeCRB(nsName, suffix)
-	if err != nil {
-		return err
-	}
-	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-		err := hubDynamicClient.Resource(crbResource).Delete(context.TODO(), crb.GetName(), metav1.DeleteOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		return true, nil
-	}); err != nil {
-		return fmt.Errorf("delete crb %q failed: %v", crb.GetName(), err)
-	}
-
-	return nil
-}
-
-func deleteManageClusterAndRelatedNamespace(clusterName string) error {
-	if err := wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
-		err := clusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
-		if err != nil && !errors.IsNotFound(err) {
-			return false, err
-		}
-		return true, nil
-	}); err != nil {
-		return fmt.Errorf("delete managed cluster %q failed: %v", clusterName, err)
-	}
-
-	// delete namespace created by hub automaticly
-	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-		err := hubClient.CoreV1().Namespaces().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
-		// some managed cluster just created, but the csr is not approved,
-		// so there is not a related namespace
-		if err != nil && !errors.IsNotFound(err) {
-			return false, err
-		}
-
-		return true, nil
-	}); err != nil {
-		return fmt.Errorf("delete related namespace %q failed: %v", clusterName, err)
-	}
-
-	return nil
-}
