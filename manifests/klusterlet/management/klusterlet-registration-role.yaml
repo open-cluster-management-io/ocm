@@ -1,4 +1,5 @@
-# Role for registration agent.
+# Mandatory Role permission for registartion agent
+# Registartion agent can not run without these permissions
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -9,11 +10,8 @@ rules:
 # TODO(zhujian7): may be replaced by a clusterrole to grant secret operation for others namespaces when addon
 # agents are supported running on the management cluster
 - apiGroups: [""]
-  resources: ["configmaps", "secrets"]
+  resources: ["secrets"]
   verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]
-- apiGroups: ["coordination.k8s.io"]
-  resources: ["leases"]
-  verbs: ["create", "get", "list", "update", "watch", "patch"]
 - apiGroups: ["", "events.k8s.io"]
   resources: ["events"]
   verbs: ["create", "patch", "update"]

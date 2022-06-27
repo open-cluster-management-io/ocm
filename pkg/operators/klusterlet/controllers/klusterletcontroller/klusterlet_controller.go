@@ -65,7 +65,9 @@ var (
 	managedStaticResourceFiles = []string{
 		"klusterlet/managed/klusterlet-registration-serviceaccount.yaml",
 		"klusterlet/managed/klusterlet-registration-clusterrole.yaml",
+		"klusterlet/managed/klusterlet-registration-clusterrole-addon-management.yaml",
 		"klusterlet/managed/klusterlet-registration-clusterrolebinding.yaml",
+		"klusterlet/managed/klusterlet-registration-clusterrolebinding-addon-management.yaml",
 		"klusterlet/managed/klusterlet-work-serviceaccount.yaml",
 		"klusterlet/managed/klusterlet-work-clusterrole.yaml",
 		"klusterlet/managed/klusterlet-work-clusterrolebinding.yaml",

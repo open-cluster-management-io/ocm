@@ -112,9 +112,9 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 					return err
 				}
 
-				// 7 managed static manifests + 9 management static manifests + 2CRDs + 2 deployments(2 duplicated CRDs, but status also recorded in the klusterlet's status)
-				if len(actual.Status.RelatedResources) != 20 {
-					return fmt.Errorf("should get 20 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				// 9 managed static manifests + 9 management static manifests + 2CRDs + 2 deployments(2 duplicated CRDs, but status also recorded in the klusterlet's status)
+				if len(actual.Status.RelatedResources) != 22 {
+					return fmt.Errorf("should get 22 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())

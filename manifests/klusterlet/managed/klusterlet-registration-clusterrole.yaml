@@ -1,28 +1,16 @@
-# Clusterrole for work agent in addition to admin clusterrole.
+# Mandatory ClusterRole permission for registartion agent
+# Registartion agent can not run without these permissions
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: open-cluster-management:{{ .KlusterletName }}-registration:agent
 rules:
-# Allow agent to get/list/watch nodes and configmaps.
+# Allow agent to get/list/watch nodes
 # list nodes to calculates the capacity and allocatable resources of the managed cluster
 - apiGroups: [""]
   resources: ["nodes"]
   verbs: ["get", "list", "watch"]
-
-# Allow agent to get/list/watch/create/delete/update/patch secrets.
-# TODO(zhujian7): consider to delete when addon agents can be deployed on the management cluster.
-- apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]
-- apiGroups: ["authorization.k8s.io"]
-  resources: ["subjectaccessreviews"]
-  verbs: ["create"]
 # Allow agent to list clusterclaims
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["clusterclaims"]
-  verbs: ["get", "list", "watch"]
-# Allow agent to list addons lease
-- apiGroups: ["coordination.k8s.io"]
-  resources: ["leases"]
   verbs: ["get", "list", "watch"]

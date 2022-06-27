@@ -1,0 +1,16 @@
+# Adddition ClusterRole permission for registartion agent 
+# Registartion agent needs these permission to manage addons
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: open-cluster-management:{{ .KlusterletName }}-registration:addon-management
+rules:
+# Allow agent to get/list/watch/create/delete/update/patch secrets.
+# TODO(zhujian7): consider to delete when addon agents can be deployed on the management cluster.
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]
+# Allow agent to list addons lease
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["create", "get", "list", "update", "watch", "patch"]
