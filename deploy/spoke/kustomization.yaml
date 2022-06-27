@@ -6,9 +6,13 @@ resources:
 - ./appliedmanifestworks.crd.yaml
 - ./component_namespace.yaml
 - ./service_account.yaml
+- ./role.yaml
+- ./role_binding.yaml
 - ./clusterrole.yaml
+- ./clusterrole_execution.yaml
 - ./clusterrole_binding.yaml
-- ./clusterrole_binding_addition.yaml
+- ./clusterrole_binding_execution.yaml
+- ./clusterrole_binding_execution-admin.yaml
 - ./deployment.yaml
 
 images:

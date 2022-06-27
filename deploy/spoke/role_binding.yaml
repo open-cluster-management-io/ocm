@@ -1,11 +1,12 @@
-# ClusterRoleBinding for work mandatory permissions.
+# RoleBinding for work mandatory permissions.
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
   name: open-cluster-management:work:agent
+  namespace: open-cluster-management-agent
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: Role
   name: open-cluster-management:work:agent
 subjects:
   - kind: ServiceAccount

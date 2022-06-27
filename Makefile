@@ -75,6 +75,8 @@ deploy-work-agent: ensure-kustomize create-cluster-ns hub-kubeconfig-secret
 	$(KUBECTL) config use-context $(SPOKE_KUBECONFIG_CONTEXT) --kubeconfig $(SPOKE_KUBECONFIG)
 	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) apply -f -
 	mv deploy/spoke/kustomization.yaml.tmp deploy/spoke/kustomization.yaml
+	$(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) apply -f deploy/spoke/role_extension-apiserver.yaml 
+	$(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) apply -f deploy/spoke/role_binding_extension-apiserver.yaml
 
 deploy-webhook: ensure-kustomize
 	cp deploy/webhook/kustomization.yaml deploy/webhook/kustomization.yaml.tmp

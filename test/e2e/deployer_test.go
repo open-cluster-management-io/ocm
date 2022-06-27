@@ -34,11 +34,17 @@ import (
 var (
 	staticResourceFiles = []string{
 		"spoke/appliedmanifestworks.crd.yaml",
-		"spoke/clusterrole.yaml",
 		"spoke/component_namespace.yaml",
 		"spoke/service_account.yaml",
+		"spoke/role.yaml",
+		"spoke/role_extension-apiserver.yaml",
+		"spoke/role_binding.yaml",
+		"spoke/role_binding_extension-apiserver.yaml",
+		"spoke/clusterrole.yaml",
+		"spoke/clusterrole_execution.yaml",
 		"spoke/clusterrole_binding.yaml",
-		"spoke/clusterrole_binding_addition.yaml",
+		"spoke/clusterrole_binding_execution.yaml",
+		"spoke/clusterrole_binding_execution-admin.yaml",
 	}
 	deploymentFile            = "spoke/deployment.yaml"
 	hubKubeconfigSecret       = "hub-kubeconfig-secret"
@@ -199,6 +205,10 @@ func (d *defaultWorkAgentDeployer) Undeploy() error {
 			err = d.spokeKubeClient.RbacV1().ClusterRoles().Delete(context.TODO(), t.Name, metav1.DeleteOptions{})
 		case *rbacv1.ClusterRoleBinding:
 			err = d.spokeKubeClient.RbacV1().ClusterRoleBindings().Delete(context.TODO(), t.Name, metav1.DeleteOptions{})
+		case *rbacv1.Role:
+			err = nil
+		case *rbacv1.RoleBinding:
+			err = nil
 		case *apiextensionsv1.CustomResourceDefinition:
 			err = d.spokeApiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(context.TODO(), t.Name, metav1.DeleteOptions{})
 		case *apiextensionsv1beta1.CustomResourceDefinition:
