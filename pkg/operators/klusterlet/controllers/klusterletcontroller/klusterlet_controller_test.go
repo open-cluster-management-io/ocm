@@ -605,19 +605,6 @@ func TestSyncDelete(t *testing.T) {
 		t.Errorf("Expected 25 delete actions, but got %d", len(deleteActions))
 	}
 
-	deleteCRDActions := []clienttesting.DeleteActionImpl{}
-	crdActions := controller.apiExtensionClient.Actions()
-	for _, action := range crdActions {
-		if action.GetVerb() == "delete" {
-			deleteAction := action.(clienttesting.DeleteActionImpl)
-			deleteCRDActions = append(deleteCRDActions, deleteAction)
-		}
-	}
-
-	if len(deleteCRDActions) != 2 {
-		t.Errorf("Expected 2 delete actions, but got %d", len(deleteCRDActions))
-	}
-
 	updateWorkActions := []clienttesting.UpdateActionImpl{}
 	workActions := controller.workClient.Actions()
 	for _, action := range workActions {
@@ -685,19 +672,6 @@ func TestSyncDeleteHosted(t *testing.T) {
 	// 11 static manifests + 2 namespaces
 	if len(deleteActionsManaged) != 13 {
 		t.Errorf("Expected 13 delete actions, but got %d", len(deleteActionsManaged))
-	}
-
-	deleteCRDActions := []clienttesting.DeleteActionImpl{}
-	crdActions := controller.managedApiExtensionClient.Actions()
-	for _, action := range crdActions {
-		if action.GetVerb() == "delete" {
-			deleteAction := action.(clienttesting.DeleteActionImpl)
-			deleteCRDActions = append(deleteCRDActions, deleteAction)
-		}
-	}
-
-	if len(deleteCRDActions) != 2 {
-		t.Errorf("Expected 2 delete actions, but got %d", len(deleteCRDActions))
 	}
 
 	updateWorkActions := []clienttesting.UpdateActionImpl{}

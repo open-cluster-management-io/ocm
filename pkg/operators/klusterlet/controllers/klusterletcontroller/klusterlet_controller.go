@@ -656,7 +656,7 @@ func (n *klusterletController) cleanUp(
 		return err
 	}
 
-	// remove AppliedManifestWorks, should be executed **before** "remove the CRDs" and "remove hub kubeconfig secret"
+	// remove finalizer from AppliedManifestWorks, should be executed **before** "remove hub kubeconfig secret".
 	if len(hubHost) > 0 {
 		if err := n.cleanUpAppliedManifestWorks(ctx, managedClients.appliedManifestWorkClient, hubHost); err != nil {
 			return err
@@ -712,19 +712,8 @@ func (n *klusterletController) cleanUp(
 		}
 	}
 
-	// remove the CRDs
-	var crdStaticFiles []string
-	// CRD v1beta1 was deprecated from k8s 1.16.0 and will be removed in k8s 1.22
-	if cnt, err := n.kubeVersion.Compare("v1.16.0"); err == nil && cnt < 0 {
-		crdStaticFiles = crdV1beta1StaticFiles
-	} else {
-		crdStaticFiles = crdV1StaticFiles
-	}
-	err = n.removeStaticResources(ctx, managedClients.kubeClient, managedClients.apiExtensionClient,
-		crdStaticFiles, config)
-	if err != nil {
-		return err
-	}
+	// no longer remove the CRDs (AppliedManifestWork & ClusterClaim), because they might be shared
+	// by multiple klusterlets. Consequently, the CRs of those CRDs will not be deleted as well when deleting a klusterlet.
 
 	// The agent namespace on the management cluster should be removed **at the end**. Otherwise if any failure occurred,
 	// the managed-external-kubeconfig secret would be removed and the next reconcile will fail due to can not build the
