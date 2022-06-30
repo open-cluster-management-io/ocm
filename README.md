@@ -15,6 +15,7 @@ You can reach the maintainers of this project at:
 -->
 
 ------
+
 ## Getting Started
 
 ### Prerequisites
@@ -22,18 +23,22 @@ You can reach the maintainers of this project at:
 You have at least one running kubernetes cluster;
 
 ### Clone this repo
+
 ```sh
 git clone https://github.com/open-cluster-management-io/placement.git
 cd placement
 ```
 
 ### Deploy the placement controller
+
 Set environment variables.
+
 ```sh
 export KUBECONFIG=</path/to/kubeconfig>
 ```
 
 Build the docker image to run the placement controller.
+
 ```sh
 go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.1
 make images
@@ -41,18 +46,22 @@ export IMAGE_NAME=<placement_image_name> # export IMAGE_NAME=quay.io/open-cluste
 ```
 
 If your are using kind, load image into the kind cluster.
+
 ```sh
 kind load docker-image <placement_image_name> # kind load docker-image quay.io/open-cluster-management/placement:latest
 ```
 
 And then deploy placement manager on the cluster.
+
 ```sh
 make deploy-hub
 ```
 
 ### What is next
+
 After a successful deployment, check on the cluster and see the placement controller has been deployed.
-```
+
+```sh
 kubectl -n open-cluster-management-hub get pods
 NAME                                                  READY   STATUS    RESTARTS   AGE
 cluster-manager-placement-controller-cf9bbd6c-x9dnd   1/1     Running   0          2m16s
@@ -61,6 +70,7 @@ cluster-manager-placement-controller-cf9bbd6c-x9dnd   1/1     Running   0       
 Here is an example.
 
 Create a `ManagedClusterSet`.
+
 ```sh
 cat <<EOF | kubectl apply -f -
 apiVersion: cluster.open-cluster-management.io/v1alpha1
@@ -71,6 +81,7 @@ EOF
 ```
 
 Create a `ManagedCluster` and assign it to clusterset `clusterset1`.
+
 ```sh
 cat <<EOF | kubectl apply -f -
 apiVersion: cluster.open-cluster-management.io/v1
@@ -86,6 +97,7 @@ EOF
 ```
 
 Create a `ManagedClusterSetBinding` to bind the `ManagedClusterSet` to the default namespace.
+
 ```sh
 cat <<EOF | kubectl apply -f -
 apiVersion: cluster.open-cluster-management.io/v1alpha1
@@ -99,6 +111,7 @@ EOF
 ```
 
 Now create a `Placement`:
+
 ```sh
 cat <<EOF | kubectl apply -f -
 apiVersion: cluster.open-cluster-management.io/v1alpha1
@@ -132,7 +145,9 @@ Events:            <none>
 ```
 
 ### Clean up
+
 Undeploy placement controller from the cluster.
+
 ```sh
 make undeploy-hub
 ```
