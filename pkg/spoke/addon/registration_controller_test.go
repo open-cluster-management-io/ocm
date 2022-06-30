@@ -95,15 +95,19 @@ func TestRegistrationSync(t *testing.T) {
 		queueKey                             string
 		addOn                                *addonv1alpha1.ManagedClusterAddOn
 		addOnRegistrationConfigs             map[string]map[string]registrationConfig
+		addonAgentOutsideManagedCluster      bool
 		expectedAddOnRegistrationConfigHashs map[string][]string
-		validateActions                      func(t *testing.T, actions []clienttesting.Action)
+		validateActions                      func(t *testing.T, actions, managementActions []clienttesting.Action)
 	}{
 		{
 			name:     "addon registration not enabled",
 			queueKey: addonName,
-			addOn:    newManagedClusterAddOn(clusterName, addonName, nil),
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+			addOn:    newManagedClusterAddOn(clusterName, addonName, nil, false),
+			validateActions: func(t *testing.T, actions, managementActions []clienttesting.Action) {
 				if len(actions) != 0 {
+					t.Errorf("expect 0 actions but got %d", len(actions))
+				}
+				if len(managementActions) != 0 {
 					t.Errorf("expect 0 actions but got %d", len(actions))
 				}
 			},
@@ -111,11 +115,12 @@ func TestRegistrationSync(t *testing.T) {
 		{
 			name:     "addon registration enabled",
 			queueKey: addonName,
-			addOn:    newManagedClusterAddOn(clusterName, addonName, []addonv1alpha1.RegistrationConfig{config1}),
+			addOn: newManagedClusterAddOn(clusterName, addonName,
+				[]addonv1alpha1.RegistrationConfig{config1}, false),
 			expectedAddOnRegistrationConfigHashs: map[string][]string{
 				addonName: {hash(config1)},
 			},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateActions: func(t *testing.T, actions, managementActions []clienttesting.Action) {
 				if len(actions) != 0 {
 					t.Errorf("expect 0 actions but got %d", len(actions))
 				}
@@ -124,7 +129,8 @@ func TestRegistrationSync(t *testing.T) {
 		{
 			name:     "addon registration updated",
 			queueKey: addonName,
-			addOn:    newManagedClusterAddOn(clusterName, addonName, []addonv1alpha1.RegistrationConfig{config2}),
+			addOn: newManagedClusterAddOn(clusterName, addonName,
+				[]addonv1alpha1.RegistrationConfig{config2}, false),
 			addOnRegistrationConfigs: map[string]map[string]registrationConfig{
 				addonName: {
 					hash(config1): {
@@ -136,7 +142,7 @@ func TestRegistrationSync(t *testing.T) {
 			expectedAddOnRegistrationConfigHashs: map[string][]string{
 				addonName: {hash(config2)},
 			},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateActions: func(t *testing.T, actions, managementActions []clienttesting.Action) {
 				if len(actions) != 1 {
 					t.Errorf("expect 1 actions but got %d", len(actions))
 				}
@@ -154,7 +160,7 @@ func TestRegistrationSync(t *testing.T) {
 					},
 				},
 			},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateActions: func(t *testing.T, actions, managementActions []clienttesting.Action) {
 				if len(actions) != 1 {
 					t.Errorf("expect 1 actions but got %d", len(actions))
 				}
@@ -162,9 +168,73 @@ func TestRegistrationSync(t *testing.T) {
 			},
 		},
 		{
+			name:     "hosted addon registration enabled",
+			queueKey: addonName,
+			addOn:    newManagedClusterAddOn(clusterName, addonName, []addonv1alpha1.RegistrationConfig{config1}, true),
+			expectedAddOnRegistrationConfigHashs: map[string][]string{
+				addonName: {hash(config1)},
+			},
+			addonAgentOutsideManagedCluster: true,
+			validateActions: func(t *testing.T, actions, managementActions []clienttesting.Action) {
+				if len(actions) != 0 {
+					t.Errorf("expect 0 actions but got %d", len(actions))
+				}
+				if len(managementActions) != 0 {
+					t.Errorf("expect 0 management actions but got %d", len(managementActions))
+				}
+			},
+		},
+		{
+			name:                            "hosted addon registration updated",
+			queueKey:                        addonName,
+			addOn:                           newManagedClusterAddOn(clusterName, addonName, []addonv1alpha1.RegistrationConfig{config2}, true),
+			addonAgentOutsideManagedCluster: true,
+			addOnRegistrationConfigs: map[string]map[string]registrationConfig{
+				addonName: {
+					hash(config1): {
+						secretName:                             "secret1",
+						installationNamespace:                  addonName,
+						addOnAgentRunningOutsideManagedCluster: true,
+					},
+				},
+			},
+			expectedAddOnRegistrationConfigHashs: map[string][]string{
+				addonName: {hash(config2)},
+			},
+			validateActions: func(t *testing.T, actions, managementActions []clienttesting.Action) {
+				if len(actions) != 0 {
+					t.Errorf("expect 0 actions but got %d", len(actions))
+				}
+				if len(managementActions) != 1 {
+					t.Errorf("expect 1 management actions but got %d", len(managementActions))
+				}
+				testinghelpers.AssertActions(t, managementActions, "delete")
+			},
+		},
+		{
+			name:     "hosted addon is deleted",
+			queueKey: addonName,
+			addOnRegistrationConfigs: map[string]map[string]registrationConfig{
+				addonName: {
+					hash(config1): {
+						secretName:                             "secret1",
+						installationNamespace:                  addonName,
+						addOnAgentRunningOutsideManagedCluster: true,
+					},
+				},
+			},
+			validateActions: func(t *testing.T, actions, managementActions []clienttesting.Action) {
+				if len(managementActions) != 1 {
+					t.Errorf("expect 1 actions but got %d", len(managementActions))
+				}
+				testinghelpers.AssertActions(t, managementActions, "delete")
+			},
+		},
+		{
 			name:     "resync",
 			queueKey: factory.DefaultQueueKey,
-			addOn:    newManagedClusterAddOn(clusterName, addonName, []addonv1alpha1.RegistrationConfig{config1}),
+			addOn: newManagedClusterAddOn(clusterName, addonName,
+				[]addonv1alpha1.RegistrationConfig{config1}, false),
 			addOnRegistrationConfigs: map[string]map[string]registrationConfig{
 				addonName: {
 					hash(config1): {
@@ -182,7 +252,7 @@ func TestRegistrationSync(t *testing.T) {
 			expectedAddOnRegistrationConfigHashs: map[string][]string{
 				addonName: {hash(config1)},
 			},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateActions: func(t *testing.T, actions, managementActions []clienttesting.Action) {
 				if len(actions) != 1 {
 					t.Errorf("expect 1 actions but got %d", len(actions))
 				}
@@ -194,6 +264,7 @@ func TestRegistrationSync(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			kubeClient := kubefake.NewSimpleClientset()
+			managementClient := kubefake.NewSimpleClientset()
 			addons := []runtime.Object{}
 			if c.addOn != nil {
 				addons = append(addons, c.addOn)
@@ -212,10 +283,11 @@ func TestRegistrationSync(t *testing.T) {
 			}
 
 			controller := addOnRegistrationController{
-				clusterName:     clusterName,
-				spokeKubeClient: kubeClient,
-				hubAddOnLister:  addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				recorder:        eventstesting.NewTestingEventRecorder(t),
+				clusterName:          clusterName,
+				managementKubeClient: managementClient,
+				spokeKubeClient:      kubeClient,
+				hubAddOnLister:       addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				recorder:             eventstesting.NewTestingEventRecorder(t),
 				startRegistrationFunc: func(ctx context.Context, config registrationConfig) context.CancelFunc {
 					_, cancel := context.WithCancel(context.Background())
 					return cancel
@@ -238,21 +310,28 @@ func TestRegistrationSync(t *testing.T) {
 					t.Errorf("expected %d config items for addOn %q, but got %d", len(hashs), addOnName, len(addonRegistrationConfigs))
 				}
 				for _, hash := range hashs {
-					if _, ok := addonRegistrationConfigs[hash]; !ok {
+					config, ok := addonRegistrationConfigs[hash]
+					if !ok {
 						t.Errorf("registration config with hash %q is not found for addOn %q", hash, addOnName)
+
+					}
+					if config.addOnAgentRunningOutsideManagedCluster != c.addonAgentOutsideManagedCluster {
+						t.Errorf("expect addon agent running outside managed cluster: %v, but got: %v",
+							c.addonAgentOutsideManagedCluster, config.addOnAgentRunningOutsideManagedCluster)
 					}
 				}
 			}
 
 			if c.validateActions != nil {
-				c.validateActions(t, kubeClient.Actions())
+				c.validateActions(t, kubeClient.Actions(), managementClient.Actions())
 			}
 		})
 	}
 }
 
-func newManagedClusterAddOn(namespace, name string, registrations []addonv1alpha1.RegistrationConfig) *addonv1alpha1.ManagedClusterAddOn {
-	return &addonv1alpha1.ManagedClusterAddOn{
+func newManagedClusterAddOn(namespace, name string, registrations []addonv1alpha1.RegistrationConfig,
+	hostedMode bool) *addonv1alpha1.ManagedClusterAddOn {
+	addon := &addonv1alpha1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
@@ -261,6 +340,11 @@ func newManagedClusterAddOn(namespace, name string, registrations []addonv1alpha
 			Registrations: registrations,
 		},
 	}
+
+	if hostedMode {
+		addon.SetAnnotations(map[string]string{hostingClusterNameAnnotation: "test"})
+	}
+	return addon
 }
 
 func hash(registration addonv1alpha1.RegistrationConfig) string {

@@ -100,8 +100,9 @@ type clientCertificateController struct {
 	ClientCertOption
 	CSROption
 	csrControl
-	spokeCoreClient corev1client.CoreV1Interface
-	controllerName  string
+	// managementCoreClient is used to create/delete hub kubeconfig secret on the management cluster
+	managementCoreClient corev1client.CoreV1Interface
+	controllerName       string
 
 	// csrName is the name of csr created by controller and waiting for approval.
 	csrName string
@@ -123,9 +124,9 @@ func NewClientCertificateController(
 	clientCertOption ClientCertOption,
 	csrOption CSROption,
 	hubCSRInformer certificatesinformers.Interface,
-	spokeSecretInformer corev1informers.SecretInformer,
-	spokeKubeClient kubernetes.Interface,
 	hubKubeClient kubernetes.Interface,
+	managementSecretInformer corev1informers.SecretInformer,
+	managementKubeClient kubernetes.Interface,
 	statusUpdater StatusUpdateFunc,
 	recorder events.Recorder,
 	controllerName string,
@@ -156,8 +157,8 @@ func NewClientCertificateController(
 		clientCertOption,
 		csrOption,
 		csrCtrl,
-		spokeSecretInformer,
-		spokeKubeClient.CoreV1(),
+		managementSecretInformer,
+		managementKubeClient.CoreV1(),
 		statusUpdater,
 		recorder,
 		controllerName), nil
@@ -167,19 +168,19 @@ func newClientCertificateController(
 	clientCertOption ClientCertOption,
 	csrOption CSROption,
 	csrControl csrControl,
-	spokeSecretInformer corev1informers.SecretInformer,
-	spokeCoreClient corev1client.CoreV1Interface,
+	managementSecretInformer corev1informers.SecretInformer,
+	managementCoreClient corev1client.CoreV1Interface,
 	statusUpdater StatusUpdateFunc,
 	recorder events.Recorder,
 	controllerName string,
 ) factory.Controller {
 	c := clientCertificateController{
-		ClientCertOption: clientCertOption,
-		CSROption:        csrOption,
-		csrControl:       csrControl,
-		spokeCoreClient:  spokeCoreClient,
-		controllerName:   controllerName,
-		statusUpdater:    statusUpdater,
+		ClientCertOption:     clientCertOption,
+		CSROption:            csrOption,
+		csrControl:           csrControl,
+		managementCoreClient: managementCoreClient,
+		controllerName:       controllerName,
+		statusUpdater:        statusUpdater,
 	}
 
 	return factory.New().
@@ -195,7 +196,7 @@ func newClientCertificateController(
 				return true
 			}
 			return false
-		}, spokeSecretInformer.Informer()).
+		}, managementSecretInformer.Informer()).
 		WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
 			return factory.DefaultQueueKey
 		}, c.EventFilterFunc, csrControl.informer()).
@@ -206,7 +207,7 @@ func newClientCertificateController(
 
 func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	// get secret containing client certificate
-	secret, err := c.spokeCoreClient.Secrets(c.SecretNamespace).Get(ctx, c.SecretName, metav1.GetOptions{})
+	secret, err := c.managementCoreClient.Secrets(c.SecretNamespace).Get(ctx, c.SecretName, metav1.GetOptions{})
 	switch {
 	case apierrors.IsNotFound(err):
 		secret = &corev1.Secret{
@@ -285,7 +286,7 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 		}
 		secret.Data = newSecretConfig
 		// save the changes into secret
-		if err := saveSecret(c.spokeCoreClient, c.SecretNamespace, secret); err != nil {
+		if err := saveSecret(c.managementCoreClient, c.SecretNamespace, secret); err != nil {
 			if updateErr := c.statusUpdater(ctx, metav1.Condition{
 				Type:    "ClusterCertificateRotated",
 				Status:  metav1.ConditionFalse,

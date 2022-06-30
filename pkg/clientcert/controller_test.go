@@ -193,12 +193,12 @@ func TestSync(t *testing.T) {
 			updater := &fakeStatusUpdater{}
 
 			controller := &clientCertificateController{
-				ClientCertOption: clientCertOption,
-				CSROption:        csrOption,
-				csrControl:       ctrl,
-				spokeCoreClient:  agentKubeClient.CoreV1(),
-				controllerName:   "test-agent",
-				statusUpdater:    updater.update,
+				ClientCertOption:     clientCertOption,
+				CSROption:            csrOption,
+				csrControl:           ctrl,
+				managementCoreClient: agentKubeClient.CoreV1(),
+				controllerName:       "test-agent",
+				statusUpdater:        updater.update,
 			}
 
 			if c.approvedCSRCert != nil {

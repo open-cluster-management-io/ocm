@@ -12,7 +12,11 @@ import (
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
-const defaultAddOnInstallationNamespace = "open-cluster-management-agent-addon"
+const (
+	defaultAddOnInstallationNamespace = "open-cluster-management-agent-addon"
+	// hostingClusterNameAnnotation is the annotation for indicating the hosting cluster name
+	hostingClusterNameAnnotation = "addon.open-cluster-management.io/hosting-cluster-name"
+)
 
 // registrationConfig contains necessary information for addon registration
 // TODO: Refactor the code here once the registration configuration is available in spec of ManagedClusterAddOn
@@ -26,6 +30,8 @@ type registrationConfig struct {
 	secretName string
 	hash       string
 	stopFunc   context.CancelFunc
+
+	addOnAgentRunningOutsideManagedCluster bool
 }
 
 func (c *registrationConfig) x509Subject(clusterName, agentName string) *pkix.Name {
@@ -60,15 +66,26 @@ func getAddOnInstallationNamespace(addOn *addonv1alpha1.ManagedClusterAddOn) str
 	return installationNamespace
 }
 
+// isAddonRunningOutsideManagedCluster returns whether the addon agent is running on the managed cluster
+func isAddonRunningOutsideManagedCluster(addOn *addonv1alpha1.ManagedClusterAddOn) bool {
+	hostingCluster, ok := addOn.Annotations[hostingClusterNameAnnotation]
+	if ok && len(hostingCluster) != 0 {
+		return true
+	}
+	return false
+}
+
 // getRegistrationConfigs reads annotations of a addon and returns a map of registrationConfig whose
 // key is the hash of the registrationConfig
 func getRegistrationConfigs(addOn *addonv1alpha1.ManagedClusterAddOn) (map[string]registrationConfig, error) {
 	configs := map[string]registrationConfig{}
+
 	for _, registration := range addOn.Status.Registrations {
 		config := registrationConfig{
-			addOnName:             addOn.Name,
-			installationNamespace: getAddOnInstallationNamespace(addOn),
-			registration:          registration,
+			addOnName:                              addOn.Name,
+			addOnAgentRunningOutsideManagedCluster: isAddonRunningOutsideManagedCluster(addOn),
+			installationNamespace:                  getAddOnInstallationNamespace(addOn),
+			registration:                           registration,
 		}
 
 		// set the secret name of client certificate

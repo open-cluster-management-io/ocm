@@ -362,11 +362,9 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			o.ClusterName,
 			o.AgentName,
 			kubeconfigData,
-			// TODO(zhujian7): By now, we only support all addon agents running on the managed cluster.
-			// In the future we need to maintain the hub cluster kubeconfig secret on the **management**
-			// cluster when there is an appropriate way to deploy addon agents on the management cluster.
-			spokeKubeClient,
 			addOnClient,
+			managementKubeClient,
+			spokeKubeClient,
 			hubKubeInformerFactory.Certificates(),
 			addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
 			hubKubeClient,
