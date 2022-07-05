@@ -1,12 +1,14 @@
-# Adddition ClusterRole permission for registartion agent 
-# Registartion agent needs these permission to manage addons
+# Addition ClusterRole permission for registration agent
+# Registration agent needs these permission to manage addons whose agents runs in managed cluster while registration 
+# agent itself runs in the management cluster. For example, if klusterlet is deployed in hosted mode, but an addon is 
+# deployed in default mode, then the registration agent runs outside the managed cluster and the addon agents run on 
+# the managed cluster.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: open-cluster-management:{{ .KlusterletName }}-registration:addon-management
 rules:
 # Allow agent to get/list/watch/create/delete/update/patch secrets.
-# TODO(zhujian7): consider to delete when addon agents can be deployed on the management cluster.
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]

@@ -82,6 +82,8 @@ var (
 		"klusterlet/management/klusterlet-registration-role.yaml",
 		"klusterlet/management/klusterlet-registration-rolebinding.yaml",
 		"klusterlet/management/klusterlet-registration-rolebinding-extension-apiserver.yaml",
+		"klusterlet/management/klusterlet-registration-clusterrole-addon-management.yaml",
+		"klusterlet/management/klusterlet-registration-clusterrolebinding-addon-management.yaml",
 		"klusterlet/management/klusterlet-work-serviceaccount.yaml",
 		"klusterlet/management/klusterlet-work-role.yaml",
 		"klusterlet/management/klusterlet-work-rolebinding.yaml",

@@ -431,9 +431,9 @@ func TestSyncDeploy(t *testing.T) {
 	}
 
 	// Check if resources are created as expected
-	// 11 managed static manifests + 9 management static manifests - 2 duplicated service account manifests + 1 addon namespace + 2 deployments
-	if len(createObjects) != 21 {
-		t.Errorf("Expect 21 objects created in the sync loop, actual %d", len(createObjects))
+	// 11 managed static manifests + 11 management static manifests - 2 duplicated service account manifests + 1 addon namespace + 2 deployments
+	if len(createObjects) != 23 {
+		t.Errorf("Expect 23 objects created in the sync loop, actual %d", len(createObjects))
 	}
 	for _, object := range createObjects {
 		ensureObject(t, object, klusterlet)
@@ -495,9 +495,9 @@ func TestSyncDeployHosted(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected on the management cluster
-	// 9 static manifests + 2 secrets(external-managed-kubeconfig-registration,external-managed-kubeconfig-work) + 2 deployments(registration-agent,work-agent) + 1 pull secret
-	if len(createObjectsManagement) != 14 {
-		t.Errorf("Expect 14 objects created in the sync loop, actual %d", len(createObjectsManagement))
+	// 11 static manifests + 2 secrets(external-managed-kubeconfig-registration,external-managed-kubeconfig-work) + 2 deployments(registration-agent,work-agent) + 1 pull secret
+	if len(createObjectsManagement) != 16 {
+		t.Errorf("Expect 16 objects created in the sync loop, actual %d", len(createObjectsManagement))
 	}
 	for _, object := range createObjectsManagement {
 		ensureObject(t, object, klusterlet)
@@ -600,9 +600,9 @@ func TestSyncDelete(t *testing.T) {
 		}
 	}
 
-	// 11 managed static manifests + 9 management static manifests + 1 hub kubeconfig + 2 namespaces + 2 deployments
-	if len(deleteActions) != 25 {
-		t.Errorf("Expected 25 delete actions, but got %d", len(deleteActions))
+	// 11 managed static manifests + 11 management static manifests + 1 hub kubeconfig + 2 namespaces + 2 deployments
+	if len(deleteActions) != 27 {
+		t.Errorf("Expected 27 delete actions, but got %d", len(deleteActions))
 	}
 
 	updateWorkActions := []clienttesting.UpdateActionImpl{}
@@ -654,10 +654,10 @@ func TestSyncDeleteHosted(t *testing.T) {
 		}
 	}
 
-	// 9 static manifests + 3 secrets(hub-kubeconfig-secret, external-managed-kubeconfig-registration,external-managed-kubeconfig-work)
+	// 11 static manifests + 3 secrets(hub-kubeconfig-secret, external-managed-kubeconfig-registration,external-managed-kubeconfig-work)
 	// + 2 deployments(registration-agent,work-agent) + 1 namespace
-	if len(deleteActionsManagement) != 15 {
-		t.Errorf("Expected 15 delete actions, but got %d", len(deleteActionsManagement))
+	if len(deleteActionsManagement) != 17 {
+		t.Errorf("Expected 17 delete actions, but got %d", len(deleteActionsManagement))
 	}
 
 	deleteActionsManaged := []clienttesting.DeleteActionImpl{}
@@ -957,9 +957,9 @@ func TestDeployOnKube111(t *testing.T) {
 	}
 
 	// Check if resources are created as expected
-	// 11 managed static manifests + 9 management static manifests - 2 duplicated service account manifests + 1 addon namespace + 2 deployments + 2 kube111 clusterrolebindings
-	if len(createObjects) != 23 {
-		t.Errorf("Expect 23 objects created in the sync loop, actual %d", len(createObjects))
+	// 11 managed static manifests + 11 management static manifests - 2 duplicated service account manifests + 1 addon namespace + 2 deployments + 2 kube111 clusterrolebindings
+	if len(createObjects) != 25 {
+		t.Errorf("Expect 25 objects created in the sync loop, actual %d", len(createObjects))
 	}
 	for _, object := range createObjects {
 		ensureObject(t, object, klusterlet)
@@ -1003,9 +1003,9 @@ func TestDeployOnKube111(t *testing.T) {
 		}
 	}
 
-	// 11 managed static manifests + 9 management static manifests + 1 hub kubeconfig + 2 namespaces + 2 deployments + 2 kube111 clusterrolebindings
-	if len(deleteActions) != 27 {
-		t.Errorf("Expected 27 delete actions, but got %d", len(deleteActions))
+	// 11 managed static manifests + 11 management static manifests + 1 hub kubeconfig + 2 namespaces + 2 deployments + 2 kube111 clusterrolebindings
+	if len(deleteActions) != 29 {
+		t.Errorf("Expected 29 delete actions, but got %d", len(deleteActions))
 	}
 }
 

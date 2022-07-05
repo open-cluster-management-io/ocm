@@ -1,4 +1,5 @@
-# ClusterRoleBinding for registration addon management permissions.
+# ClusterRoleBinding for registration to manage addons whose agents are not in the same cluster as the 
+# registration agent.
 # TODO: 1 When addon-management feature gate is disabled, do not install this ClusterRoleBinding and ClusterRole,
 # and registration agent should run successfully. 2 Replace this ClusterRoleBinding with RoleBinding, and bind 
 # ClusterRole and ServiceAccount to user defined addon namespaces.

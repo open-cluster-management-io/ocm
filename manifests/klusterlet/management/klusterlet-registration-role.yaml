@@ -14,8 +14,6 @@ rules:
   resources: ["leases"]
   verbs: ["create", "get", "list", "update", "watch", "patch"]
 # create hub-kubeconfig external-managed-registration/work secrets
-# TODO(zhujian7): may be replaced by a clusterrole to grant secret operation for others namespaces when addon
-# agents are supported running on the management cluster
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]
