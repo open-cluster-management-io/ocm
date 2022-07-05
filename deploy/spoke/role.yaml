@@ -6,6 +6,14 @@ metadata:
   name: open-cluster-management:registration-agent
   namespace: open-cluster-management-agent
 rules:
+# leader election needs to operate configmaps and leases
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["create", "get", "list", "update", "watch", "patch"]
+# create hub-kubeconfig and external-managed-registration/work secrets
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]
