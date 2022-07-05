@@ -6,7 +6,14 @@ metadata:
   name: open-cluster-management:management:{{ .KlusterletName }}-registration:agent
   namespace: {{ .AgentNamespace }}
 rules:
-# leader election needs to operate configmaps, create hub-kubeconfig external-managed-registration/work secrets
+# leader election needs to operate configmaps and leases
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["create", "get", "list", "update", "watch", "patch"]
+# create hub-kubeconfig external-managed-registration/work secrets
 # TODO(zhujian7): may be replaced by a clusterrole to grant secret operation for others namespaces when addon
 # agents are supported running on the management cluster
 - apiGroups: [""]

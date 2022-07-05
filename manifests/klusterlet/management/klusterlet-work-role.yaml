@@ -6,7 +6,7 @@ metadata:
   name: open-cluster-management:management:{{ .KlusterletName }}-work:agent
   namespace: {{ .AgentNamespace }}
 rules:
-# leader election needs to operate configmaps
+# leader election needs to operate configmaps and leases
 - apiGroups: [""]
   resources: ["configmaps"]
   verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]
