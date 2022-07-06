@@ -11,7 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
@@ -220,7 +219,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 				Message: "Registration feature gates of cluster manager are all valid",
 			})
 		} else {
-			invalidFGErr := fmt.Errorf("There are some invalid feature gates of registration: %v ", invalidFeatureGates)
+			invalidFGErr := fmt.Errorf("there are some invalid feature gates of registration: %v ", invalidFeatureGates)
 			_, _, updateError := helpers.UpdateClusterManagerStatus(ctx, n.clusterManagerClient, clusterManagerName, helpers.UpdateClusterManagerConditionFn(metav1.Condition{
 				Type: hubRegistrationFeatureGatesValid, Status: metav1.ConditionFalse, Reason: "InvalidFeatureGatesExisting",
 				Message: invalidFGErr.Error(),
@@ -631,30 +630,18 @@ func generateHubClients(hubKubeConfig *rest.Config) (kubernetes.Interface, apiex
 // Finally, a deployment on the management cluster would use the kubeconfig to access resources on the hub cluster.
 func ensureSAKubeconfigs(ctx context.Context, clusterManagerName, clusterManagerNamespace string,
 	hubKubeConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error {
-	// setup template kubeconfig
-	ensureSAToken := func(saName string) error {
-		return helpers.EnsureSAToken(ctx, saName, clusterManagerNamespace, hubClient,
-			helpers.RenderToKubeconfigSecret(ctx, saName+"-kubeconfig", clusterManagerNamespace, &rest.Config{
-				Host: hubKubeConfig.Host,
-				TLSClientConfig: rest.TLSClientConfig{
-					CAData: hubKubeConfig.CAData,
-				},
-			}, managementClient.CoreV1(), recorder))
-	}
 	sas := getSAs(clusterManagerName)
-	err := retry.OnError(retry.DefaultBackoff, func(e error) bool {
-		return true
-	}, func() error {
-		for _, sa := range sas {
-			err := ensureSAToken(sa)
-			if err != nil {
-				return err
-			}
+	for _, sa := range sas {
+		tokenGetter := helpers.SATokenGetter(ctx, sa, clusterManagerNamespace, hubClient)
+		err := helpers.SyncKubeConfigSecret(ctx, sa+"-kubeconfig", clusterManagerNamespace, &rest.Config{
+			Host: hubKubeConfig.Host,
+			TLSClientConfig: rest.TLSClientConfig{
+				CAData: hubKubeConfig.CAData,
+			},
+		}, managementClient.CoreV1(), tokenGetter, recorder)
+		if err != nil {
+			return err
 		}
-		return nil
-	})
-	if err != nil {
-		return err
 	}
 	return nil
 }

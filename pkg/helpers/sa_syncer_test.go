@@ -3,152 +3,90 @@ package helpers
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 
-	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	authv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/runtime"
 	testclient "k8s.io/client-go/kubernetes/fake"
-	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
+	clienttesting "k8s.io/client-go/testing"
 )
 
-func TestEnsureSAToken(t *testing.T) {
-	type args struct {
-		ctx           context.Context
-		saName        string
-		saNamespace   string
-		renderSAToken func([]byte) error
-		client        kubernetes.Interface
-	}
-
-	simpleRender := func(data []byte) error {
-		expected := "sa-token"
-		if expected != string(data) {
-			return fmt.Errorf("render result not as expected, data: %q", data)
-		}
-		return nil
-	}
-
-	sa := &corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test",
-			Namespace: "test",
-		},
-		Secrets: []corev1.ObjectReference{
-			{
-				Name:      "test-token",
-				Namespace: "test",
-			},
-		},
-	}
-
-	wrongNameSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test",
-			Namespace: "test",
-		},
-		Type: corev1.SecretTypeServiceAccountToken,
-		Data: map[string][]byte{
-			"token": []byte("sa-token"),
-		},
-	}
-
-	wrongTypeSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-token",
-			Namespace: "test",
-		},
-		Type: corev1.SecretTypeDockerConfigJson,
-		Data: map[string][]byte{
-			"token": []byte("sa-token"),
-		},
-	}
-
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-token",
-			Namespace: "test",
-		},
-		Type: corev1.SecretTypeServiceAccountToken,
-		Data: map[string][]byte{
-			"token": []byte("sa-token"),
-		},
-	}
+func TestTokenGetter(t *testing.T) {
+	saName := "test-sa"
+	saNamespace := "test-ns"
 
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name           string
+		objects        []runtime.Object
+		expirationTime metav1.Time
+
+		wantToken []byte
+		wantErr   bool
 	}{
 		{
-			name: "sa doesn't exist",
-			args: args{
-				saName:        "test",
-				saNamespace:   "test",
-				renderSAToken: simpleRender,
-				client:        testclient.NewSimpleClientset(),
+			name:    "no sa",
+			wantErr: true,
+		},
+		{
+			name: "no secret",
+			objects: []runtime.Object{
+				&corev1.ServiceAccount{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      saName,
+						Namespace: saNamespace,
+					},
+					Secrets: []corev1.ObjectReference{
+						{
+							Name: "test",
+						},
+					},
+				},
 			},
 			wantErr: true,
 		},
 		{
-			name: "sa exist, but token secret doesn't exist",
-			args: args{
-				saName:        "test",
-				saNamespace:   "test",
-				renderSAToken: simpleRender,
-				client:        testclient.NewSimpleClientset(sa),
+			name: "token request",
+			objects: []runtime.Object{
+				&corev1.ServiceAccount{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      saName,
+						Namespace: saNamespace,
+					},
+					Secrets: []corev1.ObjectReference{},
+				},
 			},
-			wantErr: true,
-		}, {
-			name: "no token secret",
-			args: args{
-				saName:        "test",
-				saNamespace:   "test",
-				renderSAToken: simpleRender,
-				client:        testclient.NewSimpleClientset(sa, wrongNameSecret),
-			},
-			wantErr: true,
-		}, {
-			name: "no token secret",
-			args: args{
-				saName:        "test",
-				saNamespace:   "test",
-				renderSAToken: simpleRender,
-				client:        testclient.NewSimpleClientset(sa, wrongTypeSecret),
-			},
-			wantErr: true,
-		},
-		{
-			name: "success",
-			args: args{
-				saName:        "test",
-				saNamespace:   "test",
-				renderSAToken: simpleRender,
-				client:        testclient.NewSimpleClientset(sa, secret),
-			},
-			wantErr: false,
+			wantToken: []byte("aaa"),
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := EnsureSAToken(tt.args.ctx, tt.args.saName, tt.args.saNamespace, tt.args.client, tt.args.renderSAToken); (err != nil) != tt.wantErr {
-				t.Errorf("EnsureKubeconfigFromSA() error = %v, wantErr %v", err, tt.wantErr)
+			client := testclient.NewSimpleClientset(tt.objects...)
+			client.PrependReactor("create", "serviceaccounts/token", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+				return true, &authv1.TokenRequest{Status: authv1.TokenRequestStatus{Token: "aaa", ExpirationTimestamp: tt.expirationTime}}, nil
+			})
+			tokenGetter := SATokenGetter(context.TODO(), saName, saNamespace, client)
+			token, _, err := tokenGetter()
+			fmt.Printf("client action is %v\n", client.Actions())
+			if err != nil && !tt.wantErr {
+				t.Error(err)
+			}
+			if err == nil && tt.wantErr {
+				t.Errorf("expect to get error")
+			}
+			if !reflect.DeepEqual(token, tt.wantToken) {
+				t.Errorf("token is not correct, got %s", string(token))
 			}
 		})
 	}
 }
 
-func TestRenderToKubeconfigSecret(t *testing.T) {
-	type args struct {
-		secretName         string
-		secretNamespace    string
-		templateKubeconfig *rest.Config
-		client             coreclientv1.SecretsGetter
-		recorder           events.Recorder
-	}
-
+func TestApplyKubeconfigSecret(t *testing.T) {
 	tkc := &rest.Config{
 		Host: "host",
 		TLSClientConfig: rest.TLSClientConfig{
@@ -156,91 +94,115 @@ func TestRenderToKubeconfigSecret(t *testing.T) {
 		},
 	}
 
-	client := testclient.NewSimpleClientset(&corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "secretNamespace",
-		},
-	})
+	secretName := "test-secret"
+	secretNamespace := "test-ns"
+
+	now, _ := metav1.Now().MarshalText()
 
 	tests := []struct {
-		name string
-		args args
+		name          string
+		secrets       []runtime.Object
+		token         []byte
+		tokenGetError error
+		expiration    *metav1.Time
+
+		validateActions func(t *testing.T, actions []clienttesting.Action)
+		wantErr         bool
 	}{
 		{
-			name: "the secret content should be the content of a kubeconfig",
-			args: args{
-				secretName:         "secretName",
-				secretNamespace:    "secretNamespace",
-				templateKubeconfig: tkc,
-				client:             client.CoreV1(),
-				recorder:           newTestingEventRecorder(t),
+			name:  "create secret if none",
+			token: []byte("aaa"),
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 3 {
+					t.Errorf("expect 3 actions, but get %d", len(actions))
+				}
+
+				secret := actions[2].(clienttesting.CreateAction).GetObject().(*corev1.Secret)
+				if !reflect.DeepEqual(secret.Data["token"], []byte("aaa")) {
+					t.Errorf("secret update is not correct, got %v", secret.Data)
+				}
+			},
+		},
+		{
+			name:          "get token fails",
+			token:         []byte("aaa"),
+			tokenGetError: fmt.Errorf("unexpected error"),
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 1 {
+					t.Errorf("expect 1 actions, but get %d", len(actions))
+				}
+			},
+			wantErr: true,
+		},
+		{
+			name:  "update secret if secret is not correct",
+			token: []byte("aaa"),
+			secrets: []runtime.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      secretName,
+						Namespace: secretNamespace,
+					},
+				},
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 4 {
+					t.Fatalf("expect 4 actions, but get %d", len(actions))
+				}
+
+				secret := actions[3].(clienttesting.CreateAction).GetObject().(*corev1.Secret)
+				if !reflect.DeepEqual(secret.Data["token"], []byte("aaa")) {
+					t.Errorf("secret update is not correct, got %v", secret.Data)
+				}
+			},
+		},
+		{
+			name:  "update secret if expired",
+			token: []byte("aaa"),
+			secrets: []runtime.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      secretName,
+						Namespace: secretNamespace,
+					},
+					Data: map[string][]byte{
+						"token":      []byte("aaa"),
+						"expiration": now,
+					},
+				},
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 4 {
+					t.Fatalf("expect 4 actions, but get %d", len(actions))
+				}
+
+				secret := actions[3].(clienttesting.CreateAction).GetObject().(*corev1.Secret)
+				if !reflect.DeepEqual(secret.Data["token"], []byte("aaa")) {
+					t.Errorf("secret update is not correct, got %v", secret.Data)
+				}
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			render := RenderToKubeconfigSecret(context.TODO(), tt.args.secretName, tt.args.secretNamespace, tt.args.templateKubeconfig, tt.args.client, tt.args.recorder)
-			err := render([]byte("sa-token"))
-			if err != nil {
-				t.Errorf("renderSaToken, err should be nil but got %s", err.Error())
-				return
+			tokenGetter := func() ([]byte, []byte, error) {
+				if tt.expiration == nil {
+					return tt.token, nil, tt.tokenGetError
+				}
+
+				expiration, _ := tt.expiration.MarshalText()
+				return tt.token, expiration, tt.tokenGetError
 			}
-			secret, err := client.CoreV1().Secrets("secretNamespace").Get(context.Background(), "secretName", metav1.GetOptions{})
-			if err != nil {
-				t.Errorf("get secret, err should be nil but got %s", err.Error())
-				return
+			client := testclient.NewSimpleClientset(tt.secrets...)
+			err := SyncKubeConfigSecret(context.TODO(), secretName, secretNamespace, tkc, client.CoreV1(), tokenGetter, eventstesting.NewTestingEventRecorder(t))
+			if err != nil && !tt.wantErr {
+				t.Error(err)
 			}
-			if kubeconfigContent, ok := secret.Data["kubeconfig"]; !ok {
-				t.Errorf("kubeconfig data not exist")
-				return
-			} else if string(kubeconfigContent) != "apiVersion: v1\nclusters:\n- cluster:\n    certificate-authority-data: Y2FEYXRh\n    server: host\n  name: cluster\ncontexts:\n- context:\n    cluster: cluster\n    user: user\n  name: context\ncurrent-context: context\nkind: Config\npreferences: {}\nusers:\n- name: user\n  user:\n    token: sa-token\n" {
-				t.Errorf("kubeconfig data doesn't correct, got %q", string(kubeconfigContent))
-				return
+			if err == nil && tt.wantErr {
+				t.Errorf("expect to get error")
 			}
+
+			tt.validateActions(t, client.Actions())
 		})
 	}
-}
-
-type testingEventRecorder struct {
-	t         *testing.T
-	component string
-}
-
-// NewTestingEventRecorder provides event recorder that will log all recorded events to the error log.
-func newTestingEventRecorder(t *testing.T) events.Recorder {
-	return &testingEventRecorder{t: t, component: "test"}
-}
-
-func (r *testingEventRecorder) ComponentName() string {
-	return r.component
-}
-
-func (r *testingEventRecorder) WithContext(ctx context.Context) events.Recorder {
-	return r
-}
-
-func (r *testingEventRecorder) ForComponent(c string) events.Recorder {
-	return &testingEventRecorder{t: r.t, component: c}
-}
-
-func (r *testingEventRecorder) Shutdown() {}
-
-func (r *testingEventRecorder) WithComponentSuffix(suffix string) events.Recorder {
-	return r.ForComponent(fmt.Sprintf("%s-%s", r.ComponentName(), suffix))
-}
-
-func (r *testingEventRecorder) Event(reason, message string) {
-	r.t.Logf("Event: %v: %v", reason, message)
-}
-
-func (r *testingEventRecorder) Eventf(reason, messageFmt string, args ...interface{}) {
-	r.Event(reason, fmt.Sprintf(messageFmt, args...))
-}
-
-func (r *testingEventRecorder) Warning(reason, message string) {
-	r.t.Logf("Warning: %v: %v", reason, message)
-}
-
-func (r *testingEventRecorder) Warningf(reason, messageFmt string, args ...interface{}) {
-	r.Warning(reason, fmt.Sprintf(messageFmt, args...))
 }

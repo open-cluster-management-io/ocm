@@ -13,7 +13,7 @@ import (
 
 	"github.com/onsi/gomega"
 
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -283,8 +283,8 @@ func (t *Tester) GetCreatedManagedCluster(clusterName string) (*clusterv1.Manage
 }
 
 func (t *Tester) ApproveCSR(clusterName string) error {
-	var csrs *certificatesv1beta1.CertificateSigningRequestList
-	var csrClient = t.KubeClient.CertificatesV1beta1().CertificateSigningRequests()
+	var csrs *certificatesv1.CertificateSigningRequestList
+	var csrClient = t.KubeClient.CertificatesV1().CertificateSigningRequests()
 	var err error
 
 	if csrs, err = csrClient.List(context.TODO(), metav1.ListOptions{
@@ -305,12 +305,13 @@ func (t *Tester) ApproveCSR(clusterName string) error {
 			return nil
 		}
 
-		csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
-			Type:    certificatesv1beta1.CertificateApproved,
+		csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
+			Type:    certificatesv1.CertificateApproved,
+			Status:  corev1.ConditionTrue,
 			Reason:  "Approved by E2E",
 			Message: "Approved as part of e2e",
 		})
-		_, err = csrClient.UpdateApproval(context.TODO(), csr, metav1.UpdateOptions{})
+		_, err = csrClient.UpdateApproval(context.TODO(), csr.Name, csr, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -318,12 +319,12 @@ func (t *Tester) ApproveCSR(clusterName string) error {
 	return nil
 }
 
-func isCSRInTerminalState(status *certificatesv1beta1.CertificateSigningRequestStatus) bool {
+func isCSRInTerminalState(status *certificatesv1.CertificateSigningRequestStatus) bool {
 	for _, c := range status.Conditions {
-		if c.Type == certificatesv1beta1.CertificateApproved {
+		if c.Type == certificatesv1.CertificateApproved {
 			return true
 		}
-		if c.Type == certificatesv1beta1.CertificateDenied {
+		if c.Type == certificatesv1.CertificateDenied {
 			return true
 		}
 	}
