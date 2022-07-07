@@ -30,15 +30,16 @@ const leaseDurationTimes = 5
 // TODO: we may add this to ManagedClusterAddOn API to allow addon to adjust its own lease duration seconds
 var AddOnLeaseControllerLeaseDurationSeconds = 60
 
-// managedClusterAddOnLeaseController udpates managed cluster addons status on the hub cluster through watching the managed
-// cluster status on the managed cluster.
+// managedClusterAddOnLeaseController updates the managed cluster addons status on the hub cluster through checking the add-on
+// lease on the managed/management cluster.
 type managedClusterAddOnLeaseController struct {
-	clusterName    string
-	clock          clock.Clock
-	addOnClient    addonclient.Interface
-	addOnLister    addonlisterv1alpha1.ManagedClusterAddOnLister
-	hubLeaseClient coordv1client.CoordinationV1Interface
-	leaseClient    coordv1client.CoordinationV1Interface
+	clusterName           string
+	clock                 clock.Clock
+	addOnClient           addonclient.Interface
+	addOnLister           addonlisterv1alpha1.ManagedClusterAddOnLister
+	hubLeaseClient        coordv1client.CoordinationV1Interface
+	managementLeaseClient coordv1client.CoordinationV1Interface
+	spokeLeaseClient      coordv1client.CoordinationV1Interface
 }
 
 // NewManagedClusterAddOnLeaseController returns an instance of managedClusterAddOnLeaseController
@@ -46,16 +47,18 @@ func NewManagedClusterAddOnLeaseController(clusterName string,
 	addOnClient addonclient.Interface,
 	addOnInformer addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	hubLeaseClient coordv1client.CoordinationV1Interface,
-	leaseClient coordv1client.CoordinationV1Interface,
+	managementLeaseClient coordv1client.CoordinationV1Interface,
+	spokeLeaseClient coordv1client.CoordinationV1Interface,
 	resyncInterval time.Duration,
 	recorder events.Recorder) factory.Controller {
 	c := &managedClusterAddOnLeaseController{
-		clusterName:    clusterName,
-		clock:          clock.RealClock{},
-		addOnClient:    addOnClient,
-		addOnLister:    addOnInformer.Lister(),
-		hubLeaseClient: hubLeaseClient,
-		leaseClient:    leaseClient,
+		clusterName:           clusterName,
+		clock:                 clock.RealClock{},
+		addOnClient:           addOnClient,
+		addOnLister:           addOnInformer.Lister(),
+		hubLeaseClient:        hubLeaseClient,
+		managementLeaseClient: managementLeaseClient,
+		spokeLeaseClient:      spokeLeaseClient,
 	}
 
 	// TODO We do not add leaser informer to support kubernetes version lower than 1.17. Lease v1 api
@@ -112,14 +115,22 @@ func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
 	recorder events.Recorder) error {
 	now := c.clock.Now()
 	gracePeriod := time.Duration(leaseDurationTimes*AddOnLeaseControllerLeaseDurationSeconds) * time.Second
+
+	// if the add-on agent is running on the managed cluster, try to fetch the add-on lease on the managed cluster,
+	// otherwise (running outside of the managed cluster), fetch the add-on lease on the management cluster instead.
+	leaseClient := c.spokeLeaseClient
+	if isAddonRunningOutsideManagedCluster(addOn) {
+		leaseClient = c.managementLeaseClient
+	}
+
 	// addon lease name should be same with the addon name.
-	observedLease, err := c.leaseClient.Leases(leaseNamespace).Get(ctx, addOn.Name, metav1.GetOptions{})
+	observedLease, err := leaseClient.Leases(leaseNamespace).Get(ctx, addOn.Name, metav1.GetOptions{})
 
 	var condition metav1.Condition
 	switch {
 	case errors.IsNotFound(err):
 		// for backward compatible, before release-2.3, addons update their leases on hub cluster,
-		// so if we cannot find addon lease on managed cluster, we will try to use addon hub lease.
+		// so if we cannot find addon lease on managed/management cluster, we will try to use addon hub lease.
 		// TODO: after release-2.3, we will remove these code
 		observedLease, err = c.hubLeaseClient.Leases(addOn.Namespace).Get(ctx, addOn.Name, metav1.GetOptions{})
 		if err == nil {

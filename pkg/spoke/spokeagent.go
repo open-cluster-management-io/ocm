@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	ocmfeature "open-cluster-management.io/api/feature"
 	"os"
 	"path"
 	"time"
+
+	ocmfeature "open-cluster-management.io/api/feature"
 
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
@@ -353,6 +354,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			addOnClient,
 			addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
 			hubKubeClient.CoordinationV1(),
+			managementKubeClient.CoordinationV1(),
 			spokeKubeClient.CoordinationV1(),
 			AddOnLeaseControllerSyncInterval, //TODO: this interval time should be allowed to change from outside
 			controllerContext.EventRecorder,
