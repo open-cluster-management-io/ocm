@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
@@ -232,11 +231,10 @@ func TestReconcile(t *testing.T) {
 				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
 				managedClusterAddonLister:    addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 				agentAddons:                  map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
-				eventRecorder:                eventstesting.NewTestingEventRecorder(t),
 			}
 
-			syncContext := addontesting.NewFakeSyncContext(t, c.syncKey)
-			err := controller.sync(context.TODO(), syncContext)
+			syncContext := addontesting.NewFakeSyncContext(t)
+			err := controller.sync(context.TODO(), syncContext, c.syncKey)
 			if err != nil {
 				t.Errorf("expected no error when sync: %v", err)
 			}

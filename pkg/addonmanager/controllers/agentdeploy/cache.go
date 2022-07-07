@@ -2,6 +2,7 @@ package agentdeploy
 
 import (
 	"crypto/md5"
+	"encoding/json"
 	"fmt"
 	"io"
 
@@ -84,9 +85,9 @@ func (w *workCache) safeToSkipApply(required, existing *workapiv1.ManifestWork) 
 }
 
 func hashOfResourceStruct(o interface{}) string {
-	oString := fmt.Sprintf("%v", o)
+	oString, _ := json.Marshal(o)
 	h := md5.New()
-	if _, err := io.WriteString(h, oString); err != nil {
+	if _, err := io.WriteString(h, string(oString)); err != nil {
 		klog.Errorf("failed to hash object: %v", err)
 	}
 	rval := fmt.Sprintf("%x", h.Sum(nil))

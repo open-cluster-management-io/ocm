@@ -1,4 +1,4 @@
-package main
+package helloworld_helm
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"open-cluster-management.io/addon-framework/examples/helloworld"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -16,10 +17,10 @@ import (
 )
 
 func newAgentAddon(t *testing.T) (agent.AgentAddon, error) {
-	registrationOption := newRegistrationOption(nil, nil, utilrand.String(5))
+	registrationOption := helloworld.NewRegistrationOption(nil, AddonName, utilrand.String(5))
 
-	agentAddon, err := addonfactory.NewAgentAddonFactory(addonName, FS, "manifests/charts/helloworld").
-		WithGetValuesFuncs(getValues, addonfactory.GetValuesFromAddonAnnotation).
+	agentAddon, err := addonfactory.NewAgentAddonFactory(AddonName, FS, "manifests/charts/helloworld").
+		WithGetValuesFuncs(GetValues, addonfactory.GetValuesFromAddonAnnotation).
 		WithAgentRegistrationOption(registrationOption).
 		BuildHelmAgentAddon()
 	if err != nil {
@@ -38,7 +39,7 @@ func newManagedCluster(clusterName string) *clusterv1.ManagedCluster {
 func newManagedClusterAddon(clusterName, installNamespace, values string) *addonapiv1alpha1.ManagedClusterAddOn {
 	return &addonapiv1alpha1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      addonName,
+			Name:      AddonName,
 			Namespace: clusterName,
 			Annotations: map[string]string{
 				"addon.open-cluster-management.io/values": values,

@@ -7,14 +7,13 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/crypto"
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/util/cert"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 // SigningRotation rotates a self-signed signing CA stored in a secret. It creates a new one when 80%
@@ -26,7 +25,6 @@ type SigningRotation struct {
 	Validity         time.Duration
 	Lister           corev1listers.SecretLister
 	Client           corev1client.SecretsGetter
-	EventRecorder    events.Recorder
 }
 
 func (c SigningRotation) EnsureSigningCertKeyPair() (*crypto.CA, error) {
@@ -42,12 +40,11 @@ func (c SigningRotation) EnsureSigningCertKeyPair() (*crypto.CA, error) {
 	signingCertKeyPairSecret.Type = corev1.SecretTypeTLS
 
 	if reason := needNewSigningCertKeyPair(signingCertKeyPairSecret); len(reason) > 0 {
-		c.EventRecorder.Eventf("SignerUpdateRequired", "%q in %q requires a new signing cert/key pair: %v", c.Name, c.Namespace, reason)
 		if err := setSigningCertKeyPairSecret(signingCertKeyPairSecret, c.SignerNamePrefix, c.Validity); err != nil {
 			return nil, err
 		}
 
-		actualSigningCertKeyPairSecret, _, err := resourceapply.ApplySecret(context.TODO(), c.Client, c.EventRecorder, signingCertKeyPairSecret)
+		actualSigningCertKeyPairSecret, _, err := utils.ApplySecret(context.TODO(), c.Client, signingCertKeyPairSecret)
 		if err != nil {
 			return nil, err
 		}

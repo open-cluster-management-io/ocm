@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -18,6 +16,7 @@ import (
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
@@ -28,7 +27,6 @@ import (
 type csrSignController struct {
 	kubeClient                kubernetes.Interface
 	agentAddons               map[string]agent.AgentAddon
-	eventRecorder             events.Recorder
 	managedClusterLister      clusterlister.ManagedClusterLister
 	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
 	csrLister                 certificateslisters.CertificateSigningRequestLister
@@ -41,7 +39,6 @@ func NewCSRSignController(
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	agentAddons map[string]agent.AgentAddon,
-	recorder events.Recorder,
 ) factory.Controller {
 	c := &csrSignController{
 		kubeClient:                kubeClient,
@@ -49,13 +46,12 @@ func NewCSRSignController(
 		managedClusterLister:      clusterInformers.Lister(),
 		managedClusterAddonLister: addonInformers.Lister(),
 		csrLister:                 csrInformer.Lister(),
-		eventRecorder:             recorder.WithComponentSuffix("csr-signing-controller"),
 	}
 	return factory.New().
-		WithFilteredEventsInformersQueueKeyFunc(
-			func(obj runtime.Object) string {
+		WithFilteredEventsInformersQueueKeysFunc(
+			func(obj runtime.Object) []string {
 				accessor, _ := meta.Accessor(obj)
-				return accessor.GetName()
+				return []string{accessor.GetName()}
 			},
 			func(obj interface{}) bool {
 				accessor, _ := meta.Accessor(obj)
@@ -73,11 +69,10 @@ func NewCSRSignController(
 			},
 			csrInformer.Informer()).
 		WithSync(c.sync).
-		ToController("CSRApprovingController", recorder)
+		ToController("CSRApprovingController")
 }
 
-func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	csrName := syncCtx.QueueKey()
+func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContext, csrName string) error {
 	klog.V(4).Infof("Reconciling CertificateSigningRequests %q", csrName)
 	csr, err := c.csrLister.Get(csrName)
 	if errors.IsNotFound(err) {
@@ -146,6 +141,5 @@ func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContex
 	if err != nil {
 		return err
 	}
-	c.eventRecorder.Eventf("AddonCSRAutoApproved", "addon csr %q is signedr", csr.Name)
 	return nil
 }

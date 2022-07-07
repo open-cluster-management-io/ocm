@@ -2,11 +2,11 @@ package registration
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
@@ -87,9 +87,13 @@ func TestReconcile(t *testing.T) {
 				}(),
 			},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "update")
-				actual := actions[0].(clienttesting.UpdateActionImpl).Object
-				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+				addontesting.AssertActions(t, actions, "patch")
+				actual := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(actual, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
 				if addOn.Status.Registrations[0].SignerName != "test" {
 					t.Errorf("Registration config is not updated")
 				}
@@ -129,13 +133,13 @@ func TestReconcile(t *testing.T) {
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
 				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
-				eventRecorder:             eventstesting.NewTestingEventRecorder(t),
 			}
 
 			for _, obj := range c.addon {
 				addon := obj.(*addonapiv1alpha1.ManagedClusterAddOn)
-				syncContext := addontesting.NewFakeSyncContext(t, fmt.Sprintf("%s/%s", addon.Namespace, addon.Name))
-				err := controller.sync(context.TODO(), syncContext)
+				key := fmt.Sprintf("%s/%s", addon.Namespace, addon.Name)
+				syncContext := addontesting.NewFakeSyncContext(t)
+				err := controller.sync(context.TODO(), syncContext, key)
 				if err != nil {
 					t.Errorf("expected no error when sync: %v", err)
 				}

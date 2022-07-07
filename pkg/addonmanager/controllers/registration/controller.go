@@ -2,17 +2,21 @@ package registration
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	jsonpatch "github.com/evanphx/json-patch"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
@@ -26,7 +30,6 @@ type addonConfigurationController struct {
 	managedClusterLister      clusterlister.ManagedClusterLister
 	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
 	agentAddons               map[string]agent.AgentAddon
-	eventRecorder             events.Recorder
 }
 
 func NewAddonConfigurationController(
@@ -34,20 +37,18 @@ func NewAddonConfigurationController(
 	clusterInformers clusterinformers.ManagedClusterInformer,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	agentAddons map[string]agent.AgentAddon,
-	recorder events.Recorder,
 ) factory.Controller {
 	c := &addonConfigurationController{
 		addonClient:               addonClient,
 		managedClusterLister:      clusterInformers.Lister(),
 		managedClusterAddonLister: addonInformers.Lister(),
 		agentAddons:               agentAddons,
-		eventRecorder:             recorder.WithComponentSuffix("addon-registration-controller"),
 	}
 
-	return factory.New().WithFilteredEventsInformersQueueKeyFunc(
-		func(obj runtime.Object) string {
-			key, _ := cache.MetaNamespaceKeyFunc(obj)
-			return key
+	return factory.New().WithFilteredEventsInformersQueueKeysFunc(
+		func(obj runtime.Object) []string {
+			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+			return []string{key}
 		},
 		func(obj interface{}) bool {
 			accessor, _ := meta.Accessor(obj)
@@ -58,11 +59,10 @@ func NewAddonConfigurationController(
 			return true
 		},
 		addonInformers.Informer()).
-		WithSync(c.sync).ToController("addon-registration-controller", recorder)
+		WithSync(c.sync).ToController("addon-registration-controller")
 }
 
-func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	key := syncCtx.QueueKey()
+func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
 	klog.V(4).Infof("Reconciling addon registration %q", key)
 
 	clusterName, addonName, err := cache.SplitMetaNamespaceKey(key)
@@ -92,7 +92,7 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 	if err != nil {
 		return err
 	}
-	managedClusterAddon = managedClusterAddon.DeepCopy()
+	managedClusterAddonCopy := managedClusterAddon.DeepCopy()
 
 	registrationOption := agentAddon.GetAgentAddonOptions().Registration
 	if registrationOption == nil {
@@ -110,17 +110,53 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 		return nil
 	}
 	configs := registrationOption.CSRConfigurations(managedCluster)
-	if apiequality.Semantic.DeepEqual(configs, managedClusterAddon.Status.Registrations) {
-		return nil
-	}
 
-	managedClusterAddon.Status.Registrations = configs
-	meta.SetStatusCondition(&managedClusterAddon.Status.Conditions, metav1.Condition{
+	managedClusterAddonCopy.Status.Registrations = configs
+	meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
 		Type:    "RegistrationApplied",
 		Status:  metav1.ConditionTrue,
 		Reason:  "RegistrationConfigured",
 		Message: "Registration of the addon agent is configured",
 	})
-	_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).UpdateStatus(ctx, managedClusterAddon, metav1.UpdateOptions{})
+
+	return c.patchAddonStatus(ctx, managedClusterAddonCopy, managedClusterAddon)
+}
+
+func (c *addonConfigurationController) patchAddonStatus(ctx context.Context, new, old *addonapiv1alpha1.ManagedClusterAddOn) error {
+	if equality.Semantic.DeepEqual(new.Status, old.Status) {
+		return nil
+	}
+
+	oldData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
+		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+			Registrations: old.Status.Registrations,
+			Conditions:    old.Status.Conditions,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	newData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:             new.UID,
+			ResourceVersion: new.ResourceVersion,
+		},
+		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+			Registrations: new.Status.Registrations,
+			Conditions:    new.Status.Conditions,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
+	if err != nil {
+		return fmt.Errorf("failed to create patch for addon %s: %w", new.Name, err)
+	}
+
+	klog.Infof("Patching addon %s/%s status with %s", new.Namespace, new.Name, string(patchBytes))
+	_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Patch(ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	return err
 }

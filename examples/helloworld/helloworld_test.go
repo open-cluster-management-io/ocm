@@ -1,4 +1,4 @@
-package main
+package helloworld
 
 import (
 	"fmt"
@@ -16,10 +16,10 @@ import (
 )
 
 func newAgentAddon(t *testing.T) (agent.AgentAddon, error) {
-	registrationOption := newRegistrationOption(nil, nil, utilrand.String(5))
+	registrationOption := NewRegistrationOption(nil, AddonName, utilrand.String(5))
 
-	agentAddon, err := addonfactory.NewAgentAddonFactory(addonName, fs, "manifests/templates").
-		WithGetValuesFuncs(getValues, addonfactory.GetValuesFromAddonAnnotation).
+	agentAddon, err := addonfactory.NewAgentAddonFactory(AddonName, FS, "manifests/templates").
+		WithGetValuesFuncs(GetValues, addonfactory.GetValuesFromAddonAnnotation).
 		WithAgentRegistrationOption(registrationOption).
 		BuildTemplateAgentAddon()
 	if err != nil {
@@ -38,7 +38,7 @@ func newManagedCluster(clusterName string) *clusterv1.ManagedCluster {
 func newManagedClusterAddon(clusterName, installNamespace, values string) *addonapiv1alpha1.ManagedClusterAddOn {
 	return &addonapiv1alpha1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      addonName,
+			Name:      AddonName,
 			Namespace: clusterName,
 			Annotations: map[string]string{
 				"addon.open-cluster-management.io/values": values,

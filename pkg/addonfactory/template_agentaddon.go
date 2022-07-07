@@ -3,11 +3,11 @@ package addonfactory
 import (
 	"fmt"
 
-	"github.com/openshift/library-go/pkg/assets"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/assets"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )

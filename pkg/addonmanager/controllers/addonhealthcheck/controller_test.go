@@ -2,11 +2,11 @@ package addonhealthcheck
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -121,13 +121,12 @@ func TestReconcile(t *testing.T) {
 				addonClient:               fakeAddonClient,
 				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
-				eventRecorder:             eventstesting.NewTestingEventRecorder(t),
 			}
 
 			for _, addon := range c.addon {
 				key, _ := cache.MetaNamespaceKeyFunc(addon)
-				syncContext := addontesting.NewFakeSyncContext(t, key)
-				err := controller.sync(context.TODO(), syncContext)
+				syncContext := addontesting.NewFakeSyncContext(t)
+				err := controller.sync(context.TODO(), syncContext, key)
 				if err != nil {
 					t.Errorf("expected no error when sync: %v", err)
 				}
@@ -169,19 +168,22 @@ func TestReconcileWithWork(t *testing.T) {
 		managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 		workLister:                workInformers.Work().V1().ManifestWorks().Lister(),
 		agentAddons:               map[string]agent.AgentAddon{testaddon.name: testaddon},
-		eventRecorder:             eventstesting.NewTestingEventRecorder(t),
 	}
 
 	key, _ := cache.MetaNamespaceKeyFunc(addon)
-	syncContext := addontesting.NewFakeSyncContext(t, key)
-	err := controller.sync(context.TODO(), syncContext)
+	syncContext := addontesting.NewFakeSyncContext(t)
+	err := controller.sync(context.TODO(), syncContext, key)
 	if err != nil {
 		t.Errorf("expected no error when sync: %v", err)
 	}
 
-	addontesting.AssertActions(t, fakeAddonClient.Actions(), "update")
-	actual := fakeAddonClient.Actions()[0].(clienttesting.UpdateActionImpl).Object
-	addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+	addontesting.AssertActions(t, fakeAddonClient.Actions(), "patch")
+	actual := fakeAddonClient.Actions()[0].(clienttesting.PatchActionImpl).Patch
+	addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+	err = json.Unmarshal(actual, addOn)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if meta.IsStatusConditionTrue(addOn.Status.Conditions, "Available") {
 		t.Errorf("addon condition should be unavailable: %v", addOn.Status.Conditions)
 	}
@@ -198,14 +200,18 @@ func TestReconcileWithWork(t *testing.T) {
 		t.Errorf("failed to add work to informer: %v", err)
 	}
 
-	err = controller.sync(context.TODO(), syncContext)
+	err = controller.sync(context.TODO(), syncContext, key)
 	if err != nil {
 		t.Errorf("expected no error when sync: %v", err)
 	}
 
-	addontesting.AssertActions(t, fakeAddonClient.Actions(), "update")
-	actual = fakeAddonClient.Actions()[0].(clienttesting.UpdateActionImpl).Object
-	addOn = actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+	addontesting.AssertActions(t, fakeAddonClient.Actions(), "patch")
+	actual = fakeAddonClient.Actions()[0].(clienttesting.PatchActionImpl).Patch
+	addOn = &addonapiv1alpha1.ManagedClusterAddOn{}
+	err = json.Unmarshal(actual, addOn)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	cond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 	if cond == nil && cond.Status != metav1.ConditionUnknown {
@@ -226,14 +232,18 @@ func TestReconcileWithWork(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = controller.sync(context.TODO(), syncContext)
+	err = controller.sync(context.TODO(), syncContext, key)
 	if err != nil {
 		t.Errorf("expected no error when sync: %v", err)
 	}
 
-	addontesting.AssertActions(t, fakeAddonClient.Actions(), "update")
-	actual = fakeAddonClient.Actions()[0].(clienttesting.UpdateActionImpl).Object
-	addOn = actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+	addontesting.AssertActions(t, fakeAddonClient.Actions(), "patch")
+	actual = fakeAddonClient.Actions()[0].(clienttesting.PatchActionImpl).Patch
+	addOn = &addonapiv1alpha1.ManagedClusterAddOn{}
+	err = json.Unmarshal(actual, addOn)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	cond = meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 	if cond == nil && cond.Status != metav1.ConditionTrue {
@@ -317,20 +327,23 @@ func TestReconcileWithProbe(t *testing.T) {
 		managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 		workLister:                workInformers.Work().V1().ManifestWorks().Lister(),
 		agentAddons:               map[string]agent.AgentAddon{testaddon.name: testaddon},
-		eventRecorder:             eventstesting.NewTestingEventRecorder(t),
 	}
 
 	key, _ := cache.MetaNamespaceKeyFunc(addon)
-	syncContext := addontesting.NewFakeSyncContext(t, key)
-	err := controller.sync(context.TODO(), syncContext)
+	syncContext := addontesting.NewFakeSyncContext(t)
+	err := controller.sync(context.TODO(), syncContext, key)
 	if err != nil {
 		t.Errorf("expected no error when sync: %v", err)
 	}
 
 	// return unknown if no status are found
-	addontesting.AssertActions(t, fakeAddonClient.Actions(), "update")
-	actual := fakeAddonClient.Actions()[0].(clienttesting.UpdateActionImpl).Object
-	addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+	addontesting.AssertActions(t, fakeAddonClient.Actions(), "patch")
+	actual := fakeAddonClient.Actions()[0].(clienttesting.PatchActionImpl).Patch
+	addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+	err = json.Unmarshal(actual, addOn)
+	if err != nil {
+		t.Fatal(err)
+	}
 	cond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 	if cond == nil && cond.Status != metav1.ConditionUnknown {
 		t.Errorf("addon condition should be unknown: %v", addOn.Status.Conditions)
@@ -360,15 +373,19 @@ func TestReconcileWithProbe(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = controller.sync(context.TODO(), syncContext)
+	err = controller.sync(context.TODO(), syncContext, key)
 	if err != nil {
 		t.Errorf("expected no error when sync: %v", err)
 	}
 
 	// return unavailable if check returns err
-	addontesting.AssertActions(t, fakeAddonClient.Actions(), "update")
-	actual = fakeAddonClient.Actions()[0].(clienttesting.UpdateActionImpl).Object
-	addOn = actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+	addontesting.AssertActions(t, fakeAddonClient.Actions(), "patch")
+	actual = fakeAddonClient.Actions()[0].(clienttesting.PatchActionImpl).Patch
+	addOn = &addonapiv1alpha1.ManagedClusterAddOn{}
+	err = json.Unmarshal(actual, addOn)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !meta.IsStatusConditionFalse(addOn.Status.Conditions, "Available") {
 		t.Errorf("addon condition should be unavailable: %v", addOn.Status.Conditions)
@@ -376,15 +393,19 @@ func TestReconcileWithProbe(t *testing.T) {
 
 	prober.checkError = nil
 	fakeAddonClient.ClearActions()
-	err = controller.sync(context.TODO(), syncContext)
+	err = controller.sync(context.TODO(), syncContext, key)
 	if err != nil {
 		t.Errorf("expected no error when sync: %v", err)
 	}
 
 	// return available if check returns nil
-	addontesting.AssertActions(t, fakeAddonClient.Actions(), "update")
-	actual = fakeAddonClient.Actions()[0].(clienttesting.UpdateActionImpl).Object
-	addOn = actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+	addontesting.AssertActions(t, fakeAddonClient.Actions(), "patch")
+	actual = fakeAddonClient.Actions()[0].(clienttesting.PatchActionImpl).Patch
+	addOn = &addonapiv1alpha1.ManagedClusterAddOn{}
+	err = json.Unmarshal(actual, addOn)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !meta.IsStatusConditionTrue(addOn.Status.Conditions, "Available") {
 		t.Errorf("addon condition should be available: %v", addOn.Status.Conditions)
 	}

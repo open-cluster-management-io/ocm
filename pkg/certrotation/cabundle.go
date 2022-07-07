@@ -13,19 +13,17 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/util/cert"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 
 	"github.com/openshift/library-go/pkg/crypto"
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 )
 
 // CABundleRotation maintains a CA bundle config map, but adding new CA certs and removing expired old ones.
 type CABundleRotation struct {
-	Namespace     string
-	Name          string
-	Lister        corev1listers.ConfigMapLister
-	Client        corev1client.ConfigMapsGetter
-	EventRecorder events.Recorder
+	Namespace string
+	Name      string
+	Lister    corev1listers.ConfigMapLister
+	Client    corev1client.ConfigMapsGetter
 }
 
 func (c CABundleRotation) EnsureConfigMapCABundle(signingCertKeyPair *crypto.CA) ([]*x509.Certificate, error) {
@@ -44,8 +42,7 @@ func (c CABundleRotation) EnsureConfigMapCABundle(signingCertKeyPair *crypto.CA)
 		return nil, err
 	}
 	if originalCABundleConfigMap == nil || originalCABundleConfigMap.Data == nil || !equality.Semantic.DeepEqual(originalCABundleConfigMap.Data, caBundleConfigMap.Data) {
-		c.EventRecorder.Eventf("CABundleUpdateRequired", "%q in %q requires update", c.Name, c.Namespace)
-		actualCABundleConfigMap, _, err := resourceapply.ApplyConfigMap(context.TODO(), c.Client, c.EventRecorder, caBundleConfigMap)
+		actualCABundleConfigMap, _, err := utils.ApplyConfigMap(context.TODO(), c.Client, caBundleConfigMap)
 		if err != nil {
 			return nil, err
 		}

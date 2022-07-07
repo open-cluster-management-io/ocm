@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -124,7 +123,7 @@ func TestReconcile(t *testing.T) {
 				return work
 			}()},
 			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "update")
+				addontesting.AssertActions(t, actions, "patch")
 			},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
@@ -251,14 +250,14 @@ func TestReconcile(t *testing.T) {
 				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 				workLister:                workInformerFactory.Work().V1().ManifestWorks().Lister(),
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
-				eventRecorder:             eventstesting.NewTestingEventRecorder(t),
 				cache:                     newWorkCache(),
 			}
 
 			for _, obj := range c.addon {
 				addon := obj.(*addonapiv1alpha1.ManagedClusterAddOn)
-				syncContext := addontesting.NewFakeSyncContext(t, fmt.Sprintf("%s/%s", addon.Namespace, addon.Name))
-				err := controller.sync(context.TODO(), syncContext)
+				key := fmt.Sprintf("%s/%s", addon.Namespace, addon.Name)
+				syncContext := addontesting.NewFakeSyncContext(t)
+				err := controller.sync(context.TODO(), syncContext, key)
 				if err != c.testaddon.err {
 					t.Errorf("expected error %v when sync got %v", c.testaddon.err, err)
 				}

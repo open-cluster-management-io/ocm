@@ -21,7 +21,7 @@ KUSTOMIZE_ARCHIVE_NAME?=kustomize_$(KUSTOMIZE_VERSION)_$(GOHOSTOS)_$(GOHOSTARCH)
 kustomize_dir:=$(dir $(KUSTOMIZE))
 
 # Image URL to use all building/pushing image targets;
-GO_BUILD_PACKAGES :=./examples/...
+GO_BUILD_PACKAGES :=./examples/cmd/...
 IMAGE ?= helloworld-addon
 IMAGE_REGISTRY ?= quay.io/open-cluster-management
 IMAGE_TAG ?= latest

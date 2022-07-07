@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	certv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeinformers "k8s.io/client-go/informers"
@@ -129,7 +128,6 @@ func TestSignReconcile(t *testing.T) {
 			controller := &csrSignController{
 				kubeClient:                fakeKubeClient,
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
-				eventRecorder:             eventstesting.NewTestingEventRecorder(t),
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
 				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 				csrLister:                 kubeInfomers.Certificates().V1().CertificateSigningRequests().Lister(),
@@ -137,8 +135,8 @@ func TestSignReconcile(t *testing.T) {
 
 			for _, obj := range c.csr {
 				csr := obj.(*certv1.CertificateSigningRequest)
-				syncContext := addontesting.NewFakeSyncContext(t, csr.Name)
-				err := controller.sync(context.TODO(), syncContext)
+				syncContext := addontesting.NewFakeSyncContext(t)
+				err := controller.sync(context.TODO(), syncContext, csr.Name)
 				if err != nil {
 					t.Errorf("expected no error when sync: %v", err)
 				}

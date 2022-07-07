@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	certv1 "k8s.io/api/certificates/v1"
 	certv1beta1 "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -134,7 +133,6 @@ func TestApproveReconcile(t *testing.T) {
 			controller := &csrApprovingController{
 				kubeClient:                fakeKubeClient,
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
-				eventRecorder:             eventstesting.NewTestingEventRecorder(t),
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
 				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 				csrLister:                 kubeInfomers.Certificates().V1().CertificateSigningRequests().Lister(),
@@ -142,8 +140,8 @@ func TestApproveReconcile(t *testing.T) {
 
 			for _, obj := range c.csr {
 				csr := obj.(*certv1.CertificateSigningRequest)
-				syncContext := addontesting.NewFakeSyncContext(t, csr.Name)
-				err := controller.sync(context.TODO(), syncContext)
+				syncContext := addontesting.NewFakeSyncContext(t)
+				err := controller.sync(context.TODO(), syncContext, csr.Name)
 				if err != nil {
 					t.Errorf("expected no error when sync: %v", err)
 				}
@@ -244,7 +242,6 @@ func TestApproveBetaReconcile(t *testing.T) {
 			controller := &csrApprovingController{
 				kubeClient:                fakeKubeClient,
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
-				eventRecorder:             eventstesting.NewTestingEventRecorder(t),
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
 				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 				csrListerBeta:             kubeInfomers.Certificates().V1beta1().CertificateSigningRequests().Lister(),
@@ -252,8 +249,8 @@ func TestApproveBetaReconcile(t *testing.T) {
 
 			for _, obj := range c.csr {
 				csr := obj.(*certv1beta1.CertificateSigningRequest)
-				syncContext := addontesting.NewFakeSyncContext(t, csr.Name)
-				err := controller.sync(context.TODO(), syncContext)
+				syncContext := addontesting.NewFakeSyncContext(t)
+				err := controller.sync(context.TODO(), syncContext, csr.Name)
 				if err != nil {
 					t.Errorf("expected no error when sync: %v", err)
 				}

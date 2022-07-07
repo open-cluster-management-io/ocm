@@ -3,9 +3,6 @@ package clustermanagement
 import (
 	"context"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -15,6 +12,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -32,7 +30,6 @@ type clusterManagementController struct {
 	managedClusterAddonLister    addonlisterv1alpha1.ManagedClusterAddOnLister
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
 	agentAddons                  map[string]agent.AgentAddon
-	eventRecorder                events.Recorder
 }
 
 func NewClusterManagementController(
@@ -41,7 +38,6 @@ func NewClusterManagementController(
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	agentAddons map[string]agent.AgentAddon,
-	recorder events.Recorder,
 ) factory.Controller {
 	c := &clusterManagementController{
 		addonClient:                  addonClient,
@@ -49,13 +45,12 @@ func NewClusterManagementController(
 		managedClusterAddonLister:    addonInformers.Lister(),
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
 		agentAddons:                  agentAddons,
-		eventRecorder:                recorder.WithComponentSuffix("cluster-management-addon-controller"),
 	}
 
-	return factory.New().WithFilteredEventsInformersQueueKeyFunc(
-		func(obj runtime.Object) string {
-			key, _ := cache.MetaNamespaceKeyFunc(obj)
-			return key
+	return factory.New().WithFilteredEventsInformersQueueKeysFunc(
+		func(obj runtime.Object) []string {
+			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+			return []string{key}
 		},
 		func(obj interface{}) bool {
 			accessor, _ := meta.Accessor(obj)
@@ -66,11 +61,10 @@ func NewClusterManagementController(
 			return true
 		},
 		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
-		WithSync(c.sync).ToController("cluster-management-addon-controller", recorder)
+		WithSync(c.sync).ToController("cluster-management-addon-controller")
 }
 
-func (c *clusterManagementController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	key := syncCtx.QueueKey()
+func (c *clusterManagementController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
 	klog.V(4).Infof("Reconciling addon %q", key)
 
 	namespace, addonName, err := cache.SplitMetaNamespaceKey(key)
@@ -104,9 +98,8 @@ func (c *clusterManagementController) sync(ctx context.Context, syncCtx factory.
 	addon = addon.DeepCopy()
 
 	// AddOwner if it does not exist
-	modified := resourcemerge.BoolPtr(false)
-	resourcemerge.MergeOwnerRefs(modified, &addon.OwnerReferences, []metav1.OwnerReference{*owner})
-	if *modified {
+	modified := utils.MergeOwnerRefs(&addon.OwnerReferences, *owner, false)
+	if modified {
 		_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Update(ctx, addon, metav1.UpdateOptions{})
 		return err
 	}
@@ -123,16 +116,16 @@ func (c *clusterManagementController) sync(ctx context.Context, syncCtx factory.
 	if !equality.Semantic.DeepEqual(expectedCoordinate, actualCoordinate) {
 		addon.Status.AddOnConfiguration.CRDName = expectedCoordinate.CRDName
 		addon.Status.AddOnConfiguration.CRName = expectedCoordinate.CRName
-		*modified = true
+		modified = true
 	}
 
-	utils.MergeRelatedObjects(modified, &addon.Status.RelatedObjects, addonapiv1alpha1.ObjectReference{
+	utils.MergeRelatedObjects(&modified, &addon.Status.RelatedObjects, addonapiv1alpha1.ObjectReference{
 		Name:     clusterManagementAddon.Name,
 		Resource: "clustermanagementaddons",
 		Group:    addonapiv1alpha1.GroupVersion.Group,
 	})
 
-	if !*modified {
+	if !modified {
 		return nil
 	}
 

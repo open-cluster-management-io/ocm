@@ -20,7 +20,7 @@ const (
 	AddonManifestApplied = "ManifestApplied"
 
 	// AddonManifestAppliedReasonWorkApplyFailed is the reason of condition AddonManifestApplied indicating
-	// the failure of apply manifestwork of the manifests
+	// the failuer of apply manifestwork of the manifests
 	AddonManifestAppliedReasonWorkApplyFailed = "ManifestWorkApplyFailed"
 
 	// AddonManifestAppliedReasonManifestsApplied is the reason of condition AddonManifestApplied indicating

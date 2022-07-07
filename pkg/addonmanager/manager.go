@@ -3,16 +3,12 @@ package addonmanager
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addonhealthcheck"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addoninstall"
@@ -21,6 +17,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/clustermanagement"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/registration"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
@@ -83,18 +80,6 @@ func (a *addonManager) Start(ctx context.Context) error {
 		return err
 	}
 
-	namespace, err := a.getComponentNamespace()
-	if err != nil {
-		klog.Warningf("unable to identify the current namespace for events: %v", err)
-	}
-	controllerRef, err := events.GetControllerReferenceForCurrentPod(ctx, kubeClient, namespace, nil)
-	if err != nil {
-		klog.Warningf("unable to get owner reference (falling back to namespace): %v", err)
-	}
-
-	eventRecorder := events.NewKubeRecorder(
-		kubeClient.CoreV1().Events(namespace), "addon", controllerRef)
-
 	addonNames := []string{}
 	for key := range a.addonAgents {
 		addonNames = append(addonNames, key)
@@ -137,7 +122,6 @@ func (a *addonManager) Start(ctx context.Context) error {
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 		workInformers.Work().V1().ManifestWorks(),
 		a.addonAgents,
-		eventRecorder,
 	)
 	hookDeployController := agentdeploy.NewAddonHookDeployController(
 		workClient,
@@ -146,7 +130,6 @@ func (a *addonManager) Start(ctx context.Context) error {
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 		workInformers.Work().V1().ManifestWorks(),
 		a.addonAgents,
-		eventRecorder,
 	)
 
 	registrationController := registration.NewAddonConfigurationController(
@@ -154,7 +137,6 @@ func (a *addonManager) Start(ctx context.Context) error {
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 		a.addonAgents,
-		eventRecorder,
 	)
 
 	clusterManagementController := clustermanagement.NewClusterManagementController(
@@ -163,7 +145,6 @@ func (a *addonManager) Start(ctx context.Context) error {
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 		a.addonAgents,
-		eventRecorder,
 	)
 
 	addonInstallController := addoninstall.NewAddonInstallController(
@@ -171,7 +152,6 @@ func (a *addonManager) Start(ctx context.Context) error {
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 		a.addonAgents,
-		eventRecorder,
 	)
 
 	addonHealthCheckController := addonhealthcheck.NewAddonHealthCheckController(
@@ -179,7 +159,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 		workInformers.Work().V1().ManifestWorks(),
 		a.addonAgents,
-		eventRecorder)
+	)
 
 	var csrApproveController factory.Controller
 	var csrSignController factory.Controller
@@ -195,7 +175,6 @@ func (a *addonManager) Start(ctx context.Context) error {
 			nil,
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 			a.addonAgents,
-			eventRecorder,
 		)
 		csrSignController = certificate.NewCSRSignController(
 			kubeClient,
@@ -203,7 +182,6 @@ func (a *addonManager) Start(ctx context.Context) error {
 			kubeInfomers.Certificates().V1().CertificateSigningRequests(),
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 			a.addonAgents,
-			eventRecorder,
 		)
 	} else if v1beta1Supported {
 		csrApproveController = certificate.NewCSRApprovingController(
@@ -213,7 +191,6 @@ func (a *addonManager) Start(ctx context.Context) error {
 			kubeInfomers.Certificates().V1beta1().CertificateSigningRequests(),
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 			a.addonAgents,
-			eventRecorder,
 		)
 	}
 
@@ -235,14 +212,6 @@ func (a *addonManager) Start(ctx context.Context) error {
 		go csrSignController.Run(ctx, 1)
 	}
 	return nil
-}
-
-func (a *addonManager) getComponentNamespace() (string, error) {
-	nsBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-	if err != nil {
-		return "open-cluster-management", err
-	}
-	return string(nsBytes), nil
 }
 
 // New returns a new Manager for creating addon agents.

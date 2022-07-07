@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,6 +12,8 @@ import (
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
@@ -30,7 +29,6 @@ type addonHealthCheckController struct {
 	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
 	workLister                worklister.ManifestWorkLister
 	agentAddons               map[string]agent.AgentAddon
-	eventRecorder             events.Recorder
 }
 
 func NewAddonHealthCheckController(
@@ -38,20 +36,18 @@ func NewAddonHealthCheckController(
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	workInformers workinformers.ManifestWorkInformer,
 	agentAddons map[string]agent.AgentAddon,
-	recorder events.Recorder,
 ) factory.Controller {
 	c := &addonHealthCheckController{
 		addonClient:               addonClient,
 		managedClusterAddonLister: addonInformers.Lister(),
 		workLister:                workInformers.Lister(),
 		agentAddons:               agentAddons,
-		eventRecorder:             recorder.WithComponentSuffix("addon-healthcheck-controller"),
 	}
 
-	return factory.New().WithFilteredEventsInformersQueueKeyFunc(
-		func(obj runtime.Object) string {
+	return factory.New().WithFilteredEventsInformersQueueKeysFunc(
+		func(obj runtime.Object) []string {
 			key, _ := cache.MetaNamespaceKeyFunc(obj)
-			return key
+			return []string{key}
 		},
 		func(obj interface{}) bool {
 			accessor, _ := meta.Accessor(obj)
@@ -61,10 +57,10 @@ func NewAddonHealthCheckController(
 			return true
 		},
 		addonInformers.Informer()).
-		WithFilteredEventsInformersQueueKeyFunc(
-			func(obj runtime.Object) string {
+		WithFilteredEventsInformersQueueKeysFunc(
+			func(obj runtime.Object) []string {
 				accessor, _ := meta.Accessor(obj)
-				return fmt.Sprintf("%s/%s", accessor.GetNamespace(), accessor.GetLabels()[constants.AddonLabel])
+				return []string{fmt.Sprintf("%s/%s", accessor.GetNamespace(), accessor.GetLabels()[constants.AddonLabel])}
 			},
 			func(obj interface{}) bool {
 				accessor, _ := meta.Accessor(obj)
@@ -88,11 +84,11 @@ func NewAddonHealthCheckController(
 			workInformers.Informer(),
 		).
 		WithSync(c.sync).
-		ToController("addon-healthcheck-controller", recorder)
+		ToController("addon-healthcheck-controller")
 }
 
-func (c *addonHealthCheckController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	clusterName, addonName, err := cache.SplitMetaNamespaceKey(syncCtx.QueueKey())
+func (c *addonHealthCheckController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
+	clusterName, addonName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		// ignore addon whose key is not in format: namespace/name
 		return nil
@@ -138,7 +134,6 @@ func (c *addonHealthCheckController) syncAddonHealthChecker(ctx context.Context,
 
 	if expectedHealthCheckMode != addon.Status.HealthCheck.Mode {
 		addon.Status.HealthCheck.Mode = expectedHealthCheckMode
-		c.eventRecorder.Eventf("HealthCheckModeUpdated", "Updated health check mode to %s", expectedHealthCheckMode)
 		_, err := c.addonClient.AddonV1alpha1().ManagedClusterAddOns(addon.Namespace).
 			UpdateStatus(ctx, addon, metav1.UpdateOptions{})
 		if err != nil {
@@ -150,6 +145,8 @@ func (c *addonHealthCheckController) syncAddonHealthChecker(ctx context.Context,
 }
 
 func (c *addonHealthCheckController) probeAddonStatus(ctx context.Context, addon *addonapiv1alpha1.ManagedClusterAddOn, agentAddon agent.AgentAddon) error {
+	addonCopy := addon.DeepCopy()
+
 	if agentAddon.GetAgentAddonOptions().HealthProber == nil {
 		return nil
 	}
@@ -160,44 +157,44 @@ func (c *addonHealthCheckController) probeAddonStatus(ctx context.Context, addon
 
 	addonWork, err := c.workLister.ManifestWorks(addon.Namespace).Get(constants.DeployWorkName(addon.Name))
 	if err != nil {
-		cond := metav1.Condition{
+		meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
 			Type:    "Available",
 			Status:  metav1.ConditionUnknown,
 			Reason:  "WorkNotFound",
 			Message: "Work for addon is not found",
-		}
-		return c.updateConditions(ctx, addon, cond)
+		})
+		return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
 	}
 
 	// Check the overall work available condition at first.
 	workCond := meta.FindStatusCondition(addonWork.Status.Conditions, workapiv1.WorkAvailable)
 	switch {
 	case workCond == nil:
-		cond := metav1.Condition{
+		meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
 			Type:    "Available",
 			Status:  metav1.ConditionUnknown,
 			Reason:  "WorkNotApplied",
 			Message: "Work is not applied yet",
-		}
-		return c.updateConditions(ctx, addon, cond)
+		})
+		return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
 	case workCond.Status == metav1.ConditionFalse:
-		cond := metav1.Condition{
+		meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
 			Type:    "Available",
 			Status:  metav1.ConditionFalse,
 			Reason:  "WorkApplyFailed",
 			Message: workCond.Message,
-		}
-		return c.updateConditions(ctx, addon, cond)
+		})
+		return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
 	}
 
 	if agentAddon.GetAgentAddonOptions().HealthProber.WorkProber == nil {
-		cond := metav1.Condition{
+		meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
 			Type:    "Available",
 			Status:  metav1.ConditionTrue,
 			Reason:  "WorkApplied",
 			Message: "Addon work is applied",
-		}
-		return c.updateConditions(ctx, addon, cond)
+		})
+		return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
 	}
 
 	probeFields := agentAddon.GetAgentAddonOptions().HealthProber.WorkProber.ProbeFields
@@ -207,49 +204,34 @@ func (c *addonHealthCheckController) probeAddonStatus(ctx context.Context, addon
 		// if no results are returned. it is possible that work agent has not returned the feedback value.
 		// mark condition to unknown
 		if result == nil {
-			cond := metav1.Condition{
+			meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
 				Type:    "Available",
 				Status:  metav1.ConditionUnknown,
 				Reason:  "NoProbeResult",
 				Message: "Probe results are not returned",
-			}
-			return c.updateConditions(ctx, addon, cond)
+			})
+			return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
 		}
 
 		err := agentAddon.GetAgentAddonOptions().HealthProber.WorkProber.HealthCheck(field.ResourceIdentifier, *result)
 		if err != nil {
-			cond := metav1.Condition{
+			meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
 				Type:    "Available",
 				Status:  metav1.ConditionFalse,
 				Reason:  "ProbeUnavailable",
 				Message: fmt.Sprintf("Probe addon unavailable with err %v", err),
-			}
-			return c.updateConditions(ctx, addon, cond)
+			})
+			return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
 		}
 	}
 
-	cond := metav1.Condition{
+	meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
 		Type:    "Available",
 		Status:  metav1.ConditionTrue,
 		Reason:  "ProbeAvailable",
 		Message: "Addon is available",
-	}
-	return c.updateConditions(ctx, addon, cond)
-}
-
-func (c *addonHealthCheckController) updateConditions(ctx context.Context, addon *addonapiv1alpha1.ManagedClusterAddOn, conds ...metav1.Condition) error {
-	addonCopy := addon.DeepCopy()
-
-	for _, cond := range conds {
-		meta.SetStatusCondition(&addonCopy.Status.Conditions, cond)
-	}
-
-	if equality.Semantic.DeepEqual(addon.Status.Conditions, addonCopy.Status.Conditions) {
-		return nil
-	}
-
-	_, err := c.addonClient.AddonV1alpha1().ManagedClusterAddOns(addonCopy.Namespace).UpdateStatus(ctx, addonCopy, metav1.UpdateOptions{})
-	return err
+	})
+	return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
 }
 
 func findResultByIdentifier(identifier workapiv1.ResourceIdentifier, work *workapiv1.ManifestWork) *workapiv1.StatusFeedbackResult {

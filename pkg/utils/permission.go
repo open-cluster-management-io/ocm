@@ -2,12 +2,14 @@ package utils
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	rbacclientv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/utils/pointer"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -43,7 +45,6 @@ var _ RBACPermissionBuilder = &permissionBuilder{}
 type permissionBuilder struct {
 	kubeClient kubernetes.Interface
 	u          *unionPermissionBuilder
-	recorder   events.Recorder
 }
 
 // NewRBACPermissionConfigBuilder instantiates a default RBACPermissionBuilder.
@@ -51,7 +52,6 @@ func NewRBACPermissionConfigBuilder(kubeClient kubernetes.Interface) RBACPermiss
 	return &permissionBuilder{
 		u:          &unionPermissionBuilder{},
 		kubeClient: kubeClient,
-		recorder:   events.NewInMemoryRecorder("PermissionConfigBuilder"),
 	}
 }
 
@@ -133,7 +133,7 @@ func (p *permissionBuilder) BindRoleToGroup(role *rbacv1.Role, userGroup string)
 
 func (p *permissionBuilder) WithStaticClusterRole(clusterRole *rbacv1.ClusterRole) RBACPermissionBuilder {
 	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
-		_, _, err := resourceapply.ApplyClusterRole(context.TODO(), p.kubeClient.RbacV1(), p.recorder, clusterRole)
+		_, _, err := ApplyClusterRole(context.TODO(), p.kubeClient.RbacV1(), clusterRole)
 		return err
 	})
 	return p
@@ -141,7 +141,7 @@ func (p *permissionBuilder) WithStaticClusterRole(clusterRole *rbacv1.ClusterRol
 
 func (p *permissionBuilder) WithStaticClusterRoleBinding(binding *rbacv1.ClusterRoleBinding) RBACPermissionBuilder {
 	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
-		_, _, err := resourceapply.ApplyClusterRoleBinding(context.TODO(), p.kubeClient.RbacV1(), p.recorder, binding)
+		_, _, err := ApplyClusterRoleBinding(context.TODO(), p.kubeClient.RbacV1(), binding)
 		return err
 	})
 	return p
@@ -151,7 +151,7 @@ func (p *permissionBuilder) WithStaticRole(role *rbacv1.Role) RBACPermissionBuil
 	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
 		role.Namespace = cluster.Name
 		ensureAddonOwnerReference(&role.ObjectMeta, addon)
-		_, _, err := resourceapply.ApplyRole(context.TODO(), p.kubeClient.RbacV1(), p.recorder, role)
+		_, _, err := ApplyRole(context.TODO(), p.kubeClient.RbacV1(), role)
 		return err
 	})
 	return p
@@ -161,7 +161,7 @@ func (p *permissionBuilder) WithStaticRoleBinding(binding *rbacv1.RoleBinding) R
 	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
 		binding.Namespace = cluster.Name
 		ensureAddonOwnerReference(&binding.ObjectMeta, addon)
-		_, _, err := resourceapply.ApplyRoleBinding(context.TODO(), p.kubeClient.RbacV1(), p.recorder, binding)
+		_, _, err := ApplyRoleBinding(context.TODO(), p.kubeClient.RbacV1(), binding)
 		return err
 	})
 	return p
@@ -196,4 +196,152 @@ func ensureAddonOwnerReference(metadata *metav1.ObjectMeta, addon *addonapiv1alp
 			UID:                addon.UID,
 		},
 	}
+}
+
+// ApplyClusterRole merges objectmeta, requires rules, aggregation rules are not allowed for now.
+func ApplyClusterRole(ctx context.Context, client rbacclientv1.ClusterRolesGetter, required *rbacv1.ClusterRole) (*rbacv1.ClusterRole, bool, error) {
+	if required.AggregationRule != nil && len(required.AggregationRule.ClusterRoleSelectors) != 0 {
+		return nil, false, fmt.Errorf("cannot create an aggregated cluster role")
+	}
+
+	existing, err := client.ClusterRoles().Get(ctx, required.Name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		requiredCopy := required.DeepCopy()
+		actual, err := client.ClusterRoles().Create(
+			ctx, requiredCopy, metav1.CreateOptions{})
+		return actual, true, err
+	}
+	if err != nil {
+		return nil, false, err
+	}
+
+	existingCopy := existing.DeepCopy()
+	contentSame := equality.Semantic.DeepEqual(existingCopy.Rules, required.Rules)
+	if contentSame {
+		return existingCopy, false, nil
+	}
+
+	existingCopy.Rules = required.Rules
+	existingCopy.AggregationRule = nil
+
+	actual, err := client.ClusterRoles().Update(ctx, existingCopy, metav1.UpdateOptions{})
+	return actual, true, err
+}
+
+// ApplyClusterRoleBinding merges objectmeta, requires subjects and role refs
+// TODO on non-matching roleref, delete and recreate
+func ApplyClusterRoleBinding(ctx context.Context, client rbacclientv1.ClusterRoleBindingsGetter, required *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, bool, error) {
+	existing, err := client.ClusterRoleBindings().Get(ctx, required.Name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		requiredCopy := required.DeepCopy()
+		actual, err := client.ClusterRoleBindings().Create(
+			ctx, requiredCopy, metav1.CreateOptions{})
+		return actual, true, err
+	}
+	if err != nil {
+		return nil, false, err
+	}
+
+	existingCopy := existing.DeepCopy()
+	requiredCopy := required.DeepCopy()
+
+	// Enforce apiGroup fields in roleRefs
+	existingCopy.RoleRef.APIGroup = rbacv1.GroupName
+	for i := range existingCopy.Subjects {
+		if existingCopy.Subjects[i].Kind == "User" {
+			existingCopy.Subjects[i].APIGroup = rbacv1.GroupName
+		}
+	}
+
+	requiredCopy.RoleRef.APIGroup = rbacv1.GroupName
+	for i := range requiredCopy.Subjects {
+		if requiredCopy.Subjects[i].Kind == "User" {
+			requiredCopy.Subjects[i].APIGroup = rbacv1.GroupName
+		}
+	}
+
+	subjectsAreSame := equality.Semantic.DeepEqual(existingCopy.Subjects, requiredCopy.Subjects)
+	roleRefIsSame := equality.Semantic.DeepEqual(existingCopy.RoleRef, requiredCopy.RoleRef)
+
+	if subjectsAreSame && roleRefIsSame {
+		return existingCopy, false, nil
+	}
+
+	existingCopy.Subjects = requiredCopy.Subjects
+	existingCopy.RoleRef = requiredCopy.RoleRef
+
+	actual, err := client.ClusterRoleBindings().Update(ctx, existingCopy, metav1.UpdateOptions{})
+	return actual, true, err
+}
+
+// ApplyRole merges objectmeta, requires rules
+func ApplyRole(ctx context.Context, client rbacclientv1.RolesGetter, required *rbacv1.Role) (*rbacv1.Role, bool, error) {
+	existing, err := client.Roles(required.Namespace).Get(ctx, required.Name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		requiredCopy := required.DeepCopy()
+		actual, err := client.Roles(required.Namespace).Create(
+			ctx, requiredCopy, metav1.CreateOptions{})
+		return actual, true, err
+	}
+	if err != nil {
+		return nil, false, err
+	}
+
+	existingCopy := existing.DeepCopy()
+
+	contentSame := equality.Semantic.DeepEqual(existingCopy.Rules, required.Rules)
+	if contentSame {
+		return existingCopy, false, nil
+	}
+
+	existingCopy.Rules = required.Rules
+
+	actual, err := client.Roles(required.Namespace).Update(ctx, existingCopy, metav1.UpdateOptions{})
+	return actual, true, err
+}
+
+// ApplyRoleBinding merges objectmeta, requires subjects and role refs
+// TODO on non-matching roleref, delete and recreate
+func ApplyRoleBinding(ctx context.Context, client rbacclientv1.RoleBindingsGetter, required *rbacv1.RoleBinding) (*rbacv1.RoleBinding, bool, error) {
+	existing, err := client.RoleBindings(required.Namespace).Get(ctx, required.Name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		requiredCopy := required.DeepCopy()
+		actual, err := client.RoleBindings(required.Namespace).Create(
+			ctx, requiredCopy, metav1.CreateOptions{})
+		return actual, true, err
+	}
+	if err != nil {
+		return nil, false, err
+	}
+
+	existingCopy := existing.DeepCopy()
+	requiredCopy := required.DeepCopy()
+
+	// Enforce apiGroup fields in roleRefs and subjects
+	existingCopy.RoleRef.APIGroup = rbacv1.GroupName
+	for i := range existingCopy.Subjects {
+		if existingCopy.Subjects[i].Kind == "User" {
+			existingCopy.Subjects[i].APIGroup = rbacv1.GroupName
+		}
+	}
+
+	requiredCopy.RoleRef.APIGroup = rbacv1.GroupName
+	for i := range requiredCopy.Subjects {
+		if requiredCopy.Subjects[i].Kind == "User" {
+			requiredCopy.Subjects[i].APIGroup = rbacv1.GroupName
+		}
+	}
+
+	subjectsAreSame := equality.Semantic.DeepEqual(existingCopy.Subjects, requiredCopy.Subjects)
+	roleRefIsSame := equality.Semantic.DeepEqual(existingCopy.RoleRef, requiredCopy.RoleRef)
+
+	if subjectsAreSame && roleRefIsSame {
+		return existingCopy, false, nil
+	}
+
+	existingCopy.Subjects = requiredCopy.Subjects
+	existingCopy.RoleRef = requiredCopy.RoleRef
+
+	actual, err := client.RoleBindings(requiredCopy.Namespace).Update(ctx, existingCopy, metav1.UpdateOptions{})
+	return actual, true, err
 }

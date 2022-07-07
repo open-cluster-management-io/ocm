@@ -2,12 +2,9 @@ package agent
 
 import (
 	"context"
+	"reflect"
 	"time"
 
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -17,9 +14,12 @@ import (
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	corev1lister "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
+	"open-cluster-management.io/addon-framework/examples/cmdfactory"
+	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	"open-cluster-management.io/addon-framework/pkg/lease"
 	"open-cluster-management.io/addon-framework/pkg/version"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -32,7 +32,7 @@ const HelloworldAgentInstallationNamespace = "default"
 
 func NewAgentCommand(addonName string) *cobra.Command {
 	o := NewAgentOptions(addonName)
-	cmd := controllercmd.
+	cmd := cmdfactory.
 		NewControllerCommandConfig("helloworld-addon-agent", version.Get(), o.RunAgent).
 		NewCommand()
 	cmd.Use = "agent"
@@ -64,9 +64,9 @@ func (o *AgentOptions) AddFlags(cmd *cobra.Command) {
 }
 
 // RunAgent starts the controllers on agent to process work from hub.
-func (o *AgentOptions) RunAgent(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+func (o *AgentOptions) RunAgent(ctx context.Context, kubeconfig *rest.Config) error {
 	// build kubeclient of managed cluster
-	spokeKubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
+	spokeKubeClient, err := kubernetes.NewForConfig(kubeconfig)
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,6 @@ func (o *AgentOptions) RunAgent(ctx context.Context, controllerContext *controll
 		o.SpokeClusterName,
 		o.AddonName,
 		o.AddonNamespace,
-		controllerContext.EventRecorder,
 	)
 	// create a lease updater
 	leaseUpdater := lease.NewLeaseUpdater(
@@ -118,7 +117,6 @@ type agentController struct {
 	clusterName        string
 	addonName          string
 	addonNamespace     string
-	recorder           events.Recorder
 }
 
 func newAgentController(
@@ -128,7 +126,6 @@ func newAgentController(
 	clusterName string,
 	addonName string,
 	addonNamespace string,
-	recorder events.Recorder,
 ) factory.Controller {
 	c := &agentController{
 		spokeKubeClient:    spokeKubeClient,
@@ -137,18 +134,16 @@ func newAgentController(
 		addonName:          addonName,
 		addonNamespace:     addonNamespace,
 		hubConfigMapLister: configmapInformers.Lister(),
-		recorder:           recorder,
 	}
-	return factory.New().WithInformersQueueKeyFunc(
-		func(obj runtime.Object) string {
+	return factory.New().WithInformersQueueKeysFunc(
+		func(obj runtime.Object) []string {
 			key, _ := cache.MetaNamespaceKeyFunc(obj)
-			return key
+			return []string{key}
 		}, configmapInformers.Informer()).
-		WithSync(c.sync).ToController("helloworld-agent-controller", recorder)
+		WithSync(c.sync).ToController("helloworld-agent-controller")
 }
 
-func (c *agentController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	key := syncCtx.QueueKey()
+func (c *agentController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
 	klog.V(4).Infof("Reconciling addon deploy %q", key)
 
 	clusterName, name, err := cache.SplitMetaNamespaceKey(key)
@@ -182,6 +177,20 @@ func (c *agentController) sync(ctx context.Context, syncCtx factory.SyncContext)
 		Data: cm.Data,
 	}
 
-	_, _, err = resourceapply.ApplyConfigMap(ctx, c.spokeKubeClient.CoreV1(), c.recorder, configmap)
+	existing, err := c.spokeKubeClient.CoreV1().ConfigMaps(c.addonNamespace).Get(ctx, configmap.Name, metav1.GetOptions{})
+	switch {
+	case errors.IsNotFound(err):
+		_, createErr := c.spokeKubeClient.CoreV1().ConfigMaps(c.addonNamespace).Create(ctx, configmap, metav1.CreateOptions{})
+		return createErr
+	case err != nil:
+		return err
+	}
+
+	if reflect.DeepEqual(existing.Data, configmap.Data) {
+		return nil
+	}
+
+	configmap.ResourceVersion = existing.ResourceVersion
+	_, err = c.spokeKubeClient.CoreV1().ConfigMaps(c.addonNamespace).Update(ctx, configmap, metav1.UpdateOptions{})
 	return err
 }

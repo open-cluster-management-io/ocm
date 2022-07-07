@@ -3,23 +3,23 @@ package cleanup_agent
 import (
 	"context"
 
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
+	"open-cluster-management.io/addon-framework/examples/cmdfactory"
 	"open-cluster-management.io/addon-framework/pkg/version"
 )
 
 func NewAgentCommand(addonName string) *cobra.Command {
 	o := NewAgentOptions(addonName)
-	cmdConfig := controllercmd.
+	cmdConfig := cmdfactory.
 		NewControllerCommandConfig("cleanup-agent", version.Get(), o.RunAgent)
 	cmd := cmdConfig.NewCommand()
 	cmd.Use = "cleanup"
 	cmd.Short = "Clean up the synced configmap"
 
-	cmdConfig.DisableLeaderElection = true
 	o.AddFlags(cmd)
 	return cmd
 }
@@ -39,9 +39,9 @@ func (o *AgentOptions) AddFlags(cmd *cobra.Command) {
 	flags.StringVar(&o.AddonNamespace, "addon-namespace", o.AddonNamespace, "Installation namespace of addon.")
 }
 
-func (o *AgentOptions) RunAgent(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+func (o *AgentOptions) RunAgent(ctx context.Context, kubeConfig *rest.Config) error {
 	// build kubeclient of managed cluster
-	spokeKubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
+	spokeKubeClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
 	}
