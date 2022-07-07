@@ -1,0 +1,15 @@
+apiVersion: mesh.open-cluster-management.io/v1alpha1
+kind: MeshDeployment
+metadata:
+  name: istio
+  namespace: open-cluster-management
+spec:
+  clusters: ["cluster1", "cluster2"]
+  controlPlane:
+    components: ["base", "istiod", "istio-ingress"]
+    namespace: istio-system
+    profiles: ["default"]
+    version: 1.13.2
+    revision: 1-13-2
+  meshMemberRoll: ["bookinfo"]
+  meshProvider: Upstream Istio
