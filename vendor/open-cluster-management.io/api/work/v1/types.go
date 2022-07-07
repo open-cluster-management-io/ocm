@@ -39,6 +39,14 @@ type ManifestWorkSpec struct {
 	// ManifestConfigs represents the configurations of manifests defined in workload field.
 	// +optional
 	ManifestConfigs []ManifestConfigOption `json:"manifestConfigs,omitempty"`
+
+	// Executor is the configuration that makes the work agent to perform some pre-request processing/checking.
+	// e.g. the executor identity tells the work agent to check the executor has sufficient permission to write
+	// the workloads to the local managed cluster.
+	// Note that nil executor is still supported for backward-compatibility which indicates that the work agent
+	// will not perform any additional actions before applying resources.
+	// +optional
+	Executor *ManifestWorkExecutor `json:"executor,omitempty"`
 }
 
 // Manifest represents a resource to be deployed on managed cluster.
@@ -78,11 +86,120 @@ type ManifestConfigOption struct {
 	// +required
 	ResourceIdentifier ResourceIdentifier `json:"resourceIdentifier"`
 
-	// FeedbackRules defines what resource status field should be returned.
+	// FeedbackRules defines what resource status field should be returned. If it is not set or empty,
+	// no feedback rules will be honored.
+	// +optional
+	FeedbackRules []FeedbackRule `json:"feedbackRules,omitempty"`
+
+	// UpdateStrategy defines the strategy to update this manifest. UpdateStrategy is Update
+	// if it is not set,
+	// optional
+	UpdateStrategy *UpdateStrategy `json:"updateStrategy"`
+}
+
+// ManifestWorkExecutor is the executor that applies the resources to the managed cluster. i.e. the
+// work agent.
+type ManifestWorkExecutor struct {
+	// Subject is the subject identity which the work agent uses to talk to the
+	// local cluster when applying the resources.
+	Subject ManifestWorkExecutorSubject `json:"subject"`
+}
+
+// ManifestWorkExecutorSubject is the subject identity used by the work agent to apply the resources.
+// The work agent should check whether the applying resources are out-of-scope of the permission held
+// by the executor identity.
+type ManifestWorkExecutorSubject struct {
+	// Type is the type of the subject identity.
+	// Supported types are: "ServiceAccount".
+	// +kubebuilder:validation:Enum=ServiceAccount
 	// +kubebuilder:validation:Required
 	// +required
-	FeedbackRules []FeedbackRule `json:"feedbackRules"`
+	Type ManifestWorkExecutorSubjectType `json:"type"`
+	// ServiceAccount is for identifying which service account to use by the work agent.
+	// Only required if the type is "ServiceAccount".
+	// +optional
+	ServiceAccount *ManifestWorkSubjectServiceAccount `json:"serviceAccount,omitempty"`
 }
+
+// ManifestWorkExecutorSubjectType is the type of the subject.
+type ManifestWorkExecutorSubjectType string
+
+const (
+	// ExecutorSubjectTypeServiceAccount indicates that the workload resources belong to a ServiceAccount
+	// in the managed cluster.
+	ExecutorSubjectTypeServiceAccount ManifestWorkExecutorSubjectType = "ServiceAccount"
+)
+
+// ManifestWorkSubjectServiceAccount references service account in the managed clusters.
+type ManifestWorkSubjectServiceAccount struct {
+	// Namespace is the namespace of the service account.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)$`
+	// +required
+	Namespace string `json:"namespace"`
+	// Name is the name of the service account.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)$`
+	// +required
+	Name string `json:"name"`
+}
+
+// UpdateStrategy defines the strategy to update this manifest
+type UpdateStrategy struct {
+	// type defines the strategy to update this manifest, default value is Update.
+	// Update type means to update resource by an update call.
+	// CreateOnly type means do not update resource based on current manifest.
+	// ServerSideApply type means to update resource using server side apply with work-controller as the field manager.
+	// If there is conflict, the related Applied condition of manifest will be in the status of False with the
+	// reason of ApplyConflict.
+	// +kubebuilder:default=Update
+	// +kubebuilder:validation:Enum=Update;CreateOnly;ServerSideApply
+	// +kubebuilder:validation:Required
+	// +required
+	Type UpdateStrategyType `json:"type,omitempty"`
+
+	// serverSideApply defines the configuration for server side apply. It is honored only when
+	// type of updateStrategy is ServerSideApply
+	// +optional
+	ServerSideApply *ServerSideApplyConfig `json:"serverSideApply,omitempty"`
+}
+
+type UpdateStrategyType string
+
+const (
+	// Update type means to update resource by an update call.
+	UpdateStrategyTypeUpdate UpdateStrategyType = "Update"
+
+	// CreateOnly type means do not update resource based on current manifest. This should be used only when
+	// ServerSideApply type is not support on the spoke, and the user on hub would like some other controller
+	// on the spoke to own the control of the resource.
+	UpdateStrategyTypeCreateOnly UpdateStrategyType = "CreateOnly"
+
+	// ServerSideApply type means to update resource using server side apply with work-controller as the field manager.
+	// If there is conflict, the related Applied condition of manifest will be in the status of False with the
+	// reason of ApplyConflict. This type allows another controller on the spoke to control certain field of the resource.
+	UpdateStrategyTypeServerSideApply UpdateStrategyType = "ServerSideApply"
+)
+
+type ServerSideApplyConfig struct {
+	// Force represents to force apply the manifest.
+	// +optional
+	Force bool `json:"force"`
+
+	// FieldManager is the manager to apply the resource. It is work-agent by default, but can be other name with work-agent
+	// as the prefix.
+	// +kubebuilder:default=work-agent
+	// +kubebuilder:validation:Pattern=`^work-agent`
+	// +optional
+	FieldManager string `json:"fieldManager,omitempty"`
+}
+
+// DefaultFieldManager is the default field manager of the manifestwork when the field manager is not set.
+const DefaultFieldManager = "work-agent"
 
 type FeedbackRule struct {
 	// Type defines the option of how status can be returned.

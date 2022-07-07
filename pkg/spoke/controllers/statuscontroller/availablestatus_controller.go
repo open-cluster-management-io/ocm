@@ -22,6 +22,7 @@ import (
 	workinformer "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/work/pkg/helper"
 	"open-cluster-management.io/work/pkg/spoke/statusfeedback"
 )
 
@@ -199,26 +200,23 @@ func (c *AvailableStatusController) getFeedbackValues(
 	errs := []error{}
 	values := []workapiv1.FeedbackValue{}
 
-	identifier := workapiv1.ResourceIdentifier{
-		Group:     resourceMeta.Group,
-		Resource:  resourceMeta.Resource,
-		Namespace: resourceMeta.Namespace,
-		Name:      resourceMeta.Name,
+	option := helper.FindManifestConiguration(resourceMeta, manifestOptions)
+
+	if option == nil || len(option.FeedbackRules) == 0 {
+		return values, metav1.Condition{
+			Type:   statusFeedbackConditionType,
+			Reason: "NoStatusFeedbackSynced",
+			Status: metav1.ConditionTrue,
+		}
 	}
 
-	for _, field := range manifestOptions {
-		if field.ResourceIdentifier != identifier {
-			continue
+	for _, rule := range option.FeedbackRules {
+		valuesByRule, err := c.statusReader.GetValuesByRule(obj, rule)
+		if err != nil {
+			errs = append(errs, err)
 		}
-
-		for _, rule := range field.FeedbackRules {
-			valuesByRule, err := c.statusReader.GetValuesByRule(obj, rule)
-			if err != nil {
-				errs = append(errs, err)
-			}
-			if len(valuesByRule) > 0 {
-				values = append(values, valuesByRule...)
-			}
+		if len(valuesByRule) > 0 {
+			values = append(values, valuesByRule...)
 		}
 	}
 
@@ -230,14 +228,6 @@ func (c *AvailableStatusController) getFeedbackValues(
 			Reason:  "StatusFeedbackSyncFailed",
 			Status:  metav1.ConditionFalse,
 			Message: fmt.Sprintf("Sync status feedback failed with error %v", err),
-		}
-	}
-
-	if len(values) == 0 {
-		return values, metav1.Condition{
-			Type:   statusFeedbackConditionType,
-			Reason: "NoStatusFeedbackSynced",
-			Status: metav1.ConditionTrue,
 		}
 	}
 

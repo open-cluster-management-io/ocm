@@ -131,7 +131,8 @@ func (ManifestCondition) SwaggerDoc() map[string]string {
 var map_ManifestConfigOption = map[string]string{
 	"":                   "ManifestConfigOption represents the configurations of a manifest defined in workload field.",
 	"resourceIdentifier": "ResourceIdentifier represents the group, resource, name and namespace of a resoure. iff this refers to a resource not created by this manifest work, the related rules will not be executed.",
-	"feedbackRules":      "FeedbackRules defines what resource status field should be returned.",
+	"feedbackRules":      "FeedbackRules defines what resource status field should be returned. If it is not set or empty, no feedback rules will be honored.",
+	"updateStrategy":     "UpdateStrategy defines the strategy to update this manifest. UpdateStrategy is Update if it is not set, optional",
 }
 
 func (ManifestConfigOption) SwaggerDoc() map[string]string {
@@ -172,6 +173,25 @@ func (ManifestWork) SwaggerDoc() map[string]string {
 	return map_ManifestWork
 }
 
+var map_ManifestWorkExecutor = map[string]string{
+	"":        "ManifestWorkExecutor is the executor that applies the resources to the managed cluster. i.e. the work agent.",
+	"subject": "Subject is the subject identity which the work agent uses to talk to the local cluster when applying the resources.",
+}
+
+func (ManifestWorkExecutor) SwaggerDoc() map[string]string {
+	return map_ManifestWorkExecutor
+}
+
+var map_ManifestWorkExecutorSubject = map[string]string{
+	"":               "ManifestWorkExecutorSubject is the subject identity used by the work agent to apply the resources. The work agent should check whether the applying resources are out-of-scope of the permission held by the executor identity.",
+	"type":           "Type is the type of the subject identity. Supported types are: \"ServiceAccount\".",
+	"serviceAccount": "ServiceAccount is for identifying which service account to use by the work agent. Only required if the type is \"ServiceAccount\".",
+}
+
+func (ManifestWorkExecutorSubject) SwaggerDoc() map[string]string {
+	return map_ManifestWorkExecutorSubject
+}
+
 var map_ManifestWorkList = map[string]string{
 	"":         "ManifestWorkList is a collection of manifestworks.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
@@ -187,6 +207,7 @@ var map_ManifestWorkSpec = map[string]string{
 	"workload":        "Workload represents the manifest workload to be deployed on a managed cluster.",
 	"deleteOption":    "DeleteOption represents deletion strategy when the manifestwork is deleted. Foreground deletion strategy is applied to all the resource in this manifestwork if it is not set.",
 	"manifestConfigs": "ManifestConfigs represents the configurations of manifests defined in workload field.",
+	"executor":        "Executor is the configuration that makes the work agent to perform some pre-request processing/checking. e.g. the executor identity tells the work agent to check the executor has sufficient permission to write the workloads to the local managed cluster. Note that nil executor is still supported for backward-compatibility which indicates that the work agent will not perform any additional actions before applying resources.",
 }
 
 func (ManifestWorkSpec) SwaggerDoc() map[string]string {
@@ -201,6 +222,16 @@ var map_ManifestWorkStatus = map[string]string{
 
 func (ManifestWorkStatus) SwaggerDoc() map[string]string {
 	return map_ManifestWorkStatus
+}
+
+var map_ManifestWorkSubjectServiceAccount = map[string]string{
+	"":          "ManifestWorkSubjectServiceAccount references service account in the managed clusters.",
+	"namespace": "Namespace is the namespace of the service account.",
+	"name":      "Name is the name of the service account.",
+}
+
+func (ManifestWorkSubjectServiceAccount) SwaggerDoc() map[string]string {
+	return map_ManifestWorkSubjectServiceAccount
 }
 
 var map_ManifestsTemplate = map[string]string{
@@ -233,6 +264,15 @@ func (SelectivelyOrphan) SwaggerDoc() map[string]string {
 	return map_SelectivelyOrphan
 }
 
+var map_ServerSideApplyConfig = map[string]string{
+	"force":        "Force represents to force apply the manifest.",
+	"fieldManager": "FieldManager is the manager to apply the resource. It is work-agent by default, but can be other name with work-agent as the prefix.",
+}
+
+func (ServerSideApplyConfig) SwaggerDoc() map[string]string {
+	return map_ServerSideApplyConfig
+}
+
 var map_StatusFeedbackResult = map[string]string{
 	"":       "StatusFeedbackResult represents the values of the feild synced back defined in statusFeedbacks",
 	"values": "Values represents the synced value of the interested field.",
@@ -240,6 +280,16 @@ var map_StatusFeedbackResult = map[string]string{
 
 func (StatusFeedbackResult) SwaggerDoc() map[string]string {
 	return map_StatusFeedbackResult
+}
+
+var map_UpdateStrategy = map[string]string{
+	"":                "UpdateStrategy defines the strategy to update this manifest",
+	"type":            "type defines the strategy to update this manifest, default value is Update. Update type means to update resource by an update call. CreateOnly type means do not update resource based on current manifest. ServerSideApply type means to update resource using server side apply with work-controller as the field manager. If there is conflict, the related Applied condition of manifest will be in the status of False with the reason of ApplyConflict.",
+	"serverSideApply": "serverSideApply defines the configuration for server side apply. It is honored only when type of updateStrategy is ServerSideApply",
+}
+
+func (UpdateStrategy) SwaggerDoc() map[string]string {
+	return map_UpdateStrategy
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

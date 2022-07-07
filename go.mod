@@ -9,6 +9,7 @@ require (
 	github.com/openshift/build-machinery-go v0.0.0-20220121085309-f94edc2d6874
 	github.com/openshift/generic-admission-server v1.14.1-0.20220220163846-6395b86cc87e
 	github.com/openshift/library-go v0.0.0-20220329193146-715792ed530d
+	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
 	k8s.io/api v0.23.5
@@ -20,7 +21,7 @@ require (
 	k8s.io/klog/v2 v2.60.1
 	k8s.io/kube-aggregator v0.23.5
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
-	open-cluster-management.io/api v0.7.0
+	open-cluster-management.io/api v0.7.1-0.20220629035306-4907911fd551
 	sigs.k8s.io/controller-runtime v0.11.1
 )
 
@@ -64,7 +65,6 @@ require (
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/openshift/api v0.0.0-20220315184754-d7c10d0b647e // indirect
 	github.com/openshift/client-go v0.0.0-20211209144617-7385dd6338e3 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkg/profile v1.3.0 // indirect
 	github.com/prometheus/client_golang v1.11.0 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect

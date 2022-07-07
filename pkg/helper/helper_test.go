@@ -2,6 +2,7 @@ package helper
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -11,9 +12,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
+	clienttesting "k8s.io/client-go/testing"
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
@@ -500,6 +503,135 @@ func TestHubHash(t *testing.T) {
 				t.Errorf("Expected not equal hash value, got %s, %s", hash1, hash2)
 			} else if hash1 != hash2 && c.equal {
 				t.Errorf("Expected equal hash value, got %s, %s", hash1, hash2)
+			}
+		})
+	}
+}
+
+func TestFindManifestConiguration(t *testing.T) {
+	cases := []struct {
+		name           string
+		options        []workapiv1.ManifestConfigOption
+		resourceMeta   workapiv1.ManifestResourceMeta
+		expectedOption *workapiv1.ManifestConfigOption
+	}{
+		{
+			name:           "nil options",
+			options:        nil,
+			resourceMeta:   workapiv1.ManifestResourceMeta{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
+			expectedOption: nil,
+		},
+		{
+			name: "options not found",
+			options: []workapiv1.ManifestConfigOption{
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "nodes", Name: "node1"}},
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "test1", Namespace: "testns"}},
+			},
+			resourceMeta:   workapiv1.ManifestResourceMeta{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
+			expectedOption: nil,
+		},
+		{
+			name: "options found",
+			options: []workapiv1.ManifestConfigOption{
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "nodes", Name: "node1"}},
+				{ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"}},
+			},
+			resourceMeta: workapiv1.ManifestResourceMeta{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
+			expectedOption: &workapiv1.ManifestConfigOption{
+				ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "configmaps", Name: "test", Namespace: "testns"},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			option := FindManifestConiguration(c.resourceMeta, c.options)
+			if !equality.Semantic.DeepEqual(option, c.expectedOption) {
+				t.Errorf("expect option to be %v, but got %v", c.expectedOption, option)
+			}
+		})
+	}
+}
+
+func TestApplyOwnerReferences(t *testing.T) {
+	testCases := []struct {
+		name     string
+		existing []metav1.OwnerReference
+		required metav1.OwnerReference
+
+		wantPatch  bool
+		wantOwners []metav1.OwnerReference
+	}{
+		{
+			name:       "add a owner",
+			required:   metav1.OwnerReference{Name: "n1", UID: "a"},
+			wantPatch:  true,
+			wantOwners: []metav1.OwnerReference{{Name: "n1", UID: "a"}},
+		},
+		{
+			name:       "append a owner",
+			existing:   []metav1.OwnerReference{{Name: "n2", UID: "b"}},
+			required:   metav1.OwnerReference{Name: "n1", UID: "a"},
+			wantPatch:  true,
+			wantOwners: []metav1.OwnerReference{{Name: "n2", UID: "b"}, {Name: "n1", UID: "a"}},
+		},
+		{
+			name:       "remove a owner",
+			existing:   []metav1.OwnerReference{{Name: "n2", UID: "b"}, {Name: "n1", UID: "a"}},
+			required:   metav1.OwnerReference{Name: "n1", UID: "a-"},
+			wantPatch:  true,
+			wantOwners: []metav1.OwnerReference{{Name: "n2", UID: "b"}},
+		},
+		{
+			name:      "remove a non existing owner",
+			existing:  []metav1.OwnerReference{{Name: "n2", UID: "b"}, {Name: "n1", UID: "a"}},
+			required:  metav1.OwnerReference{Name: "n3", UID: "c-"},
+			wantPatch: false,
+		},
+		{
+			name:      "append an existing owner",
+			existing:  []metav1.OwnerReference{{Name: "n2", UID: "b"}, {Name: "n1", UID: "a"}},
+			required:  metav1.OwnerReference{Name: "n1", UID: "a"},
+			wantPatch: false,
+		},
+	}
+
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, c := range testCases {
+		t.Run(c.name, func(t *testing.T) {
+			object := newSecret("ns1", "n1", false, "ns1-n1", c.existing...)
+			fakeClient := fakedynamic.NewSimpleDynamicClient(scheme, object)
+			gvr := schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
+			err := ApplyOwnerReferences(context.TODO(), fakeClient, gvr, object, c.required)
+			if err != nil {
+				t.Errorf("apply err: %v", err)
+			}
+
+			actions := fakeClient.Actions()
+			if !c.wantPatch {
+				if len(actions) > 0 {
+					t.Fatalf("expect not patch but got %v", actions)
+				}
+				return
+			}
+
+			if len(actions) != 1 {
+				t.Fatalf("expect patch action but got %v", actions)
+			}
+
+			patch := actions[0].(clienttesting.PatchAction).GetPatch()
+			patchedObject := &metav1.PartialObjectMetadata{}
+			err = json.Unmarshal(patch, patchedObject)
+			if err != nil {
+				t.Fatalf("failed to marshal patch: %v", err)
+			}
+
+			if !equality.Semantic.DeepEqual(c.wantOwners, patchedObject.GetOwnerReferences()) {
+				t.Errorf("want ownerrefs %v, but got %v", c.wantOwners, patchedObject.GetOwnerReferences())
 			}
 		})
 	}

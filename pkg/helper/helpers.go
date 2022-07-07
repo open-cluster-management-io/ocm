@@ -3,6 +3,7 @@ package helper
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -232,18 +234,9 @@ func DeleteAppliedResources(
 			continue
 		}
 
-		// Merge with the existing owners to move the owner.
-		modified := resourcemerge.BoolPtr(false)
-		resourcemerge.MergeOwnerRefs(modified, &existingOwner, []metav1.OwnerReference{*ownerCopy})
-
 		// If there are still any other existing owners (not only ManifestWorks), update ownerrefs only.
-		if len(existingOwner) > 0 {
-			if !*modified {
-				continue
-			}
-
-			u.SetOwnerReferences(existingOwner)
-			_, err = dynamicClient.Resource(gvr).Namespace(resource.Namespace).Update(ctx, u, metav1.UpdateOptions{})
+		if len(existingOwner) > 1 {
+			err := ApplyOwnerReferences(ctx, dynamicClient, gvr, u, *ownerCopy)
 			if err != nil {
 				errs = append(errs, fmt.Errorf(
 					"failed to remove owner from resource %v with key %s/%s: %w",
@@ -360,4 +353,50 @@ func NewAppliedManifestWorkOwner(appliedWork *workapiv1.AppliedManifestWork) *me
 		Name:       appliedWork.Name,
 		UID:        appliedWork.UID,
 	}
+}
+
+func FindManifestConiguration(resourceMeta workapiv1.ManifestResourceMeta, manifestOptions []workapiv1.ManifestConfigOption) *workapiv1.ManifestConfigOption {
+	identifier := workapiv1.ResourceIdentifier{
+		Group:     resourceMeta.Group,
+		Resource:  resourceMeta.Resource,
+		Namespace: resourceMeta.Namespace,
+		Name:      resourceMeta.Name,
+	}
+
+	for _, config := range manifestOptions {
+		if config.ResourceIdentifier == identifier {
+			return &config
+		}
+	}
+
+	return nil
+}
+
+func ApplyOwnerReferences(ctx context.Context, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, existing runtime.Object, requiredOwner metav1.OwnerReference) error {
+	accessor, err := meta.Accessor(existing)
+	if err != nil {
+		return fmt.Errorf("type %t cannot be accessed: %v", existing, err)
+	}
+	patch := &unstructured.Unstructured{}
+	patch.SetUID(accessor.GetUID())
+	patch.SetResourceVersion(accessor.GetResourceVersion())
+	patch.SetOwnerReferences([]metav1.OwnerReference{requiredOwner})
+
+	modified := false
+	patchedOwner := accessor.GetOwnerReferences()
+	resourcemerge.MergeOwnerRefs(&modified, &patchedOwner, []metav1.OwnerReference{requiredOwner})
+	patch.SetOwnerReferences(patchedOwner)
+
+	if !modified {
+		return nil
+	}
+
+	patchData, err := json.Marshal(patch)
+	if err != nil {
+		return err
+	}
+
+	klog.V(2).Infof("Patching resource %v %s/%s with patch %s", gvr, accessor.GetNamespace(), accessor.GetName(), string(patchData))
+	_, err = dynamicClient.Resource(gvr).Namespace(accessor.GetNamespace()).Patch(ctx, accessor.GetName(), types.MergePatchType, patchData, metav1.PatchOptions{})
+	return err
 }
