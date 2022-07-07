@@ -2,10 +2,12 @@ package hub
 
 import (
 	"context"
-	ocmfeature "open-cluster-management.io/api/feature"
 	"time"
 
+	ocmfeature "open-cluster-management.io/api/feature"
+
 	"open-cluster-management.io/registration/pkg/features"
+	"open-cluster-management.io/registration/pkg/helpers"
 	"open-cluster-management.io/registration/pkg/hub/managedclustersetbinding"
 	"open-cluster-management.io/registration/pkg/hub/taint"
 
@@ -25,10 +27,12 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/pkg/errors"
 
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 )
 
 var ResyncInterval = 5 * time.Minute
@@ -82,11 +86,29 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		controllerContext.EventRecorder,
 	)
 
-	csrController := csr.NewCSRApprovingController(
-		kubeClient,
-		kubeInfomers.Certificates().V1().CertificateSigningRequests(),
-		controllerContext.EventRecorder,
-	)
+	var csrController factory.Controller
+	if features.DefaultHubMutableFeatureGate.Enabled(ocmfeature.V1beta1CSRAPICompatibility) {
+		v1CSRSupported, v1beta1CSRSupported, err := helpers.IsCSRSupported(kubeClient)
+		if err != nil {
+			return errors.Wrapf(err, "failed CSR api discovery")
+		}
+
+		if !v1CSRSupported && v1beta1CSRSupported {
+			csrController = csr.NewV1beta1CSRApprovingController(
+				kubeClient,
+				kubeInfomers.Certificates().V1beta1().CertificateSigningRequests(),
+				controllerContext.EventRecorder,
+			)
+			klog.Info("Using v1beta1 CSR api to manage spoke client certificate")
+		}
+	}
+	if csrController == nil {
+		csrController = csr.NewCSRApprovingController(
+			kubeClient,
+			kubeInfomers.Certificates().V1().CertificateSigningRequests(),
+			controllerContext.EventRecorder,
+		)
+	}
 
 	leaseController := lease.NewClusterLeaseController(
 		kubeClient,

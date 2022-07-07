@@ -27,9 +27,10 @@ const (
 	// registration and maintains the status of managed cluster addons through watching their leases.
 	AddonManagement featuregate.Feature = "AddonManagement"
 
-	// DefaultClusterSet will make registration hub controller to maintain a default cluster set. All clusters
-	// without clusterset label will be automatically added into the default cluster set by adding a label
+	// DefaultClusterSet will make registration hub controller to maintain a default clusterset and a global clusterset.
+	// All clusters without clusterset label will be automatically added into the default clusterset by adding a label
 	// "cluster.open-cluster-management.io/clusterset=default" to the clusters.
+	// All clusters will be included to the global clusterset
 	DefaultClusterSet featuregate.Feature = "DefaultClusterSet"
 
 	// V1beta1CSRAPICompatibility will make the spoke registration agent to issue CSR requests
@@ -54,5 +55,6 @@ var DefaultSpokeRegistrationFeatureGates = map[featuregate.Feature]featuregate.F
 // feature keys for registration hub controller.  To add a new feature, define a key for it above and
 // add it here.
 var DefaultHubRegistrationFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	DefaultClusterSet: {Default: false, PreRelease: featuregate.Alpha},
+	DefaultClusterSet:          {Default: false, PreRelease: featuregate.Alpha},
+	V1beta1CSRAPICompatibility: {Default: false, PreRelease: featuregate.Alpha},
 }

@@ -198,6 +198,9 @@ type ServerSideApplyConfig struct {
 	FieldManager string `json:"fieldManager,omitempty"`
 }
 
+// DefaultFieldManager is the default field manager of the manifestwork when the field manager is not set.
+const DefaultFieldManager = "work-agent"
+
 type FeedbackRule struct {
 	// Type defines the option of how status can be returned.
 	// It can be jsonPaths or wellKnownStatus.

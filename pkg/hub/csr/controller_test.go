@@ -252,7 +252,7 @@ func TestIsSpokeClusterClientCertRenewal(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			isRenewal := isSpokeClusterClientCertRenewal(testinghelpers.NewCSR(c.csr))
+			isRenewal := isSpokeClusterClientCertRenewal(newCSRInfo(testinghelpers.NewCSR(c.csr)))
 			if isRenewal != c.isRenewal {
 				t.Errorf("expected %t, but failed", c.isRenewal)
 			}

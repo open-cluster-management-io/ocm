@@ -12,6 +12,7 @@ import (
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	certv1 "k8s.io/api/certificates/v1"
+	certv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -175,6 +176,30 @@ func AssertCSRCondition(
 	actualConditions []certv1.CertificateSigningRequestCondition,
 	expectedCondition certv1.CertificateSigningRequestCondition) {
 	var cond *certv1.CertificateSigningRequestCondition
+	for i := range actualConditions {
+		condition := actualConditions[i]
+		if condition.Type == expectedCondition.Type {
+			cond = &condition
+			break
+		}
+	}
+	if cond == nil {
+		t.Errorf("expected condition %s but got: %s", expectedCondition.Type, cond.Type)
+	}
+	if cond.Reason != expectedCondition.Reason {
+		t.Errorf("expected reason %s but got: %s", expectedCondition.Reason, cond.Reason)
+	}
+	if cond.Message != expectedCondition.Message {
+		t.Errorf("expected message %s but got: %s", expectedCondition.Message, cond.Message)
+	}
+}
+
+// AssertV1beta1CSRCondition asserts the actual csr conditions has the expected condition
+func AssertV1beta1CSRCondition(
+	t *testing.T,
+	actualConditions []certv1beta1.CertificateSigningRequestCondition,
+	expectedCondition certv1beta1.CertificateSigningRequestCondition) {
+	var cond *certv1beta1.CertificateSigningRequestCondition
 	for i := range actualConditions {
 		condition := actualConditions[i]
 		if condition.Type == expectedCondition.Type {

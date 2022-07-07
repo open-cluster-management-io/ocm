@@ -11,6 +11,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	certificatesv1 "k8s.io/api/certificates/v1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -21,7 +22,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	certificateslisters "k8s.io/client-go/listers/certificates/v1"
 	"k8s.io/klog/v2"
-
 	"open-cluster-management.io/registration/pkg/helpers"
 	"open-cluster-management.io/registration/pkg/hub/user"
 )
@@ -70,15 +70,16 @@ func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncC
 		return nil
 	}
 
+	csrInfo := newCSRInfo(csr)
 	// Check whether current csr is a renewal spoker cluster csr.
-	isRenewal := isSpokeClusterClientCertRenewal(csr)
+	isRenewal := isSpokeClusterClientCertRenewal(csrInfo)
 	if !isRenewal {
 		klog.V(4).Infof("CSR %q was not recognized", csr.Name)
 		return nil
 	}
 
 	// Authorize whether the current spoke agent has been authorized to renew its csr.
-	allowed, err := c.authorize(ctx, csr)
+	allowed, err := authorize(ctx, c.kubeClient, csrInfo)
 	if err != nil {
 		return err
 	}
@@ -105,18 +106,13 @@ func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncC
 
 // Using SubjectAccessReview API to check whether a spoke agent has been authorized to renew its csr,
 // a spoke agent is authorized after its spoke cluster is accepted by hub cluster admin.
-func (c *csrApprovingController) authorize(ctx context.Context, csr *certificatesv1.CertificateSigningRequest) (bool, error) {
-	extra := make(map[string]authorizationv1.ExtraValue)
-	for k, v := range csr.Spec.Extra {
-		extra[k] = authorizationv1.ExtraValue(v)
-	}
-
+func authorize(ctx context.Context, kubeClient kubernetes.Interface, csr csrInfo) (bool, error) {
 	sar := &authorizationv1.SubjectAccessReview{
 		Spec: authorizationv1.SubjectAccessReviewSpec{
-			User:   csr.Spec.Username,
-			UID:    csr.Spec.UID,
-			Groups: csr.Spec.Groups,
-			Extra:  extra,
+			User:   csr.username,
+			UID:    csr.uid,
+			Groups: csr.groups,
+			Extra:  csr.extra,
 			ResourceAttributes: &authorizationv1.ResourceAttributes{
 				Group:       "register.open-cluster-management.io",
 				Resource:    "managedclusters",
@@ -125,7 +121,8 @@ func (c *csrApprovingController) authorize(ctx context.Context, csr *certificate
 			},
 		},
 	}
-	sar, err := c.kubeClient.AuthorizationV1().SubjectAccessReviews().Create(ctx, sar, metav1.CreateOptions{})
+
+	sar, err := kubeClient.AuthorizationV1().SubjectAccessReviews().Create(ctx, sar, metav1.CreateOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -136,25 +133,25 @@ func (c *csrApprovingController) authorize(ctx context.Context, csr *certificate
 // 1. if the signer name in csr request is valid.
 // 2. if organization field and commonName field in csr request is valid.
 // 3. if user name in csr is the same as commonName field in csr request.
-func isSpokeClusterClientCertRenewal(csr *certificatesv1.CertificateSigningRequest) bool {
-	spokeClusterName, existed := csr.Labels[spokeClusterNameLabel]
+func isSpokeClusterClientCertRenewal(csr csrInfo) bool {
+	spokeClusterName, existed := csr.labels[spokeClusterNameLabel]
 	if !existed {
 		return false
 	}
 
-	if csr.Spec.SignerName != certificatesv1.KubeAPIServerClientSignerName {
+	if csr.signerName != certificatesv1.KubeAPIServerClientSignerName {
 		return false
 	}
 
-	block, _ := pem.Decode(csr.Spec.Request)
+	block, _ := pem.Decode(csr.request)
 	if block == nil || block.Type != "CERTIFICATE REQUEST" {
-		klog.V(4).Infof("csr %q was not recognized: PEM block type is not CERTIFICATE REQUEST", csr.Name)
+		klog.V(4).Infof("csr %q was not recognized: PEM block type is not CERTIFICATE REQUEST", csr.name)
 		return false
 	}
 
 	x509cr, err := x509.ParseCertificateRequest(block.Bytes)
 	if err != nil {
-		klog.V(4).Infof("csr %q was not recognized: %v", csr.Name, err)
+		klog.V(4).Infof("csr %q was not recognized: %v", csr.name, err)
 		return false
 	}
 
@@ -175,5 +172,54 @@ func isSpokeClusterClientCertRenewal(csr *certificatesv1.CertificateSigningReque
 		return false
 	}
 
-	return csr.Spec.Username == x509cr.Subject.CommonName
+	return csr.username == x509cr.Subject.CommonName
+}
+
+type csrInfo struct {
+	name       string
+	labels     map[string]string
+	signerName string
+	username   string
+	uid        string
+	groups     []string
+	extra      map[string]authorizationv1.ExtraValue
+	request    []byte
+}
+
+// newCSRInfo creates csrInfo from CertificateSigningRequest by api version(v1/v1beta1).
+func newCSRInfo(csr any) csrInfo {
+	extra := make(map[string]authorizationv1.ExtraValue)
+	switch v := csr.(type) {
+	case *certificatesv1.CertificateSigningRequest:
+		for k, v := range v.Spec.Extra {
+			extra[k] = authorizationv1.ExtraValue(v)
+		}
+		return csrInfo{
+			name:       v.Name,
+			labels:     v.Labels,
+			signerName: v.Spec.SignerName,
+			username:   v.Spec.Username,
+			uid:        v.Spec.UID,
+			groups:     v.Spec.Groups,
+			extra:      extra,
+			request:    v.Spec.Request,
+		}
+	case *certificatesv1beta1.CertificateSigningRequest:
+		for k, v := range v.Spec.Extra {
+			extra[k] = authorizationv1.ExtraValue(v)
+		}
+		return csrInfo{
+			name:       v.Name,
+			labels:     v.Labels,
+			signerName: *v.Spec.SignerName,
+			username:   v.Spec.Username,
+			uid:        v.Spec.UID,
+			groups:     v.Spec.Groups,
+			extra:      extra,
+			request:    v.Spec.Request,
+		}
+	default:
+		klog.Errorf("Unsupported type %T", v)
+		return csrInfo{}
+	}
 }

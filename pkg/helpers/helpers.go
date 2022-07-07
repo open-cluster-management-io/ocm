@@ -21,6 +21,7 @@ import (
 	errorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -197,6 +198,19 @@ func IsCSRInTerminalState(status *certificatesv1.CertificateSigningRequestStatus
 			return true
 		}
 		if c.Type == certificatesv1.CertificateDenied {
+			return true
+		}
+	}
+	return false
+}
+
+// Isv1beta1CSRInTerminalState checks whether a CSR is in terminal state for v1beta1 version.
+func Isv1beta1CSRInTerminalState(status *certificatesv1beta1.CertificateSigningRequestStatus) bool {
+	for _, c := range status.Conditions {
+		if c.Type == certificatesv1beta1.CertificateApproved {
+			return true
+		}
+		if c.Type == certificatesv1beta1.CertificateDenied {
 			return true
 		}
 	}
