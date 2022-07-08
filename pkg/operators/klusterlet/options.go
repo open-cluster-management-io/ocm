@@ -15,6 +15,7 @@ import (
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/controllers/addonsecretcontroller"
 	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/controllers/bootstrapcontroller"
 	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/controllers/klusterletcontroller"
 	"open-cluster-management.io/registration-operator/pkg/operators/klusterlet/controllers/ssarcontroller"
@@ -111,12 +112,20 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		controllerContext.EventRecorder,
 	)
 
+	addonController := addonsecretcontroller.NewAddonPullImageSecretController(
+		kubeClient,
+		operatorNamespace,
+		kubeInformer.Core().V1().Namespaces(),
+		controllerContext.EventRecorder,
+	)
+
 	go operatorInformer.Start(ctx.Done())
 	go kubeInformer.Start(ctx.Done())
 	go klusterletController.Run(ctx, 1)
 	go statusController.Run(ctx, 1)
 	go ssarController.Run(ctx, 1)
 	go bootstrapController.Run(ctx, 1)
+	go addonController.Run(ctx, 1)
 
 	<-ctx.Done()
 	return nil

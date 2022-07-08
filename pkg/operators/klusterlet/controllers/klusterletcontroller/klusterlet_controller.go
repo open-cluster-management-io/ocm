@@ -338,6 +338,9 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		return err
 	}
 	// Sync pull secret to the klusterlet addon namespace
+	// The reason we keep syncing secret instead of adding a label to trigger addonsecretcontroller to sync is:
+	// addonsecretcontroller only watch namespaces in the same cluster klusterlet is running on.
+	// And if addons are deployed in default mode on the managed cluster, but klusterlet is deployed in hosted on management cluster, then we still need to sync the secret here in klusterlet-controller using `managedClusterClients.kubeClient`.
 	err = n.syncPullSecret(ctx, n.kubeClient, managedClusterClients.kubeClient, klusterlet.Name, addonNamespace, controllerContext.Recorder())
 	if err != nil {
 		return err
