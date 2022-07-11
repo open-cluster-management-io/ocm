@@ -17,6 +17,12 @@ spec:
       labels:
         app: klusterlet-registration-agent
     spec:
+      {{if .HubApiServerHostAlias }}
+      hostAliases:
+      - ip: {{ .HubApiServerHostAlias.IP }}
+        hostnames:
+        - {{ .HubApiServerHostAlias.Hostname }}
+      {{end}}
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:

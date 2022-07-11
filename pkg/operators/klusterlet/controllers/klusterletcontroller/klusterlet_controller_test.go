@@ -32,7 +32,7 @@ import (
 	fakeoperatorclient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
-	opratorapiv1 "open-cluster-management.io/api/operator/v1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
 	testinghelper "open-cluster-management.io/registration-operator/pkg/helpers/testing"
@@ -69,33 +69,37 @@ func newServiceAccountSecret(name, namespace string) *corev1.Secret {
 	return secret
 }
 
-func newKlusterlet(name, namespace, clustername string) *opratorapiv1.Klusterlet {
-	return &opratorapiv1.Klusterlet{
+func newKlusterlet(name, namespace, clustername string) *operatorapiv1.Klusterlet {
+	return &operatorapiv1.Klusterlet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       name,
 			Finalizers: []string{klusterletFinalizer},
 		},
-		Spec: opratorapiv1.KlusterletSpec{
+		Spec: operatorapiv1.KlusterletSpec{
 			RegistrationImagePullSpec: "testregistration",
 			WorkImagePullSpec:         "testwork",
 			ClusterName:               clustername,
 			Namespace:                 namespace,
-			ExternalServerURLs:        []opratorapiv1.ServerURL{},
-			RegistrationConfiguration: &opratorapiv1.RegistrationConfiguration{
-				FeatureGates: []opratorapiv1.FeatureGate{
+			ExternalServerURLs:        []operatorapiv1.ServerURL{},
+			RegistrationConfiguration: &operatorapiv1.RegistrationConfiguration{
+				FeatureGates: []operatorapiv1.FeatureGate{
 					{
 						Feature: "AddonManagement",
 						Mode:    "Enable",
 					},
 				},
 			},
+			HubApiServerHostAlias: &operatorapiv1.HubApiServerHostAlias{
+				IP:       "11.22.33.44",
+				Hostname: "open-cluster-management.io",
+			},
 		},
 	}
 }
 
-func newKlusterletHosted(name, namespace, clustername string) *opratorapiv1.Klusterlet {
+func newKlusterletHosted(name, namespace, clustername string) *operatorapiv1.Klusterlet {
 	klusterlet := newKlusterlet(name, namespace, clustername)
-	klusterlet.Spec.DeployOption.Mode = opratorapiv1.InstallModeHosted
+	klusterlet.Spec.DeployOption.Mode = operatorapiv1.InstallModeHosted
 	return klusterlet
 }
 
@@ -133,7 +137,7 @@ func newServiceAccount(name, namespace string, referenceSecret string) *corev1.S
 	}
 }
 
-func newTestController(t *testing.T, klusterlet *opratorapiv1.Klusterlet, appliedManifestWorks []runtime.Object, objects ...runtime.Object) *testController {
+func newTestController(t *testing.T, klusterlet *operatorapiv1.Klusterlet, appliedManifestWorks []runtime.Object, objects ...runtime.Object) *testController {
 	fakeKubeClient := fakekube.NewSimpleClientset(objects...)
 	fakeAPIExtensionClient := fakeapiextensions.NewSimpleClientset()
 	fakeOperatorClient := fakeoperatorclient.NewSimpleClientset(klusterlet)
@@ -172,7 +176,7 @@ func newTestController(t *testing.T, klusterlet *opratorapiv1.Klusterlet, applie
 	}
 }
 
-func newTestControllerHosted(t *testing.T, klusterlet *opratorapiv1.Klusterlet, appliedManifestWorks []runtime.Object, objects ...runtime.Object) *testController {
+func newTestControllerHosted(t *testing.T, klusterlet *operatorapiv1.Klusterlet, appliedManifestWorks []runtime.Object, objects ...runtime.Object) *testController {
 	fakeKubeClient := fakekube.NewSimpleClientset(objects...)
 	fakeAPIExtensionClient := fakeapiextensions.NewSimpleClientset()
 	fakeOperatorClient := fakeoperatorclient.NewSimpleClientset(klusterlet)
@@ -336,7 +340,7 @@ func assertRegistrationDeployment(t *testing.T, actions []clienttesting.Action, 
 	}
 }
 
-func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, clusterName string, mode opratorapiv1.InstallMode, replica int32) {
+func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, clusterName string, mode operatorapiv1.InstallMode, replica int32) {
 	deployment := getDeployments(actions, verb, "work-agent")
 	if deployment == nil {
 		t.Errorf("work deployment not found")
@@ -354,7 +358,7 @@ func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, cl
 		"--hub-kubeconfig=/spoke/hub-kubeconfig/kubeconfig",
 	}
 
-	if mode == opratorapiv1.InstallModeDetached || mode == opratorapiv1.InstallModeHosted {
+	if mode == operatorapiv1.InstallModeDetached || mode == operatorapiv1.InstallModeHosted {
 		expectArgs = append(expectArgs, "--spoke-kubeconfig=/spoke/config/kubeconfig")
 	}
 
@@ -372,7 +376,7 @@ func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, cl
 	}
 }
 
-func ensureObject(t *testing.T, object runtime.Object, klusterlet *opratorapiv1.Klusterlet) {
+func ensureObject(t *testing.T, object runtime.Object, klusterlet *operatorapiv1.Klusterlet) {
 	access, err := meta.Accessor(object)
 	if err != nil {
 		t.Errorf("Unable to access objectmeta: %v", err)
@@ -724,7 +728,7 @@ func TestGetServersFromKlusterlet(t *testing.T) {
 			klusterlet := newKlusterlet("klusterlet", "testns", "")
 			for _, server := range c.servers {
 				klusterlet.Spec.ExternalServerURLs = append(klusterlet.Spec.ExternalServerURLs,
-					opratorapiv1.ServerURL{URL: server})
+					operatorapiv1.ServerURL{URL: server})
 			}
 			actual := getServersFromKlusterlet(klusterlet)
 			if actual != c.expected {
@@ -755,7 +759,7 @@ func TestReplica(t *testing.T) {
 
 	// should have 1 replica for registration deployment and 0 for work
 	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "create", "", "cluster1", 1)
-	assertWorkDeployment(t, controller.kubeClient.Actions(), "create", "cluster1", opratorapiv1.InstallModeDefault, 0)
+	assertWorkDeployment(t, controller.kubeClient.Actions(), "create", "cluster1", operatorapiv1.InstallModeDefault, 0)
 
 	klusterlet = newKlusterlet("klusterlet", "testns", "cluster1")
 	klusterlet.Status.Conditions = []metav1.Condition{
@@ -778,7 +782,7 @@ func TestReplica(t *testing.T) {
 	}
 
 	// should have 1 replica for work
-	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster1", opratorapiv1.InstallModeDefault, 1)
+	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster1", operatorapiv1.InstallModeDefault, 1)
 
 	controller.kubeClient.PrependReactor("list", "nodes", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 		if action.GetVerb() != "list" {
@@ -799,7 +803,7 @@ func TestReplica(t *testing.T) {
 	}
 
 	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "update", "", "cluster1", 3)
-	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster1", opratorapiv1.InstallModeDefault, 3)
+	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster1", operatorapiv1.InstallModeDefault, 3)
 }
 
 func TestClusterNameChange(t *testing.T) {
@@ -829,7 +833,7 @@ func TestClusterNameChange(t *testing.T) {
 	testinghelper.AssertAction(t, operatorAction[1], "update")
 	testinghelper.AssertGet(t, operatorAction[2], "operator.open-cluster-management.io", "v1", "klusterlets")
 	testinghelper.AssertAction(t, operatorAction[3], "update")
-	updatedKlusterlet := operatorAction[3].(clienttesting.UpdateActionImpl).Object.(*opratorapiv1.Klusterlet)
+	updatedKlusterlet := operatorAction[3].(clienttesting.UpdateActionImpl).Object.(*operatorapiv1.Klusterlet)
 	testinghelper.AssertOnlyGenerationStatuses(
 		t, updatedKlusterlet,
 		testinghelper.NamedDeploymentGenerationStatus("klusterlet-registration-agent", "testns", 0),
@@ -876,7 +880,7 @@ func TestClusterNameChange(t *testing.T) {
 	// Update klusterlet with different cluster name and rerun sync
 	klusterlet = newKlusterlet("klusterlet", "testns", "cluster3")
 	klusterlet.Generation = 2
-	klusterlet.Spec.ExternalServerURLs = []opratorapiv1.ServerURL{{URL: "https://localhost"}}
+	klusterlet.Spec.ExternalServerURLs = []operatorapiv1.ServerURL{{URL: "https://localhost"}}
 	controller.kubeClient.ClearActions()
 	controller.operatorClient.ClearActions()
 	if err := controller.operatorStore.Update(klusterlet); err != nil {

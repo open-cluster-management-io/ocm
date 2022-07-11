@@ -24,45 +24,58 @@ The controllers are all deployed in _open-cluster-management-agent_ namespace by
 ## Get started with [Kind](https://kind.sigs.k8s.io/)
 
 1. Create a cluster with kind
+
    ```shell
    kind create cluster 
    ```
 
 2. Deploy
+
    ```shell
    export KUBECONFIG=$HOME/.kube/config
    make deploy
    ```
 
+**PLEASE NOTE**: if the server address in kubeconfig is a domain name, the hub api server may not be accessible for `klusterlet` operator、 `registration` and `work` agent. In this case, you need to set hostAlias for [`klusterlet` deployment](deploy/klusterlet/config/operator/operator.yaml#L65) and [`klusterlet` CR](deploy/klusterlet/config/samples/operator_open-cluster-management_klusterlets.cr.yaml#L18) explicitly.
+
 ## More details about deployment
 
 We mainly provide deployment in two scenarios:
+
 1. All-in-one: using one cluster as hub and spoke at the same time.
 2. Hub-spoke: using one cluster as hub and another cluster as spoke.
 
 ### Deploy all-in-on deployment
 
-1. Set the env variable `KUBECONFIG` to kubeconfig file path. 
+1. Set the env variable `KUBECONFIG` to kubeconfig file path.
+
    ```shell
    export KUBECONFIG=$HOME/.kube/config
    ```
+
 2. Deploy all components on the cluster.
+
    ```shell
    make deploy
    ```
+
 3. To clean the environment, run `make clean-deploy`
 
 ### Deploy hub-spoke deployment
 
 1. Set env variables.
+
    ```shell
    export KUBECONFIG=$HOME/.kube/config
    ```
+
 2. Switch to hub context and deploy hub components.
-   ```
+
+   ```shell
    kubectl config use-context {hub-context}
    make deploy-hub
    ```
+
    **PLEASE NOTE**: If you're running kubernetes in docker, the `server` address in kubeconfig may not be accessible for other clusters. In this case, you need to set `HUB_KUBECONFIG` explicitly.
 
    For example, if your clusters are created by kind, you need to use kind's command to export a kubeconfig of hub with an accessible `server` address. ([The related issue](https://github.com/kubernetes-sigs/kind/issues/1305))
@@ -70,25 +83,31 @@ We mainly provide deployment in two scenarios:
    ```shell
    kind get kubeconfig --name {your kind cluster name} --internal > ./.hub-kubeconfig # ./.hub-kubeconfig is default value of HUB_KUBECONFIG 
    ```
+
 3. Switch to spoke context and deploy agent components.
-    ```
+
+   ```shell
     kubectl config use-context {spoke context}
     make deploy-spoke
-    ```
+   ```
+
 4. To clean the hub environment.
+
    ```shell
    kubectl config use-context {hub-context} 
    make clean-hub
    ```
+
 5. To clean the spoke environment.
+
    ```shell
    kubectl config use-context {spoke-context} 
    make clean-spoke
-   ``` 
+   ```
 
 ### Deploy hub(Clustermanager) with Hosted mode
 
-1. Create 3 Kind clusters: management cluster, hub cluster and a managed cluster. 
+1. Create 3 Kind clusters: management cluster, hub cluster and a managed cluster.
 
    ```shell
    kind create cluster --name hub
@@ -108,17 +127,20 @@ We mainly provide deployment in two scenarios:
    kind create cluster --name managed
    ```
 
-2. Set the env variable `KUBECONFIG` to kubeconfig file path. 
+2. Set the env variable `KUBECONFIG` to kubeconfig file path.
+
    ```shell
    export KUBECONFIG=$HOME/.kube/config
    ```
 
 3. Get the `EXTERNAL_HUB_KUBECONFIG` kubeconfig.
+
    ```shell
    kind get kubeconfig --name kind-hub --internal > ./.external-hub-kubeconfig  
    ```
 
 4. Switch to management cluster and deploy hub components.
+
    ```shell
    kubectl config use-context {management-context}
    make deploy-hub-hosted
@@ -163,14 +185,18 @@ We mainly provide deployment in two scenarios:
 We support deploy the Klusterlet(registration-agent, work-agent) outside of managed cluster, called `Hosted` mode, and we define the cluster where the Klusterlet runs as management-cluster.
 
 1. Set env variables.
+
    ```shell
    export KUBECONFIG=$HOME/.kube/config
    ```
+
 2. Switch to hub context and deploy hub components.
-   ```
+
+   ```shell
    kubectl config use-context {hub-context}
    make deploy-hub
    ```
+
    **PLEASE NOTE**: If you're running kubernetes in docker, the `server` address in kubeconfig may not be accessible for other clusters. In this case, you need to set `HUB_KUBECONFIG` explicitly.
 
    For example, if your clusters are created by kind, you need to use kind's command to export a kubeconfig of hub with an accessible `server` address. ([The related issue](https://github.com/kubernetes-sigs/kind/issues/1305))
@@ -178,8 +204,10 @@ We support deploy the Klusterlet(registration-agent, work-agent) outside of mana
    ```shell
    kind get kubeconfig --name {kind-hub-cluster-name} --internal > ./.hub-kubeconfig # ./.hub-kubeconfig is default value of HUB_KUBECONFIG
    ```
+
 3. Switch to management context and deploy agent components on management cluster.
-    ```
+
+    ```shell
     kubectl config use-context {management-context}
     make deploy-spoke-hosted
     ```
@@ -191,12 +219,16 @@ We support deploy the Klusterlet(registration-agent, work-agent) outside of mana
    ```shell
    kind get kubeconfig --name {kind-managed-cluster-name} --internal > ./.external-managed-kubeconfig # ./.external-managed-kubeconfig is default value of EXTERNAL_MANAGED_KUBECONFIG, it is only useful in Hosted mode.
    ```
+
 4. To clean the hub environment.
+
    ```shell
    kubectl config use-context {hub-context}
    make clean-hub
    ```
+
 5. To clean the spoke environment.
+
    ```shell
    kubectl config use-context {management-context}
    make clean-spoke-hosted
@@ -207,12 +239,15 @@ After a successful deployment, a `certificatesigningrequest` and a `managedclust
 be created on the hub.
 
 Switch to hub context and deploy hub components.
-```
+
+```shell
 kubectl config use-context {hub-context}
 kubectl get csr
 ```
+
 Next approve the csr and set managedCluster to be accepted by hub with the following command
-```
+
+```shell
 kubectl certificate approve {csr name}
 kubectl patch managedcluster {cluster name} -p='{"spec":{"hubAcceptsClient":true}}' --type=merge
 kubectl get managedcluster

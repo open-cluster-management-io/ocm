@@ -3,12 +3,11 @@
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
 - [Contributing guidelines](#contributing-guidelines)
-    - [Contributions](#contributions)
-    - [Certificate of Origin](#certificate-of-origin)
-    - [Contributing A Patch](#contributing-a-patch)
-    - [Issue and Pull Request Management](#issue-and-pull-request-management)
-    - [Pre-check before submitting a PR](#pre-check-before-submitting-a-pr)
-    - [Build images](#build-images)
+  - [Contributions](#contributions)
+  - [Certificate of Origin](#certificate-of-origin)
+  - [Contributing A Patch](#contributing-a-patch)
+  - [Issue and Pull Request Management](#issue-and-pull-request-management)
+  - [Pre-check before submitting a PR](#pre-check-before-submitting-a-pr)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -46,18 +45,25 @@ Repo maintainers can assign you an issue or pull request by leaving a
 After your PR is ready to commit, please run following commands to check your code.
 
 - verify your code
+
   ```shell
   make verify
   ```
+
 - run the unit test
+
   ```shell
   make test
   ```
+
 - run the integration test
+
   ```shell
   make test-integration
   ```
+
 - run the end-to-end test, prepare a kind cluster and run the following command. Make sure [imagebuilder](https://github.com/openshift/imagebuilder) is installed.
+
   ```shell
   go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.1
   

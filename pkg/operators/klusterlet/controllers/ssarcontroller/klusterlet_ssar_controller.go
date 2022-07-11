@@ -420,6 +420,17 @@ func buildKubeClientWithSecret(secret *corev1.Secret) (kubernetes.Interface, str
 	restConfig.QPS = 2
 	restConfig.Burst = 5
 
+	// TODO(@Promacanthus): When server field is a domain name in kubeconfig, such as https://xxx.yyy.zzz, and there is no such hostname in the DNS,
+	// we need to set the hostAliases for the hub Api server in klusterlet cr and .pod.spec.hostAliases.
+	// The hostAlias configuration will be used by klusterlet operator, registration agent and work agent to communicate with hub api server.
+	// Setup this manually is not a good idea, so we can set a custom dialer in rest.Config and use the ip address to setup connection.
+	//
+	// For example:
+	//
+	// restConfig.Dial = func(_ context.Context, network, _ string) (net.Conn, error) {
+	// 	return net.Dial(network, "this is the hub api server ip address")
+	// }
+
 	client, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return nil, "", err

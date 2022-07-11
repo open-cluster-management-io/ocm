@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"reflect"
+
 	"github.com/openshift/api"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -40,7 +42,6 @@ import (
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
-	"reflect"
 )
 
 const (

@@ -100,6 +100,16 @@ func (HostedClusterManagerConfiguration) SwaggerDoc() map[string]string {
 	return map_HostedClusterManagerConfiguration
 }
 
+var map_HubApiServerHostAlias = map[string]string{
+	"":         "HubApiServerHostAlias holds the mapping between IP and hostname that will be injected as an entry in the pod's hosts file.",
+	"ip":       "IP address of the host file entry.",
+	"hostname": "Hostname for the above IP address.",
+}
+
+func (HubApiServerHostAlias) SwaggerDoc() map[string]string {
+	return map_HubApiServerHostAlias
+}
+
 var map_Klusterlet = map[string]string{
 	"":       "Klusterlet represents controllers to install the resources for a managed cluster. When configured, the Klusterlet requires a secret named bootstrap-hub-kubeconfig in the agent namespace to allow API requests to the hub for the registration protocol. In Hosted mode, the Klusterlet requires an additional secret named external-managed-kubeconfig in the agent namespace to allow API requests to the managed cluster for resources installation.",
 	"spec":   "Spec represents the desired deployment configuration of Klusterlet agent.",
@@ -139,6 +149,7 @@ var map_KlusterletSpec = map[string]string{
 	"nodePlacement":             "NodePlacement enables explicit control over the scheduling of the deployed pods.",
 	"deployOption":              "DeployOption contains the options of deploying a klusterlet",
 	"registrationConfiguration": "RegistrationConfiguration contains the configuration of registration",
+	"hubApiServerHostAlias":     "HubApiServerHostAlias contains the host alias for hub api server. registration-agent and work-agent will use it to communicate with hub api server.",
 }
 
 func (KlusterletSpec) SwaggerDoc() map[string]string {

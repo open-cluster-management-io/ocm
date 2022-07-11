@@ -114,7 +114,6 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			workManagedRoleName = fmt.Sprintf("open-cluster-management:%s-work:agent", klusterlet.Name)
 			registrationSAName = fmt.Sprintf("%s-registration-sa", klusterlet.Name)
 			workSAName = fmt.Sprintf("%s-work-sa", klusterlet.Name)
-
 		})
 
 		ginkgo.AfterEach(func() {
@@ -581,6 +580,47 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("Deployment should be added hostAliases when add hostAlias into klusterlet", func() {
+			var hubApiServerHostAliasIP = "11.22.33.44"
+			var hubApiServerHostAliasHostname = "open-cluster-management.io"
+
+			klusterlet.Spec.HubApiServerHostAlias = &operatorapiv1.HubApiServerHostAlias{
+				IP:       hubApiServerHostAliasIP,
+				Hostname: hubApiServerHostAliasHostname,
+			}
+
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// Check registration agent deployment
+			gomega.Eventually(func() bool {
+				actual, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+
+				gomega.Expect(len(actual.Spec.Template.Spec.HostAliases)).Should(gomega.Equal(1))
+				gomega.Expect(actual.Spec.Template.Spec.HostAliases[0].IP).Should(gomega.Equal(hubApiServerHostAliasIP))
+				gomega.Expect(len(actual.Spec.Template.Spec.HostAliases[0].Hostnames)).Should(gomega.Equal(1))
+				gomega.Expect(actual.Spec.Template.Spec.HostAliases[0].Hostnames[0]).Should(gomega.Equal(hubApiServerHostAliasHostname))
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Check work agent deployment
+			gomega.Eventually(func() bool {
+				actual, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+
+				gomega.Expect(len(actual.Spec.Template.Spec.HostAliases)).Should(gomega.Equal(1))
+				gomega.Expect(actual.Spec.Template.Spec.HostAliases[0].IP).Should(gomega.Equal(hubApiServerHostAliasIP))
+				gomega.Expect(len(actual.Spec.Template.Spec.HostAliases[0].Hostnames)).Should(gomega.Equal(1))
+				gomega.Expect(actual.Spec.Template.Spec.HostAliases[0].Hostnames[0]).Should(gomega.Equal(hubApiServerHostAliasHostname))
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 		})
 	})
 

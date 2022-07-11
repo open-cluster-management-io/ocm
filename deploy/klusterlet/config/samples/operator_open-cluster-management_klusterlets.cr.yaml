@@ -15,3 +15,10 @@ spec:
     featureGates:
     - feature: AddonManagement
       mode: Enable
+    # Uncomment the following configuration lines to add hostAliases for hub api server, 
+    # if the server field in your hub cluster kubeconfig is a domain name instead of an ipv4 address.
+    # For example, https://xxx.yyy.zzz.
+    # This configuration is used for registration-agent and work-agent to communicate with hub api server.
+    # hubApiServerHostAlias:
+    # ip: "1.2.3.4"
+    # hostname: "xxx.yyy.zzz"
