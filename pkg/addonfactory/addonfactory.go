@@ -45,6 +45,7 @@ func NewAgentAddonFactory(addonName string, fs embed.FS, dir string) *AgentAddon
 			AddonName:       addonName,
 			Registration:    nil,
 			InstallStrategy: nil,
+			HealthProber:    nil,
 		},
 		trimCRDDescription: false,
 	}
@@ -76,6 +77,12 @@ func (f *AgentAddonFactory) WithInstallStrategy(strategy *agent.InstallStrategy)
 // WithAgentRegistrationOption defines how agent is registered to the hub cluster.
 func (f *AgentAddonFactory) WithAgentRegistrationOption(option *agent.RegistrationOption) *AgentAddonFactory {
 	f.agentAddonOptions.Registration = option
+	return f
+}
+
+// WithAgentHealthProber defines how is the healthiness status of the ManagedClusterAddon probed.
+func (f *AgentAddonFactory) WithAgentHealthProber(prober *agent.HealthProber) *AgentAddonFactory {
+	f.agentAddonOptions.HealthProber = prober
 	return f
 }
 
