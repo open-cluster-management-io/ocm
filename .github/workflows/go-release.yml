@@ -54,7 +54,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
       - name: install imagebuilder
         run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.1
-       - name: pull base image
+      - name: pull base image
         run: docker pull registry.access.redhat.com/ubi8/ubi-minimal:latest --platform=linux/${{ matrix.arch }}
       - name: images
         run: |
