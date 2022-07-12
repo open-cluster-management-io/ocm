@@ -20,3 +20,9 @@ rules:
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterroles", "roles"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "escalate", "bind"]
+# Allow OCM addons to setup metrics collection with Prometheus
+# TODO: Move this permission to the open-cluster-management:{{ .KlusterletName }}-work:execution Role (not ClusterRole)
+# when it is created.
+- apiGroups: ["monitoring.coreos.com"]
+  resources: ["servicemonitors"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
