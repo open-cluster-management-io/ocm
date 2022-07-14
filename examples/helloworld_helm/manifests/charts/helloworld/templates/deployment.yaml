@@ -9,6 +9,7 @@ metadata:
     release: {{ .Release.Name }}
     clusterName: {{ .Values.clusterName }}
     addonInstallNamespace: {{ .Values.addonInstallNamespace }}
+  annotations:
     kubeVersion: {{ .Capabilities.KubeVersion }}
 spec:
   replicas: 1
