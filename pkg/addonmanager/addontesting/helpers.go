@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/events"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -47,6 +48,24 @@ func NewUnstructured(apiVersion, kind, namespace, name string) *unstructured.Uns
 	}
 }
 
+func NewHostingUnstructured(apiVersion, kind, namespace, name string) *unstructured.Unstructured {
+	u := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": apiVersion,
+			"kind":       kind,
+			"metadata": map[string]interface{}{
+				"namespace": namespace,
+				"name":      name,
+			},
+		},
+	}
+
+	u.SetLabels(map[string]string{
+		constants.HostedManifestLocationLabelKey: constants.HostedManifestLocationHostingLabelValue,
+	})
+	return u
+}
+
 func NewAddon(name, namespace string, owners ...metav1.OwnerReference) *addonapiv1alpha1.ManagedClusterAddOn {
 	return &addonapiv1alpha1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
@@ -55,6 +74,31 @@ func NewAddon(name, namespace string, owners ...metav1.OwnerReference) *addonapi
 			OwnerReferences: owners,
 		},
 	}
+}
+
+func NewHostedModeAddon(name, namespace string, hostingCluster string,
+	owners ...metav1.OwnerReference) *addonapiv1alpha1.ManagedClusterAddOn {
+	return &addonapiv1alpha1.ManagedClusterAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name,
+			Namespace:       namespace,
+			OwnerReferences: owners,
+			Annotations:     map[string]string{constants.HostingClusterNameAnnotationKey: hostingCluster},
+		},
+	}
+}
+
+func NewHostedModeAddonWithFinalizer(name, namespace string, hostingCluster string,
+	owners ...metav1.OwnerReference) *addonapiv1alpha1.ManagedClusterAddOn {
+	addon := NewHostedModeAddon(name, namespace, hostingCluster)
+	addon.SetFinalizers([]string{constants.HostingManifestFinalizer})
+	return addon
+}
+
+func SetAddonDeletionTimestamp(addon *addonapiv1alpha1.ManagedClusterAddOn,
+	deletionTimestamp time.Time) *addonapiv1alpha1.ManagedClusterAddOn {
+	addon.DeletionTimestamp = &metav1.Time{Time: deletionTimestamp}
+	return addon
 }
 
 func NewClusterManagementAddon(name, crd, cr string) *addonapiv1alpha1.ClusterManagementAddOn {

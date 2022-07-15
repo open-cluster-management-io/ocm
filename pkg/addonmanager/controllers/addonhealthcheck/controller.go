@@ -24,6 +24,7 @@ import (
 )
 
 // addonHealthCheckController reconciles instances of ManagedClusterAddon on the hub.
+// TODO: consider health check in Hosted mode.
 type addonHealthCheckController struct {
 	addonClient               addonv1alpha1client.Interface
 	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister

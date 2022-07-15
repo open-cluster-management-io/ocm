@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -225,6 +226,15 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 									String: &jobCompleteValue,
 								},
 							},
+						},
+					},
+					Conditions: []metav1.Condition{
+						{
+							Type:               "Available",
+							Status:             metav1.ConditionTrue,
+							Reason:             "MinimumReplicasAvailable",
+							Message:            "Deployment has minimum availability.",
+							LastTransitionTime: metav1.NewTime(time.Now()),
 						},
 					},
 				},

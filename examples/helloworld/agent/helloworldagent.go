@@ -44,10 +44,11 @@ func NewAgentCommand(addonName string) *cobra.Command {
 
 // AgentOptions defines the flags for workload agent
 type AgentOptions struct {
-	HubKubeconfigFile string
-	SpokeClusterName  string
-	AddonName         string
-	AddonNamespace    string
+	HubKubeconfigFile     string
+	ManagedKubeconfigFile string
+	SpokeClusterName      string
+	AddonName             string
+	AddonNamespace        string
 }
 
 // NewWorkloadAgentOptions returns the flags with default value set
@@ -58,17 +59,33 @@ func NewAgentOptions(addonName string) *AgentOptions {
 func (o *AgentOptions) AddFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
 	// This command only supports reading from config
-	flags.StringVar(&o.HubKubeconfigFile, "hub-kubeconfig", o.HubKubeconfigFile, "Location of kubeconfig file to connect to hub cluster.")
+	flags.StringVar(&o.HubKubeconfigFile, "hub-kubeconfig", o.HubKubeconfigFile,
+		"Location of kubeconfig file to connect to hub cluster.")
+	flags.StringVar(&o.ManagedKubeconfigFile, "managed-kubeconfig", o.ManagedKubeconfigFile,
+		"Location of kubeconfig file to connect to the managed cluster.")
 	flags.StringVar(&o.SpokeClusterName, "cluster-name", o.SpokeClusterName, "Name of spoke cluster.")
 	flags.StringVar(&o.AddonNamespace, "addon-namespace", o.AddonNamespace, "Installation namespace of addon.")
 }
 
 // RunAgent starts the controllers on agent to process work from hub.
 func (o *AgentOptions) RunAgent(ctx context.Context, kubeconfig *rest.Config) error {
-	// build kubeclient of managed cluster
-	spokeKubeClient, err := kubernetes.NewForConfig(kubeconfig)
+	// build managementKubeClient of the local cluster
+	managementKubeClient, err := kubernetes.NewForConfig(kubeconfig)
 	if err != nil {
 		return err
+	}
+
+	spokeKubeClient := managementKubeClient
+	if len(o.ManagedKubeconfigFile) != 0 {
+		managedRestConfig, err := clientcmd.BuildConfigFromFlags("", /* leave masterurl as empty */
+			o.ManagedKubeconfigFile)
+		if err != nil {
+			return err
+		}
+		spokeKubeClient, err = kubernetes.NewForConfig(managedRestConfig)
+		if err != nil {
+			return err
+		}
 	}
 
 	// build kubeinformerfactory of hub cluster
@@ -86,7 +103,7 @@ func (o *AgentOptions) RunAgent(ctx context.Context, kubeconfig *rest.Config) er
 	}
 	hubKubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(hubKubeClient, 10*time.Minute, informers.WithNamespace(o.SpokeClusterName))
 
-	// create an agent contoller
+	// create an agent controller
 	agent := newAgentController(
 		spokeKubeClient,
 		addonClient,
@@ -97,7 +114,7 @@ func (o *AgentOptions) RunAgent(ctx context.Context, kubeconfig *rest.Config) er
 	)
 	// create a lease updater
 	leaseUpdater := lease.NewLeaseUpdater(
-		spokeKubeClient,
+		managementKubeClient,
 		o.AddonName,
 		o.AddonNamespace,
 	)

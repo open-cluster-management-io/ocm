@@ -3,9 +3,11 @@ namespace: open-cluster-management
 resources:
 - resources/helloworld_clustermanagementaddon.yaml
 - resources/helloworld_helm_clustermanagementaddon.yaml
+- resources/helloworld_hosted_clustermanagementaddon.yaml
 - resources/clusterrole.yaml
 - resources/helloworld_controller.yaml
 - resources/helloworld_helm_controller.yaml
+- resources/helloworld_hosted_controller.yaml
 
 images:
 - name: example-addon-image

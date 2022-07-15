@@ -1,0 +1,8 @@
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ClusterManagementAddOn
+metadata:
+  name: helloworldhosted
+spec:
+  addOnMeta:
+    displayName: helloworldhosted
+    description: "helloworldhosted is an example addon created by go template, this addon supports deploying agent both in deault mode and hosted mode"

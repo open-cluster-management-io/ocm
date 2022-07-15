@@ -1,0 +1,8 @@
+# Make sure the AddonInstallNamespace exists on the cluster where the addon agent pod deploys
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .AddonInstallNamespace }}
+  labels:
+    addon.open-cluster-management.io/namespace: "true"
+    addon.open-cluster-management.io/hosted-manifest-location: hosting

@@ -5,8 +5,10 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakework "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -17,7 +19,14 @@ func TestApplyWork(t *testing.T) {
 	fakeWorkClient := fakework.NewSimpleClientset()
 	workInformerFactory := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
 
-	work, _, _ := buildManifestWorkFromObject("cluster1", "addon1", []runtime.Object{addontesting.NewUnstructured("batch/v1", "Job", "default", "test")})
+	managedClusterAddon := &addonapiv1alpha1.ManagedClusterAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test",
+			Name:      "addon1",
+		},
+	}
+	work, _, _ := newManagedManifestWorkBuilder(false).buildManifestWorkFromObject("cluster1", managedClusterAddon,
+		[]runtime.Object{addontesting.NewUnstructured("batch/v1", "Job", "default", "test")})
 
 	_, err := applyWork(context.TODO(), fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister(), cache, work)
 	if err != nil {
@@ -39,7 +48,8 @@ func TestApplyWork(t *testing.T) {
 	addontesting.AssertNoActions(t, fakeWorkClient.Actions())
 
 	// Update work spec to update it
-	newWork, _, _ := buildManifestWorkFromObject("cluster1", "addon1", []runtime.Object{addontesting.NewUnstructured("batch/v1", "Job", "default", "test")})
+	newWork, _, _ := newManagedManifestWorkBuilder(false).buildManifestWorkFromObject("cluster1", managedClusterAddon,
+		[]runtime.Object{addontesting.NewUnstructured("batch/v1", "Job", "default", "test")})
 	newWork.Spec.DeleteOption = &workapiv1.DeleteOption{PropagationPolicy: workapiv1.DeletePropagationPolicyTypeOrphan}
 	fakeWorkClient.ClearActions()
 	_, err = applyWork(context.TODO(), fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister(), cache, newWork)

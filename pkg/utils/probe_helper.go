@@ -73,7 +73,7 @@ func HealthCheck(identifier workapiv1.ResourceIdentifier, result workapiv1.Statu
 			return nil
 		}
 
-		return fmt.Errorf("readyReplica is %d for deployement %s/%s", *value.Value.Integer, identifier.Namespace, identifier.Name)
+		return fmt.Errorf("readyReplica is %d for deployment %s/%s", *value.Value.Integer, identifier.Namespace, identifier.Name)
 	}
 	return fmt.Errorf("readyReplica is not probed")
 }

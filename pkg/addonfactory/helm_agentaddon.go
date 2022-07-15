@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/klog/v2"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -18,9 +19,11 @@ import (
 // helmBuiltinValues includes the built-in values for helm agentAddon.
 // the values in helm chart should begin with a lowercase letter, so we need convert it to Values by JsonStructToValues.
 type helmBuiltinValues struct {
-	ClusterName           string `json:"clusterName"`
-	AddonInstallNamespace string `json:"addonInstallNamespace"`
-	HubKubeConfigSecret   string `json:"hubKubeConfigSecret,omitempty"`
+	ClusterName             string `json:"clusterName"`
+	AddonInstallNamespace   string `json:"addonInstallNamespace"`
+	HubKubeConfigSecret     string `json:"hubKubeConfigSecret,omitempty"`
+	ManagedKubeConfigSecret string `json:"managedKubeConfigSecret,omitempty"`
+	InstallMode             string `json:"installMode"`
 }
 
 type HelmAgentAddon struct {
@@ -155,6 +158,9 @@ func (a *HelmAgentAddon) getBuiltinValues(
 	if a.agentAddonOptions.Registration != nil {
 		builtinValues.HubKubeConfigSecret = fmt.Sprintf("%s-hub-kubeconfig", a.agentAddonOptions.AddonName)
 	}
+
+	builtinValues.ManagedKubeConfigSecret = fmt.Sprintf("%s-managed-kubeconfig", addon.Name)
+	builtinValues.InstallMode, _ = constants.GetHostedModeInfo(addon.GetAnnotations())
 
 	helmBuiltinValues, err := JsonStructToValues(builtinValues)
 	if err != nil {

@@ -38,6 +38,11 @@ type AgentAddonFactory struct {
 // NewAgentAddonFactory builds an addonAgentFactory instance with addon name and fs.
 // dir is the path prefix based on the fs path.
 func NewAgentAddonFactory(addonName string, fs embed.FS, dir string) *AgentAddonFactory {
+	s := runtime.NewScheme()
+	_ = scheme.AddToScheme(s)
+	_ = apiextensionsv1.AddToScheme(s)
+	_ = apiextensionsv1beta1.AddToScheme(s)
+
 	return &AgentAddonFactory{
 		fs:  fs,
 		dir: dir,
@@ -48,12 +53,16 @@ func NewAgentAddonFactory(addonName string, fs embed.FS, dir string) *AgentAddon
 			HealthProber:    nil,
 		},
 		trimCRDDescription: false,
+		scheme:             s,
 	}
 }
 
 // WithScheme is an optional configuration, only used when the agentAddon has customized resource types.
-func (f *AgentAddonFactory) WithScheme(scheme *runtime.Scheme) *AgentAddonFactory {
-	f.scheme = scheme
+func (f *AgentAddonFactory) WithScheme(s *runtime.Scheme) *AgentAddonFactory {
+	f.scheme = s
+	_ = scheme.AddToScheme(f.scheme)
+	_ = apiextensionsv1.AddToScheme(f.scheme)
+	_ = apiextensionsv1beta1.AddToScheme(f.scheme)
 	return f
 }
 
@@ -86,6 +95,12 @@ func (f *AgentAddonFactory) WithAgentHealthProber(prober *agent.HealthProber) *A
 	return f
 }
 
+// WithAgentHostedModeEnabledOption will enable the agent hosted deploying mode.
+func (f *AgentAddonFactory) WithAgentHostedModeEnabledOption() *AgentAddonFactory {
+	f.agentAddonOptions.HostedModeEnabled = true
+	return f
+}
+
 // WithTrimCRDDescription is to enable trim the description of CRDs in manifestWork.
 func (f *AgentAddonFactory) WithTrimCRDDescription() *AgentAddonFactory {
 	f.trimCRDDescription = true
@@ -94,13 +109,6 @@ func (f *AgentAddonFactory) WithTrimCRDDescription() *AgentAddonFactory {
 
 // BuildHelmAgentAddon builds a helm agentAddon instance.
 func (f *AgentAddonFactory) BuildHelmAgentAddon() (agent.AgentAddon, error) {
-	if f.scheme == nil {
-		f.scheme = runtime.NewScheme()
-	}
-	_ = scheme.AddToScheme(f.scheme)
-	_ = apiextensionsv1.AddToScheme(f.scheme)
-	_ = apiextensionsv1beta1.AddToScheme(f.scheme)
-
 	userChart, err := loadChart(f.fs, f.dir)
 	if err != nil {
 		return nil, err
@@ -122,13 +130,6 @@ func (f *AgentAddonFactory) BuildTemplateAgentAddon() (agent.AgentAddon, error) 
 	if len(templateFiles) == 0 {
 		return nil, fmt.Errorf("there is no template files")
 	}
-
-	if f.scheme == nil {
-		f.scheme = runtime.NewScheme()
-	}
-	_ = scheme.AddToScheme(f.scheme)
-	_ = apiextensionsv1.AddToScheme(f.scheme)
-	_ = apiextensionsv1beta1.AddToScheme(f.scheme)
 
 	agentAddon := newTemplateAgentAddon(f)
 

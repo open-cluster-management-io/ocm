@@ -21,7 +21,7 @@ const (
 	addonInstallNamespace   = "open-cluster-management-agent-addon"
 )
 
-var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
+var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 	var helloworldhelmAddon = addonapiv1alpha1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: helloWorldHelmAddonName,

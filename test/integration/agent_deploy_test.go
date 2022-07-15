@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -14,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -65,10 +67,11 @@ const (
 var _ = ginkgo.Describe("Agent deploy", func() {
 	var managedClusterName string
 	var err error
-
+	var manifestWorkName string
 	ginkgo.BeforeEach(func() {
 		suffix := rand.String(5)
 		managedClusterName = fmt.Sprintf("managedcluster-%s", suffix)
+		manifestWorkName = constants.DeployWorkName(testAddonImpl.name)
 
 		managedCluster := &clusterv1.ManagedCluster{
 			ObjectMeta: metav1.ObjectMeta{
@@ -114,7 +117,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), fmt.Sprintf("addon-%s-deploy", testAddonImpl.name), metav1.GetOptions{})
+			work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -130,7 +133,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		// Update work status to trigger addon status
-		work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), fmt.Sprintf("addon-%s-deploy", testAddonImpl.name), metav1.GetOptions{})
+		work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: "Applied", Status: metav1.ConditionTrue, Reason: "WorkApplied"})
 		_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
@@ -149,7 +152,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		// update work to available so addon becomes available
-		work, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), fmt.Sprintf("addon-%s-deploy", testAddonImpl.name), metav1.GetOptions{})
+		work, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "WorkAvailable"})
 		_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
@@ -187,7 +190,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), fmt.Sprintf("addon-%s-deploy", testAddonImpl.name), metav1.GetOptions{})
+			work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -207,7 +210,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		// Update work status to trigger addon status
-		work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), fmt.Sprintf("addon-%s-deploy", testAddonImpl.name), metav1.GetOptions{})
+		work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "WorkAvailable"})
 
@@ -235,6 +238,15 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 							},
 						},
 					},
+					Conditions: []metav1.Condition{
+						{
+							Type:               "Available",
+							Status:             metav1.ConditionTrue,
+							Reason:             "MinimumReplicasAvailable",
+							Message:            "Deployment has minimum availability.",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
 				},
 			},
 		}
@@ -254,7 +266,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		// update to the correct condition
-		work, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), fmt.Sprintf("addon-%s-deploy", testAddonImpl.name), metav1.GetOptions{})
+		work, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		work.Status.ResourceStatus = workapiv1.ManifestResourceStatus{
 			Manifests: []workapiv1.ManifestCondition{
@@ -275,6 +287,15 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 									Integer: &replica,
 								},
 							},
+						},
+					},
+					Conditions: []metav1.Condition{
+						{
+							Type:               "Available",
+							Status:             metav1.ConditionTrue,
+							Reason:             "MinimumReplicasAvailable",
+							Message:            "Deployment has minimum availability.",
+							LastTransitionTime: metav1.NewTime(time.Now()),
 						},
 					},
 				},

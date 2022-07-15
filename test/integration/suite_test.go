@@ -34,6 +34,7 @@ var hubClusterClient clusterv1client.Interface
 var hubAddonClient addonv1alpha1client.Interface
 var hubKubeClient kubernetes.Interface
 var testAddonImpl *testAddon
+var testHostedAddonImpl *testAddon
 var testInstallByLableAddonImpl *testAddon
 var cancel context.CancelFunc
 var mgrContext context.Context
@@ -75,6 +76,13 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		registrations: map[string][]addonapiv1alpha1.RegistrationConfig{},
 	}
 
+	testHostedAddonImpl = &testAddon{
+		name:              "test-hosted",
+		manifests:         map[string][]runtime.Object{},
+		registrations:     map[string][]addonapiv1alpha1.RegistrationConfig{},
+		hostedModeEnabled: true,
+	}
+
 	testInstallByLableAddonImpl = &testAddon{
 		name:          "test-install-all",
 		manifests:     map[string][]runtime.Object{},
@@ -99,6 +107,8 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		err = mgr.AddAgent(testInstallByLableAddonImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		err = mgr.AddAgent(testHostedAddonImpl)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		err = mgr.Start(mgrContext)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	}()
@@ -115,13 +125,14 @@ var _ = ginkgo.AfterSuite(func() {
 })
 
 type testAddon struct {
-	name            string
-	manifests       map[string][]runtime.Object
-	registrations   map[string][]addonapiv1alpha1.RegistrationConfig
-	approveCSR      bool
-	cert            []byte
-	prober          *agent.HealthProber
-	installStrategy *agent.InstallStrategy
+	name              string
+	manifests         map[string][]runtime.Object
+	registrations     map[string][]addonapiv1alpha1.RegistrationConfig
+	approveCSR        bool
+	cert              []byte
+	prober            *agent.HealthProber
+	installStrategy   *agent.InstallStrategy
+	hostedModeEnabled bool
 }
 
 func (t *testAddon) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
@@ -130,9 +141,10 @@ func (t *testAddon) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapi
 
 func (t *testAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 	option := agent.AgentAddonOptions{
-		AddonName:       t.name,
-		HealthProber:    t.prober,
-		InstallStrategy: t.installStrategy,
+		AddonName:         t.name,
+		HealthProber:      t.prober,
+		InstallStrategy:   t.installStrategy,
+		HostedModeEnabled: t.hostedModeEnabled,
 	}
 
 	if len(t.registrations) > 0 {

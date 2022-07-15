@@ -6,6 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/klog/v2"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/assets"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -15,9 +16,11 @@ import (
 // templateBuiltinValues includes the built-in values for template agentAddon.
 // the values for template config should begin with an uppercase letter, so we need convert it to Values by StructToValues.
 type templateBuiltinValues struct {
-	ClusterName           string
-	AddonInstallNamespace string
-	HubKubeConfigSecret   string
+	ClusterName             string
+	AddonInstallNamespace   string
+	HubKubeConfigSecret     string
+	ManagedKubeConfigSecret string
+	InstallMode             string
 }
 
 type templateFile struct {
@@ -116,6 +119,9 @@ func (a *TemplateAgentAddon) getBuiltinValues(
 		builtinValues.HubKubeConfigSecret = fmt.Sprintf("%s-hub-kubeconfig", a.agentAddonOptions.AddonName)
 	}
 
+	builtinValues.ManagedKubeConfigSecret = fmt.Sprintf("%s-managed-kubeconfig", addon.Name)
+	builtinValues.InstallMode, _ = constants.GetHostedModeInfo(addon.GetAnnotations())
+
 	return StructToValues(builtinValues)
 }
 
@@ -125,9 +131,19 @@ func (a *TemplateAgentAddon) validateTemplateData(file string, data []byte) erro
 	if err != nil {
 		return err
 	}
+
+	// There may be some manifests for hosting cluster only or for managed cluster only, so we ignore the missing kind
+	// error to bypass the empty file
 	raw := assets.MustCreateAssetFromTemplate(file, data, configValues).Data
 	_, _, err = a.decoder.Decode(raw, nil, nil)
-	return err
+	if err != nil {
+		if !runtime.IsMissingKind(err) {
+			return err
+		}
+		klog.V(4).Infof("Validate template %v missing kind, reason: %v", file, err)
+	}
+
+	return nil
 }
 
 func (a *TemplateAgentAddon) addTemplateData(file string, data []byte) {

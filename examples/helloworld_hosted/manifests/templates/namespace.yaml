@@ -1,0 +1,8 @@
+{{- if eq .InstallMode "Hosted" }}
+# The helloworld addon will copy the configmap to the managed cluster AddonInstallNamespace,
+# Make sure the namespace exists on the managed cluster
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .AddonInstallNamespace }}
+{{- end }}

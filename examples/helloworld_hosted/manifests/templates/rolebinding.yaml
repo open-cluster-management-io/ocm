@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: helloworldhosted-agent
+  namespace: {{ .AddonInstallNamespace }}
+  labels:
+    addon.open-cluster-management.io/hosted-manifest-location: hosting
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: helloworldhosted-agent
+subjects:
+  - kind: ServiceAccount
+    name: helloworldhosted-agent-sa
+    namespace: {{ .AddonInstallNamespace }}
