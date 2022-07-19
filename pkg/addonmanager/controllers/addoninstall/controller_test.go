@@ -41,11 +41,17 @@ func newManagedClusterWithLabel(name, key, value string) *clusterv1.ManagedClust
 	return cluster
 }
 
+func newManagedClusterWithAnnotation(name, key, value string) *clusterv1.ManagedCluster {
+	cluster := addontesting.NewManagedCluster(name)
+	cluster.Annotations = map[string]string{key: value}
+	return cluster
+}
+
 func TestReconcile(t *testing.T) {
 	cases := []struct {
 		name                 string
 		addon                []runtime.Object
-		testaddon            *testAgent
+		testaddons           map[string]agent.AgentAddon
 		cluster              []runtime.Object
 		validateAddonActions func(t *testing.T, actions []clienttesting.Action)
 	}{
@@ -54,7 +60,9 @@ func TestReconcile(t *testing.T) {
 			addon:                []runtime.Object{},
 			cluster:              []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			validateAddonActions: addontesting.AssertNoActions,
-			testaddon:            &testAgent{name: "test", strategy: nil},
+			testaddons: map[string]agent.AgentAddon{
+				"test": &testAgent{name: "test", strategy: nil},
+			},
 		},
 		{
 			name:    "all install strategy",
@@ -68,7 +76,9 @@ func TestReconcile(t *testing.T) {
 					t.Errorf("Install namespace is not correct, expected test but got %s", addOn.Spec.InstallNamespace)
 				}
 			},
-			testaddon: &testAgent{name: "test", strategy: agent.InstallAllStrategy("test")},
+			testaddons: map[string]agent.AgentAddon{
+				"test": &testAgent{name: "test", strategy: agent.InstallAllStrategy("test")},
+			},
 		},
 		{
 			name:    "install addon when cluster is deleting",
@@ -79,23 +89,20 @@ func TestReconcile(t *testing.T) {
 					t.Errorf("Should not install addon when controller is deleting")
 				}
 			},
-			testaddon: &testAgent{name: "test", strategy: agent.InstallAllStrategy("test")},
+			testaddons: map[string]agent.AgentAddon{
+				"test": &testAgent{name: "test", strategy: agent.InstallAllStrategy("test")},
+			},
 		},
 		{
 			name:                 "selector install strategy with unmatched cluster",
 			addon:                []runtime.Object{},
 			cluster:              []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			validateAddonActions: addontesting.AssertNoActions,
-			testaddon: &testAgent{name: "test", strategy: agent.InstallByLabelStrategy("test", metav1.LabelSelector{
-				MatchLabels: map[string]string{"mode": "dev"},
-			})},
-		},
-		{
-			name:                 "selector install strategy with nil label selector",
-			addon:                []runtime.Object{},
-			cluster:              []runtime.Object{addontesting.NewManagedCluster("cluster1")},
-			validateAddonActions: addontesting.AssertNoActions,
-			testaddon:            &testAgent{name: "test", strategy: &agent.InstallStrategy{Type: agent.InstallByLabel}},
+			testaddons: map[string]agent.AgentAddon{
+				"test": &testAgent{name: "test", strategy: agent.InstallByLabelStrategy("test", metav1.LabelSelector{
+					MatchLabels: map[string]string{"mode": "dev"},
+				})},
+			},
 		},
 		{
 			name:    "selector install strategy with matched cluster",
@@ -109,9 +116,62 @@ func TestReconcile(t *testing.T) {
 					t.Errorf("Install namespace is not correct, expected test but got %s", addOn.Spec.InstallNamespace)
 				}
 			},
-			testaddon: &testAgent{name: "test", strategy: agent.InstallByLabelStrategy("test", metav1.LabelSelector{
-				MatchLabels: map[string]string{"mode": "dev"},
-			})},
+			testaddons: map[string]agent.AgentAddon{
+				"test": &testAgent{name: "test", strategy: agent.InstallByLabelStrategy("test", metav1.LabelSelector{
+					MatchLabels: map[string]string{"mode": "dev"},
+				})},
+			},
+		},
+		{
+			name:    "multi addons on a cluster",
+			addon:   []runtime.Object{},
+			cluster: []runtime.Object{newManagedClusterWithLabel("cluster1", "mode", "dev")},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				// expect 2 create actions for each addons
+				addontesting.AssertActions(t, actions, "create", "create")
+
+				actual := actions[0].(clienttesting.CreateActionImpl).Object
+				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+				if addOn.Spec.InstallNamespace != "test1" {
+					t.Errorf("Install namespace is not correct, expected test but got %s", addOn.Spec.InstallNamespace)
+				}
+
+				actual2 := actions[1].(clienttesting.CreateActionImpl).Object
+				addOn2 := actual2.(*addonapiv1alpha1.ManagedClusterAddOn)
+				if addOn2.Spec.InstallNamespace != "test2" {
+					t.Errorf("Install namespace is not correct, expected test but got %s", addOn.Spec.InstallNamespace)
+				}
+			},
+			testaddons: map[string]agent.AgentAddon{
+				"test1": &testAgent{name: "test1", strategy: agent.InstallAllStrategy("test1")},
+				"test2": &testAgent{name: "test2", strategy: agent.InstallAllStrategy("test2")},
+			},
+		},
+		{
+			name:  "managed cluster filter install strategy",
+			addon: []runtime.Object{},
+			cluster: []runtime.Object{
+				newManagedClusterWithAnnotation("hosted-1", "mode", "hosted"),
+				newManagedClusterWithAnnotation("hosted-2", "mode", "hosted"),
+				addontesting.NewManagedCluster("default"),
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				// expect one create on trigger by cluster "default"
+				addontesting.AssertActions(t, actions, "create")
+				actual := actions[0].(clienttesting.CreateActionImpl).Object
+				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+				if addOn.Spec.InstallNamespace != "test" {
+					t.Errorf("Install namespace is not correct, expected test but got %s", addOn.Spec.InstallNamespace)
+				}
+			},
+			testaddons: map[string]agent.AgentAddon{
+				"test": &testAgent{name: "test", strategy: agent.InstallByFilterFunctionStrategy("test", func(cluster *clusterv1.ManagedCluster) bool {
+					if v, ok := cluster.Annotations["mode"]; ok && v == "hosted" {
+						return false
+					}
+					return true
+				})},
+			},
 		},
 	}
 
@@ -138,7 +198,7 @@ func TestReconcile(t *testing.T) {
 				addonClient:               fakeAddonClient,
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
 				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
+				agentAddons:               c.testaddons,
 			}
 
 			for _, obj := range c.cluster {
@@ -148,9 +208,8 @@ func TestReconcile(t *testing.T) {
 				if err != nil {
 					t.Errorf("expected no error when sync: %v", err)
 				}
-				c.validateAddonActions(t, fakeAddonClient.Actions())
 			}
-
+			c.validateAddonActions(t, fakeAddonClient.Actions())
 		})
 	}
 }

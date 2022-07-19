@@ -87,15 +87,11 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		name:          "test-install-all",
 		manifests:     map[string][]runtime.Object{},
 		registrations: map[string][]addonapiv1alpha1.RegistrationConfig{},
-		installStrategy: &agent.InstallStrategy{
-			Type:             agent.InstallByLabel,
-			InstallNamespace: "default",
-			LabelSelector: &v1.LabelSelector{
-				MatchLabels: map[string]string{
-					"test": "test",
-				},
+		installStrategy: agent.InstallByLabelStrategy("default", v1.LabelSelector{
+			MatchLabels: map[string]string{
+				"test": "test",
 			},
-		},
+		}),
 	}
 
 	mgrContext, cancel = context.WithCancel(context.TODO())

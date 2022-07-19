@@ -6,8 +6,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
@@ -81,36 +81,29 @@ func (c *addonInstallController) sync(ctx context.Context, syncCtx factory.SyncC
 		return nil
 	}
 
+	var errs []error
+
 	for addonName, addon := range c.agentAddons {
 		if addon.GetAgentAddonOptions().InstallStrategy == nil {
 			continue
 		}
 
-		switch addon.GetAgentAddonOptions().InstallStrategy.Type {
-		case agent.InstallAll:
-			return c.applyAddon(ctx, addonName, clusterName, addon.GetAgentAddonOptions().InstallStrategy.InstallNamespace)
-		case agent.InstallByLabel:
-			labelSelector := addon.GetAgentAddonOptions().InstallStrategy.LabelSelector
-			if labelSelector == nil {
-				klog.Warningf("installByLabel strategy is set, but label selector is not set")
-				return nil
-			}
+		managedClusterFilter := addon.GetAgentAddonOptions().InstallStrategy.GetManagedClusterFilter()
+		if managedClusterFilter == nil {
+			continue
+		}
+		if !managedClusterFilter(cluster) {
+			klog.Infof("managed cluster fileter is not match for addon %s on %s", addonName, clusterName)
+			continue
+		}
 
-			selector, err := metav1.LabelSelectorAsSelector(labelSelector)
-			if err != nil {
-				klog.Warningf("labels selector is not correct: %v", err)
-				return nil
-			}
-
-			if !selector.Matches(labels.Set(cluster.Labels)) {
-				return nil
-			}
-
-			return c.applyAddon(ctx, addonName, clusterName, addon.GetAgentAddonOptions().InstallStrategy.InstallNamespace)
+		err = c.applyAddon(ctx, addonName, clusterName, addon.GetAgentAddonOptions().InstallStrategy.InstallNamespace)
+		if err != nil {
+			errs = append(errs, err)
 		}
 	}
 
-	return nil
+	return errorsutil.NewAggregate(errs)
 }
 
 func (c *addonInstallController) applyAddon(ctx context.Context, addonName, clusterName, installNamespace string) error {
