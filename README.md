@@ -36,7 +36,7 @@ In addition, developers can leverage [Addon framework](https://github.com/open-c
 The application model defines a Kubernetes-first way of describing the application. Your existing Kubernetes apps or `kustomized` apps can be adapted with the addition of a few new objects: [Channel](https://github.com/open-cluster-management-io/multicloud-operators-channel), and [Subscription](https://github.com/open-cluster-management-io/multicloud-operators-subscription). Changes made to the app are then easily delivered to managed clusters based on the dynamic placement engine. See [deploy a helm chart](solutions/deploy-a-helm-chart) on how
 to install application manager addon in OCM and deploy helm charts in multiple clusters.
 
-### GRC: Governance, Risk and Compliance across Kubernetes clusters
+### Governance across Kubernetes clusters
 
 * Use prebuilt security and configuration controllers to enforce policies on Kubernetes configuration across your clusters.
 
