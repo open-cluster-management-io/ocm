@@ -2,6 +2,7 @@ package addoninstall
 
 import (
 	"context"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -9,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -78,6 +80,14 @@ func (c *addonInstallController) sync(ctx context.Context, syncCtx factory.SyncC
 	// if cluster is deleting, do not install addon
 	if !cluster.DeletionTimestamp.IsZero() {
 		klog.V(4).Infof("Cluster %q is deleting, skip addon deploy", clusterName)
+		return nil
+	}
+
+	if value, ok := cluster.Annotations[constants.DisableAddonAutomaticInstallationAnnotationKey]; ok &&
+		strings.EqualFold(value, "true") {
+
+		klog.V(4).Infof("Cluster %q has annotation %q, skip addon deploy",
+			clusterName, constants.DisableAddonAutomaticInstallationAnnotationKey)
 		return nil
 	}
 

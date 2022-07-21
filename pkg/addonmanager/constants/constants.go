@@ -76,6 +76,10 @@ const (
 	// HostingClusterValidityReasonInvalid is the reason of condition HostingClusterValidity indicating the hosting
 	// cluster is invalid
 	HostingClusterValidityReasonInvalid = "HostingClusterInvalid"
+
+	// DisableAddonAutomaticInstallationAnnotationKey is the annotation key for disabling the functionality of
+	// installing addon automatically
+	DisableAddonAutomaticInstallationAnnotationKey = "addon.open-cluster-management.io/disable-automatic-installation"
 )
 
 // DeployWorkName return the name of work for the addon

@@ -153,6 +153,12 @@ func DeleteManagedCluster(c *clusterv1.ManagedCluster) *clusterv1.ManagedCluster
 	return c
 }
 
+func SetManagedClusterAnnotation(c *clusterv1.ManagedCluster,
+	annotations map[string]string) *clusterv1.ManagedCluster {
+	c.Annotations = annotations
+	return c
+}
+
 func NewCSR(addon, cluster string) *certv1.CertificateSigningRequest {
 	return &certv1.CertificateSigningRequest{
 		ObjectMeta: metav1.ObjectMeta{
