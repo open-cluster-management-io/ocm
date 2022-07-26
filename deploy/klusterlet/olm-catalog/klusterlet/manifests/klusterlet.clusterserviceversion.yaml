@@ -21,6 +21,14 @@ metadata:
               }
             ],
             "namespace": "open-cluster-management-agent",
+            "registrationConfiguration": {
+              "featureGates": [
+                {
+                  "feature": "AddonManagement",
+                  "mode": "Enable"
+                }
+              ]
+            },
             "registrationImagePullSpec": "quay.io/open-cluster-management/registration",
             "workImagePullSpec": "quay.io/open-cluster-management/work"
           }
@@ -36,7 +44,7 @@ metadata:
     operators.operatorframework.io/project_layout: go
     repository: https://github.com/open-cluster-management-io/registration-operator
     support: Red Hat, Inc.
-  name: klusterlet.v0.8.0
+  name: klusterlet.v0.9.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -314,8 +322,8 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc.
-  replaces: klusterlet.v0.7.0
+  replaces: klusterlet.v0.8.0
   selector:
     matchLabels:
       app: klusterlet
-  version: 0.8.0
+  version: 0.9.0

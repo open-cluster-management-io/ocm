@@ -47,7 +47,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 	ginkgo.BeforeEach(func() {
 		var ctx context.Context
 
-		klusterletNamespace = fmt.Sprintf("open-cluster-manager-%s", rand.String(6))
+		klusterletNamespace = fmt.Sprintf("open-cluster-management-%s", rand.String(6))
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: klusterletNamespace,

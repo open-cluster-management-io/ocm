@@ -55,5 +55,6 @@ var DefaultSpokeRegistrationFeatureGates = map[featuregate.Feature]featuregate.F
 // feature keys for registration hub controller.  To add a new feature, define a key for it above and
 // add it here.
 var DefaultHubRegistrationFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	DefaultClusterSet: {Default: false, PreRelease: featuregate.Alpha},
+	DefaultClusterSet:          {Default: false, PreRelease: featuregate.Alpha},
+	V1beta1CSRAPICompatibility: {Default: false, PreRelease: featuregate.Alpha},
 }

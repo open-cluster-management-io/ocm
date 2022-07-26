@@ -15,6 +15,14 @@ metadata:
               "mode": "Default"
             },
             "placementImagePullSpec": "quay.io/open-cluster-management/placement",
+            "registrationConfiguration": {
+              "featureGates": [
+                {
+                  "feature": "DefaultClusterSet",
+                  "mode": "Enable"
+                }
+              ]
+            },
             "registrationImagePullSpec": "quay.io/open-cluster-management/registration",
             "workImagePullSpec": "quay.io/open-cluster-management/work"
           }
@@ -49,13 +57,13 @@ metadata:
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
     containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2022-03-28T20:00:31Z"
+    createdAt: "2022-07-25T20:00:31Z"
     description: Manages the installation and upgrade of the ClusterManager.
     operators.operatorframework.io/builder: operator-sdk-v1.1.0
     operators.operatorframework.io/project_layout: go
     repository: https://github.com/open-cluster-management-io/registration-operator
     support: Red Hat, Inc.
-  name: cluster-manager.v0.8.0
+  name: cluster-manager.v0.9.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -355,8 +363,8 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc.
-  replaces: cluster-manager.v0.7.0
+  replaces: cluster-manager.v0.8.0
   selector:
     matchLabels:
       app: cluster-manager
-  version: 0.8.0
+  version: 0.9.0

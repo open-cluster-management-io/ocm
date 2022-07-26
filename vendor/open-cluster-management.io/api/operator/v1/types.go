@@ -294,6 +294,8 @@ type KlusterletSpec struct {
 	// necessary resources, like service accounts, roles and rolebindings, while the agent
 	// is deployed to the namespace with the same name as klusterlet on the management cluster.
 	// +optional
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern=^open-cluster-management-[-a-z0-9]*[a-z0-9]$
 	Namespace string `json:"namespace,omitempty"`
 
 	// RegistrationImagePullSpec represents the desired image configuration of registration agent.

@@ -21,7 +21,7 @@ var _ = Describe("Create klusterlet CR", func() {
 	BeforeEach(func() {
 		klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
 		clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
-		klusterletNamespace = fmt.Sprintf("e2e-agent-%s", rand.String(6))
+		klusterletNamespace = fmt.Sprintf("open-cluster-management-agent-%s", rand.String(6))
 	})
 
 	AfterEach(func() {

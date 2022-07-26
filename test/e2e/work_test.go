@@ -20,7 +20,7 @@ var _ = Describe("Create klusterlet and then create a configmap by manifestwork"
 	BeforeEach(func() {
 		klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
 		clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
-		agentNamespace = fmt.Sprintf("e2e-agent-%s", rand.String(6))
+		agentNamespace = fmt.Sprintf("open-cluster-management-agent-%s", rand.String(6))
 		workName = fmt.Sprintf("e2e-work-configmap-%s", rand.String(6))
 		configMapName = fmt.Sprintf("e2e-configmap-%s", rand.String(6))
 	})

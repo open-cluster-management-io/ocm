@@ -16,7 +16,7 @@ var _ = Describe("Manage the managed cluster addons", func() {
 	BeforeEach(func() {
 		klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
 		clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
-		agentNamespace = fmt.Sprintf("e2e-agent-%s", rand.String(6))
+		agentNamespace = fmt.Sprintf("open-cluster-management-agent-%s", rand.String(6))
 		addOnName = fmt.Sprintf("e2e-addon-%s", rand.String(6))
 	})
 	AfterEach(func() {
