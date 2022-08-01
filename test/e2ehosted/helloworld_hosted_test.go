@@ -151,6 +151,19 @@ var _ = ginkgo.Describe("install/uninstall helloworld hosted addons in Hosted mo
 			context.Background(), helloWorldHostedAddonName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+		// delete addon CR, the pre-delete job should clean up the configmap.
+		gomega.Eventually(func() error {
+			_, err := hostedManagedKubeClient.CoreV1().ConfigMaps(addonAgentNamespace).Get(
+				context.Background(), configmap.Name, metav1.GetOptions{})
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				return err
+			}
+
+			return fmt.Errorf("the configmap should be deleted")
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 		gomega.Eventually(func() bool {
 			_, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(hostedManagedClusterName).Get(
 				context.Background(), helloWorldHostedAddonName, metav1.GetOptions{})

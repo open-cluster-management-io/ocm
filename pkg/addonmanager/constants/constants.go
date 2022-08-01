@@ -17,6 +17,9 @@ const (
 	// PreDeleteHookFinalizer is the finalizer for an addon which has deployed hook objects
 	PreDeleteHookFinalizer = "cluster.open-cluster-management.io/addon-pre-delete"
 
+	// HostingPreDeleteHookFinalizer is the finalizer for an addon which has deployed hook objects on hosting cluster
+	HostingPreDeleteHookFinalizer = "cluster.open-cluster-management.io/hosting-addon-pre-delete"
+
 	// AddonManifestApplied is a condition type representing whether the manifest of an addon
 	// is applied correctly.
 	AddonManifestApplied = "ManifestApplied"
@@ -90,6 +93,16 @@ func DeployWorkName(addonName string) string {
 // DeployHostingWorkName return the name of manifest work on hosting cluster for the addon
 func DeployHostingWorkName(addonNamespace, addonName string) string {
 	return fmt.Sprintf("%s-hosting-%s", DeployWorkName(addonName), addonNamespace)
+}
+
+// PreDeleteHookWorkName return the name of pre-delete work for the addon
+func PreDeleteHookWorkName(addonName string) string {
+	return fmt.Sprintf("addon-%s-pre-delete", addonName)
+}
+
+// PreDeleteHookHostingWorkName return the name of pre-delete work on hosting cluster for the addon
+func PreDeleteHookHostingWorkName(addonNamespace, addonName string) string {
+	return fmt.Sprintf("%s-hosting-%s", PreDeleteHookWorkName(addonName), addonNamespace)
 }
 
 // GetHostedModeInfo returns addon installation mode and hosting cluster name.

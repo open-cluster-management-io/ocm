@@ -123,22 +123,6 @@ func (a *addonManager) Start(ctx context.Context) error {
 		workInformers.Work().V1().ManifestWorks(),
 		a.addonAgents,
 	)
-	hookDeployController := agentdeploy.NewAddonHookDeployController(
-		workClient,
-		addonClient,
-		clusterInformers.Cluster().V1().ManagedClusters(),
-		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
-		workInformers.Work().V1().ManifestWorks(),
-		a.addonAgents,
-	)
-	hostingDeployController := agentdeploy.NewAddonHostingDeployController(
-		workClient,
-		addonClient,
-		clusterInformers.Cluster().V1().ManagedClusters(),
-		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
-		workInformers.Work().V1().ManifestWorks(),
-		a.addonAgents,
-	)
 
 	registrationController := registration.NewAddonConfigurationController(
 		addonClient,
@@ -208,8 +192,6 @@ func (a *addonManager) Start(ctx context.Context) error {
 	go kubeInfomers.Start(ctx.Done())
 
 	go deployController.Run(ctx, 1)
-	go hookDeployController.Run(ctx, 1)
-	go hostingDeployController.Run(ctx, 1)
 	go registrationController.Run(ctx, 1)
 	go clusterManagementController.Run(ctx, 1)
 	go addonInstallController.Run(ctx, 1)

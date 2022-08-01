@@ -7,6 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/examples/cmdfactory"
 	"open-cluster-management.io/addon-framework/pkg/version"
@@ -26,8 +27,9 @@ func NewAgentCommand(addonName string) *cobra.Command {
 
 // AgentOptions defines the flags for workload agent
 type AgentOptions struct {
-	AddonName      string
-	AddonNamespace string
+	AddonName             string
+	AddonNamespace        string
+	ManagedKubeconfigFile string
 }
 
 func NewAgentOptions(addonName string) *AgentOptions {
@@ -37,6 +39,8 @@ func NewAgentOptions(addonName string) *AgentOptions {
 func (o *AgentOptions) AddFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
 	flags.StringVar(&o.AddonNamespace, "addon-namespace", o.AddonNamespace, "Installation namespace of addon.")
+	flags.StringVar(&o.ManagedKubeconfigFile, "managed-kubeconfig", o.ManagedKubeconfigFile,
+		"Location of kubeconfig file to connect to the managed cluster.")
 }
 
 func (o *AgentOptions) RunAgent(ctx context.Context, kubeConfig *rest.Config) error {
@@ -44,6 +48,17 @@ func (o *AgentOptions) RunAgent(ctx context.Context, kubeConfig *rest.Config) er
 	spokeKubeClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
+	}
+	if len(o.ManagedKubeconfigFile) != 0 {
+		managedRestConfig, err := clientcmd.BuildConfigFromFlags("", /* leave masterurl as empty */
+			o.ManagedKubeconfigFile)
+		if err != nil {
+			return err
+		}
+		spokeKubeClient, err = kubernetes.NewForConfig(managedRestConfig)
+		if err != nil {
+			return err
+		}
 	}
 
 	configMapList, err := spokeKubeClient.CoreV1().ConfigMaps(o.AddonNamespace).List(ctx, metav1.ListOptions{LabelSelector: "synced-from-hub="})

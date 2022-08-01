@@ -146,16 +146,21 @@ func TestReconcile(t *testing.T) {
 				// expect 2 create actions for each addons
 				addontesting.AssertActions(t, actions, "create", "create")
 
-				actual := actions[0].(clienttesting.CreateActionImpl).Object
-				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
-				if addOn.Spec.InstallNamespace != "test1" {
-					t.Errorf("Install namespace is not correct, expected test but got %s", addOn.Spec.InstallNamespace)
-				}
-
-				actual2 := actions[1].(clienttesting.CreateActionImpl).Object
-				addOn2 := actual2.(*addonapiv1alpha1.ManagedClusterAddOn)
-				if addOn2.Spec.InstallNamespace != "test2" {
-					t.Errorf("Install namespace is not correct, expected test but got %s", addOn.Spec.InstallNamespace)
+				for i := 0; i < 2; i++ {
+					actual := actions[i].(clienttesting.CreateActionImpl).Object
+					addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+					switch addOn.Name {
+					case "test1":
+						if addOn.Spec.InstallNamespace != "test1" {
+							t.Errorf("Install namespace is not correct, expected test1 but got %s", addOn.Spec.InstallNamespace)
+						}
+					case "test2":
+						if addOn.Spec.InstallNamespace != "test2" {
+							t.Errorf("Install namespace is not correct, expected test2 but got %s", addOn.Spec.InstallNamespace)
+						}
+					default:
+						t.Errorf("invalid addon %v", addOn.Name)
+					}
 				}
 			},
 			testaddons: map[string]agent.AgentAddon{

@@ -21,12 +21,8 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
-func preDeleteHookWorkName(addonName string) string {
-	return fmt.Sprintf("addon-%s-pre-delete", addonName)
-}
-
-func hasFinalizer(existingFinalizers []string, finalizer string) bool {
-	for _, f := range existingFinalizers {
+func addonHasFinalizer(addon *addonapiv1alpha1.ManagedClusterAddOn, finalizer string) bool {
+	for _, f := range addon.Finalizers {
 		if f == finalizer {
 			return true
 		}
@@ -34,21 +30,36 @@ func hasFinalizer(existingFinalizers []string, finalizer string) bool {
 	return false
 }
 
-func removeFinalizer(existingFinalizers []string, finalizer string) []string {
+func addonRemoveFinalizer(addon *addonapiv1alpha1.ManagedClusterAddOn, finalizer string) bool {
 	var rst []string
-	for _, f := range existingFinalizers {
+	for _, f := range addon.Finalizers {
 		if f != finalizer {
 			rst = append(rst, f)
 		}
 	}
-	return rst
+	if len(rst) != len(addon.Finalizers) {
+		addon.SetFinalizers(rst)
+		return true
+	}
+	return false
 }
 
-func addFinalizer(existingFinalizers []string, finalizer string) []string {
-	if existingFinalizers != nil {
-		return append(existingFinalizers, finalizer)
+func addonAddFinalizer(addon *addonapiv1alpha1.ManagedClusterAddOn, finalizer string) bool {
+	rst := addon.Finalizers
+	if rst == nil {
+		addon.SetFinalizers([]string{finalizer})
+		return true
 	}
-	return []string{finalizer}
+
+	for _, f := range addon.Finalizers {
+		if f == finalizer {
+			return false
+		}
+	}
+
+	rst = append(rst, finalizer)
+	addon.SetFinalizers(rst)
+	return true
 }
 
 func manifestsEqual(new, old []workapiv1.Manifest) bool {
@@ -205,7 +216,7 @@ func (m *hostingManifest) manifestWorkName(addonNamespace, addonName string) str
 }
 
 func (m *hostingManifest) preDeleteHookManifestWorkName(addonNamespace, addonName string) string {
-	return fmt.Sprintf("%s-hosting-%s", preDeleteHookWorkName(addonName), addonNamespace)
+	return constants.PreDeleteHookHostingWorkName(addonNamespace, addonName)
 }
 
 // managedManifest process manifests which will be deployed on the managed cluster
@@ -246,7 +257,7 @@ func (m *managedManifest) manifestWorkName(addonNamespace, addonName string) str
 }
 
 func (m *managedManifest) preDeleteHookManifestWorkName(addonNamespace, addonName string) string {
-	return preDeleteHookWorkName(addonName)
+	return constants.PreDeleteHookWorkName(addonName)
 }
 
 // buildManifestWorkFromObject returns the deploy manifestwork and preDelete manifestwork, if there is no manifest need
@@ -398,4 +409,54 @@ func FindManifestValue(
 		}
 	}
 	return workapiv1.FieldValue{}
+}
+
+// hookWorkIsCompleted checks the hook resources are completed.
+// hookManifestWork is completed if all resources are completed.
+// currently, we only support job and pod as hook manifest.
+// job is completed if the Completed condition of status is true.
+// pod is completed if the phase of status is Succeeded.
+func hookWorkIsCompleted(hookWork *workapiv1.ManifestWork) bool {
+	if hookWork == nil {
+		return false
+	}
+	if !meta.IsStatusConditionTrue(hookWork.Status.Conditions, workapiv1.WorkAvailable) {
+		return false
+	}
+
+	if len(hookWork.Spec.ManifestConfigs) == 0 {
+		klog.Errorf("the hook manifestWork should have manifest configs,but got 0.")
+		return false
+	}
+	for _, manifestConfig := range hookWork.Spec.ManifestConfigs {
+		switch manifestConfig.ResourceIdentifier.Resource {
+		case "jobs":
+			value := FindManifestValue(hookWork.Status.ResourceStatus, manifestConfig.ResourceIdentifier, "JobComplete")
+			if value.Type == "" {
+				return false
+			}
+			if value.String == nil {
+				return false
+			}
+			if *value.String != "True" {
+				return false
+			}
+
+		case "pods":
+			value := FindManifestValue(hookWork.Status.ResourceStatus, manifestConfig.ResourceIdentifier, "PodPhase")
+			if value.Type == "" {
+				return false
+			}
+			if value.String == nil {
+				return false
+			}
+			if *value.String != "Succeeded" {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+
+	return true
 }

@@ -3,13 +3,11 @@ package agentdeploy
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/utils/pointer"
@@ -26,22 +24,10 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
-func newHookJob(name, namespace string) *unstructured.Unstructured {
-	job := addontesting.NewUnstructured("batch/v1", "Job", namespace, name)
-	job.SetLabels(map[string]string{constants.PreDeleteHookLabel: ""})
-	return job
-}
-
-func newDeletingAddon(name, namespace string, finalizers ...string) *addonapiv1alpha1.ManagedClusterAddOn {
-	addon := addontesting.NewAddon(name, namespace)
-	addon.SetFinalizers(finalizers)
-	addon.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-	return addon
-}
-
-func TestHookWorkReconcile(t *testing.T) {
+func TestDefaultHookReconcile(t *testing.T) {
 	cases := []struct {
 		name                 string
+		key                  string
 		existingWork         []runtime.Object
 		addon                []runtime.Object
 		testaddon            *testAgent
@@ -50,53 +36,33 @@ func TestHookWorkReconcile(t *testing.T) {
 		validateWorkActions  func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
-			name:                 "no cluster",
-			addon:                []runtime.Object{addontesting.NewAddon("test", "cluster1")},
-			cluster:              []runtime.Object{},
-			existingWork:         []runtime.Object{},
-			validateAddonActions: addontesting.AssertNoActions,
-			validateWorkActions:  addontesting.AssertNoActions,
-			testaddon: &testAgent{name: "test", objects: []runtime.Object{
-				addontesting.NewUnstructured("batch/v1", "Job", "default", "test"),
-			}},
-		},
-		{
-			name:                 "no addon",
-			cluster:              []runtime.Object{addontesting.NewManagedCluster("cluster1")},
-			existingWork:         []runtime.Object{},
-			validateAddonActions: addontesting.AssertNoActions,
-			validateWorkActions:  addontesting.AssertNoActions,
-			testaddon: &testAgent{name: "test", objects: []runtime.Object{
-				addontesting.NewUnstructured("batch/v1", "Job", "default", "test"),
-			}},
-		},
-		{
-			name:    "deploy manifests without hook for an addon",
+			name:    "deploy hook manifest for a created addon, add finalizer",
+			key:     "cluster1/test",
 			addon:   []runtime.Object{addontesting.NewAddon("test", "cluster1")},
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			testaddon: &testAgent{name: "test", objects: []runtime.Object{
-				addontesting.NewUnstructured("batch/v1", "Job", "default", "test"),
-			}},
-			validateAddonActions: addontesting.AssertNoActions,
-			validateWorkActions:  addontesting.AssertNoActions,
-		},
-		{
-			name:                "deploy hook manifest for a created addon",
-			addon:               []runtime.Object{addontesting.NewAddon("test", "cluster1")},
-			cluster:             []runtime.Object{addontesting.NewManagedCluster("cluster1")},
-			testaddon:           &testAgent{name: "test", objects: []runtime.Object{newHookJob("default", "test")}},
-			validateWorkActions: addontesting.AssertNoActions,
+				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+				addontesting.NewHookJob("default", "test")}},
+			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "create")
+				actual := actions[0].(clienttesting.CreateActionImpl).Object
+				deployWork := actual.(*workapiv1.ManifestWork)
+				if deployWork.Namespace != "cluster1" || deployWork.Name != constants.DeployWorkName("test") {
+					t.Errorf("the deployWork %v/%v is incorrect.", deployWork.Namespace, deployWork.Name)
+				}
+			},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
 				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
-				if !hasFinalizer(addOn.Finalizers, constants.PreDeleteHookFinalizer) {
+				if !addonHasFinalizer(addOn, constants.PreDeleteHookFinalizer) {
 					t.Errorf("the preDeleteHookFinalizer should be added.")
 				}
 			},
 		},
 		{
-			name: "deploy hook manifest for a deleting addon, not completed",
+			name: "deploy hook manifest for a deleting addon with finalizer, not completed",
+			key:  "cluster1/test",
 			addon: []runtime.Object{
 				func() runtime.Object {
 					addon := addontesting.NewAddon("test", "cluster1")
@@ -105,10 +71,18 @@ func TestHookWorkReconcile(t *testing.T) {
 					return addon
 				}(),
 			},
-			cluster:   []runtime.Object{addontesting.NewManagedCluster("cluster1")},
-			testaddon: &testAgent{name: "test", objects: []runtime.Object{newHookJob("default", "test")}},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+				addontesting.NewHookJob("default", "test")}},
+			existingWork: []runtime.Object{addontesting.NewUnstructured("v1", "ConfigMap", "default", "test")},
 			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "create")
+				actual := actions[0].(clienttesting.CreateActionImpl).Object
+				hookWork := actual.(*workapiv1.ManifestWork)
+				if hookWork.Namespace != "cluster1" || hookWork.Name != constants.PreDeleteHookWorkName("test") {
+					t.Errorf("the hookWork %v/%v is not the hook job.", hookWork.Namespace, hookWork.Name)
+				}
 			},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
@@ -124,16 +98,24 @@ func TestHookWorkReconcile(t *testing.T) {
 			},
 		},
 		{
-			name:      "deploy hook manifest for a deleting addon, has finalizer completed",
-			addon:     []runtime.Object{newDeletingAddon("test", "cluster1", constants.PreDeleteHookFinalizer)},
-			cluster:   []runtime.Object{addontesting.NewManagedCluster("cluster1")},
-			testaddon: &testAgent{name: "test", objects: []runtime.Object{newHookJob("test", "default")}},
+			name: "deploy hook manifest for a deleting addon with finalizer, completed",
+			key:  "cluster1/test",
+			addon: []runtime.Object{
+				addontesting.SetAddonFinalizers(
+					addontesting.SetAddonDeletionTimestamp(addontesting.NewAddon("test", "cluster1"), time.Now()),
+					constants.PreDeleteHookFinalizer),
+			},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+				addontesting.NewHookJob("test", "default")}},
 			existingWork: []runtime.Object{
+				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
 				func() *workapiv1.ManifestWork {
 					work := addontesting.NewManifestWork(
-						preDeleteHookWorkName("test"),
+						constants.PreDeleteHookWorkName("test"),
 						"cluster1",
-						newHookJob("test", "default"),
+						addontesting.NewHookJob("test", "default"),
 					)
 					work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 						{
@@ -189,25 +171,31 @@ func TestHookWorkReconcile(t *testing.T) {
 			},
 			validateWorkActions: addontesting.AssertNoActions,
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				// delete finalizer, patch completed condition.
 				addontesting.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
 				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
-				if hasFinalizer(addOn.Finalizers, constants.PreDeleteHookFinalizer) {
-					t.Errorf("expected no pre delete hoook finalizer.")
+				if addonHasFinalizer(addOn, constants.PreDeleteHookFinalizer) {
+					t.Errorf("expected no pre delete hook finalizer on managedCluster.")
 				}
 			},
 		},
 		{
-			name:      "deploy hook manifest for a deleting addon, no finalizer, completed",
-			addon:     []runtime.Object{newDeletingAddon("test", "cluster1")},
-			cluster:   []runtime.Object{addontesting.NewManagedCluster("cluster1")},
-			testaddon: &testAgent{name: "test", objects: []runtime.Object{newHookJob("test", "default")}},
+			name: "deploy hook manifest for a deleting addon without finalizer, completed",
+			key:  "cluster1/test",
+			addon: []runtime.Object{
+				addontesting.SetAddonDeletionTimestamp(addontesting.NewAddon("test", "cluster1"), time.Now())},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+				addontesting.NewHookJob("test", "default")}},
 			existingWork: []runtime.Object{
+				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
 				func() *workapiv1.ManifestWork {
 					work := addontesting.NewManifestWork(
-						preDeleteHookWorkName("test"),
+						constants.PreDeleteHookWorkName("test"),
 						"cluster1",
-						newHookJob("test", "default"),
+						addontesting.NewHookJob("test", "default"),
 					)
 					work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 						{
@@ -263,16 +251,8 @@ func TestHookWorkReconcile(t *testing.T) {
 			},
 			validateWorkActions: addontesting.AssertNoActions,
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch")
-				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
-				err := json.Unmarshal(patch, addOn)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if !meta.IsStatusConditionTrue(addOn.Status.Conditions, constants.AddonHookManifestCompleted) {
-					t.Errorf("HookManifestCompleted condition should be true,but got false.")
-				}
+				// add finalizer
+				addontesting.AssertActions(t, actions, "update")
 			},
 		},
 	}
@@ -303,7 +283,7 @@ func TestHookWorkReconcile(t *testing.T) {
 				}
 			}
 
-			controller := addonHookDeployController{
+			controller := addonDeployController{
 				workClient:                fakeWorkClient,
 				addonClient:               fakeAddonClient,
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
@@ -313,17 +293,13 @@ func TestHookWorkReconcile(t *testing.T) {
 				cache:                     newWorkCache(),
 			}
 
-			for _, obj := range c.addon {
-				addon := obj.(*addonapiv1alpha1.ManagedClusterAddOn)
-				key := fmt.Sprintf("%s/%s", addon.Namespace, addon.Name)
-				syncContext := addontesting.NewFakeSyncContext(t)
-				err := controller.sync(context.TODO(), syncContext, key)
-				if err != nil {
-					t.Errorf("expected no error when sync: %v", err)
-				}
-				c.validateAddonActions(t, fakeAddonClient.Actions())
-				c.validateWorkActions(t, fakeWorkClient.Actions())
+			syncContext := addontesting.NewFakeSyncContext(t)
+			err := controller.sync(context.TODO(), syncContext, c.key)
+			if err != nil {
+				t.Errorf("expected no error when sync: %v", err)
 			}
+			c.validateAddonActions(t, fakeAddonClient.Actions())
+			c.validateWorkActions(t, fakeWorkClient.Actions())
 
 		})
 	}

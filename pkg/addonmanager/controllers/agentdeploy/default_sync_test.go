@@ -41,9 +41,10 @@ func (t *testAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	}
 }
 
-func TestReconcile(t *testing.T) {
+func TestDefaultReconcile(t *testing.T) {
 	cases := []struct {
 		name                 string
+		key                  string
 		existingWork         []runtime.Object
 		addon                []runtime.Object
 		testaddon            *testAgent
@@ -52,18 +53,22 @@ func TestReconcile(t *testing.T) {
 		validateWorkActions  func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
-			name:                 "no cluster",
-			addon:                []runtime.Object{addontesting.NewAddon("test", "cluster1")},
-			cluster:              []runtime.Object{},
-			existingWork:         []runtime.Object{},
-			validateAddonActions: addontesting.AssertNoActions,
-			validateWorkActions:  addontesting.AssertNoActions,
+			name:         "no cluster",
+			key:          "cluster1/test",
+			addon:        []runtime.Object{addontesting.NewAddon("test", "cluster1")},
+			cluster:      []runtime.Object{},
+			existingWork: []runtime.Object{},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "delete")
+			},
+			validateWorkActions: addontesting.AssertNoActions,
 			testaddon: &testAgent{name: "test", objects: []runtime.Object{
 				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
 			}},
 		},
 		{
 			name:                 "no addon",
+			key:                  "cluster1/test",
 			cluster:              []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			existingWork:         []runtime.Object{},
 			validateAddonActions: addontesting.AssertNoActions,
@@ -74,6 +79,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name:    "deploy manifests for an addon",
+			key:     "cluster1/test",
 			addon:   []runtime.Object{addontesting.NewAddon("test", "cluster1")},
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			testaddon: &testAgent{name: "test", objects: []runtime.Object{
@@ -101,6 +107,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name:    "update manifest for an addon",
+			key:     "cluster1/test",
 			addon:   []runtime.Object{addontesting.NewAddon("test", "cluster1")},
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			testaddon: &testAgent{name: "test", objects: []runtime.Object{
@@ -140,6 +147,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name:    "do not update manifest for an addon",
+			key:     "cluster1/test",
 			addon:   []runtime.Object{addontesting.NewAddon("test", "cluster1")},
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			testaddon: &testAgent{name: "test", objects: []runtime.Object{
@@ -177,6 +185,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name:    "get error when run manifest from agent",
+			key:     "cluster1/test",
 			addon:   []runtime.Object{addontesting.NewAddon("test", "cluster1")},
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			testaddon: &testAgent{
@@ -253,18 +262,16 @@ func TestReconcile(t *testing.T) {
 				cache:                     newWorkCache(),
 			}
 
-			for _, obj := range c.addon {
-				addon := obj.(*addonapiv1alpha1.ManagedClusterAddOn)
-				key := fmt.Sprintf("%s/%s", addon.Namespace, addon.Name)
-				syncContext := addontesting.NewFakeSyncContext(t)
-				err := controller.sync(context.TODO(), syncContext, key)
-				if err != c.testaddon.err {
-					t.Errorf("expected error %v when sync got %v", c.testaddon.err, err)
-				}
-				c.validateAddonActions(t, fakeAddonClient.Actions())
-				c.validateWorkActions(t, fakeWorkClient.Actions())
+			syncContext := addontesting.NewFakeSyncContext(t)
+			err := controller.sync(context.TODO(), syncContext, c.key)
+			if (err == nil && c.testaddon.err != nil) || (err != nil && c.testaddon.err == nil) {
+				t.Errorf("expected error %v when sync got %v", c.testaddon.err, err)
 			}
-
+			if err != nil && c.testaddon.err != nil && err.Error() != c.testaddon.err.Error() {
+				t.Errorf("expected error %v when sync got %v", c.testaddon.err, err)
+			}
+			c.validateAddonActions(t, fakeAddonClient.Actions())
+			c.validateWorkActions(t, fakeWorkClient.Actions())
 		})
 	}
 }

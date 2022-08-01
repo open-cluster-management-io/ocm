@@ -66,6 +66,20 @@ func NewHostingUnstructured(apiVersion, kind, namespace, name string) *unstructu
 	return u
 }
 
+func NewHookJob(name, namespace string) *unstructured.Unstructured {
+	job := NewUnstructured("batch/v1", "Job", namespace, name)
+	job.SetLabels(map[string]string{constants.PreDeleteHookLabel: ""})
+	return job
+}
+
+func NewHostedHookJob(name, namespace string) *unstructured.Unstructured {
+	job := NewUnstructured("batch/v1", "Job", namespace, name)
+	job.SetLabels(map[string]string{constants.PreDeleteHookLabel: "",
+		constants.HostedManifestLocationLabelKey: constants.HostedManifestLocationHostingLabelValue,
+	})
+	return job
+}
+
 func NewAddon(name, namespace string, owners ...metav1.OwnerReference) *addonapiv1alpha1.ManagedClusterAddOn {
 	return &addonapiv1alpha1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
@@ -98,6 +112,11 @@ func NewHostedModeAddonWithFinalizer(name, namespace string, hostingCluster stri
 func SetAddonDeletionTimestamp(addon *addonapiv1alpha1.ManagedClusterAddOn,
 	deletionTimestamp time.Time) *addonapiv1alpha1.ManagedClusterAddOn {
 	addon.DeletionTimestamp = &metav1.Time{Time: deletionTimestamp}
+	return addon
+}
+
+func SetAddonFinalizers(addon *addonapiv1alpha1.ManagedClusterAddOn, finalizers ...string) *addonapiv1alpha1.ManagedClusterAddOn {
+	addon.SetFinalizers(finalizers)
 	return addon
 }
 
