@@ -1,9 +1,6 @@
 package addon
 
 import (
-	"crypto/sha256"
-	"encoding/json"
-	"fmt"
 	"testing"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -52,7 +49,32 @@ func TestGetRegistrationConfigs(t *testing.T) {
 				},
 			},
 			configs: []registrationConfig{
-				newRegistrationConfig(addOnName, addOnNamespace, "kubernetes.io/kube-apiserver-client", "", nil),
+				newRegistrationConfig(addOnName, addOnNamespace, "kubernetes.io/kube-apiserver-client", "", nil, false),
+			},
+		},
+		{
+			name: "with default signer hosted mode",
+			addon: &addonv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testinghelpers.TestManagedClusterName,
+					Name:      addOnName,
+					Annotations: map[string]string{
+						hostingClusterNameAnnotation: "test",
+					},
+				},
+				Spec: addonv1alpha1.ManagedClusterAddOnSpec{
+					InstallNamespace: addOnNamespace,
+				},
+				Status: addonv1alpha1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1alpha1.RegistrationConfig{
+						{
+							SignerName: "kubernetes.io/kube-apiserver-client",
+						},
+					},
+				},
+			},
+			configs: []registrationConfig{
+				newRegistrationConfig(addOnName, addOnNamespace, "kubernetes.io/kube-apiserver-client", "", nil, true),
 			},
 		},
 		{
@@ -74,7 +96,7 @@ func TestGetRegistrationConfigs(t *testing.T) {
 				},
 			},
 			configs: []registrationConfig{
-				newRegistrationConfig(addOnName, addOnNamespace, "mysigner", "", nil),
+				newRegistrationConfig(addOnName, addOnNamespace, "mysigner", "", nil, false),
 			},
 		},
 	}
@@ -98,7 +120,8 @@ func TestGetRegistrationConfigs(t *testing.T) {
 	}
 }
 
-func newRegistrationConfig(addOnName, addOnNamespace, signerName, commonName string, organization []string) registrationConfig {
+func newRegistrationConfig(addOnName, addOnNamespace, signerName, commonName string, organization []string,
+	addOnAgentRunningOutsideManagedCluster bool) registrationConfig {
 	registration := addonv1alpha1.RegistrationConfig{
 		SignerName: signerName,
 		Subject: addonv1alpha1.Subject{
@@ -107,15 +130,17 @@ func newRegistrationConfig(addOnName, addOnNamespace, signerName, commonName str
 		},
 	}
 	config := registrationConfig{
-		addOnName:             addOnName,
-		installationNamespace: addOnNamespace,
-		registration:          registration,
+		addOnName: addOnName,
+		addonInstallOption: addonInstallOption{
+			InstallationNamespace:             addOnNamespace,
+			AgentRunningOutsideManagedCluster: addOnAgentRunningOutsideManagedCluster,
+		},
+
+		registration: registration,
 	}
 
-	data, _ := json.Marshal(registration)
-	h := sha256.New()
-	h.Write(data)
-	config.hash = fmt.Sprintf("%x", h.Sum(nil))
+	hash, _ := getConfigHash(registration, config.addonInstallOption)
+	config.hash = hash
 
 	return config
 }

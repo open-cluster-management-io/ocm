@@ -185,12 +185,12 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 	// https://github.com/open-cluster-management-io/enhancements/pull/65), it generate the secret on the
 	// management(hosting) cluster
 	var kubeClient kubernetes.Interface = c.spokeKubeClient
-	if config.addOnAgentRunningOutsideManagedCluster {
+	if config.AgentRunningOutsideManagedCluster {
 		kubeClient = c.managementKubeClient
 	}
 
 	kubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(
-		kubeClient, 10*time.Minute, informers.WithNamespace(config.installationNamespace))
+		kubeClient, 10*time.Minute, informers.WithNamespace(config.InstallationNamespace))
 
 	additonalSecretData := map[string][]byte{}
 	if config.registration.SignerName == certificatesv1.KubeAPIServerClientSignerName {
@@ -199,7 +199,7 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 
 	// build and start a client cert controller
 	clientCertOption := clientcert.ClientCertOption{
-		SecretNamespace:               config.installationNamespace,
+		SecretNamespace:               config.InstallationNamespace,
 		SecretName:                    config.secretName,
 		AdditionalSecretData:          additonalSecretData,
 		AdditionalSecretDataSensitive: true,
@@ -262,12 +262,12 @@ func (c *addOnRegistrationController) stopRegistration(ctx context.Context, conf
 	}
 
 	var kubeClient kubernetes.Interface = c.spokeKubeClient
-	if config.addOnAgentRunningOutsideManagedCluster {
+	if config.AgentRunningOutsideManagedCluster {
 		// delete the secret generated on the management cluster
 		kubeClient = c.managementKubeClient
 	}
 
-	err := kubeClient.CoreV1().Secrets(config.installationNamespace).
+	err := kubeClient.CoreV1().Secrets(config.InstallationNamespace).
 		Delete(ctx, config.secretName, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
