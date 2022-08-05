@@ -55,29 +55,25 @@ func TestHostingReconcile(t *testing.T) {
 		validateWorkActions  func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
-			name:         "no cluster",
-			key:          "cluster1/test",
-			addon:        []runtime.Object{addontesting.NewHostedModeAddon("test", "cluster1", "cluster2")},
-			cluster:      []runtime.Object{},
-			existingWork: []runtime.Object{},
-			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "delete")
-			},
-			validateWorkActions: addontesting.AssertNoActions,
+			name:                 "no cluster",
+			key:                  "cluster1/test",
+			addon:                []runtime.Object{addontesting.NewHostedModeAddon("test", "cluster1", "cluster2")},
+			cluster:              []runtime.Object{},
+			existingWork:         []runtime.Object{},
+			validateAddonActions: addontesting.AssertNoActions,
+			validateWorkActions:  addontesting.AssertNoActions,
 			testaddon: &testHostedAgent{name: "test", objects: []runtime.Object{
 				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
 			}},
 		},
 		{
-			name:         "no managed cluster",
-			key:          "cluster1/test",
-			addon:        []runtime.Object{addontesting.NewHostedModeAddon("test", "cluster1", "cluster2")},
-			cluster:      []runtime.Object{addontesting.NewManagedCluster("cluster2")},
-			existingWork: []runtime.Object{},
-			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "delete")
-			},
-			validateWorkActions: addontesting.AssertNoActions,
+			name:                 "no managed cluster",
+			key:                  "cluster1/test",
+			addon:                []runtime.Object{addontesting.NewHostedModeAddon("test", "cluster1", "cluster2")},
+			cluster:              []runtime.Object{addontesting.NewManagedCluster("cluster2")},
+			existingWork:         []runtime.Object{},
+			validateAddonActions: addontesting.AssertNoActions,
+			validateWorkActions:  addontesting.AssertNoActions,
 			testaddon: &testHostedAgent{name: "test", objects: []runtime.Object{
 				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
 			}},

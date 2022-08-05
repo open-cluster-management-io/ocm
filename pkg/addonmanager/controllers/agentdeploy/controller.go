@@ -151,20 +151,12 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 
 	cluster, err := c.managedClusterLister.Get(clusterName)
 	if errors.IsNotFound(err) {
-		// to delete the addon to make sure the addon is cleaned up when the cluster is not found.
-		// need go to sync to handle cleanup if the addon is deleting.
-		// in the normal case the addon should have been cleaned up after the cluster is deleted.
-		if addon.DeletionTimestamp.IsZero() {
-			return c.cleanupAddon(ctx, clusterName, addonName)
-		}
+		// the managedCluster is nil in this case,and sync cannot handle nil managedCluster.
+		// TODO: consider to force delete the addon and its deploy manifestWorks.
+		return nil
 	}
 	if err != nil {
 		return err
-	}
-
-	if !cluster.DeletionTimestamp.IsZero() {
-		// TODO: consider to delete addon here
-		return nil
 	}
 
 	syncers := []addonDeploySyncer{
@@ -200,14 +192,6 @@ func (c *addonDeployController) updateAddon(ctx context.Context, new, old *addon
 	}
 
 	return utils.PatchAddonCondition(ctx, c.addonClient, new, old)
-}
-
-func (c *addonDeployController) cleanupAddon(ctx context.Context, clusterName, addonName string) error {
-	err := c.addonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Delete(ctx, addonName, metav1.DeleteOptions{})
-	if errors.IsNotFound(err) {
-		return nil
-	}
-	return err
 }
 
 // cleanupCache is only to remove cache for deploy work in default mode when the addon is not found.

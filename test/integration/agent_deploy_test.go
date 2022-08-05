@@ -169,6 +169,21 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		// do nothing if cluster is deleting and addon is not deleted
+		cluster, err := hubClusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedClusterName, metav1.GetOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		cluster.SetFinalizers([]string{"cluster.open-cluster-management.io/api-resource-cleanup"})
+		_, err = hubClusterClient.ClusterV1().ManagedClusters().Update(context.Background(), cluster, metav1.UpdateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		time.Sleep(5 * time.Second) // wait 5 seconds to sync
+		gomega.Eventually(func() error {
+			_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("Should deploy agent and get available with prober func", func() {

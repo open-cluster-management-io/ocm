@@ -29,6 +29,12 @@ func (s *defaultSyncer) sync(ctx context.Context,
 		return addon, nil
 	}
 
+	// waiting for the addon to be deleted when cluster is deleting.
+	// TODO: consider to delete addon in this scenario.
+	if !cluster.DeletionTimestamp.IsZero() {
+		return addon, nil
+	}
+
 	deployWork, _, err := s.controller.buildManifestWorks(ctx, s.agentAddon, installMode, deployWorkNamespace, cluster, addon)
 	if err != nil {
 		return addon, err
