@@ -9,6 +9,7 @@ import (
 	ginkgo "github.com/onsi/ginkgo"
 	gomega "github.com/onsi/gomega"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
@@ -119,4 +120,33 @@ var _ = ginkgo.BeforeSuite(func() {
 		return err
 	}()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	gomega.Eventually(func() error {
+		var err error
+		var mutatingWebhookPods *v1.PodList
+		var mutatingWebhookDeployment *appsv1.Deployment
+
+		if mutatingWebhookPods, err = hubClient.CoreV1().Pods(hubNamespace).List(context.Background(),
+			metav1.ListOptions{LabelSelector: fmt.Sprintf("app=%s", mutatingWebhookName)}); err != nil {
+			return err
+		}
+		if mutatingWebhookDeployment, err = hubClient.AppsV1().Deployments(hubNamespace).Get(context.Background(),
+			mutatingWebhookName, metav1.GetOptions{}); err != nil {
+			return err
+		}
+
+		pods := len(mutatingWebhookPods.Items)
+		replicas := *mutatingWebhookDeployment.Spec.Replicas
+		readyReplicas := mutatingWebhookDeployment.Status.ReadyReplicas
+
+		if pods != (int)(replicas) {
+			return fmt.Errorf("deployment %s pods should have %d but got %d ", mutatingWebhookName, replicas, pods)
+		}
+
+		if readyReplicas != replicas {
+			return fmt.Errorf("deployment %s should have %d but got %d ready replicas", mutatingWebhookName, replicas, readyReplicas)
+		}
+
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 })
