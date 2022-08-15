@@ -2,13 +2,14 @@ package helloworld_helm
 
 import (
 	"embed"
+	"os"
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
-const defaultExampleImage = "quay.io/open-cluster-management/helloworld-addon:latest"
+const defaultExampleImage = "quay.io/open-cluster-management/addon-examples:latest"
 
 //go:embed manifests
 //go:embed manifests/charts/helloworld
@@ -33,12 +34,16 @@ type userValues struct {
 
 func GetValues(cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+	image := os.Getenv("EXAMPLE_IMAGE_NAME")
+	if len(image) == 0 {
+		image = defaultExampleImage
+	}
 	userJsonValues := userValues{
 		ClusterNamespace: cluster.GetName(),
 		Global: global{
 			ImagePullPolicy: "IfNotPresent",
 			ImageOverrides: map[string]string{
-				"helloWorldHelm": defaultExampleImage,
+				"helloWorldHelm": image,
 			},
 		},
 	}

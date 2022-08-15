@@ -17,7 +17,7 @@ import (
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/examples/cmdfactory"
 	"open-cluster-management.io/addon-framework/examples/helloworld"
-	"open-cluster-management.io/addon-framework/examples/helloworld/agent"
+	"open-cluster-management.io/addon-framework/examples/helloworld_agent"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonagent "open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/version"
@@ -60,7 +60,7 @@ func newCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(newControllerCommand())
-	cmd.AddCommand(agent.NewAgentCommand(helloworld.AddonName))
+	cmd.AddCommand(helloworld_agent.NewAgentCommand(helloworld.AddonName))
 
 	return cmd
 }
@@ -88,7 +88,8 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 	agentAddon, err := addonfactory.NewAgentAddonFactory(helloworld.AddonName, helloworld.FS, "manifests/templates").
 		WithGetValuesFuncs(helloworld.GetValues, addonfactory.GetValuesFromAddonAnnotation).
 		WithAgentRegistrationOption(registrationOption).
-		WithInstallStrategy(addonagent.InstallAllStrategy(agent.HelloworldAgentInstallationNamespace)).
+		WithInstallStrategy(addonagent.InstallAllStrategy(helloworld.InstallationNamespace)).
+		WithAgentHealthProber(helloworld.AgentHealthProber()).
 		BuildTemplateAgentAddon()
 	if err != nil {
 		klog.Errorf("failed to build agent %v", err)

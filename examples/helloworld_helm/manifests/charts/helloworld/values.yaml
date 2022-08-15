@@ -16,7 +16,7 @@ global:
   imagePullPolicy: IfNotPresent
   imagePullSecret: null
   imageOverrides:
-    helloWorldHelm: quay.io/open-cluster-management/helloworld-addon:latest
+    helloWorldHelm: quay.io/open-cluster-management/addon-examples:latest
   nodeSelector: {}
   proxyConfig:
     HTTP_PROXY: null

@@ -31,8 +31,9 @@ function hub_approve_cluster(){
 
 
 BUILD_DIR="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
-E2E_DIR="$(dirname "$BUILD_DIR")"
-REPO_DIR="$(dirname "$E2E_DIR")"
+DEPLOY_DIR="$(dirname "$BUILD_DIR")"
+EXAMPLE_DIR="$(dirname "$DEPLOY_DIR")"
+REPO_DIR="$(dirname "$EXAMPLE_DIR")"
 WORK_DIR="${REPO_DIR}/_output"
 
 KIND_VERSION="v0.11.1"
@@ -40,9 +41,6 @@ KIND="${WORK_DIR}/bin/kind"
 
 KUBE_VERSION="v1.20.2"
 KUBECTL="${WORK_DIR}/bin/kubectl"
-
-export MANAGED_CLUSTER_NAME="hub"
-export HOSTED_MANAGED_CLUSTER_NAME="managed"
 
 mkdir -p "${WORK_DIR}/bin"
 mkdir -p "${WORK_DIR}/config"
@@ -67,12 +65,12 @@ curl -s -f \
 chmod +x "${KUBECTL}"
 
 
-echo "###### installing e2e test cluster : ${WORK_DIR}/kubeconfig"
-export KUBECONFIG="${WORK_DIR}/kubeconfig"
+echo "###### installing e2e test cluster : ${REPO_DIR}/.kubeconfig"
 ${KIND} delete cluster --name ${MANAGED_CLUSTER_NAME}
 ${KIND} create cluster --image kindest/node:${KUBE_VERSION} --name ${MANAGED_CLUSTER_NAME}
 cluster_ip=$(${KUBECTL} get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}")
 cluster_context=$(${KUBECTL} config current-context)
+
 # scale replicas to 1 to save resources
 ${KUBECTL} --context="${cluster_context}" -n kube-system scale --replicas=1 deployment/coredns
 
@@ -142,7 +140,7 @@ hub_approve_cluster ${MANAGED_CLUSTER_NAME}
 
 # prepare another managed cluster for hosted mode testing
 echo "###### installing e2e test managed cluster"
-export KUBECONFIG="${WORK_DIR}/kubeconfig"
+
 ${KIND} delete cluster --name ${HOSTED_MANAGED_CLUSTER_NAME}
 ${KIND} create cluster --image kindest/node:${KUBE_VERSION} --name ${HOSTED_MANAGED_CLUSTER_NAME}
 cluster_context_managed=$(${KUBECTL} config current-context)
@@ -158,7 +156,7 @@ ${KIND} get kubeconfig --name=${HOSTED_MANAGED_CLUSTER_NAME} --internal > "${WOR
 ${KIND} get kubeconfig --name=${HOSTED_MANAGED_CLUSTER_NAME} > "${WORK_DIR}"/e2e-managed-kubeconfig-public
 ${KUBECTL} config use-context "${cluster_context}"
 
-export HOSTED_MANAGED_KLUSTERLET_NAME="managed"
+
 ${KUBECTL} create ns ${HOSTED_MANAGED_KLUSTERLET_NAME}
 cat << EOF | ${KUBECTL} apply -f -
 apiVersion: operator.open-cluster-management.io/v1
@@ -191,7 +189,7 @@ ${KUBECTL} create secret generic external-managed-kubeconfig \
   --from-file=kubeconfig="${WORK_DIR}"/e2e-managed-kubeconfig \
   -n ${HOSTED_MANAGED_KLUSTERLET_NAME}
 
-export HOSTED_MANAGED_KUBECONFIG_SECRET_NAME=e2e-hosted-managed-kubeconfig
+
 ${KUBECTL} delete secret ${HOSTED_MANAGED_KUBECONFIG_SECRET_NAME} \
   -n ${HOSTED_MANAGED_KLUSTERLET_NAME} --ignore-not-found
 ${KUBECTL} create secret generic ${HOSTED_MANAGED_KUBECONFIG_SECRET_NAME} \
@@ -213,25 +211,3 @@ ${KUBECTL} wait --for=condition=ManagedClusterConditionAvailable=true \
 ${KUBECTL} wait --for=condition=ManagedClusterConditionAvailable=true \
   managedcluster/${HOSTED_MANAGED_CLUSTER_NAME} --timeout=120s
 echo "######## clusters are prepared completed!"
-
-# install hellowrold addon controller
-cat << EOF | ${KUBECTL} apply -f -
-apiVersion: v1
-data:
-  EXAMPLE_IMAGE_NAME: ${EXAMPLE_IMAGE_NAME}
-kind: ConfigMap
-metadata:
-  name: image-config
-  namespace: open-cluster-management
-EOF
-
-${KUBECTL} apply -f "${REPO_DIR}"/examples/deploy/addon/resources -n open-cluster-management
-${KUBECTL} set image -n open-cluster-management deployment/helloworld-controller \
-  helloworld-controller="${EXAMPLE_IMAGE_NAME}"
-${KUBECTL} set image -n open-cluster-management deployment/helloworldhelm-controller \
-  helloworldhelm-controller="${EXAMPLE_IMAGE_NAME}"
-${KUBECTL} set image -n open-cluster-management deployment/helloworldhosted-controller \
-  helloworldhosted-controller="${EXAMPLE_IMAGE_NAME}"
-
-# start the e2e test
-"${REPO_DIR}"/e2ehosted.test -test.v -ginkgo.v

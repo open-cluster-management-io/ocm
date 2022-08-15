@@ -1,0 +1,25 @@
+namespace: open-cluster-management
+
+resources:
+- resources/cluster_role.yaml
+- resources/cluster_role_binding.yaml
+- resources/service_account.yaml
+- resources/helloworld_helm_clustermanagementaddon.yaml
+- resources/helloworld_helm_controller.yaml
+
+
+images:
+  - name: quay.io/open-cluster-management/addon-examples
+    newName: quay.io/open-cluster-management/addon-examples
+    newTag: latest
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+vars:
+  - name: EXAMPLE_IMAGE_NAME
+    objref:
+      kind: Deployment
+      name: helloworldhelm-controller
+      apiVersion: apps/v1
+    fieldref:
+      fieldpath: spec.template.spec.containers.[name=helloworldhelm-controller].image

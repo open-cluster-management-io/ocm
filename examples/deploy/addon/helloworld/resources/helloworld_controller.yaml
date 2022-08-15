@@ -14,17 +14,14 @@ spec:
       labels:
         app: helloworld-controller
     spec:
-      serviceAccountName: helloworld-sa
+      serviceAccountName: helloworld-addon-sa
       containers:
       - name: helloworld-controller
-        image: example-addon-image
+        image: quay.io/open-cluster-management/addon-examples
         imagePullPolicy: IfNotPresent
         env:
         - name: EXAMPLE_IMAGE_NAME
-          valueFrom:
-            configMapKeyRef:
-              name: image-config
-              key: EXAMPLE_IMAGE_NAME
+          value: $(EXAMPLE_IMAGE_NAME)
         args:
           - "/helloworld"
           - "controller"

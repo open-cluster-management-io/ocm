@@ -1,0 +1,8 @@
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ClusterManagementAddOn
+metadata:
+  name: busybox-addon
+spec:
+  addOnMeta:
+    displayName: Busybox Addon
+    description: "busybox-addon is an example addon to deploy busybox pod on the managed cluster"

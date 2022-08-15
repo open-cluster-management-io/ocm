@@ -56,7 +56,7 @@ const (
                             "cleanup",
                             "--addon-namespace=default"
                         ],
-                        "image": "quay.io/open-cluster-management/helloworld-addon:latest",
+                        "image": "quay.io/open-cluster-management/addon-examples:latest",
                         "imagePullPolicy": "Always",
                         "name": "helloworld-cleanup-agent"
                     }

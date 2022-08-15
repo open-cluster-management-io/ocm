@@ -1,14 +1,7 @@
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: helloworld-sa
-
----
   kind: ClusterRole
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
-    name: helloworld-addon
+    name: helloworldhosted-addon
   rules:
     - apiGroups: [""]
       resources: ["configmaps", "events"]
@@ -49,17 +42,3 @@ metadata:
     - apiGroups: ["addon.open-cluster-management.io"]
       resources: ["managedclusteraddons/status"]
       verbs: ["update", "patch"]
-      
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: helloworld-addon
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: helloworld-addon
-subjects:
-  - kind: ServiceAccount
-    name: helloworld-sa
-    namespace: open-cluster-management

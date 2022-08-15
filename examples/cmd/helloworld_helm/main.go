@@ -17,9 +17,8 @@ import (
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/examples/cmdfactory"
 	"open-cluster-management.io/addon-framework/examples/helloworld"
-	helloworldagent "open-cluster-management.io/addon-framework/examples/helloworld/agent"
+	"open-cluster-management.io/addon-framework/examples/helloworld_agent"
 	"open-cluster-management.io/addon-framework/examples/helloworld_helm"
-	"open-cluster-management.io/addon-framework/examples/helloworld_helm/cleanup_agent"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/version"
 
@@ -61,8 +60,8 @@ func newCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(newControllerCommand())
-	cmd.AddCommand(helloworldagent.NewAgentCommand(helloworld_helm.AddonName))
-	cmd.AddCommand(cleanup_agent.NewAgentCommand(helloworld_helm.AddonName))
+	cmd.AddCommand(helloworld_agent.NewAgentCommand(helloworld_helm.AddonName))
+	cmd.AddCommand(helloworld_agent.NewCleanupAgentCommand(helloworld_helm.AddonName))
 	return cmd
 }
 

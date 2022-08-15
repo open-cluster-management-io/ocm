@@ -1,4 +1,4 @@
-package agent
+package helloworld_agent
 
 import (
 	"context"
@@ -25,11 +25,6 @@ import (
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 )
 
-// Helloworld Agent is an example that syncs configmap in cluster namespace of hub cluster
-// to the install namespace in managedcluster.
-// addOnAgentInstallationNamespace is the namespace on the managed cluster to install the helloworld addon agent.
-const HelloworldAgentInstallationNamespace = "default"
-
 func NewAgentCommand(addonName string) *cobra.Command {
 	o := NewAgentOptions(addonName)
 	cmd := cmdfactory.
@@ -51,7 +46,7 @@ type AgentOptions struct {
 	AddonNamespace        string
 }
 
-// NewWorkloadAgentOptions returns the flags with default value set
+// NewAgentOptions returns the flags with default value set
 func NewAgentOptions(addonName string) *AgentOptions {
 	return &AgentOptions{AddonName: addonName}
 }

@@ -67,7 +67,7 @@ export KUBECONFIG=</path/to/kubeconfig>
 
 make images
 
-kind load docker-image quay.io/open-cluster-management/helloworld-addon:latest --name {your cluster name}
+kind load docker-image quay.io/open-cluster-management/addon-examples:latest --name {your cluster name}
 
 make test-e2e
 ```

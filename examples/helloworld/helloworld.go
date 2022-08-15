@@ -6,18 +6,19 @@ import (
 	"os"
 
 	"k8s.io/client-go/rest"
-	helloworldagent "open-cluster-management.io/addon-framework/examples/helloworld/agent"
 	"open-cluster-management.io/addon-framework/examples/rbac"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
 const (
-	defaultExampleImage = "quay.io/open-cluster-management/helloworld-addon:latest"
-	AddonName           = "helloworld"
+	defaultExampleImage   = "quay.io/open-cluster-management/addon-examples:latest"
+	AddonName             = "helloworld"
+	InstallationNamespace = "default"
 )
 
 //go:embed manifests
@@ -36,7 +37,7 @@ func GetValues(cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
 	installNamespace := addon.Spec.InstallNamespace
 	if len(installNamespace) == 0 {
-		installNamespace = helloworldagent.HelloworldAgentInstallationNamespace
+		installNamespace = InstallationNamespace
 	}
 
 	image := os.Getenv("EXAMPLE_IMAGE_NAME")
@@ -57,4 +58,44 @@ func GetValues(cluster *clusterv1.ManagedCluster,
 	}
 
 	return addonfactory.StructToValues(manifestConfig), nil
+}
+
+func AgentHealthProber() *agent.HealthProber {
+	return &agent.HealthProber{
+		Type: agent.HealthProberTypeWork,
+		WorkProber: &agent.WorkHealthProber{
+			ProbeFields: []agent.ProbeField{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "helloworld-agent",
+						Namespace: InstallationNamespace,
+					},
+					ProbeRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.WellKnownStatusType,
+						},
+					},
+				},
+			},
+			HealthCheck: func(identifier workapiv1.ResourceIdentifier, result workapiv1.StatusFeedbackResult) error {
+				if len(result.Values) == 0 {
+					return fmt.Errorf("no values are probed for deployment %s/%s", identifier.Namespace, identifier.Name)
+				}
+				for _, value := range result.Values {
+					if value.Name != "ReadyReplicas" {
+						continue
+					}
+
+					if *value.Value.Integer >= 1 {
+						return nil
+					}
+
+					return fmt.Errorf("readyReplica is %d for deployement %s/%s", *value.Value.Integer, identifier.Namespace, identifier.Name)
+				}
+				return fmt.Errorf("readyReplica is not probed")
+			},
+		},
+	}
 }

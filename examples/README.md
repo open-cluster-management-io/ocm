@@ -1,11 +1,12 @@
 
 # Getting Started
 
-We have 2 AddOn examples for user to understand how Addon works and how to develop an AddOn.
+We have several AddOn examples for user to understand how Addon works and how to develop an AddOn.
 
 The [helloworld example](helloworld) is implemented using Go templates, and the [helloworld_helm example](helloworld_helm) is implemented using Helm Chart.
 
 You can get more details in the [docs](../docs).
+
 ## Prerequisites
 
 These instructions assume:
@@ -27,17 +28,18 @@ go get github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.1
 export PATH=$PATH:$(go env GOPATH)/bin
 # build image
 make images
-export EXAMPLE_IMAGE_NAME=<helloworld_addon_image_name> # export EXAMPLE_IMAGE_NAME=quay.io/open-cluster-management/helloworld-addon:latest
+export EXAMPLE_IMAGE_NAME=<addon_image_name> # export EXAMPLE_IMAGE_NAME=quay.io/open-cluster-management/addon-examples:latest
 ```
 
-If your are using kind, load image into kind hub cluster.
+If you are using kind, load image into kind hub cluster.
 ```sh
 kind load docker-image $EXAMPLE_IMAGE_NAME --name <your-hub-cluster-name> # kind load docker-image  $EXAMPLE_IMAGE_NAME --name cluster1
 ```
 
 And then deploy the example AddOns controller on hub cluster.
 ```sh
-make deploy-example
+make deploy-helloworld
+make deploy-helloworld-helm
 ```
 
 The helloworld AddOn controller will create one `ManagedClusterAddOn` for each managed cluster automatically to install the helloworld agent on the managed cluster.
@@ -66,7 +68,8 @@ make undeploy-addon
 
 Undeploy example AddOn controllers from hub cluster after all managedClusterAddons are deleted.
 ```sh
-make undeploy-example
+make undeploy-helloworld
+make undeploy-helloworld-helm
 ```
 
 Remove the AddOn CR from hub cluster. It will undeploy the AddOn agent from the managed cluster as well.

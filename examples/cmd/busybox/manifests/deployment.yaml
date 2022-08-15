@@ -1,0 +1,22 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: busybox
+  namespace: open-cluster-management-agent-addon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      addon: busybox
+  template:
+    metadata:
+      labels:
+        addon: busybox
+    spec:
+      containers:
+        - name: busybox
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          args:
+            - "sleep"
+            - "3600"

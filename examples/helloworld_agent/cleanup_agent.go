@@ -1,4 +1,4 @@
-package cleanup_agent
+package helloworld_agent
 
 import (
 	"context"
@@ -13,8 +13,8 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/version"
 )
 
-func NewAgentCommand(addonName string) *cobra.Command {
-	o := NewAgentOptions(addonName)
+func NewCleanupAgentCommand(addonName string) *cobra.Command {
+	o := NewCleanupAgentOptions(addonName)
 	cmdConfig := cmdfactory.
 		NewControllerCommandConfig("cleanup-agent", version.Get(), o.RunAgent)
 	cmd := cmdConfig.NewCommand()
@@ -25,25 +25,25 @@ func NewAgentCommand(addonName string) *cobra.Command {
 	return cmd
 }
 
-// AgentOptions defines the flags for workload agent
-type AgentOptions struct {
+// CleanupAgentOptions defines the flags for workload agent
+type CleanupAgentOptions struct {
 	AddonName             string
 	AddonNamespace        string
 	ManagedKubeconfigFile string
 }
 
-func NewAgentOptions(addonName string) *AgentOptions {
-	return &AgentOptions{AddonName: addonName}
+func NewCleanupAgentOptions(addonName string) *CleanupAgentOptions {
+	return &CleanupAgentOptions{AddonName: addonName}
 }
 
-func (o *AgentOptions) AddFlags(cmd *cobra.Command) {
+func (o *CleanupAgentOptions) AddFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
 	flags.StringVar(&o.AddonNamespace, "addon-namespace", o.AddonNamespace, "Installation namespace of addon.")
 	flags.StringVar(&o.ManagedKubeconfigFile, "managed-kubeconfig", o.ManagedKubeconfigFile,
 		"Location of kubeconfig file to connect to the managed cluster.")
 }
 
-func (o *AgentOptions) RunAgent(ctx context.Context, kubeConfig *rest.Config) error {
+func (o *CleanupAgentOptions) RunAgent(ctx context.Context, kubeConfig *rest.Config) error {
 	// build kubeclient of managed cluster
 	spokeKubeClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {

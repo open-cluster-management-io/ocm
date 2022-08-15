@@ -15,17 +15,22 @@ export GOHOSTOS    ?=$(shell go env GOHOSTOS)
 export GOHOSTARCH  ?=$(shell go env GOHOSTARCH)
 
 # Tools for deploy
-KUBECONFIG ?= ./.kubeconfig
+export KUBECONFIG ?= ./.kubeconfig
+export MANAGED_CLUSTER_NAME ?= hub
+export HOSTED_MANAGED_CLUSTER_NAME ?= managed
+export HOSTED_MANAGED_KLUSTERLET_NAME ?= managed
+export HOSTED_MANAGED_KUBECONFIG_SECRET_NAME ?= e2e-hosted-managed-kubeconfig
+
 KUBECTL?=kubectl
 PWD=$(shell pwd)
 KUSTOMIZE?=$(PWD)/$(PERMANENT_TMP_GOPATH)/bin/kustomize
-KUSTOMIZE_VERSION?=v3.5.4
+KUSTOMIZE_VERSION?=v4.5.5
 KUSTOMIZE_ARCHIVE_NAME?=kustomize_$(KUSTOMIZE_VERSION)_$(GOHOSTOS)_$(GOHOSTARCH).tar.gz
 kustomize_dir:=$(dir $(KUSTOMIZE))
 
 # Image URL to use all building/pushing image targets;
 GO_BUILD_PACKAGES :=./examples/cmd/...
-IMAGE ?= helloworld-addon
+IMAGE ?= addon-examples
 IMAGE_REGISTRY ?= quay.io/open-cluster-management
 IMAGE_TAG ?= latest
 export EXAMPLE_IMAGE_NAME ?= $(IMAGE_REGISTRY)/$(IMAGE):$(IMAGE_TAG)
@@ -54,30 +59,62 @@ verify: verify-gocilint
 deploy-ocm:
 	examples/deploy/ocm/install.sh
 
-deploy-example: ensure-kustomize
-	cp examples/deploy/addon/kustomization.yaml examples/deploy/addon/kustomization.yaml.tmp
-	cd examples/deploy/addon && $(KUSTOMIZE) edit set image example-addon-image=$(EXAMPLE_IMAGE_NAME) && $(KUSTOMIZE) edit add configmap image-config --from-literal=EXAMPLE_IMAGE_NAME=$(EXAMPLE_IMAGE_NAME)
-	$(KUSTOMIZE) build examples/deploy/addon | $(KUBECTL) apply -f -
-	mv examples/deploy/addon/kustomization.yaml.tmp examples/deploy/addon/kustomization.yaml
+deploy-hosted-ocm:
+	examples/deploy/hosted-ocm/install.sh
+
+deploy-busybox: ensure-kustomize
+	cp examples/deploy/addon/busybox/kustomization.yaml examples/deploy/addon/busybox/kustomization.yaml.tmp
+	cd examples/deploy/addon/busybox && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-examples=$(EXAMPLE_IMAGE_NAME)
+	$(KUSTOMIZE) build examples/deploy/addon/busybox | $(KUBECTL) apply -f -
+	mv examples/deploy/addon/busybox/kustomization.yaml.tmp examples/deploy/addon/busybox/kustomization.yaml
+
+deploy-helloworld: ensure-kustomize
+	cp examples/deploy/addon/helloworld/kustomization.yaml examples/deploy/addon/helloworld/kustomization.yaml.tmp
+	cd examples/deploy/addon/helloworld && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-examples=$(EXAMPLE_IMAGE_NAME)
+	$(KUSTOMIZE) build examples/deploy/addon/helloworld | $(KUBECTL) apply -f -
+	mv examples/deploy/addon/helloworld/kustomization.yaml.tmp examples/deploy/addon/helloworld/kustomization.yaml
+
+deploy-helloworld-helm: ensure-kustomize
+	cp examples/deploy/addon/helloworld-helm/kustomization.yaml examples/deploy/addon/helloworld-helm/kustomization.yaml.tmp
+	cd examples/deploy/addon/helloworld-helm && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-examples=$(EXAMPLE_IMAGE_NAME)
+	$(KUSTOMIZE) build examples/deploy/addon/helloworld-helm | $(KUBECTL) apply -f -
+	mv examples/deploy/addon/helloworld-helm/kustomization.yaml.tmp examples/deploy/addon/helloworld-helm/kustomization.yaml
+
+deploy-helloworld-hosted: ensure-kustomize
+	cp examples/deploy/addon/helloworld-hosted/kustomization.yaml examples/deploy/addon/helloworld-hosted/kustomization.yaml.tmp
+	cd examples/deploy/addon/helloworld-hosted && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-examples=$(EXAMPLE_IMAGE_NAME)
+	$(KUSTOMIZE) build examples/deploy/addon/helloworld-hosted | $(KUBECTL) apply -f -
+	mv examples/deploy/addon/helloworld-hosted/kustomization.yaml.tmp examples/deploy/addon/helloworld-hosted/kustomization.yaml
 
 undeploy-addon:
-	$(KUBECTL) delete -f examples/deploy/addon/resources/helloworld_helm_clustermanagementaddon.yaml
-	$(KUBECTL) delete -f examples/deploy/addon/resources/helloworld_clustermanagementaddon.yaml
+	$(KUBECTL) delete -f examples/deploy/addon/helloworld-hosted/resources/helloworld_hosted_clustermanagementaddon.yaml --ignore-not-found
+	$(KUBECTL) delete -f examples/deploy/addon/helloworld-helm/resources/helloworld_helm_clustermanagementaddon.yaml --ignore-not-found
+	$(KUBECTL) delete -f examples/deploy/addon/helloworld/resources/helloworld_clustermanagementaddon.yaml --ignore-not-found
+	$(KUBECTL) delete -f examples/deploy/addon/busybox/resources/busybox_clustermanagementaddon.yaml --ignore-not-found
 
-undeploy-example: ensure-kustomize
-	$(KUSTOMIZE) build examples/deploy/addon | $(KUBECTL) delete --ignore-not-found -f -
+undeploy-busybox: ensure-kustomize
+	$(KUSTOMIZE) build examples/deploy/addon/busybox | $(KUBECTL) delete --ignore-not-found -f -
+
+undeploy-helloworld: ensure-kustomize
+	$(KUSTOMIZE) build examples/deploy/addon/helloworld | $(KUBECTL) delete --ignore-not-found -f -
+
+undeploy-helloworld-helm: ensure-kustomize
+	$(KUSTOMIZE) build examples/deploy/addon/helloworld-helm | $(KUBECTL) delete --ignore-not-found -f -
+
+undeploy-helloworld-hosted: ensure-kustomize
+	$(KUSTOMIZE) build examples/deploy/addon/helloworld-hosted | $(KUBECTL) delete --ignore-not-found -f -
 
 build-e2e:
 	go test -c ./test/e2e
 
-test-e2e: build-e2e deploy-ocm deploy-example
+test-e2e: build-e2e deploy-ocm deploy-helloworld deploy-helloworld-helm
 	./e2e.test -test.v -ginkgo.v
 
 build-hosted-e2e:
 	go test -c ./test/e2ehosted
 
-test-hosted-e2e: build-hosted-e2e
-	./test/e2ehosted/run-hosted-e2e-tests.sh
+test-hosted-e2e: build-hosted-e2e deploy-hosted-ocm deploy-helloworld-hosted
+	./e2ehosted.test -test.v -ginkgo.v
 
 # Ensure kustomize
 ensure-kustomize:

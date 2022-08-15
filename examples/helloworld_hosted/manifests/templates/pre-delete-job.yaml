@@ -29,7 +29,7 @@ spec:
         image: {{ .Image }}
         imagePullPolicy: IfNotPresent
         args:
-          - "/helloworld_helm"
+          - "/helloworld_hosted"
           - "cleanup"
           - "--addon-namespace={{ .AddonInstallNamespace }}"
           {{- if eq .InstallMode "Hosted" }}
