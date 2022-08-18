@@ -265,5 +265,15 @@ var _ = Describe("Delete klusterlet CR", func() {
 			}
 			return fmt.Errorf("klusterlet still exists")
 		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+
+		By(fmt.Sprintf("check the agent namespace %s on the management cluster was deleted", klusterletName))
+		Eventually(func() error {
+			_, err := t.KubeClient.CoreV1().Namespaces().Get(context.TODO(),
+				klusterletName, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return fmt.Errorf("klusterlet namespace still exists")
+		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
 	})
 })

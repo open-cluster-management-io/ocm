@@ -2,9 +2,7 @@ package klusterletcontroller
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
-	"reflect"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -39,6 +37,9 @@ import (
 )
 
 const (
+
+	// klusterletHostedFinalizer is used to clean up resources on the managed/hosted cluster in Hosted mode
+	klusterletHostedFinalizer    = "operator.open-cluster-management.io/klusterlet-hosted-cleanup"
 	klusterletFinalizer          = "operator.open-cluster-management.io/klusterlet-cleanup"
 	imagePullSecret              = "open-cluster-management-image-pull-credentials"
 	klusterletApplied            = "Applied"
@@ -127,8 +128,12 @@ type klusterletController struct {
 	skipHubSecretPlaceholder  bool
 	cache                     resourceapply.ResourceCache
 
-	// buildManagedClusterClientsHostedMode build clients for manged cluster in hosted mode, this can be override for testing
-	buildManagedClusterClientsHostedMode func(ctx context.Context, kubeClient kubernetes.Interface, namespace, secret string) (*managedClusterClients, error)
+	// buildManagedClusterClientsHostedMode build clients for the managed cluster in hosted mode,
+	// this can be overridden for testing
+	buildManagedClusterClientsHostedMode func(
+		ctx context.Context,
+		kubeClient kubernetes.Interface,
+		namespace, secret string) (*managedClusterClients, error)
 }
 
 // NewKlusterletController construct klusterlet controller
@@ -280,44 +285,35 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	}
 
 	if config.InstallMode == operatorapiv1.InstallModeHosted {
-		managedClusterClients, err = n.buildManagedClusterClientsHostedMode(ctx, n.kubeClient, config.AgentNamespace, config.ExternalManagedKubeConfigSecret)
+		managedClusterClients, err = n.buildManagedClusterClientsHostedMode(ctx,
+			n.kubeClient, config.AgentNamespace, config.ExternalManagedKubeConfigSecret)
 		if err != nil {
-			_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
-				Type: klusterletReadyToApply, Status: metav1.ConditionFalse, Reason: "KlusterletPrepareFailed",
-				Message: fmt.Sprintf("Failed to build managed cluster clients: %v", err),
-			}))
+			_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName,
+				helpers.UpdateKlusterletConditionFn(metav1.Condition{
+					Type: klusterletReadyToApply, Status: metav1.ConditionFalse, Reason: "KlusterletPrepareFailed",
+					Message: fmt.Sprintf("Failed to build managed cluster clients: %v", err),
+				}))
 			return err
-		} else {
-			_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
+		}
+
+		_, updated, updateErr := helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName,
+			helpers.UpdateKlusterletConditionFn(metav1.Condition{
 				Type: klusterletReadyToApply, Status: metav1.ConditionTrue, Reason: "KlusterletPrepared",
 				Message: "Klusterlet is ready to apply",
 			}))
+		if updated {
+			return updateErr
 		}
 	}
 
-	// Update finalizer after the clients created, otherwise, for Hosted mode if users did not provide the
-	// external managed cluster kubeconfig, we can not delete the finalizer
-	if klusterlet.DeletionTimestamp.IsZero() {
-		hasFinalizer := false
-		for i := range klusterlet.Finalizers {
-			if klusterlet.Finalizers[i] == klusterletFinalizer {
-				hasFinalizer = true
-				break
-			}
-		}
-		if !hasFinalizer {
-			klusterlet.Finalizers = append(klusterlet.Finalizers, klusterletFinalizer)
-			_, err = n.klusterletClient.Update(ctx, klusterlet, metav1.UpdateOptions{})
-			return err
-		}
-	}
-
-	// Klusterlet is deleting, we remove its related resources on managed cluster
 	if !klusterlet.DeletionTimestamp.IsZero() {
-		if err := n.cleanUp(ctx, controllerContext, managedClusterClients, config); err != nil {
-			return err
-		}
-		return n.removeKlusterletFinalizer(ctx, klusterlet)
+		// The work of klusterlet cleanup will be handled by klusterlet cleanup controller
+		return nil
+	}
+
+	if !readyToOperateManagedClusterResources(klusterlet, config.InstallMode) {
+		// wait for the external managed kubeconfig to exist to apply resources on the manged cluster
+		return nil
 	}
 
 	// Start deploy klusterlet components
@@ -465,6 +461,14 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	return nil
 }
 
+func readyToOperateManagedClusterResources(klusterlet *operatorapiv1.Klusterlet, mode operatorapiv1.InstallMode) bool {
+	if mode != operatorapiv1.InstallModeHosted {
+		return true
+	}
+
+	return meta.IsStatusConditionTrue(klusterlet.Status.Conditions, klusterletReadyToApply)
+}
+
 // getClusterNameFromHubKubeConfigSecret gets cluster name from hub kubeConfig secret
 func (n *klusterletController) getClusterNameFromHubKubeConfigSecret(ctx context.Context, config *klusterletConfig) error {
 	hubSecret, err := n.kubeClient.CoreV1().Secrets(config.AgentNamespace).Get(ctx, helpers.HubKubeConfig, metav1.GetOptions{})
@@ -497,14 +501,14 @@ func (n *klusterletController) cleanBeforeApply(ctx context.Context,
 	managedClients *managedClusterClients,
 	config klusterletConfig) error {
 	// remove static file on the managed cluster
-	err := n.removeStaticResources(ctx, managedClients.kubeClient, managedClients.apiExtensionClient,
+	err := removeStaticResources(ctx, managedClients.kubeClient, managedClients.apiExtensionClient,
 		cleanManagedStaticResourceFiles, config)
 	if err != nil {
 		return err
 	}
 
 	// remove static file on the management cluster
-	err = n.removeStaticResources(ctx, n.kubeClient, n.apiExtensionClient, cleanManagementStaticResourceFiles, config)
+	err = removeStaticResources(ctx, n.kubeClient, n.apiExtensionClient, cleanManagementStaticResourceFiles, config)
 	if err != nil {
 		return err
 	}
@@ -691,112 +695,7 @@ func (n *klusterletController) ensureNamespace(ctx context.Context, kubeClient k
 	return nil
 }
 
-func (n *klusterletController) cleanUp(
-	ctx context.Context,
-	controllerContext factory.SyncContext,
-	managedClients *managedClusterClients,
-	config klusterletConfig) error {
-	// Remove deployment
-	deployments := []string{
-		fmt.Sprintf("%s-registration-agent", config.KlusterletName),
-		fmt.Sprintf("%s-work-agent", config.KlusterletName),
-	}
-	for _, deployment := range deployments {
-		err := n.kubeClient.AppsV1().Deployments(config.AgentNamespace).Delete(ctx, deployment, metav1.DeleteOptions{})
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-		controllerContext.Recorder().Eventf("DeploymentDeleted", "deployment %s is deleted", deployment)
-	}
-
-	// get hub host from bootstrap kubeconfig
-	var hubHost string
-	bootstrapKubeConfigSecret, err := n.kubeClient.CoreV1().Secrets(config.AgentNamespace).Get(ctx, config.BootStrapKubeConfigSecret, metav1.GetOptions{})
-	switch {
-	case err == nil:
-		restConfig, err := helpers.LoadClientConfigFromSecret(bootstrapKubeConfigSecret)
-		if err != nil {
-			return fmt.Errorf("unable to load kubeconfig from secret %q %q: %w", config.AgentNamespace, config.BootStrapKubeConfigSecret, err)
-		}
-		hubHost = restConfig.Host
-	case !errors.IsNotFound(err):
-		return err
-	}
-
-	// remove finalizer from AppliedManifestWorks, should be executed **before** "remove hub kubeconfig secret".
-	if len(hubHost) > 0 {
-		if err := n.cleanUpAppliedManifestWorks(ctx, managedClients.appliedManifestWorkClient, hubHost); err != nil {
-			return err
-		}
-	}
-
-	// Remove secrets
-	secrets := []string{config.HubKubeConfigSecret}
-	if config.InstallMode == operatorapiv1.InstallModeHosted {
-		// In Hosted mod, also need to remove the external-managed-kubeconfig-registration and external-managed-kubeconfig-work
-		secrets = append(secrets, []string{config.ExternalManagedKubeConfigRegistrationSecret, config.ExternalManagedKubeConfigWorkSecret}...)
-	}
-	for _, secret := range secrets {
-		err = n.kubeClient.CoreV1().Secrets(config.AgentNamespace).Delete(ctx, secret, metav1.DeleteOptions{})
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-		controllerContext.Recorder().Eventf("SecretDeleted", "secret %s is deleted", secret)
-	}
-
-	// remove static file on the managed cluster
-	err = n.removeStaticResources(ctx, managedClients.kubeClient, managedClients.apiExtensionClient,
-		managedStaticResourceFiles, config)
-	if err != nil {
-		return err
-	}
-
-	// remove static file on the management cluster
-	err = n.removeStaticResources(ctx, n.kubeClient, n.apiExtensionClient, managementStaticResourceFiles, config)
-	if err != nil {
-		return err
-	}
-
-	// TODO remove this when we do not support kube 1.11 any longer
-	cnt, err := n.kubeVersion.Compare("v1.12.0")
-	klog.Infof("comapare version %d, %v", cnt, err)
-	if cnt, err := n.kubeVersion.Compare("v1.12.0"); err == nil && cnt < 0 {
-		err = n.removeStaticResources(ctx, managedClients.kubeClient, managedClients.apiExtensionClient,
-			kube111StaticResourceFiles, config)
-		if err != nil {
-			return err
-		}
-	}
-
-	// remove the klusterlet namespace and klusterlet addon namespace on the managed cluster
-	// For now, whether in Default or Hosted mode, the addons will be deployed on the managed cluster.
-	// TODO(zhujian7): In the future, we may consider deploy addons on the management cluster in Hosted mode.
-	namespaces := []string{config.KlusterletNamespace, fmt.Sprintf("%s-addon", config.KlusterletNamespace)}
-	for _, namespace := range namespaces {
-		err = managedClients.kubeClient.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-	}
-
-	// no longer remove the CRDs (AppliedManifestWork & ClusterClaim), because they might be shared
-	// by multiple klusterlets. Consequently, the CRs of those CRDs will not be deleted as well when deleting a klusterlet.
-
-	// The agent namespace on the management cluster should be removed **at the end**. Otherwise if any failure occurred,
-	// the managed-external-kubeconfig secret would be removed and the next reconcile will fail due to can not build the
-	// managed cluster clients.
-	if config.InstallMode == operatorapiv1.InstallModeHosted {
-		// remove the agent namespace on the management cluster
-		err = n.kubeClient.CoreV1().Namespaces().Delete(ctx, config.AgentNamespace, metav1.DeleteOptions{})
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (n *klusterletController) removeStaticResources(ctx context.Context,
+func removeStaticResources(ctx context.Context,
 	kubeClient kubernetes.Interface,
 	apiExtensionClient apiextensionsclient.Interface,
 	resources []string,
@@ -822,81 +721,6 @@ func (n *klusterletController) removeStaticResources(ctx context.Context,
 	}
 
 	return nil
-}
-
-func (n *klusterletController) removeKlusterletFinalizer(ctx context.Context, deploy *operatorapiv1.Klusterlet) error {
-	// reload klusterlet
-	deploy, err := n.klusterletClient.Get(ctx, deploy.Name, metav1.GetOptions{})
-	if errors.IsNotFound(err) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	copiedFinalizers := []string{}
-	for i := range deploy.Finalizers {
-		if deploy.Finalizers[i] == klusterletFinalizer {
-			continue
-		}
-		copiedFinalizers = append(copiedFinalizers, deploy.Finalizers[i])
-	}
-	if len(deploy.Finalizers) != len(copiedFinalizers) {
-		deploy.Finalizers = copiedFinalizers
-		_, err := n.klusterletClient.Update(ctx, deploy, metav1.UpdateOptions{})
-		return err
-	}
-
-	return nil
-}
-
-// cleanUpAppliedManifestWorks removes finalizer from the AppliedManifestWorks whose name starts with
-// the hash of the given hub host.
-func (n *klusterletController) cleanUpAppliedManifestWorks(ctx context.Context, appliedManifestWorkClient workv1client.AppliedManifestWorkInterface, hubHost string) error {
-	appliedManifestWorks, err := appliedManifestWorkClient.List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("unable to list AppliedManifestWorks: %w", err)
-	}
-	errs := []error{}
-	prefix := fmt.Sprintf("%s-", fmt.Sprintf("%x", sha256.Sum256([]byte(hubHost))))
-	for _, appliedManifestWork := range appliedManifestWorks.Items {
-		// ignore AppliedManifestWork for other klusterlet
-		if !strings.HasPrefix(appliedManifestWork.Name, prefix) {
-			continue
-		}
-
-		// remove finalizer if exists
-		if mutated := removeFinalizer(&appliedManifestWork, appliedManifestWorkFinalizer); !mutated {
-			continue
-		}
-
-		_, err := appliedManifestWorkClient.Update(ctx, &appliedManifestWork, metav1.UpdateOptions{})
-		if err != nil && !errors.IsNotFound(err) {
-			errs = append(errs, fmt.Errorf("unable to remove finalizer from AppliedManifestWork %q: %w", appliedManifestWork.Name, err))
-		}
-	}
-	return operatorhelpers.NewMultiLineAggregate(errs)
-}
-
-// removeFinalizer removes a finalizer from the list. It mutates its input.
-func removeFinalizer(obj runtime.Object, finalizerName string) bool {
-	if obj == nil || reflect.ValueOf(obj).IsNil() {
-		return false
-	}
-
-	newFinalizers := []string{}
-	accessor, _ := meta.Accessor(obj)
-	found := false
-	for _, finalizer := range accessor.GetFinalizers() {
-		if finalizer == finalizerName {
-			found = true
-			continue
-		}
-		newFinalizers = append(newFinalizers, finalizer)
-	}
-	if found {
-		accessor.SetFinalizers(newFinalizers)
-	}
-	return found
 }
 
 // TODO also read CABundle from ExternalServerURLs and set into registration deployment
@@ -925,8 +749,9 @@ func getManagedKubeConfig(ctx context.Context, kubeClient kubernetes.Interface, 
 // buildManagedClusterClientsFromSecret builds variety of clients for managed cluster from managed cluster kubeconfig secret.
 func buildManagedClusterClientsFromSecret(ctx context.Context, client kubernetes.Interface, agentNamespace, secretName string) (
 	*managedClusterClients, error) {
-	// Ensure the agent namespace for users to create the external-managed-kubeconfig secret in this namespace,
-	// so that in the next reconcile look the controller can get the secret successfully after the secret created.
+	// Ensure the agent namespace for users to create the external-managed-kubeconfig secret in this
+	// namespace, so that in the next reconcile loop the controller can get the secret successfully after
+	// the secret was created.
 	err := ensureAgentNamespace(ctx, client, agentNamespace)
 	if err != nil {
 		return nil, err

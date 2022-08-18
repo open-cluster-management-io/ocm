@@ -89,6 +89,19 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		controllerContext.EventRecorder,
 		o.SkipPlaceholderHubSecret)
 
+	klusterletCleanupController := klusterletcontroller.NewKlusterletCleanupController(
+		kubeClient,
+		apiExtensionClient,
+		dynamicClient,
+		operatorClient.OperatorV1().Klusterlets(),
+		operatorInformer.Operator().V1().Klusterlets(),
+		kubeInformer.Core().V1().Secrets(),
+		kubeInformer.Apps().V1().Deployments(),
+		workClient.WorkV1().AppliedManifestWorks(),
+		kubeVersion,
+		operatorNamespace,
+		controllerContext.EventRecorder)
+
 	ssarController := ssarcontroller.NewKlusterletSSARController(
 		kubeClient,
 		operatorClient.OperatorV1().Klusterlets(),
@@ -122,6 +135,7 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 	go operatorInformer.Start(ctx.Done())
 	go kubeInformer.Start(ctx.Done())
 	go klusterletController.Run(ctx, 1)
+	go klusterletCleanupController.Run(ctx, 1)
 	go statusController.Run(ctx, 1)
 	go ssarController.Run(ctx, 1)
 	go bootstrapController.Run(ctx, 1)
