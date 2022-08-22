@@ -311,6 +311,11 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		return nil
 	}
 
+	// do nothing until finalizer is added.
+	if !hasFinalizer(klusterlet, klusterletFinalizer) {
+		return nil
+	}
+
 	if !readyToOperateManagedClusterResources(klusterlet, config.InstallMode) {
 		// wait for the external managed kubeconfig to exist to apply resources on the manged cluster
 		return nil
@@ -466,7 +471,7 @@ func readyToOperateManagedClusterResources(klusterlet *operatorapiv1.Klusterlet,
 		return true
 	}
 
-	return meta.IsStatusConditionTrue(klusterlet.Status.Conditions, klusterletReadyToApply)
+	return meta.IsStatusConditionTrue(klusterlet.Status.Conditions, klusterletReadyToApply) && hasFinalizer(klusterlet, klusterletHostedFinalizer)
 }
 
 // getClusterNameFromHubKubeConfigSecret gets cluster name from hub kubeConfig secret
