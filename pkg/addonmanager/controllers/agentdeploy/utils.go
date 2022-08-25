@@ -371,22 +371,6 @@ func applyWork(
 	return nil, err
 }
 
-func deleteWork(
-	ctx context.Context,
-	workClient workv1client.Interface,
-	namespace, name string) error {
-
-	err := workClient.WorkV1().ManifestWorks(namespace).Delete(ctx, name, metav1.DeleteOptions{})
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-
-	return nil
-}
-
 func FindManifestValue(
 	resourceStatus workapiv1.ManifestResourceStatus,
 	identifier workapiv1.ResourceIdentifier,

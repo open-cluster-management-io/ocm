@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/pointer"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
@@ -75,7 +76,7 @@ func TestDefaultHookReconcile(t *testing.T) {
 			testaddon: &testAgent{name: "test", objects: []runtime.Object{
 				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
 				addontesting.NewHookJob("default", "test")}},
-			existingWork: []runtime.Object{addontesting.NewUnstructured("v1", "ConfigMap", "default", "test")},
+			existingWork: []runtime.Object{},
 			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "create")
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
@@ -110,7 +111,6 @@ func TestDefaultHookReconcile(t *testing.T) {
 				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
 				addontesting.NewHookJob("test", "default")}},
 			existingWork: []runtime.Object{
-				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
 				func() *workapiv1.ManifestWork {
 					work := addontesting.NewManifestWork(
 						constants.PreDeleteHookWorkName("test"),
@@ -190,7 +190,6 @@ func TestDefaultHookReconcile(t *testing.T) {
 				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
 				addontesting.NewHookJob("test", "default")}},
 			existingWork: []runtime.Object{
-				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
 				func() *workapiv1.ManifestWork {
 					work := addontesting.NewManifestWork(
 						constants.PreDeleteHookWorkName("test"),
@@ -267,6 +266,18 @@ func TestDefaultHookReconcile(t *testing.T) {
 			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
 			clusterInformers := clusterv1informers.NewSharedInformerFactory(fakeClusterClient, 10*time.Minute)
 
+			err := workInformerFactory.Work().V1().ManifestWorks().Informer().AddIndexers(
+				cache.Indexers{
+					byAddon:           indexByAddon,
+					byHostedAddon:     indexByHostedAddon,
+					hookByHostedAddon: indexHookByHostedAddon,
+				},
+			)
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			for _, obj := range c.cluster {
 				if err := clusterInformers.Cluster().V1().ManagedClusters().Informer().GetStore().Add(obj); err != nil {
 					t.Error("failed to add cluster object to informer:", err)
@@ -288,13 +299,14 @@ func TestDefaultHookReconcile(t *testing.T) {
 				addonClient:               fakeAddonClient,
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
 				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				workIndexer:               workInformerFactory.Work().V1().ManifestWorks().Informer().GetIndexer(),
 				workLister:                workInformerFactory.Work().V1().ManifestWorks().Lister(),
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
 				cache:                     newWorkCache(),
 			}
 
 			syncContext := addontesting.NewFakeSyncContext(t)
-			err := controller.sync(context.TODO(), syncContext, c.key)
+			err = controller.sync(context.TODO(), syncContext, c.key)
 			if err != nil {
 				t.Errorf("expected no error when sync: %v", err)
 			}

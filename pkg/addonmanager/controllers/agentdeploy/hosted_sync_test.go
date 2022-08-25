@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -136,10 +137,7 @@ func TestHostingReconcile(t *testing.T) {
 					t.Errorf("expected hosting manifest finalizer")
 				}
 			},
-			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				// default sync deletes the deploy work since there is no manifests needed deploy in the managed cluster
-				addontesting.AssertActions(t, actions, "delete")
-			},
+			validateWorkActions: addontesting.AssertNoActions,
 			testaddon: &testHostedAgent{name: "test", objects: []runtime.Object{
 				addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
 			}},
@@ -177,7 +175,7 @@ func TestHostingReconcile(t *testing.T) {
 			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				// default sync deletes the deploy work since there is no manifests needed deploy in the managed cluster
 				// hosted sync creates the deploy work in the hosting cluster ns
-				addontesting.AssertActions(t, actions, "delete", "create")
+				addontesting.AssertActions(t, actions, "create")
 			},
 		},
 		{
@@ -208,9 +206,8 @@ func TestHostingReconcile(t *testing.T) {
 				return work
 			}()},
 			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				// default sync deletes the deploy work since there is no manifests needed deploy in the managed cluster
 				// hosted sync updates the deploy work in the hosting cluster ns
-				addontesting.AssertActions(t, actions, "delete", "patch")
+				addontesting.AssertActions(t, actions, "patch")
 			},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
@@ -255,10 +252,7 @@ func TestHostingReconcile(t *testing.T) {
 				}
 				return work
 			}()},
-			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				// default sync deletes the deploy work since there is no manifests needed deploy in the managed cluster
-				addontesting.AssertActions(t, actions, "delete")
-			},
+			validateWorkActions: addontesting.AssertNoActions,
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 
@@ -344,6 +338,10 @@ func TestHostingReconcile(t *testing.T) {
 					addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
 					addontesting.NewHostingUnstructured("v1", "Deployment", "default", "test"),
 				)
+				work.Labels = map[string]string{
+					constants.AddonLabel:          "test",
+					constants.AddonNamespaceLabel: "cluster1",
+				}
 				work.Status.Conditions = []metav1.Condition{
 					{
 						Type:   workapiv1.WorkApplied,
@@ -377,6 +375,18 @@ func TestHostingReconcile(t *testing.T) {
 			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
 			clusterInformers := clusterv1informers.NewSharedInformerFactory(fakeClusterClient, 10*time.Minute)
 
+			err := workInformerFactory.Work().V1().ManifestWorks().Informer().AddIndexers(
+				cache.Indexers{
+					byAddon:           indexByAddon,
+					byHostedAddon:     indexByHostedAddon,
+					hookByHostedAddon: indexHookByHostedAddon,
+				},
+			)
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			for _, obj := range c.cluster {
 				if err := clusterInformers.Cluster().V1().ManagedClusters().Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
@@ -398,13 +408,14 @@ func TestHostingReconcile(t *testing.T) {
 				addonClient:               fakeAddonClient,
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
 				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				workIndexer:               workInformerFactory.Work().V1().ManifestWorks().Informer().GetIndexer(),
 				workLister:                workInformerFactory.Work().V1().ManifestWorks().Lister(),
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
 				cache:                     newWorkCache(),
 			}
 
 			syncContext := addontesting.NewFakeSyncContext(t)
-			err := controller.sync(context.TODO(), syncContext, c.key)
+			err = controller.sync(context.TODO(), syncContext, c.key)
 			if (err == nil && c.testaddon.err != nil) || (err != nil && c.testaddon.err == nil) {
 				t.Errorf("expected error %v when sync got %v", c.testaddon.err, err)
 			}

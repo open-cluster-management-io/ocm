@@ -7,16 +7,26 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
 type hostedSyncer struct {
-	controller *addonDeployController
+	applyWork func(ctx context.Context, appliedType string,
+		work *workapiv1.ManifestWork, addon *addonapiv1alpha1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
+
+	deleteWork func(ctx context.Context, workNamespace, workName string) error
+
+	getWorkByAddon func(addonName, addonNamespace string) ([]*workapiv1.ManifestWork, error)
+
+	getCluster func(clusterName string) (*clusterv1.ManagedCluster, error)
+
 	agentAddon agent.AgentAddon
 }
 
@@ -33,7 +43,7 @@ func (s *hostedSyncer) sync(ctx context.Context,
 	installMode, hostingClusterName := constants.GetHostedModeInfo(addon.GetAnnotations())
 	if installMode != constants.InstallModeHosted {
 		// the installMode is changed from hosted to default, cleanup the hosting resources
-		if err := s.cleanupDeployWork(ctx, addon, ""); err != nil {
+		if err := s.cleanupDeployWork(ctx, addon); err != nil {
 			return addon, err
 		}
 		addonRemoveFinalizer(addon, constants.HostingManifestFinalizer)
@@ -42,9 +52,9 @@ func (s *hostedSyncer) sync(ctx context.Context,
 
 	// Get Hosting Cluster, check whether the hosting cluster is a managed cluster of the hub
 	// TODO: check whether the hosting cluster of the addon is the same hosting cluster of the klusterlet
-	hostingCluster, err := s.controller.managedClusterLister.Get(hostingClusterName)
+	hostingCluster, err := s.getCluster(hostingClusterName)
 	if errors.IsNotFound(err) {
-		if err = s.cleanupDeployWork(ctx, addon, ""); err != nil {
+		if err = s.cleanupDeployWork(ctx, addon); err != nil {
 			return addon, err
 		}
 
@@ -69,7 +79,7 @@ func (s *hostedSyncer) sync(ctx context.Context,
 	})
 
 	if !hostingCluster.DeletionTimestamp.IsZero() {
-		if err = s.cleanupDeployWork(ctx, addon, hostingClusterName); err != nil {
+		if err = s.cleanupDeployWork(ctx, addon); err != nil {
 			return addon, err
 		}
 		addonRemoveFinalizer(addon, constants.HostingManifestFinalizer)
@@ -82,7 +92,7 @@ func (s *hostedSyncer) sync(ctx context.Context,
 			return addon, nil
 		}
 
-		if err = s.cleanupDeployWork(ctx, addon, hostingClusterName); err != nil {
+		if err = s.cleanupDeployWork(ctx, addon); err != nil {
 			return addon, err
 		}
 		addonRemoveFinalizer(addon, constants.HostingManifestFinalizer)
@@ -99,44 +109,62 @@ func (s *hostedSyncer) sync(ctx context.Context,
 		return addon, nil
 	}
 
-	deployWorkName := constants.DeployHostingWorkName(addon.Namespace, addon.Name)
-	deployWork, _, err := s.controller.buildManifestWorks(ctx, s.agentAddon, installMode, hostingClusterName, cluster, addon)
+	deployWorks, _, err := buildManifestWorks(ctx, s.agentAddon, installMode, hostingClusterName, cluster, addon)
 	if err != nil {
 		return addon, err
 	}
 
-	if deployWork == nil {
-		if err = s.cleanupDeployWork(ctx, addon, hostingClusterName); err != nil {
-			return addon, fmt.Errorf("failed to cleanup deploy work %s/%s when got no object", hostingClusterName, deployWorkName)
-		}
-		addonRemoveFinalizer(addon, constants.HostingManifestFinalizer)
-		return addon, nil
+	currentWorks, err := s.getWorkByAddon(addon.Name, addon.Namespace)
+	if err != nil {
+		return addon, err
 	}
 
-	_, err = s.controller.applyWork(ctx, constants.AddonHostingManifestApplied, deployWork, addon)
-	return addon, err
+	requiredWorkNames := sets.NewString()
+	for _, work := range deployWorks {
+		requiredWorkNames.Insert(work.Name)
+	}
+
+	var errs []error
+	for _, work := range currentWorks {
+		if requiredWorkNames.Has(work.Name) {
+			continue
+		}
+		err = s.deleteWork(ctx, work.Namespace, work.Name)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	for _, deployWork := range deployWorks {
+		_, err = s.applyWork(ctx, constants.AddonHostingManifestApplied, deployWork, addon)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return addon, utilerrors.NewAggregate(errs)
 }
 
 // cleanupDeployWork will delete the hosting manifestWork and cache. if the hostingClusterName is empty, will try
 // to find out the hosting cluster by manifestWork labels and do the cleanup.
 func (s *hostedSyncer) cleanupDeployWork(ctx context.Context,
-	addon *addonapiv1alpha1.ManagedClusterAddOn,
-	hostingClusterName string) (err error) {
+	addon *addonapiv1alpha1.ManagedClusterAddOn) (err error) {
 	if !addonHasFinalizer(addon, constants.HostingManifestFinalizer) {
 		return nil
 	}
 
-	if len(hostingClusterName) == 0 {
-		if hostingClusterName, err = s.controller.findHostingCluster(addon.Namespace, addon.Name); err != nil {
-			return err
+	currentWorks, err := s.getWorkByAddon(addon.Name, addon.Namespace)
+	if err != nil {
+		return err
+	}
+
+	var errs []error
+	for _, work := range currentWorks {
+		err = s.deleteWork(ctx, work.Namespace, work.Name)
+		if err != nil {
+			errs = append(errs, err)
 		}
 	}
 
-	deployWorkName := constants.DeployHostingWorkName(addon.Namespace, addon.Name)
-	if err = deleteWork(ctx, s.controller.workClient, hostingClusterName, deployWorkName); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-
-	s.controller.cache.removeCache(deployWorkName, hostingClusterName)
-	return nil
+	return utilerrors.NewAggregate(errs)
 }

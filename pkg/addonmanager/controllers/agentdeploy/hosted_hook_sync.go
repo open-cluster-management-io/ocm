@@ -7,15 +7,25 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
 type hostedHookSyncer struct {
-	controller *addonDeployController
+	applyWork func(ctx context.Context, appliedType string,
+		work *workapiv1.ManifestWork, addon *addonapiv1alpha1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
+
+	deleteWork func(ctx context.Context, workNamespace, workName string) error
+
+	getWorkByAddon func(addonName, addonNamespace string) ([]*workapiv1.ManifestWork, error)
+
+	getCluster func(clusterName string) (*clusterv1.ManagedCluster, error)
+
 	agentAddon agent.AgentAddon
 }
 
@@ -36,9 +46,9 @@ func (s *hostedHookSyncer) sync(ctx context.Context,
 
 	// Get Hosting Cluster, check whether the hosting cluster is a managed cluster of the hub
 	// TODO: check whether the hosting cluster of the addon is the same hosting cluster of the klusterlet
-	hostingCluster, err := s.controller.managedClusterLister.Get(hostingClusterName)
+	hostingCluster, err := s.getCluster(hostingClusterName)
 	if errors.IsNotFound(err) {
-		if err = s.cleanupHookWork(ctx, addon, ""); err != nil {
+		if err = s.cleanupHookWork(ctx, addon); err != nil {
 			return addon, err
 		}
 
@@ -50,14 +60,14 @@ func (s *hostedHookSyncer) sync(ctx context.Context,
 	}
 
 	if !hostingCluster.DeletionTimestamp.IsZero() {
-		if err = s.cleanupHookWork(ctx, addon, hostingClusterName); err != nil {
+		if err = s.cleanupHookWork(ctx, addon); err != nil {
 			return addon, err
 		}
 		addonRemoveFinalizer(addon, constants.HostingPreDeleteHookFinalizer)
 		return addon, nil
 	}
 
-	_, hookWork, err := s.controller.buildManifestWorks(ctx, s.agentAddon, installMode, hostingClusterName, cluster, addon)
+	_, hookWork, err := buildManifestWorks(ctx, s.agentAddon, installMode, hostingClusterName, cluster, addon)
 	if err != nil {
 		return addon, err
 	}
@@ -78,7 +88,7 @@ func (s *hostedHookSyncer) sync(ctx context.Context,
 		return addon, nil
 	}
 
-	hookWork, err = s.controller.applyWork(ctx, constants.AddonHostingManifestApplied, hookWork, addon)
+	hookWork, err = s.applyWork(ctx, constants.AddonHostingManifestApplied, hookWork, addon)
 	if err != nil {
 		return addon, err
 	}
@@ -92,7 +102,7 @@ func (s *hostedHookSyncer) sync(ctx context.Context,
 			Message: fmt.Sprintf("hook manifestWork %v is completed.", hookWork.Name),
 		})
 
-		if err = s.cleanupHookWork(ctx, addon, hostingClusterName); err != nil {
+		if err = s.cleanupHookWork(ctx, addon); err != nil {
 			return addon, err
 		}
 		if addonRemoveFinalizer(addon, constants.HostingPreDeleteHookFinalizer) {
@@ -115,23 +125,23 @@ func (s *hostedHookSyncer) sync(ctx context.Context,
 // cleanupHookWork will delete the hosting pre-delete hook manifestWork and remove the finalizer,
 // if the hostingClusterName is empty, will try to find out the hosting cluster by manifestWork labels and do the cleanup
 func (s *hostedHookSyncer) cleanupHookWork(ctx context.Context,
-	addon *addonapiv1alpha1.ManagedClusterAddOn,
-	hostingClusterName string) (err error) {
+	addon *addonapiv1alpha1.ManagedClusterAddOn) (err error) {
 	if !addonHasFinalizer(addon, constants.HostingPreDeleteHookFinalizer) {
 		return nil
 	}
 
-	if len(hostingClusterName) == 0 {
-		if hostingClusterName, err = s.controller.findHostingCluster(addon.Namespace, addon.Name); err != nil {
-			return err
-		}
-	}
-
-	hookWorkName := constants.PreDeleteHookHostingWorkName(addon.Namespace, addon.Name)
-	if err = deleteWork(ctx, s.controller.workClient, hostingClusterName, hookWorkName); err != nil {
+	currentWorks, err := s.getWorkByAddon(addon.Name, addon.Namespace)
+	if err != nil {
 		return err
 	}
 
-	s.controller.cache.removeCache(hookWorkName, hostingClusterName)
-	return nil
+	var errs []error
+	for _, work := range currentWorks {
+		err = s.deleteWork(ctx, work.Namespace, work.Name)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return utilerrors.NewAggregate(errs)
 }

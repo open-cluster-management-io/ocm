@@ -11,10 +11,15 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
 type defaultHookSyncer struct {
-	controller *addonDeployController
+	applyWork func(ctx context.Context, appliedType string,
+		work *workapiv1.ManifestWork, addon *addonapiv1alpha1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
+
+	removeWorkCache func(workName, workNamespace string)
+
 	agentAddon agent.AgentAddon
 }
 
@@ -24,7 +29,7 @@ func (s *defaultHookSyncer) sync(ctx context.Context,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.ManagedClusterAddOn, error) {
 	installMode := constants.InstallModeDefault
 	deployWorkNamespace := addon.Namespace
-	_, hookWork, err := s.controller.buildManifestWorks(ctx, s.agentAddon, installMode, deployWorkNamespace, cluster, addon)
+	_, hookWork, err := buildManifestWorks(ctx, s.agentAddon, installMode, deployWorkNamespace, cluster, addon)
 	if err != nil {
 		return addon, err
 	}
@@ -43,7 +48,7 @@ func (s *defaultHookSyncer) sync(ctx context.Context,
 	}
 
 	// will deploy the pre-delete hook manifestWork when the addon is deleting
-	hookWork, err = s.controller.applyWork(ctx, constants.AddonManifestApplied, hookWork, addon)
+	hookWork, err = s.applyWork(ctx, constants.AddonManifestApplied, hookWork, addon)
 	if err != nil {
 		return addon, err
 	}
@@ -57,7 +62,7 @@ func (s *defaultHookSyncer) sync(ctx context.Context,
 			Message: fmt.Sprintf("hook manifestWork %v is completed.", hookWork.Name),
 		})
 
-		s.controller.cache.removeCache(constants.PreDeleteHookWorkName(addon.Name), deployWorkNamespace)
+		s.removeWorkCache(hookWork.Name, deployWorkNamespace)
 		addonRemoveFinalizer(addon, constants.PreDeleteHookFinalizer)
 		return addon, nil
 	}

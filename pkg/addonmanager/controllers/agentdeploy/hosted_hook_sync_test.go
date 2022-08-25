@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/pointer"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
@@ -49,9 +50,7 @@ func TestHostingHookReconcile(t *testing.T) {
 				addontesting.NewHostedHookJob("test", "default"),
 			}},
 			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				// default sync deletes the deploy work since there is no manifests needed deploy in the managed cluster
-				// hosted sync create the deploy work
-				addontesting.AssertActions(t, actions, "delete", "create")
+				addontesting.AssertActions(t, actions, "create")
 			},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "update")
@@ -78,9 +77,7 @@ func TestHostingHookReconcile(t *testing.T) {
 				addontesting.NewHostedHookJob("test", "default"),
 			}},
 			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				// default sync deletes the deploy work since there is no manifests needed deploy in the managed cluster
-				// hosted sync creates the deploy work.
-				addontesting.AssertActions(t, actions, "delete", "create")
+				addontesting.AssertActions(t, actions, "create")
 			},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
@@ -103,7 +100,7 @@ func TestHostingHookReconcile(t *testing.T) {
 				addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
 				addontesting.NewHostedHookJob("test", "default"),
 			}},
-			existingWork: []runtime.Object{addontesting.NewUnstructured("v1", "ConfigMap", "default", "test")},
+			existingWork: []runtime.Object{},
 			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				// hosted sync deploy the hook work in the hosting cluster ns
 				addontesting.AssertActions(t, actions, "create")
@@ -144,13 +141,16 @@ func TestHostingHookReconcile(t *testing.T) {
 				addontesting.NewHostedHookJob("test", "default"),
 			}},
 			existingWork: []runtime.Object{
-				addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
 				func() *workapiv1.ManifestWork {
 					work := addontesting.NewManifestWork(
 						constants.PreDeleteHookHostingWorkName("cluster1", "test"),
 						"cluster2",
 						addontesting.NewHostedHookJob("test", "default"),
 					)
+					work.Labels = map[string]string{
+						constants.AddonLabel:          "test",
+						constants.AddonNamespaceLabel: "cluster1",
+					}
 					work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 						{
 							ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -238,13 +238,16 @@ func TestHostingHookReconcile(t *testing.T) {
 				addontesting.NewHostedHookJob("test", "default"),
 			}},
 			existingWork: []runtime.Object{
-				addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
 				func() *workapiv1.ManifestWork {
 					work := addontesting.NewManifestWork(
 						constants.PreDeleteHookHostingWorkName("cluster1", "test"),
 						"cluster2",
 						addontesting.NewHostedHookJob("test", "default"),
 					)
+					work.Labels = map[string]string{
+						constants.AddonLabel:          "test",
+						constants.AddonNamespaceLabel: "cluster1",
+					}
 					work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 						{
 							ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -323,6 +326,17 @@ func TestHostingHookReconcile(t *testing.T) {
 			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
 			clusterInformers := clusterv1informers.NewSharedInformerFactory(fakeClusterClient, 10*time.Minute)
 
+			err := workInformerFactory.Work().V1().ManifestWorks().Informer().AddIndexers(
+				cache.Indexers{
+					byAddon:           indexByAddon,
+					byHostedAddon:     indexByHostedAddon,
+					hookByHostedAddon: indexHookByHostedAddon,
+				},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			for _, obj := range c.cluster {
 				if err := clusterInformers.Cluster().V1().ManagedClusters().Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
@@ -344,13 +358,14 @@ func TestHostingHookReconcile(t *testing.T) {
 				addonClient:               fakeAddonClient,
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
 				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				workIndexer:               workInformerFactory.Work().V1().ManifestWorks().Informer().GetIndexer(),
 				workLister:                workInformerFactory.Work().V1().ManifestWorks().Lister(),
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
 				cache:                     newWorkCache(),
 			}
 
 			syncContext := addontesting.NewFakeSyncContext(t)
-			err := controller.sync(context.TODO(), syncContext, c.key)
+			err = controller.sync(context.TODO(), syncContext, c.key)
 			if (err == nil && c.testaddon.err != nil) || (err != nil && c.testaddon.err == nil) {
 				t.Errorf("expected error %v when sync got %v", c.testaddon.err, err)
 			}
