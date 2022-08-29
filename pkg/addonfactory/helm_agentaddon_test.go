@@ -94,6 +94,18 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 			expectedImage:            "quay.io/helloworld:2.4",
 			expectedObjCnt:           2,
 		},
+		{
+			name:                     "template render ok with multiple resources in one file",
+			scheme:                   testScheme,
+			clusterName:              "cluster2",
+			addonName:                "helloworld",
+			installNamespace:         "myNs",
+			annotationValues:         `{"global": {"nodeSelector":{"host":"ssd"},"imageOverrides":{"testImage":"quay.io/helloworld:2.4"}}}`,
+			expectedInstallNamespace: "myNs",
+			expectedNodeSelector:     map[string]string{"host": "ssd"},
+			expectedImage:            "quay.io/helloworld:2.4",
+			expectedObjCnt:           6,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -1,14 +1,18 @@
 package addonfactory
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"sort"
+	"strings"
 
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/engine"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -88,15 +92,31 @@ func (a *HelmAgentAddon) Manifests(
 			continue
 		}
 		klog.V(4).Infof("rendered template: %v", data)
-		object, _, err := a.decoder.Decode([]byte(data), nil, nil)
-		if err != nil {
-			if runtime.IsMissingKind(err) {
-				klog.V(4).Infof("Skipping template %v, reason: %v", k, err)
-				continue
+
+		yamlReader := yaml.NewYAMLReader(bufio.NewReader(strings.NewReader(data)))
+		for {
+			b, err := yamlReader.Read()
+			if err == io.EOF {
+				break
 			}
-			return nil, err
+			if err != nil {
+				return nil, err
+			}
+			if len(b) != 0 {
+				object, _, err := a.decoder.Decode(b, nil, nil)
+				if err != nil {
+					// In some conditions, resources will be provide by other hub-side components.
+					// Example case: https://github.com/open-cluster-management-io/addon-framework/pull/72
+					if runtime.IsMissingKind(err) {
+						klog.V(4).Infof("Skipping template %v, reason: %v", k, err)
+						continue
+					}
+					return nil, err
+				}
+				objects = append(objects, object)
+			}
 		}
-		objects = append(objects, object)
+
 	}
 
 	if a.trimCRDDescription {
