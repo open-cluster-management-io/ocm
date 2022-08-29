@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -22,6 +21,7 @@ import (
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/work/pkg/spoke/apply"
 	"open-cluster-management.io/work/pkg/spoke/controllers"
 	"open-cluster-management.io/work/pkg/spoke/spoketesting"
 )
@@ -43,7 +43,6 @@ func newController(t *testing.T, work *workapiv1.ManifestWork, appliedWork *work
 		appliedManifestWorkClient: fakeWorkClient.WorkV1().AppliedManifestWorks(),
 		appliedManifestWorkLister: workInformerFactory.Work().V1().AppliedManifestWorks().Lister(),
 		restMapper:                mapper,
-		staticResourceCache:       resourceapply.NewResourceCache(),
 	}
 
 	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(work); err != nil {
@@ -61,9 +60,13 @@ func newController(t *testing.T, work *workapiv1.ManifestWork, appliedWork *work
 	}
 }
 
+func (t *testController) toController() *ManifestWorkController {
+	t.controller.appliers = apply.NewAppliers(t.dynamicClient, t.kubeClient, nil)
+	return t.controller
+}
+
 func (t *testController) withKubeObject(objects ...runtime.Object) *testController {
 	kubeClient := fakekube.NewSimpleClientset(objects...)
-	t.controller.spokeKubeclient = kubeClient
 	t.kubeClient = kubeClient
 	return t
 }
@@ -196,13 +199,13 @@ func (t *testCase) validate(
 		}
 	}
 	if len(actualWorkActions) != len(t.expectedWorkAction) {
-		ts.Errorf("Expected %d action but got %#v", len(t.expectedWorkAction), actualWorkActions)
+		ts.Errorf("Expected work client has %d action but got %#v", len(t.expectedWorkAction), actualWorkActions)
 	}
 	for index := range actualWorkActions {
 		spoketesting.AssertAction(ts, actualWorkActions[index], t.expectedWorkAction[index])
 	}
 	if len(actualAppliedWorkActions) != len(t.expectedAppliedWorkAction) {
-		ts.Errorf("Expected %d action but got %#v", len(t.expectedAppliedWorkAction), actualAppliedWorkActions)
+		ts.Errorf("Expected applied work client has %d action but got %#v", len(t.expectedAppliedWorkAction), actualAppliedWorkActions)
 	}
 	for index := range actualAppliedWorkActions {
 		spoketesting.AssertAction(ts, actualAppliedWorkActions[index], t.expectedAppliedWorkAction[index])
@@ -210,14 +213,14 @@ func (t *testCase) validate(
 
 	spokeDynamicActions := dynamicClient.Actions()
 	if len(spokeDynamicActions) != len(t.expectedDynamicAction) {
-		ts.Errorf("Expected %d action but got %#v", len(t.expectedDynamicAction), spokeDynamicActions)
+		ts.Errorf("Expected dynamic client has %d action but got %#v", len(t.expectedDynamicAction), spokeDynamicActions)
 	}
 	for index := range spokeDynamicActions {
 		spoketesting.AssertAction(ts, spokeDynamicActions[index], t.expectedDynamicAction[index])
 	}
 	spokeKubeActions := kubeClient.Actions()
 	if len(spokeKubeActions) != len(t.expectedKubeAction) {
-		ts.Errorf("Expected %d action but got %#v", len(t.expectedKubeAction), spokeKubeActions)
+		ts.Errorf("Expected kube client has %d action but got %#v", len(t.expectedKubeAction), spokeKubeActions)
 	}
 	for index := range spokeKubeActions {
 		spoketesting.AssertAction(ts, spokeKubeActions[index], t.expectedKubeAction[index])
@@ -278,7 +281,6 @@ func TestSync(t *testing.T) {
 			withWorkManifest(spoketesting.NewUnstructured("v1", "Secret", "ns1", "test")).
 			withExpectedWorkAction("update").
 			withAppliedWorkAction("create").
-			withExpectedDynamicAction("get").
 			withExpectedKubeAction("get", "create").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
 			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
@@ -292,7 +294,6 @@ func TestSync(t *testing.T) {
 		newTestCase("update single resource").
 			withWorkManifest(spoketesting.NewUnstructured("v1", "Secret", "ns1", "test")).
 			withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
-			withExpectedDynamicAction("get").
 			withExpectedWorkAction("update").
 			withAppliedWorkAction("create").
 			withExpectedKubeAction("get", "delete", "create").
@@ -318,7 +319,6 @@ func TestSync(t *testing.T) {
 			withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
 			withExpectedWorkAction("update").
 			withAppliedWorkAction("create").
-			withExpectedDynamicAction("get", "get").
 			withExpectedKubeAction("get", "delete", "create", "get", "create").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}, expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
 			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
@@ -332,7 +332,7 @@ func TestSync(t *testing.T) {
 				withKubeObject(c.spokeObject...).
 				withUnstructuredObject(c.spokeDynamicObject...)
 			syncContext := spoketesting.NewFakeSyncContext(t, workKey)
-			err := controller.controller.sync(context.TODO(), syncContext)
+			err := controller.toController().sync(context.TODO(), syncContext)
 			if err != nil {
 				t.Errorf("Should be success with no err: %v", err)
 			}
@@ -349,7 +349,6 @@ func TestFailedToApplyResource(t *testing.T) {
 		withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
 		withExpectedWorkAction("update").
 		withAppliedWorkAction("create").
-		withExpectedDynamicAction("get", "get").
 		withExpectedKubeAction("get", "delete", "create", "get", "create").
 		withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}, expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionFalse}).
 		withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionFalse})
@@ -373,7 +372,7 @@ func TestFailedToApplyResource(t *testing.T) {
 		return true, &corev1.Secret{}, fmt.Errorf("Fake error")
 	})
 	syncContext := spoketesting.NewFakeSyncContext(t, workKey)
-	err := controller.controller.sync(context.TODO(), syncContext)
+	err := controller.toController().sync(context.TODO(), syncContext)
 	if err == nil {
 		t.Errorf("Should return an err")
 	}
@@ -415,7 +414,7 @@ func TestUpdateStrategy(t *testing.T) {
 			withManifestConfig(newManifestConfigOption("", "newobjects", "ns1", "n1", &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeServerSideApply})).
 			withExpectedWorkAction("update").
 			withAppliedWorkAction("create").
-			withExpectedDynamicAction("get", "patch", "patch").
+			withExpectedDynamicAction("patch", "patch").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
 			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
 		newTestCase("update single resource with server side apply updateStrategy").
@@ -424,7 +423,7 @@ func TestUpdateStrategy(t *testing.T) {
 			withManifestConfig(newManifestConfigOption("", "newobjects", "ns1", "n1", &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeServerSideApply})).
 			withExpectedWorkAction("update").
 			withAppliedWorkAction("create").
-			withExpectedDynamicAction("get", "patch", "patch").
+			withExpectedDynamicAction("patch", "patch").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
 			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
 		newTestCase("update single resource with create only updateStrategy").
@@ -452,7 +451,7 @@ func TestUpdateStrategy(t *testing.T) {
 				return true, spoketesting.NewUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}}), nil // clusterroleaggregator drops returned objects so no point in constructing them
 			})
 			syncContext := spoketesting.NewFakeSyncContext(t, workKey)
-			err := controller.controller.sync(context.TODO(), syncContext)
+			err := controller.toController().sync(context.TODO(), syncContext)
 			if err != nil {
 				t.Errorf("Should be success with no err: %v", err)
 			}
@@ -469,7 +468,7 @@ func TestServerSideApplyConflict(t *testing.T) {
 		withManifestConfig(newManifestConfigOption("", "newobjects", "ns1", "n1", &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeServerSideApply})).
 		withExpectedWorkAction("update").
 		withAppliedWorkAction("create").
-		withExpectedDynamicAction("get", "patch").
+		withExpectedDynamicAction("patch").
 		withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionFalse}).
 		withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionFalse})
 
@@ -485,7 +484,7 @@ func TestServerSideApplyConflict(t *testing.T) {
 		return true, nil, errors.NewConflict(schema.GroupResource{Resource: "newobjects"}, "n1", fmt.Errorf("conflict error"))
 	})
 	syncContext := spoketesting.NewFakeSyncContext(t, workKey)
-	err := controller.controller.sync(context.TODO(), syncContext)
+	err := controller.toController().sync(context.TODO(), syncContext)
 	if err != nil {
 		t.Errorf("Should be success with no err: %v", err)
 	}
@@ -502,56 +501,6 @@ func newManifestConfigOption(group, resource, namespace, name string, strategy *
 			Name:      name,
 		},
 		UpdateStrategy: strategy,
-	}
-}
-
-// Test unstructured compare
-func TestIsSameUnstructured(t *testing.T) {
-	cases := []struct {
-		name     string
-		obj1     *unstructured.Unstructured
-		obj2     *unstructured.Unstructured
-		expected bool
-	}{
-		{
-			name:     "different kind",
-			obj1:     spoketesting.NewUnstructured("v1", "Kind1", "ns1", "n1"),
-			obj2:     spoketesting.NewUnstructured("v1", "Kind2", "ns1", "n1"),
-			expected: false,
-		},
-		{
-			name:     "different namespace",
-			obj1:     spoketesting.NewUnstructured("v1", "Kind1", "ns1", "n1"),
-			obj2:     spoketesting.NewUnstructured("v1", "Kind1", "ns2", "n1"),
-			expected: false,
-		},
-		{
-			name:     "different name",
-			obj1:     spoketesting.NewUnstructured("v1", "Kind1", "ns1", "n1"),
-			obj2:     spoketesting.NewUnstructured("v1", "Kind1", "ns1", "n2"),
-			expected: false,
-		},
-		{
-			name:     "different spec",
-			obj1:     spoketesting.NewUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}}),
-			obj2:     spoketesting.NewUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val2"}}),
-			expected: false,
-		},
-		{
-			name:     "same spec, different status",
-			obj1:     spoketesting.NewUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}, "status": "status1"}),
-			obj2:     spoketesting.NewUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}, "status": "status2"}),
-			expected: true,
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			actual := isSameUnstructured(c.obj1, c.obj2)
-			if c.expected != actual {
-				t.Errorf("expected %t, but %t", c.expected, actual)
-			}
-		})
 	}
 }
 
@@ -870,251 +819,6 @@ func TestManageOwner(t *testing.T) {
 			if !equality.Semantic.DeepEqual(owner, c.expectOwner) {
 				t.Errorf("Expect owner is %v, but got %v", c.expectOwner, owner)
 			}
-		})
-	}
-}
-
-func TestApplyUnstructred(t *testing.T) {
-	cases := []struct {
-		name            string
-		owner           metav1.OwnerReference
-		existing        *unstructured.Unstructured
-		required        *unstructured.Unstructured
-		gvr             schema.GroupVersionResource
-		validateActions func(t *testing.T, actions []clienttesting.Action)
-	}{
-		{
-			name:     "create a new object with owner",
-			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"},
-			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
-			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("Expect 1 actions, but have %d", len(actions))
-				}
-
-				spoketesting.AssertAction(t, actions[0], "create")
-
-				obj := actions[0].(clienttesting.CreateActionImpl).Object.(*unstructured.Unstructured)
-				owners := obj.GetOwnerReferences()
-				if len(owners) != 1 {
-					t.Errorf("Expect 1 owners, but have %d", len(owners))
-				}
-
-				if owners[0].UID != "testowner" {
-					t.Errorf("Owner UId is not correct, got %s", owners[0].UID)
-				}
-			},
-		},
-		{
-			name:     "create a new object without owner",
-			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner-"},
-			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
-			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("Expect 1 actions, but have %d", len(actions))
-				}
-
-				spoketesting.AssertAction(t, actions[0], "create")
-
-				obj := actions[0].(clienttesting.CreateActionImpl).Object.(*unstructured.Unstructured)
-				owners := obj.GetOwnerReferences()
-				if len(owners) != 0 {
-					t.Errorf("Expect 1 owners, but have %d", len(owners))
-				}
-			},
-		},
-		{
-			name: "update an object owner",
-			existing: spoketesting.NewUnstructured(
-				"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"}),
-			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"},
-			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
-			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("Expect 1 actions, but have %d", len(actions))
-				}
-
-				spoketesting.AssertAction(t, actions[0], "update")
-
-				obj := actions[0].(clienttesting.UpdateActionImpl).Object.(*unstructured.Unstructured)
-				owners := obj.GetOwnerReferences()
-				if len(owners) != 2 {
-					t.Errorf("Expect 2 owners, but have %d", len(owners))
-				}
-
-				if owners[0].UID != "testowner1" {
-					t.Errorf("Owner UId is not correct, got %s", owners[0].UID)
-				}
-				if owners[1].UID != "testowner" {
-					t.Errorf("Owner UId is not correct, got %s", owners[1].UID)
-				}
-			},
-		},
-		{
-			name: "update an object without owner",
-			existing: spoketesting.NewUnstructured(
-				"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"}),
-			owner:    metav1.OwnerReference{Name: "test", UID: "testowner-"},
-			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
-			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 0 {
-					t.Errorf("Expect 0 actions, but have %d", len(actions))
-				}
-			},
-		},
-		{
-			name: "remove an object owner",
-			existing: spoketesting.NewUnstructured(
-				"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"}),
-			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner-"},
-			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
-			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("Expect 1 actions, but have %d", len(actions))
-				}
-
-				spoketesting.AssertAction(t, actions[0], "update")
-
-				obj := actions[0].(clienttesting.UpdateActionImpl).Object.(*unstructured.Unstructured)
-				owners := obj.GetOwnerReferences()
-				if len(owners) != 0 {
-					t.Errorf("Expect 0 owner, but have %d", len(owners))
-				}
-			},
-		},
-		{
-			name: "merge labels",
-			existing: func() *unstructured.Unstructured {
-				obj := spoketesting.NewUnstructured(
-					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
-				obj.SetLabels(map[string]string{"foo": "bar"})
-				return obj
-			}(),
-			owner: metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"},
-			required: func() *unstructured.Unstructured {
-				obj := spoketesting.NewUnstructured(
-					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
-				obj.SetLabels(map[string]string{"foo1": "bar1"})
-				return obj
-			}(),
-			gvr: schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("Expect 1 actions, but have %d", len(actions))
-				}
-
-				spoketesting.AssertAction(t, actions[0], "update")
-
-				obj := actions[0].(clienttesting.UpdateActionImpl).Object.(*unstructured.Unstructured)
-				labels := obj.GetLabels()
-				if len(labels) != 2 {
-					t.Errorf("Expect 2 labels, but have %d", len(labels))
-				}
-			},
-		},
-		{
-			name: "merge annotation",
-			existing: func() *unstructured.Unstructured {
-				obj := spoketesting.NewUnstructured(
-					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
-				obj.SetAnnotations(map[string]string{"foo": "bar"})
-				return obj
-			}(),
-			owner: metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"},
-			required: func() *unstructured.Unstructured {
-				obj := spoketesting.NewUnstructured(
-					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
-				obj.SetAnnotations(map[string]string{"foo1": "bar1"})
-				return obj
-			}(),
-			gvr: schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("Expect 1 actions, but have %d", len(actions))
-				}
-
-				spoketesting.AssertAction(t, actions[0], "update")
-
-				obj := actions[0].(clienttesting.UpdateActionImpl).Object.(*unstructured.Unstructured)
-				annotations := obj.GetAnnotations()
-				if len(annotations) != 2 {
-					t.Errorf("Expect 2 annotations, but have %d", len(annotations))
-				}
-			},
-		},
-		{
-			name: "set existing finalizer",
-			existing: func() *unstructured.Unstructured {
-				obj := spoketesting.NewUnstructured(
-					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
-				obj.SetFinalizers([]string{"foo"})
-				return obj
-			}(),
-			owner: metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"},
-			required: func() *unstructured.Unstructured {
-				obj := spoketesting.NewUnstructured(
-					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
-				obj.SetFinalizers([]string{"foo1"})
-				return obj
-			}(),
-			gvr: schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 0 {
-					t.Errorf("Expect 0 actions, but have %d", len(actions))
-				}
-			},
-		},
-		{
-			name: "nothing to update",
-			existing: func() *unstructured.Unstructured {
-				obj := spoketesting.NewUnstructured(
-					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
-				obj.SetLabels(map[string]string{"foo": "bar"})
-				obj.SetAnnotations(map[string]string{"foo": "bar"})
-				return obj
-			}(),
-			owner: metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"},
-			required: func() *unstructured.Unstructured {
-				obj := spoketesting.NewUnstructured(
-					"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"})
-				obj.SetLabels(map[string]string{"foo": "bar"})
-				obj.SetAnnotations(map[string]string{"foo": "bar"})
-				return obj
-			}(),
-			gvr: schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 0 {
-					t.Errorf("Expect 0 actions, but have %v", actions)
-				}
-			},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			work, workKey := spoketesting.NewManifestWork(0)
-			work.Finalizers = []string{controllers.ManifestWorkFinalizer}
-			objects := []runtime.Object{}
-			if c.existing != nil {
-				objects = append(objects, c.existing)
-			}
-			controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).withUnstructuredObject(objects...)
-			syncContext := spoketesting.NewFakeSyncContext(t, workKey)
-
-			c.required.SetOwnerReferences([]metav1.OwnerReference{c.owner})
-			_, _, err := controller.controller.applyUnstructured(
-				context.TODO(), c.existing, c.required, c.gvr, syncContext.Recorder())
-
-			if err != nil {
-				t.Errorf("expect no error, but got %v", err)
-			}
-
-			c.validateActions(t, controller.dynamicClient.Actions())
 		})
 	}
 }

@@ -2,14 +2,11 @@ package manifestcontroller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,15 +17,11 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
-	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	"github.com/pkg/errors"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	workinformer "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
@@ -36,6 +29,7 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/work/pkg/helper"
+	"open-cluster-management.io/work/pkg/spoke/apply"
 	"open-cluster-management.io/work/pkg/spoke/controllers"
 )
 
@@ -49,25 +43,16 @@ type ManifestWorkController struct {
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
 	appliedManifestWorkLister worklister.AppliedManifestWorkLister
 	spokeDynamicClient        dynamic.Interface
-	spokeKubeclient           kubernetes.Interface
-	spokeAPIExtensionClient   apiextensionsclient.Interface
 	hubHash                   string
 	restMapper                meta.RESTMapper
-	staticResourceCache       resourceapply.ResourceCache
+	appliers                  *apply.Appliers
 }
 
 type applyResult struct {
-	resourceapply.ApplyResult
+	Result runtime.Object
+	Error  error
 
 	resourceMeta workapiv1.ManifestResourceMeta
-}
-
-type serverSideApplyConflictError struct {
-	ssaErr error
-}
-
-func (e *serverSideApplyConflictError) Error() string {
-	return e.ssaErr.Error()
 }
 
 // NewManifestWorkController returns a ManifestWorkController
@@ -91,13 +76,10 @@ func NewManifestWorkController(
 		appliedManifestWorkClient: appliedManifestWorkClient,
 		appliedManifestWorkLister: appliedManifestWorkInformer.Lister(),
 		spokeDynamicClient:        spokeDynamicClient,
-		spokeKubeclient:           spokeKubeClient,
-		spokeAPIExtensionClient:   spokeAPIExtensionClient,
 		hubHash:                   hubHash,
 		restMapper:                restMapper,
-		// TODO we did not gc resources in cache, which may cause more memory usage. It
-		// should be refactored using own cache implementation in the future.
-		staticResourceCache: resourceapply.NewResourceCache(),
+
+		appliers: apply.NewAppliers(spokeDynamicClient, spokeKubeClient, spokeAPIExtensionClient),
 	}
 
 	return factory.New().
@@ -191,7 +173,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	newManifestConditions := []workapiv1.ManifestCondition{}
 	for _, result := range resourceResults {
 		// ignore server side apply conflict error since it cannot be resolved by error fallback.
-		var ssaConflict *serverSideApplyConflictError
+		var ssaConflict *apply.ServerSideApplyConflictError
 		if result.Error != nil && !errors.As(result.Error, &ssaConflict) {
 			errs = append(errs, result.Error)
 		}
@@ -231,7 +213,7 @@ func (m *ManifestWorkController) applyManifests(
 	for index, manifest := range manifests {
 		switch {
 		case existingResults[index].Result == nil:
-			// Apply if there is not result.
+			// Apply if there is no result.
 			existingResults[index] = m.applyOneManifest(ctx, index, manifest, workSpec, recorder, owner)
 		case apierrors.IsConflict(existingResults[index].Error):
 			// Apply if there is a resource confilct error.
@@ -250,11 +232,6 @@ func (m *ManifestWorkController) applyOneManifest(
 	recorder events.Recorder,
 	owner metav1.OwnerReference) applyResult {
 
-	clientHolder := resourceapply.NewClientHolder().
-		WithAPIExtensionsClient(m.spokeAPIExtensionClient).
-		WithKubernetes(m.spokeKubeclient).
-		WithDynamicClient(m.spokeDynamicClient)
-
 	result := applyResult{}
 
 	// parse the required and set resource meta
@@ -271,16 +248,6 @@ func (m *ManifestWorkController) applyOneManifest(
 		return result
 	}
 
-	// try to get the existing at first.
-	existing, existingErr := m.spokeDynamicClient.
-		Resource(gvr).
-		Namespace(required.GetNamespace()).
-		Get(ctx, required.GetName(), metav1.GetOptions{})
-	if existingErr != nil && !apierrors.IsNotFound(existingErr) {
-		result.Error = existingErr
-		return result
-	}
-
 	// compute required ownerrefs based on delete option
 	requiredOwner := manageOwnerRef(gvr, resMeta.Namespace, resMeta.Name, workSpec.DeleteOption, owner)
 
@@ -292,118 +259,15 @@ func (m *ManifestWorkController) applyOneManifest(
 		strategy = *option.UpdateStrategy
 	}
 
-	// apply resource based on update strategy
-	switch strategy.Type {
-	case workapiv1.UpdateStrategyTypeServerSideApply:
-		result.Result, result.Changed, result.Error = m.serverSideApply(ctx, gvr, required, option.UpdateStrategy.ServerSideApply, recorder)
-	case workapiv1.UpdateStrategyTypeCreateOnly, workapiv1.UpdateStrategyTypeUpdate:
-		if strategy.Type == workapiv1.UpdateStrategyTypeCreateOnly && existingErr == nil {
-			result.Result = existing
-			break
-		}
-		required.SetOwnerReferences([]metav1.OwnerReference{requiredOwner})
-		results := resourceapply.ApplyDirectly(ctx, clientHolder, recorder, m.staticResourceCache, func(name string) ([]byte, error) {
-			return required.MarshalJSON()
-		}, "manifest")
+	applier := m.appliers.GetApplier(strategy.Type)
+	result.Result, result.Error = applier.Apply(ctx, gvr, required, requiredOwner, option, recorder)
 
-		result.Result = results[0].Result
-		result.Changed = results[0].Changed
-		result.Error = results[0].Error
-
-		// Try apply with dynamic client if the manifest cannot be decoded by scheme or typed client is not found
-		// TODO we should check the certain error.
-		// Use dynamic client when scheme cannot decode manifest or typed client cannot handle the object
-		if isDecodeError(result.Error) || isUnhandledError(result.Error) || isUnsupportedError(result.Error) {
-			result.Result, result.Changed, result.Error = m.applyUnstructured(ctx, existing, required, gvr, recorder)
-		}
-	}
-
-	// patch the ownerref no matter apply fails or not.
+	// patch the ownerref
 	if result.Error == nil {
 		result.Error = helper.ApplyOwnerReferences(ctx, m.spokeDynamicClient, gvr, result.Result, requiredOwner)
 	}
 
 	return result
-}
-
-func (m *ManifestWorkController) serverSideApply(
-	ctx context.Context,
-	gvr schema.GroupVersionResource,
-	required *unstructured.Unstructured,
-	config *workapiv1.ServerSideApplyConfig,
-	recorder events.Recorder) (*unstructured.Unstructured, bool, error) {
-	force := false
-	fieldManager := workapiv1.DefaultFieldManager
-
-	if config != nil {
-		force = config.Force
-		if len(config.FieldManager) > 0 {
-			fieldManager = config.FieldManager
-		}
-	}
-
-	patch, err := json.Marshal(resourcemerge.WithCleanLabelsAndAnnotations(required))
-	if err != nil {
-		return nil, false, err
-	}
-
-	// TODO use Apply method instead when upgrading the client-go to 0.25.x
-	actual, err := m.spokeDynamicClient.
-		Resource(gvr).
-		Namespace(required.GetNamespace()).
-		Patch(ctx, required.GetName(), types.ApplyPatchType, patch, metav1.PatchOptions{FieldManager: fieldManager, Force: pointer.Bool(force)})
-	resourceKey, _ := cache.MetaNamespaceKeyFunc(required)
-	recorder.Eventf(fmt.Sprintf(
-		"Server Side Applied %s %s", required.GetKind(), resourceKey), "Patched with field manager %s", fieldManager)
-
-	if apierrors.IsConflict(err) {
-		return actual, true, &serverSideApplyConflictError{ssaErr: err}
-	}
-
-	return actual, true, err
-}
-
-func (m *ManifestWorkController) applyUnstructured(
-	ctx context.Context,
-	existing, required *unstructured.Unstructured,
-	gvr schema.GroupVersionResource,
-	recorder events.Recorder) (*unstructured.Unstructured, bool, error) {
-	if existing == nil {
-		actual, err := m.spokeDynamicClient.Resource(gvr).Namespace(required.GetNamespace()).Create(
-			ctx, resourcemerge.WithCleanLabelsAndAnnotations(required).(*unstructured.Unstructured), metav1.CreateOptions{})
-		recorder.Eventf(fmt.Sprintf(
-			"%s Created", required.GetKind()), "Created %s/%s because it was missing", required.GetNamespace(), required.GetName())
-		return actual, true, err
-	}
-
-	// Merge OwnerRefs, Labels, and Annotations.
-	existingOwners := existing.GetOwnerReferences()
-	existingLabels := existing.GetLabels()
-	existingAnnotations := existing.GetAnnotations()
-	modified := resourcemerge.BoolPtr(false)
-
-	resourcemerge.MergeMap(modified, &existingLabels, required.GetLabels())
-	resourcemerge.MergeMap(modified, &existingAnnotations, required.GetAnnotations())
-	resourcemerge.MergeOwnerRefs(modified, &existingOwners, required.GetOwnerReferences())
-
-	// Always overwrite required from existing, since required has been merged to existing
-	required.SetOwnerReferences(existingOwners)
-	required.SetLabels(existingLabels)
-	required.SetAnnotations(existingAnnotations)
-
-	// Keep the finalizers unchanged
-	required.SetFinalizers(existing.GetFinalizers())
-
-	// Compare and update the unstrcuctured.
-	if !*modified && isSameUnstructured(required, existing) {
-		return existing, false, nil
-	}
-	required.SetResourceVersion(existing.GetResourceVersion())
-	actual, err := m.spokeDynamicClient.Resource(gvr).Namespace(required.GetNamespace()).Update(
-		ctx, required, metav1.UpdateOptions{})
-	recorder.Eventf(fmt.Sprintf(
-		"%s Updated", required.GetKind()), "Updated %s/%s", required.GetNamespace(), required.GetName())
-	return actual, true, err
 }
 
 // manageOwnerRef return a ownerref based on the resource and the deleteOption indicating whether the owneref
@@ -492,50 +356,6 @@ func (m *ManifestWorkController) generateUpdateStatusFunc(generation int64, newM
 		oldStatus.Conditions = helper.MergeStatusConditions(oldStatus.Conditions, newConditions)
 		return nil
 	}
-}
-
-// isDecodeError is to check if the error returned from resourceapply is due to that the object cannot
-// be decoded or no typed client can handle the object.
-func isDecodeError(err error) bool {
-	return err != nil && strings.HasPrefix(err.Error(), "cannot decode")
-}
-
-// isUnhandledError is to check if the error returned from resourceapply is due to that no typed
-// client can handle the object
-func isUnhandledError(err error) bool {
-	return err != nil && strings.HasPrefix(err.Error(), "unhandled type")
-}
-
-// isUnsupportedError is to check if the error returned from resourceapply is due to
-// the PR https://github.com/openshift/library-go/pull/1042
-func isUnsupportedError(err error) bool {
-	return err != nil && strings.HasPrefix(err.Error(), "unsupported object type")
-}
-
-// isSameUnstructured compares the two unstructured object.
-// The comparison ignores the metadata and status field, and check if the two objects are semantically equal.
-func isSameUnstructured(obj1, obj2 *unstructured.Unstructured) bool {
-	obj1Copy := obj1.DeepCopy()
-	obj2Copy := obj2.DeepCopy()
-
-	// Compare gvk, name, namespace at first
-	if obj1Copy.GroupVersionKind() != obj2Copy.GroupVersionKind() {
-		return false
-	}
-	if obj1Copy.GetName() != obj2Copy.GetName() {
-		return false
-	}
-	if obj1Copy.GetNamespace() != obj2Copy.GetNamespace() {
-		return false
-	}
-
-	// Compare semantically after removing metadata and status field
-	delete(obj1Copy.Object, "metadata")
-	delete(obj2Copy.Object, "metadata")
-	delete(obj1Copy.Object, "status")
-	delete(obj2Copy.Object, "status")
-
-	return equality.Semantic.DeepEqual(obj1Copy.Object, obj2Copy.Object)
 }
 
 // allInCondition checks status of conditions with a particular type in ManifestCondition array.

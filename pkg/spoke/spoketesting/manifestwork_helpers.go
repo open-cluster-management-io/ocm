@@ -51,6 +51,12 @@ func NewSecret(name, namespace string, content string) *corev1.Secret {
 	}
 }
 
+func NewSecretWithType(name, namespace string, content string, t corev1.SecretType) *corev1.Secret {
+	secret := NewSecret(name, namespace, content)
+	secret.Type = t
+	return secret
+}
+
 func NewUnstructuredSecretBySize(namespace, name string, size int32) *unstructured.Unstructured {
 	data := ""
 	for i := int32(0); i < size; i++ {
