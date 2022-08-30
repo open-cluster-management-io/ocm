@@ -162,7 +162,7 @@ apply-spoke-cr: bootstrap-secret
 	| $(KUBECTL) apply -f -
 
 apply-spoke-cr-hosted: bootstrap-secret-hosted external-managed-secret
-	$(KUSTOMIZE) build deploy/klusterlet/config/samples | $(SED_CMD) -e "s,mode: Default,mode: Detached," -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build deploy/klusterlet/config/samples | $(SED_CMD) -e "s,mode: Default,mode: Detached," -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,cluster1,$(MANAGED_CLUSTER_NAME)," | $(KUBECTL) apply -f -
 
 clean-hub-cr:
 	$(KUBECTL) delete managedcluster --all --ignore-not-found
