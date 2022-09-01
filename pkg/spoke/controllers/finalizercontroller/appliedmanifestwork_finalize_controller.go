@@ -36,6 +36,7 @@ func NewAppliedManifestWorkFinalizeController(
 	spokeDynamicClient dynamic.Interface,
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
 	appliedManifestWorkInformer workinformer.AppliedManifestWorkInformer,
+	hubHash string,
 ) factory.Controller {
 
 	controller := &AppliedManifestWorkFinalizeController{
@@ -46,10 +47,10 @@ func NewAppliedManifestWorkFinalizeController(
 	}
 
 	return factory.New().
-		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
+		WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
 			accessor, _ := meta.Accessor(obj)
 			return accessor.GetName()
-		}, appliedManifestWorkInformer.Informer()).
+		}, helper.AppliedManifestworkHubHashFilter(hubHash), appliedManifestWorkInformer.Informer()).
 		WithSync(controller.sync).ToController("AppliedManifestWorkFinalizer", recorder)
 }
 

@@ -330,6 +330,14 @@ func AppliedManifestworkQueueKeyFunc(hubhash string) factory.ObjectQueueKeyFunc 
 	}
 }
 
+// AppliedManifestworkHubHashFilter filter the appliedmanifestwork belonging to this hub
+func AppliedManifestworkHubHashFilter(hubHash string) factory.EventFilterFunc {
+	return func(obj interface{}) bool {
+		accessor, _ := meta.Accessor(obj)
+		return strings.HasPrefix(accessor.GetName(), hubHash)
+	}
+}
+
 // HubHash returns a hash of hubserver
 // NOTE: the length of hash string is 64, meaning the length of manifestwork name should be less than 189
 func HubHash(hubServer string) string {
