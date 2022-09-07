@@ -40,7 +40,7 @@ func TestCreateSpokeCluster(t *testing.T) {
 			name:            "create an existed cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get")
+				testinghelpers.AssertActions(t, actions, "get", "update")
 			},
 		},
 	}

@@ -53,40 +53,87 @@ func NewManagedClusterCreatingController(
 }
 
 func (c *managedClusterCreatingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	_, err := c.hubClusterClient.ClusterV1().ManagedClusters().Get(ctx, c.clusterName, metav1.GetOptions{})
-	switch {
-	case errors.IsUnauthorized(err),
-		errors.IsForbidden(err) && strings.Contains(err.Error(), anonymous):
+	existingCluster, err := c.hubClusterClient.ClusterV1().ManagedClusters().Get(ctx, c.clusterName, metav1.GetOptions{})
+	if err != nil && skipUnauthorizedError(err) == nil && strings.Contains(err.Error(), anonymous) {
 		klog.V(4).Infof("unable to get the managed cluster %q from hub: %v", c.clusterName, err)
 		return nil
-	case errors.IsNotFound(err):
-	case err == nil:
-		return nil
-	case err != nil:
+	}
+
+	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
-	managedCluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: c.clusterName,
-		},
+	// create ManagedCluster if not found
+	if errors.IsNotFound(err) {
+		managedCluster := &clusterv1.ManagedCluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: c.clusterName,
+			},
+		}
+
+		if len(c.spokeExternalServerURLs) != 0 {
+			var managedClusterClientConfigs []clusterv1.ClientConfig
+			for _, serverURL := range c.spokeExternalServerURLs {
+				managedClusterClientConfigs = append(managedClusterClientConfigs, clusterv1.ClientConfig{
+					URL:      serverURL,
+					CABundle: c.spokeCABundle,
+				})
+			}
+			managedCluster.Spec.ManagedClusterClientConfigs = managedClusterClientConfigs
+		}
+
+		_, err = c.hubClusterClient.ClusterV1().ManagedClusters().Create(ctx, managedCluster, metav1.CreateOptions{})
+		// ManagedCluster is only allowed created during bootstrap. After bootstrap secret expired, an unauthorized error will be got, skip it
+		if skipUnauthorizedError(err) != nil {
+			return fmt.Errorf("unable to create managed cluster with name %q on hub: %w", c.clusterName, err)
+		}
+		syncCtx.Recorder().Eventf("ManagedClusterCreated", "Managed cluster %q created on hub", c.clusterName)
+		return nil
 	}
 
-	if len(c.spokeExternalServerURLs) != 0 {
-		managedClusterClientConfigs := []clusterv1.ClientConfig{}
-		for _, serverURL := range c.spokeExternalServerURLs {
+	// do not update ManagedClusterClientConfigs in ManagedCluster if spokeExternalServerURLs is empty
+	if len(c.spokeExternalServerURLs) == 0 {
+		return nil
+	}
+
+	// merge ClientConfig
+	managedClusterClientConfigs := existingCluster.Spec.ManagedClusterClientConfigs
+	for _, serverURL := range c.spokeExternalServerURLs {
+		isIncludeByExisting := false
+		for _, existingClientConfig := range existingCluster.Spec.ManagedClusterClientConfigs {
+			if serverURL == existingClientConfig.URL {
+				isIncludeByExisting = true
+				break
+			}
+		}
+
+		if !isIncludeByExisting {
 			managedClusterClientConfigs = append(managedClusterClientConfigs, clusterv1.ClientConfig{
 				URL:      serverURL,
 				CABundle: c.spokeCABundle,
 			})
 		}
-		managedCluster.Spec.ManagedClusterClientConfigs = managedClusterClientConfigs
+	}
+	if len(existingCluster.Spec.ManagedClusterClientConfigs) == len(managedClusterClientConfigs) {
+		return nil
 	}
 
-	_, err = c.hubClusterClient.ClusterV1().ManagedClusters().Create(ctx, managedCluster, metav1.CreateOptions{})
-	if err != nil {
-		return fmt.Errorf("unable to create managed cluster with name %q on hub: %w", c.clusterName, err)
+	// update ManagedClusterClientConfigs in ManagedCluster
+	clusterCopy := existingCluster.DeepCopy()
+	clusterCopy.Spec.ManagedClusterClientConfigs = managedClusterClientConfigs
+	_, err = c.hubClusterClient.ClusterV1().ManagedClusters().Update(ctx, clusterCopy, metav1.UpdateOptions{})
+	// ManagedClusterClientConfigs in ManagedCluster is only allowed updated during bootstrap. After bootstrap secret expired, an unauthorized error will be got, skip it
+	if skipUnauthorizedError(err) != nil {
+		return fmt.Errorf("unable to update ManagedClusterClientConfigs of managed cluster %q in hub: %w", c.clusterName, err)
 	}
-	syncCtx.Recorder().Eventf("ManagedClusterCreated", "Managed cluster %q created on hub", c.clusterName)
+
 	return nil
+}
+
+func skipUnauthorizedError(err error) error {
+	if errors.IsUnauthorized(err) || errors.IsForbidden(err) {
+		return nil
+	}
+
+	return err
 }
