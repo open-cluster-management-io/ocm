@@ -96,7 +96,7 @@ func TestServerSideApply(t *testing.T) {
 				return
 			}
 
-			var ssaConflict *ServerSideApplyConflictError
+			var ssaConflict = &ServerSideApplyConflictError{}
 			if !errors.As(err, &ssaConflict) {
 				t.Errorf("expect serverside apply conflict error, but got %v", err)
 			}

@@ -173,7 +173,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	newManifestConditions := []workapiv1.ManifestCondition{}
 	for _, result := range resourceResults {
 		// ignore server side apply conflict error since it cannot be resolved by error fallback.
-		var ssaConflict *apply.ServerSideApplyConflictError
+		var ssaConflict = &apply.ServerSideApplyConflictError{}
 		if result.Error != nil && !errors.As(result.Error, &ssaConflict) {
 			errs = append(errs, result.Error)
 		}
