@@ -35,9 +35,15 @@ type ManagedClusterAddOnSpec struct {
 	// installNamespace is the namespace on the managed cluster to install the addon agent.
 	// If it is not set, open-cluster-management-agent-addon namespace is used to install the addon agent.
 	// +optional
+	// +kubebuilder:default=open-cluster-management-agent-addon
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
 	InstallNamespace string `json:"installNamespace,omitempty"`
+
+	// config represents the configuration namespace and name for the current add-on.
+	// In scenario where the current add-on has its own configuration.
+	// +optional
+	Config *ConfigReferent `json:"config,omitempty"`
 }
 
 // RegistrationConfig defines the configuration of the addon agent to register to hub. The Klusterlet agent will
@@ -94,12 +100,18 @@ type ManagedClusterAddOnStatus struct {
 	// addOnMeta is a reference to the metadata information for the add-on.
 	// This should be same as the addOnMeta for the corresponding ClusterManagementAddOn resource.
 	// +optional
-	AddOnMeta AddOnMeta `json:"addOnMeta"`
+	AddOnMeta AddOnMeta `json:"addOnMeta,omitempty"`
 
+	// Deprecated: Use configReference instead
 	// addOnConfiguration is a reference to configuration information for the add-on.
 	// This resource is use to locate the configuration resource for the add-on.
 	// +optional
-	AddOnConfiguration ConfigCoordinates `json:"addOnConfiguration"`
+	AddOnConfiguration ConfigCoordinates `json:"addOnConfiguration,omitempty"`
+
+	// configReference is a reference to the add-on configuration.
+	// This will be overridden by the clustermanagementaddon configuration reference.
+	// +optional
+	ConfigReference *ConfigReference `json:"configReference,omitempty"`
 
 	// registrations is the conifigurations for the addon agent to register to hub. It should be set by each addon controller
 	// on hub to define how the addon agent on managedcluster is registered. With the registration defined,
@@ -126,6 +138,9 @@ const (
 	// ManagedClusterAddOnConditionDegraded represents that the addon agent is providing degraded service on
 	// the managed cluster.
 	ManagedClusterAddOnConditionDegraded string = "Degraded"
+
+	// ManagedClusterAddOnCondtionConfigured represents that the addon agent is configured with its configuration
+	ManagedClusterAddOnCondtionConfigured string = "Configured"
 )
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
@@ -145,6 +160,21 @@ type ObjectReference struct {
 	// +kubebuilder:validation:Required
 	// +required
 	Name string `json:"name"`
+}
+
+// ConfigReference is a reference to the current add-on configuration.
+// This resource is used to locate the configuration resource for the current add-on.
+type ConfigReference struct {
+	// This field is synced from ClusterManagementAddOn configGroupResource field.
+	ConfigGroupResource `json:",inline"`
+
+	// This field is synced from ClusterManagementAddOn defaultConfig and ManagedClusterAddOn config fields.
+	// If both of them are defined, the ManagedClusterAddOn config will overwrite the ClusterManagementAddOn
+	// defaultConfig.
+	ConfigReferent `json:",inline"`
+
+	// lastObservedGeneration is the observed generation of the add-on configuration.
+	LastObservedGeneration int64 `json:"lastObservedGeneration"`
 }
 
 // HealthCheckMode indicates the mode for the addon to check its healthiness status

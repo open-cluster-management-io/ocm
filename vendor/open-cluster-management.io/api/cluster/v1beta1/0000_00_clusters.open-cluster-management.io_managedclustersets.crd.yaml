@@ -151,11 +151,12 @@ spec:
                           additionalProperties:
                             type: string
                     selectorType:
-                      description: SelectorType could only be "LegacyClusterSetLabel" or "LabelSelector" "LegacyClusterSetLabel" means to use label "cluster.open-cluster-management.io/clusterset:<ManagedClusterSet Name>"" to select target clusters. "LabelSelector" means use labelSelector to select target managedClusters
+                      description: SelectorType could only be "LegacyClusterSetLabel", "ExclusiveClusterSetLabel" or "LabelSelector" "ExclusiveClusterSetLabel" means to use label "cluster.open-cluster-management.io/clusterset:<ManagedClusterSet Name>"" to select target clusters. "LegacyClusterSetLabel" will be replaced by "ExclusiveClusterSetLabel" future "LabelSelector" means use labelSelector to select target managedClusters
                       type: string
                       default: LegacyClusterSetLabel
                       enum:
                         - LegacyClusterSetLabel
+                        - ExclusiveClusterSetLabel
                         - LabelSelector
             status:
               description: Status represents the current status of the ManagedClusterSet

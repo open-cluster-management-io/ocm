@@ -81,7 +81,7 @@ func BuildClusterSelector(clusterSet *ManagedClusterSet) (labels.Selector, error
 	selectorType := clusterSet.Spec.ClusterSelector.SelectorType
 
 	switch selectorType {
-	case "", LegacyClusterSetLabel:
+	case "", LegacyClusterSetLabel, ExclusiveClusterSetLabel:
 		return labels.SelectorFromSet(labels.Set{
 			ClusterSetLabel: clusterSet.Name,
 		}), nil

@@ -165,7 +165,7 @@ func TestSyncDeploy(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(createCRDObjects), 9)
+	testinghelper.AssertEqualNumber(t, len(createCRDObjects), 10)
 
 	createAPIServiceObjects := []runtime.Object{}
 	apiServiceActions := tc.apiRegistrationClient.Actions()
@@ -222,7 +222,7 @@ func TestSyncDelete(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(deleteCRDActions), 11)
+	testinghelper.AssertEqualNumber(t, len(deleteCRDActions), 12)
 
 	deleteAPIServiceActions := []clienttesting.DeleteActionImpl{}
 	apiServiceActions := tc.apiRegistrationClient.Actions()

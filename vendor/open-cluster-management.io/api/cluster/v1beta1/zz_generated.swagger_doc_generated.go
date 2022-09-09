@@ -13,7 +13,7 @@ package v1beta1
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_ManagedClusterSelector = map[string]string{
 	"":              "ManagedClusterSelector represents a selector of ManagedClusters",
-	"selectorType":  "SelectorType could only be \"LegacyClusterSetLabel\" or \"LabelSelector\" \"LegacyClusterSetLabel\" means to use label \"cluster.open-cluster-management.io/clusterset:<ManagedClusterSet Name>\"\" to select target clusters. \"LabelSelector\" means use labelSelector to select target managedClusters",
+	"selectorType":  "SelectorType could only be \"LegacyClusterSetLabel\", \"ExclusiveClusterSetLabel\" or \"LabelSelector\" \"ExclusiveClusterSetLabel\" means to use label \"cluster.open-cluster-management.io/clusterset:<ManagedClusterSet Name>\"\" to select target clusters. \"LegacyClusterSetLabel\" will be replaced by \"ExclusiveClusterSetLabel\" future \"LabelSelector\" means use labelSelector to select target managedClusters",
 	"labelSelector": "LabelSelector define the general labelSelector which clusterset will use to select target managedClusters",
 }
 
