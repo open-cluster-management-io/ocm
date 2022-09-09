@@ -1,23 +1,13 @@
 package agentdeploy
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
-
-	jsonpatch "github.com/evanphx/json-patch"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
-	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
@@ -59,32 +49,6 @@ func addonAddFinalizer(addon *addonapiv1alpha1.ManagedClusterAddOn, finalizer st
 
 	rst = append(rst, finalizer)
 	addon.SetFinalizers(rst)
-	return true
-}
-
-func manifestsEqual(new, old []workapiv1.Manifest) bool {
-	if len(new) != len(old) {
-		return false
-	}
-
-	for i := range new {
-		if !equality.Semantic.DeepEqual(new[i].Raw, old[i].Raw) {
-			return false
-		}
-	}
-	return true
-}
-
-func manifestWorkSpecEqual(new, old workapiv1.ManifestWorkSpec) bool {
-	if !manifestsEqual(new.Workload.Manifests, old.Workload.Manifests) {
-		return false
-	}
-	if !equality.Semantic.DeepEqual(new.ManifestConfigs, old.ManifestConfigs) {
-		return false
-	}
-	if !equality.Semantic.DeepEqual(new.DeleteOption, old.DeleteOption) {
-		return false
-	}
 	return true
 }
 
@@ -309,66 +273,6 @@ func (b *manifestWorkBuiler) buildManifestWorkFromObject(
 	}
 
 	return deployManifestWork, hookManifestWork, nil
-}
-
-func applyWork(
-	ctx context.Context,
-	workClient workv1client.Interface,
-	workLister worklister.ManifestWorkLister,
-	cache *workCache,
-	required *workapiv1.ManifestWork) (*workapiv1.ManifestWork, error) {
-	existingWork, err := workLister.ManifestWorks(required.Namespace).Get(required.Name)
-	existingWork = existingWork.DeepCopy()
-	if err != nil {
-		if errors.IsNotFound(err) {
-			existingWork, err = workClient.WorkV1().ManifestWorks(required.Namespace).Create(ctx, required, metav1.CreateOptions{})
-			if err == nil {
-				cache.updateCache(required, existingWork)
-				return existingWork, nil
-			}
-			return nil, err
-		}
-		return nil, err
-	}
-
-	if cache.safeToSkipApply(required, existingWork) {
-		return existingWork, nil
-	}
-
-	if manifestWorkSpecEqual(required.Spec, existingWork.Spec) {
-		return existingWork, nil
-	}
-
-	oldData, err := json.Marshal(&workapiv1.ManifestWork{
-		Spec: existingWork.Spec,
-	})
-	if err != nil {
-		return existingWork, err
-	}
-
-	newData, err := json.Marshal(&workapiv1.ManifestWork{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:             existingWork.UID,
-			ResourceVersion: existingWork.ResourceVersion,
-		},
-		Spec: required.Spec,
-	})
-	if err != nil {
-		return existingWork, err
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
-	if err != nil {
-		return existingWork, fmt.Errorf("failed to create patch for addon %s: %w", existingWork.Name, err)
-	}
-
-	klog.V(2).Infof("Patching work %s/%s with %s", existingWork.Namespace, existingWork.Name, string(patchBytes))
-	updated, err := workClient.WorkV1().ManifestWorks(existingWork.Namespace).Patch(ctx, existingWork.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
-	if err == nil {
-		cache.updateCache(required, existingWork)
-		return updated, nil
-	}
-	return nil, err
 }
 
 func FindManifestValue(

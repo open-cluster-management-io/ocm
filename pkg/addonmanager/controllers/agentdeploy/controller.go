@@ -16,6 +16,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
+	"open-cluster-management.io/addon-framework/pkg/common/workapplier"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -25,21 +26,18 @@ import (
 	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
-	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
 // addonDeployController deploy addon agent resources on the managed cluster.
 type addonDeployController struct {
-	workClient                workv1client.Interface
+	workApplier               *workapplier.WorkApplier
 	addonClient               addonv1alpha1client.Interface
 	managedClusterLister      clusterlister.ManagedClusterLister
 	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
-	workLister                worklister.ManifestWorkLister
 	workIndexer               cache.Indexer
 	agentAddons               map[string]agent.AgentAddon
-	cache                     *workCache
 }
 
 func NewAddonDeployController(
@@ -63,14 +61,12 @@ func NewAddonDeployController(
 	}
 
 	c := &addonDeployController{
-		workClient:                workClient,
+		workApplier:               workapplier.NewWorkApplierWithTypedClient(workClient, workInformers.Lister()),
 		addonClient:               addonClient,
 		managedClusterLister:      clusterInformers.Lister(),
 		managedClusterAddonLister: addonInformers.Lister(),
-		workLister:                workInformers.Lister(),
 		workIndexer:               workInformers.Informer().GetIndexer(),
 		agentAddons:               agentAddons,
-		cache:                     newWorkCache(),
 	}
 
 	return factory.New().WithFilteredEventsInformersQueueKeysFunc(
@@ -181,22 +177,21 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 		&defaultSyncer{
 			applyWork:      c.applyWork,
 			getWorkByAddon: c.getWorksByAddonFn(byAddon),
-			deleteWork:     c.deleteWork,
+			deleteWork:     c.workApplier.Delete,
 			agentAddon:     agentAddon,
 		},
 		&hostedSyncer{
 			applyWork:      c.applyWork,
-			deleteWork:     c.deleteWork,
+			deleteWork:     c.workApplier.Delete,
 			getCluster:     c.managedClusterLister.Get,
 			getWorkByAddon: c.getWorksByAddonFn(byHostedAddon),
 			agentAddon:     agentAddon},
 		&defaultHookSyncer{
-			applyWork:       c.applyWork,
-			removeWorkCache: c.cache.removeCache,
-			agentAddon:      agentAddon},
+			applyWork:  c.applyWork,
+			agentAddon: agentAddon},
 		&hostedHookSyncer{
 			applyWork:      c.applyWork,
-			deleteWork:     c.deleteWork,
+			deleteWork:     c.workApplier.Delete,
 			getCluster:     c.managedClusterLister.Get,
 			getWorkByAddon: c.getWorksByAddonFn(hookByHostedAddon),
 			agentAddon:     agentAddon},
@@ -230,21 +225,10 @@ func (c *addonDeployController) updateAddon(ctx context.Context, new, old *addon
 	return utils.PatchAddonCondition(ctx, c.addonClient, new, old)
 }
 
-func (c *addonDeployController) deleteWork(ctx context.Context, workNamespace, workName string) error {
-	err := c.workClient.WorkV1().ManifestWorks(workNamespace).Delete(ctx, workName, metav1.DeleteOptions{})
-	if errors.IsNotFound(err) {
-		return nil
-	}
-
-	c.cache.removeCache(workName, workNamespace)
-
-	return err
-}
-
 func (c *addonDeployController) applyWork(ctx context.Context, appliedType string,
 	work *workapiv1.ManifestWork, addon *addonapiv1alpha1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error) {
 
-	work, err := applyWork(ctx, c.workClient, c.workLister, c.cache, work)
+	work, err := c.workApplier.Apply(ctx, work)
 	if err != nil {
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 			Type:    appliedType,

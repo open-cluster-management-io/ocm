@@ -17,9 +17,6 @@ import (
 type defaultHookSyncer struct {
 	applyWork func(ctx context.Context, appliedType string,
 		work *workapiv1.ManifestWork, addon *addonapiv1alpha1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
-
-	removeWorkCache func(workName, workNamespace string)
-
 	agentAddon agent.AgentAddon
 }
 
@@ -62,7 +59,6 @@ func (s *defaultHookSyncer) sync(ctx context.Context,
 			Message: fmt.Sprintf("hook manifestWork %v is completed.", hookWork.Name),
 		})
 
-		s.removeWorkCache(hookWork.Name, deployWorkNamespace)
 		addonRemoveFinalizer(addon, constants.PreDeleteHookFinalizer)
 		return addon, nil
 	}
