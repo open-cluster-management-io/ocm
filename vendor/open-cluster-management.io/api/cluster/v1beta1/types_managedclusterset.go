@@ -4,7 +4,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//LegacyClusterSetLabel LabelKey
+//ExclusiveClusterSetLabel and LegacyClusterSetLabel LabelKey
 const ClusterSetLabel = "cluster.open-cluster-management.io/clusterset"
 
 // +genclient
@@ -50,10 +50,11 @@ type ManagedClusterSetSpec struct {
 
 // ManagedClusterSelector represents a selector of ManagedClusters
 type ManagedClusterSelector struct {
-	// SelectorType could only be "LegacyClusterSetLabel" or "LabelSelector"
-	// "LegacyClusterSetLabel" means to use label "cluster.open-cluster-management.io/clusterset:<ManagedClusterSet Name>"" to select target clusters.
+	// SelectorType could only be "LegacyClusterSetLabel", "ExclusiveClusterSetLabel" or "LabelSelector"
+	// "ExclusiveClusterSetLabel" means to use label "cluster.open-cluster-management.io/clusterset:<ManagedClusterSet Name>"" to select target clusters.
+	// "LegacyClusterSetLabel" will be replaced by "ExclusiveClusterSetLabel" future
 	// "LabelSelector" means use labelSelector to select target managedClusters
-	// +kubebuilder:validation:Enum=LegacyClusterSetLabel;LabelSelector
+	// +kubebuilder:validation:Enum=LegacyClusterSetLabel;ExclusiveClusterSetLabel;LabelSelector
 	// +kubebuilder:default:=LegacyClusterSetLabel
 	// +required
 	SelectorType SelectorType `json:"selectorType,omitempty"`
@@ -66,7 +67,9 @@ type ManagedClusterSelector struct {
 type SelectorType string
 
 const (
-	// "LegacyClusterSetLabel" means to use label "cluster.open-cluster-management.io/clusterset:<ManagedClusterSet Name>"" to select target clusters.
+	// "ExclusiveClusterSetLabel" means to use label "cluster.open-cluster-management.io/clusterset:<ManagedClusterSet Name>"" to select target clusters.
+	ExclusiveClusterSetLabel SelectorType = "ExclusiveClusterSetLabel"
+	//LegacyClusterSetLabel will be replaced by "ExclusiveClusterSetLabel"
 	LegacyClusterSetLabel SelectorType = "LegacyClusterSetLabel"
 	// "LabelSelector" means use labelSelector to select target managedClusters
 	LabelSelector SelectorType = "LabelSelector"

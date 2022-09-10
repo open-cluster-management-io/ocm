@@ -176,6 +176,22 @@ func TestSchedulingController_sync(t *testing.T) {
 			},
 			validateActions: testinghelpers.AssertNoActions,
 		},
+		{
+			name: "placement schedule controller is disabled",
+			placement: testinghelpers.NewPlacementWithAnnotations(placementNamespace, placementName,
+				map[string]string{
+					clusterapiv1beta1.PlacementDisableAnnotation: "true",
+				}).Build(),
+			scheduleResult: &scheduleResult{
+				feasibleClusters: []*clusterapiv1.ManagedCluster{
+					testinghelpers.NewManagedCluster("cluster1").Build(),
+					testinghelpers.NewManagedCluster("cluster2").Build(),
+					testinghelpers.NewManagedCluster("cluster3").Build(),
+				},
+				scheduledDecisions: []clusterapiv1beta1.ClusterDecision{},
+			},
+			validateActions: testinghelpers.AssertNoActions,
+		},
 	}
 
 	for _, c := range cases {

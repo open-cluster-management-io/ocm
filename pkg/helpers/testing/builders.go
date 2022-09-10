@@ -29,6 +29,18 @@ func NewPlacement(namespace, name string) *placementBuilder {
 	}
 }
 
+func NewPlacementWithAnnotations(namespace, name string, annotations map[string]string) *placementBuilder {
+	return &placementBuilder{
+		placement: &clusterapiv1beta1.Placement{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:   namespace,
+				Name:        name,
+				Annotations: annotations,
+			},
+		},
+	}
+}
+
 func (b *placementBuilder) WithUID(uid string) *placementBuilder {
 	b.placement.UID = types.UID(uid)
 	return b
