@@ -19,5 +19,6 @@ func NewHubOperatorCmd() *cobra.Command {
 	cmd.Use = "hub"
 	cmd.Short = "Start the cluster manager operator"
 
+	cmd.Flags().BoolVar(&options.SkipRemoveCRDs, "skip-remove-crds", false, "Skip removing CRDs while ClusterManager is deleting.")
 	return cmd
 }

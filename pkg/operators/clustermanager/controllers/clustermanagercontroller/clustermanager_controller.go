@@ -134,6 +134,7 @@ type clusterManagerController struct {
 	// For testcases which don't need these functions, we could set fake funcs
 	generateHubClusterClients func(hubConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, apiregistrationclient.APIServicesGetter, error)
 	ensureSAKubeconfigs       func(ctx context.Context, clusterManagerName, clusterManagerNamespace string, hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error
+	skipRemoveCRDs            bool
 }
 
 // NewClusterManagerController construct cluster manager hub controller
@@ -145,6 +146,7 @@ func NewClusterManagerController(
 	deploymentInformer appsinformer.DeploymentInformer,
 	configMapInformer corev1informers.ConfigMapInformer,
 	recorder events.Recorder,
+	skipRemoveCRDs bool,
 ) factory.Controller {
 	controller := &clusterManagerController{
 		operatorKubeClient:        operatorKubeClient,
@@ -156,6 +158,7 @@ func NewClusterManagerController(
 		generateHubClusterClients: generateHubClients,
 		ensureSAKubeconfigs:       ensureSAKubeconfigs,
 		cache:                     resourceapply.NewResourceCache(),
+		skipRemoveCRDs:            skipRemoveCRDs,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -266,7 +269,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 
 	// If the ClusterManager is deleting, we remove its related resources on hub
 	if !clusterManager.DeletionTimestamp.IsZero() {
-		if err := cleanUpHub(ctx, controllerContext, clusterManagerMode, hubClient, hubApiExtensionClient, hubApiRegistrationClient, config); err != nil {
+		if err := cleanUpHub(ctx, controllerContext, clusterManagerMode, hubClient, hubApiExtensionClient, hubApiRegistrationClient, config, n.skipRemoveCRDs); err != nil {
 			return err
 		}
 		if err := cleanUpManagement(ctx, controllerContext, managementClient, config); err != nil {
@@ -353,7 +356,7 @@ func applyHubResources(
 	cache resourceapply.ResourceCache,
 ) (appliedErrs []error, err error) {
 	// Apply hub cluster resources
-	hubResources := getHubResources(clusterManagerMode, manifestsConfig.RegistrationWebhook.IsIPFormat, manifestsConfig.WorkWebhook.IsIPFormat)
+	hubResources := getHubResources(clusterManagerMode, manifestsConfig.RegistrationWebhook.IsIPFormat, manifestsConfig.WorkWebhook.IsIPFormat, false)
 	resourceResults := helpers.ApplyDirectly(
 		ctx,
 		hubClient,
@@ -551,18 +554,21 @@ func removeCRD(ctx context.Context, apiExtensionClient apiextensionsclient.Inter
 func cleanUpHub(ctx context.Context, controllerContext factory.SyncContext,
 	mode operatorapiv1.InstallMode,
 	kubeClient kubernetes.Interface, apiExtensionClient apiextensionsclient.Interface, apiRegistrationClient apiregistrationclient.APIServicesGetter,
-	config manifests.HubConfig) error {
-	// Remove crd
-	for _, name := range crdNames {
-		err := removeCRD(ctx, apiExtensionClient, name)
-		if err != nil {
-			return err
+	config manifests.HubConfig, skipRemoveCRDs bool) error {
+
+	if !skipRemoveCRDs {
+		// Remove crd
+		for _, name := range crdNames {
+			err := removeCRD(ctx, apiExtensionClient, name)
+			if err != nil {
+				return err
+			}
+			controllerContext.Recorder().Eventf("CRDDeleted", "crd %s is deleted", name)
 		}
-		controllerContext.Recorder().Eventf("CRDDeleted", "crd %s is deleted", name)
 	}
 
 	// Remove All Static files
-	hubResources := append(getHubResources(mode, config.RegistrationWebhook.IsIPFormat, config.WorkWebhook.IsIPFormat), hubApiserviceFiles...)
+	hubResources := append(getHubResources(mode, config.RegistrationWebhook.IsIPFormat, config.WorkWebhook.IsIPFormat, skipRemoveCRDs), hubApiserviceFiles...)
 	for _, file := range hubResources {
 		err := helpers.CleanUpStaticObject(
 			ctx,
@@ -657,9 +663,12 @@ func getSAs(clusterManagerName string) []string {
 	}
 }
 
-func getHubResources(mode operatorapiv1.InstallMode, isRegistrationIPFormat, isWorkIPFormat bool) []string {
+func getHubResources(mode operatorapiv1.InstallMode, isRegistrationIPFormat, isWorkIPFormat, skipAddCRDs bool) []string {
 	hubResources := []string{namespaceResource}
-	hubResources = append(hubResources, hubCRDResourceFiles...)
+	if !skipAddCRDs {
+		hubResources = append(hubResources, hubCRDResourceFiles...)
+	}
+
 	hubResources = append(hubResources, hubWebhookResourceFiles...)
 	hubResources = append(hubResources, hubRbacResourceFiles...)
 

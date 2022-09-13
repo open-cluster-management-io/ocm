@@ -16,6 +16,7 @@ import (
 )
 
 type Options struct {
+	SkipRemoveCRDs bool
 }
 
 // RunClusterManagerOperator starts a new cluster manager operator
@@ -46,7 +47,8 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 		operatorInformer.Operator().V1().ClusterManagers(),
 		kubeInformer.Apps().V1().Deployments(),
 		kubeInformer.Core().V1().ConfigMaps(),
-		controllerContext.EventRecorder)
+		controllerContext.EventRecorder,
+		o.SkipRemoveCRDs)
 
 	statusController := clustermanagerstatuscontroller.NewClusterManagerStatusController(
 		operatorClient.OperatorV1().ClusterManagers(),
