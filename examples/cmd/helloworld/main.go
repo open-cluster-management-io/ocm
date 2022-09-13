@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/client-go/rest"
 	utilflag "k8s.io/component-base/cli/flag"
-	"k8s.io/component-base/logs"
+	logs "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/examples/cmdfactory"
 	"open-cluster-management.io/addon-framework/examples/helloworld"
@@ -32,7 +32,7 @@ func main() {
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 
-	logs.NewOptions().AddFlags(pflag.CommandLine)
+	logs.AddFlags(logs.NewLoggingConfiguration(), pflag.CommandLine)
 
 	command := newCommand()
 	if err := command.Execute(); err != nil {
