@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/util/retry"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/work/pkg/spoke"
@@ -636,11 +637,22 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			go func() {
 				for _, manifest := range manifests {
 					cm := manifest.Object.(*corev1.ConfigMap)
-					cm, err := spokeKubeClient.CoreV1().ConfigMaps(cm.Namespace).Get(context.Background(), cm.Name, metav1.GetOptions{})
-					if err == nil {
-						cm.Finalizers = nil
-						_, _ = spokeKubeClient.CoreV1().ConfigMaps(cm.Namespace).Update(context.Background(), cm, metav1.UpdateOptions{})
-					}
+					err = retry.OnError(
+						retry.DefaultBackoff,
+						func(err error) bool {
+							return err != nil
+						},
+						func() error {
+							cm, err := spokeKubeClient.CoreV1().ConfigMaps(cm.Namespace).Get(context.Background(), cm.Name, metav1.GetOptions{})
+							if err != nil {
+								return err
+							}
+
+							cm.Finalizers = nil
+							_, err = spokeKubeClient.CoreV1().ConfigMaps(cm.Namespace).Update(context.Background(), cm, metav1.UpdateOptions{})
+							return err
+						})
+					gomega.Expect(err).ToNot(gomega.HaveOccurred())
 					time.Sleep(2 * time.Second)
 				}
 			}()

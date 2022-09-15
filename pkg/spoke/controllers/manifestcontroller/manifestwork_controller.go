@@ -30,10 +30,14 @@ import (
 
 	"open-cluster-management.io/work/pkg/helper"
 	"open-cluster-management.io/work/pkg/spoke/apply"
+	"open-cluster-management.io/work/pkg/spoke/auth"
 	"open-cluster-management.io/work/pkg/spoke/controllers"
 )
 
-var ResyncInterval = 5 * time.Minute
+var (
+	ResyncInterval     = 5 * time.Minute
+	MaxRequeueDuration = 24 * time.Hour
+)
 
 // ManifestWorkController is to reconcile the workload resources
 // fetched from hub cluster on spoke cluster.
@@ -46,6 +50,7 @@ type ManifestWorkController struct {
 	hubHash                   string
 	restMapper                meta.RESTMapper
 	appliers                  *apply.Appliers
+	validator                 auth.ExecutorValidator
 }
 
 type applyResult struct {
@@ -78,8 +83,8 @@ func NewManifestWorkController(
 		spokeDynamicClient:        spokeDynamicClient,
 		hubHash:                   hubHash,
 		restMapper:                restMapper,
-
-		appliers: apply.NewAppliers(spokeDynamicClient, spokeKubeClient, spokeAPIExtensionClient),
+		appliers:                  apply.NewAppliers(spokeDynamicClient, spokeKubeClient, spokeAPIExtensionClient),
+		validator:                 auth.NewExecutorValidator(spokeKubeClient),
 	}
 
 	return factory.New().
@@ -125,6 +130,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	if !found {
 		return nil
 	}
+
 	// Apply appliedManifestWork
 	appliedManifestWorkName := fmt.Sprintf("%s-%s", m.hubHash, manifestWork.Name)
 	appliedManifestWork, err := m.appliedManifestWorkLister.Get(appliedManifestWorkName)
@@ -171,13 +177,8 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	}
 
 	newManifestConditions := []workapiv1.ManifestCondition{}
+	var requeueTime = MaxRequeueDuration
 	for _, result := range resourceResults {
-		// ignore server side apply conflict error since it cannot be resolved by error fallback.
-		var ssaConflict = &apply.ServerSideApplyConflictError{}
-		if result.Error != nil && !errors.As(result.Error, &ssaConflict) {
-			errs = append(errs, result.Error)
-		}
-
 		manifestCondition := workapiv1.ManifestCondition{
 			ResourceMeta: result.resourceMeta,
 			Conditions:   []metav1.Condition{},
@@ -187,18 +188,42 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 		manifestCondition.Conditions = append(manifestCondition.Conditions, buildAppliedStatusCondition(result))
 
 		newManifestConditions = append(newManifestConditions, manifestCondition)
+
+		// If it is a forbidden error, after the condition is constructed, we set the error to nil
+		// and requeue the item
+		var authError = &auth.NotAllowedError{}
+		if errors.As(result.Error, &authError) {
+			klog.V(2).Infof("apply work %s fails with err: %v", manifestWorkName, result.Error)
+			result.Error = nil
+
+			if authError.RequeueTime < requeueTime {
+				requeueTime = authError.RequeueTime
+			}
+		}
+
+		// ignore server side apply conflict error since it cannot be resolved by error fallback.
+		var ssaConflict = &apply.ServerSideApplyConflictError{}
+		if result.Error != nil && !errors.As(result.Error, &ssaConflict) {
+			errs = append(errs, result.Error)
+		}
 	}
 
 	// Update work status
-	_, _, err = helper.UpdateManifestWorkStatus(
+	_, updated, err := helper.UpdateManifestWorkStatus(
 		ctx, m.manifestWorkClient, manifestWork, m.generateUpdateStatusFunc(manifestWork.Generation, newManifestConditions))
 	if err != nil {
 		errs = append(errs, fmt.Errorf("failed to update work status with err %w", err))
 	}
+
+	if !updated && requeueTime < MaxRequeueDuration {
+		controllerContext.Queue().AddAfter(manifestWorkName, requeueTime)
+	}
+
 	if len(errs) > 0 {
 		err = utilerrors.NewAggregate(errs)
 		klog.Errorf("Reconcile work %s fails with err: %v", manifestWorkName, err)
 	}
+
 	return err
 }
 
@@ -243,6 +268,13 @@ func (m *ManifestWorkController) applyOneManifest(
 
 	resMeta, gvr, err := buildResourceMeta(index, required, m.restMapper)
 	result.resourceMeta = resMeta
+	if err != nil {
+		result.Error = err
+		return result
+	}
+
+	// check the Executor subject permission before applying
+	err = m.validator.Validate(ctx, workSpec.Executor, gvr, resMeta.Namespace, resMeta.Name, auth.ApplyAction)
 	if err != nil {
 		result.Error = err
 		return result

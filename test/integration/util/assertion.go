@@ -122,6 +122,21 @@ func AssertExistenceOfConfigMaps(manifests []workapiv1.Manifest, kubeClient kube
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
+// check if configmap does not exist
+func AssertNonexistenceOfConfigMaps(manifests []workapiv1.Manifest, kubeClient kubernetes.Interface,
+	eventuallyTimeout, eventuallyInterval int) {
+	gomega.Eventually(func() bool {
+		for _, manifest := range manifests {
+			expected := manifest.Object.(*corev1.ConfigMap)
+			_, err := kubeClient.CoreV1().ConfigMaps(expected.Namespace).Get(
+				context.Background(), expected.Name, metav1.GetOptions{})
+			return apierrors.IsNotFound(err)
+		}
+
+		return false
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.BeFalse())
+}
+
 // check the existence of resource with GVR, namespace and name
 func AssertExistenceOfResources(gvrs []schema.GroupVersionResource, namespaces, names []string, dynamicClient dynamic.Interface, eventuallyTimeout, eventuallyInterval int) {
 	gomega.Expect(gvrs).To(gomega.HaveLen(len(namespaces)))

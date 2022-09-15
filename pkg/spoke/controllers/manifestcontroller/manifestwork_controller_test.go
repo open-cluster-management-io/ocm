@@ -22,6 +22,7 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/work/pkg/spoke/apply"
+	"open-cluster-management.io/work/pkg/spoke/auth"
 	"open-cluster-management.io/work/pkg/spoke/controllers"
 	"open-cluster-management.io/work/pkg/spoke/spoketesting"
 )
@@ -36,13 +37,14 @@ type testController struct {
 func newController(t *testing.T, work *workapiv1.ManifestWork, appliedWork *workapiv1.AppliedManifestWork, mapper meta.RESTMapper) *testController {
 	fakeWorkClient := fakeworkclient.NewSimpleClientset(work)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fakeWorkClient, 5*time.Minute, workinformers.WithNamespace("cluster1"))
-
+	spokeKubeClient := fakekube.NewSimpleClientset()
 	controller := &ManifestWorkController{
 		manifestWorkClient:        fakeWorkClient.WorkV1().ManifestWorks("cluster1"),
 		manifestWorkLister:        workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks("cluster1"),
 		appliedManifestWorkClient: fakeWorkClient.WorkV1().AppliedManifestWorks(),
 		appliedManifestWorkLister: workInformerFactory.Work().V1().AppliedManifestWorks().Lister(),
 		restMapper:                mapper,
+		validator:                 auth.NewExecutorValidator(spokeKubeClient),
 	}
 
 	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(work); err != nil {

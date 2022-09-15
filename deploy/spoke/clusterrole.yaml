@@ -15,4 +15,7 @@ rules:
 - apiGroups: ["work.open-cluster-management.io"]
   resources: ["appliedmanifestworks/finalizers"]
   verbs: ["update"]
-  
+# Allow agent to create subjectaccessreviews
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["create"]
