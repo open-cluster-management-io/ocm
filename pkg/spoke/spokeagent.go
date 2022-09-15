@@ -177,6 +177,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		controllerContext.EventRecorder,
 	)
 	go hubKubeconfigSecretController.Run(ctx, 1)
+	go namespacedManagementKubeInformerFactory.Start(ctx.Done())
 
 	// check if there already exists a valid client config for hub
 	ok, err := o.hasValidHubClientConfig()
@@ -191,7 +192,9 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	// informer cache'
 	if !ok {
 		// create a ClientCertForHubController for spoke agent bootstrap
+		// the bootstrap informers are supposed to be terminated after completing the bootstrap process.
 		bootstrapInformerFactory := informers.NewSharedInformerFactory(bootstrapKubeClient, 10*time.Minute)
+		bootstrapNamespacedManagementKubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(managementKubeClient, 10*time.Minute, informers.WithNamespace(o.ComponentNamespace))
 
 		// create a kubeconfig with references to the key/cert files in the same secret
 		kubeconfig := clientcert.BuildKubeconfig(bootstrapClientConfig, clientcert.TLSCertFile, clientcert.TLSKeyFile)
@@ -205,7 +208,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			o.ClusterName, o.AgentName, o.ComponentNamespace, o.HubKubeconfigSecret,
 			kubeconfigData,
 			// store the secret in the cluster where the agent pod runs
-			namespacedManagementKubeInformerFactory.Core().V1().Secrets(),
+			bootstrapNamespacedManagementKubeInformerFactory.Core().V1().Secrets(),
 			bootstrapInformerFactory.Certificates(),
 			managementKubeClient,
 			bootstrapKubeClient,
@@ -220,7 +223,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		bootstrapCtx, stopBootstrap := context.WithCancel(ctx)
 
 		go bootstrapInformerFactory.Start(bootstrapCtx.Done())
-		go namespacedManagementKubeInformerFactory.Start(bootstrapCtx.Done())
+		go bootstrapNamespacedManagementKubeInformerFactory.Start(bootstrapCtx.Done())
 
 		go clientCertForHubController.Run(bootstrapCtx, 1)
 
