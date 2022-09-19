@@ -16,9 +16,16 @@ The script and instructions provided in this doc help you to setup an Open Clust
 
 ## Setup the clusters
 
-1. Edit the kind configuration files, including `cluster1-config.yaml` and `cluster2-config.yaml`, for managed clusters to update the value in `apiServerAddress` to match your private IP address, which makes the kube apiserver of the managed clusters accessable for Argo CD running on the hub cluster. 
+1. Find your private IP address
 
-2. Run `./setup-ocm.sh`, you will see two clusters registered on the hub cluster.
+```shell
+ifconfig | grep inet
+```
+Your IP address is usually next to the last entry of 'inet'. An IP address is always in the format of x.x.x.x but it will never be 127.0.0.1 because that is your machines loopback address. 
+
+2. Edit the kind configuration files, including `cluster1-config.yaml` and `cluster2-config.yaml`, for managed clusters to update the value in `apiServerAddress` to match your private IP address, which makes the kube apiserver of the managed clusters accessable for Argo CD running on the hub cluster. 
+
+3. Run `./setup-ocm.sh`, you will see two clusters registered on the hub cluster.
 
     ```
     NAME       HUB ACCEPTED   MANAGED CLUSTER URLS                  JOINED   AVAILABLE   AGE
