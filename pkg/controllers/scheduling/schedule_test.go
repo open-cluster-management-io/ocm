@@ -15,6 +15,7 @@ import (
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterlisterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	"open-cluster-management.io/placement/pkg/controllers/framework"
 	testinghelpers "open-cluster-management.io/placement/pkg/helpers/testing"
 )
 
@@ -33,6 +34,7 @@ func TestSchedule(t *testing.T) {
 		expectedScoreResult  []PrioritizerResult
 		expectedDecisions    []clusterapiv1beta1.ClusterDecision
 		expectedUnScheduled  int
+		expectedStatus       framework.Status
 	}{
 		{
 			name:      "new placement satisfied",
@@ -71,6 +73,7 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
 			},
 			expectedUnScheduled: 0,
+			expectedStatus:      *framework.NewStatus("", framework.Success, ""),
 		},
 		{
 			name:      "new placement unsatisfied",
@@ -109,6 +112,37 @@ func TestSchedule(t *testing.T) {
 				},
 			},
 			expectedUnScheduled: 2,
+			expectedStatus:      *framework.NewStatus("", framework.Success, ""),
+		},
+		{
+			name: "new placement misconfigured",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithNOC(3).AddToleration(
+				&clusterapiv1beta1.Toleration{
+					Value:    "value1",
+					Operator: clusterapiv1beta1.TolerationOpEqual,
+				}).Build(),
+			initObjs: []runtime.Object{
+				testinghelpers.NewClusterSet(clusterSetName).Build(),
+				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
+			},
+			decisions: []runtime.Object{},
+			clusters: []*clusterapiv1.ManagedCluster{
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
+			},
+			expectedDecisions: []clusterapiv1beta1.ClusterDecision{},
+			expectedFilterResult: []FilterResult{
+				{
+					Name:             "Predicate",
+					FilteredClusters: []string{"cluster1"},
+				},
+			},
+			expectedScoreResult: []PrioritizerResult{},
+			expectedUnScheduled: 0,
+			expectedStatus: *framework.NewStatus(
+				"TaintToleration",
+				framework.Misconfigured,
+				"If the key is empty, operator must be Exists.",
+			),
 		},
 		{
 			name:      "placement with all decisions scheduled",
@@ -157,6 +191,7 @@ func TestSchedule(t *testing.T) {
 				},
 			},
 			expectedUnScheduled: 0,
+			expectedStatus:      *framework.NewStatus("", framework.Success, ""),
 		},
 		{
 			name:      "placement with empty Prioritizer Policy",
@@ -195,6 +230,7 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
 			},
 			expectedUnScheduled: 0,
+			expectedStatus:      *framework.NewStatus("", framework.Success, ""),
 		},
 		{
 			name: "placement with taint and toleration",
@@ -256,6 +292,7 @@ func TestSchedule(t *testing.T) {
 				},
 			},
 			expectedUnScheduled: 1,
+			expectedStatus:      *framework.NewStatus("", framework.Success, ""),
 		},
 		{
 			name:      "placement with additive Prioritizer Policy",
@@ -310,6 +347,7 @@ func TestSchedule(t *testing.T) {
 				},
 			},
 			expectedUnScheduled: 0,
+			expectedStatus:      *framework.NewStatus("", framework.Success, ""),
 		},
 		{
 			name:      "placement with exact Prioritizer Policy",
@@ -351,6 +389,7 @@ func TestSchedule(t *testing.T) {
 				},
 			},
 			expectedUnScheduled: 0,
+			expectedStatus:      *framework.NewStatus("", framework.Success, ""),
 		},
 		{
 			name:      "placement with part of decisions scheduled",
@@ -398,6 +437,7 @@ func TestSchedule(t *testing.T) {
 				},
 			},
 			expectedUnScheduled: 2,
+			expectedStatus:      *framework.NewStatus("", framework.Success, ""),
 		},
 		{
 			name:      "schedule to cluster with least decisions",
@@ -443,6 +483,7 @@ func TestSchedule(t *testing.T) {
 				},
 			},
 			expectedUnScheduled: 0,
+			expectedStatus:      *framework.NewStatus("", framework.Success, ""),
 		},
 		{
 			name:      "do not schedule to other cluster even with least decisions",
@@ -498,6 +539,7 @@ func TestSchedule(t *testing.T) {
 				},
 			},
 			expectedUnScheduled: 0,
+			expectedStatus:      *framework.NewStatus("", framework.Success, ""),
 		},
 	}
 
@@ -506,15 +548,16 @@ func TestSchedule(t *testing.T) {
 			c.initObjs = append(c.initObjs, c.placement)
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
 			s := NewPluginScheduler(testinghelpers.NewFakePluginHandle(t, clusterClient, c.initObjs...))
-			result, err := s.Schedule(
+			result, status := s.Schedule(
 				context.TODO(),
 				c.placement,
 				c.clusters,
 			)
-			if err != nil {
-				t.Errorf("unexpected err: %v", err)
+			//TODO
+			if status.Message() != c.expectedStatus.Message() && status.Code() != c.expectedStatus.Code() {
+				t.Errorf("unexpected err: %v", status.AsError())
 			}
-			if !reflect.DeepEqual(result.Decisions(), c.expectedDecisions) {
+			if len(c.expectedDecisions) != 0 && !reflect.DeepEqual(result.Decisions(), c.expectedDecisions) {
 				t.Errorf("expected %v scheduled, but got %v", c.expectedDecisions, result.Decisions())
 			}
 			if result.NumOfUnscheduled() != c.expectedUnScheduled {

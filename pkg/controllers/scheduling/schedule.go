@@ -8,12 +8,14 @@ import (
 	"time"
 
 	kevents "k8s.io/client-go/tools/events"
+	"k8s.io/klog/v2"
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterlisterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	"open-cluster-management.io/placement/pkg/controllers/framework"
 	"open-cluster-management.io/placement/pkg/plugins"
 	"open-cluster-management.io/placement/pkg/plugins/addon"
 	"open-cluster-management.io/placement/pkg/plugins/balance"
@@ -39,7 +41,7 @@ type Scheduler interface {
 		ctx context.Context,
 		placement *clusterapiv1beta1.Placement,
 		clusters []*clusterapiv1.ManagedCluster,
-	) (ScheduleResult, error)
+	) (ScheduleResult, *framework.Status)
 }
 
 type ScheduleResult interface {
@@ -162,8 +164,9 @@ func (s *pluginScheduler) Schedule(
 	ctx context.Context,
 	placement *clusterapiv1beta1.Placement,
 	clusters []*clusterapiv1.ManagedCluster,
-) (ScheduleResult, error) {
+) (ScheduleResult, *framework.Status) {
 	filtered := clusters
+	finalStatus := framework.NewStatus("", framework.Success, "")
 
 	results := &scheduleResult{
 		filteredRecords: map[string][]*clusterapiv1.ManagedCluster{},
@@ -174,12 +177,15 @@ func (s *pluginScheduler) Schedule(
 	filterPipline := []string{}
 
 	for _, f := range s.filters {
-		filterResult := f.Filter(ctx, placement, filtered)
+		filterResult, status := f.Filter(ctx, placement, filtered)
 		filtered = filterResult.Filtered
-		err := filterResult.Err
 
-		if err != nil {
-			return nil, err
+		switch {
+		case status.IsError():
+			return results, status
+		case status.Code() == framework.Warning:
+			klog.Warningf("%v", status.Message())
+			finalStatus = status
 		}
 
 		filterPipline = append(filterPipline, f.Name())
@@ -190,15 +196,23 @@ func (s *pluginScheduler) Schedule(
 	// Prioritize clusters
 	// 1. Get weight for each prioritizers.
 	// For example, weights is {"Steady": 1, "Balance":1, "AddOn/default/ratio":3}.
-	weights, err := getWeights(s.prioritizerWeights, placement)
-	if err != nil {
-		return nil, err
+	weights, status := getWeights(s.prioritizerWeights, placement)
+	switch {
+	case status.IsError():
+		return results, status
+	case status.Code() == framework.Warning:
+		klog.Warningf("%v", status.Message())
+		finalStatus = status
 	}
 
 	// 2. Generate prioritizers for each placement whose weight != 0.
-	prioritizers, err := getPrioritizers(weights, s.handle)
-	if err != nil {
-		return nil, err
+	prioritizers, status := getPrioritizers(weights, s.handle)
+	switch {
+	case status.IsError():
+		return results, status
+	case status.Code() == framework.Warning:
+		klog.Warningf("%v", status.Message())
+		finalStatus = status
 	}
 
 	// 3. Calculate clusters scores.
@@ -208,12 +222,15 @@ func (s *pluginScheduler) Schedule(
 	}
 	for sc, p := range prioritizers {
 		// Get cluster score.
-		scoreResult := p.Score(ctx, placement, filtered)
+		scoreResult, status := p.Score(ctx, placement, filtered)
 		score := scoreResult.Scores
-		err := scoreResult.Err
 
-		if err != nil {
-			return nil, err
+		switch {
+		case status.IsError():
+			return results, status
+		case status.Code() == framework.Warning:
+			klog.Warningf("%v", status.Message())
+			finalStatus = status
 		}
 
 		// Record prioritizer score and weight
@@ -252,19 +269,19 @@ func (s *pluginScheduler) Schedule(
 
 	// set placement requeue time
 	for _, f := range s.filters {
-		if r := f.RequeueAfter(ctx, placement); r.RequeueTime != nil {
+		if r, _ := f.RequeueAfter(ctx, placement); r.RequeueTime != nil {
 			newRequeueAfter := time.Until(*r.RequeueTime)
 			results.requeueAfter = setRequeueAfter(results.requeueAfter, &newRequeueAfter)
 		}
 	}
 	for _, p := range prioritizers {
-		if r := p.RequeueAfter(ctx, placement); r.RequeueTime != nil {
+		if r, _ := p.RequeueAfter(ctx, placement); r.RequeueTime != nil {
 			newRequeueAfter := time.Until(*r.RequeueTime)
 			results.requeueAfter = setRequeueAfter(results.requeueAfter, &newRequeueAfter)
 		}
 	}
 
-	return results, nil
+	return results, finalStatus
 }
 
 // makeClusterDecisions selects clusters based on given cluster slice and then creates
@@ -306,7 +323,7 @@ func setRequeueAfter(requeueAfter, newRequeueAfter *time.Duration) *time.Duratio
 // Get prioritizer weight for the placement.
 // In Additive and "" mode, will override defaultWeight with what placement has defined and return.
 // In Exact mode, will return the name and weight defined in placement.
-func getWeights(defaultWeight map[clusterapiv1beta1.ScoreCoordinate]int32, placement *clusterapiv1beta1.Placement) (map[clusterapiv1beta1.ScoreCoordinate]int32, error) {
+func getWeights(defaultWeight map[clusterapiv1beta1.ScoreCoordinate]int32, placement *clusterapiv1beta1.Placement) (map[clusterapiv1beta1.ScoreCoordinate]int32, *framework.Status) {
 	mode := placement.Spec.PrioritizerPolicy.Mode
 	switch {
 	case mode == clusterapiv1beta1.PrioritizerPolicyModeExact:
@@ -314,12 +331,14 @@ func getWeights(defaultWeight map[clusterapiv1beta1.ScoreCoordinate]int32, place
 	case mode == clusterapiv1beta1.PrioritizerPolicyModeAdditive || mode == "":
 		return mergeWeights(defaultWeight, placement.Spec.PrioritizerPolicy.Configurations)
 	default:
-		return nil, fmt.Errorf("incorrect prioritizer policy mode: %s", mode)
+		msg := fmt.Sprintf("incorrect prioritizer policy mode: %s", mode)
+		return nil, framework.NewStatus("", framework.Misconfigured, msg)
 	}
 }
 
-func mergeWeights(defaultWeight map[clusterapiv1beta1.ScoreCoordinate]int32, customizedWeight []clusterapiv1beta1.PrioritizerConfig) (map[clusterapiv1beta1.ScoreCoordinate]int32, error) {
+func mergeWeights(defaultWeight map[clusterapiv1beta1.ScoreCoordinate]int32, customizedWeight []clusterapiv1beta1.PrioritizerConfig) (map[clusterapiv1beta1.ScoreCoordinate]int32, *framework.Status) {
 	weights := make(map[clusterapiv1beta1.ScoreCoordinate]int32)
+	status := framework.NewStatus("", framework.Success, "")
 	// copy the default weight
 	for sc, w := range defaultWeight {
 		weights[sc] = w
@@ -330,15 +349,16 @@ func mergeWeights(defaultWeight map[clusterapiv1beta1.ScoreCoordinate]int32, cus
 		if c.ScoreCoordinate != nil {
 			weights[*c.ScoreCoordinate] = c.Weight
 		} else {
-			return nil, fmt.Errorf("scoreCoordinate field is required")
+			return nil, framework.NewStatus("", framework.Misconfigured, "scoreCoordinate field is required")
 		}
 	}
-	return weights, nil
+	return weights, status
 }
 
 // Generate prioritizers for the placement.
-func getPrioritizers(weights map[clusterapiv1beta1.ScoreCoordinate]int32, handle plugins.Handle) (map[clusterapiv1beta1.ScoreCoordinate]plugins.Prioritizer, error) {
+func getPrioritizers(weights map[clusterapiv1beta1.ScoreCoordinate]int32, handle plugins.Handle) (map[clusterapiv1beta1.ScoreCoordinate]plugins.Prioritizer, *framework.Status) {
 	result := make(map[clusterapiv1beta1.ScoreCoordinate]plugins.Prioritizer)
+	status := framework.NewStatus("", framework.Success, "")
 	for k, v := range weights {
 		if v == 0 {
 			continue
@@ -352,18 +372,17 @@ func getPrioritizers(weights map[clusterapiv1beta1.ScoreCoordinate]int32, handle
 			case k.BuiltIn == PrioritizerResourceAllocatableCPU || k.BuiltIn == PrioritizerResourceAllocatableMemory:
 				result[k] = resource.NewResourcePrioritizerBuilder(handle).WithPrioritizerName(k.BuiltIn).Build()
 			default:
-				//TODO: show the failure in placement.status conditions
-				return nil, fmt.Errorf("incorrect builtin prioritizer: %s", k.BuiltIn)
+				msg := fmt.Sprintf("incorrect builtin prioritizer: %s", k.BuiltIn)
+				return nil, framework.NewStatus("", framework.Misconfigured, msg)
 			}
 		} else {
 			if k.AddOn == nil {
-				//TODO: show the failure in placement.status conditions
-				return nil, fmt.Errorf("addOn should not be empty")
+				return nil, framework.NewStatus("", framework.Misconfigured, "addOn should not be empty")
 			}
 			result[k] = addon.NewAddOnPrioritizerBuilder(handle).WithResourceName(k.AddOn.ResourceName).WithScoreName(k.AddOn.ScoreName).Build()
 		}
 	}
-	return result, nil
+	return result, status
 }
 
 func (r *scheduleResult) FilterResults() []FilterResult {

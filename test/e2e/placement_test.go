@@ -113,6 +113,16 @@ var _ = ginkgo.Describe("Placement", func() {
 			) {
 				return false
 			}
+
+			if !util.HasCondition(
+				placement.Status.Conditions,
+				clusterapiv1beta1.PlacementConditionMisconfigured,
+				"Succeedconfigured",
+				metav1.ConditionFalse,
+			) {
+				return false
+			}
+
 			return placement.Status.NumberOfSelectedClusters == int32(numOfSelectedClusters)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	}

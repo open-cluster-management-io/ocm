@@ -2,6 +2,7 @@ package addon
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -23,6 +24,7 @@ func TestScoreClusterWithAddOn(t *testing.T) {
 		clusters            []*clusterapiv1.ManagedCluster
 		existingAddOnScores []runtime.Object
 		expectedScores      map[string]int64
+		expectedErr         error
 	}{
 		{
 			name:      "no addon scores",
@@ -62,6 +64,7 @@ func TestScoreClusterWithAddOn(t *testing.T) {
 				testinghelpers.NewAddOnPlacementScore("cluster3", "test").WithScore("score1", 50).Build(),
 			},
 			expectedScores: map[string]int64{"cluster1": 0, "cluster2": 40, "cluster3": 50},
+			expectedErr:    errors.New("AddOnPlacementScores cluster1/test expired"),
 		},
 		{
 			name:      "all the addon scores generated",
@@ -90,11 +93,11 @@ func TestScoreClusterWithAddOn(t *testing.T) {
 				scoreName:       "score1",
 			}
 
-			scoreResult := addon.Score(context.TODO(), c.placement, c.clusters)
+			scoreResult, status := addon.Score(context.TODO(), c.placement, c.clusters)
 			scores := scoreResult.Scores
-			err := scoreResult.Err
-			if err != nil {
-				t.Errorf("Expect no error, but got %v", err)
+			err := status.AsError()
+			if err != nil && err.Error() != c.expectedErr.Error() {
+				t.Errorf("expect err %v but get %v", c.expectedErr, err)
 			}
 
 			if !apiequality.Semantic.DeepEqual(scores, c.expectedScores) {

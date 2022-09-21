@@ -92,7 +92,7 @@ func TestMatchWithClusterTaintToleration(t *testing.T) {
 			initObjs:              []runtime.Object{},
 			expectedClusterNames:  []string{},
 			expectedRequeueResult: plugins.PluginRequeueResult{},
-			expectedErr:           errors.New("If the key is empty, operator must be Exists.\n"),
+			expectedErr:           errors.New("If the key is empty, operator must be Exists."),
 		},
 		{
 			name: "taint.Effect is NoSelect and tolerations.Operator is Equal, toleration has empty value",
@@ -181,9 +181,7 @@ func TestMatchWithClusterTaintToleration(t *testing.T) {
 			initObjs:              []runtime.Object{},
 			expectedClusterNames:  []string{},
 			expectedRequeueResult: plugins.PluginRequeueResult{},
-			expectedErr: errors.New(
-				"If the operator is Exists, the value should be empty.\n",
-			),
+			expectedErr:           errors.New("If the operator is Exists, the value should be empty."),
 		},
 		{
 			name: "taint.Effect is NoSelect and tolerations.Operator is Exist, toleration has empty value",
@@ -745,12 +743,12 @@ func TestMatchWithClusterTaintToleration(t *testing.T) {
 			p := &TaintToleration{
 				handle: testinghelpers.NewFakePluginHandle(t, nil, c.initObjs...),
 			}
-			result := p.Filter(context.TODO(), c.placement, c.clusters)
+			result, status := p.Filter(context.TODO(), c.placement, c.clusters)
 			clusters := result.Filtered
-			err := result.Err
+			err := status.AsError()
 
 			if err != nil && err.Error() != c.expectedErr.Error() {
-				t.Errorf("unexpected err: %v", err)
+				t.Errorf("expect err %v but get %v", c.expectedErr, err)
 			}
 
 			expectedClusterNames := sets.NewString(c.expectedClusterNames...)
@@ -771,7 +769,7 @@ func TestMatchWithClusterTaintToleration(t *testing.T) {
 				)
 			}
 
-			requeueResult := p.RequeueAfter(context.TODO(), c.placement)
+			requeueResult, _ := p.RequeueAfter(context.TODO(), c.placement)
 			expectedRequeueTime := c.expectedRequeueResult.RequeueTime
 			actualRequeueTime := requeueResult.RequeueTime
 			if !((expectedRequeueTime == nil && actualRequeueTime == nil) ||

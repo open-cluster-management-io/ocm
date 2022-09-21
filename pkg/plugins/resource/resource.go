@@ -8,6 +8,7 @@ import (
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	"open-cluster-management.io/placement/pkg/controllers/framework"
 	"open-cluster-management.io/placement/pkg/plugins"
 )
 
@@ -77,15 +78,16 @@ func (r *ResourcePrioritizer) Description() string {
 	return description
 }
 
-func (r *ResourcePrioritizer) Score(ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) plugins.PluginScoreResult {
+func (r *ResourcePrioritizer) Score(ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) (plugins.PluginScoreResult, *framework.Status) {
+	status := framework.NewStatus(r.Name(), framework.Success, "")
 	if r.algorithm == "Allocatable" {
-		return mostResourceAllocatableScores(r.resource, clusters)
+		return mostResourceAllocatableScores(r.resource, clusters), status
 	}
-	return plugins.PluginScoreResult{}
+	return plugins.PluginScoreResult{}, status
 }
 
-func (r *ResourcePrioritizer) RequeueAfter(ctx context.Context, placement *clusterapiv1beta1.Placement) plugins.PluginRequeueResult {
-	return plugins.PluginRequeueResult{}
+func (r *ResourcePrioritizer) RequeueAfter(ctx context.Context, placement *clusterapiv1beta1.Placement) (plugins.PluginRequeueResult, *framework.Status) {
+	return plugins.PluginRequeueResult{}, framework.NewStatus(r.Name(), framework.Success, "")
 }
 
 // Calculate clusters scores based on the resource allocatable.

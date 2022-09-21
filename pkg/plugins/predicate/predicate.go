@@ -9,6 +9,7 @@ import (
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	"open-cluster-management.io/placement/pkg/controllers/framework"
 	"open-cluster-management.io/placement/pkg/plugins"
 )
 
@@ -36,17 +37,18 @@ func (p *Predicate) Description() string {
 }
 
 func (p *Predicate) Filter(
-	ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) plugins.PluginFilterResult {
+	ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) (plugins.PluginFilterResult, *framework.Status) {
+	status := framework.NewStatus(p.Name(), framework.Success, "")
 
 	if len(placement.Spec.Predicates) == 0 {
 		return plugins.PluginFilterResult{
 			Filtered: clusters,
-		}
+		}, status
 	}
 	if len(clusters) == 0 {
 		return plugins.PluginFilterResult{
 			Filtered: clusters,
-		}
+		}, status
 	}
 
 	// prebuild label/claim selectors for each predicate
@@ -55,16 +57,20 @@ func (p *Predicate) Filter(
 		// build label selector
 		labelSelector, err := convertLabelSelector(predicate.RequiredClusterSelector.LabelSelector)
 		if err != nil {
-			return plugins.PluginFilterResult{
-				Err: err,
-			}
+			return plugins.PluginFilterResult{}, framework.NewStatus(
+				p.Name(),
+				framework.Misconfigured,
+				err.Error(),
+			)
 		}
 		// build claim selector
 		claimSelector, err := convertClaimSelector(predicate.RequiredClusterSelector.ClaimSelector)
 		if err != nil {
-			return plugins.PluginFilterResult{
-				Err: err,
-			}
+			return plugins.PluginFilterResult{}, framework.NewStatus(
+				p.Name(),
+				framework.Misconfigured,
+				err.Error(),
+			)
 		}
 		predicateSelectors = append(predicateSelectors, predicateSelector{
 			labelSelector: labelSelector,
@@ -92,11 +98,11 @@ func (p *Predicate) Filter(
 
 	return plugins.PluginFilterResult{
 		Filtered: matched,
-	}
+	}, status
 }
 
-func (p *Predicate) RequeueAfter(ctx context.Context, placement *clusterapiv1beta1.Placement) plugins.PluginRequeueResult {
-	return plugins.PluginRequeueResult{}
+func (p *Predicate) RequeueAfter(ctx context.Context, placement *clusterapiv1beta1.Placement) (plugins.PluginRequeueResult, *framework.Status) {
+	return plugins.PluginRequeueResult{}, framework.NewStatus(p.Name(), framework.Success, "")
 }
 
 // getClusterClaims returns a map containing cluster claims from the status of cluster

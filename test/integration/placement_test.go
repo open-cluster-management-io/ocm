@@ -174,8 +174,8 @@ var _ = ginkgo.Describe("Placement", func() {
 		}, eventuallyTimeout*2, eventuallyInterval).Should(gomega.BeTrue())
 	}
 
-	assertPlacementStatus := func(placementName string, numOfSelectedClusters int, satisfied bool) {
-		ginkgo.By("Check the status of placement")
+	assertPlacementConditionSatisfied := func(placementName string, numOfSelectedClusters int, satisfied bool) {
+		ginkgo.By("Check the condition PlacementSatisfied of placement")
 		gomega.Eventually(func() bool {
 			placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
 			if err != nil {
@@ -198,6 +198,33 @@ var _ = ginkgo.Describe("Placement", func() {
 				return false
 			}
 			return placement.Status.NumberOfSelectedClusters == int32(numOfSelectedClusters)
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+	}
+
+	assertPlacementConditionMisconfigured := func(placementName string, misConfigured bool) {
+		ginkgo.By("Check the condition PlacementMisconfigured of placement")
+		gomega.Eventually(func() bool {
+			placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
+			if err != nil {
+				return false
+			}
+			if !misConfigured && !util.HasCondition(
+				placement.Status.Conditions,
+				clusterapiv1beta1.PlacementConditionMisconfigured,
+				"Succeedconfigured",
+				metav1.ConditionFalse,
+			) {
+				return false
+			}
+			if misConfigured && !util.HasCondition(
+				placement.Status.Conditions,
+				clusterapiv1beta1.PlacementConditionMisconfigured,
+				"Misconfigured",
+				metav1.ConditionTrue,
+			) {
+				return false
+			}
+			return true
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	}
 
@@ -407,7 +434,24 @@ var _ = ginkgo.Describe("Placement", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	}
 
-	assertCreatingPlacement := func(name string, noc *int32, nod int, prioritizerPolicy clusterapiv1beta1.PrioritizerPolicy, tolerations []clusterapiv1beta1.Toleration) {
+	assertCreatingPlacement := func(name string, noc *int32, prioritizerPolicy clusterapiv1beta1.PrioritizerPolicy, tolerations []clusterapiv1beta1.Toleration) {
+		ginkgo.By("Create placement")
+		placement := &clusterapiv1beta1.Placement{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      name,
+			},
+			Spec: clusterapiv1beta1.PlacementSpec{
+				NumberOfClusters:  noc,
+				PrioritizerPolicy: prioritizerPolicy,
+				Tolerations:       tolerations,
+			},
+		}
+		placement, err = clusterClient.ClusterV1beta1().Placements(namespace).Create(context.Background(), placement, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	}
+
+	assertCreatingPlacementWithDecision := func(name string, noc *int32, nod int, prioritizerPolicy clusterapiv1beta1.PrioritizerPolicy, tolerations []clusterapiv1beta1.Toleration) {
 		ginkgo.By("Create placement")
 		placement := &clusterapiv1beta1.Placement{
 			ObjectMeta: metav1.ObjectMeta{
@@ -426,8 +470,20 @@ var _ = ginkgo.Describe("Placement", func() {
 		assertPlacementDecisionCreated(placement)
 		assertNumberOfDecisions(placementName, nod)
 		if noc != nil {
-			assertPlacementStatus(placementName, nod, nod == int(*noc))
+			assertPlacementConditionSatisfied(placementName, nod, nod == int(*noc))
 		}
+	}
+
+	assertUpdatingPlacement := func(name string, noc *int32, prioritizerPolicy clusterapiv1beta1.PrioritizerPolicy, tolerations []clusterapiv1beta1.Toleration) {
+		ginkgo.By("Updating placement")
+		placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		placement.Spec.NumberOfClusters = noc
+		placement.Spec.Tolerations = tolerations
+		placement.Spec.PrioritizerPolicy = prioritizerPolicy
+		placement, err = clusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 
 	assertCreatingAddOnPlacementScores := func(clusternamespace, crname, scorename string, score int32) {
@@ -481,7 +537,7 @@ var _ = ginkgo.Describe("Placement", func() {
 		ginkgo.It("Should re-create placementdecisions successfully once placementdecisions are deleted", func() {
 			assertBindingClusterSet(clusterSet1Name)
 			assertCreatingClusters(clusterSet1Name, 5)
-			assertCreatingPlacement(placementName, noc(10), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, noc(10), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 
 			ginkgo.By("Delete placementdecisions")
 			placementDecisions, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
@@ -505,7 +561,7 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertBindingClusterSet(clusterSet2Name)
 			assertCreatingClusters(clusterSet1Name, 2)
 			assertCreatingClusters(clusterSet2Name, 3)
-			assertCreatingPlacement(placementName, noc(10), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, noc(10), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 
 			// update ClusterSets
 			placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
@@ -521,7 +577,7 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertBindingClusterSet(clusterSet1Name)
 			assertCreatingClusters(clusterSet1Name, 2)
 			assertCreatingClusters(clusterSet1Name, 3, "cloud", "Amazon")
-			assertCreatingPlacement(placementName, noc(10), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, noc(10), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 
 			// add a predicates
 			placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
@@ -546,7 +602,7 @@ var _ = ginkgo.Describe("Placement", func() {
 		ginkgo.It("Should schedule successfully once spec.NumberOfClusters is reduced", func() {
 			assertBindingClusterSet(clusterSet1Name)
 			assertCreatingClusters(clusterSet1Name, 5)
-			assertCreatingPlacement(placementName, noc(10), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, noc(10), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 
 			ginkgo.By("Reduce NOC of the placement")
 			placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
@@ -558,13 +614,13 @@ var _ = ginkgo.Describe("Placement", func() {
 
 			nod := int(noc)
 			assertNumberOfDecisions(placementName, nod)
-			assertPlacementStatus(placementName, nod, true)
+			assertPlacementConditionSatisfied(placementName, nod, true)
 		})
 
 		ginkgo.It("Should schedule successfully once spec.NumberOfClusters is increased", func() {
 			assertBindingClusterSet(clusterSet1Name)
 			assertCreatingClusters(clusterSet1Name, 10)
-			assertCreatingPlacement(placementName, noc(5), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, noc(5), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 
 			ginkgo.By("Increase NOC of the placement")
 			placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
@@ -576,26 +632,45 @@ var _ = ginkgo.Describe("Placement", func() {
 
 			nod := int(noc)
 			assertNumberOfDecisions(placementName, nod)
-			assertPlacementStatus(placementName, nod, true)
+			assertPlacementConditionSatisfied(placementName, nod, true)
+		})
+
+		ginkgo.It("Should schedule successfully once MisConfigured is fixed", func() {
+			assertBindingClusterSet(clusterSet1Name)
+			assertCreatingClusters(clusterSet1Name, 1)
+
+			assertCreatingPlacement(placementName, noc(1), clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{
+				{
+					Key:      "key1",
+					Operator: clusterapiv1beta1.TolerationOpExists,
+					Value:    "value1",
+				},
+			})
+			assertPlacementConditionMisconfigured(placementName, true)
+
+			assertUpdatingPlacement(placementName, noc(1), clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
+			assertNumberOfDecisions(placementName, 1)
+			assertPlacementConditionMisconfigured(placementName, false)
+			assertPlacementConditionSatisfied(placementName, 1, true)
 		})
 
 		ginkgo.It("Should be satisfied once new clusters are added", func() {
 			assertBindingClusterSet(clusterSet1Name)
 			assertCreatingClusters(clusterSet1Name, 5)
-			assertCreatingPlacement(placementName, noc(10), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, noc(10), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 
 			// add more clusters
 			assertCreatingClusters(clusterSet1Name, 5)
 
 			nod := 10
 			assertNumberOfDecisions(placementName, nod)
-			assertPlacementStatus(placementName, nod, true)
+			assertPlacementConditionSatisfied(placementName, nod, true)
 		})
 
 		ginkgo.It("Should schedule successfully once new clusterset is bound", func() {
 			assertBindingClusterSet(clusterSet1Name)
 			assertCreatingClusters(clusterSet1Name, 5)
-			assertCreatingPlacement(placementName, noc(10), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, noc(10), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 
 			ginkgo.By("Bind one more clusterset to the placement namespace")
 			assertBindingClusterSet(clusterSet2Name)
@@ -603,17 +678,17 @@ var _ = ginkgo.Describe("Placement", func() {
 
 			nod := 8
 			assertNumberOfDecisions(placementName, nod)
-			assertPlacementStatus(placementName, nod, false)
+			assertPlacementConditionSatisfied(placementName, nod, false)
 		})
 
 		ginkgo.It("Should create multiple placementdecisions once scheduled", func() {
 			assertBindingClusterSet(clusterSet1Name)
 			assertCreatingClusters(clusterSet1Name, 101)
-			assertCreatingPlacement(placementName, nil, 101, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, nil, 101, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 
 			nod := 101
 			assertNumberOfDecisions(placementName, nod)
-			assertPlacementStatus(placementName, nod, true)
+			assertPlacementConditionSatisfied(placementName, nod, true)
 		})
 
 		ginkgo.It("Should schedule successfully with taint/toleration and requeue when expire TolerationSeconds", func() {
@@ -653,7 +728,7 @@ var _ = ginkgo.Describe("Placement", func() {
 			})
 
 			//Checking the result of the placement
-			assertCreatingPlacement(placementName, noc(4), 3, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{
+			assertCreatingPlacementWithDecision(placementName, noc(4), 3, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{
 				{
 					Key:               "key1",
 					Operator:          clusterapiv1beta1.TolerationOpExists,
@@ -704,7 +779,7 @@ var _ = ginkgo.Describe("Placement", func() {
 			}
 
 			//Checking the result of the placement
-			assertCreatingPlacement(placementName, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
 			assertClusterNamesOfDecisions(placementName, []string{clusterNames[0], clusterNames[1]})
 		})
 
@@ -749,7 +824,7 @@ var _ = ginkgo.Describe("Placement", func() {
 			}
 
 			//Checking the result of the placement
-			assertCreatingPlacement(placementName, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
 			assertClusterNamesOfDecisions(placementName, []string{clusterNames[0], clusterNames[2]})
 
 		})
@@ -787,7 +862,7 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertCreatingAddOnPlacementScores(clusterNames[2], "demo", "demo", 100)
 
 			//Checking the result of the placement
-			assertCreatingPlacement(placementName, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
 			assertClusterNamesOfDecisions(placementName, []string{clusterNames[1], clusterNames[2]})
 		})
 
@@ -821,7 +896,7 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertCreatingClustersWithNames(clusterSet1Name, clusterNames)
 
 			//Creating the placement
-			assertCreatingPlacement(placementName, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
 
 			//Checking the result of the placement when no AddOnPlacementScores
 			assertClusterNamesOfDecisions(placementName, []string{clusterNames[0], clusterNames[1]})
@@ -891,7 +966,7 @@ var _ = ginkgo.Describe("Placement", func() {
 			}
 
 			//Checking the result of the placement
-			assertCreatingPlacement(placementName, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
 			assertClusterNamesOfDecisions(placementName, []string{clusterNames[0], clusterNames[2]})
 
 			ginkgo.By("Adding fake placement decisions")
@@ -947,7 +1022,7 @@ var _ = ginkgo.Describe("Placement", func() {
 			}
 
 			//Checking the result of the placement
-			assertCreatingPlacement(placementName, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
 			assertClusterNamesOfDecisions(placementName, []string{clusterNames[0], clusterNames[2]})
 
 			ginkgo.By("Adding a new cluster with resources")
@@ -969,10 +1044,10 @@ var _ = ginkgo.Describe("Placement", func() {
 		ginkgo.It("Should re-schedule successfully once a clusterset deleted/added", func() {
 			assertBindingClusterSet(clusterSet1Name)
 			assertCreatingClusters(clusterSet1Name, 5)
-			assertCreatingPlacement(placementName, noc(10), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, noc(10), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 
 			assertNumberOfDecisions(placementName, 5)
-			assertPlacementStatus(placementName, 5, false)
+			assertPlacementConditionSatisfied(placementName, 5, false)
 
 			ginkgo.By("Delete the clusterset")
 			assertDeletingClusterSet(clusterSet1Name)
@@ -983,7 +1058,7 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertCreatingClusterSet(clusterSet1Name)
 
 			assertNumberOfDecisions(placementName, 5)
-			assertPlacementStatus(placementName, 5, false)
+			assertPlacementConditionSatisfied(placementName, 5, false)
 		})
 
 		ginkgo.It("Should re-schedule successfully once a labelselector type clusterset deleted/added", func() {
@@ -997,10 +1072,10 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertCreatingClusterWithLabel("cluster2", map[string]string{
 				"vendor": "IKS",
 			})
-			assertCreatingPlacement(placementName, noc(10), 1, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, noc(10), 1, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 
 			assertNumberOfDecisions(placementName, 1)
-			assertPlacementStatus(placementName, 1, false)
+			assertPlacementConditionSatisfied(placementName, 1, false)
 
 			ginkgo.By("Delete the clusterset")
 			assertDeletingClusterSet(clusterSet1Name)
@@ -1012,15 +1087,16 @@ var _ = ginkgo.Describe("Placement", func() {
 				"vendor": "openShift",
 			})
 			assertNumberOfDecisions(placementName, 1)
-			assertPlacementStatus(placementName, 1, false)
+			assertPlacementConditionSatisfied(placementName, 1, false)
 		})
+
 		ginkgo.It("Should re-schedule successfully once a clustersetbinding deleted/added", func() {
 			assertBindingClusterSet(clusterSet1Name)
 			assertCreatingClusters(clusterSet1Name, 5)
-			assertCreatingPlacement(placementName, noc(10), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, noc(10), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 
 			assertNumberOfDecisions(placementName, 5)
-			assertPlacementStatus(placementName, 5, false)
+			assertPlacementConditionSatisfied(placementName, 5, false)
 
 			ginkgo.By("Delete the clustersetbinding")
 			assertDeletingClusterSetBinding(clusterSet1Name)
@@ -1031,8 +1107,9 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertCreatingClusterSetBinding(clusterSet1Name)
 
 			assertNumberOfDecisions(placementName, 5)
-			assertPlacementStatus(placementName, 5, false)
+			assertPlacementConditionSatisfied(placementName, 5, false)
 		})
+
 	})
 })
 

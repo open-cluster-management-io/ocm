@@ -109,9 +109,9 @@ func TestMatchWithClusterPredicates(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			p := &Predicate{}
-			result := p.Filter(context.TODO(), c.placement, c.clusters)
+			result, status := p.Filter(context.TODO(), c.placement, c.clusters)
 			clusters := result.Filtered
-			err := result.Err
+			err := status.AsError()
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}

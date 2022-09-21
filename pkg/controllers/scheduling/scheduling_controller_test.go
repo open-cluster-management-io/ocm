@@ -16,6 +16,7 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	"open-cluster-management.io/placement/pkg/controllers/framework"
 	testinghelpers "open-cluster-management.io/placement/pkg/helpers/testing"
 )
 
@@ -26,7 +27,7 @@ type testScheduler struct {
 func (s *testScheduler) Schedule(ctx context.Context,
 	placement *clusterapiv1beta1.Placement,
 	clusters []*clusterapiv1.ManagedCluster,
-) (ScheduleResult, error) {
+) (ScheduleResult, *framework.Status) {
 	return s.result, nil
 }
 
@@ -152,7 +153,7 @@ func TestSchedulingController_sync(t *testing.T) {
 		{
 			name: "placement status not changed",
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).
-				WithNumOfSelectedClusters(3).WithSatisfiedCondition(3, 0).Build(),
+				WithNumOfSelectedClusters(3).WithSatisfiedCondition(3, 0).WithMisconfiguredCondition(metav1.ConditionFalse).Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet("clusterset1").Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, "clusterset1"),
@@ -561,6 +562,7 @@ func TestNewSatisfiedCondition(t *testing.T) {
 				c.numOfAvailableClusters,
 				c.numOfFeasibleClusters,
 				c.numOfUnscheduledDecisions,
+				nil,
 			)
 
 			if condition.Status != c.expectedStatus {
@@ -568,6 +570,53 @@ func TestNewSatisfiedCondition(t *testing.T) {
 			}
 			if condition.Reason != c.expectedReason {
 				t.Errorf("expected reason %q but got %q", c.expectedReason, condition.Reason)
+			}
+		})
+	}
+}
+
+func TestNewMisconfiguredCondition(t *testing.T) {
+	cases := []struct {
+		name            string
+		status          *framework.Status
+		expectedStatus  metav1.ConditionStatus
+		expectedReason  string
+		expectedMessage string
+	}{
+		{
+			name:            "Misconfigured is false when status is success",
+			status:          framework.NewStatus("plugin", framework.Success, "reasons"),
+			expectedStatus:  metav1.ConditionFalse,
+			expectedReason:  "Succeedconfigured",
+			expectedMessage: "Placement configurations check pass",
+		},
+		{
+			name:            "Misconfigured is false when status is error",
+			status:          framework.NewStatus("plugin", framework.Error, "reasons"),
+			expectedStatus:  metav1.ConditionFalse,
+			expectedReason:  "Succeedconfigured",
+			expectedMessage: "Placement configurations check pass",
+		},
+		{
+			name:            "Misconfigured is true",
+			status:          framework.NewStatus("plugin", framework.Misconfigured, "reasons"),
+			expectedStatus:  metav1.ConditionTrue,
+			expectedReason:  "Misconfigured",
+			expectedMessage: "plugin:reasons",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			condition := newMisconfiguredCondition(c.status)
+			if condition.Status != c.expectedStatus {
+				t.Errorf("expected status %q but got %q", c.expectedStatus, condition.Status)
+			}
+			if condition.Reason != c.expectedReason {
+				t.Errorf("expected reason %q but got %q", c.expectedReason, condition.Reason)
+			}
+			if condition.Message != c.expectedMessage {
+				t.Errorf("expected message %q but got %q", c.expectedReason, condition.Reason)
 			}
 		})
 	}
@@ -722,6 +771,7 @@ func TestBind(t *testing.T) {
 				context.TODO(),
 				testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
 				c.clusterDecisions,
+				nil,
 				nil,
 			)
 			if err != nil {

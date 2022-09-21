@@ -127,9 +127,9 @@ func TestScoreClusterWithResource(t *testing.T) {
 				algorithm: c.algorithm,
 			}
 
-			scoreResult := resource.Score(context.TODO(), c.placement, c.clusters)
+			scoreResult, status := resource.Score(context.TODO(), c.placement, c.clusters)
 			scores := scoreResult.Scores
-			err := scoreResult.Err
+			err := status.AsError()
 
 			if err != nil {
 				t.Errorf("Expect no error, but got %v", err)

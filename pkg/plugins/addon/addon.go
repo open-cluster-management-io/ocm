@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	"open-cluster-management.io/placement/pkg/controllers/framework"
 	"open-cluster-management.io/placement/pkg/plugins"
 )
 
@@ -66,9 +66,10 @@ func (c *AddOn) Description() string {
 	return description
 }
 
-func (c *AddOn) Score(ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) plugins.PluginScoreResult {
+func (c *AddOn) Score(ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) (plugins.PluginScoreResult, *framework.Status) {
 	scores := map[string]int64{}
 	expiredScores := ""
+	status := framework.NewStatus(c.Name(), framework.Success, "")
 
 	for _, cluster := range clusters {
 		namespace := cluster.Name
@@ -96,19 +97,19 @@ func (c *AddOn) Score(ctx context.Context, placement *clusterapiv1beta1.Placemen
 		}
 	}
 
-	//TODO: show the failure in placement.status conditions
 	if len(expiredScores) > 0 {
-		c.handle.EventRecorder().Eventf(
-			placement, nil, corev1.EventTypeWarning,
-			"AddOnPlacementScoresExpired", "AddOnPlacementScoresExpired",
-			"AddOnPlacementScores%s expired", expiredScores)
+		status = framework.NewStatus(
+			c.Name(),
+			framework.Warning,
+			fmt.Sprintf("AddOnPlacementScores%s expired", expiredScores),
+		)
 	}
 
 	return plugins.PluginScoreResult{
 		Scores: scores,
-	}
+	}, status
 }
 
-func (c *AddOn) RequeueAfter(ctx context.Context, placement *clusterapiv1beta1.Placement) plugins.PluginRequeueResult {
-	return plugins.PluginRequeueResult{}
+func (c *AddOn) RequeueAfter(ctx context.Context, placement *clusterapiv1beta1.Placement) (plugins.PluginRequeueResult, *framework.Status) {
+	return plugins.PluginRequeueResult{}, framework.NewStatus(c.Name(), framework.Success, "")
 }

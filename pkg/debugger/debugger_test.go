@@ -15,6 +15,7 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	"open-cluster-management.io/placement/pkg/controllers/framework"
 	scheduling "open-cluster-management.io/placement/pkg/controllers/scheduling"
 	testinghelpers "open-cluster-management.io/placement/pkg/helpers/testing"
 )
@@ -52,7 +53,7 @@ func (r *testResult) NumOfUnscheduled() int {
 func (s *testScheduler) Schedule(ctx context.Context,
 	placement *clusterapiv1beta1.Placement,
 	clusters []*clusterapiv1.ManagedCluster,
-) (scheduling.ScheduleResult, error) {
+) (scheduling.ScheduleResult, *framework.Status) {
 	return s.result, nil
 }
 
