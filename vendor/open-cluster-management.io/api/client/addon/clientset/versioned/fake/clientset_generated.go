@@ -58,7 +58,10 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-var _ clientset.Interface = &Clientset{}
+var (
+	_ clientset.Interface = &Clientset{}
+	_ testing.FakeClient  = &Clientset{}
+)
 
 // AddonV1alpha1 retrieves the AddonV1alpha1Client
 func (c *Clientset) AddonV1alpha1() addonv1alpha1.AddonV1alpha1Interface {

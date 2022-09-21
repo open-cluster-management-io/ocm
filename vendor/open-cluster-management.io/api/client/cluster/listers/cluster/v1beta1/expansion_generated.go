@@ -13,3 +13,19 @@ type ManagedClusterSetBindingListerExpansion interface{}
 // ManagedClusterSetBindingNamespaceListerExpansion allows custom methods to be added to
 // ManagedClusterSetBindingNamespaceLister.
 type ManagedClusterSetBindingNamespaceListerExpansion interface{}
+
+// PlacementListerExpansion allows custom methods to be added to
+// PlacementLister.
+type PlacementListerExpansion interface{}
+
+// PlacementNamespaceListerExpansion allows custom methods to be added to
+// PlacementNamespaceLister.
+type PlacementNamespaceListerExpansion interface{}
+
+// PlacementDecisionListerExpansion allows custom methods to be added to
+// PlacementDecisionLister.
+type PlacementDecisionListerExpansion interface{}
+
+// PlacementDecisionNamespaceListerExpansion allows custom methods to be added to
+// PlacementDecisionNamespaceLister.
+type PlacementDecisionNamespaceListerExpansion interface{}

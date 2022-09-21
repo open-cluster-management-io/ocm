@@ -101,7 +101,7 @@ func (c *FakeAddOnPlacementScores) UpdateStatus(ctx context.Context, addOnPlacem
 // Delete takes name of the addOnPlacementScore and deletes it. Returns an error if one occurs.
 func (c *FakeAddOnPlacementScores) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(addonplacementscoresResource, c.ns, name), &v1alpha1.AddOnPlacementScore{})
+		Invokes(testing.NewDeleteActionWithOptions(addonplacementscoresResource, c.ns, name, opts), &v1alpha1.AddOnPlacementScore{})
 
 	return err
 }

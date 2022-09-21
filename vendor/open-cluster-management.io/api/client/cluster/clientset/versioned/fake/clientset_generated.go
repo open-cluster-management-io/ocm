@@ -62,7 +62,10 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-var _ clientset.Interface = &Clientset{}
+var (
+	_ clientset.Interface = &Clientset{}
+	_ testing.FakeClient  = &Clientset{}
+)
 
 // ClusterV1 retrieves the ClusterV1Client
 func (c *Clientset) ClusterV1() clusterv1.ClusterV1Interface {

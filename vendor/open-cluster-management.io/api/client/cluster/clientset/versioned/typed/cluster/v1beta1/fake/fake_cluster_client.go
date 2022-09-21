@@ -20,6 +20,14 @@ func (c *FakeClusterV1beta1) ManagedClusterSetBindings(namespace string) v1beta1
 	return &FakeManagedClusterSetBindings{c, namespace}
 }
 
+func (c *FakeClusterV1beta1) Placements(namespace string) v1beta1.PlacementInterface {
+	return &FakePlacements{c, namespace}
+}
+
+func (c *FakeClusterV1beta1) PlacementDecisions(namespace string) v1beta1.PlacementDecisionInterface {
+	return &FakePlacementDecisions{c, namespace}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeClusterV1beta1) RESTClient() rest.Interface {
