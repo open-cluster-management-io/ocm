@@ -6,10 +6,14 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addonconfig"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addonhealthcheck"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addoninstall"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/agentdeploy"
@@ -38,8 +42,9 @@ type AddonManager interface {
 }
 
 type addonManager struct {
-	addonAgents map[string]agent.AgentAddon
-	config      *rest.Config
+	addonAgents  map[string]agent.AgentAddon
+	addonConfigs map[schema.GroupVersionResource]bool
+	config       *rest.Config
 }
 
 func (a *addonManager) AddAgent(addon agent.AgentAddon) error {
@@ -55,6 +60,11 @@ func (a *addonManager) AddAgent(addon agent.AgentAddon) error {
 }
 
 func (a *addonManager) Start(ctx context.Context) error {
+	dynamicClient, err := dynamic.NewForConfig(a.config)
+	if err != nil {
+		return err
+	}
+
 	kubeClient, err := kubernetes.NewForConfig(a.config)
 	if err != nil {
 		return err
@@ -81,8 +91,11 @@ func (a *addonManager) Start(ctx context.Context) error {
 	}
 
 	addonNames := []string{}
-	for key := range a.addonAgents {
+	for key, agent := range a.addonAgents {
 		addonNames = append(addonNames, key)
+		for _, configGVR := range agent.GetAgentAddonOptions().SupportedConfigGVRs {
+			a.addonConfigs[configGVR] = true
+		}
 	}
 	addonInformers := addoninformers.NewSharedInformerFactory(addonClient, 10*time.Minute)
 	workInformers := workv1informers.NewSharedInformerFactoryWithOptions(workClient, 10*time.Minute,
@@ -114,6 +127,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
 		}),
 	)
+	dynamicInformers := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, 10*time.Minute)
 
 	deployController := agentdeploy.NewAddonDeployController(
 		workClient,
@@ -153,6 +167,16 @@ func (a *addonManager) Start(ctx context.Context) error {
 		a.addonAgents,
 	)
 
+	var addonConfigController factory.Controller
+	if len(a.addonConfigs) != 0 {
+		addonConfigController = addonconfig.NewAddonConfigController(
+			addonClient,
+			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+			dynamicInformers,
+			a.addonConfigs,
+		)
+	}
+
 	var csrApproveController factory.Controller
 	var csrSignController factory.Controller
 	// Spawn the following controllers only if v1 CSR api is supported in the
@@ -190,12 +214,16 @@ func (a *addonManager) Start(ctx context.Context) error {
 	go workInformers.Start(ctx.Done())
 	go clusterInformers.Start(ctx.Done())
 	go kubeInfomers.Start(ctx.Done())
+	go dynamicInformers.Start(ctx.Done())
 
 	go deployController.Run(ctx, 1)
 	go registrationController.Run(ctx, 1)
 	go clusterManagementController.Run(ctx, 1)
 	go addonInstallController.Run(ctx, 1)
 	go addonHealthCheckController.Run(ctx, 1)
+	if addonConfigController != nil {
+		go addonConfigController.Run(ctx, 1)
+	}
 	if csrApproveController != nil {
 		go csrApproveController.Run(ctx, 1)
 	}
@@ -208,7 +236,8 @@ func (a *addonManager) Start(ctx context.Context) error {
 // New returns a new Manager for creating addon agents.
 func New(config *rest.Config) (AddonManager, error) {
 	return &addonManager{
-		config:      config,
-		addonAgents: map[string]agent.AgentAddon{},
+		config:       config,
+		addonConfigs: map[schema.GroupVersionResource]bool{},
+		addonAgents:  map[string]agent.AgentAddon{},
 	}, nil
 }

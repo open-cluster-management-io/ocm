@@ -10,6 +10,7 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -28,6 +29,12 @@ const (
 	eventuallyInterval = 1  // seconds
 )
 
+var addOnDeploymentConfigGVR = schema.GroupVersionResource{
+	Group:    "addon.open-cluster-management.io",
+	Version:  "v1alpha1",
+	Resource: "addondeploymentconfigs",
+}
+
 var testEnv *envtest.Environment
 var hubWorkClient workclientset.Interface
 var hubClusterClient clusterv1client.Interface
@@ -36,6 +43,7 @@ var hubKubeClient kubernetes.Interface
 var testAddonImpl *testAddon
 var testHostedAddonImpl *testAddon
 var testInstallByLableAddonImpl *testAddon
+var testAddOnConfigsImpl *testAddon
 var cancel context.CancelFunc
 var mgrContext context.Context
 
@@ -94,6 +102,13 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		}),
 	}
 
+	testAddOnConfigsImpl = &testAddon{
+		name:                "test-addon-configs",
+		manifests:           map[string][]runtime.Object{},
+		registrations:       map[string][]addonapiv1alpha1.RegistrationConfig{},
+		supportedConfigGVRs: []schema.GroupVersionResource{addOnDeploymentConfigGVR},
+	}
+
 	mgrContext, cancel = context.WithCancel(context.TODO())
 	// start hub controller
 	go func() {
@@ -104,6 +119,8 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		err = mgr.AddAgent(testInstallByLableAddonImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		err = mgr.AddAgent(testHostedAddonImpl)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		err = mgr.AddAgent(testAddOnConfigsImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		err = mgr.Start(mgrContext)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -121,14 +138,15 @@ var _ = ginkgo.AfterSuite(func() {
 })
 
 type testAddon struct {
-	name              string
-	manifests         map[string][]runtime.Object
-	registrations     map[string][]addonapiv1alpha1.RegistrationConfig
-	approveCSR        bool
-	cert              []byte
-	prober            *agent.HealthProber
-	installStrategy   *agent.InstallStrategy
-	hostedModeEnabled bool
+	name                string
+	manifests           map[string][]runtime.Object
+	registrations       map[string][]addonapiv1alpha1.RegistrationConfig
+	approveCSR          bool
+	cert                []byte
+	prober              *agent.HealthProber
+	installStrategy     *agent.InstallStrategy
+	hostedModeEnabled   bool
+	supportedConfigGVRs []schema.GroupVersionResource
 }
 
 func (t *testAddon) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
@@ -137,10 +155,11 @@ func (t *testAddon) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapi
 
 func (t *testAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 	option := agent.AgentAddonOptions{
-		AddonName:         t.name,
-		HealthProber:      t.prober,
-		InstallStrategy:   t.installStrategy,
-		HostedModeEnabled: t.hostedModeEnabled,
+		AddonName:           t.name,
+		HealthProber:        t.prober,
+		InstallStrategy:     t.installStrategy,
+		HostedModeEnabled:   t.hostedModeEnabled,
+		SupportedConfigGVRs: t.supportedConfigGVRs,
 	}
 
 	if len(t.registrations) > 0 {

@@ -8,6 +8,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// AddOnDeploymentConfigs returns a AddOnDeploymentConfigInformer.
+	AddOnDeploymentConfigs() AddOnDeploymentConfigInformer
 	// ClusterManagementAddOns returns a ClusterManagementAddOnInformer.
 	ClusterManagementAddOns() ClusterManagementAddOnInformer
 	// ManagedClusterAddOns returns a ManagedClusterAddOnInformer.
@@ -23,6 +25,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// AddOnDeploymentConfigs returns a AddOnDeploymentConfigInformer.
+func (v *version) AddOnDeploymentConfigs() AddOnDeploymentConfigInformer {
+	return &addOnDeploymentConfigInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // ClusterManagementAddOns returns a ClusterManagementAddOnInformer.

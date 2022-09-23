@@ -79,7 +79,11 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 			if err != nil {
 				return err
 			}
+			//nolint:staticcheck
+			//lint:ignore SA1019 Ignore the deprecation warnings
 			if !apiequality.Semantic.DeepEqual(clusterManagementAddon.Spec.AddOnConfiguration, actual.Status.AddOnConfiguration) {
+				//nolint:staticcheck
+				//lint:ignore SA1019 Ignore the deprecation warnings
 				return fmt.Errorf("Expected config coordinate is not correct, actual: %v", actual.Status.AddOnConfiguration)
 			}
 			relatedObjects := []addonapiv1alpha1.ObjectReference{

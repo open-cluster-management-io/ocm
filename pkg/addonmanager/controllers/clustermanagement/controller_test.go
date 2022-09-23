@@ -2,11 +2,14 @@ package clustermanagement
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clienttesting "k8s.io/client-go/testing"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -19,7 +22,8 @@ import (
 )
 
 type testAgent struct {
-	name string
+	name       string
+	configGVRs []schema.GroupVersionResource
 }
 
 func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
@@ -28,7 +32,8 @@ func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapi
 
 func (t *testAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	return agent.AgentAddonOptions{
-		AddonName: t.name,
+		AddonName:           t.name,
+		SupportedConfigGVRs: t.configGVRs,
 	}
 }
 
@@ -139,6 +144,8 @@ func TestReconcile(t *testing.T) {
 				addontesting.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
 				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+				//nolint:staticcheck
+				//lint:ignore SA1019 Ignore the deprecation warnings
 				if addOn.Status.AddOnConfiguration.CRDName != "testcrd" || addOn.Status.AddOnConfiguration.CRName != "testcr" {
 					t.Errorf("Config coordinate is not updated")
 				}
@@ -196,6 +203,404 @@ func TestReconcile(t *testing.T) {
 					t.Errorf("Related object is not updated, %v", addOn.Status.RelatedObjects)
 				}
 			},
+		},
+		{
+			name:                "using default config",
+			syncKey:             "cluster1/test",
+			managedClusteraddon: []runtime.Object{addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test"))},
+			clusterManagementAddon: []runtime.Object{
+				func() *addonapiv1alpha1.ClusterManagementAddOn {
+					clusterManagementAddon := addontesting.NewClusterManagementAddon("test", "", "")
+					clusterManagementAddon.Spec.SupportedConfigs = []addonapiv1alpha1.ConfigMeta{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "configs.test",
+								Resource: "testconfigs",
+							},
+							DefaultConfig: &addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "default",
+							},
+						},
+					}
+					return clusterManagementAddon
+				}(),
+			},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{
+				name:       "test",
+				configGVRs: []schema.GroupVersionResource{{Group: "configs.test", Resource: "testconfigs"}},
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "update")
+				actual := actions[0].(clienttesting.UpdateActionImpl).Object
+				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+				if len(addOn.Status.ConfigReferences) != 1 {
+					t.Errorf("Expect one addon config reference, but got %v", len(addOn.Status.ConfigReferences))
+				}
+				if addOn.Status.ConfigReferences[0].Name != "default" {
+					t.Errorf("Expect addon config version is default, but got %v", addOn.Status.ConfigReferences)
+				}
+			},
+		},
+		{
+			name:    "merge configs",
+			syncKey: "cluster1/test",
+			managedClusteraddon: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test"))
+					addon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "config1.test",
+								Resource: "config1",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "override",
+							},
+						},
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "config3.test",
+								Resource: "config3",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "config3",
+							},
+						},
+					}
+					return addon
+				}(),
+			},
+			clusterManagementAddon: []runtime.Object{
+				func() *addonapiv1alpha1.ClusterManagementAddOn {
+					clusterManagementAddon := addontesting.NewClusterManagementAddon("test", "", "")
+					clusterManagementAddon.Spec.SupportedConfigs = []addonapiv1alpha1.ConfigMeta{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "config1.test",
+								Resource: "config1",
+							},
+							DefaultConfig: &addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "default",
+							},
+						},
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "config2.test",
+								Resource: "config2",
+							},
+							DefaultConfig: &addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "config2",
+							},
+						},
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "config3.test",
+								Resource: "config3",
+							},
+						},
+					}
+					return clusterManagementAddon
+				}(),
+			},
+			cluster: []runtime.Object{
+				addontesting.NewManagedCluster("cluster1"),
+			},
+			testaddon: &testAgent{
+				name: "test",
+				configGVRs: []schema.GroupVersionResource{
+					{Group: "config1.test", Resource: "config1"},
+					{Group: "config2.test", Resource: "config2"},
+					{Group: "config3.test", Resource: "config3"},
+				},
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "update")
+				actual := actions[0].(clienttesting.UpdateActionImpl).Object
+				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+				if len(addOn.Status.ConfigReferences) != 3 {
+					t.Errorf("Expect 3 addon config references, but got %v", len(addOn.Status.ConfigReferences))
+				}
+			},
+		},
+		{
+			name:    "update config",
+			syncKey: "cluster1/test",
+			managedClusteraddon: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test"))
+					addon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "configs.test",
+								Resource: "testconfigs",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "test2",
+							},
+						},
+					}
+					addon.Status.RelatedObjects = []addonapiv1alpha1.ObjectReference{
+						{
+							Name:     "test",
+							Group:    "addon.open-cluster-management.io",
+							Resource: "clustermanagementaddons",
+						},
+					}
+					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "configs.test",
+								Resource: "testconfigs",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "test1",
+							},
+							LastObservedGeneration: 1,
+						},
+					}
+					return addon
+				}(),
+			},
+			clusterManagementAddon: []runtime.Object{
+				func() *addonapiv1alpha1.ClusterManagementAddOn {
+					clusterManagementAddon := addontesting.NewClusterManagementAddon("test", "", "")
+					clusterManagementAddon.Spec.SupportedConfigs = []addonapiv1alpha1.ConfigMeta{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "configs.test",
+								Resource: "testconfigs",
+							},
+							DefaultConfig: &addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "default",
+							},
+						},
+					}
+					return clusterManagementAddon
+				}(),
+			},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{
+				name:       "test",
+				configGVRs: []schema.GroupVersionResource{{Group: "configs.test", Resource: "testconfigs"}},
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "update")
+				actual := actions[0].(clienttesting.UpdateActionImpl).Object
+				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+				config := addOn.Status.ConfigReferences[0]
+				if config.Name != "test2" {
+					t.Errorf("Expect addon config is test2, but got %v", config.Name)
+				}
+				if config.LastObservedGeneration != 0 {
+					t.Errorf("Expect addon generation is 0, but got %v", config.LastObservedGeneration)
+				}
+			},
+		},
+		{
+			name:                   "no configs in ClusterManagementAddOn",
+			syncKey:                "cluster1/test",
+			managedClusteraddon:    []runtime.Object{addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test"))},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "", "")},
+			cluster:                []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{
+				name:       "test",
+				configGVRs: []schema.GroupVersionResource{{Group: "configs.test", Resource: "testconfigs"}},
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if !meta.IsStatusConditionTrue(addOn.Status.Conditions, UnsupportedConfigurationType) {
+					t.Errorf("Expect addon config is wrong, but failed")
+				}
+			},
+		},
+		{
+			name:                "unregistered configs in ClusterManagementAddOn",
+			syncKey:             "cluster1/test",
+			managedClusteraddon: []runtime.Object{addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test"))},
+			clusterManagementAddon: []runtime.Object{
+				func() *addonapiv1alpha1.ClusterManagementAddOn {
+					clusterManagementAddon := addontesting.NewClusterManagementAddon("test", "", "")
+					clusterManagementAddon.Spec.SupportedConfigs = []addonapiv1alpha1.ConfigMeta{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "wrong.test",
+								Resource: "wrong",
+							},
+						},
+					}
+					return clusterManagementAddon
+				}(),
+			},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{
+				name: "test",
+				configGVRs: []schema.GroupVersionResource{
+					{Group: "configs.test", Resource: "testconfigs"},
+				},
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if !meta.IsStatusConditionTrue(addOn.Status.Conditions, UnsupportedConfigurationType) {
+					t.Errorf("Expect addon config is wrong, but failed")
+				}
+			},
+		},
+		{
+			name:                "duplicated configs in ClusterManagementAddOn",
+			syncKey:             "cluster1/test",
+			managedClusteraddon: []runtime.Object{addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test"))},
+			clusterManagementAddon: []runtime.Object{
+				func() *addonapiv1alpha1.ClusterManagementAddOn {
+					clusterManagementAddon := addontesting.NewClusterManagementAddon("test", "", "")
+					clusterManagementAddon.Spec.SupportedConfigs = []addonapiv1alpha1.ConfigMeta{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "configs.test",
+								Resource: "testconfigs",
+							},
+						},
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "configs.test",
+								Resource: "testconfigs",
+							},
+						},
+					}
+					return clusterManagementAddon
+				}(),
+			},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{
+				name:       "test",
+				configGVRs: []schema.GroupVersionResource{{Group: "configs.test", Resource: "testconfigs"}},
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if !meta.IsStatusConditionTrue(addOn.Status.Conditions, UnsupportedConfigurationType) {
+					t.Errorf("Expect addon config is wrong, but failed")
+				}
+			},
+		},
+		{
+			name:    "unsupported configs in ManagedClusterAddOn",
+			syncKey: "cluster1/test",
+			managedClusteraddon: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test"))
+					addon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "config1.test",
+								Resource: "config1",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "override",
+							},
+						},
+					}
+					return addon
+				}(),
+			},
+			clusterManagementAddon: []runtime.Object{
+				func() *addonapiv1alpha1.ClusterManagementAddOn {
+					clusterManagementAddon := addontesting.NewClusterManagementAddon("test", "", "")
+					clusterManagementAddon.Spec.SupportedConfigs = []addonapiv1alpha1.ConfigMeta{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "configs.test",
+								Resource: "testconfigs",
+							},
+						},
+					}
+					return clusterManagementAddon
+				}(),
+			},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{
+				name:       "test",
+				configGVRs: []schema.GroupVersionResource{{Group: "configs.test", Resource: "testconfigs"}},
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if !meta.IsStatusConditionTrue(addOn.Status.Conditions, UnsupportedConfigurationType) {
+					t.Errorf("Expect addon config is wrong, but failed")
+				}
+			},
+		},
+		{
+			name:    "no configs",
+			syncKey: "cluster1/test",
+			managedClusteraddon: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test"))
+					addon.Status.RelatedObjects = []addonapiv1alpha1.ObjectReference{
+						{
+							Name:     "test",
+							Group:    "addon.open-cluster-management.io",
+							Resource: "clustermanagementaddons",
+						},
+					}
+					return addon
+				}(),
+			},
+			clusterManagementAddon: []runtime.Object{
+				func() *addonapiv1alpha1.ClusterManagementAddOn {
+					clusterManagementAddon := addontesting.NewClusterManagementAddon("test", "", "")
+					clusterManagementAddon.Spec.SupportedConfigs = []addonapiv1alpha1.ConfigMeta{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "configs.test",
+								Resource: "testconfigs",
+							},
+						},
+					}
+					return clusterManagementAddon
+				}(),
+			},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{
+				name:       "test",
+				configGVRs: []schema.GroupVersionResource{{Group: "configs.test", Resource: "testconfigs"}},
+			},
+			validateAddonActions: addontesting.AssertNoActions,
 		},
 	}
 

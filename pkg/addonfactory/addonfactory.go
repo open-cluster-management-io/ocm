@@ -7,6 +7,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -47,10 +48,11 @@ func NewAgentAddonFactory(addonName string, fs embed.FS, dir string) *AgentAddon
 		fs:  fs,
 		dir: dir,
 		agentAddonOptions: agent.AgentAddonOptions{
-			AddonName:       addonName,
-			Registration:    nil,
-			InstallStrategy: nil,
-			HealthProber:    nil,
+			AddonName:           addonName,
+			Registration:        nil,
+			InstallStrategy:     nil,
+			HealthProber:        nil,
+			SupportedConfigGVRs: []schema.GroupVersionResource{},
 		},
 		trimCRDDescription: false,
 		scheme:             s,
@@ -107,8 +109,18 @@ func (f *AgentAddonFactory) WithTrimCRDDescription() *AgentAddonFactory {
 	return f
 }
 
+// WithConfigGVRs defines the addon supported configuration GroupVersionResource
+func (f *AgentAddonFactory) WithConfigGVRs(gvrs []schema.GroupVersionResource) *AgentAddonFactory {
+	f.agentAddonOptions.SupportedConfigGVRs = gvrs
+	return f
+}
+
 // BuildHelmAgentAddon builds a helm agentAddon instance.
 func (f *AgentAddonFactory) BuildHelmAgentAddon() (agent.AgentAddon, error) {
+	if err := validateSupportedConfigGVRs(f.agentAddonOptions.SupportedConfigGVRs); err != nil {
+		return nil, err
+	}
+
 	userChart, err := loadChart(f.fs, f.dir)
 	if err != nil {
 		return nil, err
@@ -122,6 +134,10 @@ func (f *AgentAddonFactory) BuildHelmAgentAddon() (agent.AgentAddon, error) {
 
 // BuildTemplateAgentAddon builds a template agentAddon instance.
 func (f *AgentAddonFactory) BuildTemplateAgentAddon() (agent.AgentAddon, error) {
+	if err := validateSupportedConfigGVRs(f.agentAddonOptions.SupportedConfigGVRs); err != nil {
+		return nil, err
+	}
+
 	templateFiles, err := getTemplateFiles(f.fs, f.dir)
 	if err != nil {
 		klog.Errorf("failed to get template files. %v", err)
@@ -144,4 +160,33 @@ func (f *AgentAddonFactory) BuildTemplateAgentAddon() (agent.AgentAddon, error) 
 		agentAddon.addTemplateData(file, template)
 	}
 	return agentAddon, nil
+}
+
+func validateSupportedConfigGVRs(configGVRs []schema.GroupVersionResource) error {
+	if len(configGVRs) == 0 {
+		// no configs required, ignore
+		return nil
+	}
+
+	configGVRMap := map[schema.GroupVersionResource]bool{}
+	for index, gvr := range configGVRs {
+		if gvr.Empty() {
+			return fmt.Errorf("config type is empty, index=%d", index)
+		}
+
+		if gvr.Version == "" {
+			return fmt.Errorf("config version is required, index=%d", index)
+		}
+
+		if gvr.Resource == "" {
+			return fmt.Errorf("config resource is required, index=%d", index)
+		}
+
+		if _, existed := configGVRMap[gvr]; existed {
+			return fmt.Errorf("config type %q is duplicated", gvr.String())
+		}
+		configGVRMap[gvr] = true
+	}
+
+	return nil
 }

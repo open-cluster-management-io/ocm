@@ -2,6 +2,8 @@ package clustermanagement
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -9,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -21,6 +24,8 @@ import (
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 )
+
+const UnsupportedConfigurationType = "UnsupportedConfiguration"
 
 // clusterManagementController reconciles instances of managedclusteradd on the hub
 // based on the clustermanagementaddon.
@@ -85,8 +90,6 @@ func (c *clusterManagementController) sync(ctx context.Context, syncCtx factory.
 		return c.syncAllAddon(syncCtx, addonName)
 	}
 
-	owner := metav1.NewControllerRef(clusterManagementAddon, addonapiv1alpha1.GroupVersion.WithKind("ClusterManagementAddOn"))
-
 	addon, err := c.managedClusterAddonLister.ManagedClusterAddOns(namespace).Get(addonName)
 	switch {
 	case errors.IsNotFound(err):
@@ -95,42 +98,39 @@ func (c *clusterManagementController) sync(ctx context.Context, syncCtx factory.
 		return err
 	}
 
-	addon = addon.DeepCopy()
+	addonCopy := addon.DeepCopy()
 
-	// AddOwner if it does not exist
-	modified := utils.MergeOwnerRefs(&addon.OwnerReferences, *owner, false)
+	// Add owner if it does not exist
+	owner := metav1.NewControllerRef(clusterManagementAddon, addonapiv1alpha1.GroupVersion.WithKind("ClusterManagementAddOn"))
+	modified := utils.MergeOwnerRefs(&addonCopy.OwnerReferences, *owner, false)
 	if modified {
-		_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Update(ctx, addon, metav1.UpdateOptions{})
+		_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Update(ctx, addonCopy, metav1.UpdateOptions{})
 		return err
 	}
 
-	expectedCoordinate := addonapiv1alpha1.ConfigCoordinates{
-		CRDName: clusterManagementAddon.Spec.AddOnConfiguration.CRDName,
-		CRName:  clusterManagementAddon.Spec.AddOnConfiguration.CRName,
-	}
-	actualCoordinate := addonapiv1alpha1.ConfigCoordinates{
-		CRDName: addon.Status.AddOnConfiguration.CRDName,
-		CRName:  addon.Status.AddOnConfiguration.CRName,
-	}
-
-	if !equality.Semantic.DeepEqual(expectedCoordinate, actualCoordinate) {
-		addon.Status.AddOnConfiguration.CRDName = expectedCoordinate.CRDName
-		addon.Status.AddOnConfiguration.CRName = expectedCoordinate.CRName
-		modified = true
-	}
-
-	utils.MergeRelatedObjects(&modified, &addon.Status.RelatedObjects, addonapiv1alpha1.ObjectReference{
+	// Add related ClusterManagementAddon
+	utils.MergeRelatedObjects(&modified, &addonCopy.Status.RelatedObjects, addonapiv1alpha1.ObjectReference{
 		Name:     clusterManagementAddon.Name,
 		Resource: "clustermanagementaddons",
 		Group:    addonapiv1alpha1.GroupVersion.Group,
 	})
 
+	// Add config references
+	if err := mergeConfigReferences(&modified, c.agentAddons[addonName], clusterManagementAddon, addonCopy); err != nil {
+		meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
+			Type:    UnsupportedConfigurationType,
+			Status:  metav1.ConditionTrue,
+			Reason:  "ConfigurationUnsupported",
+			Message: err.Error(),
+		})
+		return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
+	}
+
 	if !modified {
 		return nil
 	}
 
-	_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).UpdateStatus(ctx, addon, metav1.UpdateOptions{})
-
+	_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).UpdateStatus(ctx, addonCopy, metav1.UpdateOptions{})
 	return err
 }
 
@@ -154,4 +154,190 @@ func (c *clusterManagementController) syncAllAddon(syncCtx factory.SyncContext, 
 	}
 
 	return nil
+}
+
+func mergeConfigReferences(
+	modified *bool,
+	agent agent.AgentAddon,
+	clusterManagementAddon *addonapiv1alpha1.ClusterManagementAddOn,
+	addon *addonapiv1alpha1.ManagedClusterAddOn,
+) error {
+	registeredConfigs := agent.GetAgentAddonOptions().SupportedConfigGVRs
+	if len(registeredConfigs) == 0 {
+		// the config resources are not registed by framework
+		// for compatibility, try to merge old addon configuration
+		// TODO  this will be removed after next few releases
+		mergeAddOnConfiguration(modified, clusterManagementAddon, addon)
+		return nil
+	}
+
+	cmaConfigs := clusterManagementAddon.Spec.SupportedConfigs
+	if len(cmaConfigs) == 0 {
+		return fmt.Errorf("the supported config resources are required in ClusterManagementAddon")
+	}
+
+	// make sure the supported configs in ClusterManagementAddon are registered and no duplicated
+	cmaConfigSet, err := validateCMAConfigs(cmaConfigs, registeredConfigs)
+	if err != nil {
+		return err
+	}
+
+	// merge the ClusterManagementAddOn default configs and ManagedClusterAddOn configs
+	// TODO After merged there may be multiple configs with the same group and resource in the config reference list,
+	// currently, we save all of them, in the future, we may consider a way to define which config should be used
+	expectedConfigReferences, err := mergeConfigs(cmaConfigSet, addon.Spec.Configs)
+	if err != nil {
+		return err
+	}
+
+	if len(expectedConfigReferences) == 0 {
+		// the config name is not defined, ignore
+		return nil
+	}
+
+	if !equality.Semantic.DeepEqual(addon.Status.ConfigReferences, expectedConfigReferences) {
+		addon.Status.ConfigReferences = expectedConfigReferences
+		*modified = true
+	}
+
+	return nil
+}
+
+// for compatibility, ignore the deprecation warnings
+func mergeAddOnConfiguration(
+	modified *bool,
+	clusterManagementAddon *addonapiv1alpha1.ClusterManagementAddOn,
+	addon *addonapiv1alpha1.ManagedClusterAddOn,
+) {
+	expectedCoordinate := addonapiv1alpha1.ConfigCoordinates{
+		//nolint:staticcheck
+		//lint:ignore SA1019 Ignore the deprecation warnings
+		CRDName: clusterManagementAddon.Spec.AddOnConfiguration.CRDName,
+		//nolint:staticcheck
+		//lint:ignore SA1019 Ignore the deprecation warnings
+		CRName: clusterManagementAddon.Spec.AddOnConfiguration.CRName,
+	}
+	actualCoordinate := addonapiv1alpha1.ConfigCoordinates{
+		//nolint:staticcheck
+		//lint:ignore SA1019 Ignore the deprecation warnings
+		CRDName: addon.Status.AddOnConfiguration.CRDName,
+		//nolint:staticcheck
+		//lint:ignore SA1019 Ignore the deprecation warnings
+		CRName: addon.Status.AddOnConfiguration.CRName,
+	}
+
+	if !equality.Semantic.DeepEqual(expectedCoordinate, actualCoordinate) {
+		//nolint:staticcheck
+		//lint:ignore SA1019 Ignore the deprecation warnings
+		addon.Status.AddOnConfiguration.CRDName = expectedCoordinate.CRDName
+		//nolint:staticcheck
+		//lint:ignore SA1019 Ignore the deprecation warnings
+		addon.Status.AddOnConfiguration.CRName = expectedCoordinate.CRName
+		*modified = true
+	}
+}
+
+func isRegistedConfig(gvrs []schema.GroupVersionResource, config addonapiv1alpha1.ConfigMeta) bool {
+	for _, gvr := range gvrs {
+		if gvr.Group == config.Group && gvr.Resource == config.Resource {
+			return true
+		}
+	}
+	return false
+}
+
+func listRegistedConfigs(gvrs []schema.GroupVersionResource) string {
+	keys := make([]string, 0, len(gvrs))
+	for _, gvr := range gvrs {
+		keys = append(keys, gvr.String())
+	}
+	return strings.Join(keys, ";")
+}
+
+func validateCMAConfigs(cmaSupportedConfigs []addonapiv1alpha1.ConfigMeta,
+	registedConfigs []schema.GroupVersionResource) (map[schema.GroupResource]*addonapiv1alpha1.ConfigReferent, error) {
+	supportedConfigSet := map[schema.GroupResource]*addonapiv1alpha1.ConfigReferent{}
+	for _, cmaConfig := range cmaSupportedConfigs {
+		configGR := schema.GroupResource{
+			Group:    cmaConfig.Group,
+			Resource: cmaConfig.Resource,
+		}
+
+		_, existed := supportedConfigSet[configGR]
+		if existed {
+			return nil, fmt.Errorf("the config resource %q is duplicated", configGR.String())
+		}
+
+		// the supported config in ClusterManagementAddon should be registed in add-on framework
+		if !isRegistedConfig(registedConfigs, cmaConfig) {
+			return nil, fmt.Errorf("the config resource %q in ClusterManagementAddon is unregistered, registered configs: %q",
+				configGR.String(), listRegistedConfigs(registedConfigs))
+		}
+
+		supportedConfigSet[configGR] = cmaConfig.DefaultConfig
+	}
+
+	return supportedConfigSet, nil
+}
+
+func mergeConfigs(
+	cmaConfigSet map[schema.GroupResource]*addonapiv1alpha1.ConfigReferent,
+	mcaConfigs []addonapiv1alpha1.AddOnConfig) ([]addonapiv1alpha1.ConfigReference, error) {
+	configReferences := []addonapiv1alpha1.ConfigReference{}
+	mcaConfigGRs := []schema.GroupResource{}
+
+	// using ManagedClusterAddOn configs override the ClusterManagementAddOn default configs
+	for _, mcaConfig := range mcaConfigs {
+		configGR := schema.GroupResource{
+			Group:    mcaConfig.Group,
+			Resource: mcaConfig.Resource,
+		}
+
+		_, supported := cmaConfigSet[configGR]
+		if !supported {
+			return nil, fmt.Errorf("the config resource %q is unsupported", configGR.String())
+		}
+
+		if mcaConfig.Name == "" {
+			return nil, fmt.Errorf("the config name is required in %q", configGR.String())
+		}
+
+		configReferences = append(configReferences, addonapiv1alpha1.ConfigReference{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    mcaConfig.Group,
+				Resource: mcaConfig.Resource,
+			},
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Name:      mcaConfig.Name,
+				Namespace: mcaConfig.Namespace,
+			},
+		})
+
+		mcaConfigGRs = append(mcaConfigGRs, configGR)
+	}
+
+	// remove the ClusterManagementAddOn default configs from ManagedClusterAddOn configs
+	for _, configGR := range mcaConfigGRs {
+		delete(cmaConfigSet, configGR)
+	}
+
+	// add the default configs from ClusterManagementAddOn
+	for groupResource, defautlConifg := range cmaConfigSet {
+		if defautlConifg == nil {
+			continue
+		}
+
+		configReferences = append(configReferences, addonapiv1alpha1.ConfigReference{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    groupResource.Group,
+				Resource: groupResource.Resource,
+			},
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Name:      defautlConifg.Name,
+				Namespace: defautlConifg.Namespace,
+			},
+		})
+	}
+
+	return configReferences, nil
 }

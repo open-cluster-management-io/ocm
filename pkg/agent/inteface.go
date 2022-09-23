@@ -7,6 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -65,6 +66,10 @@ type AgentAddonOptions struct {
 	// If not set, will be defaulted to false.
 	// +optional
 	HostedModeEnabled bool
+
+	// SupportedConfigGVRs is a list of addon supported configuration GroupVersionResource
+	// each configuration GroupVersionResource should be unique
+	SupportedConfigGVRs []schema.GroupVersionResource
 }
 
 type CSRSignerFunc func(csr *certificatesv1.CertificateSigningRequest) []byte
