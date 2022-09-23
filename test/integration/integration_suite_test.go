@@ -136,6 +136,14 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 			DeployOption: operatorapiv1.ClusterManagerDeployOption{
 				Mode: operatorapiv1.InstallModeDefault,
 			},
+			WorkConfiguration: &operatorapiv1.WorkConfiguration{
+				FeatureGates: []operatorapiv1.FeatureGate{
+					{
+						Feature: "NilExecutorValidating",
+						Mode:    "Enable",
+					},
+				},
+			},
 		},
 	}, metav1.CreateOptions{})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())

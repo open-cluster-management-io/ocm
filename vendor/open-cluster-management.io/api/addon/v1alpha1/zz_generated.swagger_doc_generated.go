@@ -12,7 +12,7 @@ package v1alpha1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_AddOnDeploymentConfig = map[string]string{
-	"":     "AddOnDeploymentConfig represents a deployment configuration for an add-on. AddOnDeploymentConfig is a cluster-scoped resource.",
+	"":     "AddOnDeploymentConfig represents a deployment configuration for an add-on.",
 	"spec": "spec represents a desired configuration for an add-on.",
 }
 
@@ -92,7 +92,8 @@ func (ClusterManagementAddOnList) SwaggerDoc() map[string]string {
 var map_ClusterManagementAddOnSpec = map[string]string{
 	"":                   "ClusterManagementAddOnSpec provides information for the add-on.",
 	"addOnMeta":          "addOnMeta is a reference to the metadata information for the add-on.",
-	"addOnConfiguration": "addOnConfiguration is a reference to configuration information for the add-on. In scenario where a multiple add-ons share the same add-on CRD, multiple ClusterManagementAddOn resources need to be created and reference the same AddOnConfiguration.",
+	"addOnConfiguration": "Deprecated: Use supportedConfigs filed instead addOnConfiguration is a reference to configuration information for the add-on. In scenario where a multiple add-ons share the same add-on CRD, multiple ClusterManagementAddOn resources need to be created and reference the same AddOnConfiguration.",
+	"supportedConfigs":   "supportedConfigs is a list of configuration types supported by add-on. An empty list means the add-on does not require configurations. The default is an empty list",
 }
 
 func (ClusterManagementAddOnSpec) SwaggerDoc() map[string]string {
@@ -109,11 +110,9 @@ func (ClusterManagementAddOnStatus) SwaggerDoc() map[string]string {
 
 var map_ConfigCoordinates = map[string]string{
 	"":                       "ConfigCoordinates represents the information for locating the CRD and CR that configures the add-on.",
-	"crdName":                "Deprecated: Use configGroupResource filed instead crdName is the name of the CRD used to configure instances of the managed add-on. This field should be configured if the add-on have a CRD that controls the configuration of the add-on.",
-	"crName":                 "Deprecated: Use configGroupResource filed instead crName is the name of the CR used to configure instances of the managed add-on. This field should be configured if add-on CR have a consistent name across the all of the ManagedCluster instaces.",
-	"lastObservedGeneration": "Deprecated: This will be removed lastObservedGeneration is the observed generation of the custom resource for the configuration of the addon.",
-	"configGroupResource":    "configGroupResource represents the GroupResource of the add-on configuration.",
-	"defaultConfig":          "defaultConfig represents the namespace and name of the default add-on configuration. In scenario where all add-ons have a same configuration.",
+	"crdName":                "crdName is the name of the CRD used to configure instances of the managed add-on. This field should be configured if the add-on have a CRD that controls the configuration of the add-on.",
+	"crName":                 "crName is the name of the CR used to configure instances of the managed add-on. This field should be configured if add-on CR have a consistent name across the all of the ManagedCluster instaces.",
+	"lastObservedGeneration": "lastObservedGeneration is the observed generation of the custom resource for the configuration of the addon.",
 }
 
 func (ConfigCoordinates) SwaggerDoc() map[string]string {
@@ -128,6 +127,15 @@ var map_ConfigGroupResource = map[string]string{
 
 func (ConfigGroupResource) SwaggerDoc() map[string]string {
 	return map_ConfigGroupResource
+}
+
+var map_ConfigMeta = map[string]string{
+	"":              "ConfigMeta represents a collection of metadata information for add-on configuration.",
+	"defaultConfig": "defaultConfig represents the namespace and name of the default add-on configuration. In scenario where all add-ons have a same configuration.",
+}
+
+func (ConfigMeta) SwaggerDoc() map[string]string {
+	return map_ConfigMeta
 }
 
 var map_ConfigReferent = map[string]string{
@@ -178,7 +186,7 @@ func (ManagedClusterAddOnList) SwaggerDoc() map[string]string {
 var map_ManagedClusterAddOnSpec = map[string]string{
 	"":                 "ManagedClusterAddOnSpec defines the install configuration of an addon agent on managed cluster.",
 	"installNamespace": "installNamespace is the namespace on the managed cluster to install the addon agent. If it is not set, open-cluster-management-agent-addon namespace is used to install the addon agent.",
-	"config":           "config represents the configuration namespace and name for the current add-on. In scenario where the current add-on has its own configuration.",
+	"configs":          "configs is a list of add-on configurations. In scenario where the current add-on has its own configurations. An empty list means there are no defautl configurations for add-on. The default is an empty list",
 }
 
 func (ManagedClusterAddOnSpec) SwaggerDoc() map[string]string {
@@ -191,7 +199,7 @@ var map_ManagedClusterAddOnStatus = map[string]string{
 	"relatedObjects":     "relatedObjects is a list of objects that are \"interesting\" or related to this operator. Common uses are: 1. the detailed resource driving the operator 2. operator namespaces 3. operand namespaces 4. related ClusterManagementAddon resource",
 	"addOnMeta":          "addOnMeta is a reference to the metadata information for the add-on. This should be same as the addOnMeta for the corresponding ClusterManagementAddOn resource.",
 	"addOnConfiguration": "Deprecated: Use configReference instead addOnConfiguration is a reference to configuration information for the add-on. This resource is use to locate the configuration resource for the add-on.",
-	"configReference":    "configReference is a reference to the add-on configuration. This will be overridden by the clustermanagementaddon configuration reference.",
+	"configReferences":   "configReferences is a list of current add-on configuration references. This will be overridden by the clustermanagementaddon configuration references.",
 	"registrations":      "registrations is the conifigurations for the addon agent to register to hub. It should be set by each addon controller on hub to define how the addon agent on managedcluster is registered. With the registration defined, The addon agent can access to kube apiserver with kube style API or other endpoints on hub cluster with client certificate authentication. A csr will be created per registration configuration. If more than one registrationConfig is defined, a csr will be created for each registration configuration. It is not allowed that multiple registrationConfigs have the same signer name. After the csr is approved on the hub cluster, the klusterlet agent will create a secret in the installNamespace for the registrationConfig. If the signerName is \"kubernetes.io/kube-apiserver-client\", the secret name will be \"{addon name}-hub-kubeconfig\" whose contents includes key/cert and kubeconfig. Otherwise, the secret name will be \"{addon name}-{signer name}-client-cert\" whose contents includes key/cert.",
 	"healthCheck":        "healthCheck indicates how to check the healthiness status of the current addon. It should be set by each addon implementation, by default, the lease mode will be used.",
 }

@@ -37,11 +37,18 @@ type ClusterManagementAddOnSpec struct {
 	// +optional
 	AddOnMeta AddOnMeta `json:"addOnMeta,omitempty"`
 
+	// Deprecated: Use supportedConfigs filed instead
 	// addOnConfiguration is a reference to configuration information for the add-on.
 	// In scenario where a multiple add-ons share the same add-on CRD, multiple ClusterManagementAddOn
 	// resources need to be created and reference the same AddOnConfiguration.
 	// +optional
 	AddOnConfiguration ConfigCoordinates `json:"addOnConfiguration,omitempty"`
+
+	// supportedConfigs is a list of configuration types supported by add-on.
+	// An empty list means the add-on does not require configurations.
+	// The default is an empty list
+	// +optional
+	SupportedConfigs []ConfigMeta `json:"supportedConfigs,omitempty"`
 }
 
 // AddOnMeta represents a collection of metadata information for the add-on.
@@ -55,33 +62,32 @@ type AddOnMeta struct {
 	Description string `json:"description,omitempty"`
 }
 
-// ConfigCoordinates represents the information for locating the CRD and CR that configures the add-on.
-type ConfigCoordinates struct {
-	// Deprecated: Use configGroupResource filed instead
-	// crdName is the name of the CRD used to configure instances of the managed add-on.
-	// This field should be configured if the add-on have a CRD that controls the configuration of the add-on.
-	// +optional
-	CRDName string `json:"crdName,omitempty"`
-
-	// Deprecated: Use configGroupResource filed instead
-	// crName is the name of the CR used to configure instances of the managed add-on.
-	// This field should be configured if add-on CR have a consistent name across the all of the ManagedCluster instaces.
-	// +optional
-	CRName string `json:"crName,omitempty"`
-
-	// Deprecated: This will be removed
-	// lastObservedGeneration is the observed generation of the custom resource for the configuration of the addon.
-	// +optional
-	LastObservedGeneration int64 `json:"lastObservedGeneration,omitempty"`
-
-	// configGroupResource represents the GroupResource of the add-on configuration.
-	// +optional
-	ConfigGroupResource *ConfigGroupResource `json:"configGroupResource,omitempty"`
+// ConfigMeta represents a collection of metadata information for add-on configuration.
+type ConfigMeta struct {
+	// group and resouce of the add-on configuration.
+	ConfigGroupResource `json:",inline"`
 
 	// defaultConfig represents the namespace and name of the default add-on configuration.
 	// In scenario where all add-ons have a same configuration.
 	// +optional
 	DefaultConfig *ConfigReferent `json:"defaultConfig,omitempty"`
+}
+
+// ConfigCoordinates represents the information for locating the CRD and CR that configures the add-on.
+type ConfigCoordinates struct {
+	// crdName is the name of the CRD used to configure instances of the managed add-on.
+	// This field should be configured if the add-on have a CRD that controls the configuration of the add-on.
+	// +optional
+	CRDName string `json:"crdName,omitempty"`
+
+	// crName is the name of the CR used to configure instances of the managed add-on.
+	// This field should be configured if add-on CR have a consistent name across the all of the ManagedCluster instaces.
+	// +optional
+	CRName string `json:"crName,omitempty"`
+
+	// lastObservedGeneration is the observed generation of the custom resource for the configuration of the addon.
+	// +optional
+	LastObservedGeneration int64 `json:"lastObservedGeneration,omitempty"`
 }
 
 // ConfigGroupResource represents the GroupResource of the add-on configuration

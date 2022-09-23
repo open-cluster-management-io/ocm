@@ -9,13 +9,13 @@ spec:
     listKind: AddOnDeploymentConfigList
     plural: addondeploymentconfigs
     singular: addondeploymentconfig
-  scope: Cluster
+  scope: Namespaced
   preserveUnknownFields: false
   versions:
     - name: v1alpha1
       schema:
         openAPIV3Schema:
-          description: AddOnDeploymentConfig represents a deployment configuration for an add-on. AddOnDeploymentConfig is a cluster-scoped resource.
+          description: AddOnDeploymentConfig represents a deployment configuration for an add-on.
           type: object
           properties:
             apiVersion:

@@ -17,7 +17,7 @@ import (
 // AddOnDeploymentConfigsGetter has a method to return a AddOnDeploymentConfigInterface.
 // A group's client should implement this interface.
 type AddOnDeploymentConfigsGetter interface {
-	AddOnDeploymentConfigs() AddOnDeploymentConfigInterface
+	AddOnDeploymentConfigs(namespace string) AddOnDeploymentConfigInterface
 }
 
 // AddOnDeploymentConfigInterface has methods to work with AddOnDeploymentConfig resources.
@@ -36,12 +36,14 @@ type AddOnDeploymentConfigInterface interface {
 // addOnDeploymentConfigs implements AddOnDeploymentConfigInterface
 type addOnDeploymentConfigs struct {
 	client rest.Interface
+	ns     string
 }
 
 // newAddOnDeploymentConfigs returns a AddOnDeploymentConfigs
-func newAddOnDeploymentConfigs(c *AddonV1alpha1Client) *addOnDeploymentConfigs {
+func newAddOnDeploymentConfigs(c *AddonV1alpha1Client, namespace string) *addOnDeploymentConfigs {
 	return &addOnDeploymentConfigs{
 		client: c.RESTClient(),
+		ns:     namespace,
 	}
 }
 
@@ -49,6 +51,7 @@ func newAddOnDeploymentConfigs(c *AddonV1alpha1Client) *addOnDeploymentConfigs {
 func (c *addOnDeploymentConfigs) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.AddOnDeploymentConfig, err error) {
 	result = &v1alpha1.AddOnDeploymentConfig{}
 	err = c.client.Get().
+		Namespace(c.ns).
 		Resource("addondeploymentconfigs").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -65,6 +68,7 @@ func (c *addOnDeploymentConfigs) List(ctx context.Context, opts v1.ListOptions) 
 	}
 	result = &v1alpha1.AddOnDeploymentConfigList{}
 	err = c.client.Get().
+		Namespace(c.ns).
 		Resource("addondeploymentconfigs").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -81,6 +85,7 @@ func (c *addOnDeploymentConfigs) Watch(ctx context.Context, opts v1.ListOptions)
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Namespace(c.ns).
 		Resource("addondeploymentconfigs").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -91,6 +96,7 @@ func (c *addOnDeploymentConfigs) Watch(ctx context.Context, opts v1.ListOptions)
 func (c *addOnDeploymentConfigs) Create(ctx context.Context, addOnDeploymentConfig *v1alpha1.AddOnDeploymentConfig, opts v1.CreateOptions) (result *v1alpha1.AddOnDeploymentConfig, err error) {
 	result = &v1alpha1.AddOnDeploymentConfig{}
 	err = c.client.Post().
+		Namespace(c.ns).
 		Resource("addondeploymentconfigs").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(addOnDeploymentConfig).
@@ -103,6 +109,7 @@ func (c *addOnDeploymentConfigs) Create(ctx context.Context, addOnDeploymentConf
 func (c *addOnDeploymentConfigs) Update(ctx context.Context, addOnDeploymentConfig *v1alpha1.AddOnDeploymentConfig, opts v1.UpdateOptions) (result *v1alpha1.AddOnDeploymentConfig, err error) {
 	result = &v1alpha1.AddOnDeploymentConfig{}
 	err = c.client.Put().
+		Namespace(c.ns).
 		Resource("addondeploymentconfigs").
 		Name(addOnDeploymentConfig.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -115,6 +122,7 @@ func (c *addOnDeploymentConfigs) Update(ctx context.Context, addOnDeploymentConf
 // Delete takes name of the addOnDeploymentConfig and deletes it. Returns an error if one occurs.
 func (c *addOnDeploymentConfigs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
+		Namespace(c.ns).
 		Resource("addondeploymentconfigs").
 		Name(name).
 		Body(&opts).
@@ -129,6 +137,7 @@ func (c *addOnDeploymentConfigs) DeleteCollection(ctx context.Context, opts v1.D
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		Namespace(c.ns).
 		Resource("addondeploymentconfigs").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -141,6 +150,7 @@ func (c *addOnDeploymentConfigs) DeleteCollection(ctx context.Context, opts v1.D
 func (c *addOnDeploymentConfigs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.AddOnDeploymentConfig, err error) {
 	result = &v1alpha1.AddOnDeploymentConfig{}
 	err = c.client.Patch(pt).
+		Namespace(c.ns).
 		Resource("addondeploymentconfigs").
 		Name(name).
 		SubResource(subresources...).

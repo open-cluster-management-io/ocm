@@ -13,6 +13,7 @@ type HubConfig struct {
 	RegistrationWebhook            Webhook
 	WorkWebhook                    Webhook
 	RegistrationFeatureGates       []string
+	WorkFeatureGates               []string
 }
 
 type Webhook struct {

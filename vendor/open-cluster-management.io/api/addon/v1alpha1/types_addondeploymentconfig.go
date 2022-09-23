@@ -6,11 +6,9 @@ import (
 )
 
 // +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // AddOnDeploymentConfig represents a deployment configuration for an add-on.
-// AddOnDeploymentConfig is a cluster-scoped resource.
 type AddOnDeploymentConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

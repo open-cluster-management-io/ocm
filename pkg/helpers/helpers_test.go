@@ -1430,7 +1430,7 @@ func TestSyncSecret(t *testing.T) {
 		existingObjects             []runtime.Object
 		expectedSecret              *corev1.Secret
 		expectedChanged             bool
-		expectedErr                 error
+		expectedErr                 string
 	}{
 		{
 			name:            "syncing existing secret succeeds when the target is missing",
@@ -1458,7 +1458,7 @@ func TestSyncSecret(t *testing.T) {
 				Data: map[string][]byte{"foo": []byte("bar")},
 			},
 			expectedChanged: true,
-			expectedErr:     nil,
+			expectedErr:     "",
 		},
 		{
 			name:            "syncing existing secret succeeds when the target is present and needs update",
@@ -1494,7 +1494,7 @@ func TestSyncSecret(t *testing.T) {
 				Data: map[string][]byte{"foo": []byte("bar2")},
 			},
 			expectedChanged: true,
-			expectedErr:     nil,
+			expectedErr:     "",
 		},
 		{
 			name:            "syncing missing source secret doesn't fail",
@@ -1506,7 +1506,7 @@ func TestSyncSecret(t *testing.T) {
 			existingObjects: []runtime.Object{},
 			expectedSecret:  nil,
 			expectedChanged: true,
-			expectedErr:     nil,
+			expectedErr:     "",
 		},
 		{
 			name:            "syncing service account token doesn't sync without the token being present",
@@ -1527,7 +1527,7 @@ func TestSyncSecret(t *testing.T) {
 			},
 			expectedSecret:  nil,
 			expectedChanged: false,
-			expectedErr:     fmt.Errorf("secret sourceNamespace/sourceName doesn't have a token yet"),
+			expectedErr:     "secret sourceNamespace/sourceName doesn't have a token yet",
 		},
 		{
 			name:            "syncing service account token strips \"managed\" annotations",
@@ -1559,7 +1559,7 @@ func TestSyncSecret(t *testing.T) {
 				Data: map[string][]byte{"token": []byte("top-secret")},
 			},
 			expectedChanged: true,
-			expectedErr:     nil,
+			expectedErr:     "",
 		},
 	}
 
@@ -1570,7 +1570,7 @@ func TestSyncSecret(t *testing.T) {
 			secret, changed, err := SyncSecret(
 				context.TODO(), client.CoreV1(), clientTarget.CoreV1(), events.NewInMemoryRecorder("test"), tc.sourceNamespace, tc.sourceName, tc.targetNamespace, tc.targetName, tc.ownerRefs)
 
-			if !reflect.DeepEqual(err, tc.expectedErr) {
+			if (err == nil && len(tc.expectedErr) != 0) || (err != nil && err.Error() != tc.expectedErr) {
 				t.Errorf("%s: expected error %v, got %v", tc.name, tc.expectedErr, err)
 				return
 			}
@@ -1660,14 +1660,14 @@ func TestFeatureGatesArgs(t *testing.T) {
 	}{
 		{
 			name:              "empty input feature gates",
-			component:         ComponentHubKey,
+			component:         ComponentHubRegistrationKey,
 			inputFeatureGates: []operatorapiv1.FeatureGate{},
 			expect1:           []string{},
 			expect2:           []string{},
 		},
 		{
 			name:      "valid input feature gates",
-			component: ComponentSpokeKey,
+			component: ComponentSpokeRegistrationKey,
 			inputFeatureGates: []operatorapiv1.FeatureGate{
 				{
 					Feature: "AddonManagement",
@@ -1683,7 +1683,7 @@ func TestFeatureGatesArgs(t *testing.T) {
 		},
 		{
 			name:      "invalid input feature gates",
-			component: ComponentSpokeKey,
+			component: ComponentSpokeRegistrationKey,
 			inputFeatureGates: []operatorapiv1.FeatureGate{
 				{
 					Feature: "AddonManagementInvalid",

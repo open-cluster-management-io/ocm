@@ -49,6 +49,7 @@ var map_ClusterManagerSpec = map[string]string{
 	"nodePlacement":             "NodePlacement enables explicit control over the scheduling of the deployed pods.",
 	"deployOption":              "DeployOption contains the options of deploying a cluster-manager Default mode is used if DeployOption is not set.",
 	"registrationConfiguration": "RegistrationConfiguration contains the configuration of registration",
+	"workConfiguration":         "WorkConfiguration contains the configuration of work",
 }
 
 func (ClusterManagerSpec) SwaggerDoc() map[string]string {
@@ -217,6 +218,14 @@ var map_WebhookConfiguration = map[string]string{
 
 func (WebhookConfiguration) SwaggerDoc() map[string]string {
 	return map_WebhookConfiguration
+}
+
+var map_WorkConfiguration = map[string]string{
+	"featureGates": "FeatureGates represents the list of feature gates for work If it is set empty, default feature gates will be used. If it is set, featuregate/Foo is an example of one item in FeatureGates:\n  1. If featuregate/Foo does not exist, registration-operator will discard it\n  2. If featuregate/Foo exists and is false by default. It is now possible to set featuregate/Foo=[false|true]\n  3. If featuregate/Foo exists and is true by default. If a cluster-admin upgrading from 1 to 2 wants to continue having featuregate/Foo=false,\n \the can set featuregate/Foo=false before upgrading. Let's say the cluster-admin wants featuregate/Foo=false.",
+}
+
+func (WorkConfiguration) SwaggerDoc() map[string]string {
+	return map_WorkConfiguration
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

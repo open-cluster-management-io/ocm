@@ -22,8 +22,8 @@ type AddonV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *AddonV1alpha1Client) AddOnDeploymentConfigs() AddOnDeploymentConfigInterface {
-	return newAddOnDeploymentConfigs(c)
+func (c *AddonV1alpha1Client) AddOnDeploymentConfigs(namespace string) AddOnDeploymentConfigInterface {
+	return newAddOnDeploymentConfigs(c, namespace)
 }
 
 func (c *AddonV1alpha1Client) ClusterManagementAddOns() ClusterManagementAddOnInterface {

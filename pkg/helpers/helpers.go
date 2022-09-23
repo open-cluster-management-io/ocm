@@ -48,8 +48,9 @@ const (
 	defaultReplica = 3
 	singleReplica  = 1
 
-	ComponentHubKey   = "hub"
-	ComponentSpokeKey = "spoke"
+	ComponentHubRegistrationKey   = "hub-registration"
+	ComponentSpokeRegistrationKey = "spoke-registration"
+	ComponentHubWorkKey           = "hub-work"
 )
 
 var (
@@ -57,9 +58,10 @@ var (
 	genericCodecs = serializer.NewCodecFactory(genericScheme)
 	genericCodec  = genericCodecs.UniversalDeserializer()
 
-	RegistrationFeatureGatesMap = map[string]map[featuregate.Feature]featuregate.FeatureSpec{
-		ComponentHubKey:   ocmfeature.DefaultHubRegistrationFeatureGates,
-		ComponentSpokeKey: ocmfeature.DefaultSpokeRegistrationFeatureGates,
+	FeatureGatesMap = map[string]map[featuregate.Feature]featuregate.FeatureSpec{
+		ComponentHubRegistrationKey:   ocmfeature.DefaultHubRegistrationFeatureGates,
+		ComponentSpokeRegistrationKey: ocmfeature.DefaultSpokeRegistrationFeatureGates,
+		ComponentHubWorkKey:           ocmfeature.DefaultHubWorkFeatureGates,
 	}
 )
 
@@ -860,7 +862,7 @@ func GetHubKubeconfig(ctx context.Context,
 // FeatureGatesArgs is used to generate feature gates args
 func FeatureGatesArgs(featureGates []operatorapiv1.FeatureGate, component string) (featureGatesArgs []string, invalidFeatureGates []string) {
 	for _, featureGate := range featureGates {
-		if !isValidRegistrationFeatureGate(featureGate.Feature, component) {
+		if !isValidFeatureGate(featureGate.Feature, component) {
 			invalidFeatureGates = append(invalidFeatureGates, featureGate.Feature)
 		} else {
 			value := false
@@ -874,8 +876,8 @@ func FeatureGatesArgs(featureGates []operatorapiv1.FeatureGate, component string
 	return featureGatesArgs, invalidFeatureGates
 }
 
-func isValidRegistrationFeatureGate(feature string, component string) bool {
-	if featureGates, ok := RegistrationFeatureGatesMap[component]; ok {
+func isValidFeatureGate(feature string, component string) bool {
+	if featureGates, ok := FeatureGatesMap[component]; ok {
 		if _, ok := featureGates[featuregate.Feature(feature)]; ok {
 			return true
 		}

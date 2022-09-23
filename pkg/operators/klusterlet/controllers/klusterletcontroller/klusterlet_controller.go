@@ -262,7 +262,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	// If there are some invalid feature gates of registration, will output condition `InvalidRegistrationFeatureGates` in Klusterlet.
 	if klusterlet.Spec.RegistrationConfiguration != nil && len(klusterlet.Spec.RegistrationConfiguration.FeatureGates) > 0 {
 		featureGateArgs, invalidFeatureGates := helpers.FeatureGatesArgs(
-			klusterlet.Spec.RegistrationConfiguration.FeatureGates, helpers.ComponentSpokeKey)
+			klusterlet.Spec.RegistrationConfiguration.FeatureGates, helpers.ComponentSpokeRegistrationKey)
 		if len(invalidFeatureGates) == 0 {
 			config.RegistrationFeatureGates = featureGateArgs
 			_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{

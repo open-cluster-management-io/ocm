@@ -40,10 +40,12 @@ type ManagedClusterAddOnSpec struct {
 	// +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
 	InstallNamespace string `json:"installNamespace,omitempty"`
 
-	// config represents the configuration namespace and name for the current add-on.
-	// In scenario where the current add-on has its own configuration.
+	// configs is a list of add-on configurations.
+	// In scenario where the current add-on has its own configurations.
+	// An empty list means there are no defautl configurations for add-on.
+	// The default is an empty list
 	// +optional
-	Config *ConfigReferent `json:"config,omitempty"`
+	Configs []AddOnConfig `json:"configs,omitempty"`
 }
 
 // RegistrationConfig defines the configuration of the addon agent to register to hub. The Klusterlet agent will
@@ -64,6 +66,14 @@ type RegistrationConfig struct {
 	//
 	// +optional
 	Subject Subject `json:"subject,omitempty"`
+}
+
+type AddOnConfig struct {
+	// group and resource of add-on configuration.
+	ConfigGroupResource `json:",inline"`
+
+	// name and namespace of add-on configuration.
+	ConfigReferent `json:",inline"`
 }
 
 // Subject is the user subject of the addon agent to be registered to the hub.
@@ -108,10 +118,10 @@ type ManagedClusterAddOnStatus struct {
 	// +optional
 	AddOnConfiguration ConfigCoordinates `json:"addOnConfiguration,omitempty"`
 
-	// configReference is a reference to the add-on configuration.
-	// This will be overridden by the clustermanagementaddon configuration reference.
+	// configReferences is a list of current add-on configuration references.
+	// This will be overridden by the clustermanagementaddon configuration references.
 	// +optional
-	ConfigReference *ConfigReference `json:"configReference,omitempty"`
+	ConfigReferences []ConfigReference `json:"configReferences,omitempty"`
 
 	// registrations is the conifigurations for the addon agent to register to hub. It should be set by each addon controller
 	// on hub to define how the addon agent on managedcluster is registered. With the registration defined,
@@ -169,8 +179,8 @@ type ConfigReference struct {
 	ConfigGroupResource `json:",inline"`
 
 	// This field is synced from ClusterManagementAddOn defaultConfig and ManagedClusterAddOn config fields.
-	// If both of them are defined, the ManagedClusterAddOn config will overwrite the ClusterManagementAddOn
-	// defaultConfig.
+	// If both of them are defined, the ManagedClusterAddOn configs will overwrite the ClusterManagementAddOn
+	// defaultConfigs.
 	ConfigReferent `json:",inline"`
 
 	// lastObservedGeneration is the observed generation of the add-on configuration.
