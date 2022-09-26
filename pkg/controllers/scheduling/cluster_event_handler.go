@@ -2,14 +2,15 @@ package scheduling
 
 import (
 	"fmt"
+	"reflect"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	cache "k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
+	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
 type clusterEventHandler struct {
@@ -38,8 +39,8 @@ func (h *clusterEventHandler) OnUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
-	// if the clusterset of the cluster changes, process the original clusterset
-	if newCluster.Labels[clusterSetLabel] != oldCluster.Labels[clusterSetLabel] {
+	// if the cluster labels changes, process the original clusterset
+	if !reflect.DeepEqual(newCluster.Labels, oldCluster.Labels) {
 		h.onChange(oldCluster)
 	}
 }
@@ -62,46 +63,43 @@ func (h *clusterEventHandler) onChange(obj interface{}) {
 		return
 	}
 
-	clusterSetName, err := h.getClusterSetName(cluster)
+	clusterSetNames, err := h.getClusterSetNames(cluster)
 	if err != nil {
 		klog.V(4).Infof("Unable to get clusterset of cluster %q: %v", cluster.GetName(), err)
 		return
 	}
 
 	// skip cluster belongs to no clusterset
-	if len(clusterSetName) == 0 {
+	if len(clusterSetNames) == 0 {
 		return
 	}
 
-	// enqueue placements which might be impacted
-	err = enqueuePlacementsByClusterSet(
-		clusterSetName,
-		h.clusterSetBindingLister,
-		h.placementLister,
-		h.enqueuePlacementFunc,
-	)
-	if err != nil {
-		klog.Errorf("Unable to enqueue placements with access to clusterset %q: %v", clusterSetName, err)
+	for _, clusterSetName := range clusterSetNames {
+		// enqueue placements which might be impacted
+		err = enqueuePlacementsByClusterSet(
+			clusterSetName,
+			h.clusterSetBindingLister,
+			h.placementLister,
+			h.enqueuePlacementFunc,
+		)
+		if err != nil {
+			klog.Errorf("Unable to enqueue placements with access to clusterset %q: %v", clusterSetName, err)
+		}
 	}
 }
 
 // getClusterSetName returns the name of the clusterset the cluster belongs to. It also checks the existence
 // of the clusterset.
-func (h *clusterEventHandler) getClusterSetName(cluster metav1.Object) (string, error) {
-	// skip cluster belongs to no clusterset
-	labels := cluster.GetLabels()
-	clusterSetName, ok := labels[clusterSetLabel]
-	if !ok {
-		return "", nil
-	}
-	_, err := h.clusterSetLister.Get(clusterSetName)
-	// skip if the clusterset does not exist
-	if errors.IsNotFound(err) {
-		return "", nil
-	}
+func (h *clusterEventHandler) getClusterSetNames(cluster metav1.Object) ([]string, error) {
+	clusterSetNames := []string{}
+	clusterSets, err := clusterapiv1beta1.GetClusterSetsOfCluster(cluster.(*clusterapiv1.ManagedCluster), h.clusterSetLister)
 	if err != nil {
-		return "", err
+		return clusterSetNames, err
 	}
 
-	return clusterSetName, nil
+	for _, cs := range clusterSets {
+		clusterSetNames = append(clusterSetNames, cs.Name)
+	}
+
+	return clusterSetNames, nil
 }

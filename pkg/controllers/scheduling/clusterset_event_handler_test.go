@@ -5,11 +5,13 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cache "k8s.io/client-go/tools/cache"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	testinghelpers "open-cluster-management.io/placement/pkg/helpers/testing"
 )
 
@@ -75,8 +77,26 @@ func TestOnClusterSetAdd(t *testing.T) {
 			obj:  "invalid object type",
 		},
 		{
-			name: "clusterset",
+			name: "clusterset selector type is LegacyClusterSetLabel",
 			obj:  testinghelpers.NewClusterSet("clusterset1").Build(),
+			initObjs: []runtime.Object{
+				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
+				testinghelpers.NewPlacement("ns1", "placement1").Build(),
+			},
+			queuedKeys: []string{
+				"ns1/placement1",
+			},
+		},
+		{
+			name: "clusterset selector type is LabelSelector",
+			obj: testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{
+				SelectorType: clusterapiv1beta1.LabelSelector,
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"cloud": "Amazon",
+					},
+				},
+			}).Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),
@@ -122,8 +142,26 @@ func TestOnClusterSetDelete(t *testing.T) {
 			obj:  "invalid object type",
 		},
 		{
-			name: "clusterset",
+			name: "clusterset selector type is LegacyClusterSetLabel",
 			obj:  testinghelpers.NewClusterSet("clusterset1").Build(),
+			initObjs: []runtime.Object{
+				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
+				testinghelpers.NewPlacement("ns1", "placement1").Build(),
+			},
+			queuedKeys: []string{
+				"ns1/placement1",
+			},
+		},
+		{
+			name: "clusterset selector type is LabelSelector",
+			obj: testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{
+				SelectorType: clusterapiv1beta1.LabelSelector,
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"cloud": "Amazon",
+					},
+				},
+			}).Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),

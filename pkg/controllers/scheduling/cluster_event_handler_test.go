@@ -5,11 +5,13 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	testinghelpers "open-cluster-management.io/placement/pkg/helpers/testing"
 )
 
@@ -55,6 +57,36 @@ func TestOnClusterChange(t *testing.T) {
 				"ns2/placement2",
 			},
 		},
+		{
+			name: "cluster blongs to multiple clusterset",
+			obj:  testinghelpers.NewManagedCluster("cluster1").WithLabel("cloud", "Amazon").WithLabel(clusterSetLabel, "clusterset2").Build(),
+			initObjs: []runtime.Object{
+				testinghelpers.NewClusterSet("global").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{
+					SelectorType:  clusterapiv1beta1.LabelSelector,
+					LabelSelector: &metav1.LabelSelector{},
+				}).Build(),
+				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{
+					SelectorType: clusterapiv1beta1.LabelSelector,
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"cloud": "Amazon",
+						},
+					},
+				}).Build(),
+				testinghelpers.NewClusterSet("clusterset2").Build(),
+				testinghelpers.NewClusterSetBinding("ns1", "global"),
+				testinghelpers.NewClusterSetBinding("ns2", "clusterset1"),
+				testinghelpers.NewClusterSetBinding("ns3", "clusterset2"),
+				testinghelpers.NewPlacement("ns1", "placement1").Build(),
+				testinghelpers.NewPlacement("ns2", "placement2").Build(),
+				testinghelpers.NewPlacement("ns3", "placement3").Build(),
+			},
+			queuedKeys: []string{
+				"ns1/placement1",
+				"ns2/placement2",
+				"ns3/placement3",
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -93,6 +125,42 @@ func TestOnClusterUpdate(t *testing.T) {
 			name:   "cluster belongs to no clusterset",
 			newObj: testinghelpers.NewManagedCluster("cluster1").WithLabel("cloud", "Amazon").Build(),
 			oldObj: testinghelpers.NewManagedCluster("cluster1").WithLabel("cloud", "Google").Build(),
+			initObjs: []runtime.Object{
+				testinghelpers.NewClusterSet("clusterset1").Build(),
+				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
+				testinghelpers.NewPlacement("ns1", "placement1").Build(),
+			},
+		},
+		{
+			name:   "cluster blongs to multiple clusterset",
+			newObj: testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset2").WithLabel("cloud", "Google").Build(),
+			oldObj: testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset2").WithLabel("cloud", "Amazon").Build(),
+			initObjs: []runtime.Object{
+				testinghelpers.NewClusterSet("global").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{
+					SelectorType:  clusterapiv1beta1.LabelSelector,
+					LabelSelector: &metav1.LabelSelector{},
+				}).Build(),
+				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{
+					SelectorType: clusterapiv1beta1.LabelSelector,
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"cloud": "Amazon",
+						},
+					},
+				}).Build(),
+				testinghelpers.NewClusterSet("clusterset2").Build(),
+				testinghelpers.NewClusterSetBinding("ns1", "global"),
+				testinghelpers.NewClusterSetBinding("ns2", "clusterset1"),
+				testinghelpers.NewClusterSetBinding("ns3", "clusterset2"),
+				testinghelpers.NewPlacement("ns1", "placement1").Build(),
+				testinghelpers.NewPlacement("ns2", "placement2").Build(),
+				testinghelpers.NewPlacement("ns3", "placement3").Build(),
+			},
+			queuedKeys: []string{
+				"ns1/placement1",
+				"ns2/placement2",
+				"ns3/placement3",
+			},
 		},
 		{
 			name: "assign a cluster to a clusterset",
@@ -110,16 +178,33 @@ func TestOnClusterUpdate(t *testing.T) {
 		},
 		{
 			name:   "remove cluster from a clusterset",
-			newObj: testinghelpers.NewManagedCluster("cluster1").WithLabel("cloud", "Amazon").Build(),
-			oldObj: testinghelpers.NewManagedCluster("cluster1").
-				WithLabel(clusterSetLabel, "clusterset1").WithLabel("cloud", "Amazon").Build(),
+			newObj: testinghelpers.NewManagedCluster("cluster1").Build(),
+			oldObj: testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset2").WithLabel("cloud", "Amazon").Build(),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1").Build(),
-				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
+				testinghelpers.NewClusterSet("global").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{
+					SelectorType:  clusterapiv1beta1.LabelSelector,
+					LabelSelector: &metav1.LabelSelector{},
+				}).Build(),
+				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{
+					SelectorType: clusterapiv1beta1.LabelSelector,
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"cloud": "Amazon",
+						},
+					},
+				}).Build(),
+				testinghelpers.NewClusterSet("clusterset2").Build(),
+				testinghelpers.NewClusterSetBinding("ns1", "global"),
+				testinghelpers.NewClusterSetBinding("ns2", "clusterset1"),
+				testinghelpers.NewClusterSetBinding("ns3", "clusterset2"),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),
+				testinghelpers.NewPlacement("ns2", "placement2").Build(),
+				testinghelpers.NewPlacement("ns3", "placement3").Build(),
 			},
 			queuedKeys: []string{
 				"ns1/placement1",
+				"ns2/placement2",
+				"ns3/placement3",
 			},
 		},
 		{
@@ -195,14 +280,32 @@ func TestOnClusterDelete(t *testing.T) {
 		},
 		{
 			name: "cluster",
-			obj:  testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset1").Build(),
+			obj:  testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset2").WithLabel("cloud", "Amazon").Build(),
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1").Build(),
-				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
+				testinghelpers.NewClusterSet("global").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{
+					SelectorType:  clusterapiv1beta1.LabelSelector,
+					LabelSelector: &metav1.LabelSelector{},
+				}).Build(),
+				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{
+					SelectorType: clusterapiv1beta1.LabelSelector,
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"cloud": "Amazon",
+						},
+					},
+				}).Build(),
+				testinghelpers.NewClusterSet("clusterset2").Build(),
+				testinghelpers.NewClusterSetBinding("ns1", "global"),
+				testinghelpers.NewClusterSetBinding("ns2", "clusterset1"),
+				testinghelpers.NewClusterSetBinding("ns3", "clusterset2"),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),
+				testinghelpers.NewPlacement("ns2", "placement2").Build(),
+				testinghelpers.NewPlacement("ns3", "placement3").Build(),
 			},
 			queuedKeys: []string{
 				"ns1/placement1",
+				"ns2/placement2",
+				"ns3/placement3",
 			},
 		},
 		{

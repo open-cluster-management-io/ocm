@@ -667,6 +667,30 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertPlacementConditionSatisfied(placementName, nod, true)
 		})
 
+		ginkgo.It("Should be satisfied once new clusters belong to labelselector type clusterset are added", func() {
+			ginkgo.By("Bind clusterset to the placement namespace")
+			assertCreatingLabelSelectorClusterSet(clusterSet1Name, map[string]string{
+				"vendor": "openShift",
+			})
+			assertCreatingClusterSetBinding(clusterSet1Name)
+			assertCreatingClusterWithLabel(clusterName+"1", map[string]string{
+				"vendor": "openShift",
+			})
+			assertCreatingPlacementWithDecision(placementName, noc(2), 1, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
+
+			// add more clusters
+			assertCreatingClusterWithLabel(clusterName+"2", map[string]string{
+				"vendor": "openShift",
+			})
+
+			nod := 2
+			assertNumberOfDecisions(placementName, nod)
+			assertPlacementConditionSatisfied(placementName, nod, true)
+
+			assertDeletingCluster(clusterName + "1")
+			assertDeletingCluster(clusterName + "2")
+		})
+
 		ginkgo.It("Should schedule successfully once new clusterset is bound", func() {
 			assertBindingClusterSet(clusterSet1Name)
 			assertCreatingClusters(clusterSet1Name, 5)
@@ -679,6 +703,34 @@ var _ = ginkgo.Describe("Placement", func() {
 			nod := 8
 			assertNumberOfDecisions(placementName, nod)
 			assertPlacementConditionSatisfied(placementName, nod, false)
+		})
+
+		ginkgo.It("Should schedule successfully once new labelselector type clusterset is bound", func() {
+			ginkgo.By("Bind clusterset to the placement namespace")
+			assertCreatingLabelSelectorClusterSet(clusterSet1Name, map[string]string{
+				"vendor": "openShift",
+			})
+			assertCreatingClusterSetBinding(clusterSet1Name)
+			assertCreatingClusterWithLabel(clusterName+"1", map[string]string{
+				"vendor": "openShift",
+			})
+			assertCreatingPlacementWithDecision(placementName, noc(2), 1, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
+
+			ginkgo.By("Bind one more labelselector clusterset to the placement namespace")
+			assertCreatingLabelSelectorClusterSet(clusterSet2Name, map[string]string{
+				"vendor": "IKS",
+			})
+			assertCreatingClusterSetBinding(clusterSet2Name)
+			assertCreatingClusterWithLabel(clusterName+"2", map[string]string{
+				"vendor": "IKS",
+			})
+
+			nod := 2
+			assertNumberOfDecisions(placementName, nod)
+			assertPlacementConditionSatisfied(placementName, nod, true)
+
+			assertDeletingCluster(clusterName + "1")
+			assertDeletingCluster(clusterName + "2")
 		})
 
 		ginkgo.It("Should create multiple placementdecisions once scheduled", func() {
@@ -981,7 +1033,7 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertClusterNamesOfDecisions(placementName, []string{clusterNames[0], clusterNames[2]})
 		})
 
-		ginkgo.It("Should re-schedule successfully once a new cluster added/deleted", func() {
+		ginkgo.It("Should re-schedule successfully once a new cluster with resources added/deleted", func() {
 			// cluster settings
 			clusterNames := []string{
 				clusterName + "-1",
@@ -1066,10 +1118,10 @@ var _ = ginkgo.Describe("Placement", func() {
 				"vendor": "openShift",
 			})
 			assertCreatingClusterSetBinding(clusterSet1Name)
-			assertCreatingClusterWithLabel("cluster1", map[string]string{
+			assertCreatingClusterWithLabel(clusterName+"1", map[string]string{
 				"vendor": "openShift",
 			})
-			assertCreatingClusterWithLabel("cluster2", map[string]string{
+			assertCreatingClusterWithLabel(clusterName+"2", map[string]string{
 				"vendor": "IKS",
 			})
 			assertCreatingPlacementWithDecision(placementName, noc(10), 1, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
@@ -1088,6 +1140,12 @@ var _ = ginkgo.Describe("Placement", func() {
 			})
 			assertNumberOfDecisions(placementName, 1)
 			assertPlacementConditionSatisfied(placementName, 1, false)
+
+			ginkgo.By("Delete the cluster")
+			assertDeletingCluster(clusterName + "1")
+			assertNumberOfDecisions(placementName, 0)
+
+			assertDeletingCluster(clusterName + "2")
 		})
 
 		ginkgo.It("Should re-schedule successfully once a clustersetbinding deleted/added", func() {

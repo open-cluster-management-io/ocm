@@ -24,6 +24,7 @@ var _ = ginkgo.Describe("Placement", func() {
 	var namespace string
 	var placementName string
 	var clusterSet1Name string
+	var clusterSetGlobal string
 	var suffix string
 	var err error
 
@@ -32,6 +33,7 @@ var _ = ginkgo.Describe("Placement", func() {
 		namespace = fmt.Sprintf("ns-%s", suffix)
 		placementName = fmt.Sprintf("placement-%s", suffix)
 		clusterSet1Name = fmt.Sprintf("clusterset-%s", suffix)
+		clusterSetGlobal = "global"
 
 		// create testing namespace
 		ns := &corev1.Namespace{
@@ -46,6 +48,7 @@ var _ = ginkgo.Describe("Placement", func() {
 	ginkgo.AfterEach(func() {
 		ginkgo.By("Delete managedclusterset")
 		clusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.Background(), clusterSet1Name, metav1.DeleteOptions{})
+		clusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.Background(), clusterSetGlobal, metav1.DeleteOptions{})
 
 		ginkgo.By("Delete managedclusters")
 		clusterClient.ClusterV1().ManagedClusters().DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{
@@ -127,16 +130,27 @@ var _ = ginkgo.Describe("Placement", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	}
 
-	assertBindingClusterSet := func(clusterSetName string) {
-		ginkgo.By("Create clusterset/clustersetbinding")
+	assertCreatingClusterSet := func(clusterSetName string, matchLabel map[string]string) {
+		ginkgo.By("Create clusterset")
 		clusterset := &clusterapiv1beta1.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: clusterSetName,
 			},
 		}
+		if matchLabel != nil {
+			clusterset.Spec.ClusterSelector = clusterapiv1beta1.ManagedClusterSelector{
+				SelectorType: clusterapiv1beta1.LabelSelector,
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: matchLabel,
+				},
+			}
+		}
 		_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	}
 
+	assertCreatingClusterSetBinding := func(clusterSetName string) {
+		ginkgo.By("Create clustersetbinding")
 		csb := &clusterapiv1beta1.ManagedClusterSetBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
@@ -148,6 +162,12 @@ var _ = ginkgo.Describe("Placement", func() {
 		}
 		_, err = clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	}
+
+	assertBindingClusterSet := func(clusterSetName string, matchLabel map[string]string) {
+		ginkgo.By("Create clusterset/clustersetbinding")
+		assertCreatingClusterSet(clusterSetName, matchLabel)
+		assertCreatingClusterSetBinding(clusterSetName)
 	}
 
 	assertCreatingClusters := func(clusterSetName string, num int) {
@@ -188,7 +208,7 @@ var _ = ginkgo.Describe("Placement", func() {
 	}
 
 	ginkgo.It("Should schedule successfully", func() {
-		assertBindingClusterSet(clusterSet1Name)
+		assertBindingClusterSet(clusterSet1Name, nil)
 		assertCreatingClusters(clusterSet1Name, 5)
 		assertCreatingPlacement(placementName, noc(10), 5)
 
@@ -203,8 +223,10 @@ var _ = ginkgo.Describe("Placement", func() {
 		assertNumberOfDecisions(placementName, 5)
 		assertPlacementStatus(placementName, 5, false)
 
-		// create 2 more clusters
-		assertCreatingClusters(clusterSet1Name, 2)
+		// create global clusterset
+		assertBindingClusterSet(clusterSetGlobal, map[string]string{})
+		// create 2 more clusters belong to global clusterset
+		assertCreatingClusters("", 2)
 		assertNumberOfDecisions(placementName, 6)
 		assertPlacementStatus(placementName, 6, true)
 
@@ -226,7 +248,7 @@ var _ = ginkgo.Describe("Placement", func() {
 	})
 
 	ginkgo.It("Should delete placementdecision successfully", func() {
-		assertBindingClusterSet(clusterSet1Name)
+		assertBindingClusterSet(clusterSet1Name, nil)
 		assertCreatingClusters(clusterSet1Name, 1)
 		assertCreatingPlacement(placementName, nil, 1)
 
