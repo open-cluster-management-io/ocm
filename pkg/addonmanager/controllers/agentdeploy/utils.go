@@ -1,12 +1,16 @@
 package agentdeploy
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
+	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/common/workbuilder"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
@@ -83,7 +87,7 @@ func newManifestWork(addonNamespace, addonName, clusterName string, manifests []
 // isPreDeleteHookObject check the object is a pre-delete hook resources.
 // currently, we only support job and pod as hook resources.
 // we use WellKnownStatus here to get the job/pad status fields to check if the job/pod is completed.
-func (b *manifestWorkBuiler) isPreDeleteHookObject(obj runtime.Object) (bool, *workapiv1.ManifestConfigOption) {
+func (b *addonWorksBuilder) isPreDeleteHookObject(obj runtime.Object) (bool, *workapiv1.ManifestConfigOption) {
 	var resource string
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	switch gvk.Kind {
@@ -118,28 +122,31 @@ func (b *manifestWorkBuiler) isPreDeleteHookObject(obj runtime.Object) (bool, *w
 		},
 	}
 }
-func newManagedManifestWorkBuilder(hostedModeEnabled bool) *manifestWorkBuiler {
-	return &manifestWorkBuiler{
+func newAddonWorksBuilder(hostedModeEnabled bool, workBuilder *workbuilder.WorkBuilder) *addonWorksBuilder {
+	return &addonWorksBuilder{
 		processor:         &managedManifest{},
 		hostedModeEnabled: hostedModeEnabled,
+		workBuilder:       workBuilder,
 	}
 }
 
-func newHostingManifestWorkBuilder(hostedModeEnabled bool) *manifestWorkBuiler {
-	return &manifestWorkBuiler{
+func newHostingAddonWorksBuilder(hostedModeEnabled bool, workBuilder *workbuilder.WorkBuilder) *addonWorksBuilder {
+	return &addonWorksBuilder{
 		processor:         &hostingManifest{},
 		hostedModeEnabled: hostedModeEnabled,
+		workBuilder:       workBuilder,
 	}
 }
 
-type manifestWorkBuiler struct {
+type addonWorksBuilder struct {
 	processor         manifestProcessor
 	hostedModeEnabled bool
+	workBuilder       *workbuilder.WorkBuilder
 }
 
 type manifestProcessor interface {
 	deployable(hostedModeEnabled bool, installMode string, obj runtime.Object) (bool, error)
-	manifestWorkName(addonNamespace, addonName string) string
+	manifestWorkNamePrefix(addonNamespace, addonName string) string
 	preDeleteHookManifestWorkName(addonNamespace, addonName string) string
 }
 
@@ -175,8 +182,8 @@ func (m *hostingManifest) deployable(hostedModeEnabled bool, installMode string,
 	return false, nil
 }
 
-func (m *hostingManifest) manifestWorkName(addonNamespace, addonName string) string {
-	return constants.DeployHostingWorkName(addonNamespace, addonName)
+func (m *hostingManifest) manifestWorkNamePrefix(addonNamespace, addonName string) string {
+	return constants.DeployHostingWorkNamePrefix(addonNamespace, addonName)
 }
 
 func (m *hostingManifest) preDeleteHookManifestWorkName(addonNamespace, addonName string) string {
@@ -216,33 +223,31 @@ func (m *managedManifest) deployable(hostedModeEnabled bool, installMode string,
 	return false, nil
 }
 
-func (m *managedManifest) manifestWorkName(addonNamespace, addonName string) string {
-	return constants.DeployWorkName(addonName)
+func (m *managedManifest) manifestWorkNamePrefix(addonNamespace, addonName string) string {
+	return constants.DeployWorkNamePrefix(addonName)
 }
 
 func (m *managedManifest) preDeleteHookManifestWorkName(addonNamespace, addonName string) string {
 	return constants.PreDeleteHookWorkName(addonName)
 }
 
-// buildManifestWorkFromObject returns the deploy manifestwork and preDelete manifestwork, if there is no manifest need
+// BuildDeployWorks returns the deploy manifestWorks. if there is no manifest need
 // to deploy, will return nil.
-func (b *manifestWorkBuiler) buildManifestWorkFromObject(
-	manifestWorkNamespace string,
+func (b *addonWorksBuilder) BuildDeployWorks(addonWorkNamespace string,
 	addon *addonapiv1alpha1.ManagedClusterAddOn,
-	objects []runtime.Object) (deployManifestWork, hookManifestWork *workapiv1.ManifestWork, err error) {
-	var deployManifests []workapiv1.Manifest
-	var hookManifests []workapiv1.Manifest
-	var manifestConfigs []workapiv1.ManifestConfigOption
-
-	addonName := addon.Name
+	existingWorks []workapiv1.ManifestWork,
+	objects []runtime.Object,
+	manifestOptions []workapiv1.ManifestConfigOption) (deployWorks, deleteWorks []*workapiv1.ManifestWork, err error) {
+	var deployObjects []runtime.Object
+	var owner *metav1.OwnerReference
 	installMode, _ := constants.GetHostedModeInfo(addon.GetAnnotations())
 
-	for _, object := range objects {
-		rawObject, err := runtime.Encode(unstructured.UnstructuredJSONScheme, object)
-		if err != nil {
-			return nil, nil, err
-		}
+	// only set addon as the owner of works in default mode. should not set owner in hosted mode.
+	if installMode == constants.InstallModeDefault {
+		owner = metav1.NewControllerRef(addon, addonapiv1alpha1.GroupVersion.WithKind("ManagedClusterAddOn"))
+	}
 
+	for _, object := range objects {
 		deployable, err := b.processor.deployable(b.hostedModeEnabled, installMode, object)
 		if err != nil {
 			return nil, nil, err
@@ -251,28 +256,71 @@ func (b *manifestWorkBuiler) buildManifestWorkFromObject(
 			continue
 		}
 
-		isHookObject, manifestConfig := b.isPreDeleteHookObject(object)
+		isHookObject, _ := b.isPreDeleteHookObject(object)
 		if isHookObject {
-			hookManifests = append(hookManifests, workapiv1.Manifest{
-				RawExtension: runtime.RawExtension{Raw: rawObject},
-			})
-			manifestConfigs = append(manifestConfigs, *manifestConfig)
-		} else {
-			deployManifests = append(deployManifests, workapiv1.Manifest{
-				RawExtension: runtime.RawExtension{Raw: rawObject},
-			})
+			continue
 		}
+		deployObjects = append(deployObjects, object)
+	}
+	if len(deployObjects) == 0 {
+		return nil, nil, nil
 	}
 
-	deployManifestWork = newManifestWork(addon.Namespace, addonName, manifestWorkNamespace,
-		deployManifests, b.processor.manifestWorkName)
-	hookManifestWork = newManifestWork(addon.Namespace, addonName, manifestWorkNamespace,
-		hookManifests, b.processor.preDeleteHookManifestWorkName)
-	if hookManifestWork != nil {
-		hookManifestWork.Spec.ManifestConfigs = manifestConfigs
+	return b.workBuilder.Build(deployObjects,
+		newAddonWorkObjectMeta(b.processor.manifestWorkNamePrefix(addon.Namespace, addon.Name), addon.Name, addon.Namespace, addonWorkNamespace, owner),
+		workbuilder.ExistingManifestWorksOption(existingWorks),
+		workbuilder.ManifestConfigOption(manifestOptions))
+}
+
+// BuildHookWork returns the preDelete manifestWork, if there is no manifest need
+// to deploy, will return nil.
+func (b *addonWorksBuilder) BuildHookWork(addonWorkNamespace string,
+	addon *addonapiv1alpha1.ManagedClusterAddOn,
+	objects []runtime.Object) (hookWork *workapiv1.ManifestWork, err error) {
+	var hookManifests []workapiv1.Manifest
+	var hookManifestConfigs []workapiv1.ManifestConfigOption
+	var owner *metav1.OwnerReference
+	installMode, _ := constants.GetHostedModeInfo(addon.GetAnnotations())
+
+	// only set addon as the owner of works in default mode. should not set owner in hosted mode.
+	if installMode == constants.InstallModeDefault {
+		owner = metav1.NewControllerRef(addon, addonapiv1alpha1.GroupVersion.WithKind("ManagedClusterAddOn"))
 	}
 
-	return deployManifestWork, hookManifestWork, nil
+	for _, object := range objects {
+		deployable, err := b.processor.deployable(b.hostedModeEnabled, installMode, object)
+		if err != nil {
+			return nil, err
+		}
+		if !deployable {
+			continue
+		}
+
+		isHookObject, manifestConfig := b.isPreDeleteHookObject(object)
+		if !isHookObject {
+			continue
+		}
+		rawObject, err := runtime.Encode(unstructured.UnstructuredJSONScheme, object)
+		if err != nil {
+			return nil, err
+		}
+
+		hookManifests = append(hookManifests, workapiv1.Manifest{RawExtension: runtime.RawExtension{Raw: rawObject}})
+		hookManifestConfigs = append(hookManifestConfigs, *manifestConfig)
+	}
+	if len(hookManifests) == 0 {
+		return nil, nil
+	}
+
+	hookWork = newManifestWork(addon.Namespace, addon.Name, addonWorkNamespace, hookManifests, b.processor.preDeleteHookManifestWorkName)
+	if owner != nil {
+		hookWork.OwnerReferences = []metav1.OwnerReference{*owner}
+	}
+	hookWork.Spec.ManifestConfigs = hookManifestConfigs
+	if addon.Namespace != addonWorkNamespace {
+		hookWork.Labels[constants.AddonNamespaceLabel] = addon.Namespace
+	}
+	return hookWork, nil
 }
 
 func FindManifestValue(
@@ -347,4 +395,48 @@ func hookWorkIsCompleted(hookWork *workapiv1.ManifestWork) bool {
 	}
 
 	return true
+}
+
+func newAddonWorkObjectMeta(namePrefix, addonName, addonNamespace, workNamespace string, owner *metav1.OwnerReference) workbuilder.GenerateManifestWorkObjectMeta {
+	return func(index int) metav1.ObjectMeta {
+		objectMeta := metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-%d", namePrefix, index),
+			Namespace: workNamespace,
+			Labels: map[string]string{
+				constants.AddonLabel: addonName,
+			},
+		}
+		if owner != nil {
+			objectMeta.OwnerReferences = []metav1.OwnerReference{*owner}
+		}
+		// if the addon namespace is not equal with the manifestwork namespace(cluster name), add the addon namespace label
+		if addonNamespace != workNamespace {
+			objectMeta.Labels[constants.AddonNamespaceLabel] = addonNamespace
+		}
+		return objectMeta
+	}
+}
+
+func getManifestConfigOption(agentAddon agent.AgentAddon) []workapiv1.ManifestConfigOption {
+	if agentAddon.GetAgentAddonOptions().HealthProber == nil {
+		return nil
+	}
+
+	if agentAddon.GetAgentAddonOptions().HealthProber.Type != agent.HealthProberTypeWork {
+		return nil
+	}
+
+	if agentAddon.GetAgentAddonOptions().HealthProber.WorkProber == nil {
+		return nil
+	}
+
+	manifestConfigs := []workapiv1.ManifestConfigOption{}
+	probeRules := agentAddon.GetAgentAddonOptions().HealthProber.WorkProber.ProbeFields
+	for _, rule := range probeRules {
+		manifestConfigs = append(manifestConfigs, workapiv1.ManifestConfigOption{
+			ResourceIdentifier: rule.ResourceIdentifier,
+			FeedbackRules:      rule.ProbeRules,
+		})
+	}
+	return manifestConfigs
 }

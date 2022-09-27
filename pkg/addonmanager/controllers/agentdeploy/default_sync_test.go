@@ -16,6 +16,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/common/workapplier"
+	"open-cluster-management.io/addon-framework/pkg/common/workbuilder"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
@@ -121,6 +122,9 @@ func TestDefaultReconcile(t *testing.T) {
 					addontesting.NewUnstructured("v1", "ConfigMap", "default", "test1"),
 					addontesting.NewUnstructured("v1", "Deployment", "default", "test1"),
 				)
+				work.SetLabels(map[string]string{
+					constants.AddonLabel: "test",
+				})
 				work.Status.Conditions = []metav1.Condition{
 					{
 						Type:   workapiv1.WorkApplied,
@@ -161,6 +165,9 @@ func TestDefaultReconcile(t *testing.T) {
 					addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
 					addontesting.NewUnstructured("v1", "Deployment", "default", "test"),
 				)
+				work.SetLabels(map[string]string{
+					constants.AddonLabel: "test",
+				})
 				work.Status.Conditions = []metav1.Condition{
 					{
 						Type:   workapiv1.WorkApplied,
@@ -266,6 +273,7 @@ func TestDefaultReconcile(t *testing.T) {
 
 			controller := addonDeployController{
 				workApplier:               workapplier.NewWorkApplierWithTypedClient(fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister()),
+				workBuilder:               workbuilder.NewWorkBuilder(),
 				addonClient:               fakeAddonClient,
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
 				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),

@@ -92,11 +92,17 @@ var _ = ginkgo.Describe("install/uninstall helloworld hosted addons in Hosted mo
 			},
 			Data: klusterletSecret.Data,
 		}
-		_, err = hubKubeClient.CoreV1().Secrets(addonAgentNamespace).Create(
-			context.Background(), &addonSecret, metav1.CreateOptions{})
-		if err != nil {
-			gomega.Expect(errors.IsAlreadyExists(err)).To(gomega.BeTrue())
-		}
+		gomega.Eventually(func() error {
+			_, err = hubKubeClient.CoreV1().Secrets(addonAgentNamespace).Create(
+				context.Background(), &addonSecret, metav1.CreateOptions{})
+			if err != nil {
+				if errors.IsAlreadyExists(err) {
+					return nil
+				}
+				return err
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
 			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(hostedManagedClusterName).Get(

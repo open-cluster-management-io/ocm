@@ -16,6 +16,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/common/workapplier"
+	"open-cluster-management.io/addon-framework/pkg/common/workbuilder"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
@@ -108,7 +109,7 @@ func TestHostingReconcile(t *testing.T) {
 				addontesting.AssertActions(t, actions, "create")
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				deployWork := actual.(*workapiv1.ManifestWork)
-				if deployWork.Namespace != "cluster1" || deployWork.Name != constants.DeployWorkName("test") {
+				if deployWork.Namespace != "cluster1" || deployWork.Name != fmt.Sprintf("%s-%v", constants.DeployWorkNamePrefix("test"), 0) {
 					t.Errorf("the manifestWork %v/%v is not in managed cluster ns.", deployWork.Namespace, deployWork.Name)
 				}
 			},
@@ -193,11 +194,15 @@ func TestHostingReconcile(t *testing.T) {
 			}},
 			existingWork: []runtime.Object{func() *workapiv1.ManifestWork {
 				work := addontesting.NewManifestWork(
-					constants.DeployHostingWorkName("cluster1", "test"),
+					constants.DeployHostingWorkNamePrefix("cluster1", "test"),
 					"cluster2",
 					addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test1"),
 					addontesting.NewHostingUnstructured("v1", "Deployment", "default", "test1"),
 				)
+				work.SetLabels(map[string]string{
+					constants.AddonLabel:          "test",
+					constants.AddonNamespaceLabel: "cluster1",
+				})
 				work.Status.Conditions = []metav1.Condition{
 					{
 						Type:   workapiv1.WorkApplied,
@@ -240,11 +245,15 @@ func TestHostingReconcile(t *testing.T) {
 			}},
 			existingWork: []runtime.Object{func() *workapiv1.ManifestWork {
 				work := addontesting.NewManifestWork(
-					constants.DeployHostingWorkName("cluster1", "test"),
+					constants.DeployHostingWorkNamePrefix("cluster1", "test"),
 					"cluster2",
 					addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
 					addontesting.NewHostingUnstructured("v1", "Deployment", "default", "test"),
 				)
+				work.SetLabels(map[string]string{
+					constants.AddonLabel:          "test",
+					constants.AddonNamespaceLabel: "cluster1",
+				})
 				work.Status.Conditions = []metav1.Condition{
 					{
 						Type:   workapiv1.WorkApplied,
@@ -287,7 +296,7 @@ func TestHostingReconcile(t *testing.T) {
 			},
 			existingWork: []runtime.Object{func() *workapiv1.ManifestWork {
 				work := addontesting.NewManifestWork(
-					constants.DeployHostingWorkName("cluster1", "test"),
+					constants.DeployHostingWorkNamePrefix("cluster1", "test"),
 					"cluster2",
 					addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
 					addontesting.NewHostingUnstructured("v1", "Deployment", "default", "test"),
@@ -334,7 +343,7 @@ func TestHostingReconcile(t *testing.T) {
 			}},
 			existingWork: []runtime.Object{func() *workapiv1.ManifestWork {
 				work := addontesting.NewManifestWork(
-					constants.DeployHostingWorkName("cluster1", "test"),
+					constants.DeployHostingWorkNamePrefix("cluster1", "test"),
 					"cluster2",
 					addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
 					addontesting.NewHostingUnstructured("v1", "Deployment", "default", "test"),
@@ -406,6 +415,7 @@ func TestHostingReconcile(t *testing.T) {
 
 			controller := addonDeployController{
 				workApplier:               workapplier.NewWorkApplierWithTypedClient(fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister()),
+				workBuilder:               workbuilder.NewWorkBuilder(),
 				addonClient:               fakeAddonClient,
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
 				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),

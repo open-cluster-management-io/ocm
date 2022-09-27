@@ -71,7 +71,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 	ginkgo.BeforeEach(func() {
 		suffix := rand.String(5)
 		managedClusterName = fmt.Sprintf("managedcluster-%s", suffix)
-		manifestWorkName = constants.DeployWorkName(testAddonImpl.name)
+		manifestWorkName = fmt.Sprintf("%s-0", constants.DeployWorkNamePrefix(testAddonImpl.name))
 
 		managedCluster := &clusterv1.ManagedCluster{
 			ObjectMeta: metav1.ObjectMeta{

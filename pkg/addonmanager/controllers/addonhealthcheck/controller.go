@@ -3,11 +3,14 @@ package addonhealthcheck
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
@@ -77,7 +80,7 @@ func NewAddonHealthCheckController(
 				if _, ok := c.agentAddons[addonName]; !ok {
 					return false
 				}
-				if accessor.GetName() != constants.DeployWorkName(addonName) {
+				if !strings.HasPrefix(accessor.GetName(), constants.DeployWorkNamePrefix(addonName)) {
 					return false
 				}
 				return true
@@ -156,8 +159,11 @@ func (c *addonHealthCheckController) probeAddonStatus(ctx context.Context, addon
 		return nil
 	}
 
-	addonWork, err := c.workLister.ManifestWorks(addon.Namespace).Get(constants.DeployWorkName(addon.Name))
-	if err != nil {
+	requirement, _ := labels.NewRequirement(constants.AddonLabel, selection.Equals, []string{addon.Name})
+	selector := labels.NewSelector().Add(*requirement)
+
+	addonWorks, err := c.workLister.ManifestWorks(addon.Namespace).List(selector)
+	if err != nil || len(addonWorks) == 0 {
 		meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
 			Type:    "Available",
 			Status:  metav1.ConditionUnknown,
@@ -167,25 +173,33 @@ func (c *addonHealthCheckController) probeAddonStatus(ctx context.Context, addon
 		return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
 	}
 
-	// Check the overall work available condition at first.
-	workCond := meta.FindStatusCondition(addonWork.Status.Conditions, workapiv1.WorkAvailable)
-	switch {
-	case workCond == nil:
-		meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
-			Type:    "Available",
-			Status:  metav1.ConditionUnknown,
-			Reason:  "WorkNotApplied",
-			Message: "Work is not applied yet",
-		})
-		return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
-	case workCond.Status == metav1.ConditionFalse:
-		meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
-			Type:    "Available",
-			Status:  metav1.ConditionFalse,
-			Reason:  "WorkApplyFailed",
-			Message: workCond.Message,
-		})
-		return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
+	manifestConditions := []workapiv1.ManifestCondition{}
+	for _, work := range addonWorks {
+		if !strings.HasPrefix(work.Name, constants.DeployWorkNamePrefix(addon.Name)) {
+			continue
+		}
+		// Check the overall work available condition at first.
+		workCond := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkAvailable)
+		switch {
+		case workCond == nil:
+			meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
+				Type:    "Available",
+				Status:  metav1.ConditionUnknown,
+				Reason:  "WorkNotApplied",
+				Message: "Work is not applied yet",
+			})
+			return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
+		case workCond.Status == metav1.ConditionFalse:
+			meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
+				Type:    "Available",
+				Status:  metav1.ConditionFalse,
+				Reason:  "WorkApplyFailed",
+				Message: workCond.Message,
+			})
+			return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
+		}
+
+		manifestConditions = append(manifestConditions, work.Status.ResourceStatus.Manifests...)
 	}
 
 	if agentAddon.GetAgentAddonOptions().HealthProber.WorkProber == nil {
@@ -201,7 +215,7 @@ func (c *addonHealthCheckController) probeAddonStatus(ctx context.Context, addon
 	probeFields := agentAddon.GetAgentAddonOptions().HealthProber.WorkProber.ProbeFields
 
 	for _, field := range probeFields {
-		result := findResultByIdentifier(field.ResourceIdentifier, addonWork)
+		result := findResultByIdentifier(field.ResourceIdentifier, manifestConditions)
 		// if no results are returned. it is possible that work agent has not returned the feedback value.
 		// mark condition to unknown
 		if result == nil {
@@ -235,8 +249,8 @@ func (c *addonHealthCheckController) probeAddonStatus(ctx context.Context, addon
 	return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
 }
 
-func findResultByIdentifier(identifier workapiv1.ResourceIdentifier, work *workapiv1.ManifestWork) *workapiv1.StatusFeedbackResult {
-	for _, status := range work.Status.ResourceStatus.Manifests {
+func findResultByIdentifier(identifier workapiv1.ResourceIdentifier, manifestConditions []workapiv1.ManifestCondition) *workapiv1.StatusFeedbackResult {
+	for _, status := range manifestConditions {
 		if identifier.Group != status.ResourceMeta.Group {
 			continue
 		}

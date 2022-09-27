@@ -189,14 +189,24 @@ func TestReconcileWithWork(t *testing.T) {
 	}
 
 	fakeAddonClient.ClearActions()
-	work := &workapiv1.ManifestWork{
+	work0 := &workapiv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: addon.Namespace,
-			Name:      constants.DeployWorkName(addon.Name),
+			Name:      fmt.Sprintf("%s-0", constants.DeployWorkNamePrefix(addon.Name)),
+			Labels:    map[string]string{constants.AddonLabel: addOn.Name},
 		},
 	}
-
-	if err := workInformers.Work().V1().ManifestWorks().Informer().GetStore().Add(work); err != nil {
+	if err := workInformers.Work().V1().ManifestWorks().Informer().GetStore().Add(work0); err != nil {
+		t.Errorf("failed to add work to informer: %v", err)
+	}
+	work1 := &workapiv1.ManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: addon.Namespace,
+			Name:      fmt.Sprintf("%s-1", constants.DeployWorkNamePrefix(addon.Name)),
+			Labels:    map[string]string{constants.AddonLabel: addOn.Name},
+		},
+	}
+	if err := workInformers.Work().V1().ManifestWorks().Informer().GetStore().Add(work1); err != nil {
 		t.Errorf("failed to add work to informer: %v", err)
 	}
 
@@ -218,7 +228,7 @@ func TestReconcileWithWork(t *testing.T) {
 		t.Errorf("addon condition should be unknown: %v", addOn.Status.Conditions)
 	}
 
-	work.Status = workapiv1.ManifestWorkStatus{
+	work0.Status = workapiv1.ManifestWorkStatus{
 		Conditions: []metav1.Condition{
 			{
 				Type:   workapiv1.WorkAvailable,
@@ -228,7 +238,39 @@ func TestReconcileWithWork(t *testing.T) {
 	}
 
 	fakeAddonClient.ClearActions()
-	if err := workInformers.Work().V1().ManifestWorks().Informer().GetStore().Update(work); err != nil {
+	if err := workInformers.Work().V1().ManifestWorks().Informer().GetStore().Update(work0); err != nil {
+		t.Fatal(err)
+	}
+
+	err = controller.sync(context.TODO(), syncContext, key)
+	if err != nil {
+		t.Errorf("expected no error when sync: %v", err)
+	}
+
+	addontesting.AssertActions(t, fakeAddonClient.Actions(), "patch")
+	actual = fakeAddonClient.Actions()[0].(clienttesting.PatchActionImpl).Patch
+	addOn = &addonapiv1alpha1.ManagedClusterAddOn{}
+	err = json.Unmarshal(actual, addOn)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cond = meta.FindStatusCondition(addOn.Status.Conditions, "Available")
+	if cond == nil && cond.Status != metav1.ConditionUnknown {
+		t.Errorf("addon condition should be unknown: %v", addOn.Status.Conditions)
+	}
+
+	work1.Status = workapiv1.ManifestWorkStatus{
+		Conditions: []metav1.Condition{
+			{
+				Type:   workapiv1.WorkAvailable,
+				Status: metav1.ConditionTrue,
+			},
+		},
+	}
+
+	fakeAddonClient.ClearActions()
+	if err := workInformers.Work().V1().ManifestWorks().Informer().GetStore().Update(work1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -269,6 +311,18 @@ func (p *testProbe) ProbeFields() []agent.ProbeField {
 				},
 			},
 		},
+		{
+			ResourceIdentifier: workapiv1.ResourceIdentifier{
+				Resource:  "tests",
+				Name:      "test2",
+				Namespace: "testns",
+			},
+			ProbeRules: []workapiv1.FeedbackRule{
+				{
+					Type: workapiv1.WellKnownStatusType,
+				},
+			},
+		},
 	}
 }
 
@@ -279,10 +333,26 @@ func (p *testProbe) HealthCheck(workapiv1.ResourceIdentifier, workapiv1.StatusFe
 
 func TestReconcileWithProbe(t *testing.T) {
 	addon := NewAddonWithHealthCheck("test", "cluster1", addonapiv1alpha1.HealthCheckModeCustomized)
-	work := &workapiv1.ManifestWork{
+	work0 := &workapiv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: addon.Namespace,
-			Name:      constants.DeployWorkName(addon.Name),
+			Name:      fmt.Sprintf("%s-0", constants.DeployWorkNamePrefix(addon.Name)),
+			Labels:    map[string]string{constants.AddonLabel: addon.Name},
+		},
+		Status: workapiv1.ManifestWorkStatus{
+			Conditions: []metav1.Condition{
+				{
+					Type:   workapiv1.WorkAvailable,
+					Status: metav1.ConditionTrue,
+				},
+			},
+		},
+	}
+	work1 := &workapiv1.ManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: addon.Namespace,
+			Name:      fmt.Sprintf("%s-1", constants.DeployWorkNamePrefix(addon.Name)),
+			Labels:    map[string]string{constants.AddonLabel: addon.Name},
 		},
 		Status: workapiv1.ManifestWorkStatus{
 			Conditions: []metav1.Condition{
@@ -295,7 +365,7 @@ func TestReconcileWithProbe(t *testing.T) {
 	}
 
 	fakeAddonClient := fakeaddon.NewSimpleClientset(addon)
-	fakeWorkClient := fakework.NewSimpleClientset(work)
+	fakeWorkClient := fakework.NewSimpleClientset(work0, work1)
 
 	addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
 	workInformers := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
@@ -303,7 +373,10 @@ func TestReconcileWithProbe(t *testing.T) {
 	if err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(addon); err != nil {
 		t.Errorf("failed to add addon to informer: %v", err)
 	}
-	if err := workInformers.Work().V1().ManifestWorks().Informer().GetStore().Add(work); err != nil {
+	if err := workInformers.Work().V1().ManifestWorks().Informer().GetStore().Add(work0); err != nil {
+		t.Errorf("failed to add work to informer: %v", err)
+	}
+	if err := workInformers.Work().V1().ManifestWorks().Informer().GetStore().Add(work1); err != nil {
 		t.Errorf("failed to add work to informer: %v", err)
 	}
 
@@ -349,7 +422,7 @@ func TestReconcileWithProbe(t *testing.T) {
 		t.Errorf("addon condition should be unknown: %v", addOn.Status.Conditions)
 	}
 
-	work.Status.ResourceStatus = workapiv1.ManifestResourceStatus{
+	work0.Status.ResourceStatus = workapiv1.ManifestResourceStatus{
 		Manifests: []workapiv1.ManifestCondition{
 			{
 				ResourceMeta: workapiv1.ManifestResourceMeta{
@@ -369,7 +442,7 @@ func TestReconcileWithProbe(t *testing.T) {
 	}
 
 	fakeAddonClient.ClearActions()
-	if err = workInformers.Work().V1().ManifestWorks().Informer().GetStore().Update(work); err != nil {
+	if err = workInformers.Work().V1().ManifestWorks().Informer().GetStore().Update(work0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -393,6 +466,49 @@ func TestReconcileWithProbe(t *testing.T) {
 
 	prober.checkError = nil
 	fakeAddonClient.ClearActions()
+	err = controller.sync(context.TODO(), syncContext, key)
+	if err != nil {
+		t.Errorf("expected no error when sync: %v", err)
+	}
+
+	// return unavailable if check returns err
+	addontesting.AssertActions(t, fakeAddonClient.Actions(), "patch")
+	actual = fakeAddonClient.Actions()[0].(clienttesting.PatchActionImpl).Patch
+	addOn = &addonapiv1alpha1.ManagedClusterAddOn{}
+	err = json.Unmarshal(actual, addOn)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cond = meta.FindStatusCondition(addOn.Status.Conditions, "Available")
+	if cond == nil && cond.Status != metav1.ConditionUnknown {
+		t.Errorf("addon condition should be unknown: %v", addOn.Status.Conditions)
+	}
+
+	work1.Status.ResourceStatus = workapiv1.ManifestResourceStatus{
+		Manifests: []workapiv1.ManifestCondition{
+			{
+				ResourceMeta: workapiv1.ManifestResourceMeta{
+					Resource:  "tests",
+					Name:      "test2",
+					Namespace: "testns",
+				},
+				StatusFeedbacks: workapiv1.StatusFeedbackResult{
+					Values: []workapiv1.FeedbackValue{
+						{
+							Name: "noop",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	fakeAddonClient.ClearActions()
+	if err = workInformers.Work().V1().ManifestWorks().Informer().GetStore().Update(work1); err != nil {
+		t.Fatal(err)
+	}
+
 	err = controller.sync(context.TODO(), syncContext, key)
 	if err != nil {
 		t.Errorf("expected no error when sync: %v", err)

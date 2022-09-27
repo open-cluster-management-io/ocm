@@ -8,7 +8,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
@@ -18,6 +17,9 @@ import (
 )
 
 type hostedSyncer struct {
+	buildWorks func(installMode, workNamespace string, cluster *clusterv1.ManagedCluster, existingWorks []*workapiv1.ManifestWork,
+		addon *addonapiv1alpha1.ManagedClusterAddOn) (appliedWorks, deleteWorks []*workapiv1.ManifestWork, err error)
+
 	applyWork func(ctx context.Context, appliedType string,
 		work *workapiv1.ManifestWork, addon *addonapiv1alpha1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
 
@@ -34,7 +36,6 @@ func (s *hostedSyncer) sync(ctx context.Context,
 	syncCtx factory.SyncContext,
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.ManagedClusterAddOn, error) {
-
 	// Hosted mode is not enabled, will not deploy any resource on the hosting cluster
 	if !s.agentAddon.GetAgentAddonOptions().HostedModeEnabled {
 		return addon, nil
@@ -109,27 +110,19 @@ func (s *hostedSyncer) sync(ctx context.Context,
 		return addon, nil
 	}
 
-	deployWorks, _, err := buildManifestWorks(ctx, s.agentAddon, installMode, hostingClusterName, cluster, addon)
-	if err != nil {
-		return addon, err
-	}
-
 	currentWorks, err := s.getWorkByAddon(addon.Name, addon.Namespace)
 	if err != nil {
 		return addon, err
 	}
 
-	requiredWorkNames := sets.NewString()
-	for _, work := range deployWorks {
-		requiredWorkNames.Insert(work.Name)
+	deployWorks, deleteWorks, err := s.buildWorks(constants.InstallModeHosted, hostingClusterName, cluster, currentWorks, addon)
+	if err != nil {
+		return addon, err
 	}
 
 	var errs []error
-	for _, work := range currentWorks {
-		if requiredWorkNames.Has(work.Name) {
-			continue
-		}
-		err = s.deleteWork(ctx, work.Namespace, work.Name)
+	for _, deleteWork := range deleteWorks {
+		err = s.deleteWork(ctx, deleteWork.Namespace, deleteWork.Name)
 		if err != nil {
 			errs = append(errs, err)
 		}

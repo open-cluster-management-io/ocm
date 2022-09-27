@@ -44,6 +44,7 @@ var testAddonImpl *testAddon
 var testHostedAddonImpl *testAddon
 var testInstallByLableAddonImpl *testAddon
 var testAddOnConfigsImpl *testAddon
+var testMultiWorksAddonImpl *testAddon
 var cancel context.CancelFunc
 var mgrContext context.Context
 
@@ -109,6 +110,12 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		supportedConfigGVRs: []schema.GroupVersionResource{addOnDeploymentConfigGVR},
 	}
 
+	testMultiWorksAddonImpl = &testAddon{
+		name:          "test-multi-works",
+		manifests:     map[string][]runtime.Object{},
+		registrations: map[string][]addonapiv1alpha1.RegistrationConfig{},
+	}
+
 	mgrContext, cancel = context.WithCancel(context.TODO())
 	// start hub controller
 	go func() {
@@ -121,6 +128,8 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		err = mgr.AddAgent(testHostedAddonImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		err = mgr.AddAgent(testAddOnConfigsImpl)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		err = mgr.AddAgent(testMultiWorksAddonImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		err = mgr.Start(mgrContext)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())

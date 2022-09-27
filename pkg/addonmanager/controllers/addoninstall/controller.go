@@ -103,7 +103,7 @@ func (c *addonInstallController) sync(ctx context.Context, syncCtx factory.SyncC
 			continue
 		}
 		if !managedClusterFilter(cluster) {
-			klog.Infof("managed cluster fileter is not match for addon %s on %s", addonName, clusterName)
+			klog.V(4).Infof("managed cluster filter is not match for addon %s on %s", addonName, clusterName)
 			continue
 		}
 

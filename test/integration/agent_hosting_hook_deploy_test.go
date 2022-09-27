@@ -79,7 +79,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 		suffix := rand.String(5)
 		managedClusterName = fmt.Sprintf("managedcluster-%s", suffix)
 		hostingClusterName = fmt.Sprintf("hostingcluster-%s", suffix)
-		hostingManifestWorkName = constants.DeployHostingWorkName(managedClusterName, testHostedAddonImpl.name)
+		hostingManifestWorkName = fmt.Sprintf("%s-0", constants.DeployHostingWorkNamePrefix(managedClusterName, testHostedAddonImpl.name))
 
 		managedCluster := &clusterv1.ManagedCluster{
 			ObjectMeta: metav1.ObjectMeta{

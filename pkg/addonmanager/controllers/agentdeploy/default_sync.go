@@ -4,7 +4,6 @@ import (
 	"context"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
@@ -14,6 +13,9 @@ import (
 )
 
 type defaultSyncer struct {
+	buildWorks func(installMode, workNamespace string, cluster *clusterv1.ManagedCluster, existingWorks []*workapiv1.ManifestWork,
+		addon *addonapiv1alpha1.ManagedClusterAddOn) (appliedWorks, deleteWorks []*workapiv1.ManifestWork, err error)
+
 	applyWork func(ctx context.Context, appliedType string,
 		work *workapiv1.ManifestWork, addon *addonapiv1alpha1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
 
@@ -28,7 +30,6 @@ func (s *defaultSyncer) sync(ctx context.Context,
 	syncCtx factory.SyncContext,
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.ManagedClusterAddOn, error) {
-	installMode := constants.InstallModeDefault
 	deployWorkNamespace := addon.Namespace
 
 	var errs []error
@@ -43,25 +44,18 @@ func (s *defaultSyncer) sync(ctx context.Context,
 		return addon, nil
 	}
 
-	deployWorks, _, err := buildManifestWorks(ctx, s.agentAddon, installMode, deployWorkNamespace, cluster, addon)
-	if err != nil {
-		return addon, err
-	}
-
 	currentWorks, err := s.getWorkByAddon(addon.Name, addon.Namespace)
 	if err != nil {
 		return addon, err
 	}
 
-	requiredWorkNames := sets.NewString()
-	for _, work := range deployWorks {
-		requiredWorkNames.Insert(work.Name)
+	deployWorks, deleteWorks, err := s.buildWorks(constants.InstallModeDefault, deployWorkNamespace, cluster, currentWorks, addon)
+	if err != nil {
+		return addon, err
 	}
-	for _, work := range currentWorks {
-		if requiredWorkNames.Has(work.Name) {
-			continue
-		}
-		err = s.deleteWork(ctx, deployWorkNamespace, work.Name)
+
+	for _, deleteWork := range deleteWorks {
+		err = s.deleteWork(ctx, deployWorkNamespace, deleteWork.Name)
 		if err != nil {
 			errs = append(errs, err)
 		}

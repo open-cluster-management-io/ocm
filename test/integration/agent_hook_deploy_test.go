@@ -122,7 +122,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		// deploy manifest is deployed
 		gomega.Eventually(func() error {
-			work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), fmt.Sprintf("addon-%s-deploy", testAddonImpl.name), metav1.GetOptions{})
+			work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), fmt.Sprintf("addon-%s-deploy-0", testAddonImpl.name), metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -153,7 +153,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		// Update work status to trigger addon status
-		work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), fmt.Sprintf("addon-%s-deploy", testAddonImpl.name), metav1.GetOptions{})
+		work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), fmt.Sprintf("%s-0", constants.DeployWorkNamePrefix(testAddonImpl.name)), metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: "Applied", Status: metav1.ConditionTrue, Reason: "WorkApplied"})
 		meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: "Available", Status: metav1.ConditionTrue, Reason: "ResourceAvailable"})

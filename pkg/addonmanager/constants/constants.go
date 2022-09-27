@@ -85,14 +85,14 @@ const (
 	DisableAddonAutomaticInstallationAnnotationKey = "addon.open-cluster-management.io/disable-automatic-installation"
 )
 
-// DeployWorkName return the name of work for the addon
-func DeployWorkName(addonName string) string {
+// DeployWorkNamePrefix returns the prefix of the work name for the addon
+func DeployWorkNamePrefix(addonName string) string {
 	return fmt.Sprintf("addon-%s-deploy", addonName)
 }
 
-// DeployHostingWorkName return the name of manifest work on hosting cluster for the addon
-func DeployHostingWorkName(addonNamespace, addonName string) string {
-	return fmt.Sprintf("%s-hosting-%s", DeployWorkName(addonName), addonNamespace)
+// DeployHostingWorkNamePrefix returns the prefix of the work name on hosting cluster for the addon
+func DeployHostingWorkNamePrefix(addonNamespace, addonName string) string {
+	return fmt.Sprintf("%s-hosting-%s", DeployWorkNamePrefix(addonName), addonNamespace)
 }
 
 // PreDeleteHookWorkName return the name of pre-delete work for the addon
