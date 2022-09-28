@@ -35,7 +35,11 @@ import (
 )
 
 var (
+	// crdNames is the list of CRDs to be wiped out before deleting other resources when clusterManager is deleted.
+	// The order of the list matters, the managedclusteraddon crd needs to be deleted at first so all addon related
+	// manifestwork is deleted, then other manifestworks.
 	crdNames = []string{
+		"managedclusteraddons.addon.open-cluster-management.io",
 		"manifestworks.work.open-cluster-management.io",
 		"managedclusters.cluster.open-cluster-management.io",
 	}

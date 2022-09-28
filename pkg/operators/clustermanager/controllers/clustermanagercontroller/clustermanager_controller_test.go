@@ -222,7 +222,7 @@ func TestSyncDelete(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(deleteCRDActions), 12)
+	testinghelper.AssertEqualNumber(t, len(deleteCRDActions), 13)
 
 	deleteAPIServiceActions := []clienttesting.DeleteActionImpl{}
 	apiServiceActions := tc.apiRegistrationClient.Actions()
