@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/pflag"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	_ "open-cluster-management.io/work/pkg/features"
 	"open-cluster-management.io/work/pkg/webhook"
 )
 

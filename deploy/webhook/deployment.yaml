@@ -26,6 +26,8 @@ spec:
           - "--secure-port=6443"
           # webhook is not hosting any k8s api resource, so it is not subjected to APF feature
           - "--feature-gates=APIPriorityAndFairness=false"
+          # enable NilExecutorValidating for e2e
+          - "--feature-gates=NilExecutorValidating=true"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

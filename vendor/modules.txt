@@ -1193,7 +1193,7 @@ k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/strings/slices
 k8s.io/utils/trace
-# open-cluster-management.io/api v0.8.0
+# open-cluster-management.io/api v0.8.1-0.20220922101757-abd2ec6ed64f
 ## explicit; go 1.18
 open-cluster-management.io/api/client/work/clientset/versioned
 open-cluster-management.io/api/client/work/clientset/versioned/fake
@@ -1205,6 +1205,7 @@ open-cluster-management.io/api/client/work/informers/externalversions/internalin
 open-cluster-management.io/api/client/work/informers/externalversions/work
 open-cluster-management.io/api/client/work/informers/externalversions/work/v1
 open-cluster-management.io/api/client/work/listers/work/v1
+open-cluster-management.io/api/feature
 open-cluster-management.io/api/work/v1
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.30
 ## explicit; go 1.17
