@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"open-cluster-management.io/work/pkg/helper"
+	"open-cluster-management.io/work/pkg/spoke/auth"
 	"open-cluster-management.io/work/pkg/spoke/controllers/appliedmanifestcontroller"
 	"open-cluster-management.io/work/pkg/spoke/controllers/finalizercontroller"
 	"open-cluster-management.io/work/pkg/spoke/controllers/manifestcontroller"
@@ -103,6 +104,7 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 		return err
 	}
 
+	validator := auth.NewExecutorValidator(spokeRestConfig, spokeKubeClient)
 	manifestWorkController := manifestcontroller.NewManifestWorkController(
 		ctx,
 		controllerContext.EventRecorder,
@@ -116,6 +118,7 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 		spokeWorkInformerFactory.Work().V1().AppliedManifestWorks(),
 		hubhash,
 		restMapper,
+		validator,
 	)
 	addFinalizerController := finalizercontroller.NewAddFinalizerController(
 		controllerContext.EventRecorder,

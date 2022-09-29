@@ -7,9 +7,14 @@ import (
 	"time"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
@@ -29,8 +34,8 @@ const (
 type ExecutorValidator interface {
 	// Validate whether the work executor subject has permission to perform action on the specific manifest,
 	// if there is no permission will return a kubernetes forbidden error.
-	Validate(ctx context.Context, executor *workapiv1.ManifestWorkExecutor,
-		gvr schema.GroupVersionResource, namespace, name string, action ExecuteAction) error
+	Validate(ctx context.Context, executor *workapiv1.ManifestWorkExecutor, gvr schema.GroupVersionResource,
+		namespace, name string, obj *unstructured.Unstructured, action ExecuteAction) error
 }
 
 type NotAllowedError struct {
@@ -46,18 +51,33 @@ func (e *NotAllowedError) Error() string {
 	return err
 }
 
-func NewExecutorValidator(kubeClient kubernetes.Interface) ExecutorValidator {
+func NewExecutorValidator(config *rest.Config, kubeClient kubernetes.Interface) ExecutorValidator {
 	return &sarValidator{
-		kubeClient: kubeClient,
+		kubeClient:               kubeClient,
+		config:                   config,
+		newImpersonateClientFunc: defaultNewImpersonateClient,
 	}
 }
 
 type sarValidator struct {
-	kubeClient kubernetes.Interface
+	kubeClient               kubernetes.Interface
+	config                   *rest.Config
+	newImpersonateClientFunc newImpersonateClient
+}
+
+type newImpersonateClient func(config *rest.Config, username string) (dynamic.Interface, error)
+
+func defaultNewImpersonateClient(config *rest.Config, username string) (dynamic.Interface, error) {
+	if config == nil {
+		return nil, fmt.Errorf("kube config should not be nil")
+	}
+	impersonatedConfig := *config
+	impersonatedConfig.Impersonate.UserName = username
+	return dynamic.NewForConfig(&impersonatedConfig)
 }
 
 func (v *sarValidator) Validate(ctx context.Context, executor *workapiv1.ManifestWorkExecutor,
-	gvr schema.GroupVersionResource, namespace, name string, action ExecuteAction) error {
+	gvr schema.GroupVersionResource, namespace, name string, obj *unstructured.Unstructured, action ExecuteAction) error {
 	if executor == nil {
 		return nil
 	}
@@ -97,13 +117,61 @@ func (v *sarValidator) Validate(ctx context.Context, executor *workapiv1.Manifes
 
 	if !allowed {
 		return &NotAllowedError{
-			Err: fmt.Errorf("not allowed to %s the resource %s %s, name: %s",
-				strings.ToLower(string(action)), resource.Group, resource.Resource, resource.Name),
+			Err: fmt.Errorf("not allowed to %s the resource %s %s, %s %s",
+				strings.ToLower(string(action)), resource.Group, resource.Resource, resource.Namespace, resource.Name),
 			RequeueTime: 60 * time.Second,
 		}
 	}
 
+	switch {
+	case action != ApplyAction:
+		return nil
+	case gvr.Group != "rbac.authorization.k8s.io":
+		return nil
+	case gvr.Resource == "roles", gvr.Resource == "rolebindings",
+		gvr.Resource == "clusterroles", gvr.Resource == "clusterrolebindings":
+		// subjectaccessreview can not permission escalation, use an impersonation request to check again
+		return v.checkEscalation(ctx, sa, gvr, namespace, name, obj)
+	}
+
 	return nil
+}
+
+func (v *sarValidator) checkEscalation(ctx context.Context, sa *workapiv1.ManifestWorkSubjectServiceAccount,
+	gvr schema.GroupVersionResource, namespace, name string, obj *unstructured.Unstructured) error {
+
+	dynamicClient, err := v.newImpersonateClientFunc(v.config, username(sa.Namespace, sa.Name))
+	if err != nil {
+		return err
+	}
+
+	_, err = dynamicClient.Resource(gvr).Namespace(namespace).Create(ctx, obj, metav1.CreateOptions{
+		DryRun: []string{"All"},
+	})
+	if apierrors.IsForbidden(err) {
+		klog.Infof("not allowed to apply the resource %s %s, %s %s, error: %s",
+			gvr.Group, gvr.Resource, namespace, name, err.Error())
+		return &NotAllowedError{
+			Err: fmt.Errorf("not allowed to apply the resource %s %s, %s %s, error: permission escalation",
+				gvr.Group, gvr.Resource, namespace, name),
+			RequeueTime: 60 * time.Second,
+		}
+	}
+
+	if apierrors.IsAlreadyExists(err) {
+		// it is not necessary to further check the permission for update when the resource exists, because
+		// the API server checks the permission escalation before checking the existence.
+		return nil
+	}
+	return err
+}
+
+func username(saNamespace, saName string) string {
+	return fmt.Sprintf("system:serviceaccount:%s:%s", saNamespace, saName)
+}
+func groups(saNamespace string) []string {
+	return []string{"system:serviceaccounts", "system:authenticated",
+		fmt.Sprintf("system:serviceaccounts:%s", saNamespace)}
 }
 
 func buildSubjectAccessReviews(saNamespace string, saName string,
@@ -123,9 +191,8 @@ func buildSubjectAccessReviews(saNamespace string, saName string,
 					Namespace:   resource.Namespace,
 					Verb:        verb,
 				},
-				User: fmt.Sprintf("system:serviceaccount:%s:%s", saNamespace, saName),
-				Groups: []string{"system:serviceaccounts", "system:authenticated",
-					fmt.Sprintf("system:serviceaccounts:%s", saNamespace)},
+				User:   username(saNamespace, saName),
+				Groups: groups(saNamespace),
 			},
 		})
 	}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -73,6 +74,36 @@ func NewConfigmap(namespace, name string, data map[string]string, finalizers []s
 	}
 
 	return cm
+}
+
+func NewRoleForManifest(namespace, name string, rules ...rbacv1.PolicyRule) *rbacv1.Role {
+	return &rbacv1.Role{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Role",
+			APIVersion: "rbac.authorization.k8s.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Rules: rules,
+	}
+}
+
+func NewRoleBindingForManifest(namespace, name string, rule rbacv1.RoleRef,
+	subjects ...rbacv1.Subject) *rbacv1.RoleBinding {
+	return &rbacv1.RoleBinding{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "RoleBinding",
+			APIVersion: "rbac.authorization.k8s.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Subjects: subjects,
+		RoleRef:  rule,
+	}
 }
 
 func ToManifest(object runtime.Object) workapiv1.Manifest {

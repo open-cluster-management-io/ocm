@@ -73,7 +73,8 @@ func NewManifestWorkController(
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
 	appliedManifestWorkInformer workinformer.AppliedManifestWorkInformer,
 	hubHash string,
-	restMapper meta.RESTMapper) factory.Controller {
+	restMapper meta.RESTMapper,
+	validator auth.ExecutorValidator) factory.Controller {
 
 	controller := &ManifestWorkController{
 		manifestWorkClient:        manifestWorkClient,
@@ -84,7 +85,7 @@ func NewManifestWorkController(
 		hubHash:                   hubHash,
 		restMapper:                restMapper,
 		appliers:                  apply.NewAppliers(spokeDynamicClient, spokeKubeClient, spokeAPIExtensionClient),
-		validator:                 auth.NewExecutorValidator(spokeKubeClient),
+		validator:                 validator,
 	}
 
 	return factory.New().
@@ -274,7 +275,7 @@ func (m *ManifestWorkController) applyOneManifest(
 	}
 
 	// check the Executor subject permission before applying
-	err = m.validator.Validate(ctx, workSpec.Executor, gvr, resMeta.Namespace, resMeta.Name, auth.ApplyAction)
+	err = m.validator.Validate(ctx, workSpec.Executor, gvr, resMeta.Namespace, resMeta.Name, required, auth.ApplyAction)
 	if err != nil {
 		result.Error = err
 		return result
