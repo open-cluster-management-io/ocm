@@ -140,7 +140,10 @@ func (a *HelmAgentAddon) getValues(
 			if err != nil {
 				return overrideValues, err
 			}
+
+			klog.V(4).Infof("index=%d, user values: %v", i, userValues)
 			overrideValues = MergeValues(overrideValues, userValues)
+			klog.V(4).Infof("index=%d, override values: %v", i, overrideValues)
 		}
 	}
 

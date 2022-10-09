@@ -1,8 +1,9 @@
 package addonfactory
 
 import (
-	"reflect"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/api/equality"
 )
 
 func TestGetValuesFromAddonAnnotation(t *testing.T) {
@@ -39,7 +40,7 @@ func TestGetValuesFromAddonAnnotation(t *testing.T) {
 			if !c.expectedErr && err != nil {
 				t.Errorf("expected no error, bug got err %v", err)
 			}
-			if !reflect.DeepEqual(values, c.expectedValues) {
+			if !equality.Semantic.DeepEqual(values, c.expectedValues) {
 				t.Errorf("expected values %v, but got values %v", c.expectedValues, values)
 			}
 		})
@@ -57,33 +58,38 @@ func TestMergeStructValues(t *testing.T) {
 	}
 	cases := []struct {
 		name           string
-		jsonStruct     config
-		values         Values
+		valuesList     []Values
 		expectedValues Values
 	}{
 		{
-			name: "merge ok",
-			jsonStruct: config{
-				Name: "test",
-				Global: global{
-					Image: "test",
-					Tag:   "test",
-				},
+			name: "mutilpe merge",
+			valuesList: []Values{
+				func() Values {
+					values, err := JsonStructToValues(config{
+						Name:   "test",
+						Global: global{Image: "test1"},
+					})
+					if err != nil {
+						t.Fatalf("failed to struct to values %v", err)
+					}
+					return values
+				}(),
+				{"name": "dev", "label": "dev"},
+				{"global": map[string]interface{}{"image": "test2", "tag": "test"}},
 			},
-			values:         Values{"name": "dev", "label": "dev"},
-			expectedValues: Values{"name": "dev", "label": "dev", "global": map[string]interface{}{"image": "test", "tag": "test"}},
+			expectedValues: Values{"name": "dev", "label": "dev", "global": map[string]interface{}{"image": "test2", "tag": "test"}},
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			aValues, err := JsonStructToValues(c.jsonStruct)
-			if err != nil {
-				t.Fatalf("failed to struct to values %v", err)
+			overrideValues := Values{}
+			for _, values := range c.valuesList {
+				overrideValues = MergeValues(overrideValues, values)
 			}
-			mergedValues := MergeValues(aValues, c.values)
-			if len(mergedValues) != len(c.expectedValues) {
-				t.Errorf("expected values %v, but got values %v", c.expectedValues, mergedValues)
+
+			if len(overrideValues) != len(c.expectedValues) {
+				t.Errorf("expected values %v, but got values %v", c.expectedValues, overrideValues)
 			}
 		})
 	}

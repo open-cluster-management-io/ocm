@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: image-config
+data:
+  image: quay.io/open-cluster-management/addon-examples:latest
+  imagePullPolicy: IfNotPresent

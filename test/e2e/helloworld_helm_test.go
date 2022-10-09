@@ -7,7 +7,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,6 +19,8 @@ import (
 const (
 	helloWorldHelmAddonName = "helloworldhelm"
 	addonInstallNamespace   = "open-cluster-management-agent-addon"
+
+	imageConfigName = "image-config"
 )
 
 var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
@@ -30,6 +32,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			InstallNamespace: addonInstallNamespace,
 		},
 	}
+
 	ginkgo.BeforeEach(func() {
 		gomega.Eventually(func() error {
 			_, err := hubClusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedClusterName, metav1.GetOptions{})
@@ -56,6 +59,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
+
 	ginkgo.AfterEach(func() {
 		gomega.Eventually(func() error {
 			_, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), helloWorldHelmAddonName, metav1.GetOptions{})
@@ -67,11 +71,11 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			}
 
 			return hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), helloWorldHelmAddonName, metav1.DeleteOptions{})
-
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
-	ginkgo.It("Install/uninstall addon and make sure it is available", func() {
+	ginkgo.It("addon should be available", func() {
+		ginkgo.By("Make sure addon is available and has pre-delete finalizer")
 		gomega.Eventually(func() error {
 			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), helloWorldHelmAddonName, metav1.GetOptions{})
 			if err != nil {
@@ -98,7 +102,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
-		// Ensure helloworldhelm addon is functioning.
+		ginkgo.By("Make sure addon is functioning")
 		configmap := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("config-%s", rand.String(6)),
@@ -119,13 +123,13 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 				return err
 			}
 
-			if !apiequality.Semantic.DeepEqual(copyiedConfig.Data, configmap.Data) {
+			if !equality.Semantic.DeepEqual(copyiedConfig.Data, configmap.Data) {
 				return fmt.Errorf("expected configmap is not correct, %v", copyiedConfig.Data)
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
-		// delete addon CR, the pre-delete job should clean up the configmap. the addon and agent should be deleted too.
+		ginkgo.By("The pre-delete job should clean up the configmap after the addon is deleted")
 		err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), helloWorldHelmAddonName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		gomega.Eventually(func() error {
@@ -139,6 +143,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 
 			return fmt.Errorf("the configmap should be deleted")
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
 		gomega.Eventually(func() error {
 			_, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), helloWorldHelmAddonName, metav1.GetOptions{})
 			if err != nil {
@@ -163,7 +168,39 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			return fmt.Errorf("the agent deployment should be deleted")
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
-	ginkgo.It("values in annotation of addon cr works", func() {
+
+	ginkgo.It("addon should be configured with mutiple configurations", func() {
+		ginkgo.By("Prepare a AddOnDeploymentConfig for addon nodeSelector and tolerations")
+		gomega.Eventually(func() error {
+			return prepareAddOnDeploymentConfig(managedClusterName)
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Prepare a ConfigMap for addon image configuration")
+		gomega.Eventually(func() error {
+			_, err := hubKubeClient.CoreV1().ConfigMaps(managedClusterName).Get(context.Background(), imageConfigName, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				if _, err := hubKubeClient.CoreV1().ConfigMaps(managedClusterName).Create(
+					context.Background(),
+					&corev1.ConfigMap{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      imageConfigName,
+							Namespace: managedClusterName,
+						},
+						Data: map[string]string{"image": "quay.io/test:test", "imagePullPolicy": "Never"},
+					},
+					metav1.CreateOptions{},
+				); err != nil {
+					return err
+				}
+			}
+			if err != nil {
+				return err
+			}
+
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
 			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), helloWorldHelmAddonName, metav1.GetOptions{})
 			if err != nil {
@@ -171,8 +208,29 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			}
 			newAddon := addon.DeepCopy()
 			newAddon.SetAnnotations(map[string]string{
-				"addon.open-cluster-management.io/values": `{"global":{"imagePullSecret":"mySecret","imageOverrides":{"helloWorldHelm":"quay.io/test:test"}}}`,
+				"addon.open-cluster-management.io/values": `{"global":{"imagePullSecret":"mySecret"}}`,
 			})
+			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+				{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						Resource: "configmaps",
+					},
+					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+						Namespace: managedClusterName,
+						Name:      imageConfigName,
+					},
+				},
+				{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						Group:    "addon.open-cluster-management.io",
+						Resource: "addondeploymentconfigs",
+					},
+					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+						Namespace: managedClusterName,
+						Name:      deployConfigName,
+					},
+				},
+			}
 			_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
@@ -180,24 +238,43 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
+		ginkgo.By("Make sure addon is configured")
 		gomega.Eventually(func() error {
 			agentDeploy, err := hubKubeClient.AppsV1().Deployments(addonInstallNamespace).Get(context.Background(), "helloworldhelm-agent", metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
+
 			imagePullSecrets := agentDeploy.Spec.Template.Spec.ImagePullSecrets
 			if len(imagePullSecrets) != 1 {
-				return fmt.Errorf("the imagePullSecret is not overriden by the value in annotion")
+				return fmt.Errorf("expect one image pull secret, but %v", imagePullSecrets)
 			}
 			if imagePullSecrets[0].Name != "mySecret" {
-				return fmt.Errorf("the imagePullSecret is not overriden by the value in annotion")
+				return fmt.Errorf("the imagePullSecret is not overriden by the value in annotion, %v", imagePullSecrets)
 			}
-			container := agentDeploy.Spec.Template.Spec.Containers[0]
-			if container.Image != "quay.io/test:test" {
-				return fmt.Errorf("the image is not overriden by the values in annotion")
+
+			containers := agentDeploy.Spec.Template.Spec.Containers
+			if len(containers) != 1 {
+				return fmt.Errorf("expect one container, but %v", containers)
 			}
+
+			if containers[0].Image != "quay.io/test:test" {
+				return fmt.Errorf("unexpected image %s", containers[0].Image)
+			}
+
+			if containers[0].ImagePullPolicy != "Never" {
+				return fmt.Errorf("unexpected image pull policy  %s", containers[0].ImagePullPolicy)
+			}
+
+			if !equality.Semantic.DeepEqual(agentDeploy.Spec.Template.Spec.NodeSelector, nodeSelector) {
+				return fmt.Errorf("unexpected nodeSeletcor %v", agentDeploy.Spec.Template.Spec.NodeSelector)
+			}
+
+			if !equality.Semantic.DeepEqual(agentDeploy.Spec.Template.Spec.Tolerations, tolerations) {
+				return fmt.Errorf("unexpected tolerations %v", agentDeploy.Spec.Template.Spec.Tolerations)
+			}
+
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
-
 })

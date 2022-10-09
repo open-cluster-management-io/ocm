@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	utilflag "k8s.io/component-base/cli/flag"
 	logs "k8s.io/component-base/logs/api/v1"
@@ -21,7 +22,9 @@ import (
 	"open-cluster-management.io/addon-framework/examples/helloworld_helm"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/version"
+	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 )
@@ -76,6 +79,16 @@ func newControllerCommand() *cobra.Command {
 }
 
 func runController(ctx context.Context, kubeConfig *rest.Config) error {
+	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		return err
+	}
+
+	addonClient, err := addonv1alpha1client.NewForConfig(kubeConfig)
+	if err != nil {
+		return err
+	}
+
 	mgr, err := addonmanager.New(kubeConfig)
 	if err != nil {
 		klog.Errorf("failed to new addon manager %v", err)
@@ -88,8 +101,19 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		utilrand.String(5))
 
 	agentAddon, err := addonfactory.NewAgentAddonFactory(helloworld_helm.AddonName, helloworld_helm.FS, "manifests/charts/helloworld").
-		WithGetValuesFuncs(helloworld_helm.GetValues, addonfactory.GetValuesFromAddonAnnotation).
-		WithAgentRegistrationOption(registrationOption).
+		WithConfigGVRs(
+			schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
+			addonfactory.AddOnDeploymentConfigGVR,
+		).
+		WithGetValuesFuncs(
+			helloworld_helm.GetDefaultValues,
+			addonfactory.GetAddOnDeloymentConfigValues(
+				addonfactory.NewAddOnDeloymentConfigGetter(addonClient),
+				addonfactory.ToAddOnNodePlacementValues,
+			),
+			helloworld_helm.GetImageValues(kubeClient),
+			addonfactory.GetValuesFromAddonAnnotation,
+		).WithAgentRegistrationOption(registrationOption).
 		BuildHelmAgentAddon()
 	if err != nil {
 		klog.Errorf("failed to build agent %v", err)

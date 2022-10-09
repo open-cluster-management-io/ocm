@@ -42,3 +42,6 @@
     - apiGroups: ["addon.open-cluster-management.io"]
       resources: ["managedclusteraddons/status"]
       verbs: ["update", "patch"]
+    - apiGroups: ["addon.open-cluster-management.io"]
+      resources: ["addondeploymentconfigs"]
+      verbs: ["get", "list", "watch"]

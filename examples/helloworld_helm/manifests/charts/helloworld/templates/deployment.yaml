@@ -30,6 +30,12 @@ spec:
       - name: hub-config
         secret:
           secretName: {{ .Values.hubKubeConfigSecret }}
+      {{- if .Values.tolerations }}
+      tolerations: {{ toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.global.nodeSelector }}
+      nodeSelector: {{ toYaml .Values.global.nodeSelector | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ template "helloworldhelm.name" . }}-agent
         image: {{ .Values.global.imageOverrides.helloWorldHelm }}

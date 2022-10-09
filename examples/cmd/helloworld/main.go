@@ -21,6 +21,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonagent "open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/version"
+	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
@@ -76,17 +77,31 @@ func newControllerCommand() *cobra.Command {
 }
 
 func runController(ctx context.Context, kubeConfig *rest.Config) error {
+	addonClient, err := addonv1alpha1client.NewForConfig(kubeConfig)
+	if err != nil {
+		return err
+	}
+
 	mgr, err := addonmanager.New(kubeConfig)
 	if err != nil {
 		return err
 	}
+
 	registrationOption := helloworld.NewRegistrationOption(
 		kubeConfig,
 		helloworld.AddonName,
-		utilrand.String(5))
+		utilrand.String(5),
+	)
 
 	agentAddon, err := addonfactory.NewAgentAddonFactory(helloworld.AddonName, helloworld.FS, "manifests/templates").
-		WithGetValuesFuncs(helloworld.GetValues, addonfactory.GetValuesFromAddonAnnotation).
+		WithConfigGVRs(addonfactory.AddOnDeploymentConfigGVR).
+		WithGetValuesFuncs(
+			helloworld.GetDefaultValues,
+			addonfactory.GetAddOnDeloymentConfigValues(
+				addonfactory.NewAddOnDeloymentConfigGetter(addonClient),
+				addonfactory.ToAddOnDeloymentConfigValues,
+			),
+		).
 		WithAgentRegistrationOption(registrationOption).
 		WithInstallStrategy(addonagent.InstallAllStrategy(helloworld.InstallationNamespace)).
 		WithAgentHealthProber(helloworld.AgentHealthProber()).

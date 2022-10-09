@@ -110,8 +110,8 @@ func (f *AgentAddonFactory) WithTrimCRDDescription() *AgentAddonFactory {
 }
 
 // WithConfigGVRs defines the addon supported configuration GroupVersionResource
-func (f *AgentAddonFactory) WithConfigGVRs(gvrs []schema.GroupVersionResource) *AgentAddonFactory {
-	f.agentAddonOptions.SupportedConfigGVRs = gvrs
+func (f *AgentAddonFactory) WithConfigGVRs(gvrs ...schema.GroupVersionResource) *AgentAddonFactory {
+	f.agentAddonOptions.SupportedConfigGVRs = append(f.agentAddonOptions.SupportedConfigGVRs, gvrs...)
 	return f
 }
 

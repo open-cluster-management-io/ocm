@@ -88,7 +88,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 
 	agentAddon, err := addonfactory.NewAgentAddonFactory(
 		helloworld_hosted.AddonName, helloworld_hosted.FS, "manifests/templates").
-		WithGetValuesFuncs(helloworld.GetValues, addonfactory.GetValuesFromAddonAnnotation).
+		WithGetValuesFuncs(helloworld.GetDefaultValues, addonfactory.GetValuesFromAddonAnnotation).
 		WithAgentRegistrationOption(registrationOption).
 		WithAgentHostedModeEnabledOption().
 		BuildTemplateAgentAddon()

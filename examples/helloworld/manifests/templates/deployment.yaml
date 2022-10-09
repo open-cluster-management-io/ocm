@@ -16,6 +16,24 @@ spec:
         app: helloworld-agent
     spec:
       serviceAccountName: helloworld-agent-sa
+{{- if .NodeSelector }}
+      nodeSelector:
+      {{- range $key, $value := .NodeSelector }}
+        "{{ $key }}": "{{ $value }}"
+      {{- end }}
+{{- end }}
+{{- if .Tolerations }}
+      tolerations:
+      {{- range $toleration := .Tolerations }}
+      - key: "{{ $toleration.Key }}"
+        value: "{{ $toleration.Value }}"
+        effect: "{{ $toleration.Effect }}"
+        operator: "{{ $toleration.Operator }}"
+        {{- if $toleration.TolerationSeconds }}
+        tolerationSeconds: {{ $toleration.TolerationSeconds }}
+        {{- end }}
+      {{- end }}
+{{- end }}
       volumes:
       - name: hub-config
         secret:

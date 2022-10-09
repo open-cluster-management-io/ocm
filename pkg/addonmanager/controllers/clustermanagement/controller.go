@@ -195,7 +195,22 @@ func mergeConfigReferences(
 		return nil
 	}
 
-	if !equality.Semantic.DeepEqual(addon.Status.ConfigReferences, expectedConfigReferences) {
+	// we should ignore the last observed generation when we compare two config references
+	actualConfigReferences := []addonapiv1alpha1.ConfigReference{}
+	for _, config := range addon.Status.ConfigReferences {
+		actualConfigReferences = append(actualConfigReferences, addonapiv1alpha1.ConfigReference{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    config.Group,
+				Resource: config.Resource,
+			},
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Name:      config.Name,
+				Namespace: config.Namespace,
+			},
+		})
+	}
+
+	if !equality.Semantic.DeepEqual(actualConfigReferences, expectedConfigReferences) {
 		addon.Status.ConfigReferences = expectedConfigReferences
 		*modified = true
 	}

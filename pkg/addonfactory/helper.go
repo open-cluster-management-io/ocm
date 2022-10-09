@@ -8,9 +8,12 @@ import (
 	"strings"
 
 	"github.com/fatih/structs"
+
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
+
 	"k8s.io/klog/v2"
+
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
@@ -38,20 +41,20 @@ func GetValuesFromAddonAnnotation(
 // MergeValues merges the 2 given Values to a Values.
 // the values of b will override that in a for the same fields.
 func MergeValues(a, b Values) Values {
-	out := make(map[string]interface{}, len(a))
+	out := Values{}
 	for k, v := range a {
 		out[k] = v
 	}
-	for k, v := range b {
-		if v, ok := v.(map[string]interface{}); ok {
-			if bv, ok := out[k]; ok {
-				if bv, ok := bv.(map[string]interface{}); ok {
-					out[k] = MergeValues(bv, v)
+	for bk, bv := range b {
+		if bv, ok := bv.(map[string]interface{}); ok {
+			if av, ok := out[bk]; ok {
+				if av, ok := av.(map[string]interface{}); ok {
+					out[bk] = mergeInterfaceMaps(av, bv)
 					continue
 				}
 			}
 		}
-		out[k] = v
+		out[bk] = bv
 	}
 	return out
 }
@@ -146,4 +149,26 @@ func stripPrefix(chartPrefix, path string) string {
 	chartPrefixLen := len(strings.Split(prefixNoPathSeparatorSuffix, string(filepath.Separator)))
 	pathValues := strings.Split(path, string(filepath.Separator))
 	return strings.Join(pathValues[chartPrefixLen:], string(filepath.Separator))
+}
+
+func mergeInterfaceMaps(a, b map[string]interface{}) map[string]interface{} {
+	out := map[string]interface{}{}
+	for k, v := range a {
+		out[k] = v
+	}
+
+	for bk, bv := range b {
+		if bv, ok := bv.(map[string]interface{}); ok {
+			if av, ok := out[bk]; ok {
+				if av, ok := av.(map[string]interface{}); ok {
+					out[bk] = mergeInterfaceMaps(av, bv)
+					continue
+				}
+			}
+		}
+
+		out[bk] = bv
+	}
+
+	return out
 }

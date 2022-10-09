@@ -33,7 +33,7 @@ func NewRegistrationOption(kubeConfig *rest.Config, addonName, agentName string)
 	}
 }
 
-func GetValues(cluster *clusterv1.ManagedCluster,
+func GetDefaultValues(cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
 	installNamespace := addon.Spec.InstallNamespace
 	if len(installNamespace) == 0 {

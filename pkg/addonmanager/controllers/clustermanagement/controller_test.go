@@ -406,6 +406,68 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
+			name:    "should not update config",
+			syncKey: "cluster1/test",
+			managedClusteraddon: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test"))
+					addon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "configs.test",
+								Resource: "testconfigs",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "test1",
+							},
+						},
+					}
+					addon.Status.RelatedObjects = []addonapiv1alpha1.ObjectReference{
+						{
+							Name:     "test",
+							Group:    "addon.open-cluster-management.io",
+							Resource: "clustermanagementaddons",
+						},
+					}
+					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "configs.test",
+								Resource: "testconfigs",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "test1",
+							},
+							LastObservedGeneration: 1,
+						},
+					}
+					return addon
+				}(),
+			},
+			clusterManagementAddon: []runtime.Object{
+				func() *addonapiv1alpha1.ClusterManagementAddOn {
+					clusterManagementAddon := addontesting.NewClusterManagementAddon("test", "", "")
+					clusterManagementAddon.Spec.SupportedConfigs = []addonapiv1alpha1.ConfigMeta{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "configs.test",
+								Resource: "testconfigs",
+							},
+						},
+					}
+					return clusterManagementAddon
+				}(),
+			},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{
+				name:       "test",
+				configGVRs: []schema.GroupVersionResource{{Group: "configs.test", Resource: "testconfigs"}},
+			},
+			validateAddonActions: addontesting.AssertNoActions,
+		},
+		{
 			name:                   "no configs in ClusterManagementAddOn",
 			syncKey:                "cluster1/test",
 			managedClusteraddon:    []runtime.Object{addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test"))},
