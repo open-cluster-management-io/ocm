@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -32,6 +33,9 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/registration-operator/manifests"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
+	"open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/migrationcontroller"
+
+	migrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/typed/migration/v1alpha1"
 )
 
 var (
@@ -58,6 +62,14 @@ var (
 		"cluster-manager/hub/0000_02_addon.open-cluster-management.io_addondeploymentconfigs.crd.yaml",
 		"cluster-manager/hub/0000_03_clusters.open-cluster-management.io_placementdecisions.crd.yaml",
 		"cluster-manager/hub/0000_05_clusters.open-cluster-management.io_addonplacementscores.crd.yaml",
+	}
+
+	// removed CRD StoredVersions
+	removedCRDStoredVersions = map[string]string{
+		"placements.cluster.open-cluster-management.io":                "v1alpha1",
+		"placementdecisions.cluster.open-cluster-management.io":        "v1alpha1",
+		"managedclustersets.cluster.open-cluster-management.io":        "v1alpha1",
+		"managedclustersetbindings.cluster.open-cluster-management.io": "v1alpha1",
 	}
 
 	// The hubWebhookResourceFiles should be deployed in the hub cluster
@@ -138,7 +150,7 @@ type clusterManagerController struct {
 	recorder             events.Recorder
 	cache                resourceapply.ResourceCache
 	// For testcases which don't need these functions, we could set fake funcs
-	generateHubClusterClients func(hubConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, apiregistrationclient.APIServicesGetter, error)
+	generateHubClusterClients func(hubConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, apiregistrationclient.APIServicesGetter, migrationclient.StorageVersionMigrationsGetter, error)
 	ensureSAKubeconfigs       func(ctx context.Context, clusterManagerName, clusterManagerNamespace string, hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error
 	skipRemoveCRDs            bool
 }
@@ -308,7 +320,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	if err != nil {
 		return err
 	}
-	hubClient, hubApiExtensionClient, hubApiRegistrationClient, err := n.generateHubClusterClients(hubKubeConfig)
+	hubClient, hubApiExtensionClient, hubApiRegistrationClient, hubMigrationClient, err := n.generateHubClusterClients(hubKubeConfig)
 	if err != nil {
 		return err
 	}
@@ -326,6 +338,11 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	}
 
 	var relatedResources []operatorapiv1.RelatedResourceMeta
+
+	// update CRD StoredVersion
+	if err := updateStoredVersion(ctx, hubApiExtensionClient, hubMigrationClient); err != nil {
+		return err
+	}
 
 	// Apply resources on the hub cluster
 	hubAppliedErrs, err := applyHubResources(
@@ -557,6 +574,51 @@ func applyManagementResources(
 	return currentGenerations, appliedErrs, nil
 }
 
+// updateStoredVersion update(remove) deleted api version from CRD status.StoredVersions
+func updateStoredVersion(ctx context.Context, apiExtensionClient apiextensionsclient.Interface, hubMigrationClient migrationclient.StorageVersionMigrationsGetter) error {
+	for name, version := range removedCRDStoredVersions {
+		// Check migration status before update CRD stored version
+		// If CRD's StorageVersionMigration is not found, it means that the previous or the current release CRD doesn't need migration, and can contiue to update the CRD's stored version.
+		// If CRD's StorageVersionMigration is found and the status is success, it means that the current CRs were migrated successfully, and can contiue to update the CRD's stored version.
+		// Other cases, for example, the migration failed, we should not contiue to update the stored version, that will caused the stored old version CRs inconsistent with latest CRD.
+		svmStatus, err := migrationcontroller.IsStorageVersionMigrationSucceeded(hubMigrationClient, name)
+		if svmStatus == false && !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to updateStoredVersion as StorageVersionMigrations %v: %v", name, err)
+		}
+
+		// retrieve CRD
+		crd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			klog.Warningf("faield to get CRD %v: %v", crd.Name, err)
+			continue
+		}
+
+		// remove v1alpha1 from its status
+		oldStoredVersions := crd.Status.StoredVersions
+		newStoredVersions := make([]string, 0, len(oldStoredVersions))
+		for _, stored := range oldStoredVersions {
+			if stored != version {
+				newStoredVersions = append(newStoredVersions, stored)
+			}
+		}
+
+		if !reflect.DeepEqual(oldStoredVersions, newStoredVersions) {
+			crd.Status.StoredVersions = newStoredVersions
+			// update the status sub-resource
+			crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().UpdateStatus(ctx, crd, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
+			klog.V(4).Infof("updated CRD %v status storedVersions: %v", crd.Name, crd.Status.StoredVersions)
+		}
+	}
+
+	return nil
+}
+
 func removeClusterManagerFinalizer(ctx context.Context, clusterManagerClient operatorv1client.ClusterManagerInterface, deploy *operatorapiv1.ClusterManager) error {
 	copiedFinalizers := []string{}
 	for i := range deploy.Finalizers {
@@ -663,20 +725,24 @@ func cleanUpManagement(ctx context.Context, controllerContext factory.SyncContex
 	return nil
 }
 
-func generateHubClients(hubKubeConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, apiregistrationclient.APIServicesGetter, error) {
+func generateHubClients(hubKubeConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, apiregistrationclient.APIServicesGetter, migrationclient.StorageVersionMigrationsGetter, error) {
 	hubClient, err := kubernetes.NewForConfig(hubKubeConfig)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	hubApiExtensionClient, err := apiextensionsclient.NewForConfig(hubKubeConfig)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	hubApiRegistrationClient, err := apiregistrationclient.NewForConfig(hubKubeConfig)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	return hubClient, hubApiExtensionClient, hubApiRegistrationClient, nil
+	hubMigrationClient, err := migrationclient.NewForConfig(hubKubeConfig)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	return hubClient, hubApiExtensionClient, hubApiRegistrationClient, hubMigrationClient, nil
 }
 
 // ensureSAKubeconfigs is used to create a kubeconfig with a token from a ServiceAccount.

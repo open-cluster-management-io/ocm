@@ -100,6 +100,11 @@ func TestApplyStorageVersionMigrations(t *testing.T) {
 		},
 	}
 
+	if len(migrationRequestFiles) == 0 {
+		t.Log("skip testing applyStorageVersionMigrations as no migrationRequestFiles")
+		return
+	}
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fakeMigrationClient := fakemigrationclient.NewSimpleClientset(c.existingObjects...)

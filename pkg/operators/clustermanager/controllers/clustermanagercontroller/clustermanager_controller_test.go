@@ -28,6 +28,8 @@ import (
 	fakeoperatorlient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	fakemigrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/fake"
+	migrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/typed/migration/v1alpha1"
 
 	"open-cluster-management.io/registration-operator/pkg/helpers"
 	testinghelper "open-cluster-management.io/registration-operator/pkg/helpers/testing"
@@ -90,6 +92,7 @@ func setup(t *testing.T, tc *testController, crds ...runtime.Object) {
 	fakeManagementKubeClient := fakekube.NewSimpleClientset()
 	fakeAPIExtensionClient := fakeapiextensions.NewSimpleClientset(crds...)
 	fakeAPIRegistrationClient := fakeapiregistration.NewSimpleClientset()
+	fakeMigrationClient := fakemigrationclient.NewSimpleClientset()
 
 	// set clients in test controller
 	tc.apiExtensionClient = fakeAPIExtensionClient
@@ -100,8 +103,8 @@ func setup(t *testing.T, tc *testController, crds ...runtime.Object) {
 	// set clients in clustermanager controller
 	tc.clusterManagerController.recorder = eventstesting.NewTestingEventRecorder(t)
 	tc.clusterManagerController.operatorKubeClient = fakeManagementKubeClient
-	tc.clusterManagerController.generateHubClusterClients = func(hubKubeConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, apiregistrationclient.APIServicesGetter, error) {
-		return fakeHubKubeClient, fakeAPIExtensionClient, fakeAPIRegistrationClient.ApiregistrationV1(), nil
+	tc.clusterManagerController.generateHubClusterClients = func(hubKubeConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, apiregistrationclient.APIServicesGetter, migrationclient.StorageVersionMigrationsGetter, error) {
+		return fakeHubKubeClient, fakeAPIExtensionClient, fakeAPIRegistrationClient.ApiregistrationV1(), fakeMigrationClient.MigrationV1alpha1(), nil
 	}
 	tc.clusterManagerController.ensureSAKubeconfigs = func(ctx context.Context, clusterManagerName, clusterManagerNamespace string, hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error {
 		return nil
