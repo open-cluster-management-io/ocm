@@ -210,6 +210,209 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 		})
 	})
 
+	ginkgo.Context("Apply the resource with executor deleting validating", func() {
+		executorName := "test-executor"
+		ginkgo.BeforeEach(func() {
+			manifests = []workapiv1.Manifest{
+				util.ToManifest(util.NewConfigmap(o.SpokeClusterName, "cm1", map[string]string{"a": "b"}, []string{})),
+				util.ToManifest(util.NewConfigmap(o.SpokeClusterName, "cm2", map[string]string{"c": "d"}, []string{})),
+			}
+			executor = &workapiv1.ManifestWorkExecutor{
+				Subject: workapiv1.ManifestWorkExecutorSubject{
+					Type: workapiv1.ExecutorSubjectTypeServiceAccount,
+					ServiceAccount: &workapiv1.ManifestWorkSubjectServiceAccount{
+						Namespace: o.SpokeClusterName,
+						Name:      executorName,
+					},
+				},
+			}
+		})
+
+		ginkgo.It("Executor does not have delete permission and delete option is foreground", func() {
+			roleName := "role1"
+			_, err = spokeKubeClient.RbacV1().Roles(o.SpokeClusterName).Create(
+				context.TODO(), &rbacv1.Role{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: o.SpokeClusterName,
+						Name:      roleName,
+					},
+					Rules: []rbacv1.PolicyRule{
+						{
+							Verbs:         []string{"create", "update", "patch", "get", "list"},
+							APIGroups:     []string{""},
+							Resources:     []string{"configmaps"},
+							ResourceNames: []string{"cm1", "cm2"},
+						},
+					},
+				}, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			_, err = spokeKubeClient.RbacV1().RoleBindings(o.SpokeClusterName).Create(
+				context.TODO(), &rbacv1.RoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: o.SpokeClusterName,
+						Name:      roleName,
+					},
+					Subjects: []rbacv1.Subject{
+						{
+							Kind:      "ServiceAccount",
+							Namespace: o.SpokeClusterName,
+							Name:      executorName,
+						},
+					},
+					RoleRef: rbacv1.RoleRef{
+						APIGroup: "rbac.authorization.k8s.io",
+						Kind:     "Role",
+						Name:     roleName,
+					},
+				}, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Create(
+				context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied),
+				metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionFalse, metav1.ConditionFalse},
+				eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable),
+				metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionFalse, metav1.ConditionFalse},
+				eventuallyTimeout, eventuallyInterval)
+
+			// ensure configmaps not exist
+			util.AssertNonexistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
+		})
+
+		ginkgo.It("Executor does not have delete permission and delete option is  orphan", func() {
+			roleName := "role1"
+			_, err = spokeKubeClient.RbacV1().Roles(o.SpokeClusterName).Create(
+				context.TODO(), &rbacv1.Role{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: o.SpokeClusterName,
+						Name:      roleName,
+					},
+					Rules: []rbacv1.PolicyRule{
+						{
+							Verbs:         []string{"create", "update", "patch", "get", "list"},
+							APIGroups:     []string{""},
+							Resources:     []string{"configmaps"},
+							ResourceNames: []string{"cm1", "cm2"},
+						},
+					},
+				}, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			_, err = spokeKubeClient.RbacV1().RoleBindings(o.SpokeClusterName).Create(
+				context.TODO(), &rbacv1.RoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: o.SpokeClusterName,
+						Name:      roleName,
+					},
+					Subjects: []rbacv1.Subject{
+						{
+							Kind:      "ServiceAccount",
+							Namespace: o.SpokeClusterName,
+							Name:      executorName,
+						},
+					},
+					RoleRef: rbacv1.RoleRef{
+						APIGroup: "rbac.authorization.k8s.io",
+						Kind:     "Role",
+						Name:     roleName,
+					},
+				}, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			work.Spec.DeleteOption = &workapiv1.DeleteOption{
+				PropagationPolicy: workapiv1.DeletePropagationPolicyTypeOrphan,
+			}
+			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Create(
+				context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied),
+				metav1.ConditionTrue, []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue},
+				eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable),
+				metav1.ConditionTrue, []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue},
+				eventuallyTimeout, eventuallyInterval)
+
+			// ensure configmaps all exist
+			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
+		})
+
+		ginkgo.It("Executor does not have delete permission and delete option is  selectively orphan", func() {
+			roleName := "role1"
+			_, err = spokeKubeClient.RbacV1().Roles(o.SpokeClusterName).Create(
+				context.TODO(), &rbacv1.Role{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: o.SpokeClusterName,
+						Name:      roleName,
+					},
+					Rules: []rbacv1.PolicyRule{
+						{
+							Verbs:         []string{"create", "update", "patch", "get", "list"},
+							APIGroups:     []string{""},
+							Resources:     []string{"configmaps"},
+							ResourceNames: []string{"cm1", "cm2"},
+						},
+					},
+				}, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			_, err = spokeKubeClient.RbacV1().RoleBindings(o.SpokeClusterName).Create(
+				context.TODO(), &rbacv1.RoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: o.SpokeClusterName,
+						Name:      roleName,
+					},
+					Subjects: []rbacv1.Subject{
+						{
+							Kind:      "ServiceAccount",
+							Namespace: o.SpokeClusterName,
+							Name:      executorName,
+						},
+					},
+					RoleRef: rbacv1.RoleRef{
+						APIGroup: "rbac.authorization.k8s.io",
+						Kind:     "Role",
+						Name:     roleName,
+					},
+				}, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			work.Spec.DeleteOption = &workapiv1.DeleteOption{
+				PropagationPolicy: workapiv1.DeletePropagationPolicyTypeSelectivelyOrphan,
+				SelectivelyOrphan: &workapiv1.SelectivelyOrphan{
+					OrphaningRules: []workapiv1.OrphaningRule{
+						{
+							Resource:  "configmaps",
+							Namespace: o.SpokeClusterName,
+							Name:      "cm1",
+						},
+					},
+				},
+			}
+			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Create(
+				context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied),
+				metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionFalse},
+				eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable),
+				metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionFalse},
+				eventuallyTimeout, eventuallyInterval)
+
+			// ensure configmap cm1 exist and cm2 not exist
+			util.AssertExistenceOfConfigMaps(
+				[]workapiv1.Manifest{
+					util.ToManifest(util.NewConfigmap(o.SpokeClusterName, "cm1", map[string]string{"a": "b"}, []string{})),
+				}, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
+			util.AssertNonexistenceOfConfigMaps(
+				[]workapiv1.Manifest{
+					util.ToManifest(util.NewConfigmap(o.SpokeClusterName, "cm2", map[string]string{"a": "b"}, []string{})),
+				}, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
+		})
+	})
+
 	ginkgo.Context("Apply the resource with executor escalation validating", func() {
 		executorName := "test-executor"
 		ginkgo.BeforeEach(func() {

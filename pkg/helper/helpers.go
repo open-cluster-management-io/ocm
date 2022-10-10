@@ -408,3 +408,47 @@ func ApplyOwnerReferences(ctx context.Context, dynamicClient dynamic.Interface, 
 	_, err = dynamicClient.Resource(gvr).Namespace(accessor.GetNamespace()).Patch(ctx, accessor.GetName(), types.MergePatchType, patchData, metav1.PatchOptions{})
 	return err
 }
+
+// OwnedByTheWork checks whether the manifest resource will be owned by the manifest work based on the deleteOption
+func OwnedByTheWork(gvr schema.GroupVersionResource,
+	namespace, name string,
+	deleteOption *workapiv1.DeleteOption) bool {
+	// Be default, it is forgound deletion, the manifestwork will own the manifest
+	if deleteOption == nil {
+		return true
+	}
+
+	switch deleteOption.PropagationPolicy {
+	case workapiv1.DeletePropagationPolicyTypeForeground:
+		return true
+	case workapiv1.DeletePropagationPolicyTypeOrphan:
+		return false
+	}
+
+	// If there is none specified selectivelyOrphan, none of the manifests should be orphaned
+	if deleteOption.SelectivelyOrphan == nil {
+		return true
+	}
+
+	for _, o := range deleteOption.SelectivelyOrphan.OrphaningRules {
+		if o.Group != gvr.Group {
+			continue
+		}
+
+		if o.Resource != gvr.Resource {
+			continue
+		}
+
+		if o.Name != name {
+			continue
+		}
+
+		if o.Namespace != namespace {
+			continue
+		}
+
+		return false
+	}
+
+	return true
+}

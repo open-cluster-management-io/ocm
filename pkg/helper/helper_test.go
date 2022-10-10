@@ -636,3 +636,74 @@ func TestApplyOwnerReferences(t *testing.T) {
 		})
 	}
 }
+
+func TestOwnedByTheWork(t *testing.T) {
+	testGVR := schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
+	namespace := "testns"
+	name := "test"
+
+	cases := []struct {
+		name         string
+		deleteOption *workapiv1.DeleteOption
+		expected     bool
+	}{
+		{
+			name:     "foreground by default",
+			expected: true,
+		},
+		{
+			name:         "orphan the resource",
+			deleteOption: &workapiv1.DeleteOption{PropagationPolicy: workapiv1.DeletePropagationPolicyTypeOrphan},
+			expected:     false,
+		},
+		{
+			name:         "no orphan rule with selectively orphan",
+			deleteOption: &workapiv1.DeleteOption{PropagationPolicy: workapiv1.DeletePropagationPolicyTypeSelectivelyOrphan},
+			expected:     true,
+		},
+		{
+			name: "orphan the resource with selectively orphan",
+			deleteOption: &workapiv1.DeleteOption{
+				PropagationPolicy: workapiv1.DeletePropagationPolicyTypeSelectivelyOrphan,
+				SelectivelyOrphan: &workapiv1.SelectivelyOrphan{
+					OrphaningRules: []workapiv1.OrphaningRule{
+						{
+							Group:     "",
+							Resource:  "secrets",
+							Namespace: namespace,
+							Name:      name,
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "resourcec is not matched in orphan rule with selectively orphan",
+			deleteOption: &workapiv1.DeleteOption{
+				PropagationPolicy: workapiv1.DeletePropagationPolicyTypeSelectivelyOrphan,
+				SelectivelyOrphan: &workapiv1.SelectivelyOrphan{
+					OrphaningRules: []workapiv1.OrphaningRule{
+						{
+							Group:     "",
+							Resource:  "secrets",
+							Namespace: "testns1",
+							Name:      name,
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			own := OwnedByTheWork(testGVR, namespace, name, c.deleteOption)
+
+			if own != c.expected {
+				t.Errorf("Expect owned by the work is %v, but got %v", c.expected, own)
+			}
+		})
+	}
+}

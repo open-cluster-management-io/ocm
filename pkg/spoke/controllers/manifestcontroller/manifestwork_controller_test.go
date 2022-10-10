@@ -21,6 +21,7 @@ import (
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/work/pkg/helper"
 	"open-cluster-management.io/work/pkg/spoke/apply"
 	"open-cluster-management.io/work/pkg/spoke/auth"
 	"open-cluster-management.io/work/pkg/spoke/controllers"
@@ -816,7 +817,7 @@ func TestManageOwner(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			owner := manageOwnerRef(testGVR, namespace, name, c.deleteOption, c.owner)
+			owner := manageOwnerRef(helper.OwnedByTheWork(testGVR, namespace, name, c.deleteOption), c.owner)
 
 			if !equality.Semantic.DeepEqual(owner, c.expectOwner) {
 				t.Errorf("Expect owner is %v, but got %v", c.expectOwner, owner)

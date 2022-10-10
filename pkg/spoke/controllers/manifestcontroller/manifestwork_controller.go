@@ -274,15 +274,18 @@ func (m *ManifestWorkController) applyOneManifest(
 		return result
 	}
 
+	// check if the resource to be applied should be owned by the manifest work
+	ownedByTheWork := helper.OwnedByTheWork(gvr, resMeta.Namespace, resMeta.Name, workSpec.DeleteOption)
+
 	// check the Executor subject permission before applying
-	err = m.validator.Validate(ctx, workSpec.Executor, gvr, resMeta.Namespace, resMeta.Name, required, auth.ApplyAction)
+	err = m.validator.Validate(ctx, workSpec.Executor, gvr, resMeta.Namespace, resMeta.Name, ownedByTheWork, required)
 	if err != nil {
 		result.Error = err
 		return result
 	}
 
 	// compute required ownerrefs based on delete option
-	requiredOwner := manageOwnerRef(gvr, resMeta.Namespace, resMeta.Name, workSpec.DeleteOption, owner)
+	requiredOwner := manageOwnerRef(ownedByTheWork, owner)
 
 	// find update strategy option.
 	option := helper.FindManifestConiguration(resMeta, workSpec.ManifestConfigs)
@@ -303,57 +306,18 @@ func (m *ManifestWorkController) applyOneManifest(
 	return result
 }
 
-// manageOwnerRef return a ownerref based on the resource and the deleteOption indicating whether the owneref
-// should be removed or added. If the resource is orphaned, the owner's UID is updated for removal.
+// manageOwnerRef return a ownerref based on the resource and the ownedByTheWork indicating whether the owneref
+// should be removed or added. If the resource is not owned by the work, the owner's UID is updated for removal.
 func manageOwnerRef(
-	gvr schema.GroupVersionResource,
-	namespace, name string,
-	deleteOption *workapiv1.DeleteOption,
+	ownedByTheWork bool,
 	myOwner metav1.OwnerReference) metav1.OwnerReference {
-
-	// Be default, it is forgound deletion.
-	if deleteOption == nil {
+	if ownedByTheWork {
 		return myOwner
 	}
-
 	removalKey := fmt.Sprintf("%s-", myOwner.UID)
 	ownerCopy := myOwner.DeepCopy()
-
-	switch deleteOption.PropagationPolicy {
-	case workapiv1.DeletePropagationPolicyTypeForeground:
-		return myOwner
-	case workapiv1.DeletePropagationPolicyTypeOrphan:
-		ownerCopy.UID = types.UID(removalKey)
-		return *ownerCopy
-	}
-
-	// If there is none specified selectivelyOrphan, none of the manifests should be orphaned
-	if deleteOption.SelectivelyOrphan == nil {
-		return myOwner
-	}
-
-	for _, o := range deleteOption.SelectivelyOrphan.OrphaningRules {
-		if o.Group != gvr.Group {
-			continue
-		}
-
-		if o.Resource != gvr.Resource {
-			continue
-		}
-
-		if o.Name != name {
-			continue
-		}
-
-		if o.Namespace != namespace {
-			continue
-		}
-
-		ownerCopy.UID = types.UID(removalKey)
-		return *ownerCopy
-	}
-
-	return myOwner
+	ownerCopy.UID = types.UID(removalKey)
+	return *ownerCopy
 }
 
 // generateUpdateStatusFunc returns a function which aggregates manifest conditions and generates work conditions.

@@ -26,7 +26,6 @@ func TestValidate(t *testing.T) {
 		executor  *workapiv1.ManifestWorkExecutor
 		namespace string
 		name      string
-		action    ExecuteAction
 		expect    error
 	}{
 		"executor nil": {
@@ -49,19 +48,6 @@ func TestValidate(t *testing.T) {
 			},
 			expect: fmt.Errorf("the executor service account is nil"),
 		},
-		"action invalid": {
-			executor: &workapiv1.ManifestWorkExecutor{
-				Subject: workapiv1.ManifestWorkExecutorSubject{
-					Type: workapiv1.ExecutorSubjectTypeServiceAccount,
-					ServiceAccount: &workapiv1.ManifestWorkSubjectServiceAccount{
-						Namespace: "test-ns",
-						Name:      "test-name",
-					},
-				},
-			},
-			action: "test-action",
-			expect: fmt.Errorf("execute action test-action is invalid"),
-		},
 		"forbideen": {
 			executor: &workapiv1.ManifestWorkExecutor{
 				Subject: workapiv1.ManifestWorkExecutorSubject{
@@ -74,7 +60,6 @@ func TestValidate(t *testing.T) {
 			},
 			namespace: "test-deny",
 			name:      "test",
-			action:    ApplyAction,
 			expect:    fmt.Errorf("not allowed to apply the resource  secrets, test-deny test, will try again in 1m0s"),
 		},
 		"allow": {
@@ -89,7 +74,6 @@ func TestValidate(t *testing.T) {
 			},
 			namespace: "test-allow",
 			name:      "test",
-			action:    ApplyAction,
 			expect:    nil,
 		},
 	}
@@ -121,7 +105,7 @@ func TestValidate(t *testing.T) {
 	validator := NewExecutorValidator(nil, kubeClient)
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
-			err := validator.Validate(context.TODO(), test.executor, gvr, test.namespace, test.name, nil, test.action)
+			err := validator.Validate(context.TODO(), test.executor, gvr, test.namespace, test.name, true, nil)
 			if test.expect == nil {
 				if err != nil {
 					t.Errorf("expect nil but got %s", err)
@@ -212,7 +196,7 @@ func TestValidateEscalation(t *testing.T) {
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
-			err := validator.Validate(context.TODO(), test.executor, gvr, test.namespace, test.name, test.obj, ApplyAction)
+			err := validator.Validate(context.TODO(), test.executor, gvr, test.namespace, test.name, true, test.obj)
 			if test.expect == nil {
 				if err != nil {
 					t.Errorf("expect nil but got %s", err)

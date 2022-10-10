@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -19,23 +18,13 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
-// ExecuteAction is the action of executing the manifest work
-type ExecuteAction string
-
-const (
-	// ApplyAction represents applying(create/update) resource to the managed cluster
-	ApplyAction ExecuteAction = "Apply"
-	// DeleteAction represents deleting resource from the managed cluster
-	DeleteAction ExecuteAction = "Delete"
-)
-
 // ExecutorValidator validates whether the executor has permission to perform the requests
 // to the local managed cluster
 type ExecutorValidator interface {
 	// Validate whether the work executor subject has permission to perform action on the specific manifest,
 	// if there is no permission will return a kubernetes forbidden error.
 	Validate(ctx context.Context, executor *workapiv1.ManifestWorkExecutor, gvr schema.GroupVersionResource,
-		namespace, name string, obj *unstructured.Unstructured, action ExecuteAction) error
+		namespace, name string, ownedByTheWork bool, obj *unstructured.Unstructured) error
 }
 
 type NotAllowedError struct {
@@ -77,7 +66,8 @@ func defaultNewImpersonateClient(config *rest.Config, username string) (dynamic.
 }
 
 func (v *sarValidator) Validate(ctx context.Context, executor *workapiv1.ManifestWorkExecutor,
-	gvr schema.GroupVersionResource, namespace, name string, obj *unstructured.Unstructured, action ExecuteAction) error {
+	gvr schema.GroupVersionResource, namespace, name string,
+	ownedByTheWork bool, obj *unstructured.Unstructured) error {
 	if executor == nil {
 		return nil
 	}
@@ -91,14 +81,13 @@ func (v *sarValidator) Validate(ctx context.Context, executor *workapiv1.Manifes
 		return fmt.Errorf("the executor service account is nil")
 	}
 
-	var verbs []string
-	switch action {
-	case ApplyAction:
-		verbs = []string{"create", "update", "patch", "get"}
-	case DeleteAction:
-		verbs = []string{"delete"}
-	default:
-		return fmt.Errorf("execute action %s is invalid", action)
+	verbs := []string{"create", "update", "patch", "get"}
+	if ownedByTheWork {
+		// if the resource to be applied is owned by the manifestwork, will check the delete permission in
+		// the applying phase in advance. it means the resource will be applied if the executor has the
+		// delete permission when applying. and even if the delete permission of the executor is revoked
+		// after applying success, the resource will also be deleted when deleting the manifestwork
+		verbs = append(verbs, "delete")
 	}
 
 	resource := authorizationv1.ResourceAttributes{
@@ -117,20 +106,18 @@ func (v *sarValidator) Validate(ctx context.Context, executor *workapiv1.Manifes
 
 	if !allowed {
 		return &NotAllowedError{
-			Err: fmt.Errorf("not allowed to %s the resource %s %s, %s %s",
-				strings.ToLower(string(action)), resource.Group, resource.Resource, resource.Namespace, resource.Name),
+			Err: fmt.Errorf("not allowed to apply the resource %s %s, %s %s",
+				resource.Group, resource.Resource, resource.Namespace, resource.Name),
 			RequeueTime: 60 * time.Second,
 		}
 	}
 
-	switch {
-	case action != ApplyAction:
+	if gvr.Group != "rbac.authorization.k8s.io" {
 		return nil
-	case gvr.Group != "rbac.authorization.k8s.io":
-		return nil
-	case gvr.Resource == "roles", gvr.Resource == "rolebindings",
-		gvr.Resource == "clusterroles", gvr.Resource == "clusterrolebindings":
-		// subjectaccessreview can not permission escalation, use an impersonation request to check again
+	}
+	if gvr.Resource == "roles" || gvr.Resource == "rolebindings" ||
+		gvr.Resource == "clusterroles" || gvr.Resource == "clusterrolebindings" {
+		// subjectaccessreview can not check permission escalation, use an impersonation request to check again
 		return v.checkEscalation(ctx, sa, gvr, namespace, name, obj)
 	}
 
