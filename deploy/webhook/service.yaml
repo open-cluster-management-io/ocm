@@ -6,5 +6,9 @@ spec:
   selector:
     app: managedcluster-admission
   ports:
-  - port: 443
+  - name: webhook-server
+    port: 443
     targetPort: 6443
+  - name: conversion-webhook
+    port: 9443
+    targetPort: 9443

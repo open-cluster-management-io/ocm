@@ -57,7 +57,7 @@ rules:
 # Allow hub to manage managedclustersets
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["managedclustersets"]
-  verbs: ["get", "list", "watch"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["managedclustersets/status"]
   verbs: ["update", "patch"]

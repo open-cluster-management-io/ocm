@@ -292,3 +292,10 @@ type PlacementList struct {
 	// Items is a list of Placements.
 	Items []Placement `json:"items"`
 }
+
+const (
+	// PlacementDisableAnnotation is used to disable scheduling for a placement.
+	// It is a experimental flag to let placement controller ignore this placement,
+	// so other placement consumers can chime in.
+	PlacementDisableAnnotation = "cluster.open-cluster-management.io/experimental-scheduling-disable"
+)

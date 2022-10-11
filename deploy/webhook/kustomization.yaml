@@ -32,6 +32,7 @@ resources:
 - ./service_account.yaml
 - ./service.yaml
 - ./webhook.yaml
+- ../hub
 
 images:
 - name: quay.io/open-cluster-management/registration:latest
@@ -39,3 +40,14 @@ images:
   newTag: latest
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+
+# inject conversion webhook in clusterset crd
+patches:
+- path: managedclustersets_conversion_webhook.crd.yaml
+
+# generate servering cert for webhook
+secretGenerator:
+- files:
+  - cert/tls.crt
+  - cert/tls.key
+  name: registration-webhook-serving-cert

@@ -12,6 +12,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1alpha1"
 	clusterv1beta1 "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta1"
+	clusterv1beta2 "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta2"
 )
 
 type Interface interface {
@@ -19,6 +20,7 @@ type Interface interface {
 	ClusterV1() clusterv1.ClusterV1Interface
 	ClusterV1alpha1() clusterv1alpha1.ClusterV1alpha1Interface
 	ClusterV1beta1() clusterv1beta1.ClusterV1beta1Interface
+	ClusterV1beta2() clusterv1beta2.ClusterV1beta2Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -28,6 +30,7 @@ type Clientset struct {
 	clusterV1       *clusterv1.ClusterV1Client
 	clusterV1alpha1 *clusterv1alpha1.ClusterV1alpha1Client
 	clusterV1beta1  *clusterv1beta1.ClusterV1beta1Client
+	clusterV1beta2  *clusterv1beta2.ClusterV1beta2Client
 }
 
 // ClusterV1 retrieves the ClusterV1Client
@@ -43,6 +46,11 @@ func (c *Clientset) ClusterV1alpha1() clusterv1alpha1.ClusterV1alpha1Interface {
 // ClusterV1beta1 retrieves the ClusterV1beta1Client
 func (c *Clientset) ClusterV1beta1() clusterv1beta1.ClusterV1beta1Interface {
 	return c.clusterV1beta1
+}
+
+// ClusterV1beta2 retrieves the ClusterV1beta2Client
+func (c *Clientset) ClusterV1beta2() clusterv1beta2.ClusterV1beta2Interface {
+	return c.clusterV1beta2
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -97,6 +105,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
+	cs.clusterV1beta2, err = clusterv1beta2.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
@@ -121,6 +133,7 @@ func New(c rest.Interface) *Clientset {
 	cs.clusterV1 = clusterv1.New(c)
 	cs.clusterV1alpha1 = clusterv1alpha1.New(c)
 	cs.clusterV1beta1 = clusterv1beta1.New(c)
+	cs.clusterV1beta2 = clusterv1beta2.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

@@ -33,3 +33,21 @@ spec:
               - ALL
           privileged: false
           runAsNonRoot: true
+      - name: conversion-webhook
+        image: quay.io/open-cluster-management/registration:latest
+        args:
+        - /registration
+        - "webhook-server"
+        - "port=9443"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9443
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: webhook-secret
+          readOnly: true
+      volumes:
+      - name: webhook-secret
+        secret:
+          secretName: registration-webhook-serving-cert

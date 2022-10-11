@@ -16,3 +16,5 @@ e2e.test
 *.out
 _output/
 .idea/
+
+deploy/webhook/cert
