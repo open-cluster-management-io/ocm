@@ -419,7 +419,27 @@ func applyHubResources(
 	recorder events.Recorder,
 	cache resourceapply.ResourceCache,
 ) (appliedErrs []error, err error) {
+	// Try to load ca bundle from configmap
+	// If the configmap is found, populate it into configmap.
+	// If the configmap not found yet, skip this and apply other resources first.
+	caBundle := "placeholder"
+	configmap, err := configMapLister.ConfigMaps(clusterManagerNamespace).Get(caBundleConfigmap)
+	switch {
+	case errors.IsNotFound(err):
+		// do nothing
+	case err != nil:
+		return appliedErrs, err
+	default:
+		if cb := configmap.Data["ca-bundle.crt"]; len(cb) > 0 {
+			caBundle = cb
+		}
+	}
+	encodedCaBundle := base64.StdEncoding.EncodeToString([]byte(caBundle))
+	manifestsConfig.RegistrationAPIServiceCABundle = encodedCaBundle
+	manifestsConfig.WorkAPIServiceCABundle = encodedCaBundle
+
 	// Apply hub cluster resources
+	// ClusterSet crd need caBundle, so we need to apply the hubresources after get caBundle
 	hubResources := getHubResources(clusterManagerMode, manifestsConfig.RegistrationWebhook.IsIPFormat, manifestsConfig.WorkWebhook.IsIPFormat, false)
 	resourceResults := helpers.ApplyDirectly(
 		ctx,
@@ -445,25 +465,6 @@ func applyHubResources(
 			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
 		}
 	}
-
-	// Try to load ca bundle from configmap
-	// If the configmap is found, populate it into configmap.
-	// If the configmap not found yet, skip this and apply other resources first.
-	caBundle := "placeholder"
-	configmap, err := configMapLister.ConfigMaps(clusterManagerNamespace).Get(caBundleConfigmap)
-	switch {
-	case errors.IsNotFound(err):
-		// do nothing
-	case err != nil:
-		return appliedErrs, err
-	default:
-		if cb := configmap.Data["ca-bundle.crt"]; len(cb) > 0 {
-			caBundle = cb
-		}
-	}
-	encodedCaBundle := base64.StdEncoding.EncodeToString([]byte(caBundle))
-	manifestsConfig.RegistrationAPIServiceCABundle = encodedCaBundle
-	manifestsConfig.WorkAPIServiceCABundle = encodedCaBundle
 
 	// Apply Apiservice files to hub cluster.
 	// The reason why apply Apiservice after apply other staticfiles(including namespace) is because Apiservices requires the CABundleConfigmap.

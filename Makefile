@@ -8,6 +8,7 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
 	targets/openshift/deps.mk \
 	targets/openshift/images.mk \
+	targets/openshift/yaml-patch.mk\
 	lib/tmp.mk\
 )
 
@@ -69,9 +70,12 @@ endif
 copy-crd:
 	bash -x hack/copy-crds.sh
 
-update: copy-crd
+patch-crd: ensure-yaml-patch
+	bash hack/patch/patch-crd.sh $(YAML_PATCH)
 
-verify-crds:
+update: patch-crd copy-crd
+
+verify-crds: patch-crd
 	bash -x hack/verify-crds.sh
 
 verify-gocilint:
