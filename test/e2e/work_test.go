@@ -78,55 +78,6 @@ var _ = Describe("Create klusterlet and then create a configmap by manifestwork"
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(BeTrue())
 	})
 
-	// TODO: remove this after the detached mode is not used in klusterlet
-	It("Create configmap using manifestwork and then delete klusterlet in Detached mode", func() {
-		var err error
-		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v", klusterletName, clusterName))
-		_, err = t.CreateKlusterlet(klusterletName, clusterName, agentNamespace, operatorapiv1.InstallModeDetached)
-		Expect(err).ToNot(HaveOccurred())
-
-		By(fmt.Sprintf("waiting for the managed cluster %v to be created", clusterName))
-		Eventually(func() error {
-			_, err = t.GetCreatedManagedCluster(clusterName)
-			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
-
-		By(fmt.Sprintf("approve the created managed cluster %v", clusterName))
-		Eventually(func() error {
-			return t.ApproveCSR(clusterName)
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
-
-		By(fmt.Sprintf("accept the created managed cluster %v", clusterName))
-		Eventually(func() error {
-			return t.AcceptsClient(clusterName)
-		}, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
-
-		By(fmt.Sprintf("waiting for the managed cluster %v to be ready", clusterName))
-		Eventually(func() error {
-			return t.CheckManagedClusterStatus(clusterName)
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
-
-		By(fmt.Sprintf("create configmap %v/%v using manifestwork %v/%v", configMapNamespace,
-			configMapName, clusterName, workName))
-		_, err = t.CreateWorkOfConfigMap(workName, clusterName, configMapName, configMapNamespace)
-		Expect(err).ToNot(HaveOccurred())
-
-		By(fmt.Sprintf("waiting for configmap %v/%v to be created", configMapNamespace, configMapName))
-		Eventually(func() error {
-			_, err := t.KubeClient.CoreV1().ConfigMaps(configMapNamespace).
-				Get(context.TODO(), configMapName, metav1.GetOptions{})
-			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
-
-		By(fmt.Sprintf("delete manifestwork %v/%v", clusterName, workName))
-		err = t.WorkClient.WorkV1().ManifestWorks(clusterName).Delete(context.Background(), workName, metav1.DeleteOptions{})
-		Expect(err).ToNot(HaveOccurred())
-		Eventually(func() bool {
-			_, err := t.WorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
-			return errors.IsNotFound(err)
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(BeTrue())
-	})
-
 	It("Create configmap using manifestwork and then delete klusterlet in Hosted mode", func() {
 		var err error
 		By(fmt.Sprintf("create klusterlet %v with managed cluster name %v", klusterletName, clusterName))

@@ -259,11 +259,6 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		}
 	}
 
-	// TODO: remove this when detached mode is not used in klusterlet
-	if config.InstallMode == operatorapiv1.InstallModeDetached {
-		config.InstallMode = operatorapiv1.InstallModeHosted
-	}
-
 	if config.InstallMode == operatorapiv1.InstallModeHosted {
 		managedClusterClients, err = n.buildManagedClusterClientsHostedMode(ctx,
 			n.kubeClient, config.AgentNamespace, config.ExternalManagedKubeConfigSecret)

@@ -407,7 +407,7 @@ func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, cl
 		"--hub-kubeconfig=/spoke/hub-kubeconfig/kubeconfig",
 	}
 
-	if mode == operatorapiv1.InstallModeDetached || mode == operatorapiv1.InstallModeHosted {
+	if mode == operatorapiv1.InstallModeHosted {
 		expectArgs = append(expectArgs, "--spoke-kubeconfig=/spoke/config/kubeconfig")
 	}
 

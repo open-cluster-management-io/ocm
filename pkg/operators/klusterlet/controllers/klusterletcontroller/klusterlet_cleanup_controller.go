@@ -98,11 +98,6 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 	klusterlet = klusterlet.DeepCopy()
 	installMode := klusterlet.Spec.DeployOption.Mode
 
-	// TODO: remove this when detached mode is not used in klusterlet
-	if installMode == operatorapiv1.InstallModeDetached {
-		installMode = operatorapiv1.InstallModeHosted
-	}
-
 	if klusterlet.DeletionTimestamp.IsZero() {
 		if !hasFinalizer(klusterlet, klusterletFinalizer) {
 			return n.addFinalizer(ctx, klusterlet, klusterletFinalizer)
