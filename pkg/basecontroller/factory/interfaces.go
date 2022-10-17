@@ -22,6 +22,9 @@ type Controller interface {
 
 	// Name returns the controller name string.
 	Name() string
+
+	// SyncContext returns the SyncContext of this controller
+	SyncContext() SyncContext
 }
 
 // SyncContext interface represents a context given to the Sync() function where the main controller logic happen.

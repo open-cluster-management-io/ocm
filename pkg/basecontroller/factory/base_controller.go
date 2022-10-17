@@ -42,6 +42,10 @@ func waitForNamedCacheSync(controllerName string, stopCh <-chan struct{}, cacheS
 	return nil
 }
 
+func (c *baseController) SyncContext() SyncContext {
+	return c.syncContext
+}
+
 func (c *baseController) Run(ctx context.Context, workers int) {
 	// give caches 10 minutes to sync
 	cacheSyncCtx, cacheSyncCancel := context.WithTimeout(ctx, c.cacheSyncTimeout)

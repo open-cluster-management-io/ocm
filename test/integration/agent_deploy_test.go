@@ -332,4 +332,65 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
+	ginkgo.It("Should allow trigger externally", func() {
+		obj := &unstructured.Unstructured{}
+		err := obj.UnmarshalJSON([]byte(deploymentJson))
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		testAddonImpl.manifests[managedClusterName] = []runtime.Object{obj}
+
+		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: testAddonImpl.name,
+			},
+			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+				InstallNamespace: "default",
+			},
+		}
+		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		gomega.Eventually(func() error {
+			work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			if len(work.Spec.Workload.Manifests) != 1 {
+				return fmt.Errorf("Unexpected number of work manifests")
+			}
+
+			if apiequality.Semantic.DeepEqual(work.Spec.Workload.Manifests[0].Raw, []byte(deploymentJson)) {
+				return fmt.Errorf("expected manifest is no correct, get %v", work.Spec.Workload.Manifests[0].Raw)
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		// Update object of addon and trigger the reconcile manually.
+		newObj := obj.DeepCopy()
+		err = unstructured.SetNestedField(newObj.Object, int64(2), "spec", "replicas")
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		testAddonImpl.manifests[managedClusterName] = []runtime.Object{newObj}
+		addonManager.Trigger(managedClusterName, testAddonImpl.name)
+
+		gomega.Eventually(func() error {
+			work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			if len(work.Spec.Workload.Manifests) != 1 {
+				return fmt.Errorf("Unexpected number of work manifests")
+			}
+
+			newDeploymentJson, err := newObj.MarshalJSON()
+			if err != nil {
+				return err
+			}
+
+			if apiequality.Semantic.DeepEqual(work.Spec.Workload.Manifests[0].Raw, newDeploymentJson) {
+				return fmt.Errorf("expected manifest is no correct, get %v", work.Spec.Workload.Manifests[0].Raw)
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	})
 })

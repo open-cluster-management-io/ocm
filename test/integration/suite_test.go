@@ -47,6 +47,7 @@ var testAddOnConfigsImpl *testAddon
 var testMultiWorksAddonImpl *testAddon
 var cancel context.CancelFunc
 var mgrContext context.Context
+var addonManager addonmanager.AddonManager
 
 func TestIntegration(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
@@ -119,19 +120,19 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	mgrContext, cancel = context.WithCancel(context.TODO())
 	// start hub controller
 	go func() {
-		mgr, err := addonmanager.New(cfg)
+		addonManager, err = addonmanager.New(cfg)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		err = mgr.AddAgent(testAddonImpl)
+		err = addonManager.AddAgent(testAddonImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		err = mgr.AddAgent(testInstallByLableAddonImpl)
+		err = addonManager.AddAgent(testInstallByLableAddonImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		err = mgr.AddAgent(testHostedAddonImpl)
+		err = addonManager.AddAgent(testHostedAddonImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		err = mgr.AddAgent(testAddOnConfigsImpl)
+		err = addonManager.AddAgent(testAddOnConfigsImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		err = mgr.AddAgent(testMultiWorksAddonImpl)
+		err = addonManager.AddAgent(testMultiWorksAddonImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		err = mgr.Start(mgrContext)
+		err = addonManager.Start(mgrContext)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	}()
 

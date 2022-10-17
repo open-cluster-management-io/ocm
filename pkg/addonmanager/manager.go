@@ -37,6 +37,10 @@ type AddonManager interface {
 	// AddAgent register an addon agent to the manager.
 	AddAgent(addon agent.AgentAddon) error
 
+	// Trigger triggers a reconcile loop in the manager. Currently it
+	// only trigger the deploy controller.
+	Trigger(clusterName, addonName string)
+
 	// Start starts all registered addon agent.
 	Start(ctx context.Context) error
 }
@@ -45,6 +49,7 @@ type addonManager struct {
 	addonAgents  map[string]agent.AgentAddon
 	addonConfigs map[schema.GroupVersionResource]bool
 	config       *rest.Config
+	syncContexts []factory.SyncContext
 }
 
 func (a *addonManager) AddAgent(addon agent.AgentAddon) error {
@@ -57,6 +62,12 @@ func (a *addonManager) AddAgent(addon agent.AgentAddon) error {
 	}
 	a.addonAgents[addonOption.AddonName] = addon
 	return nil
+}
+
+func (a *addonManager) Trigger(clusterName, addonName string) {
+	for _, syncContex := range a.syncContexts {
+		syncContex.Queue().Add(fmt.Sprintf("%s/%s", clusterName, addonName))
+	}
 }
 
 func (a *addonManager) Start(ctx context.Context) error {
@@ -210,6 +221,8 @@ func (a *addonManager) Start(ctx context.Context) error {
 		)
 	}
 
+	a.syncContexts = append(a.syncContexts, deployController.SyncContext())
+
 	go addonInformers.Start(ctx.Done())
 	go workInformers.Start(ctx.Done())
 	go clusterInformers.Start(ctx.Done())
@@ -237,6 +250,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 func New(config *rest.Config) (AddonManager, error) {
 	return &addonManager{
 		config:       config,
+		syncContexts: []factory.SyncContext{},
 		addonConfigs: map[schema.GroupVersionResource]bool{},
 		addonAgents:  map[string]agent.AgentAddon{},
 	}, nil
