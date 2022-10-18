@@ -3,6 +3,7 @@ package helpers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -1191,7 +1192,7 @@ func TestGetRelatedResource(t *testing.T) {
 			objData := assets.MustCreateAssetFromTemplate(c.manifestFile, template, c.config).Data
 
 			relatedResource, err := GenerateRelatedResource(objData)
-			if !reflect.DeepEqual(err, c.expectedErr) {
+			if !errors.Is(err, c.expectedErr) {
 				t.Errorf(diff.ObjectDiff(err, c.expectedErr))
 			}
 			if !reflect.DeepEqual(relatedResource, c.expectedRelatedResource) {

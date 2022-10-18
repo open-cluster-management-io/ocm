@@ -3,6 +3,7 @@ package helpers
 import (
 	"context"
 	"io/ioutil"
+	"path/filepath"
 	"time"
 
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -70,11 +71,11 @@ func SATokenGetter(ctx context.Context, saName, saNamespace string, saClient kub
 	}
 }
 
-func SyncKubeConfigSecret(ctx context.Context, secretName, secretNamespace string, templateKubeconfig *rest.Config, secretClient coreclientv1.SecretsGetter, tokenGetter TokenGetterFunc, recorder events.Recorder) error {
+func SyncKubeConfigSecret(ctx context.Context, secretName, secretNamespace, kubeconfigPath string, templateKubeconfig *rest.Config, secretClient coreclientv1.SecretsGetter, tokenGetter TokenGetterFunc, recorder events.Recorder) error {
 	secret, err := secretClient.Secrets(secretNamespace).Get(ctx, secretName, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
-		return applyKubeconfigSecret(ctx, templateKubeconfig, secretName, secretNamespace, secretClient, tokenGetter, recorder)
+		return applyKubeconfigSecret(ctx, templateKubeconfig, secretName, secretNamespace, kubeconfigPath, secretClient, tokenGetter, recorder)
 	case err != nil:
 		return err
 	}
@@ -83,7 +84,7 @@ func SyncKubeConfigSecret(ctx context.Context, secretName, secretNamespace strin
 		return nil
 	}
 
-	return applyKubeconfigSecret(ctx, templateKubeconfig, secretName, secretNamespace, secretClient, tokenGetter, recorder)
+	return applyKubeconfigSecret(ctx, templateKubeconfig, secretName, secretNamespace, kubeconfigPath, secretClient, tokenGetter, recorder)
 }
 
 func tokenValid(secret *corev1.Secret) bool {
@@ -112,7 +113,7 @@ func tokenValid(secret *corev1.Secret) bool {
 }
 
 // applyKubeconfigSecret would render saToken to a secret.
-func applyKubeconfigSecret(ctx context.Context, templateKubeconfig *rest.Config, secretName, secretNamespace string, secretClient coreclientv1.SecretsGetter, tokenGetter TokenGetterFunc, recorder events.Recorder) error {
+func applyKubeconfigSecret(ctx context.Context, templateKubeconfig *rest.Config, secretName, secretNamespace, kubeconfigPath string, secretClient coreclientv1.SecretsGetter, tokenGetter TokenGetterFunc, recorder events.Recorder) error {
 
 	token, expiration, err := tokenGetter()
 	if err != nil {
@@ -155,7 +156,7 @@ func applyKubeconfigSecret(ctx context.Context, templateKubeconfig *rest.Config,
 		},
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			"user": {
-				TokenFile: "token",
+				TokenFile: filepath.Join(filepath.Dir(kubeconfigPath), "token"),
 			},
 		},
 		CurrentContext: "context",

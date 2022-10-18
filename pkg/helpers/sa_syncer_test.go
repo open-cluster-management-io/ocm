@@ -194,7 +194,7 @@ func TestApplyKubeconfigSecret(t *testing.T) {
 				return tt.token, expiration, tt.tokenGetError
 			}
 			client := testclient.NewSimpleClientset(tt.secrets...)
-			err := SyncKubeConfigSecret(context.TODO(), secretName, secretNamespace, tkc, client.CoreV1(), tokenGetter, eventstesting.NewTestingEventRecorder(t))
+			err := SyncKubeConfigSecret(context.TODO(), secretName, secretNamespace, "/tmp/kubeconfig", tkc, client.CoreV1(), tokenGetter, eventstesting.NewTestingEventRecorder(t))
 			if err != nil && !tt.wantErr {
 				t.Error(err)
 			}

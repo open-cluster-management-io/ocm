@@ -754,7 +754,7 @@ func ensureSAKubeconfigs(ctx context.Context, clusterManagerName, clusterManager
 	sas := getSAs(clusterManagerName)
 	for _, sa := range sas {
 		tokenGetter := helpers.SATokenGetter(ctx, sa, clusterManagerNamespace, hubClient)
-		err := helpers.SyncKubeConfigSecret(ctx, sa+"-kubeconfig", clusterManagerNamespace, &rest.Config{
+		err := helpers.SyncKubeConfigSecret(ctx, sa+"-kubeconfig", clusterManagerNamespace, "/var/run/secrets/hub/kubeconfig", &rest.Config{
 			Host: hubKubeConfig.Host,
 			TLSClientConfig: rest.TLSClientConfig{
 				CAData: hubKubeConfig.CAData,

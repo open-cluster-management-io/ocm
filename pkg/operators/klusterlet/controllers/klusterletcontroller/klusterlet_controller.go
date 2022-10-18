@@ -565,7 +565,7 @@ func (n *klusterletController) createManagedClusterKubeconfig(
 	saClient kubernetes.Interface, secretClient coreclientv1.SecretsGetter,
 	recorder events.Recorder) error {
 	tokenGetter := helpers.SATokenGetter(ctx, saName, klusterletNamespace, saClient)
-	err := helpers.SyncKubeConfigSecret(ctx, secretName, agentNamespace, kubeconfigTemplate, n.kubeClient.CoreV1(), tokenGetter, recorder)
+	err := helpers.SyncKubeConfigSecret(ctx, secretName, agentNamespace, "/spoke/config/kubeconfig", kubeconfigTemplate, n.kubeClient.CoreV1(), tokenGetter, recorder)
 	if err != nil {
 		_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
 			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
