@@ -33,39 +33,26 @@ var _ = ginkgo.Describe("Create v1beta1 managedclusterset", func() {
 				},
 			},
 		}
-
 		_, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		ginkgo.By("Get v1beta1 ManagedClusterSet using v1beta1 client")
-		gomega.Eventually(func() bool {
-			managedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
-			if err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
 		ginkgo.By("Update v1beta1 ManagedClusterSet using v1beta1 client")
-		gomega.Eventually(func() bool {
-			updateManagedClusterSet := managedClusterSet.DeepCopy()
-			updateManagedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels = nil
-			updateManagedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Update(context.Background(), updateManagedClusterSet, metav1.UpdateOptions{})
+		gomega.Eventually(func() error {
+			updateManagedClusterSet, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
-				return false
+				return err
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			updateManagedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels = nil
+			_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Update(context.Background(), updateManagedClusterSet, metav1.UpdateOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Delete v1beta1 ManagedClusterSet using v1beta1 client")
-		gomega.Eventually(func() bool {
-			err = clusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.Background(), managedClusterSetName, metav1.DeleteOptions{})
-			if err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		gomega.Eventually(func() error {
+			return clusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.Background(), managedClusterSetName, metav1.DeleteOptions{})
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
+
 	ginkgo.It("Create a v1beta1 labelselector based ManagedClusterSet and get/update/delete with v1beta2 client", func() {
 		ginkgo.By("Create a v1beta1 ManagedClusterSet")
 		suffix := rand.String(6)
@@ -85,49 +72,42 @@ var _ = ginkgo.Describe("Create v1beta1 managedclusterset", func() {
 				},
 			},
 		}
-
 		_, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ginkgo.By("Get v1beta1 ManagedClusterSet using v1beta2 client")
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			v1beta2ManagedClusterSet, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
-				return false
+				return err
 			}
 
-			if !reflect.DeepEqual(string(v1beta2ManagedClusterSet.Spec.ClusterSelector.SelectorType), string(managedClusterSet.Spec.ClusterSelector.SelectorType)) {
-				return false
+			if string(v1beta2ManagedClusterSet.Spec.ClusterSelector.SelectorType) != string(managedClusterSet.Spec.ClusterSelector.SelectorType) {
+				return fmt.Errorf("unexpected v1beta2 cluster set %v", v1beta2ManagedClusterSet)
 			}
 			if !reflect.DeepEqual(v1beta2ManagedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels, managedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels) {
-				return false
+				return fmt.Errorf("unexpected v1beta2 cluster set %v", v1beta2ManagedClusterSet)
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Update v1beta1 ManagedClusterSet using v1beta2 client")
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			updateManagedClusterSet, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
-				return false
+				return err
 			}
 			updateManagedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels = nil
 			_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Update(context.Background(), updateManagedClusterSet, metav1.UpdateOptions{})
-			if err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Delete v1beta1 ManagedClusterSet using v1beta2 client")
-		gomega.Eventually(func() bool {
-			err = clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.Background(), managedClusterSetName, metav1.DeleteOptions{})
-			if err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		gomega.Eventually(func() error {
+			return clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.Background(), managedClusterSetName, metav1.DeleteOptions{})
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
+
 	ginkgo.It("Create a v1beta1 legacy ManagedClusterSet and get/update/delete with v1beta2 client", func() {
 		ginkgo.By("Create a v1beta1 legacy ManagedClusterSet")
 		suffix := rand.String(6)
@@ -142,30 +122,25 @@ var _ = ginkgo.Describe("Create v1beta1 managedclusterset", func() {
 				},
 			},
 		}
-
 		_, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ginkgo.By("Get v1beta1 ManagedClusterSet using v1beta2 client")
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			v1beta2ManagedClusterSet, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
-				return false
+				return err
 			}
 			if v1beta2ManagedClusterSet.Spec.ClusterSelector.SelectorType != clusterv1beta2.ExclusiveClusterSetLabel {
-				return false
+				return fmt.Errorf("unexpected v1beta2 cluster set %v", v1beta2ManagedClusterSet)
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Delete v1beta1 ManagedClusterSet using v1beta2 client")
-		gomega.Eventually(func() bool {
-			err = clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.Background(), managedClusterSetName, metav1.DeleteOptions{})
-			if err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		gomega.Eventually(func() error {
+			return clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.Background(), managedClusterSetName, metav1.DeleteOptions{})
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 })
 
@@ -189,39 +164,26 @@ var _ = ginkgo.Describe("Create v1beta2 managedclusterset", func() {
 				},
 			},
 		}
-
 		_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		ginkgo.By("Get v1beta2 ManagedClusterSet using v1beta2 client")
-		gomega.Eventually(func() bool {
-			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
-			if err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
 		ginkgo.By("Update v1beta2 ManagedClusterSet using v1beta2 client")
-		gomega.Eventually(func() bool {
-			updateManagedClusterSet := managedClusterSet.DeepCopy()
-			updateManagedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels = nil
-			updateManagedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Update(context.Background(), updateManagedClusterSet, metav1.UpdateOptions{})
+		gomega.Eventually(func() error {
+			updateManagedClusterSet, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
-				return false
+				return err
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			updateManagedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels = nil
+			_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Update(context.Background(), updateManagedClusterSet, metav1.UpdateOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Delete v1beta2 ManagedClusterSet using v1beta2 client")
-		gomega.Eventually(func() bool {
-			err = clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.Background(), managedClusterSetName, metav1.DeleteOptions{})
-			if err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		gomega.Eventually(func() error {
+			return clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.Background(), managedClusterSetName, metav1.DeleteOptions{})
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
+
 	ginkgo.It("Create a v1beta2 labelselector based ManagedClusterSet and get/update/delete with v1beta1 client", func() {
 		ginkgo.By("Create a v1beta2 ManagedClusterSet")
 		suffix := rand.String(6)
@@ -241,48 +203,41 @@ var _ = ginkgo.Describe("Create v1beta2 managedclusterset", func() {
 				},
 			},
 		}
-
 		_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ginkgo.By("Get v1beta2 ManagedClusterSet using v1beta1 client")
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			v1beta1ManagedClusterSet, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
-				return false
+				return err
 			}
-			if !reflect.DeepEqual(string(v1beta1ManagedClusterSet.Spec.ClusterSelector.SelectorType), string(managedClusterSet.Spec.ClusterSelector.SelectorType)) {
-				return false
+			if string(v1beta1ManagedClusterSet.Spec.ClusterSelector.SelectorType) != string(managedClusterSet.Spec.ClusterSelector.SelectorType) {
+				return fmt.Errorf("unexpected v1beta1 cluster set %v", v1beta1ManagedClusterSet)
 			}
 			if !reflect.DeepEqual(v1beta1ManagedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels, managedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels) {
-				return false
+				return fmt.Errorf("unexpected v1beta1 cluster set %v", v1beta1ManagedClusterSet)
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Update v1beta2 ManagedClusterSet using v1beta1 client")
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			updateManagedClusterSet, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
-				return false
+				return err
 			}
 			updateManagedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels = nil
 			_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Update(context.Background(), updateManagedClusterSet, metav1.UpdateOptions{})
-			if err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Delete v1beta2 ManagedClusterSet using v1beta1 client")
-		gomega.Eventually(func() bool {
-			err = clusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.Background(), managedClusterSetName, metav1.DeleteOptions{})
-			if err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		gomega.Eventually(func() error {
+			return clusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.Background(), managedClusterSetName, metav1.DeleteOptions{})
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
+
 	ginkgo.It("Create a v1beta2 legacy ManagedClusterSet and get/update/delete with v1beta1 client", func() {
 		ginkgo.By("Create a v1beta2 legacy ManagedClusterSet")
 		suffix := rand.String(6)
@@ -297,29 +252,24 @@ var _ = ginkgo.Describe("Create v1beta2 managedclusterset", func() {
 				},
 			},
 		}
-
 		_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ginkgo.By("Get v1beta2 ManagedClusterSet using v1beta2 client")
-		gomega.Eventually(func() bool {
+		gomega.Eventually(func() error {
 			v1beta1ManagedClusterSet, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
-				return false
+				return err
 			}
 			if v1beta1ManagedClusterSet.Spec.ClusterSelector.SelectorType != clusterv1beta1.LegacyClusterSetLabel {
-				return false
+				return fmt.Errorf("unexpected v1beta1 cluster set %v", v1beta1ManagedClusterSet)
 			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Delete v1beta2 ManagedClusterSet using v1beta1 client")
-		gomega.Eventually(func() bool {
-			err = clusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.Background(), managedClusterSetName, metav1.DeleteOptions{})
-			if err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		gomega.Eventually(func() error {
+			return clusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.Background(), managedClusterSetName, metav1.DeleteOptions{})
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 })
