@@ -14,9 +14,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	clocktesting "k8s.io/utils/clock/testing"
 )
 
 var now = time.Now()
@@ -100,7 +100,6 @@ func TestSync(t *testing.T) {
 		name             string
 		queueKey         string
 		addOns           []runtime.Object
-		hubLeases        []runtime.Object
 		managementLeases []runtime.Object
 		spokeLeases      []runtime.Object
 		validateActions  func(t *testing.T, ctx *testinghelpers.FakeSyncContext, actions []clienttesting.Action)
@@ -109,7 +108,6 @@ func TestSync(t *testing.T) {
 			name:        "bad queue key",
 			queueKey:    "test/test/test",
 			addOns:      []runtime.Object{},
-			hubLeases:   []runtime.Object{},
 			spokeLeases: []runtime.Object{},
 			validateActions: func(t *testing.T, ctx *testinghelpers.FakeSyncContext, actions []clienttesting.Action) {
 				testinghelpers.AssertNoActions(t, actions)
@@ -119,7 +117,6 @@ func TestSync(t *testing.T) {
 			name:        "no addons",
 			queueKey:    "test/test",
 			addOns:      []runtime.Object{},
-			hubLeases:   []runtime.Object{},
 			spokeLeases: []runtime.Object{},
 			validateActions: func(t *testing.T, ctx *testinghelpers.FakeSyncContext, actions []clienttesting.Action) {
 				testinghelpers.AssertNoActions(t, actions)
@@ -137,7 +134,6 @@ func TestSync(t *testing.T) {
 					InstallNamespace: "test",
 				},
 			}},
-			hubLeases:   []runtime.Object{},
 			spokeLeases: []runtime.Object{},
 			validateActions: func(t *testing.T, ctx *testinghelpers.FakeSyncContext, actions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, actions, "get", "patch")
@@ -169,7 +165,6 @@ func TestSync(t *testing.T) {
 					InstallNamespace: "test",
 				},
 			}},
-			hubLeases: []runtime.Object{},
 			spokeLeases: []runtime.Object{
 				testinghelpers.NewAddOnLease("test", "test", now.Add(-5*time.Minute)),
 			},
@@ -203,7 +198,6 @@ func TestSync(t *testing.T) {
 					InstallNamespace: "test",
 				},
 			}},
-			hubLeases: []runtime.Object{},
 			spokeLeases: []runtime.Object{
 				testinghelpers.NewAddOnLease("test", "test", now),
 			},
@@ -247,7 +241,6 @@ func TestSync(t *testing.T) {
 					},
 				},
 			}},
-			hubLeases: []runtime.Object{},
 			spokeLeases: []runtime.Object{
 				testinghelpers.NewAddOnLease("test", "test", now),
 			},
@@ -275,7 +268,6 @@ func TestSync(t *testing.T) {
 					},
 				},
 			},
-			hubLeases: []runtime.Object{},
 			spokeLeases: []runtime.Object{
 				testinghelpers.NewAddOnLease("test1", "test1", now.Add(-5*time.Minute)),
 			},
@@ -300,39 +292,9 @@ func TestSync(t *testing.T) {
 					InstallNamespace: "test",
 				},
 			}},
-			hubLeases: []runtime.Object{},
 			managementLeases: []runtime.Object{
 				testinghelpers.NewAddOnLease("test", "test", now),
 			},
-			validateActions: func(t *testing.T, ctx *testinghelpers.FakeSyncContext, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
-				addOn := &addonv1alpha1.ManagedClusterAddOn{}
-				err := json.Unmarshal(patch, addOn)
-				if err != nil {
-					t.Fatal(err)
-				}
-				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
-				if addOnCond == nil {
-					t.Errorf("expected addon available condition, but failed")
-					return
-				}
-				if addOnCond.Status != metav1.ConditionTrue {
-					t.Errorf("expected addon available condition is available, but failed")
-				}
-			},
-		},
-		{
-			name:     "addon update its lease constantly (compatibility)",
-			queueKey: "test/test",
-			addOns: []runtime.Object{&addonv1alpha1.ManagedClusterAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: testinghelpers.TestManagedClusterName,
-					Name:      "test",
-				},
-			}},
-			hubLeases:   []runtime.Object{testinghelpers.NewAddOnLease(testinghelpers.TestManagedClusterName, "test", now)},
-			spokeLeases: []runtime.Object{},
 			validateActions: func(t *testing.T, ctx *testinghelpers.FakeSyncContext, actions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, actions, "get", "patch")
 				patch := actions[1].(clienttesting.PatchAction).GetPatch()
@@ -365,7 +327,6 @@ func TestSync(t *testing.T) {
 					},
 				},
 			}},
-			hubLeases:   []runtime.Object{},
 			spokeLeases: []runtime.Object{},
 			validateActions: func(t *testing.T, ctx *testinghelpers.FakeSyncContext, actions []clienttesting.Action) {
 				testinghelpers.AssertNoActions(t, actions)
@@ -384,14 +345,12 @@ func TestSync(t *testing.T) {
 				}
 			}
 
-			hubClient := kubefake.NewSimpleClientset(c.hubLeases...)
 			managementLeaseClient := kubefake.NewSimpleClientset(c.managementLeases...)
 			spokeLeaseClient := kubefake.NewSimpleClientset(c.spokeLeases...)
 
 			ctrl := &managedClusterAddOnLeaseController{
 				clusterName:           testinghelpers.TestManagedClusterName,
-				clock:                 clock.NewFakeClock(time.Now()),
-				hubLeaseClient:        hubClient.CoordinationV1(),
+				clock:                 clocktesting.NewFakeClock(time.Now()),
 				addOnClient:           addOnClient,
 				addOnLister:           addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 				managementLeaseClient: managementLeaseClient.CoordinationV1(),
