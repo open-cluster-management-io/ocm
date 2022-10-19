@@ -125,7 +125,6 @@ func (f *AgentAddonFactory) BuildHelmAgentAddon() (agent.AgentAddon, error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO: validate chart
 
 	agentAddon := newHelmAgentAddon(f, userChart)
 
@@ -152,9 +151,6 @@ func (f *AgentAddonFactory) BuildTemplateAgentAddon() (agent.AgentAddon, error) 
 	for _, file := range templateFiles {
 		template, err := f.fs.ReadFile(file)
 		if err != nil {
-			return nil, err
-		}
-		if err := agentAddon.validateTemplateData(file, template); err != nil {
 			return nil, err
 		}
 		agentAddon.addTemplateData(file, template)

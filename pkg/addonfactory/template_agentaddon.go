@@ -125,27 +125,6 @@ func (a *TemplateAgentAddon) getBuiltinValues(
 	return StructToValues(builtinValues)
 }
 
-// validateTemplateData validate template render and object decoder using  an empty cluster and addon
-func (a *TemplateAgentAddon) validateTemplateData(file string, data []byte) error {
-	configValues, err := a.getValues(&clusterv1.ManagedCluster{}, &addonapiv1alpha1.ManagedClusterAddOn{})
-	if err != nil {
-		return err
-	}
-
-	// There may be some manifests for hosting cluster only or for managed cluster only, so we ignore the missing kind
-	// error to bypass the empty file
-	raw := assets.MustCreateAssetFromTemplate(file, data, configValues).Data
-	_, _, err = a.decoder.Decode(raw, nil, nil)
-	if err != nil {
-		if !runtime.IsMissingKind(err) {
-			return err
-		}
-		klog.V(4).Infof("Validate template %v missing kind, reason: %v", file, err)
-	}
-
-	return nil
-}
-
 func (a *TemplateAgentAddon) addTemplateData(file string, data []byte) {
 	a.templateFiles = append(a.templateFiles, templateFile{name: file, content: data})
 }
