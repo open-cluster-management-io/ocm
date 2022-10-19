@@ -94,6 +94,7 @@ spec:
           name: kubeconfig
           readOnly: true
         {{ end }}
+      {{ if not .HostedMode }}
       - name: {{ .ClusterManagerName }}-registration-conversion-webhook
         image: {{ .RegistrationImage }}
         args:
@@ -132,6 +133,7 @@ spec:
         - mountPath: /tmp/k8s-webhook-server/serving-certs
           name: webhook-secret
           readOnly: true
+      {{ end }}
       volumes:
       - name: webhook-secret
         secret:

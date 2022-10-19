@@ -48,13 +48,14 @@ var (
 		"managedclusters.cluster.open-cluster-management.io",
 	}
 
-	namespaceResource = "cluster-manager/cluster-manager-namespace.yaml"
+	namespaceResource       = "cluster-manager/cluster-manager-namespace.yaml"
+	hostedClusterSetCrdFile = "cluster-manager/hub/0000_00_clusters.open-cluster-management.io_managedclustersets.crd-hosted.yaml"
+	clusterSetCrdFile       = "cluster-manager/hub/0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml"
 
 	// crdResourceFiles should be deployed in the hub cluster
 	hubCRDResourceFiles = []string{
 		"cluster-manager/hub/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml",
 		"cluster-manager/hub/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml",
-		"cluster-manager/hub/0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml",
 		"cluster-manager/hub/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml",
 		"cluster-manager/hub/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml",
 		"cluster-manager/hub/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml",
@@ -780,6 +781,12 @@ func getSAs(clusterManagerName string) []string {
 func getHubResources(mode operatorapiv1.InstallMode, isRegistrationIPFormat, isWorkIPFormat, skipAddCRDs bool) []string {
 	hubResources := []string{namespaceResource}
 	if !skipAddCRDs {
+		//TODO: Currently, in hosted mode, clusterset only support v1beta1 version, will fix it in future releases
+		if mode == operatorapiv1.InstallModeHosted {
+			hubResources = append(hubResources, hostedClusterSetCrdFile)
+		} else {
+			hubResources = append(hubResources, clusterSetCrdFile)
+		}
 		hubResources = append(hubResources, hubCRDResourceFiles...)
 	}
 

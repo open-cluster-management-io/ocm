@@ -116,13 +116,13 @@ We mainly provide deployment in two scenarios:
    apiVersion: kind.x-k8s.io/v1alpha4
    nodes:
    - role: control-plane
-   extraPortMappings:
-   - containerPort: 30443
-      hostPort: 30443
-      protocol: TCP
-   - containerPort: 31443
-      hostPort: 31443
-      protocol: TCP
+     extraPortMappings:
+     - containerPort: 30443
+       hostPort: 30443
+       protocol: TCP
+     - containerPort: 31443
+       hostPort: 31443
+       protocol: TCP
    EOF
    kind create cluster --name managed
    ```
@@ -136,7 +136,7 @@ We mainly provide deployment in two scenarios:
 3. Get the `EXTERNAL_HUB_KUBECONFIG` kubeconfig.
 
    ```shell
-   kind get kubeconfig --name kind-hub --internal > ./.external-hub-kubeconfig  
+   kind get kubeconfig --name hub --internal > ./.external-hub-kubeconfig  
    ```
 
 4. Switch to management cluster and deploy hub components.
