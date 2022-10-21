@@ -62,6 +62,18 @@ const (
 			}
 		}
 	}`
+
+	mchJson = `{
+    "apiVersion": "operator.open-cluster-management.io/v1",
+    "kind": "MultiClusterHub",
+    "metadata": {
+        "name": "multiclusterhub",
+        "namespace": "open-cluster-management"
+    },
+    "spec": {
+        "separateCertificateManagement": false
+    }
+}`
 )
 
 var _ = ginkgo.Describe("Agent deploy", func() {
@@ -392,5 +404,43 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	})
+
+	ginkgo.It("Should deploy agent and get deletion options", func() {
+		deployObj := &unstructured.Unstructured{}
+		err := deployObj.UnmarshalJSON([]byte(deploymentJson))
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		mchObj := &unstructured.Unstructured{}
+		err = mchObj.UnmarshalJSON([]byte(mchJson))
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		mchObj.SetAnnotations(map[string]string{constants.AnnotationDeletionOrphan: ""})
+		testAddonImpl.manifests[managedClusterName] = []runtime.Object{deployObj, mchObj}
+
+		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: testAddonImpl.name,
+			},
+			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+				InstallNamespace: "default",
+			},
+		}
+		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		var work *workapiv1.ManifestWork
+		gomega.Eventually(func() error {
+			work, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		gomega.Expect(len(work.Spec.Workload.Manifests)).Should(gomega.Equal(2))
+		gomega.Expect(work.Spec.DeleteOption).ShouldNot(gomega.Equal(nil))
+		gomega.Expect(work.Spec.DeleteOption.PropagationPolicy).Should(gomega.Equal(workapiv1.DeletePropagationPolicyTypeSelectivelyOrphan))
+		gomega.Expect(work.Spec.DeleteOption.SelectivelyOrphan).ShouldNot(gomega.Equal(nil))
+		gomega.Expect(len(work.Spec.DeleteOption.SelectivelyOrphan.OrphaningRules)).Should(gomega.Equal(1))
+		gomega.Expect(work.Spec.DeleteOption.SelectivelyOrphan.OrphaningRules[0].Group).Should(gomega.Equal("operator.open-cluster-management.io"))
+		gomega.Expect(work.Spec.DeleteOption.SelectivelyOrphan.OrphaningRules[0].Resource).Should(gomega.Equal("multiclusterhubs"))
+		gomega.Expect(work.Spec.DeleteOption.SelectivelyOrphan.OrphaningRules[0].Namespace).Should(gomega.Equal("open-cluster-management"))
+		gomega.Expect(work.Spec.DeleteOption.SelectivelyOrphan.OrphaningRules[0].Name).Should(gomega.Equal("multiclusterhub"))
 	})
 })

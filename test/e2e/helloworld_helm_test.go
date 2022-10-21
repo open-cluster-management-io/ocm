@@ -156,8 +156,9 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			return fmt.Errorf("the managedClusterAddon should be deleted")
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
+		ginkgo.By("The pre-delete job should be deleted ")
 		gomega.Eventually(func() error {
-			_, err := hubKubeClient.AppsV1().Deployments(addonInstallNamespace).Get(context.Background(), "helloworldhelm-agent", metav1.GetOptions{})
+			_, err := hubKubeClient.BatchV1().Jobs(addonInstallNamespace).Get(context.Background(), "helloworldhelm-cleanup-configmap", metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return nil
@@ -165,7 +166,19 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 				return err
 			}
 
-			return fmt.Errorf("the agent deployment should be deleted")
+			return fmt.Errorf("the job should be deleted")
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("The deployment with deletion-orphan annotation should not be deleted ")
+		gomega.Eventually(func() error {
+			_, err := hubKubeClient.AppsV1().Deployments(addonInstallNamespace).Get(context.Background(), "helloworldhelm-agent", metav1.GetOptions{})
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return fmt.Errorf("the deployment should not be deleted")
+				}
+				return err
+			}
+			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 

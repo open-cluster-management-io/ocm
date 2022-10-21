@@ -83,6 +83,10 @@ const (
 	// DisableAddonAutomaticInstallationAnnotationKey is the annotation key for disabling the functionality of
 	// installing addon automatically
 	DisableAddonAutomaticInstallationAnnotationKey = "addon.open-cluster-management.io/disable-automatic-installation"
+
+	// AnnotationDeletionOrphan is an annotation for the manifest which will not be cleaned up
+	// after the addon manifestWork is deleted.
+	AnnotationDeletionOrphan = "addon-cluster-management.io/deletion-orphan"
 )
 
 // DeployWorkNamePrefix returns the prefix of the work name for the addon

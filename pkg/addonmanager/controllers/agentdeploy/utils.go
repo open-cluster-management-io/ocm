@@ -247,6 +247,7 @@ func (b *addonWorksBuilder) BuildDeployWorks(addonWorkNamespace string,
 		owner = metav1.NewControllerRef(addon, addonapiv1alpha1.GroupVersion.WithKind("ManagedClusterAddOn"))
 	}
 
+	var deletionOrphaningRules []workapiv1.OrphaningRule
 	for _, object := range objects {
 		deployable, err := b.processor.deployable(b.hostedModeEnabled, installMode, object)
 		if err != nil {
@@ -260,16 +261,36 @@ func (b *addonWorksBuilder) BuildDeployWorks(addonWorkNamespace string,
 		if isHookObject {
 			continue
 		}
+
+		rule, err := getDeletionOrphaningRule(object)
+		if err != nil {
+			return nil, nil, err
+		}
+		if rule != nil {
+			deletionOrphaningRules = append(deletionOrphaningRules, *rule)
+		}
+
 		deployObjects = append(deployObjects, object)
 	}
 	if len(deployObjects) == 0 {
 		return nil, nil, nil
 	}
 
+	var deletionOption *workapiv1.DeleteOption
+	if len(deletionOrphaningRules) != 0 {
+		deletionOption = &workapiv1.DeleteOption{
+			PropagationPolicy: workapiv1.DeletePropagationPolicyTypeSelectivelyOrphan,
+			SelectivelyOrphan: &workapiv1.SelectivelyOrphan{
+				OrphaningRules: deletionOrphaningRules,
+			},
+		}
+	}
+
 	return b.workBuilder.Build(deployObjects,
 		newAddonWorkObjectMeta(b.processor.manifestWorkNamePrefix(addon.Namespace, addon.Name), addon.Name, addon.Namespace, addonWorkNamespace, owner),
 		workbuilder.ExistingManifestWorksOption(existingWorks),
-		workbuilder.ManifestConfigOption(manifestOptions))
+		workbuilder.ManifestConfigOption(manifestOptions),
+		workbuilder.DeletionOption(deletionOption))
 }
 
 // BuildHookWork returns the preDelete manifestWork, if there is no manifest need
@@ -439,4 +460,26 @@ func getManifestConfigOption(agentAddon agent.AgentAddon) []workapiv1.ManifestCo
 		})
 	}
 	return manifestConfigs
+}
+
+func getDeletionOrphaningRule(obj runtime.Object) (*workapiv1.OrphaningRule, error) {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+	annotations := accessor.GetAnnotations()
+	if _, ok := annotations[constants.AnnotationDeletionOrphan]; !ok {
+		return nil, nil
+	}
+
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	plural, _ := meta.UnsafeGuessKindToResource(gvk)
+
+	rule := &workapiv1.OrphaningRule{
+		Group:     plural.Group,
+		Resource:  plural.Resource,
+		Name:      accessor.GetName(),
+		Namespace: accessor.GetNamespace(),
+	}
+	return rule, nil
 }
