@@ -108,7 +108,7 @@ func (a *ManagedClusterMutatingAdmissionHook) Admit(req *admissionv1beta1.Admiss
 	return status
 }
 
-//addDefaultClusterSetLabel add label "cluster.open-cluster-management.io/clusterset:default" for ManagedCluster if the managedCluster has no ManagedClusterSet label
+// addDefaultClusterSetLabel add label "cluster.open-cluster-management.io/clusterset:default" for ManagedCluster if the managedCluster has no ManagedClusterSet label
 func (a *ManagedClusterMutatingAdmissionHook) addDefaultClusterSetLabel(managedCluster *clusterv1.ManagedCluster, clusterObj []byte) ([]jsonPatchOperation, *admissionv1beta1.AdmissionResponse) {
 	var jsonPatches []jsonPatchOperation
 

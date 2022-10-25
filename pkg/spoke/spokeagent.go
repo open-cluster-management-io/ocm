@@ -78,27 +78,28 @@ func NewSpokeAgentOptions() *SpokeAgentOptions {
 // RunSpokeAgent starts the controllers on spoke agent to register to the hub.
 //
 // There are two deploy mode for the registration agent: 'Default' mode and 'Detached' mode,
-// - In Default mode, the registration agent pod runs on the spoke/managed cluster.
-// - In Detached mode, the registration agent pod may run on a separated cluster from the
-//   spoke/managed cluster, we define this cluster as 'management' cluster.
+//   - In Default mode, the registration agent pod runs on the spoke/managed cluster.
+//   - In Detached mode, the registration agent pod may run on a separated cluster from the
+//     spoke/managed cluster, we define this cluster as 'management' cluster.
 //
 // The spoke agent uses four kubeconfigs for different concerns:
-// - The 'management' kubeconfig: used to communicate with the cluster where the agent pod
-//   runs. In Default mode, it is the managed cluster's kubeconfig; in Detached mode, it is
-//   the management cluster's kubeconfig.
-// - The 'spoke' kubeconfig: used to communicate with the spoke/managed cluster which will
-//   be registered to the hub.
-// - The 'bootstrap' kubeconfig: used to communicate with the hub in order to
-//   submit a CertificateSigningRequest, begin the join flow with the hub, and
-//   to write the 'hub' kubeconfig.
-// - The 'hub' kubeconfig: used to communicate with the hub using a signed
-//   certificate from the hub.
+//   - The 'management' kubeconfig: used to communicate with the cluster where the agent pod
+//     runs. In Default mode, it is the managed cluster's kubeconfig; in Detached mode, it is
+//     the management cluster's kubeconfig.
+//   - The 'spoke' kubeconfig: used to communicate with the spoke/managed cluster which will
+//     be registered to the hub.
+//   - The 'bootstrap' kubeconfig: used to communicate with the hub in order to
+//     submit a CertificateSigningRequest, begin the join flow with the hub, and
+//     to write the 'hub' kubeconfig.
+//   - The 'hub' kubeconfig: used to communicate with the hub using a signed
+//     certificate from the hub.
 //
 // RunSpokeAgent handles the following scenarios:
-//   #1. Bootstrap kubeconfig is valid and there is no valid hub kubeconfig in secret
-//   #2. Both bootstrap kubeconfig and hub kubeconfig are valid
-//   #3. Bootstrap kubeconfig is invalid (e.g. certificate expired) and hub kubeconfig is valid
-//   #4. Neither bootstrap kubeconfig nor hub kubeconfig is valid
+//
+//	#1. Bootstrap kubeconfig is valid and there is no valid hub kubeconfig in secret
+//	#2. Both bootstrap kubeconfig and hub kubeconfig are valid
+//	#3. Bootstrap kubeconfig is invalid (e.g. certificate expired) and hub kubeconfig is valid
+//	#4. Neither bootstrap kubeconfig nor hub kubeconfig is valid
 //
 // A temporary ClientCertForHubController with bootstrap kubeconfig is created
 // and started if the hub kubeconfig does not exist or is invalid and used to
@@ -484,11 +485,12 @@ func generateAgentName() string {
 }
 
 // hasValidHubClientConfig returns ture if all the conditions below are met:
-//   1. KubeconfigFile exists;
-//   2. TLSKeyFile exists;
-//   3. TLSCertFile exists;
-//   4. Certificate in TLSCertFile is issued for the current cluster/agent;
-//   5. Certificate in TLSCertFile is not expired;
+//  1. KubeconfigFile exists;
+//  2. TLSKeyFile exists;
+//  3. TLSCertFile exists;
+//  4. Certificate in TLSCertFile is issued for the current cluster/agent;
+//  5. Certificate in TLSCertFile is not expired;
+//
 // Normally, KubeconfigFile/TLSKeyFile/TLSCertFile will be created once the bootstrap process
 // completes. Changing the name of the cluster will make the existing hub kubeconfig invalid,
 // because certificate in TLSCertFile is issued to a specific cluster/agent.
@@ -536,9 +538,9 @@ func (o *SpokeAgentOptions) hasValidHubClientConfig() (bool, error) {
 //   5. Generate a random cluster name then;
 
 // Rules for picking up agent name:
-//   1. Parse agent name from the common name of the certification subject if the certification exists;
-//   2. Fallback to agent name in the mounted secret if it exists;
-//   3. Generate a random agent name then;
+//  1. Parse agent name from the common name of the certification subject if the certification exists;
+//  2. Fallback to agent name in the mounted secret if it exists;
+//  3. Generate a random agent name then;
 func (o *SpokeAgentOptions) getOrGenerateClusterAgentNames() (string, string) {
 	// try to load cluster/agent name from tls certification
 	var clusterNameInCert, agentNameInCert string

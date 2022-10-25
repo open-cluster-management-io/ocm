@@ -52,10 +52,10 @@ var (
 
 // This suite is sensitive to the following environment variables:
 //
-// - IMAGE_NAME sets the exact image to deploy for the registration agent
-// - IMAGE_REGISTRY sets the image registry to use to build the IMAGE_NAME if
-//   IMAGE_NAME is unset: IMAGE_REGISTRY/registration:latest
-// - KUBECONFIG is the location of the kubeconfig file to use
+//   - IMAGE_NAME sets the exact image to deploy for the registration agent
+//   - IMAGE_REGISTRY sets the image registry to use to build the IMAGE_NAME if
+//     IMAGE_NAME is unset: IMAGE_REGISTRY/registration:latest
+//   - KUBECONFIG is the location of the kubeconfig file to use
 var _ = ginkgo.BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
 	registrationImage = os.Getenv("IMAGE_NAME")
