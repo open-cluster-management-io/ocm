@@ -65,10 +65,10 @@ func (c TargetRotation) EnsureTargetCertKeyPair(ctx context.Context, signingCert
 // Return empty if a valid cert/key pair is in place and no need to rotate it yet.
 //
 // We create a new target cert/key pair if
-//   1) no cert/key pair exits
-//   2) or the cert expired (then we are also pretty late)
-//   3) or we are over the renewal percentage of the validity
-//   4) or our old CA is gone from the bundle (then we are pretty late to the renewal party)
+//  1. no cert/key pair exits
+//  2. or the cert expired (then we are also pretty late)
+//  3. or we are over the renewal percentage of the validity
+//  4. or our old CA is gone from the bundle (then we are pretty late to the renewal party)
 func needNewTargetCertKeyPair(secret *corev1.Secret, caBundleCerts []*x509.Certificate) string {
 	certData := secret.Data["tls.crt"]
 	if len(certData) == 0 {

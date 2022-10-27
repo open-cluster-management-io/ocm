@@ -41,12 +41,12 @@ var ResyncInterval = time.Minute * 5
 
 // certRotationController does:
 //
-// 1) continuously create a self-signed signing CA (via SigningRotation).
-//    It creates the next one when a given percentage of the validity of the old CA has passed.
-// 2) maintain a CA bundle with all not yet expired CA certs.
-// 3) continuously create target cert/key pairs signed by the latest signing CA
-//    It creates the next one when a given percentage of the validity of the previous cert has
-//    passed, or when a new CA has been created.
+//  1. continuously create a self-signed signing CA (via SigningRotation).
+//     It creates the next one when a given percentage of the validity of the old CA has passed.
+//  2. maintain a CA bundle with all not yet expired CA certs.
+//  3. continuously create target cert/key pairs signed by the latest signing CA
+//     It creates the next one when a given percentage of the validity of the previous cert has
+//     passed, or when a new CA has been created.
 type certRotationController struct {
 	rotationMap          map[string]rotations // key is clusterManager's name, value is a rotations struct
 	kubeClient           kubernetes.Interface
