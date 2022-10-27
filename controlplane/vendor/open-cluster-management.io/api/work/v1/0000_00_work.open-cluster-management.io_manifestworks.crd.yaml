@@ -1,0 +1,383 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: manifestworks.work.open-cluster-management.io
+spec:
+  group: work.open-cluster-management.io
+  names:
+    kind: ManifestWork
+    listKind: ManifestWorkList
+    plural: manifestworks
+    singular: manifestwork
+  scope: Namespaced
+  preserveUnknownFields: false
+  versions:
+    - name: v1
+      schema:
+        openAPIV3Schema:
+          description: ManifestWork represents a manifests workload that hub wants to deploy on the managed cluster. A manifest workload is defined as a set of Kubernetes resources. ManifestWork must be created in the cluster namespace on the hub, so that agent on the corresponding managed cluster can access this resource and deploy on the managed cluster.
+          type: object
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: Spec represents a desired configuration of work to be deployed on the managed cluster.
+              type: object
+              properties:
+                deleteOption:
+                  description: DeleteOption represents deletion strategy when the manifestwork is deleted. Foreground deletion strategy is applied to all the resource in this manifestwork if it is not set.
+                  type: object
+                  properties:
+                    propagationPolicy:
+                      description: propagationPolicy can be Foreground, Orphan or SelectivelyOrphan SelectivelyOrphan should be rarely used.  It is provided for cases where particular resources is transfering ownership from one ManifestWork to another or another management unit. Setting this value will allow a flow like 1. create manifestwork/2 to manage foo 2. update manifestwork/1 to selectively orphan foo 3. remove foo from manifestwork/1 without impacting continuity because manifestwork/2 adopts it.
+                      type: string
+                      default: Foreground
+                      enum:
+                        - Foreground
+                        - Orphan
+                        - SelectivelyOrphan
+                    selectivelyOrphans:
+                      description: selectivelyOrphan represents a list of resources following orphan deletion stratecy
+                      type: object
+                      properties:
+                        orphaningRules:
+                          description: orphaningRules defines a slice of orphaningrule. Each orphaningrule identifies a single resource included in this manifestwork
+                          type: array
+                          items:
+                            description: OrphaningRule identifies a single resource included in this manifestwork to be orphaned
+                            type: object
+                            required:
+                              - name
+                              - resource
+                            properties:
+                              group:
+                                description: Group is the API Group of the Kubernetes resource, empty string indicates it is in core group.
+                                type: string
+                              name:
+                                description: Name is the name of the Kubernetes resource.
+                                type: string
+                              namespace:
+                                description: Name is the namespace of the Kubernetes resource, empty string indicates it is a cluster scoped resource.
+                                type: string
+                              resource:
+                                description: Resource is the resource name of the Kubernetes resource.
+                                type: string
+                executor:
+                  description: Executor is the configuration that makes the work agent to perform some pre-request processing/checking. e.g. the executor identity tells the work agent to check the executor has sufficient permission to write the workloads to the local managed cluster. Note that nil executor is still supported for backward-compatibility which indicates that the work agent will not perform any additional actions before applying resources.
+                  type: object
+                  properties:
+                    subject:
+                      description: Subject is the subject identity which the work agent uses to talk to the local cluster when applying the resources.
+                      type: object
+                      required:
+                        - type
+                      properties:
+                        serviceAccount:
+                          description: ServiceAccount is for identifying which service account to use by the work agent. Only required if the type is "ServiceAccount".
+                          type: object
+                          required:
+                            - name
+                            - namespace
+                          properties:
+                            name:
+                              description: Name is the name of the service account.
+                              type: string
+                              maxLength: 253
+                              minLength: 1
+                              pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)$
+                            namespace:
+                              description: Namespace is the namespace of the service account.
+                              type: string
+                              maxLength: 253
+                              minLength: 1
+                              pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)$
+                        type:
+                          description: 'Type is the type of the subject identity. Supported types are: "ServiceAccount".'
+                          type: string
+                          enum:
+                            - ServiceAccount
+                manifestConfigs:
+                  description: ManifestConfigs represents the configurations of manifests defined in workload field.
+                  type: array
+                  items:
+                    description: ManifestConfigOption represents the configurations of a manifest defined in workload field.
+                    type: object
+                    required:
+                      - resourceIdentifier
+                    properties:
+                      feedbackRules:
+                        description: FeedbackRules defines what resource status field should be returned. If it is not set or empty, no feedback rules will be honored.
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - type
+                          properties:
+                            jsonPaths:
+                              description: JsonPaths defines the json path under status field to be synced.
+                              type: array
+                              items:
+                                type: object
+                                required:
+                                  - name
+                                  - path
+                                properties:
+                                  name:
+                                    description: Name represents the alias name for this field
+                                    type: string
+                                  path:
+                                    description: Path represents the json path of the field under status. The path must point to a field with single value in the type of integer, bool or string. If the path points to a non-existing field, no value will be returned. If the path points to a structure, map or slice, no value will be returned and the status conddition of StatusFeedBackSynced will be set as false. Ref to https://kubernetes.io/docs/reference/kubectl/jsonpath/ on how to write a jsonPath.
+                                    type: string
+                                  version:
+                                    description: Version is the version of the Kubernetes resource. If it is not specified, the resource with the semantically latest version is used to resolve the path.
+                                    type: string
+                            type:
+                              description: Type defines the option of how status can be returned. It can be jsonPaths or wellKnownStatus. If the type is JSONPaths, user should specify the jsonPaths field If the type is WellKnownStatus, certain common fields of status defined by a rule only for types in in k8s.io/api and open-cluster-management/api will be reported, If these status fields do not exist, no values will be reported.
+                              type: string
+                              enum:
+                                - WellKnownStatus
+                                - JSONPaths
+                      resourceIdentifier:
+                        description: ResourceIdentifier represents the group, resource, name and namespace of a resoure. iff this refers to a resource not created by this manifest work, the related rules will not be executed.
+                        type: object
+                        required:
+                          - name
+                          - resource
+                        properties:
+                          group:
+                            description: Group is the API Group of the Kubernetes resource, empty string indicates it is in core group.
+                            type: string
+                          name:
+                            description: Name is the name of the Kubernetes resource.
+                            type: string
+                          namespace:
+                            description: Name is the namespace of the Kubernetes resource, empty string indicates it is a cluster scoped resource.
+                            type: string
+                          resource:
+                            description: Resource is the resource name of the Kubernetes resource.
+                            type: string
+                      updateStrategy:
+                        description: UpdateStrategy defines the strategy to update this manifest. UpdateStrategy is Update if it is not set, optional
+                        type: object
+                        required:
+                          - type
+                        properties:
+                          serverSideApply:
+                            description: serverSideApply defines the configuration for server side apply. It is honored only when type of updateStrategy is ServerSideApply
+                            type: object
+                            properties:
+                              fieldManager:
+                                description: FieldManager is the manager to apply the resource. It is work-agent by default, but can be other name with work-agent as the prefix.
+                                type: string
+                                default: work-agent
+                                pattern: ^work-agent
+                              force:
+                                description: Force represents to force apply the manifest.
+                                type: boolean
+                          type:
+                            description: type defines the strategy to update this manifest, default value is Update. Update type means to update resource by an update call. CreateOnly type means do not update resource based on current manifest. ServerSideApply type means to update resource using server side apply with work-controller as the field manager. If there is conflict, the related Applied condition of manifest will be in the status of False with the reason of ApplyConflict.
+                            type: string
+                            default: Update
+                            enum:
+                              - Update
+                              - CreateOnly
+                              - ServerSideApply
+                workload:
+                  description: Workload represents the manifest workload to be deployed on a managed cluster.
+                  type: object
+                  properties:
+                    manifests:
+                      description: Manifests represents a list of kuberenetes resources to be deployed on a managed cluster.
+                      type: array
+                      items:
+                        description: Manifest represents a resource to be deployed on managed cluster.
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                        x-kubernetes-embedded-resource: true
+            status:
+              description: Status represents the current status of work.
+              type: object
+              properties:
+                conditions:
+                  description: 'Conditions contains the different condition statuses for this work. Valid condition types are: 1. Applied represents workload in ManifestWork is applied successfully on managed cluster. 2. Progressing represents workload in ManifestWork is being applied on managed cluster. 3. Available represents workload in ManifestWork exists on the managed cluster. 4. Degraded represents the current state of workload does not match the desired state for a certain period.'
+                  type: array
+                  items:
+                    description: "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, type FooStatus struct{     // Represents the observations of a foo's current state.     // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\"     // +patchMergeKey=type     // +patchStrategy=merge     // +listType=map     // +listMapKey=type     Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n     // other fields }"
+                    type: object
+                    required:
+                      - lastTransitionTime
+                      - message
+                      - reason
+                      - status
+                      - type
+                    properties:
+                      lastTransitionTime:
+                        description: lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                        type: string
+                        format: date-time
+                      message:
+                        description: message is a human readable message indicating details about the transition. This may be an empty string.
+                        type: string
+                        maxLength: 32768
+                      observedGeneration:
+                        description: observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.
+                        type: integer
+                        format: int64
+                        minimum: 0
+                      reason:
+                        description: reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty.
+                        type: string
+                        maxLength: 1024
+                        minLength: 1
+                        pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      status:
+                        description: status of the condition, one of True, False, Unknown.
+                        type: string
+                        enum:
+                          - "True"
+                          - "False"
+                          - Unknown
+                      type:
+                        description: type of condition in CamelCase or in foo.example.com/CamelCase. --- Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be useful (see .node.status.conditions), the ability to deconflict is important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                        type: string
+                        maxLength: 316
+                        pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                resourceStatus:
+                  description: ResourceStatus represents the status of each resource in manifestwork deployed on a managed cluster. The Klusterlet agent on managed cluster syncs the condition from the managed cluster to the hub.
+                  type: object
+                  properties:
+                    manifests:
+                      description: 'Manifests represents the condition of manifests deployed on managed cluster. Valid condition types are: 1. Progressing represents the resource is being applied on managed cluster. 2. Applied represents the resource is applied successfully on managed cluster. 3. Available represents the resource exists on the managed cluster. 4. Degraded represents the current state of resource does not match the desired state for a certain period.'
+                      type: array
+                      items:
+                        description: ManifestCondition represents the conditions of the resources deployed on a managed cluster.
+                        type: object
+                        properties:
+                          conditions:
+                            description: Conditions represents the conditions of this resource on a managed cluster.
+                            type: array
+                            items:
+                              description: "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, type FooStatus struct{     // Represents the observations of a foo's current state.     // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\"     // +patchMergeKey=type     // +patchStrategy=merge     // +listType=map     // +listMapKey=type     Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n     // other fields }"
+                              type: object
+                              required:
+                                - lastTransitionTime
+                                - message
+                                - reason
+                                - status
+                                - type
+                              properties:
+                                lastTransitionTime:
+                                  description: lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                                  type: string
+                                  format: date-time
+                                message:
+                                  description: message is a human readable message indicating details about the transition. This may be an empty string.
+                                  type: string
+                                  maxLength: 32768
+                                observedGeneration:
+                                  description: observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.
+                                  type: integer
+                                  format: int64
+                                  minimum: 0
+                                reason:
+                                  description: reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty.
+                                  type: string
+                                  maxLength: 1024
+                                  minLength: 1
+                                  pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                                status:
+                                  description: status of the condition, one of True, False, Unknown.
+                                  type: string
+                                  enum:
+                                    - "True"
+                                    - "False"
+                                    - Unknown
+                                type:
+                                  description: type of condition in CamelCase or in foo.example.com/CamelCase. --- Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be useful (see .node.status.conditions), the ability to deconflict is important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                                  type: string
+                                  maxLength: 316
+                                  pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                          resourceMeta:
+                            description: ResourceMeta represents the group, version, kind, name and namespace of a resoure.
+                            type: object
+                            properties:
+                              group:
+                                description: Group is the API Group of the Kubernetes resource.
+                                type: string
+                              kind:
+                                description: Kind is the kind of the Kubernetes resource.
+                                type: string
+                              name:
+                                description: Name is the name of the Kubernetes resource.
+                                type: string
+                              namespace:
+                                description: Name is the namespace of the Kubernetes resource.
+                                type: string
+                              ordinal:
+                                description: Ordinal represents the index of the manifest on spec.
+                                type: integer
+                                format: int32
+                              resource:
+                                description: Resource is the resource name of the Kubernetes resource.
+                                type: string
+                              version:
+                                description: Version is the version of the Kubernetes resource.
+                                type: string
+                          statusFeedback:
+                            description: StatusFeedback represents the values of the feild synced back defined in statusFeedbacks
+                            type: object
+                            properties:
+                              values:
+                                description: Values represents the synced value of the interested field.
+                                type: array
+                                items:
+                                  type: object
+                                  required:
+                                    - fieldValue
+                                    - name
+                                  properties:
+                                    fieldValue:
+                                      description: Value is the value of the status field. The value of the status field can only be integer, string or boolean.
+                                      type: object
+                                      required:
+                                        - type
+                                      properties:
+                                        boolean:
+                                          description: Boolean is bool value when type is boolean.
+                                          type: boolean
+                                        integer:
+                                          description: Integer is the integer value when type is integer.
+                                          type: integer
+                                          format: int64
+                                        string:
+                                          description: String is the string value when when type is string.
+                                          type: string
+                                        type:
+                                          description: Type represents the type of the value, it can be integer, string or boolean.
+                                          type: string
+                                          enum:
+                                            - Integer
+                                            - String
+                                            - Boolean
+                                    name:
+                                      description: Name represents the alias name for this field. It is the same as what is specified in StatuFeedbackRule in the spec.
+                                      type: string
+                                x-kubernetes-list-map-keys:
+                                  - name
+                                x-kubernetes-list-type: map
+      served: true
+      storage: true
+      subresources:
+        status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
