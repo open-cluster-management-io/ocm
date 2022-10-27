@@ -374,7 +374,7 @@ func getHubConfigSSARs(clusterName string) []authorizationv1.SelfSubjectAccessRe
 	leaseResource := authorizationv1.ResourceAttributes{
 		Group:     "coordination.k8s.io",
 		Resource:  "leases",
-		Name:      fmt.Sprintf("cluster-lease-%s", clusterName),
+		Name:      "managed-cluster-lease",
 		Namespace: clusterName,
 	}
 	reviews = append(reviews, generateSelfSubjectAccessReviews(leaseResource, "get", "update")...)
