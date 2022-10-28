@@ -30,3 +30,9 @@ N/A
 * Remove API Placement PlacementDecision ClusterSet ClusterSetBinding API version v1alpha. ([#278](https://github.com/open-cluster-management-io/registration-operator/pull/278) [@haoqing0110](https://github.com/haoqing0110))
 * Remove install mode Detached. ([#282](https://github.com/open-cluster-management-io/registration-operator/pull/282) [@zhujian7](https://github.com/zhujian7))
 * Remove clusterrole/role cleanBeforeApply code added in ocm 0.8.0. ([#283](https://github.com/open-cluster-management-io/registration-operator/pull/283) [@haoqing0110](https://github.com/haoqing0110))
+
+## v0.9.1
+
+### Bug Fixes
+
+* Fix the incorrect managed cluster lease name. ([#288](https://github.com/open-cluster-management-io/registration-operator/pull/288) [@skeeey](https://github.com/skeeey))
