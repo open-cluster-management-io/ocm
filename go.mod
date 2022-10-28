@@ -1,6 +1,6 @@
 module open-cluster-management.io/placement
 
-go 1.18
+go 1.19
 
 replace k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42 // keep compatibility for k8s.io/apiserver v0.24.3
 
