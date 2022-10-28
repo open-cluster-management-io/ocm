@@ -186,8 +186,9 @@ func TestSync(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "test-",
 				},
-				Subject:    testSubject,
-				SignerName: certificates.KubeAPIServerClientSignerName,
+				Subject:         testSubject,
+				SignerName:      certificates.KubeAPIServerClientSignerName,
+				HaltCSRCreation: func() bool { return false },
 			}
 
 			updater := &fakeStatusUpdater{}
@@ -230,7 +231,7 @@ func TestSync(t *testing.T) {
 	}
 }
 
-var _ csrControl = &mockCSRControl{}
+var _ CSRControl = &mockCSRControl{}
 
 func conditionEqual(expected, actual *metav1.Condition) bool {
 	if expected == nil && actual == nil {
@@ -301,6 +302,6 @@ func (m *mockCSRControl) getIssuedCertificate(name string) ([]byte, error) {
 	return m.issuedCertData, err
 }
 
-func (m *mockCSRControl) informer() cache.SharedIndexInformer {
+func (m *mockCSRControl) Informer() cache.SharedIndexInformer {
 	panic("implement me")
 }

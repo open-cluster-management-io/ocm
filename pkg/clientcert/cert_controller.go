@@ -6,28 +6,22 @@ import (
 	"crypto/x509/pkix"
 	"fmt"
 	"math/rand"
-	ocmfeature "open-cluster-management.io/api/feature"
 	"reflect"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	certificatesinformers "k8s.io/client-go/informers/certificates"
 	corev1informers "k8s.io/client-go/informers/core/v1"
-	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog/v2"
-	"open-cluster-management.io/registration/pkg/features"
-	"open-cluster-management.io/registration/pkg/helpers"
 )
 
 const (
@@ -73,6 +67,9 @@ type CSROption struct {
 
 	// EventFilterFunc matches csrs created with above options
 	EventFilterFunc factory.EventFilterFunc
+
+	// HaltCSRCreation halt the csr creation
+	HaltCSRCreation func() bool
 }
 
 // ClientCertOption includes options that is used to create client certificate
@@ -99,7 +96,7 @@ type StatusUpdateFunc func(ctx context.Context, cond metav1.Condition) error
 type clientCertificateController struct {
 	ClientCertOption
 	CSROption
-	csrControl
+	csrControl CSRControl
 	// managementCoreClient is used to create/delete hub kubeconfig secret on the management cluster
 	managementCoreClient corev1client.CoreV1Interface
 	controllerName       string
@@ -123,51 +120,7 @@ type clientCertificateController struct {
 func NewClientCertificateController(
 	clientCertOption ClientCertOption,
 	csrOption CSROption,
-	hubCSRInformer certificatesinformers.Interface,
-	hubKubeClient kubernetes.Interface,
-	managementSecretInformer corev1informers.SecretInformer,
-	managementKubeClient kubernetes.Interface,
-	statusUpdater StatusUpdateFunc,
-	recorder events.Recorder,
-	controllerName string,
-) (factory.Controller, error) {
-	var csrCtrl csrControl = nil
-	if features.DefaultSpokeMutableFeatureGate.Enabled(ocmfeature.V1beta1CSRAPICompatibility) {
-		v1CSRSupported, v1beta1CSRSupported, err := helpers.IsCSRSupported(hubKubeClient)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed CSR api discovery")
-		}
-		if !v1CSRSupported && v1beta1CSRSupported {
-			csrCtrl = &v1beta1CSRControl{
-				hubCSRInformer: hubCSRInformer.V1beta1().CertificateSigningRequests(),
-				hubCSRLister:   hubCSRInformer.V1beta1().CertificateSigningRequests().Lister(),
-				hubCSRClient:   hubKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
-			}
-			klog.Info("Using v1beta1 CSR api to manage spoke client certificate")
-		}
-	}
-	if csrCtrl == nil {
-		csrCtrl = &v1CSRControl{
-			hubCSRInformer: hubCSRInformer.V1().CertificateSigningRequests(),
-			hubCSRLister:   hubCSRInformer.V1().CertificateSigningRequests().Lister(),
-			hubCSRClient:   hubKubeClient.CertificatesV1().CertificateSigningRequests(),
-		}
-	}
-	return newClientCertificateController(
-		clientCertOption,
-		csrOption,
-		csrCtrl,
-		managementSecretInformer,
-		managementKubeClient.CoreV1(),
-		statusUpdater,
-		recorder,
-		controllerName), nil
-}
-
-func newClientCertificateController(
-	clientCertOption ClientCertOption,
-	csrOption CSROption,
-	csrControl csrControl,
+	csrControl CSRControl,
 	managementSecretInformer corev1informers.SecretInformer,
 	managementCoreClient corev1client.CoreV1Interface,
 	statusUpdater StatusUpdateFunc,
@@ -199,7 +152,7 @@ func newClientCertificateController(
 		}, managementSecretInformer.Informer()).
 		WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
 			return factory.DefaultQueueKey
-		}, c.EventFilterFunc, csrControl.informer()).
+		}, c.EventFilterFunc, csrControl.Informer()).
 		WithSync(c.sync).
 		ResyncEvery(ControllerResyncInterval).
 		ToController(controllerName, recorder)
@@ -344,6 +297,19 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 		return err
 	}
 	if !shouldCreate {
+		return nil
+	}
+
+	shouldHalt := c.CSROption.HaltCSRCreation()
+	if shouldHalt {
+		if updateErr := c.statusUpdater(ctx, metav1.Condition{
+			Type:    "ClusterCertificateRotated",
+			Status:  metav1.ConditionFalse,
+			Reason:  "ClientCertificateUpdateFailed",
+			Message: "Stop creating csr since there are too many csr created already on hub",
+		}); updateErr != nil {
+			return updateErr
+		}
 		return nil
 	}
 

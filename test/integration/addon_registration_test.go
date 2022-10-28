@@ -385,6 +385,53 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			return !reflect.DeepEqual(secret.Data, newSecret.Data)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	})
+
+	ginkgo.It("should stop addon client cert update if too frequent", func() {
+		assertSuccessClusterBootstrap()
+		signerName := "kubernetes.io/kube-apiserver-client"
+		assertSuccessAddOnBootstrap(signerName)
+
+		// update subject for 15 times
+		for i := 1; i <= 15; i++ {
+			addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			addOn.Status = addonv1alpha1.ManagedClusterAddOnStatus{
+				Registrations: []addonv1alpha1.RegistrationConfig{
+					{
+						SignerName: addOn.Status.Registrations[0].SignerName,
+						Subject: addonv1alpha1.Subject{
+							User: fmt.Sprintf("test-%d", i),
+						},
+					},
+				},
+			}
+			_, err = addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.TODO(), addOn, metav1.UpdateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			// sleep 1 second to ensure controller issue a new csr.
+			time.Sleep(1 * time.Second)
+		}
+
+		ginkgo.By("CSR should not exceed 10")
+		csrs, err := kubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s,%s=%s", clientcert.ClusterNameLabel, managedClusterName, clientcert.AddonNameLabel, addOnName),
+		})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(len(csrs.Items) >= 10).ShouldNot(gomega.BeFalse())
+
+		gomega.Eventually(func() error {
+			addOn, err := addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.TODO(), addOnName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			if meta.IsStatusConditionFalse(addOn.Status.Conditions, "ClusterCertificateRotated") {
+				return nil
+			}
+
+			return fmt.Errorf("addon status is not correct, got %v", addOn.Status.Conditions)
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+	})
 })
 
 func getSecretName(addOnName, signerName string) string {

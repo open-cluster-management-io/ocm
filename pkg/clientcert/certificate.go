@@ -12,14 +12,19 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	certificatesinformers "k8s.io/client-go/informers/certificates/v1"
+	certificatesinformers "k8s.io/client-go/informers/certificates"
+	certificatesv1informers "k8s.io/client-go/informers/certificates/v1"
+	"k8s.io/client-go/kubernetes"
 	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1"
-	certificateslisters "k8s.io/client-go/listers/certificates/v1"
+	certificatesv1listers "k8s.io/client-go/listers/certificates/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
+	ocmfeature "open-cluster-management.io/api/feature"
+	"open-cluster-management.io/registration/pkg/features"
+	"open-cluster-management.io/registration/pkg/helpers"
 )
 
 // HasValidClientCertificate checks if there exists a valid client certificate in the given secret
@@ -165,18 +170,20 @@ func BuildKubeconfig(clientConfig *restclient.Config, certPath, keyPath string) 
 	return kubeconfig
 }
 
-type csrControl interface {
+type CSRControl interface {
 	create(ctx context.Context, recorder events.Recorder, objMeta metav1.ObjectMeta, csrData []byte, signerName string) (string, error)
 	isApproved(name string) (bool, error)
 	getIssuedCertificate(name string) ([]byte, error)
-	informer() cache.SharedIndexInformer
+
+	// public so we can add indexer outside
+	Informer() cache.SharedIndexInformer
 }
 
-var _ csrControl = &v1CSRControl{}
+var _ CSRControl = &v1CSRControl{}
 
 type v1CSRControl struct {
-	hubCSRInformer certificatesinformers.CertificateSigningRequestInformer
-	hubCSRLister   certificateslisters.CertificateSigningRequestLister
+	hubCSRInformer certificatesv1informers.CertificateSigningRequestInformer
+	hubCSRLister   certificatesv1listers.CertificateSigningRequestLister
 	hubCSRClient   csrclient.CertificateSigningRequestInterface
 }
 
@@ -228,7 +235,7 @@ func (v *v1CSRControl) create(ctx context.Context, recorder events.Recorder, obj
 	return req.Name, nil
 }
 
-func (v *v1CSRControl) informer() cache.SharedIndexInformer {
+func (v *v1CSRControl) Informer() cache.SharedIndexInformer {
 	return v.hubCSRInformer.Informer()
 }
 
@@ -245,4 +252,28 @@ func (v *v1CSRControl) get(name string) (metav1.Object, error) {
 		return nil, err
 	}
 	return csr, nil
+}
+
+func NewCSRControl(hubCSRInformer certificatesinformers.Interface, hubKubeClient kubernetes.Interface) (CSRControl, error) {
+	if features.DefaultSpokeMutableFeatureGate.Enabled(ocmfeature.V1beta1CSRAPICompatibility) {
+		v1CSRSupported, v1beta1CSRSupported, err := helpers.IsCSRSupported(hubKubeClient)
+		if err != nil {
+			return nil, err
+		}
+		if !v1CSRSupported && v1beta1CSRSupported {
+			csrCtrl := &v1beta1CSRControl{
+				hubCSRInformer: hubCSRInformer.V1beta1().CertificateSigningRequests(),
+				hubCSRLister:   hubCSRInformer.V1beta1().CertificateSigningRequests().Lister(),
+				hubCSRClient:   hubKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
+			}
+			klog.Info("Using v1beta1 CSR api to manage spoke client certificate")
+			return csrCtrl, nil
+		}
+	}
+
+	return &v1CSRControl{
+		hubCSRInformer: hubCSRInformer.V1().CertificateSigningRequests(),
+		hubCSRLister:   hubCSRInformer.V1().CertificateSigningRequests().Lister(),
+		hubCSRClient:   hubKubeClient.CertificatesV1().CertificateSigningRequests(),
+	}, nil
 }

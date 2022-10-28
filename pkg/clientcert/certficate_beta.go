@@ -14,7 +14,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-var _ csrControl = &v1beta1CSRControl{}
+var _ CSRControl = &v1beta1CSRControl{}
 
 type v1beta1CSRControl struct {
 	hubCSRInformer certificatesinformers.CertificateSigningRequestInformer
@@ -74,7 +74,7 @@ func (v *v1beta1CSRControl) create(ctx context.Context, recorder events.Recorder
 	return req.Name, nil
 }
 
-func (v *v1beta1CSRControl) informer() cache.SharedIndexInformer {
+func (v *v1beta1CSRControl) Informer() cache.SharedIndexInformer {
 	return v.hubCSRInformer.Informer()
 }
 

@@ -204,22 +204,23 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			return err
 		}
 
+		csrControl, err := clientcert.NewCSRControl(bootstrapInformerFactory.Certificates(), bootstrapKubeClient)
+		if err != nil {
+			return err
+		}
+
 		controllerName := fmt.Sprintf("BootstrapClientCertController@cluster:%s", o.ClusterName)
-		clientCertForHubController, err := managedcluster.NewClientCertForHubController(
+		clientCertForHubController := managedcluster.NewClientCertForHubController(
 			o.ClusterName, o.AgentName, o.ComponentNamespace, o.HubKubeconfigSecret,
 			kubeconfigData,
 			// store the secret in the cluster where the agent pod runs
 			bootstrapNamespacedManagementKubeInformerFactory.Core().V1().Secrets(),
-			bootstrapInformerFactory.Certificates(),
+			csrControl,
 			managementKubeClient,
-			bootstrapKubeClient,
 			managedcluster.GenerateBootstrapStatusUpdater(),
 			controllerContext.EventRecorder,
 			controllerName,
 		)
-		if err != nil {
-			return err
-		}
 
 		bootstrapCtx, stopBootstrap := context.WithCancel(ctx)
 
@@ -288,15 +289,19 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		return err
 	}
 
+	csrControl, err := clientcert.NewCSRControl(hubKubeInformerFactory.Certificates(), hubKubeClient)
+	if err != nil {
+		return err
+	}
+
 	// create another ClientCertForHubController for client certificate rotation
 	controllerName := fmt.Sprintf("ClientCertController@cluster:%s", o.ClusterName)
-	clientCertForHubController, err := managedcluster.NewClientCertForHubController(
+	clientCertForHubController := managedcluster.NewClientCertForHubController(
 		o.ClusterName, o.AgentName, o.ComponentNamespace, o.HubKubeconfigSecret,
 		kubeconfigData,
 		namespacedManagementKubeInformerFactory.Core().V1().Secrets(),
-		hubKubeInformerFactory.Certificates(),
+		csrControl,
 		managementKubeClient,
-		hubKubeClient,
 		managedcluster.GenerateStatusUpdater(hubClusterClient, o.ClusterName),
 		controllerContext.EventRecorder,
 		controllerName,
@@ -370,9 +375,8 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			addOnClient,
 			managementKubeClient,
 			spokeKubeClient,
-			hubKubeInformerFactory.Certificates(),
+			csrControl,
 			addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
-			hubKubeClient,
 			controllerContext.EventRecorder,
 		)
 	}

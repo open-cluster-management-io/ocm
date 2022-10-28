@@ -15,14 +15,21 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers"
-	certificatesinformers "k8s.io/client-go/informers/certificates"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	"open-cluster-management.io/registration/pkg/clientcert"
 	"open-cluster-management.io/registration/pkg/helpers"
+)
+
+const (
+	indexByAddon = "indexByAddon"
+
+	// TODO(qiujian16) expose it if necessary in the future.
+	addonCSRThreshold = 10
 )
 
 // addOnRegistrationController monitors ManagedClusterAddOns on hub and starts addOn registration
@@ -36,10 +43,10 @@ type addOnRegistrationController struct {
 	managementKubeClient kubernetes.Interface // in-cluster local management kubeClient
 	spokeKubeClient      kubernetes.Interface
 	hubAddOnLister       addonlisterv1alpha1.ManagedClusterAddOnLister
-	hubCSRInformer       certificatesinformers.Interface
-	hubKubeClient        kubernetes.Interface
 	addOnClient          addonclient.Interface
+	csrControl           clientcert.CSRControl
 	recorder             events.Recorder
+	csrIndexer           cache.Indexer
 
 	startRegistrationFunc func(ctx context.Context, config registrationConfig) context.CancelFunc
 
@@ -56,9 +63,8 @@ func NewAddOnRegistrationController(
 	addOnClient addonclient.Interface,
 	managementKubeClient kubernetes.Interface,
 	managedKubeClient kubernetes.Interface,
-	hubCSRInformer certificatesinformers.Interface,
+	csrControl clientcert.CSRControl,
 	hubAddOnInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
-	hubCSRClient kubernetes.Interface,
 	recorder events.Recorder,
 ) factory.Controller {
 	c := &addOnRegistrationController{
@@ -68,11 +74,18 @@ func NewAddOnRegistrationController(
 		managementKubeClient:     managementKubeClient,
 		spokeKubeClient:          managedKubeClient,
 		hubAddOnLister:           hubAddOnInformers.Lister(),
-		hubCSRInformer:           hubCSRInformer,
-		hubKubeClient:            hubCSRClient,
+		csrControl:               csrControl,
 		addOnClient:              addOnClient,
 		recorder:                 recorder,
+		csrIndexer:               csrControl.Informer().GetIndexer(),
 		addOnRegistrationConfigs: map[string]map[string]registrationConfig{},
+	}
+
+	err := csrControl.Informer().AddIndexers(cache.Indexers{
+		indexByAddon: indexByAddonFunc,
+	})
+	if err != nil {
+		utilruntime.HandleError(err)
 	}
 
 	c.startRegistrationFunc = c.startRegistration
@@ -218,31 +231,43 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 		DNSNames:        []string{fmt.Sprintf("%s.addon.open-cluster-management.io", config.addOnName)},
 		SignerName:      config.registration.SignerName,
 		EventFilterFunc: createCSREventFilterFunc(c.clusterName, config.addOnName, config.registration.SignerName),
+		HaltCSRCreation: c.haltCSRCreationFunc(config.addOnName),
 	}
 
 	controllerName := fmt.Sprintf("ClientCertController@addon:%s:signer:%s", config.addOnName, config.registration.SignerName)
 
 	statusUpdater := c.generateStatusUpdate(c.clusterName, config.addOnName)
 
-	clientCertController, err := clientcert.NewClientCertificateController(
+	clientCertController := clientcert.NewClientCertificateController(
 		clientCertOption,
 		csrOption,
-		c.hubCSRInformer,
-		c.hubKubeClient,
+		c.csrControl,
 		kubeInformerFactory.Core().V1().Secrets(),
-		kubeClient,
+		kubeClient.CoreV1(),
 		statusUpdater,
 		c.recorder,
 		controllerName,
 	)
-	if err != nil {
-		utilruntime.HandleError(err)
-	}
 
 	go kubeInformerFactory.Start(ctx.Done())
 	go clientCertController.Run(ctx, 1)
 
 	return stopFunc
+}
+
+func (c *addOnRegistrationController) haltCSRCreationFunc(addonName string) func() bool {
+	return func() bool {
+		items, err := c.csrIndexer.ByIndex(indexByAddon, fmt.Sprintf("%s/%s", c.clusterName, addonName))
+		if err != nil {
+			return false
+		}
+
+		if len(items) >= addonCSRThreshold {
+			return true
+		}
+
+		return false
+	}
 }
 
 func (c *addOnRegistrationController) generateStatusUpdate(clusterName, addonName string) clientcert.StatusUpdateFunc {
@@ -291,6 +316,25 @@ func (c *addOnRegistrationController) cleanup(ctx context.Context, addOnName str
 
 	delete(c.addOnRegistrationConfigs, addOnName)
 	return nil
+}
+
+func indexByAddonFunc(obj interface{}) ([]string, error) {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	cluster, ok := accessor.GetLabels()[clientcert.ClusterNameLabel]
+	if !ok {
+		return []string{}, nil
+	}
+
+	addon, ok := accessor.GetLabels()[clientcert.AddonNameLabel]
+	if !ok {
+		return []string{}, nil
+	}
+
+	return []string{fmt.Sprintf("%s/%s", cluster, addon)}, nil
 }
 
 func createCSREventFilterFunc(clusterName, addOnName, signerName string) factory.EventFilterFunc {
