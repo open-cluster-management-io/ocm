@@ -161,6 +161,99 @@ func TestUpdateStatusCondition(t *testing.T) {
 	}
 }
 
+func TestReplaceKlusterletConditionFn(t *testing.T) {
+	cases := []struct {
+		name               string
+		startingConditions []metav1.Condition
+		newCondition       metav1.Condition
+		removeType         string
+		expectedUpdated    bool
+		expectedConditions []metav1.Condition
+	}{
+		{
+			name: "replace empty",
+			startingConditions: []metav1.Condition{
+				newCondition("two", "True", "my-reason", "my-message", nil),
+			},
+			newCondition:    newCondition("one", "True", "my-reason", "my-message", nil),
+			expectedUpdated: true,
+			expectedConditions: []metav1.Condition{
+				newCondition("two", "True", "my-reason", "my-message", nil),
+				newCondition("one", "True", "my-reason", "my-message", nil),
+			},
+		},
+		{
+			name: "replace an existing type",
+			startingConditions: []metav1.Condition{
+				newCondition("two", "True", "my-reason", "my-message", nil),
+			},
+			newCondition:    newCondition("one", "True", "my-reason", "my-message", nil),
+			removeType:      "two",
+			expectedUpdated: true,
+			expectedConditions: []metav1.Condition{
+				newCondition("one", "True", "my-reason", "my-message", nil),
+			},
+		},
+		{
+			name: "replace a non-existing type",
+			startingConditions: []metav1.Condition{
+				newCondition("two", "True", "my-reason", "my-message", nil),
+			},
+			newCondition:    newCondition("one", "True", "my-reason", "my-message", nil),
+			removeType:      "three",
+			expectedUpdated: true,
+			expectedConditions: []metav1.Condition{
+				newCondition("two", "True", "my-reason", "my-message", nil),
+				newCondition("one", "True", "my-reason", "my-message", nil),
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fakeOperatorClient := opereatorfake.NewSimpleClientset(
+				&operatorapiv1.ClusterManager{
+					ObjectMeta: metav1.ObjectMeta{Name: "testmanagedcluster"},
+					Status: operatorapiv1.ClusterManagerStatus{
+						Conditions: c.startingConditions,
+					},
+				},
+				&operatorapiv1.Klusterlet{
+					ObjectMeta: metav1.ObjectMeta{Name: "testmanagedcluster"},
+					Status: operatorapiv1.KlusterletStatus{
+						Conditions: c.startingConditions,
+					},
+				},
+			)
+
+			klusterletstatus, updated, err := UpdateKlusterletStatus(
+				context.TODO(),
+				fakeOperatorClient.OperatorV1().Klusterlets(),
+				"testmanagedcluster",
+				ReplaceKlusterletConditionFn(c.removeType, c.newCondition),
+			)
+			if err != nil {
+				t.Errorf("unexpected err: %v", err)
+			}
+			if updated != c.expectedUpdated {
+				t.Errorf("expected %t, but %t", c.expectedUpdated, updated)
+			}
+
+			for i := range c.expectedConditions {
+				expected := c.expectedConditions[i]
+
+				klusterletactual := klusterletstatus.Conditions[i]
+				if expected.LastTransitionTime == (metav1.Time{}) {
+					klusterletactual.LastTransitionTime = metav1.Time{}
+				}
+				if !equality.Semantic.DeepEqual(expected, klusterletactual) {
+					t.Errorf(diff.ObjectDiff(expected, klusterletactual))
+				}
+			}
+		})
+	}
+}
+
 func newCondition(name, status, reason, message string, lastTransition *metav1.Time) metav1.Condition {
 	ret := metav1.Condition{
 		Type:    name,

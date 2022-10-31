@@ -49,6 +49,7 @@ const (
 	appliedManifestWorkFinalizer = "cluster.open-cluster-management.io/applied-manifest-work-cleanup"
 
 	spokeRegistrationFeatureGatesInvalid = "InvalidRegistrationFeatureGates"
+	spokeRegistrationFeatureGatesValid   = "ValidRegistrationFeatureGates"
 )
 
 var (
@@ -239,22 +240,28 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		appliedManifestWorkClient: n.appliedManifestWorkClient,
 	}
 
-	// If there are some invalid feature gates of registration, will output condition `InvalidRegistrationFeatureGates` in Klusterlet.
+	// If there are some invalid feature gates of registration, will output condition `ValidRegistrationFeatureGates` False in Klusterlet.
 	if klusterlet.Spec.RegistrationConfiguration != nil && len(klusterlet.Spec.RegistrationConfiguration.FeatureGates) > 0 {
 		featureGateArgs, invalidFeatureGates := helpers.FeatureGatesArgs(
 			klusterlet.Spec.RegistrationConfiguration.FeatureGates, helpers.ComponentSpokeRegistrationKey)
 		if len(invalidFeatureGates) == 0 {
 			config.RegistrationFeatureGates = featureGateArgs
-			_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
-				Type: spokeRegistrationFeatureGatesInvalid, Status: metav1.ConditionTrue, Reason: "FeatureGatesAllValid",
-				Message: "Registration feature gates of klusterlet are all valid",
-			}))
+			// TODO: after the 0.10.0 is released, change back to UpdateKlusterletConditionFn
+			_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.ReplaceKlusterletConditionFn(
+				spokeRegistrationFeatureGatesInvalid,
+				metav1.Condition{
+					Type: spokeRegistrationFeatureGatesValid, Status: metav1.ConditionTrue, Reason: "FeatureGatesAllValid",
+					Message: "Registration feature gates of klusterlet are all valid",
+				}))
 		} else {
 			invalidFGErr := fmt.Errorf("there are some invalid feature gates of registration: %v ", invalidFeatureGates)
-			_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.UpdateKlusterletConditionFn(metav1.Condition{
-				Type: spokeRegistrationFeatureGatesInvalid, Status: metav1.ConditionFalse, Reason: "InvalidFeatureGatesExisting",
-				Message: invalidFGErr.Error(),
-			}))
+			// TODO: after the 0.10.0 is released, change back to UpdateKlusterletConditionFn
+			_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName, helpers.ReplaceKlusterletConditionFn(
+				spokeRegistrationFeatureGatesInvalid,
+				metav1.Condition{
+					Type: spokeRegistrationFeatureGatesValid, Status: metav1.ConditionFalse, Reason: "InvalidFeatureGatesExisting",
+					Message: invalidFGErr.Error(),
+				}))
 			return invalidFGErr
 		}
 	}

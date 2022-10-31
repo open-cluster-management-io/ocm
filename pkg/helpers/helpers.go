@@ -173,6 +173,17 @@ func UpdateKlusterletConditionFn(conds ...metav1.Condition) UpdateKlusterletStat
 	}
 }
 
+// TODO: just for upgrading, we need to remove this in 0.11.0
+func ReplaceKlusterletConditionFn(removeConditionType string, conds ...metav1.Condition) UpdateKlusterletStatusFunc {
+	return func(oldStatus *operatorapiv1.KlusterletStatus) error {
+		meta.RemoveStatusCondition(&oldStatus.Conditions, removeConditionType)
+		for _, cond := range conds {
+			meta.SetStatusCondition(&oldStatus.Conditions, cond)
+		}
+		return nil
+	}
+}
+
 func CleanUpStaticObject(
 	ctx context.Context,
 	client kubernetes.Interface,

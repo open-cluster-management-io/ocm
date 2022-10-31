@@ -270,7 +270,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	conditions := &clusterManager.Status.Conditions
 
 	// If there are some invalid feature gates of registration, will output
-	// condition `InvalidRegistrationFeatureGates` in ClusterManager.
+	// condition `ValidRegistrationFeatureGates` False in ClusterManager.
 	if clusterManager.Spec.RegistrationConfiguration != nil {
 		featureGates, condition, err := n.checkFeatureGate(ctx, clusterManagerName,
 			clusterManager.Spec.RegistrationConfiguration.FeatureGates, "registration")
@@ -281,7 +281,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		meta.SetStatusCondition(conditions, condition)
 	}
 	// If there are some invalid feature gates of work, will output
-	// condition `InvalidWorkFeatureGates` in ClusterManager.
+	// condition `ValidWorkFeatureGates` False in ClusterManager.
 	if clusterManager.Spec.WorkConfiguration != nil {
 		featureGates, condition, err := n.checkFeatureGate(ctx, clusterManagerName,
 			clusterManager.Spec.WorkConfiguration.FeatureGates, "work")
