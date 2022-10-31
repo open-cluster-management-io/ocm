@@ -1,0 +1,5 @@
+# Copyright Contributors to the Open Cluster Management project
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: open-cluster-management
