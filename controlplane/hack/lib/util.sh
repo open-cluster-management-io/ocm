@@ -295,19 +295,19 @@ clusters:
   - cluster:
       certificate-authority: ${ca_file}
       server: https://${api_host}:${api_port}/
-    name: local-up-ocm-control-plane
+    name: hub
 users:
   - user:
       token: ${token}
       client-certificate: ${dest_dir}/client-${client_id}.crt
       client-key: ${dest_dir}/client-${client_id}.key
-    name: local-up-ocm-control-plane
+    name: ocm-standalone-controlplane
 contexts:
   - context:
-      cluster: local-up-ocm-control-plane
-      user: local-up-ocm-control-plane
-    name: local-up-ocm-control-plane
-current-context: local-up-ocm-control-plane
+      cluster: hub
+      user: ocm-standalone-controlplane
+    name: ocm-controlplane
+current-context: ocm-controlplane
 EOF
 }
 

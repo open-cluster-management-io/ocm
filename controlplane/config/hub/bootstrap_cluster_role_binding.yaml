@@ -1,0 +1,13 @@
+# Copyright Contributors to the Open Cluster Management project
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cluster-bootstrap
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:open-cluster-management:bootstrap
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: system:bootstrappers:managedcluster
