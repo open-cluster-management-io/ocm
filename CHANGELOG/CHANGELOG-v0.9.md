@@ -36,3 +36,4 @@ N/A
 ### Bug Fixes
 
 * Fix the incorrect managed cluster lease name. ([#288](https://github.com/open-cluster-management-io/registration-operator/pull/288) [@skeeey](https://github.com/skeeey))
+* Fix the paradox description of the klusterlet condition([#294](https://github.com/open-cluster-management-io/registration-operator/pull/294) [@zhujian7](https://github.com/zhujian7))
