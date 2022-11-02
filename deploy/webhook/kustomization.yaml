@@ -25,7 +25,6 @@ namespace: open-cluster-management-hub
 # here. These are deployed via a "make install" dependency.
 
 resources:
-- ./apiservice.yaml
 - ./clusterrole_binding.yaml
 - ./clusterrole.yaml
 - ./deployment.yaml

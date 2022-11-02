@@ -17,7 +17,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
-	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -28,7 +27,7 @@ import (
 
 var hubNamespace = "open-cluster-management-hub"
 var mutatingWebhookName = "managedcluster-admission"
-var mutatingWebhookContainerName = "managedcluster-admission"
+var mutatingWebhookContainerName = "webhook"
 
 func TestE2E(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
@@ -41,13 +40,12 @@ const (
 )
 
 var (
-	hubClient           kubernetes.Interface
-	hubDynamicClient    dynamic.Interface
-	hubAPIServiceClient *apiregistrationclient.ApiregistrationV1Client
-	hubAddOnClient      addonclient.Interface
-	clusterClient       clusterclient.Interface
-	registrationImage   string
-	clusterCfg          *rest.Config
+	hubClient         kubernetes.Interface
+	hubDynamicClient  dynamic.Interface
+	hubAddOnClient    addonclient.Interface
+	clusterClient     clusterclient.Interface
+	registrationImage string
+	clusterCfg        *rest.Config
 )
 
 // This suite is sensitive to the following environment variables:
@@ -81,11 +79,6 @@ var _ = ginkgo.BeforeSuite(func() {
 		}
 
 		hubDynamicClient, err = dynamic.NewForConfig(clusterCfg)
-		if err != nil {
-			return err
-		}
-
-		hubAPIServiceClient, err = apiregistrationclient.NewForConfig(clusterCfg)
 		if err != nil {
 			return err
 		}

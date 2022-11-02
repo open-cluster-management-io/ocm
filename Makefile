@@ -58,6 +58,7 @@ deploy-hub: ensure-kustomize
 
 deploy-webhook: ensure-kustomize
 	cp deploy/webhook/managedclustersets_conversion_webhook.crd.yaml deploy/webhook/managedclustersets_conversion_webhook.crd.yaml.tmp
+	cp deploy/webhook/webhook.yaml deploy/webhook/webhook.yaml.tmp
 	bash -x hack/inject-ca.sh
 	cp deploy/webhook/kustomization.yaml deploy/webhook/kustomization.yaml.tmp
 	cd deploy/webhook && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/registration:latest=$(IMAGE_NAME)
@@ -65,6 +66,7 @@ deploy-webhook: ensure-kustomize
 	$(KUSTOMIZE) build deploy/webhook | $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) apply -f -
 	mv deploy/webhook/kustomization.yaml.tmp deploy/webhook/kustomization.yaml
 	mv -f deploy/webhook/managedclustersets_conversion_webhook.crd.yaml.tmp deploy/webhook/managedclustersets_conversion_webhook.crd.yaml
+	mv deploy/webhook/webhook.yaml.tmp deploy/webhook/webhook.yaml
 
 cluster-ip:
 	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)

@@ -12,29 +12,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
 var _ = ginkgo.Describe("ManagedClusterSetBinding", func() {
-	ginkgo.BeforeEach(func() {
-		// make sure the api service v1.admission.cluster.open-cluster-management.io is available
-		gomega.Eventually(func() bool {
-			apiService, err := hubAPIServiceClient.APIServices().Get(context.TODO(), apiserviceName, metav1.GetOptions{})
-			if err != nil {
-				return false
-			}
-			if len(apiService.Status.Conditions) == 0 {
-				return false
-			}
-			return apiService.Status.Conditions[0].Type == apiregistrationv1.Available &&
-				apiService.Status.Conditions[0].Status == apiregistrationv1.ConditionTrue
-		}, 60*time.Second, 1*time.Second).Should(gomega.BeTrue())
-	})
 
 	ginkgo.Context("ManagedClusterSetBinding", func() {
 		var namespace string
-
 		ginkgo.BeforeEach(func() {
 			// create a namespace for testing
 			namespace = fmt.Sprintf("ns-%s", rand.String(6))

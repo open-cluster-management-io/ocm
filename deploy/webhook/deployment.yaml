@@ -16,30 +16,27 @@ spec:
     spec:
       serviceAccountName: managedcluster-admission-sa
       containers:
-      - name: managedcluster-admission
-        image: quay.io/open-cluster-management/registration:latest
-        imagePullPolicy: IfNotPresent
-        args:
-          - "/registration"
-          - "webhook"
-          - "--cert-dir=/tmp"
-          - "--secure-port=6443"
-          # webhook is not hosting any k8s api resource, so it is not subjected to APF feature
-          - "--feature-gates=DefaultClusterSet=true,APIPriorityAndFairness=false"
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - ALL
-          privileged: false
-          runAsNonRoot: true
-      - name: conversion-webhook
+      - name: webhook
         image: quay.io/open-cluster-management/registration:latest
         args:
         - /registration
         - "webhook-server"
         - "port=9443"
+        - "--feature-gates=DefaultClusterSet=true"
         imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTP
+            port: 8000
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            scheme: HTTP
+            port: 8000
+          initialDelaySeconds: 2
         ports:
         - containerPort: 9443
           protocol: TCP

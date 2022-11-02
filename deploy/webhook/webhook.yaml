@@ -7,10 +7,11 @@ webhooks:
   failurePolicy: Fail
   clientConfig:
     service:
-      # reach the webhook via the registered aggregated API
-      namespace: default
-      name: kubernetes
-      path: /apis/admission.cluster.open-cluster-management.io/v1/managedclustervalidators
+      namespace: open-cluster-management-hub
+      name: managedcluster-admission
+      path: /validate-cluster-open-cluster-management-io-v1-managedcluster
+      port: 9443
+    caBundle: CA_PLACE_HOLDER
   rules:
   - operations:
     - CREATE
@@ -21,7 +22,7 @@ webhooks:
     - "*"
     resources:
     - managedclusters
-  admissionReviewVersions: ["v1beta1"]
+  admissionReviewVersions: ["v1beta1","v1"]
   sideEffects: None
   timeoutSeconds: 3
 
@@ -36,10 +37,11 @@ webhooks:
   failurePolicy: Fail
   clientConfig:
     service:
-      # reach the webhook via the registered aggregated API
-      namespace: default
-      name: kubernetes
-      path: /apis/admission.cluster.open-cluster-management.io/v1/managedclustermutators
+      namespace: open-cluster-management-hub
+      name: managedcluster-admission
+      path: /mutate-cluster-open-cluster-management-io-v1-managedcluster
+      port: 9443
+    caBundle: CA_PLACE_HOLDER
   rules:
   - operations:
     - CREATE
@@ -50,7 +52,7 @@ webhooks:
     - "*"
     resources:
     - managedclusters
-  admissionReviewVersions: ["v1beta1"]
+  admissionReviewVersions: ["v1beta1","v1"]
   sideEffects: None
   timeoutSeconds: 3
 
@@ -65,10 +67,11 @@ webhooks:
   failurePolicy: Fail
   clientConfig:
     service:
-      # reach the webhook via the registered aggregated API
-      namespace: default
-      name: kubernetes
-      path: /apis/admission.cluster.open-cluster-management.io/v1/managedclustersetbindingvalidators
+      namespace: open-cluster-management-hub
+      name: managedcluster-admission
+      path: /validate-cluster-open-cluster-management-io-v1beta1-managedclustersetbinding
+      port: 9443
+    caBundle: CA_PLACE_HOLDER
   rules:
   - operations:
     - CREATE
@@ -76,9 +79,39 @@ webhooks:
     apiGroups:
     - cluster.open-cluster-management.io
     apiVersions:
-    - "*"
+    - v1beta1
     resources:
     - managedclustersetbindings
-  admissionReviewVersions: ["v1beta1"]
+  admissionReviewVersions: ["v1beta1","v1"]
+  sideEffects: None
+  timeoutSeconds: 3
+
+---
+
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: managedclustersetbindingv1beta2validators.admission.cluster.open-cluster-management.io
+webhooks:
+- name: managedclustersetbindingv1beta2validators.admission.cluster.open-cluster-management.io
+  failurePolicy: Fail
+  clientConfig:
+    service:
+      namespace: open-cluster-management-hub
+      name: managedcluster-admission
+      path: /validate-cluster-open-cluster-management-io-v1beta2-managedclustersetbinding
+      port: 9443
+    caBundle: CA_PLACE_HOLDER  
+  rules:
+  - operations:
+    - CREATE
+    - UPDATE
+    apiGroups:
+    - cluster.open-cluster-management.io
+    apiVersions:
+    - v1beta2
+    resources:
+    - managedclustersetbindings
+  admissionReviewVersions: ["v1beta1","v1"]
   sideEffects: None
   timeoutSeconds: 3

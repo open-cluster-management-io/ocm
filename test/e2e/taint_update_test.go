@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -20,7 +21,6 @@ var _ = ginkgo.Describe("Taints update check", func() {
 			managedCluster *clusterv1.ManagedCluster
 			clusterName    string
 		)
-
 		ginkgo.BeforeEach(func() {
 			clusterName = fmt.Sprintf("managedcluster-%s", rand.String(6))
 			managedCluster = &clusterv1.ManagedCluster{
