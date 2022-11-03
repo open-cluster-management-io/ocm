@@ -1,0 +1,17 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: ocm-controlplane
+  labels:
+    component: ocm-controlplane
+spec:
+  host: ""
+  tls:
+    termination: passthrough
+  to:
+    kind: Service
+    name: ocm-controlplane
+    weight: 100
+  wildcardPolicy: None
+status:
+  ingress: []

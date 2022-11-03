@@ -1,0 +1,43 @@
+
+# Adds namespace to all resources.
+namespace: ocm-controlplane
+
+# Value of this field is prepended to the
+# names of all resources, e.g. a deployment named
+# "wordpress" becomes "alices-wordpress".
+# Note that it should also match with the prefix (text before '-') of the namespace
+# field above.
+#namePrefix: multicloud-
+
+# Labels to add to all resources and selectors.
+#commonLabels:
+#  someName: someValue
+
+# Each entry in this list must resolve to an existing
+# resource definition in YAML.  These are the resource
+# files that kustomize reads, modifies and emits as a
+# YAML string, with resources separated by document
+# markers ("---").
+#
+# General rule here is anything deployed by OLM bundles should go here as well,
+# this is used in "make deploy" for developers and should mimic what OLM deploys
+# for you. CRDs are an exception to this as we don't want to have to list them all
+# here. These are deployed via a "make install" dependency.
+
+resources:
+- ./deployment.yaml
+- ./service.yaml
+- ./route.yaml
+
+images:
+- name: quay.io/open-cluster-management/controlplane:latest
+  newName: quay.io/open-cluster-management/controlplane
+  newTag: latest
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+secretGenerator:
+- name: controlplane-cert
+  files:
+  - kube-serviceaccount.key
+  - client-ca.crt
