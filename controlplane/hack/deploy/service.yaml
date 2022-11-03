@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ocm-controlplane
+  labels:
+    component: ocm-controlplane
+spec:
+  ports:
+    - name: app
+      port: 443
+      protocol: TCP
+      targetPort: 4443
+  selector:
+    app: ocm-controlplane

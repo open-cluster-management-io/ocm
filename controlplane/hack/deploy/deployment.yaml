@@ -1,0 +1,43 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: ocm-controlplane
+  labels:
+    app: ocm-controlplane
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ocm-controlplane
+  template:
+    metadata:
+      labels:
+        app: ocm-controlplane
+    spec:
+      containers:
+      - name: controlplane
+        image: quay.io/open-cluster-management/controlplane:latest
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/ocm-controlplane"
+          - "--authorization-mode=RBAC"
+          - "--feature-gates=DefaultClusterSet=true"
+          - "--enable-bootstrap-token-auth"
+          - "--service-account-key-file=/controlplane/cert/kube-serviceaccount.key"
+          - "--cert-dir=/controlplane/cert"
+          - "--client-ca-file=/controlplane/cert/client-ca.crt"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
+        volumeMounts:
+        - name: controlplane-cert
+          mountPath: "/controlplane/cert"
+          readOnly: true
+      volumes:
+      - name: contrlplane-cert
+        secret:
+          secretName: controlplane-cert
