@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/davecgh/go-spew v1.1.1
+	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.20.0
 	github.com/openshift/build-machinery-go v0.0.0-20220720161851-9b4f0386f6b0
@@ -21,7 +22,7 @@ require (
 	k8s.io/klog/v2 v2.70.1
 	k8s.io/kube-aggregator v0.24.3
 	k8s.io/utils v0.0.0-20220725171434-9bab9ef40391
-	open-cluster-management.io/api v0.8.1-0.20220922101757-abd2ec6ed64f
+	open-cluster-management.io/api v0.9.1-0.20221031031432-8b08a2ec335b
 	sigs.k8s.io/controller-runtime v0.12.3
 )
 
@@ -35,7 +36,6 @@ require (
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
-	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect

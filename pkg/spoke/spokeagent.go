@@ -33,6 +33,7 @@ type WorkloadAgentOptions struct {
 	QPS                 float32
 	Burst               int
 	StatusSyncInterval  time.Duration
+	AgentID             string
 }
 
 // NewWorkloadAgentOptions returns the flags with default value set
@@ -52,6 +53,7 @@ func (o *WorkloadAgentOptions) AddFlags(cmd *cobra.Command) {
 	flags.StringVar(&o.SpokeKubeconfigFile, "spoke-kubeconfig", o.SpokeKubeconfigFile,
 		"Location of kubeconfig file to connect to spoke cluster. If this is not set, will use '--kubeconfig' to build client to connect to the managed cluster.")
 	flags.StringVar(&o.SpokeClusterName, "spoke-cluster-name", o.SpokeClusterName, "Name of spoke cluster.")
+	flags.StringVar(&o.AgentID, "agent-id", o.AgentID, "ID of the work agent to identify the work this agent should handle after restart/recovery.")
 	flags.Float32Var(&o.QPS, "spoke-kube-api-qps", o.QPS, "QPS to use while talking with apiserver on spoke cluster.")
 	flags.IntVar(&o.Burst, "spoke-kube-api-burst", o.Burst, "Burst to use while talking with apiserver on spoke cluster.")
 	flags.DurationVar(&o.StatusSyncInterval, "status-sync-interval", o.StatusSyncInterval, "Interval to sync resource status to hub.")
@@ -65,6 +67,11 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 		return err
 	}
 	hubhash := helper.HubHash(hubRestConfig.Host)
+
+	agentID := o.AgentID
+	if len(agentID) == 0 {
+		agentID = hubhash
+	}
 
 	hubWorkClient, err := workclientset.NewForConfig(hubRestConfig)
 	if err != nil {
@@ -116,7 +123,7 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 		workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks(o.SpokeClusterName),
 		spokeWorkClient.WorkV1().AppliedManifestWorks(),
 		spokeWorkInformerFactory.Work().V1().AppliedManifestWorks(),
-		hubhash,
+		hubhash, agentID,
 		restMapper,
 		validator,
 	)
@@ -131,7 +138,7 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 		spokeDynamicClient,
 		spokeWorkClient.WorkV1().AppliedManifestWorks(),
 		spokeWorkInformerFactory.Work().V1().AppliedManifestWorks(),
-		hubhash,
+		agentID,
 	)
 	manifestWorkFinalizeController := finalizercontroller.NewManifestWorkFinalizeController(
 		controllerContext.EventRecorder,
@@ -141,6 +148,12 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 		spokeWorkClient.WorkV1().AppliedManifestWorks(),
 		spokeWorkInformerFactory.Work().V1().AppliedManifestWorks(),
 		hubhash,
+	)
+	unmanagedAppliedManifestWorkController := finalizercontroller.NewUnManagedAppliedWorkController(
+		controllerContext.EventRecorder,
+		spokeWorkClient.WorkV1().AppliedManifestWorks(),
+		spokeWorkInformerFactory.Work().V1().AppliedManifestWorks(),
+		hubhash, agentID,
 	)
 	appliedManifestWorkController := appliedmanifestcontroller.NewAppliedManifestWorkController(
 		controllerContext.EventRecorder,
@@ -165,6 +178,7 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 	go spokeWorkInformerFactory.Start(ctx.Done())
 	go addFinalizerController.Run(ctx, 1)
 	go appliedManifestWorkFinalizeController.Run(ctx, 1)
+	go unmanagedAppliedManifestWorkController.Run(ctx, 1)
 	go appliedManifestWorkController.Run(ctx, 1)
 	go manifestWorkController.Run(ctx, 1)
 	go manifestWorkFinalizeController.Run(ctx, 1)

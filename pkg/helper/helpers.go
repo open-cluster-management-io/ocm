@@ -330,6 +330,17 @@ func AppliedManifestworkQueueKeyFunc(hubhash string) factory.ObjectQueueKeyFunc 
 	}
 }
 
+// AppliedManifestworkAgentIDFilter filter the appliedmanifestwork belonging to this work agent
+func AppliedManifestworkAgentIDFilter(agentID string) factory.EventFilterFunc {
+	return func(obj interface{}) bool {
+		appliedWork, ok := obj.(*workapiv1.AppliedManifestWork)
+		if !ok {
+			return false
+		}
+		return appliedWork.Spec.AgentID == agentID
+	}
+}
+
 // AppliedManifestworkHubHashFilter filter the appliedmanifestwork belonging to this hub
 func AppliedManifestworkHubHashFilter(hubHash string) factory.EventFilterFunc {
 	return func(obj interface{}) bool {

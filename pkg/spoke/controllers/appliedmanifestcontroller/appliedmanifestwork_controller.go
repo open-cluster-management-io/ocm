@@ -64,7 +64,10 @@ func NewAppliedManifestWorkController(
 			accessor, _ := meta.Accessor(obj)
 			return accessor.GetName()
 		}, manifestWorkInformer.Informer()).
-		WithInformersQueueKeyFunc(helper.AppliedManifestworkQueueKeyFunc(hubHash), appliedManifestWorkInformer.Informer()).
+		WithFilteredEventsInformersQueueKeyFunc(
+			helper.AppliedManifestworkQueueKeyFunc(hubHash),
+			helper.AppliedManifestworkHubHashFilter(hubHash),
+			appliedManifestWorkInformer.Informer()).
 		WithSync(controller.sync).ToController("AppliedManifestWorkController", recorder)
 }
 

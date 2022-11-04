@@ -134,10 +134,16 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// Ensure the appliedmanifestwork of deleted manifestwork is removed so it won't try to delete shared resource
-			gomega.Eventually(func() bool {
-				_, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
-				return errors.IsNotFound(err)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() error {
+				appliedWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				if err != nil {
+					return err
+				}
+				return fmt.Errorf("appliedmanifestwork should not exist: %v", appliedWork.DeletionTimestamp)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 			// Ensure the configmap is kept and tracked by anotherappliedmanifestwork.
 			gomega.Eventually(func() error {

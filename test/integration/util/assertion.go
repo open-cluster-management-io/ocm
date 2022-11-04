@@ -22,20 +22,23 @@ import (
 
 func AssertWorkCondition(namespace, name string, workClient workclientset.Interface, expectedType string, expectedWorkStatus metav1.ConditionStatus,
 	expectedManifestStatuses []metav1.ConditionStatus, eventuallyTimeout, eventuallyInterval int) {
-	gomega.Eventually(func() bool {
+	gomega.Eventually(func() error {
 		work, err := workClient.WorkV1().ManifestWorks(namespace).Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
-			return false
+			return err
 		}
 
 		// check manifest status conditions
 		if ok := HaveManifestCondition(work.Status.ResourceStatus.Manifests, expectedType, expectedManifestStatuses); !ok {
-			return false
+			return fmt.Errorf("condition %s does not exist", expectedType)
 		}
 
 		// check work status condition
-		return meta.IsStatusConditionPresentAndEqual(work.Status.Conditions, expectedType, expectedWorkStatus)
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		if meta.IsStatusConditionPresentAndEqual(work.Status.Conditions, expectedType, expectedWorkStatus) {
+			return nil
+		}
+		return fmt.Errorf("status of type %s does not match", expectedType)
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 }
 
 func AssertWorkGeneration(namespace, name string, workClient workclientset.Interface, expectedType string, eventuallyTimeout, eventuallyInterval int) {
@@ -62,10 +65,16 @@ func AssertWorkGeneration(namespace, name string, workClient workclientset.Inter
 // check if work is deleted
 func AssertWorkDeleted(namespace, name, hubhash string, manifests []workapiv1.Manifest, workClient workclientset.Interface, kubeClient kubernetes.Interface, eventuallyTimeout, eventuallyInterval int) {
 	// wait for deletion of manifest work
-	gomega.Eventually(func() bool {
+	gomega.Eventually(func() error {
 		_, err := workClient.WorkV1().ManifestWorks(namespace).Get(context.Background(), name, metav1.GetOptions{})
-		return apierrors.IsNotFound(err)
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("work %s in namespace %s still exists", name, namespace)
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 	// wait for deletion of appliedmanifestwork
 	appliedManifestWorkName := fmt.Sprintf("%s-%s", hubhash, name)
@@ -80,10 +89,16 @@ func AssertWorkDeleted(namespace, name, hubhash string, manifests []workapiv1.Ma
 }
 
 func AssertAppliedManifestWorkDeleted(name string, workClient workclientset.Interface, eventuallyTimeout, eventuallyInterval int) {
-	gomega.Eventually(func() bool {
+	gomega.Eventually(func() error {
 		_, err := workClient.WorkV1().AppliedManifestWorks().Get(context.Background(), name, metav1.GetOptions{})
-		return apierrors.IsNotFound(err)
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("appliedwork %s still exists", name)
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 }
 
 // check if finalizer is added

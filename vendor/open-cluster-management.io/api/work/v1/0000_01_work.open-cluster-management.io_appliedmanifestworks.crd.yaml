@@ -30,6 +30,9 @@ spec:
               description: Spec represents the desired configuration of AppliedManifestWork.
               type: object
               properties:
+                agentID:
+                  description: AgentID represents the ID of the work agent who is to handle this AppliedManifestWork.
+                  type: string
                 hubHash:
                   description: HubHash represents the hash of the first hub kube apiserver to identify which hub this AppliedManifestWork links to.
                   type: string

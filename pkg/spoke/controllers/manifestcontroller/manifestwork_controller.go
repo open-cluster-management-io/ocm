@@ -2,11 +2,13 @@ package manifestcontroller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
 
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,6 +22,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/pkg/errors"
@@ -48,6 +51,7 @@ type ManifestWorkController struct {
 	appliedManifestWorkLister worklister.AppliedManifestWorkLister
 	spokeDynamicClient        dynamic.Interface
 	hubHash                   string
+	agentID                   string
 	restMapper                meta.RESTMapper
 	appliers                  *apply.Appliers
 	validator                 auth.ExecutorValidator
@@ -72,7 +76,7 @@ func NewManifestWorkController(
 	manifestWorkLister worklister.ManifestWorkNamespaceLister,
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
 	appliedManifestWorkInformer workinformer.AppliedManifestWorkInformer,
-	hubHash string,
+	hubHash, agentID string,
 	restMapper meta.RESTMapper,
 	validator auth.ExecutorValidator) factory.Controller {
 
@@ -83,6 +87,7 @@ func NewManifestWorkController(
 		appliedManifestWorkLister: appliedManifestWorkInformer.Lister(),
 		spokeDynamicClient:        spokeDynamicClient,
 		hubHash:                   hubHash,
+		agentID:                   agentID,
 		restMapper:                restMapper,
 		appliers:                  apply.NewAppliers(spokeDynamicClient, spokeKubeClient, spokeAPIExtensionClient),
 		validator:                 validator,
@@ -93,7 +98,10 @@ func NewManifestWorkController(
 			accessor, _ := meta.Accessor(obj)
 			return accessor.GetName()
 		}, manifestWorkInformer.Informer()).
-		WithInformersQueueKeyFunc(helper.AppliedManifestworkQueueKeyFunc(hubHash), appliedManifestWorkInformer.Informer()).
+		WithFilteredEventsInformersQueueKeyFunc(
+			helper.AppliedManifestworkQueueKeyFunc(hubHash),
+			helper.AppliedManifestworkHubHashFilter(hubHash),
+			appliedManifestWorkInformer.Informer()).
 		WithSync(controller.sync).ResyncEvery(ResyncInterval).ToController("ManifestWorkAgent", recorder)
 }
 
@@ -133,25 +141,8 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	}
 
 	// Apply appliedManifestWork
-	appliedManifestWorkName := fmt.Sprintf("%s-%s", m.hubHash, manifestWork.Name)
-	appliedManifestWork, err := m.appliedManifestWorkLister.Get(appliedManifestWorkName)
-	switch {
-	case apierrors.IsNotFound(err):
-		appliedManifestWork = &workapiv1.AppliedManifestWork{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:       appliedManifestWorkName,
-				Finalizers: []string{controllers.AppliedManifestWorkFinalizer},
-			},
-			Spec: workapiv1.AppliedManifestWorkSpec{
-				HubHash:          m.hubHash,
-				ManifestWorkName: manifestWorkName,
-			},
-		}
-		appliedManifestWork, err = m.appliedManifestWorkClient.Create(ctx, appliedManifestWork, metav1.CreateOptions{})
-		if err != nil {
-			return err
-		}
-	case err != nil:
+	appliedManifestWork, err := m.applyAppliedManifestWork(ctx, manifestWork.Name, m.hubHash, m.agentID)
+	if err != nil {
 		return err
 	}
 
@@ -226,6 +217,60 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	}
 
 	return err
+}
+
+func (m *ManifestWorkController) applyAppliedManifestWork(ctx context.Context, workName, hubHash, agentID string) (*workapiv1.AppliedManifestWork, error) {
+	appliedManifestWorkName := fmt.Sprintf("%s-%s", m.hubHash, workName)
+	requiredAppliedWork := &workapiv1.AppliedManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       appliedManifestWorkName,
+			Finalizers: []string{controllers.AppliedManifestWorkFinalizer},
+		},
+		Spec: workapiv1.AppliedManifestWorkSpec{
+			HubHash:          m.hubHash,
+			ManifestWorkName: workName,
+			AgentID:          agentID,
+		},
+	}
+
+	appliedManifestWork, err := m.appliedManifestWorkLister.Get(appliedManifestWorkName)
+	switch {
+	case apierrors.IsNotFound(err):
+		return m.appliedManifestWorkClient.Create(ctx, requiredAppliedWork, metav1.CreateOptions{})
+
+	case err != nil:
+		return nil, err
+	}
+
+	if equality.Semantic.DeepEqual(appliedManifestWork.Spec, requiredAppliedWork.Spec) {
+		return appliedManifestWork, nil
+	}
+
+	oldData, err := json.Marshal(workapiv1.AppliedManifestWork{
+		Spec: appliedManifestWork.Spec,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to Marshal old data for appliedManifestWork %s: %w", appliedManifestWorkName, err)
+	}
+
+	newData, err := json.Marshal(workapiv1.AppliedManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:             appliedManifestWork.UID,
+			ResourceVersion: appliedManifestWork.ResourceVersion,
+		}, // to ensure they appear in the patch as preconditions
+		Spec: requiredAppliedWork.Spec,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to Marshal new data for appliedManifestWork %s: %w", appliedManifestWorkName, err)
+	}
+
+	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create patch for appliedManifestWork %s: %w", appliedManifestWorkName, err)
+	}
+
+	appliedManifestWork, err = m.appliedManifestWorkClient.Patch(ctx, appliedManifestWorkName, types.MergePatchType, patchBytes, metav1.PatchOptions{})
+	return appliedManifestWork, err
 }
 
 func (m *ManifestWorkController) applyManifests(
