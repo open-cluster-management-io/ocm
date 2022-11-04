@@ -45,7 +45,7 @@ func NewAddOnDeloymentConfigGetter(addonClient addonv1alpha1client.Interface) Ad
 // If there are mutiple AddOnDeloymentConfig objects in the AddOn ConfigReferences, the big index object will
 // override the one from small index
 func GetAddOnDeloymentConfigValues(
-	getter AddOnDeloymentConfigGetter, toValuesFunc AddOnDeloymentConfigToValuesFunc) GetValuesFunc {
+	getter AddOnDeloymentConfigGetter, toValuesFuncs ...AddOnDeloymentConfigToValuesFunc) GetValuesFunc {
 	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
 		var lastValues = Values{}
 		for _, config := range addon.Status.ConfigReferences {
@@ -59,12 +59,13 @@ func GetAddOnDeloymentConfigValues(
 				return nil, err
 			}
 
-			values, err := toValuesFunc(*addOnDeloymentConfig)
-			if err != nil {
-				return nil, err
+			for _, toValuesFunc := range toValuesFuncs {
+				values, err := toValuesFunc(*addOnDeloymentConfig)
+				if err != nil {
+					return nil, err
+				}
+				lastValues = MergeValues(lastValues, values)
 			}
-
-			lastValues = MergeValues(lastValues, values)
 		}
 
 		return lastValues, nil
@@ -79,9 +80,9 @@ func GetAddOnDeloymentConfigValues(
 // }
 // after transformed, the key set of Values object will be: {"Image", "ImagePullPolicy", "NodeSelector", "Tolerations"}
 func ToAddOnDeloymentConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
-	values := Values{}
-	for _, variable := range config.Spec.CustomizedVariables {
-		values[variable.Name] = variable.Value
+	values, err := ToAddOnCustomizedVariableValues(config)
+	if err != nil {
+		return nil, err
 	}
 
 	if config.Spec.NodePlacement != nil {
@@ -122,6 +123,22 @@ func ToAddOnNodePlacementValues(config addonapiv1alpha1.AddOnDeploymentConfig) (
 	values, err := JsonStructToValues(jsonStruct)
 	if err != nil {
 		return nil, err
+	}
+
+	return values, nil
+}
+
+// ToAddOnCustomizedVariables only transform the CustomizedVariables in the spec of AddOnDeploymentConfig into Values object.
+// for example: the spec of one AddOnDeploymentConfig is:
+// {
+//  customizedVariables: [{name: "a", value: "x"}, {name: "b", value: "y"}],
+// }
+// after transformed, the Values will be:
+// map[a:x b:y]
+func ToAddOnCustomizedVariableValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
+	values := Values{}
+	for _, variable := range config.Spec.CustomizedVariables {
+		values[variable.Name] = variable.Value
 	}
 
 	return values, nil

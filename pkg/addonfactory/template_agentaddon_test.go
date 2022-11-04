@@ -2,10 +2,12 @@ package addonfactory
 
 import (
 	"embed"
+	"fmt"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1apha1 "open-cluster-management.io/api/cluster/v1alpha1"
@@ -20,22 +22,29 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 		Image        string
 	}
 
+	type secretConfig struct {
+		HubKubeConfigSecret     string
+		ManagedKubeConfigSecret string
+	}
+
 	scheme := runtime.NewScheme()
 	_ = clusterv1apha1.Install(scheme)
 
 	cases := []struct {
-		name                     string
-		dir                      string
-		scheme                   *runtime.Scheme
-		clusterName              string
-		addonName                string
-		installNamespace         string
-		getValuesFunc            GetValuesFunc
-		annotationConfig         string
-		expectedInstallNamespace string
-		expectedNodeSelector     map[string]string
-		expectedImage            string
-		expectedObjectCnt        int
+		name                            string
+		dir                             string
+		scheme                          *runtime.Scheme
+		clusterName                     string
+		addonName                       string
+		installNamespace                string
+		getValuesFunc                   GetValuesFunc
+		annotationConfig                string
+		expectedInstallNamespace        string
+		expectedNodeSelector            map[string]string
+		expectedImage                   string
+		expectedObjectCnt               int
+		expectedHubKubeConfigSecret     string
+		expectedManagedKubeConfigSecret string
 	}{
 		{
 			name:             "template render ok with annotation config and default scheme",
@@ -107,9 +116,39 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 			expectedImage:            "quay.io/helloworld:2.4",
 			expectedObjectCnt:        1,
 		},
+		{
+			name:             "deployment template render ok with overriden secret names",
+			dir:              "testmanifests/template",
+			clusterName:      "cluster1",
+			addonName:        "helloworld",
+			scheme:           scheme,
+			annotationConfig: `{"Image":"quay.io/helloworld:2.4"}`,
+			getValuesFunc: func(cluster *clusterv1.ManagedCluster,
+				addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+				config := secretConfig{
+					HubKubeConfigSecret:     "external-hub-kubeconfig",
+					ManagedKubeConfigSecret: "external-managed-kubeconfig",
+				}
+				return StructToValues(config), nil
+			},
+			expectedInstallNamespace:        AddonDefaultInstallNamespace,
+			expectedNodeSelector:            map[string]string{},
+			expectedImage:                   "quay.io/helloworld:2.4",
+			expectedObjectCnt:               2,
+			expectedHubKubeConfigSecret:     "external-hub-kubeconfig",
+			expectedManagedKubeConfigSecret: "external-managed-kubeconfig",
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			if len(c.expectedHubKubeConfigSecret) == 0 {
+				c.expectedHubKubeConfigSecret = fmt.Sprintf("%s-hub-kubeconfig", c.addonName)
+			}
+
+			if len(c.expectedManagedKubeConfigSecret) == 0 {
+				c.expectedManagedKubeConfigSecret = fmt.Sprintf("%s-managed-kubeconfig", c.addonName)
+			}
+
 			cluster := NewFakeManagedCluster(c.clusterName)
 			clusterAddon := NewFakeManagedClusterAddon(c.addonName, c.clusterName, c.installNamespace,
 				c.annotationConfig)
@@ -117,6 +156,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 			agentAddon, err := NewAgentAddonFactory(c.addonName, templateFS, c.dir).
 				WithScheme(c.scheme).
 				WithGetValuesFuncs(c.getValuesFunc, GetValuesFromAddonAnnotation).
+				WithAgentRegistrationOption(&agent.RegistrationOption{}).
 				BuildTemplateAgentAddon()
 			if err != nil {
 				t.Errorf("expected no error, got err %v", err)
@@ -156,6 +196,14 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 					}
 					if object.Spec.Value != c.expectedImage {
 						t.Errorf("expected image is %s, but got %s", c.expectedImage, object.Spec.Value)
+					}
+
+					if value, ok := object.Annotations["hubKubeConfigSecret"]; !ok || value != c.expectedHubKubeConfigSecret {
+						t.Errorf("expected hubKubeConfigSecret is %s, but got %s", c.expectedHubKubeConfigSecret, value)
+					}
+
+					if value, ok := object.Annotations["managedKubeConfigSecret"]; !ok || value != c.expectedManagedKubeConfigSecret {
+						t.Errorf("expected managedKubeConfigSecret is %s, but got %s", c.expectedManagedKubeConfigSecret, value)
 					}
 				}
 			}

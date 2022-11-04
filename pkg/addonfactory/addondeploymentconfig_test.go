@@ -20,7 +20,7 @@ var (
 func TestGetAddOnDeloymentConfigValues(t *testing.T) {
 	cases := []struct {
 		name           string
-		toValuesFunc   AddOnDeloymentConfigToValuesFunc
+		toValuesFuncs  []AddOnDeloymentConfigToValuesFunc
 		addOnObjs      []runtime.Object
 		expectedValues Values
 	}{
@@ -47,8 +47,8 @@ func TestGetAddOnDeloymentConfigValues(t *testing.T) {
 			expectedValues: Values{},
 		},
 		{
-			name:         "mutiple addon deployment configs",
-			toValuesFunc: ToAddOnDeloymentConfigValues,
+			name:          "mutiple addon deployment configs",
+			toValuesFuncs: []AddOnDeloymentConfigToValuesFunc{ToAddOnDeloymentConfigValues},
 			addOnObjs: []runtime.Object{
 				func() *addonapiv1alpha1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
@@ -109,8 +109,8 @@ func TestGetAddOnDeloymentConfigValues(t *testing.T) {
 			},
 		},
 		{
-			name:         "to addon node placement",
-			toValuesFunc: ToAddOnNodePlacementValues,
+			name:          "to addon node placement",
+			toValuesFuncs: []AddOnDeloymentConfigToValuesFunc{ToAddOnNodePlacementValues},
 			addOnObjs: []runtime.Object{
 				func() *addonapiv1alpha1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
@@ -148,6 +148,53 @@ func TestGetAddOnDeloymentConfigValues(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:          "multiple toValuesFuncs",
+			toValuesFuncs: []AddOnDeloymentConfigToValuesFunc{ToAddOnNodePlacementValues, ToAddOnCustomizedVariableValues},
+			addOnObjs: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1")
+					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "addon.open-cluster-management.io",
+								Resource: "addondeploymentconfigs",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "config",
+							},
+						},
+					}
+					return addon
+				}(),
+				&addonapiv1alpha1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "config",
+						Namespace: "cluster1",
+					},
+					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+						NodePlacement: &addonapiv1alpha1.NodePlacement{
+							NodeSelector: nodeSelector,
+							Tolerations:  tolerations,
+						},
+						CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+							{
+								Name:  "managedKubeConfigSecret",
+								Value: "external-managed-kubeconfig",
+							},
+						},
+					},
+				},
+			},
+			expectedValues: Values{
+				"global": map[string]interface{}{"nodeSelector": map[string]interface{}{"kubernetes.io/os": "linux"}},
+				"tolerations": []interface{}{
+					map[string]interface{}{"effect": "NoExecute", "key": "foo", "operator": "Exists"},
+				},
+				"managedKubeConfigSecret": "external-managed-kubeconfig",
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -161,7 +208,7 @@ func TestGetAddOnDeloymentConfigValues(t *testing.T) {
 				t.Errorf("expected addon object, but failed")
 			}
 
-			values, err := GetAddOnDeloymentConfigValues(getter, c.toValuesFunc)(nil, addOn)
+			values, err := GetAddOnDeloymentConfigValues(getter, c.toValuesFuncs...)(nil, addOn)
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
 			}

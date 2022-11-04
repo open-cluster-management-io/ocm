@@ -2,6 +2,7 @@ package addonfactory
 
 import (
 	"embed"
+	"fmt"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -9,6 +10,7 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1apha1 "open-cluster-management.io/api/cluster/v1alpha1"
@@ -59,16 +61,19 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 	_ = scheme.AddToScheme(testScheme)
 
 	cases := []struct {
-		name                     string
-		scheme                   *runtime.Scheme
-		clusterName              string
-		addonName                string
-		installNamespace         string
-		annotationValues         string
-		expectedInstallNamespace string
-		expectedNodeSelector     map[string]string
-		expectedImage            string
-		expectedObjCnt           int
+		name                            string
+		scheme                          *runtime.Scheme
+		clusterName                     string
+		addonName                       string
+		installNamespace                string
+		annotationValues                string
+		getValuesFunc                   GetValuesFunc
+		expectedInstallNamespace        string
+		expectedNodeSelector            map[string]string
+		expectedImage                   string
+		expectedObjCnt                  int
+		expectedHubKubeConfigSecret     string
+		expectedManagedKubeConfigSecret string
 	}{
 		{
 			name:                     "template render ok with annotation values",
@@ -106,16 +111,51 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 			expectedImage:            "quay.io/helloworld:2.4",
 			expectedObjCnt:           6,
 		},
+		{
+			name:             "template render ok with getValuesFunc",
+			scheme:           testScheme,
+			clusterName:      "cluster1",
+			addonName:        "helloworld",
+			installNamespace: "myNs",
+			annotationValues: `{"global": {"nodeSelector":{"host":"ssd"},"imageOverrides":{"testImage":"quay.io/helloworld:2.4"}}}`,
+			getValuesFunc: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+				return Values{
+					"hubKubeConfigSecret":     "external-hub-kubeconfig",
+					"managedKubeConfigSecret": "external-managed-kubeconfig",
+				}, nil
+			},
+			expectedInstallNamespace:        "myNs",
+			expectedNodeSelector:            map[string]string{"host": "ssd"},
+			expectedImage:                   "quay.io/helloworld:2.4",
+			expectedObjCnt:                  4,
+			expectedHubKubeConfigSecret:     "external-hub-kubeconfig",
+			expectedManagedKubeConfigSecret: "external-managed-kubeconfig",
+		},
 	}
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			getValuesFuncs := []GetValuesFunc{getValues, GetValuesFromAddonAnnotation}
+			if c.getValuesFunc != nil {
+				getValuesFuncs = append(getValuesFuncs, c.getValuesFunc)
+			}
+
+			if len(c.expectedHubKubeConfigSecret) == 0 {
+				c.expectedHubKubeConfigSecret = fmt.Sprintf("%s-hub-kubeconfig", c.addonName)
+			}
+
+			if len(c.expectedManagedKubeConfigSecret) == 0 {
+				c.expectedManagedKubeConfigSecret = fmt.Sprintf("%s-managed-kubeconfig", c.addonName)
+			}
+
 			cluster := NewFakeManagedCluster(c.clusterName)
 			clusterAddon := NewFakeManagedClusterAddon(c.addonName, c.clusterName, c.installNamespace, c.annotationValues)
 
 			agentAddon, err := NewAgentAddonFactory(c.addonName, chartFS, "testmanifests/chart").
-				WithGetValuesFuncs(getValues, GetValuesFromAddonAnnotation).
+				WithGetValuesFuncs(getValuesFuncs...).
 				WithScheme(c.scheme).
 				WithTrimCRDDescription().
+				WithAgentRegistrationOption(&agent.RegistrationOption{}).
 				BuildHelmAgentAddon()
 			if err != nil {
 				t.Errorf("expected no error, got err %v", err)
@@ -148,6 +188,16 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 				case *clusterv1apha1.ClusterClaim:
 					if object.Spec.Value != c.clusterName {
 						t.Errorf("expected clusterName is %s, but got %s", c.clusterName, object.Spec.Value)
+					}
+
+					if object.Name == c.clusterName {
+						if value, ok := object.Annotations["hubKubeConfigSecret"]; !ok || value != c.expectedHubKubeConfigSecret {
+							t.Errorf("expected hubKubeConfigSecret is %s, but got %s", c.expectedHubKubeConfigSecret, value)
+						}
+
+						if value, ok := object.Annotations["managedKubeConfigSecret"]; !ok || value != c.expectedManagedKubeConfigSecret {
+							t.Errorf("expected managedKubeConfigSecret is %s, but got %s", c.expectedManagedKubeConfigSecret, value)
+						}
 					}
 				case *apiextensionsv1.CustomResourceDefinition:
 					if object.Name != "test.cluster.open-cluster-management.io" {

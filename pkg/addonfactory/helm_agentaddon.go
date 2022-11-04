@@ -22,12 +22,21 @@ import (
 
 // helmBuiltinValues includes the built-in values for helm agentAddon.
 // the values in helm chart should begin with a lowercase letter, so we need convert it to Values by JsonStructToValues.
+// the built-in values can not be overrided by getValuesFuncs
 type helmBuiltinValues struct {
 	ClusterName             string `json:"clusterName"`
 	AddonInstallNamespace   string `json:"addonInstallNamespace"`
 	HubKubeConfigSecret     string `json:"hubKubeConfigSecret,omitempty"`
 	ManagedKubeConfigSecret string `json:"managedKubeConfigSecret,omitempty"`
 	InstallMode             string `json:"installMode"`
+}
+
+// helmDefaultValues includes the default values for helm agentAddon.
+// the values in helm chart should begin with a lowercase letter, so we need convert it to Values by JsonStructToValues.
+// the default values can be overrided by getValuesFuncs
+type helmDefaultValues struct {
+	HubKubeConfigSecret     string `json:"hubKubeConfigSecret,omitempty"`
+	ManagedKubeConfigSecret string `json:"managedKubeConfigSecret,omitempty"`
 }
 
 type HelmAgentAddon struct {
@@ -134,6 +143,13 @@ func (a *HelmAgentAddon) getValues(
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (chartutil.Values, error) {
 	overrideValues := map[string]interface{}{}
 
+	defaultValues, err := a.getDefaultValues(cluster, addon)
+	if err != nil {
+		klog.Error("failed to get defaultValue. err:%v", err)
+		return nil, err
+	}
+	overrideValues = MergeValues(overrideValues, defaultValues)
+
 	for i := 0; i < len(a.getValuesFuncs); i++ {
 		if a.getValuesFuncs[i] != nil {
 			userValues, err := a.getValuesFuncs[i](cluster, addon)
@@ -177,12 +193,6 @@ func (a *HelmAgentAddon) getBuiltinValues(
 	}
 	builtinValues.AddonInstallNamespace = installNamespace
 
-	// TODO: hubKubeConfigSecret depends on the signer configuration in registration, and the registration is an array.
-	if a.agentAddonOptions.Registration != nil {
-		builtinValues.HubKubeConfigSecret = fmt.Sprintf("%s-hub-kubeconfig", a.agentAddonOptions.AddonName)
-	}
-
-	builtinValues.ManagedKubeConfigSecret = fmt.Sprintf("%s-managed-kubeconfig", addon.Name)
 	builtinValues.InstallMode, _ = constants.GetHostedModeInfo(addon.GetAnnotations())
 
 	helmBuiltinValues, err := JsonStructToValues(builtinValues)
@@ -191,6 +201,26 @@ func (a *HelmAgentAddon) getBuiltinValues(
 		return nil, err
 	}
 	return helmBuiltinValues, nil
+}
+
+func (a *HelmAgentAddon) getDefaultValues(
+	cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+	defaultValues := helmDefaultValues{}
+
+	// TODO: hubKubeConfigSecret depends on the signer configuration in registration, and the registration is an array.
+	if a.agentAddonOptions.Registration != nil {
+		defaultValues.HubKubeConfigSecret = fmt.Sprintf("%s-hub-kubeconfig", a.agentAddonOptions.AddonName)
+	}
+
+	defaultValues.ManagedKubeConfigSecret = fmt.Sprintf("%s-managed-kubeconfig", addon.Name)
+
+	helmDefaultValues, err := JsonStructToValues(defaultValues)
+	if err != nil {
+		klog.Error("failed to convert defaultValues to values %v.err:%v", defaultValues, err)
+		return nil, err
+	}
+	return helmDefaultValues, nil
 }
 
 // only support Capabilities.KubeVersion

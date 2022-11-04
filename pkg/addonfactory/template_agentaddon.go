@@ -15,12 +15,19 @@ import (
 
 // templateBuiltinValues includes the built-in values for template agentAddon.
 // the values for template config should begin with an uppercase letter, so we need convert it to Values by StructToValues.
+// the built-in values can not be overrided by getValuesFuncs
 type templateBuiltinValues struct {
-	ClusterName             string
-	AddonInstallNamespace   string
+	ClusterName           string
+	AddonInstallNamespace string
+	InstallMode           string
+}
+
+// templateDefaultValues includes the default values for template agentAddon.
+// the values for template config should begin with an uppercase letter, so we need convert it to Values by StructToValues.
+// the default values can be overrided by getValuesFuncs
+type templateDefaultValues struct {
 	HubKubeConfigSecret     string
 	ManagedKubeConfigSecret string
-	InstallMode             string
 }
 
 type templateFile struct {
@@ -87,6 +94,9 @@ func (a *TemplateAgentAddon) getValues(
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
 	overrideValues := map[string]interface{}{}
 
+	defaultValues := a.getDefaultValues(cluster, addon)
+	overrideValues = MergeValues(overrideValues, defaultValues)
+
 	for i := 0; i < len(a.getValuesFuncs); i++ {
 		if a.getValuesFuncs[i] != nil {
 			userValues, err := a.getValuesFuncs[i](cluster, addon)
@@ -114,15 +124,24 @@ func (a *TemplateAgentAddon) getBuiltinValues(
 	}
 	builtinValues.AddonInstallNamespace = installNamespace
 
-	// TODO: hubKubeConfigSecret depends on the signer configuration in registration, and the registration is an array.
-	if a.agentAddonOptions.Registration != nil {
-		builtinValues.HubKubeConfigSecret = fmt.Sprintf("%s-hub-kubeconfig", a.agentAddonOptions.AddonName)
-	}
-
-	builtinValues.ManagedKubeConfigSecret = fmt.Sprintf("%s-managed-kubeconfig", addon.Name)
 	builtinValues.InstallMode, _ = constants.GetHostedModeInfo(addon.GetAnnotations())
 
 	return StructToValues(builtinValues)
+}
+
+func (a *TemplateAgentAddon) getDefaultValues(
+	cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1alpha1.ManagedClusterAddOn) Values {
+	defaultValues := templateDefaultValues{}
+
+	// TODO: hubKubeConfigSecret depends on the signer configuration in registration, and the registration is an array.
+	if a.agentAddonOptions.Registration != nil {
+		defaultValues.HubKubeConfigSecret = fmt.Sprintf("%s-hub-kubeconfig", a.agentAddonOptions.AddonName)
+	}
+
+	defaultValues.ManagedKubeConfigSecret = fmt.Sprintf("%s-managed-kubeconfig", addon.Name)
+
+	return StructToValues(defaultValues)
 }
 
 func (a *TemplateAgentAddon) addTemplateData(file string, data []byte) {
