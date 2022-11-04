@@ -75,13 +75,14 @@ func (c *managedClusterLeaseController) sync(ctx context.Context, syncCtx factor
 		observedLeaseDurationSeconds = 60
 	}
 
-	// if lease duration is changed, start a new lease update routine.
+	// if lease duration is changed, stop the old lease update routine.
 	if c.lastLeaseDurationSeconds != observedLeaseDurationSeconds {
 		c.lastLeaseDurationSeconds = observedLeaseDurationSeconds
 		c.leaseUpdater.stop()
-		c.leaseUpdater.start(ctx, time.Duration(c.lastLeaseDurationSeconds)*time.Second)
 	}
 
+	// ensure there is a starting lease update routine.
+	c.leaseUpdater.start(ctx, time.Duration(c.lastLeaseDurationSeconds)*time.Second)
 	return nil
 }
 
@@ -99,6 +100,10 @@ type leaseUpdater struct {
 func (u *leaseUpdater) start(ctx context.Context, leaseDuration time.Duration) {
 	u.lock.Lock()
 	defer u.lock.Unlock()
+
+	if u.cancel != nil {
+		return
+	}
 
 	var updateCtx context.Context
 	updateCtx, u.cancel = context.WithCancel(ctx)

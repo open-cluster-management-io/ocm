@@ -13,6 +13,7 @@ import (
 	"open-cluster-management.io/registration/pkg/spoke"
 	"open-cluster-management.io/registration/test/integration/util"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -38,40 +39,13 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
-
 		cancel := util.RunAgent("cluster-leasetest", agentOptions, spokeCfg)
 		defer cancel()
 
-		// simulate hub cluster admin to accept the managedcluster and approve the csr
-		gomega.Eventually(func() error {
-			if err := util.AcceptManagedCluster(clusterClient, managedClusterName); err != nil {
-				return err
-			}
-			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
-
-		gomega.Eventually(func() bool {
-			if err := authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24); err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
-		// simulate k8s to mount the hub kubeconfig secret after the bootstrap is finished
-		gomega.Eventually(func() bool {
-			if _, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret); err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
+		bootstrapManagedCluster(managedClusterName, hubKubeconfigSecret)
 		// after two grace period, make sure the managed cluster is available
-		<-time.After(time.Duration(2*5*util.TestLeaseDurationSeconds) * time.Second)
-		managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		availableCond := meta.FindStatusCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
-		gomega.Expect(availableCond).ShouldNot(gomega.BeNil())
-		gomega.Expect(availableCond.Status).Should(gomega.Equal(metav1.ConditionTrue))
+		gracePeriod := 2 * 5 * util.TestLeaseDurationSeconds
+		assertAvailableCondition(managedClusterName, metav1.ConditionTrue, gracePeriod)
 	})
 
 	ginkgo.It("managed cluster available condition should be recovered after its lease update is recovered", func() {
@@ -83,73 +57,17 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
-
 		stop := util.RunAgent("cluster-availabletest", agentOptions, spokeCfg)
 
-		// simulate hub cluster admin to accept the managed cluster and approve the csr
-		gomega.Eventually(func() bool {
-			if err := util.AcceptManagedCluster(clusterClient, managedClusterName); err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
-		gomega.Eventually(func() bool {
-			if err := authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24); err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
-		// simulate k8s to mount the hub kubeconfig secret after the bootstrap is finished
-		gomega.Eventually(func() bool {
-			if _, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret); err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
-		// make sure the managed cluster is available
-		gomega.Eventually(func() bool {
-			managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
-			if err != nil {
-				return false
-			}
-			availableCond := meta.FindStatusCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
-			if availableCond == nil {
-				return false
-			}
-			return availableCond.Status == metav1.ConditionTrue
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		bootstrapManagedCluster(managedClusterName, hubKubeconfigSecret)
+		assertAvailableCondition(managedClusterName, metav1.ConditionTrue, 0)
 
 		// stop the current managed cluster
 		stop()
 
 		// after one grace period, make sure the managed available condition is cluster unknown
-		<-time.After(time.Duration(5*util.TestLeaseDurationSeconds) * time.Second)
-		gomega.Eventually(func() error {
-			managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
-			if err != nil {
-				return err
-			}
-
-			// update the cluster to trigger condition update
-			managedCluster.Labels = map[string]string{"foo": "bar"}
-			_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.Background(), managedCluster, metav1.UpdateOptions{})
-			if err != nil {
-				return err
-			}
-
-			availableCond := meta.FindStatusCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
-			if availableCond == nil {
-				return fmt.Errorf("available condition is not found")
-			}
-
-			if availableCond.Status != metav1.ConditionUnknown {
-				return fmt.Errorf("avaibale condition should be unknown")
-			}
-			return nil
-		}, 10, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		gracePeriod := 5 * util.TestLeaseDurationSeconds
+		assertAvailableCondition(managedClusterName, metav1.ConditionUnknown, gracePeriod)
 
 		agentOptions = spoke.SpokeAgentOptions{
 			ClusterName:              managedClusterName,
@@ -158,17 +76,96 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
-
 		stop = util.RunAgent("cluster-availabletest", agentOptions, spokeCfg)
 		defer stop()
 
 		// after one grace period, make sure the managed cluster available condition is recovered
-		<-time.After(time.Duration(5*util.TestLeaseDurationSeconds+1) * time.Second)
-		managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		availableCond := meta.FindStatusCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
-		gomega.Expect(availableCond).ShouldNot(gomega.BeNil())
-		gomega.Expect(availableCond.Status).Should(gomega.Equal(metav1.ConditionTrue))
+		gracePeriod = 5*util.TestLeaseDurationSeconds + 1
+		assertAvailableCondition(managedClusterName, metav1.ConditionTrue, gracePeriod)
+	})
 
+	ginkgo.It("managed cluster available condition should be recovered after the cluster is restored", func() {
+		// run registration agent
+		agentOptions := spoke.SpokeAgentOptions{
+			ClusterName:              managedClusterName,
+			BootstrapKubeconfig:      bootstrapKubeConfigFile,
+			HubKubeconfigSecret:      hubKubeconfigSecret,
+			HubKubeconfigDir:         hubKubeconfigDir,
+			ClusterHealthCheckPeriod: 1 * time.Minute,
+		}
+		cancel := util.RunAgent("cluster-leasetest", agentOptions, spokeCfg)
+		defer cancel()
+
+		bootstrapManagedCluster(managedClusterName, hubKubeconfigSecret)
+		assertAvailableCondition(managedClusterName, metav1.ConditionTrue, 0)
+
+		// remove the cluster
+		gomega.Eventually(func() error {
+			if err := clusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(), managedClusterName, metav1.DeleteOptions{}); err != nil {
+				return err
+			}
+			managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			managedCluster.Finalizers = []string{}
+			_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		// restore the cluster
+		gomega.Eventually(func() error {
+			_, err := clusterClient.ClusterV1().ManagedClusters().Create(
+				context.TODO(),
+				&clusterv1.ManagedCluster{
+					ObjectMeta: metav1.ObjectMeta{Name: managedClusterName},
+					Spec: clusterv1.ManagedClusterSpec{
+						HubAcceptsClient:     true,
+						LeaseDurationSeconds: util.TestLeaseDurationSeconds,
+					},
+				},
+				metav1.CreateOptions{},
+			)
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		// after two grace period, make sure the managed cluster is available
+		gracePeriod := 2 * 5 * util.TestLeaseDurationSeconds
+		assertAvailableCondition(managedClusterName, metav1.ConditionTrue, gracePeriod)
 	})
 })
+
+func bootstrapManagedCluster(managedClusterName, hubKubeconfigSecret string) {
+	// simulate hub cluster admin to accept the managed cluster and approve the csr
+	gomega.Eventually(func() error {
+		return util.AcceptManagedCluster(clusterClient, managedClusterName)
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+	gomega.Eventually(func() error {
+		return authn.ApproveSpokeClusterCSR(kubeClient, managedClusterName, time.Hour*24)
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+	// simulate k8s to mount the hub kubeconfig secret after the bootstrap is finished
+	gomega.Eventually(func() error {
+		_, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret)
+		return err
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
+
+func assertAvailableCondition(managedClusterName string, status metav1.ConditionStatus, d int) {
+	<-time.After(time.Duration(d) * time.Second)
+	gomega.Eventually(func() error {
+		managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
+		if err != nil {
+			return err
+		}
+		availableCond := meta.FindStatusCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable)
+		if availableCond == nil {
+			return fmt.Errorf("available condition is not found")
+		}
+		if availableCond.Status != status {
+			return fmt.Errorf("expected avaibale condition is %s, but %v", status, availableCond)
+		}
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
