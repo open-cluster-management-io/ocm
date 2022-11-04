@@ -122,5 +122,4 @@ func (a *ManagedClusterWebhook) addDefaultClusterSetLabel(managedCluster *cluste
 	if !ok || len(clusterSetName) == 0 {
 		managedCluster.Labels[clusterv1beta2.ClusterSetLabel] = defaultClusterSetName
 	}
-	return
 }

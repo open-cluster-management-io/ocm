@@ -20,7 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	v1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
@@ -28,20 +27,20 @@ func TestDefault(t *testing.T) {
 	now := time.Now()
 	cases := []struct {
 		name          string
-		cluster       *v1.ManagedCluster
-		oldCluster    *v1.ManagedCluster
-		expectCluster *v1.ManagedCluster
+		cluster       *clusterv1.ManagedCluster
+		oldCluster    *clusterv1.ManagedCluster
+		expectCluster *clusterv1.ManagedCluster
 		expectedError bool
 	}{
 		{
 			name:          "Empty spec cluster",
 			expectedError: false,
-			cluster: &v1.ManagedCluster{
+			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 				},
 			},
-			expectCluster: &v1.ManagedCluster{
+			expectCluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
@@ -53,47 +52,47 @@ func TestDefault(t *testing.T) {
 		{
 			name:          "New taint",
 			expectedError: false,
-			cluster: &v1.ManagedCluster{
+			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
 						clusterv1beta2.ClusterSetLabel: defaultClusterSetName,
 					},
 				},
-				Spec: v1.ManagedClusterSpec{
-					Taints: []v1.Taint{
+				Spec: clusterv1.ManagedClusterSpec{
+					Taints: []clusterv1.Taint{
 						{
 							Key:    "a",
 							Value:  "b",
-							Effect: v1.TaintEffectNoSelect,
+							Effect: clusterv1.TaintEffectNoSelect,
 						},
 						{
 							Key:    "c",
 							Value:  "d",
-							Effect: v1.TaintEffectPreferNoSelect,
+							Effect: clusterv1.TaintEffectPreferNoSelect,
 						},
 					},
 				},
 			},
-			expectCluster: &v1.ManagedCluster{
+			expectCluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
 						clusterv1beta2.ClusterSetLabel: defaultClusterSetName,
 					},
 				},
-				Spec: v1.ManagedClusterSpec{
-					Taints: []v1.Taint{
+				Spec: clusterv1.ManagedClusterSpec{
+					Taints: []clusterv1.Taint{
 						{
 							Key:       "a",
 							Value:     "b",
-							Effect:    v1.TaintEffectNoSelect,
+							Effect:    clusterv1.TaintEffectNoSelect,
 							TimeAdded: newTime(now, 0),
 						},
 						{
 							Key:       "c",
 							Value:     "d",
-							Effect:    v1.TaintEffectPreferNoSelect,
+							Effect:    clusterv1.TaintEffectPreferNoSelect,
 							TimeAdded: newTime(now, 0),
 						},
 					},
@@ -103,48 +102,48 @@ func TestDefault(t *testing.T) {
 		{
 			name:          "New taint with timeAdded specified",
 			expectedError: false,
-			cluster: &v1.ManagedCluster{
+			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
 						clusterv1beta2.ClusterSetLabel: defaultClusterSetName,
 					},
 				},
-				Spec: v1.ManagedClusterSpec{
-					Taints: []v1.Taint{
+				Spec: clusterv1.ManagedClusterSpec{
+					Taints: []clusterv1.Taint{
 						{
 							Key:    "a",
 							Value:  "b",
-							Effect: v1.TaintEffectNoSelect,
+							Effect: clusterv1.TaintEffectNoSelect,
 						},
 						{
 							Key:       "c",
 							Value:     "d",
-							Effect:    v1.TaintEffectPreferNoSelect,
+							Effect:    clusterv1.TaintEffectPreferNoSelect,
 							TimeAdded: newTime(now, 0),
 						},
 					},
 				},
 			},
-			expectCluster: &v1.ManagedCluster{
+			expectCluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
 						clusterv1beta2.ClusterSetLabel: defaultClusterSetName,
 					},
 				},
-				Spec: v1.ManagedClusterSpec{
-					Taints: []v1.Taint{
+				Spec: clusterv1.ManagedClusterSpec{
+					Taints: []clusterv1.Taint{
 						{
 							Key:       "a",
 							Value:     "b",
-							Effect:    v1.TaintEffectNoSelect,
+							Effect:    clusterv1.TaintEffectNoSelect,
 							TimeAdded: newTime(now, 0),
 						},
 						{
 							Key:       "c",
 							Value:     "d",
-							Effect:    v1.TaintEffectPreferNoSelect,
+							Effect:    clusterv1.TaintEffectPreferNoSelect,
 							TimeAdded: newTime(now, 0),
 						},
 					},
@@ -154,72 +153,72 @@ func TestDefault(t *testing.T) {
 		{
 			name:          "update taint",
 			expectedError: false,
-			oldCluster: &v1.ManagedCluster{
+			oldCluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
 						clusterv1beta2.ClusterSetLabel: defaultClusterSetName,
 					},
 				},
-				Spec: v1.ManagedClusterSpec{
-					Taints: []v1.Taint{
+				Spec: clusterv1.ManagedClusterSpec{
+					Taints: []clusterv1.Taint{
 						{
 							Key:       "a",
 							Value:     "b",
-							Effect:    v1.TaintEffectNoSelect,
+							Effect:    clusterv1.TaintEffectNoSelect,
 							TimeAdded: newTime(now, -10*time.Second),
 						},
 						{
 							Key:       "c",
 							Value:     "d",
-							Effect:    v1.TaintEffectNoSelect,
+							Effect:    clusterv1.TaintEffectNoSelect,
 							TimeAdded: newTime(now, -10*time.Second),
 						},
 					},
 				},
 			},
-			cluster: &v1.ManagedCluster{
+			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
 						clusterv1beta2.ClusterSetLabel: defaultClusterSetName,
 					},
 				},
-				Spec: v1.ManagedClusterSpec{
-					Taints: []v1.Taint{
+				Spec: clusterv1.ManagedClusterSpec{
+					Taints: []clusterv1.Taint{
 						{
 							Key:       "a",
 							Value:     "b",
-							Effect:    v1.TaintEffectNoSelect,
+							Effect:    clusterv1.TaintEffectNoSelect,
 							TimeAdded: newTime(now, -10*time.Second),
 						},
 						{
 							Key:    "c",
 							Value:  "d",
-							Effect: v1.TaintEffectNoSelectIfNew,
+							Effect: clusterv1.TaintEffectNoSelectIfNew,
 						},
 					},
 				},
 			},
-			expectCluster: &v1.ManagedCluster{
+			expectCluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
 						clusterv1beta2.ClusterSetLabel: defaultClusterSetName,
 					},
 				},
-				Spec: v1.ManagedClusterSpec{
-					Taints: []v1.Taint{
+				Spec: clusterv1.ManagedClusterSpec{
+					Taints: []clusterv1.Taint{
 						{
 							Key:       "a",
 							Value:     "b",
-							Effect:    v1.TaintEffectNoSelect,
+							Effect:    clusterv1.TaintEffectNoSelect,
 							TimeAdded: newTime(now, -10*time.Second),
 						},
 						{
 							Key:       "c",
 							Value:     "d",
-							Effect:    v1.TaintEffectNoSelectIfNew,
+							Effect:    clusterv1.TaintEffectNoSelectIfNew,
 							TimeAdded: newTime(now, 0),
 						},
 					},
@@ -229,73 +228,73 @@ func TestDefault(t *testing.T) {
 		{
 			name:          "taint update request denied",
 			expectedError: true,
-			oldCluster: &v1.ManagedCluster{
+			oldCluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
 						clusterv1beta2.ClusterSetLabel: defaultClusterSetName,
 					},
 				},
-				Spec: v1.ManagedClusterSpec{
-					Taints: []v1.Taint{
+				Spec: clusterv1.ManagedClusterSpec{
+					Taints: []clusterv1.Taint{
 						{
 							Key:       "a",
 							Value:     "b",
-							Effect:    v1.TaintEffectNoSelect,
+							Effect:    clusterv1.TaintEffectNoSelect,
 							TimeAdded: newTime(now, -10*time.Second),
 						},
 						{
 							Key:       "c",
 							Value:     "d",
-							Effect:    v1.TaintEffectNoSelect,
+							Effect:    clusterv1.TaintEffectNoSelect,
 							TimeAdded: newTime(now, -10*time.Second),
 						},
 					},
 				},
 			},
-			cluster: &v1.ManagedCluster{
+			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
 						clusterv1beta2.ClusterSetLabel: defaultClusterSetName,
 					},
 				},
-				Spec: v1.ManagedClusterSpec{
-					Taints: []v1.Taint{
+				Spec: clusterv1.ManagedClusterSpec{
+					Taints: []clusterv1.Taint{
 						{
 							Key:       "a",
 							Value:     "b",
-							Effect:    v1.TaintEffectNoSelect,
+							Effect:    clusterv1.TaintEffectNoSelect,
 							TimeAdded: newTime(now, -20*time.Second),
 						},
 						{
 							Key:       "c",
 							Value:     "d",
-							Effect:    v1.TaintEffectNoSelectIfNew,
+							Effect:    clusterv1.TaintEffectNoSelectIfNew,
 							TimeAdded: newTime(now, -10*time.Second),
 						},
 					},
 				},
 			},
-			expectCluster: &v1.ManagedCluster{
+			expectCluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
 						clusterv1beta2.ClusterSetLabel: defaultClusterSetName,
 					},
 				},
-				Spec: v1.ManagedClusterSpec{
-					Taints: []v1.Taint{
+				Spec: clusterv1.ManagedClusterSpec{
+					Taints: []clusterv1.Taint{
 						{
 							Key:       "a",
 							Value:     "b",
-							Effect:    v1.TaintEffectNoSelect,
+							Effect:    clusterv1.TaintEffectNoSelect,
 							TimeAdded: newTime(now, -10*time.Second),
 						},
 						{
 							Key:       "c",
 							Value:     "d",
-							Effect:    v1.TaintEffectNoSelectIfNew,
+							Effect:    clusterv1.TaintEffectNoSelectIfNew,
 							TimeAdded: newTime(now, 0),
 						},
 					},
@@ -305,61 +304,61 @@ func TestDefault(t *testing.T) {
 		{
 			name:          "delete taint",
 			expectedError: false,
-			oldCluster: &v1.ManagedCluster{
+			oldCluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
 						clusterv1beta2.ClusterSetLabel: defaultClusterSetName,
 					},
 				},
-				Spec: v1.ManagedClusterSpec{
-					Taints: []v1.Taint{
+				Spec: clusterv1.ManagedClusterSpec{
+					Taints: []clusterv1.Taint{
 						{
 							Key:       "a",
 							Value:     "b",
-							Effect:    v1.TaintEffectNoSelect,
+							Effect:    clusterv1.TaintEffectNoSelect,
 							TimeAdded: newTime(now, -10*time.Second),
 						},
 						{
 							Key:       "c",
 							Value:     "d",
-							Effect:    v1.TaintEffectNoSelect,
+							Effect:    clusterv1.TaintEffectNoSelect,
 							TimeAdded: newTime(now, -10*time.Second),
 						},
 					},
 				},
 			},
-			cluster: &v1.ManagedCluster{
+			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
 						clusterv1beta2.ClusterSetLabel: defaultClusterSetName,
 					},
 				},
-				Spec: v1.ManagedClusterSpec{
-					Taints: []v1.Taint{
+				Spec: clusterv1.ManagedClusterSpec{
+					Taints: []clusterv1.Taint{
 						{
 							Key:       "a",
 							Value:     "b",
-							Effect:    v1.TaintEffectNoSelect,
+							Effect:    clusterv1.TaintEffectNoSelect,
 							TimeAdded: newTime(now, -10*time.Second),
 						},
 					},
 				},
 			},
-			expectCluster: &v1.ManagedCluster{
+			expectCluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
 						clusterv1beta2.ClusterSetLabel: defaultClusterSetName,
 					},
 				},
-				Spec: v1.ManagedClusterSpec{
-					Taints: []v1.Taint{
+				Spec: clusterv1.ManagedClusterSpec{
+					Taints: []clusterv1.Taint{
 						{
 							Key:       "a",
 							Value:     "b",
-							Effect:    v1.TaintEffectNoSelect,
+							Effect:    clusterv1.TaintEffectNoSelect,
 							TimeAdded: newTime(now, -10*time.Second),
 						},
 					},
@@ -369,7 +368,7 @@ func TestDefault(t *testing.T) {
 		{
 			name:          "Has clusterset label",
 			expectedError: false,
-			cluster: &v1.ManagedCluster{
+			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
@@ -377,7 +376,7 @@ func TestDefault(t *testing.T) {
 					},
 				},
 			},
-			expectCluster: &v1.ManagedCluster{
+			expectCluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
@@ -389,7 +388,7 @@ func TestDefault(t *testing.T) {
 		{
 			name:          "Has default clusterset label",
 			expectedError: false,
-			cluster: &v1.ManagedCluster{
+			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
@@ -397,7 +396,7 @@ func TestDefault(t *testing.T) {
 					},
 				},
 			},
-			expectCluster: &v1.ManagedCluster{
+			expectCluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
@@ -409,7 +408,7 @@ func TestDefault(t *testing.T) {
 		{
 			name:          "Has null clusterset label",
 			expectedError: false,
-			cluster: &v1.ManagedCluster{
+			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
@@ -417,7 +416,7 @@ func TestDefault(t *testing.T) {
 					},
 				},
 			},
-			expectCluster: &v1.ManagedCluster{
+			expectCluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
@@ -429,7 +428,7 @@ func TestDefault(t *testing.T) {
 		{
 			name:          "Has other label",
 			expectedError: false,
-			cluster: &v1.ManagedCluster{
+			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
@@ -437,7 +436,7 @@ func TestDefault(t *testing.T) {
 					},
 				},
 			},
-			expectCluster: &v1.ManagedCluster{
+			expectCluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set-1",
 					Labels: map[string]string{
@@ -481,6 +480,7 @@ func TestDefault(t *testing.T) {
 
 			cluster := &clusterv1.ManagedCluster{}
 			if err := json.Unmarshal(clusterBytes, cluster); err != nil {
+				t.Errorf("faile to decode cluster %s", string(clusterBytes))
 			}
 			err := w.Default(ctx, cluster)
 			if err != nil || c.expectCluster != nil {
@@ -502,7 +502,7 @@ func TestDefault(t *testing.T) {
 	}
 }
 
-func DiffTaintTime(src, dest []v1.Taint) bool {
+func DiffTaintTime(src, dest []clusterv1.Taint) bool {
 	if len(src) != len(dest) {
 		return false
 	}

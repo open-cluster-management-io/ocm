@@ -19,6 +19,11 @@ func (r *ManagedClusterWebhook) Init(mgr ctrl.Manager) error {
 	return err
 }
 
+// SetExternalKubeClientSet is function to enable the webhook injecting to kube admssion
+func (r *ManagedClusterWebhook) SetExternalKubeClientSet(client kubernetes.Interface) {
+	r.kubeClient = client
+}
+
 func (r *ManagedClusterWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		WithValidator(r).
