@@ -140,9 +140,8 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		return err
 	}
 
-	// TODO: we will add the managedcluster-namespace.yaml back to staticFiles
-	// in next release, currently, we need keep the namespace after the managed
-	// cluster is deleted.
+	// TODO consider to add the managedcluster-namespace.yaml back to staticFiles,
+	// currently, we keep the namespace after the managed cluster is deleted.
 	applyFiles := []string{"manifests/managedcluster-namespace.yaml"}
 	applyFiles = append(applyFiles, staticFiles...)
 

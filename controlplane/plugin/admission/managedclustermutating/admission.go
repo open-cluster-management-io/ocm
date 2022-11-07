@@ -12,7 +12,8 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
 	clusterv1api "open-cluster-management.io/api/cluster/v1"
-	clusterwebhook "open-cluster-management.io/registration/pkg/webhook/cluster"
+	clusterwebhookv1 "open-cluster-management.io/registration/pkg/webhook/v1"
+	runtimeadmission "sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	admissionutil "open-cluster-management.io/ocm-controlplane/plugin/admission/util"
 )
@@ -27,6 +28,7 @@ func Register(plugins *admission.Plugins) {
 
 type Plugin struct {
 	*admission.Handler
+	webhook *clusterwebhookv1.ManagedClusterWebhook
 }
 
 func (p *Plugin) ValidateInitialization() error {
@@ -39,12 +41,11 @@ var _ admission.InitializationValidator = &Plugin{}
 func NewPlugin() *Plugin {
 	return &Plugin{
 		Handler: admission.NewHandler(admission.Create, admission.Update),
+		webhook: &clusterwebhookv1.ManagedClusterWebhook{},
 	}
 }
 
 func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
-	var mcm clusterwebhook.ManagedClusterMutatingAdmissionHook
-
 	v := generic.VersionedAttributes{
 		Attributes:         a,
 		VersionedOldObject: a.GetOldObject(),
@@ -67,28 +68,21 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	}
 
 	uid := types.UID(uuid.NewUUID())
-	ar := request.CreateV1beta1AdmissionReview(uid, &v, &i)
-
-	obj := a.GetObject()
-	raw := runtime.RawExtension{}
-	err := admissionutil.Convert_runtime_Object_To_runtime_RawExtension_Raw(&obj, &raw)
-	if err != nil {
-		return fmt.Errorf("error occured in ManagedClusterMutating: failed to convert Object to RawExtension.")
-	}
-	ar.Request.Object = raw
+	ar := request.CreateV1AdmissionReview(uid, &v, &i)
 
 	old := a.GetOldObject()
 	oldRaw := runtime.RawExtension{}
-	err = admissionutil.Convert_runtime_Object_To_runtime_RawExtension_Raw(&old, &oldRaw)
+	err := admissionutil.Convert_runtime_Object_To_runtime_RawExtension_Raw(&old, &oldRaw)
 	if err != nil {
 		return fmt.Errorf("error occured in ManagedClusterMutating: failed to convert Object to RawExtension.")
 	}
 	ar.Request.OldObject = oldRaw
 
-	ar.Response = mcm.Admit(ar.Request)
-
-	if !ar.Response.Allowed {
-		return fmt.Errorf("error occured in ManagedClusterMutating: [%d] %s", ar.Response.Result.Code, ar.Response.Result.Message)
+	r := runtimeadmission.Request{AdmissionRequest: *ar.Request}
+	admissionContext := runtimeadmission.NewContextWithRequest(ctx, r)
+	if err := p.webhook.Default(admissionContext, a.GetObject()); err != nil {
+		return err
 	}
+
 	return nil
 }
