@@ -179,11 +179,6 @@ const (
 	// The cluster-manager will be deployed in the hub-cluster, the klusterlet will be deployed in the managed-cluster.
 	InstallModeDefault InstallMode = "Default"
 
-	// InstallModeDetached means deploying components outside.
-	// The cluster-manager will be deployed outside of the hub-cluster, the klusterlet will be deployed outside of the managed-cluster.
-	// DEPRECATED: please use Hosted instead.
-	InstallModeDetached InstallMode = "Detached"
-
 	// InstallModeHosted means deploying components outside.
 	// The cluster-manager will be deployed outside of the hub-cluster, the klusterlet will be deployed outside of the managed-cluster.
 	InstallModeHosted InstallMode = "Hosted"

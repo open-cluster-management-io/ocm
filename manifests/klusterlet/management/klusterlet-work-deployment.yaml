@@ -53,6 +53,7 @@ spec:
           - "agent"
           - "--spoke-cluster-name={{ .ClusterName }}"
           - "--hub-kubeconfig=/spoke/hub-kubeconfig/kubeconfig"
+          - "--agent-id={{ .AgentID }}"
           {{if eq .InstallMode "Hosted"}}
           - "--spoke-kubeconfig=/spoke/config/kubeconfig"
           {{end}}

@@ -527,6 +527,9 @@ type AppliedManifestWorkSpec struct {
 	// +required
 	HubHash string `json:"hubHash"`
 
+	// AgentID represents the ID of the work agent who is to handle this AppliedManifestWork.
+	AgentID string `json:"agentID"`
+
 	// ManifestWorkName represents the name of the related manifestwork on the hub.
 	// +required
 	ManifestWorkName string `json:"manifestWorkName"`

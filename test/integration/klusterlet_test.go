@@ -438,7 +438,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
 				// klusterlet has no condition, replica is 0
 				gomega.Expect(actual.Status.Replicas).Should(gomega.Equal(int32(0)))
-				gomega.Expect(len(actual.Spec.Template.Spec.Containers[0].Args)).Should(gomega.Equal(5))
+				gomega.Expect(len(actual.Spec.Template.Spec.Containers[0].Args)).Should(gomega.Equal(6))
 				return actual.Spec.Template.Spec.Containers[0].Args[2] != "--spoke-cluster-name=cluster2"
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 

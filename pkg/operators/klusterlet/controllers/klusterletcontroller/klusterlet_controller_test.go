@@ -405,6 +405,7 @@ func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, cl
 		"agent",
 		fmt.Sprintf("--spoke-cluster-name=%s", clusterName),
 		"--hub-kubeconfig=/spoke/hub-kubeconfig/kubeconfig",
+		"--agent-id=",
 	}
 
 	if mode == operatorapiv1.InstallModeHosted {

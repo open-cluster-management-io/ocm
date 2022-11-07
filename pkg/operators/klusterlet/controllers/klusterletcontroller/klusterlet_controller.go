@@ -170,6 +170,7 @@ type klusterletConfig struct {
 	// 2). In the Hosted mode, it is on the management cluster and has the same name as
 	//     the klusterlet.
 	AgentNamespace            string
+	AgentID                   string
 	RegistrationImage         string
 	WorkImage                 string
 	ClusterName               string
@@ -217,6 +218,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		KlusterletName:            klusterlet.Name,
 		KlusterletNamespace:       helpers.KlusterletNamespace(klusterlet),
 		AgentNamespace:            helpers.AgentNamespace(klusterlet),
+		AgentID:                   string(klusterlet.UID),
 		RegistrationImage:         klusterlet.Spec.RegistrationImagePullSpec,
 		WorkImage:                 klusterlet.Spec.WorkImagePullSpec,
 		ClusterName:               klusterlet.Spec.ClusterName,
