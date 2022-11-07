@@ -25,3 +25,7 @@ vendor:
 	go mod tidy 
 	go mod vendor
 .PHONY: vendor
+
+update:
+	bash -x hack/crd-update/copy-crds.sh
+.PHONY: update

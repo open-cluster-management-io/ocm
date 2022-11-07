@@ -58,7 +58,7 @@ func NewManagedClusterSetController(
 				utilruntime.HandleError(fmt.Errorf("error to get object: %v", obj))
 				return
 			}
-			//enqueue all cluster related clustersets
+			// enqueue all cluster related clustersets
 			c.enqueueClusterClusterSet(cluster)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
@@ -81,7 +81,7 @@ func NewManagedClusterSetController(
 		DeleteFunc: func(obj interface{}) {
 			switch t := obj.(type) {
 			case *v1.ManagedCluster:
-				//enqueue all cluster related clustersets
+				// enqueue all cluster related clustersets
 				c.enqueueClusterClusterSet(t)
 			case cache.DeletedFinalStateUnknown:
 				cluster, ok := t.Obj.(*v1.ManagedCluster)
@@ -89,7 +89,7 @@ func NewManagedClusterSetController(
 					utilruntime.HandleError(fmt.Errorf("error to get object: %v", obj))
 					return
 				}
-				//enqueue all cluster related clustersets
+				// enqueue all cluster related clustersets
 				c.enqueueClusterClusterSet(cluster)
 			default:
 				utilruntime.HandleError(fmt.Errorf("error decoding object, invalid type"))
@@ -113,7 +113,7 @@ func (c *managedClusterSetController) sync(ctx context.Context, syncCtx factory.
 	if len(clusterSetName) == 0 {
 		return nil
 	}
-	klog.Infof("Reconciling ManagedClusterSet %s", clusterSetName)
+	klog.V(4).Infof("Reconciling ManagedClusterSet %s", clusterSetName)
 	clusterSet, err := c.clusterSetLister.Get(clusterSetName)
 	if errors.IsNotFound(err) {
 		// cluster set not found, could have been deleted, do nothing.
@@ -171,7 +171,7 @@ func (c *managedClusterSetController) syncClusterSet(ctx context.Context, origin
 	return nil
 }
 
-//enqueueClusterClusterSet enqueue a cluster related clusterset
+// enqueueClusterClusterSet enqueue a cluster related clusterset
 func (c *managedClusterSetController) enqueueClusterClusterSet(cluster *v1.ManagedCluster) {
 	clusterSets, err := clusterv1beta1.GetClusterSetsOfCluster(cluster, c.clusterSetLister)
 	if err != nil {
@@ -183,8 +183,8 @@ func (c *managedClusterSetController) enqueueClusterClusterSet(cluster *v1.Manag
 	}
 }
 
-//enqueueUpdateClusterClusterSet get the oldCluster related clustersets and newCluster related clustersets,
-//then enqueue the diff clustersets(added clustersets and removed clustersets)
+// enqueueUpdateClusterClusterSet get the oldCluster related clustersets and newCluster related clustersets,
+// then enqueue the diff clustersets(added clustersets and removed clustersets)
 func (c *managedClusterSetController) enqueueUpdateClusterClusterSet(oldCluster, newCluster *v1.ManagedCluster) {
 	oldClusterSets, err := clusterv1beta1.GetClusterSetsOfCluster(oldCluster, c.clusterSetLister)
 	if err != nil {
@@ -203,7 +203,7 @@ func (c *managedClusterSetController) enqueueUpdateClusterClusterSet(oldCluster,
 	}
 }
 
-//getDiffClusterSetsNames return the diff clustersets names
+// getDiffClusterSetsNames return the diff clustersets names
 func getDiffClusterSetsNames(oldSets, newSets []*clusterv1beta1.ManagedClusterSet) sets.String {
 	oldSetsMap := sets.NewString()
 	newSetsMap := sets.NewString()

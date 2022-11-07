@@ -4,6 +4,7 @@ import (
 	"context"
 
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
@@ -21,8 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
-
-const addOnAvailableConditionType = "Available" //TODO add this to ManagedClusterAddOn api
 
 // managedClusterAddonHealthCheckController udpates managed cluster addons status through watching the managed cluster status on
 // the hub cluster.
@@ -95,7 +94,7 @@ func (c *managedClusterAddOnHealthCheckController) sync(ctx context.Context, syn
 			addOn.Namespace,
 			addOn.Name,
 			helpers.UpdateManagedClusterAddOnStatusFn(metav1.Condition{
-				Type:    addOnAvailableConditionType,
+				Type:    addonv1alpha1.ManagedClusterAddOnConditionAvailable,
 				Status:  managedClusterAvailableCondition.Status,
 				Reason:  managedClusterAvailableCondition.Reason,
 				Message: managedClusterAvailableCondition.Message,

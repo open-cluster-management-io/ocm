@@ -17,9 +17,11 @@ require (
 	k8s.io/kube-aggregator v0.24.3
 	k8s.io/kubernetes v1.24.0
 	k8s.io/utils v0.0.0-20220713171938-56c0de1e6f5e
-	open-cluster-management.io/api v0.8.0
+	open-cluster-management.io/api v0.9.0
 	open-cluster-management.io/clusteradm v0.4.0
-	open-cluster-management.io/registration v0.7.0
+	open-cluster-management.io/placement v0.9.0
+	open-cluster-management.io/registration v0.9.1-0.20221104092257-2e1c039a8e17
+	sigs.k8s.io/controller-runtime v0.12.3
 )
 
 require (
@@ -67,7 +69,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/gnostic v0.5.7-v3refs // indirect
+	github.com/google/gnostic v0.6.9 // indirect
 	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
@@ -79,7 +81,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
-	github.com/imdario/mergo v0.3.12 // indirect
+	github.com/imdario/mergo v0.3.13 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -128,10 +130,10 @@ require (
 	go.etcd.io/etcd/raft/v3 v3.5.4 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.starlark.net v0.0.0-20220302181546-5411bad688d1 // indirect
-	go.uber.org/goleak v1.1.12 // indirect
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect
+	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	gonum.org/v1/gonum v0.6.2 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
@@ -166,7 +168,7 @@ require (
 	google.golang.org/api v0.92.0 // indirect
 	google.golang.org/genproto v0.0.0-20220822174746-9e6da59bd2fc // indirect
 	google.golang.org/grpc v1.49.0 // indirect
-	k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42
+	k8s.io/kube-openapi v0.0.0-20220627174259-011e075b9cb8
 )
 
 require (
@@ -246,6 +248,7 @@ replace (
 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.24.0
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.24.0
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.24.0
+	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.24.0
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.24.0
 	k8s.io/kubectl => k8s.io/kubectl v0.24.0
@@ -256,6 +259,3 @@ replace (
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.24.0
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.24.0
 )
-
-// TODO(ycyaoxdu): modify registration, and maybe we can import registration directly?
-replace open-cluster-management.io/registration => github.com/ycyaoxdu/registration v0.6.1-0.20220825022246-bc0bfd1dc8f9
