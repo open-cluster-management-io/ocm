@@ -35,24 +35,42 @@ type ClusterManagementAddOn struct {
 type ClusterManagementAddOnSpec struct {
 	// addOnMeta is a reference to the metadata information for the add-on.
 	// +optional
-	AddOnMeta AddOnMeta `json:"addOnMeta"`
+	AddOnMeta AddOnMeta `json:"addOnMeta,omitempty"`
 
+	// Deprecated: Use supportedConfigs filed instead
 	// addOnConfiguration is a reference to configuration information for the add-on.
-	// In scenario where a multiple add-ons share the same add-on CRD,
-	// multiple ClusterManagementAddOn resources need to be created and reference the same AddOnConfiguration.
+	// In scenario where a multiple add-ons share the same add-on CRD, multiple ClusterManagementAddOn
+	// resources need to be created and reference the same AddOnConfiguration.
 	// +optional
-	AddOnConfiguration ConfigCoordinates `json:"addOnConfiguration"`
+	AddOnConfiguration ConfigCoordinates `json:"addOnConfiguration,omitempty"`
+
+	// supportedConfigs is a list of configuration types supported by add-on.
+	// An empty list means the add-on does not require configurations.
+	// The default is an empty list
+	// +optional
+	SupportedConfigs []ConfigMeta `json:"supportedConfigs,omitempty"`
 }
 
 // AddOnMeta represents a collection of metadata information for the add-on.
 type AddOnMeta struct {
 	// displayName represents the name of add-on that will be displayed.
 	// +optional
-	DisplayName string `json:"displayName"`
+	DisplayName string `json:"displayName,omitempty"`
 
 	// description represents the detailed description of the add-on.
 	// +optional
-	Description string `json:"description"`
+	Description string `json:"description,omitempty"`
+}
+
+// ConfigMeta represents a collection of metadata information for add-on configuration.
+type ConfigMeta struct {
+	// group and resouce of the add-on configuration.
+	ConfigGroupResource `json:",inline"`
+
+	// defaultConfig represents the namespace and name of the default add-on configuration.
+	// In scenario where all add-ons have a same configuration.
+	// +optional
+	DefaultConfig *ConfigReferent `json:"defaultConfig,omitempty"`
 }
 
 // ConfigCoordinates represents the information for locating the CRD and CR that configures the add-on.
@@ -60,16 +78,42 @@ type ConfigCoordinates struct {
 	// crdName is the name of the CRD used to configure instances of the managed add-on.
 	// This field should be configured if the add-on have a CRD that controls the configuration of the add-on.
 	// +optional
-	CRDName string `json:"crdName"`
+	CRDName string `json:"crdName,omitempty"`
 
 	// crName is the name of the CR used to configure instances of the managed add-on.
 	// This field should be configured if add-on CR have a consistent name across the all of the ManagedCluster instaces.
 	// +optional
-	CRName string `json:"crName"`
+	CRName string `json:"crName,omitempty"`
 
 	// lastObservedGeneration is the observed generation of the custom resource for the configuration of the addon.
 	// +optional
 	LastObservedGeneration int64 `json:"lastObservedGeneration,omitempty"`
+}
+
+// ConfigGroupResource represents the GroupResource of the add-on configuration
+type ConfigGroupResource struct {
+	// group of the add-on configuration.
+	Group string `json:"group"`
+
+	// resource of the add-on configuration.
+	// +required
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength:=1
+	Resource string `json:"resource"`
+}
+
+// ConfigReferent represents the namespace and name for an add-on configuration.
+type ConfigReferent struct {
+	// namespace of the add-on configuration.
+	// If this field is not set, the configuration is in the cluster scope.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
+	// name of the add-on configuration.
+	// +required
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength:=1
+	Name string `json:"name"`
 }
 
 // ClusterManagementAddOnStatus represents the current status of cluster management add-on.

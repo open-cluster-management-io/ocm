@@ -37,13 +37,12 @@ var baseCRD = []string{
 	// manifest work
 	"0000_00_work.open-cluster-management.io_manifestworks.crd.yaml",
 	// addon
+	"0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml",
 	"0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml",
-	// cluster claim
-	"0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml",
+	"0000_02_addon.open-cluster-management.io_addondeploymentconfigs.crd.yaml",
 	// placement & placementdecision
 	"0000_02_clusters.open-cluster-management.io_placements.crd.yaml",
 	"0000_03_clusters.open-cluster-management.io_placementdecisions.crd.yaml",
-	// placement score
 	"0000_05_clusters.open-cluster-management.io_addonplacementscores.crd.yaml",
 }
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/admission"
@@ -14,9 +13,8 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
 	"k8s.io/client-go/kubernetes"
 	clusterv1alpha1api "open-cluster-management.io/api/cluster/v1alpha1"
-	clustersetbindingwebhook "open-cluster-management.io/registration/pkg/webhook/clustersetbinding"
-
-	admissionutil "open-cluster-management.io/ocm-controlplane/plugin/admission/util"
+	webhookv1beta2 "open-cluster-management.io/registration/pkg/webhook/v1beta2"
+	runtimeadmission "sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 const PluginName = "ManagedClusterSetBindingValidating"
@@ -29,16 +27,16 @@ func Register(plugins *admission.Plugins) {
 
 type Plugin struct {
 	*admission.Handler
-	client kubernetes.Interface
+	webhook *webhookv1beta2.ManagedClusterSetBindingWebhook
 }
 
 func (p *Plugin) SetExternalKubeClientSet(client kubernetes.Interface) {
-	p.client = client
+	p.webhook.SetExternalKubeClientSet(client)
 }
 
 func (p *Plugin) ValidateInitialization() error {
-	if p.client == nil {
-		return fmt.Errorf("missing client")
+	if p.webhook == nil {
+		return fmt.Errorf("missing admission")
 	}
 	return nil
 }
@@ -50,13 +48,11 @@ var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&Plugin{})
 func NewPlugin() *Plugin {
 	return &Plugin{
 		Handler: admission.NewHandler(admission.Create, admission.Update),
+		webhook: &webhookv1beta2.ManagedClusterSetBindingWebhook{},
 	}
 }
 
 func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
-	var mcsbv = clustersetbindingwebhook.ManagedClusterSetBindingValidatingAdmissionHook{}
-	mcsbv.SetKubeClient(p.client)
-
 	v := generic.VersionedAttributes{
 		Attributes:         a,
 		VersionedOldObject: a.GetOldObject(),
@@ -79,28 +75,16 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 	}
 
 	uid := types.UID(uuid.NewUUID())
-	ar := request.CreateV1beta1AdmissionReview(uid, &v, &i)
+	ar := request.CreateV1AdmissionReview(uid, &v, &i)
 
-	obj := a.GetObject()
-	raw := runtime.RawExtension{}
-	err := admissionutil.Convert_runtime_Object_To_runtime_RawExtension_Raw(&obj, &raw)
-	if err != nil {
-		return fmt.Errorf("error occured in ManagedClusterMutating: failed to convert Object to RawExtension")
+	r := runtimeadmission.Request{AdmissionRequest: *ar.Request}
+	admissionContext := runtimeadmission.NewContextWithRequest(ctx, r)
+	switch a.GetOperation() {
+	case admission.Create:
+		return p.webhook.ValidateCreate(admissionContext, a.GetObject())
+	case admission.Update:
+		return p.webhook.ValidateUpdate(admissionContext, a.GetOldObject(), a.GetObject())
 	}
-	ar.Request.Object = raw
 
-	old := a.GetOldObject()
-	oldRaw := runtime.RawExtension{}
-	err = admissionutil.Convert_runtime_Object_To_runtime_RawExtension_Raw(&old, &oldRaw)
-	if err != nil {
-		return fmt.Errorf("error occured in ManagedClusterMutating: failed to convert Object to RawExtension")
-	}
-	ar.Request.OldObject = oldRaw
-
-	res := mcsbv.Validate(ar.Request)
-
-	if !res.Allowed {
-		return fmt.Errorf("error occured in ManagedClusterSetBindingValidating: [%d] %s", res.Result.Code, res.Result.Message)
-	}
 	return nil
 }

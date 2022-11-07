@@ -1,0 +1,93 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: addondeploymentconfigs.addon.open-cluster-management.io
+spec:
+  group: addon.open-cluster-management.io
+  names:
+    kind: AddOnDeploymentConfig
+    listKind: AddOnDeploymentConfigList
+    plural: addondeploymentconfigs
+    singular: addondeploymentconfig
+  scope: Namespaced
+  preserveUnknownFields: false
+  versions:
+    - name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          description: AddOnDeploymentConfig represents a deployment configuration for an add-on.
+          type: object
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: spec represents a desired configuration for an add-on.
+              type: object
+              properties:
+                customizedVariables:
+                  description: CustomizedVariables is a list of name-value variables for the current add-on deployment. The add-on implementation can use these variables to render its add-on deployment. The default is an empty list.
+                  type: array
+                  items:
+                    description: CustomizedVariable represents a customized variable for add-on deployment.
+                    type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        description: Name of this variable.
+                        type: string
+                        maxLength: 255
+                        pattern: ^[a-zA-Z_][_a-zA-Z0-9]*$
+                      value:
+                        description: Value of this variable.
+                        type: string
+                        maxLength: 1024
+                  x-kubernetes-list-map-keys:
+                    - name
+                  x-kubernetes-list-type: map
+                nodePlacement:
+                  description: NodePlacement enables explicit control over the scheduling of the add-on agents on the managed cluster. All add-on agent pods are expected to comply with this node placement. If the placement is nil, the placement is not specified, it will be omitted. If the placement is an empty object, the placement will match all nodes and tolerate nothing.
+                  type: object
+                  properties:
+                    nodeSelector:
+                      description: NodeSelector defines which Nodes the Pods are scheduled on. If the selector is an empty list, it will match all nodes. The default is an empty list.
+                      type: object
+                      additionalProperties:
+                        type: string
+                    tolerations:
+                      description: Tolerations is attached by pods to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>. If the tolerations is an empty list, it will tolerate nothing. The default is an empty list.
+                      type: array
+                      items:
+                        description: The pod this Toleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.
+                        type: object
+                        properties:
+                          effect:
+                            description: Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
+                            type: string
+                          key:
+                            description: Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys.
+                            type: string
+                          operator:
+                            description: Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.
+                            type: string
+                          tolerationSeconds:
+                            description: TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system.
+                            type: integer
+                            format: int64
+                          value:
+                            description: Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string.
+                            type: string
+      served: true
+      storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

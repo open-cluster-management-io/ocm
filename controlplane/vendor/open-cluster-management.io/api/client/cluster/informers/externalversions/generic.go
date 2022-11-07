@@ -10,6 +10,7 @@ import (
 	v1 "open-cluster-management.io/api/cluster/v1"
 	v1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	v1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	v1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
 // GenericInformer is type of SharedIndexInformer which will locate and delegate to other
@@ -47,14 +48,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1alpha1().AddOnPlacementScores().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("clusterclaims"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1alpha1().ClusterClaims().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("managedclustersets"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1alpha1().ManagedClusterSets().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("managedclustersetbindings"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1alpha1().ManagedClusterSetBindings().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("placements"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1alpha1().Placements().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("placementdecisions"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1alpha1().PlacementDecisions().Informer()}, nil
 
 		// Group=cluster.open-cluster-management.io, Version=v1beta1
 	case v1beta1.SchemeGroupVersion.WithResource("managedclustersets"):
@@ -65,6 +58,12 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1beta1().Placements().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("placementdecisions"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1beta1().PlacementDecisions().Informer()}, nil
+
+		// Group=cluster.open-cluster-management.io, Version=v1beta2
+	case v1beta2.SchemeGroupVersion.WithResource("managedclustersets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1beta2().ManagedClusterSets().Informer()}, nil
+	case v1beta2.SchemeGroupVersion.WithResource("managedclustersetbindings"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1beta2().ManagedClusterSetBindings().Informer()}, nil
 
 	}
 

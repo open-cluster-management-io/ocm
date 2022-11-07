@@ -42,9 +42,33 @@ spec:
               description: spec holds configuration that could apply to any operator.
               type: object
               properties:
+                configs:
+                  description: configs is a list of add-on configurations. In scenario where the current add-on has its own configurations. An empty list means there are no defautl configurations for add-on. The default is an empty list
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - resource
+                    properties:
+                      group:
+                        description: group of the add-on configuration.
+                        type: string
+                      name:
+                        description: name of the add-on configuration.
+                        type: string
+                        minLength: 1
+                      namespace:
+                        description: namespace of the add-on configuration. If this field is not set, the configuration is in the cluster scope.
+                        type: string
+                      resource:
+                        description: resource of the add-on configuration.
+                        type: string
+                        minLength: 1
                 installNamespace:
                   description: installNamespace is the namespace on the managed cluster to install the addon agent. If it is not set, open-cluster-management-agent-addon namespace is used to install the addon agent.
                   type: string
+                  default: open-cluster-management-agent-addon
                   maxLength: 63
                   pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
             status:
@@ -52,7 +76,7 @@ spec:
               type: object
               properties:
                 addOnConfiguration:
-                  description: addOnConfiguration is a reference to configuration information for the add-on. This resource is use to locate the configuration resource for the add-on.
+                  description: 'Deprecated: Use configReference instead addOnConfiguration is a reference to configuration information for the add-on. This resource is use to locate the configuration resource for the add-on.'
                   type: object
                   properties:
                     crName:
@@ -119,6 +143,34 @@ spec:
                         type: string
                         maxLength: 316
                         pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                configReferences:
+                  description: configReferences is a list of current add-on configuration references. This will be overridden by the clustermanagementaddon configuration references.
+                  type: array
+                  items:
+                    description: ConfigReference is a reference to the current add-on configuration. This resource is used to locate the configuration resource for the current add-on.
+                    type: object
+                    required:
+                      - name
+                      - resource
+                    properties:
+                      group:
+                        description: group of the add-on configuration.
+                        type: string
+                      lastObservedGeneration:
+                        description: lastObservedGeneration is the observed generation of the add-on configuration.
+                        type: integer
+                        format: int64
+                      name:
+                        description: name of the add-on configuration.
+                        type: string
+                        minLength: 1
+                      namespace:
+                        description: namespace of the add-on configuration. If this field is not set, the configuration is in the cluster scope.
+                        type: string
+                      resource:
+                        description: resource of the add-on configuration.
+                        type: string
+                        minLength: 1
                 healthCheck:
                   description: healthCheck indicates how to check the healthiness status of the current addon. It should be set by each addon implementation, by default, the lease mode will be used.
                   type: object

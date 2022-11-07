@@ -138,7 +138,7 @@ func (c *managedClusterSetBindingController) sync(ctx context.Context, syncCtx f
 		return nil
 	}
 
-	klog.Infof("Reconciling ManagedClusterSetBinding %s", key)
+	klog.V(4).Infof("Reconciling ManagedClusterSetBinding %s", key)
 
 	bindingNamespace, bindingName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {

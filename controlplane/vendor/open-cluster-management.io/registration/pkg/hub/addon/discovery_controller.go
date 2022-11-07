@@ -128,6 +128,10 @@ func (c *addOnFeatureDiscoveryController) syncAddOn(ctx context.Context, cluster
 	}
 
 	cluster, err := c.clusterLister.Get(clusterName)
+	if errors.IsNotFound(err) {
+		// no cluster, it could be deleted
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("unable to find cluster with name %q: %w", clusterName, err)
 	}

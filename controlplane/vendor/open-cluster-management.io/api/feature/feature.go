@@ -40,6 +40,11 @@ const (
 	// means that all the approved CSR objects will be signed by the built-in CSR controller in
 	// kube-controller-manager.
 	V1beta1CSRAPICompatibility featuregate.Feature = "V1beta1CSRAPICompatibility"
+
+	// NilExecutorValidating will make the work-webhook to validate the manifest work even if its executor is nil, it
+	// will check if the request user has the execute-as permission with the default executor
+	// "system:serviceaccount::klusterlet-work-sa"
+	NilExecutorValidating featuregate.Feature = "NilExecutorValidating"
 )
 
 // DefaultSpokeRegistrationFeatureGates consists of all known ocm-registration
@@ -57,4 +62,10 @@ var DefaultSpokeRegistrationFeatureGates = map[featuregate.Feature]featuregate.F
 var DefaultHubRegistrationFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	DefaultClusterSet:          {Default: false, PreRelease: featuregate.Alpha},
 	V1beta1CSRAPICompatibility: {Default: false, PreRelease: featuregate.Alpha},
+}
+
+// DefaultHubWorkFeatureGates consists of all known acm work wehbook feature keys.
+// To add a new feature, define a key for it above and add it here.
+var DefaultHubWorkFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	NilExecutorValidating: {Default: false, PreRelease: featuregate.Alpha},
 }
