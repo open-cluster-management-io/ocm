@@ -6,7 +6,7 @@ work
 *.dylib
 !vendor/**
 .idea
-
+deploy/webhook/cert
 # Test binary, build with `go test -c`
 *.test
 

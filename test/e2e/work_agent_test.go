@@ -21,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/work/test/integration/util"
 )
@@ -148,21 +147,6 @@ var _ = ginkgo.Describe("Work agent", func() {
 		var ns1 string
 		var ns2 string
 		var err error
-
-		ginkgo.BeforeEach(func() {
-			// make sure the api service v1.admission.cluster.open-cluster-management.io is available
-			gomega.Eventually(func() bool {
-				apiService, err := hubAPIServiceClient.APIServices().Get(context.TODO(), apiserviceName, metav1.GetOptions{})
-				if err != nil {
-					return false
-				}
-				if len(apiService.Status.Conditions) == 0 {
-					return false
-				}
-				return apiService.Status.Conditions[0].Type == apiregistrationv1.Available &&
-					apiService.Status.Conditions[0].Status == apiregistrationv1.ConditionTrue
-			}, 60*time.Second, 1*time.Second).Should(gomega.BeTrue())
-		})
 
 		ginkgo.It("Should create, update and delete manifestwork successfully", func() {
 			ginkgo.By("create manifestwork")

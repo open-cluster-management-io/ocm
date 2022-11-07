@@ -80,10 +80,13 @@ deploy-work-agent: ensure-kustomize create-cluster-ns hub-kubeconfig-secret
 
 deploy-webhook: ensure-kustomize
 	cp deploy/webhook/kustomization.yaml deploy/webhook/kustomization.yaml.tmp
+	cp deploy/webhook/webhook.yaml deploy/webhook/webhook.yaml.tmp
+	bash -x hack/inject-ca.sh
 	cd deploy/webhook && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/work:latest=$(IMAGE_NAME)
 	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
 	$(KUSTOMIZE) build deploy/webhook | $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) apply -f -
 	mv deploy/webhook/kustomization.yaml.tmp deploy/webhook/kustomization.yaml
+	mv deploy/webhook/webhook.yaml.tmp deploy/webhook/webhook.yaml
 
 clean-work-agent:
 	$(KUBECTL) config use-context $(SPOKE_KUBECONFIG_CONTEXT) --kubeconfig $(SPOKE_KUBECONFIG)

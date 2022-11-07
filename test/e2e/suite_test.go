@@ -9,7 +9,9 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,22 +20,24 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
+var hubNamespace = "open-cluster-management-hub"
+var mutatingWebhookName = "work-webhook"
+
 var (
-	nameSuffix          string
-	clusterName         string
-	workImage           string
-	restConfig          *rest.Config
-	spokeKubeClient     kubernetes.Interface
-	spokeDynamicClient  dynamic.Interface
-	hubWorkClient       workclientset.Interface
-	hubAPIServiceClient *apiregistrationclient.ApiregistrationV1Client
-	agentDeployer       workAgentDeployer
+	nameSuffix         string
+	clusterName        string
+	workImage          string
+	hubClient          kubernetes.Interface
+	restConfig         *rest.Config
+	spokeKubeClient    kubernetes.Interface
+	spokeDynamicClient dynamic.Interface
+	hubWorkClient      workclientset.Interface
+	agentDeployer      workAgentDeployer
 )
 
 func TestE2e(t *testing.T) {
@@ -72,13 +76,13 @@ var _ = ginkgo.BeforeSuite(func() {
 	hubWorkClient, err = workclientset.NewForConfig(restConfig)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+	hubClient, err = kubernetes.NewForConfig(restConfig)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 	spokeApiExtensionsClient, err := apiextensionsclient.NewForConfig(restConfig)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	nameSuffix = rand.String(5)
-
-	hubAPIServiceClient, err = apiregistrationclient.NewForConfig(restConfig)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	// create cluster namespace
 	clusterName = fmt.Sprintf("cluster-%s", nameSuffix)
@@ -102,6 +106,36 @@ var _ = ginkgo.BeforeSuite(func() {
 		hubWorkClient)
 	err = agentDeployer.Deploy()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	gomega.Eventually(func() error {
+		var err error
+		var workWebhookPods *v1.PodList
+		var mutatingWebhookDeployment *appsv1.Deployment
+
+		if workWebhookPods, err = hubClient.CoreV1().Pods(hubNamespace).List(context.Background(),
+			metav1.ListOptions{LabelSelector: fmt.Sprintf("app=%s", mutatingWebhookName)}); err != nil {
+			return err
+		}
+		if mutatingWebhookDeployment, err = hubClient.AppsV1().Deployments(hubNamespace).Get(context.Background(),
+			mutatingWebhookName, metav1.GetOptions{}); err != nil {
+			return err
+		}
+
+		pods := len(workWebhookPods.Items)
+		replicas := *mutatingWebhookDeployment.Spec.Replicas
+		readyReplicas := mutatingWebhookDeployment.Status.ReadyReplicas
+
+		if pods != (int)(replicas) {
+			return fmt.Errorf("deployment %s pods should have %d but got %d ", mutatingWebhookName, replicas, pods)
+		}
+
+		if readyReplicas != replicas {
+			return fmt.Errorf("deployment %s should have %d but got %d ready replicas", mutatingWebhookName, replicas, readyReplicas)
+		}
+
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
 })
 
 var _ = ginkgo.AfterSuite(func() {

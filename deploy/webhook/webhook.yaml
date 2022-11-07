@@ -7,10 +7,11 @@ webhooks:
   failurePolicy: Fail
   clientConfig:
     service:
-      # reach the webhook via the registered aggregated API
-      namespace: default
-      name: kubernetes
-      path: /apis/admission.work.open-cluster-management.io/v1/manifestworkvalidators
+      namespace: open-cluster-management-hub
+      name: work-webhook
+      path: /validate-work-open-cluster-management-io-v1-manifestwork
+      port: 9443
+    caBundle: CA_PLACE_HOLDER
   rules:
   - operations:
     - CREATE
@@ -21,6 +22,6 @@ webhooks:
     - "*"
     resources:
     - manifestworks
-  admissionReviewVersions: ["v1beta1"]
+  admissionReviewVersions: ["v1beta1","v1"]
   sideEffects: None
   timeoutSeconds: 3

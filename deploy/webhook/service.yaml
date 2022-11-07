@@ -6,5 +6,5 @@ spec:
   selector:
     app: work-webhook
   ports:
-  - port: 443
-    targetPort: 6443
+  - port: 9443
+    targetPort: 9443
