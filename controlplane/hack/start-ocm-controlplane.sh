@@ -10,7 +10,7 @@ if ! ifconfig >& /dev/null; then
   exit 1
 fi
 # use ifconfig to get local IP address here
-SERVING_IP=$(ifconfig eth0 | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')
+SERVING_IP=$(ifconfig en0 | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')
 #  set port
 SERVING_PORT=44444
 # use embedded etcd if set to true

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -30,6 +31,7 @@ import (
 var HubNameSpace = "open-cluster-management-hub"
 var HubSA = "hub-sa"
 var PublicNamespace = "kube-public"
+var SystemNamespace = "kube-system"
 
 // TODO(ycyaoxdu): not hard-code this
 var kubeconfigpath = ".ocmconfig/cert/kube-aggregator.kubeconfig"
@@ -113,7 +115,7 @@ func bootstrapTokenSecret(ctx context.Context, discoveryClient discovery.Discove
 	}
 
 	obj2, err := dri.Create(context.Background(), unstructuredObj, metav1.CreateOptions{})
-	if err != nil {
+	if err != nil && !errors.IsAlreadyExists(err) {
 		return err
 	}
 
@@ -122,46 +124,15 @@ func bootstrapTokenSecret(ctx context.Context, discoveryClient discovery.Discove
 }
 
 func Bootstrap(ctx context.Context, discoveryClient discovery.DiscoveryInterface, dynamicClient dynamic.Interface, kubeClient kubernetes.Interface) error {
-	err := bootstrapTokenSecret(ctx, discoveryClient, dynamicClient)
-	if err != nil {
-		klog.Errorf("failed to bootstrap token secret: %v", err)
-		// nolint:nilerr
-		return nil // don't klog.Fatal. This only happens when context is cancelled.
-	}
-
 	// bootstrap namespace first
 	var defaultns = &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "default",
 		},
 	}
-	_, err = kubeClient.CoreV1().Namespaces().Create(ctx, defaultns, metav1.CreateOptions{})
-	if err != nil {
+	_, err := kubeClient.CoreV1().Namespaces().Create(ctx, defaultns, metav1.CreateOptions{})
+	if err != nil && !errors.IsAlreadyExists(err) {
 		klog.Errorf("failed to bootstrap default namespace: %v", err)
-		// nolint:nilerr
-		return nil // don't klog.Fatal. This only happens when context is cancelled.
-	}
-
-	var sa = &corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: HubSA,
-		},
-	}
-	_, err = kubeClient.CoreV1().ServiceAccounts("default").Create(ctx, sa, metav1.CreateOptions{})
-	if err != nil {
-		klog.Errorf("failed to bootstrap hub serviceaccount: %v", err)
-		// nolint:nilerr
-		return nil // don't klog.Fatal. This only happens when context is cancelled.
-	}
-
-	var hubns = &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: HubNameSpace,
-		},
-	}
-	_, err = kubeClient.CoreV1().Namespaces().Create(ctx, hubns, metav1.CreateOptions{})
-	if err != nil {
-		klog.Errorf("failed to bootstrap hub namespace: %v", err)
 		// nolint:nilerr
 		return nil // don't klog.Fatal. This only happens when context is cancelled.
 	}
@@ -176,11 +147,31 @@ func Bootstrap(ctx context.Context, discoveryClient discovery.DiscoveryInterface
 	}); err == nil {
 		// configmap cluster-info
 		err = clusterinfo.CreateBootstrapConfigMapIfNotExists(kubeClient, kubeconfigpath)
-		if err != nil {
+		if err != nil && errors.IsAlreadyExists(err) {
+			// don't klog.Fatal. This only happens when context is cancelled.
 			klog.Errorf("failed to bootstrap cluster-info configmap: %v", err)
 			// nolint:nilerr
-			return nil // don't klog.Fatal. This only happens when context is cancelled.
 		}
+	} else {
+		klog.Errorf("failed to get namespace %s: %w", PublicNamespace, err)
+		// nolint:nilerr
+	}
+
+	if err = wait.PollInfinite(1*time.Second, func() (bool, error) {
+		_, err := kubeClient.CoreV1().Namespaces().Get(ctx, SystemNamespace, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	}); err == nil {
+		err = bootstrapTokenSecret(ctx, discoveryClient, dynamicClient)
+		if err != nil {
+			klog.Errorf("failed to bootstrap token secret: %v", err)
+			// nolint:nilerr
+		}
+	} else {
+		klog.Errorf("failed to get namespace %s: %w", SystemNamespace, err)
+		// nolint:nilerr
 	}
 
 	return bootstrap(ctx, discoveryClient, dynamicClient)
