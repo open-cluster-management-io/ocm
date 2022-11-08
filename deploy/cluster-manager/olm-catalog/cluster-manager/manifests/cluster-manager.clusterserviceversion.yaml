@@ -63,7 +63,7 @@ metadata:
     operators.operatorframework.io/project_layout: go
     repository: https://github.com/open-cluster-management-io/registration-operator
     support: Red Hat, Inc.
-  name: cluster-manager.v0.9.0
+  name: cluster-manager.v0.10.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}

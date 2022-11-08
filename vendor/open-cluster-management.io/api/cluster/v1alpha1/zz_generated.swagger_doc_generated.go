@@ -12,7 +12,7 @@ package v1alpha1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_ClusterClaim = map[string]string{
-	"":     "ClusterClaim represents cluster information that a managed cluster claims ClusterClaims with well known names include,\n  1. id.k8s.io, it contains a unique identifier for the cluster.\n  2. clusterset.k8s.io, it contains an identifier that relates the cluster\n     to the ClusterSet in which it belongs.\nClusterClaims created on a managed cluster will be collected and saved into the status of the corresponding ManagedCluster on hub.",
+	"":     "ClusterClaim represents cluster information that a managed cluster claims ClusterClaims with well known names include,\n 1. id.k8s.io, it contains a unique identifier for the cluster.\n 2. clusterset.k8s.io, it contains an identifier that relates the cluster\n    to the ClusterSet in which it belongs.\n\nClusterClaims created on a managed cluster will be collected and saved into the status of the corresponding ManagedCluster on hub.",
 	"spec": "Spec defines the attributes of the ClusterClaim.",
 }
 

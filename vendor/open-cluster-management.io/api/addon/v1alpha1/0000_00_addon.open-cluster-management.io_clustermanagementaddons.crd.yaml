@@ -86,10 +86,15 @@ spec:
                       group:
                         description: group of the add-on configuration.
                         type: string
+                        default: ""
                       resource:
                         description: resource of the add-on configuration.
                         type: string
                         minLength: 1
+                  x-kubernetes-list-map-keys:
+                    - group
+                    - resource
+                  x-kubernetes-list-type: map
             status:
               description: status represents the current status of cluster management add-on.
               type: object

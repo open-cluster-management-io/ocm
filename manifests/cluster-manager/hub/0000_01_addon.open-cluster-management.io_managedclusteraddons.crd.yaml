@@ -54,6 +54,7 @@ spec:
                       group:
                         description: group of the add-on configuration.
                         type: string
+                        default: ""
                       name:
                         description: name of the add-on configuration.
                         type: string
@@ -156,6 +157,7 @@ spec:
                       group:
                         description: group of the add-on configuration.
                         type: string
+                        default: ""
                       lastObservedGeneration:
                         description: lastObservedGeneration is the observed generation of the add-on configuration.
                         type: integer

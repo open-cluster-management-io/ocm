@@ -4,7 +4,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//LegacyClusterSetLabel LabelKey
+// LegacyClusterSetLabel LabelKey
 const ClusterSetLabel = "cluster.open-cluster-management.io/clusterset"
 
 // +genclient
@@ -18,9 +18,9 @@ const ClusterSetLabel = "cluster.open-cluster-management.io/clusterset"
 
 // ManagedClusterSet defines a group of ManagedClusters that user's workload can run on.
 // A workload can be defined to deployed on a ManagedClusterSet, which mean:
-//   1. The workload can run on any ManagedCluster in the ManagedClusterSet
-//   2. The workload cannot run on any ManagedCluster outside the ManagedClusterSet
-//   3. The service exposed by the workload can be shared in any ManagedCluster in the ManagedClusterSet
+//  1. The workload can run on any ManagedCluster in the ManagedClusterSet
+//  2. The workload cannot run on any ManagedCluster outside the ManagedClusterSet
+//  3. The service exposed by the workload can be shared in any ManagedCluster in the ManagedClusterSet
 //
 // In order to assign a ManagedCluster to a certian ManagedClusterSet, add a label with name
 // `cluster.open-cluster-management.io/clusterset` on the ManagedCluster to refers to the ManagedClusterSet.

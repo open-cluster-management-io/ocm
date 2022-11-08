@@ -25,7 +25,7 @@ spec:
       name: v1beta1
       schema:
         openAPIV3Schema:
-          description: "Placement defines a rule to select a set of ManagedClusters from the ManagedClusterSets bound to the placement namespace. \n Here is how the placement policy combines with other selection methods to determine a matching list of ManagedClusters: 1) Kubernetes clusters are registered with hub as cluster-scoped ManagedClusters; 2) ManagedClusters are organized into cluster-scoped ManagedClusterSets; 3) ManagedClusterSets are bound to workload namespaces; 4) Namespace-scoped Placements specify a slice of ManagedClusterSets which select a working set    of potential ManagedClusters; 5) Then Placements subselect from that working set using label/claim selection. \n No ManagedCluster will be selected if no ManagedClusterSet is bound to the placement namespace. User is able to bind a ManagedClusterSet to a namespace by creating a ManagedClusterSetBinding in that namespace if they have a RBAC rule to CREATE on the virtual subresource of `managedclustersets/bind`. \n A slice of PlacementDecisions with label cluster.open-cluster-management.io/placement={placement name} will be created to represent the ManagedClusters selected by this placement. \n If a ManagedCluster is selected and added into the PlacementDecisions, other components may apply workload on it; once it is removed from the PlacementDecisions, the workload applied on this ManagedCluster should be evicted accordingly."
+          description: "Placement defines a rule to select a set of ManagedClusters from the ManagedClusterSets bound to the placement namespace. \n Here is how the placement policy combines with other selection methods to determine a matching list of ManagedClusters:  1. Kubernetes clusters are registered with hub as cluster-scoped ManagedClusters;  2. ManagedClusters are organized into cluster-scoped ManagedClusterSets;  3. ManagedClusterSets are bound to workload namespaces;  4. Namespace-scoped Placements specify a slice of ManagedClusterSets which select a working set     of potential ManagedClusters;  5. Then Placements subselect from that working set using label/claim selection. \n No ManagedCluster will be selected if no ManagedClusterSet is bound to the placement namespace. User is able to bind a ManagedClusterSet to a namespace by creating a ManagedClusterSetBinding in that namespace if they have a RBAC rule to CREATE on the virtual subresource of `managedclustersets/bind`. \n A slice of PlacementDecisions with label cluster.open-cluster-management.io/placement={placement name} will be created to represent the ManagedClusters selected by this placement. \n If a ManagedCluster is selected and added into the PlacementDecisions, other components may apply workload on it; once it is removed from the PlacementDecisions, the workload applied on this ManagedCluster should be evicted accordingly."
           type: object
           required:
             - spec
@@ -149,7 +149,7 @@ spec:
                                     description: ScoreName defines the score name inside AddOnPlacementScore. AddOnPlacementScore contains a list of score name and score value, ScoreName specify the score to be used by the prioritizer.
                                     type: string
                               builtIn:
-                                description: 'BuiltIn defines the name of a BuiltIn prioritizer. Below are the valid BuiltIn prioritizer names. 1) Balance: balance the decisions among the clusters. 2) Steady: ensure the existing decision is stabilized. 3) ResourceAllocatableCPU & ResourceAllocatableMemory: sort clusters based on the allocatable.'
+                                description: 'BuiltIn defines the name of a BuiltIn prioritizer. Below are the valid BuiltIn prioritizer names. 1) Balance: balance the decisions among the clusters. 2) Steady: ensure the existing decision is stabilized. 3) ResourceAllocatableCPU & ResourceAllocatableMemory: sort clusters based on the allocatable. 4) Spread: spread the workload evenly to topologies.'
                                 type: string
                               type:
                                 description: Type defines the type of the prioritizer score. Type is either "BuiltIn", "AddOn" or "", where "" is "BuiltIn" by default. When the type is "BuiltIn", need to specify a BuiltIn prioritizer name in BuiltIn. When the type is "AddOn", need to configure the score source in AddOn.
@@ -169,6 +169,45 @@ spec:
                       description: Mode is either Exact, Additive, "" where "" is Additive by default. In Additive mode, any prioritizer not explicitly enumerated is enabled in its default Configurations, in which Steady and Balance prioritizers have the weight of 1 while other prioritizers have the weight of 0. Additive doesn't require configuring all prioritizers. The default Configurations may change in the future, and additional prioritization will happen. In Exact mode, any prioritizer not explicitly enumerated is weighted as zero. Exact requires knowing the full set of prioritizers you want, but avoids behavior changes between releases.
                       type: string
                       default: Additive
+                spreadPolicy:
+                  description: SpreadPolicy defines how placement decisions should be distributed among a set of ManagedClusters.
+                  type: object
+                  properties:
+                    spreadConstraints:
+                      description: SpreadConstraints defines how the placement decision should be distributed among a set of ManagedClusters. The importance of the SpreadConstraintsTerms follows the natural order of their index in the slice. The scheduler first consider SpreadConstraintsTerms with smaller index then those with larger index to distribute the placement decision.
+                      type: array
+                      maxItems: 8
+                      items:
+                        description: SpreadConstraintsTerm defines a terminology to spread placement decisions.
+                        type: object
+                        required:
+                          - topologyKey
+                          - topologyKeyType
+                        properties:
+                          maxSkew:
+                            description: MaxSkew represents the degree to which the workload may be unevenly distributed. Skew is the maximum difference between the number of selected ManagedClusters in a topology and the global minimum. The global minimum is the minimum number of selected ManagedClusters for the topologies within the same TopologyKey. The minimum possible value of MaxSkew is 1, and the default value is 1.
+                            type: integer
+                            format: int32
+                            default: 1
+                            minimum: 1
+                          topologyKey:
+                            description: TopologyKey is either a label key or a cluster claim name of ManagedClusters.
+                            type: string
+                            maxLength: 316
+                            pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]$
+                          topologyKeyType:
+                            description: TopologyKeyType indicates the type of TopologyKey. It could be Label or Claim.
+                            type: string
+                            enum:
+                              - Label
+                              - Claim
+                          whenUnsatisfiable:
+                            description: WhenUnsatisfiable represents the action of the scheduler when MaxSkew cannot be satisfied. It could be DoNotSchedule or ScheduleAnyway. The default value is ScheduleAnyway. DoNotSchedule instructs the scheduler not to schedule more ManagedClusters when MaxSkew is not satisfied. ScheduleAnyway instructs the scheduler to keep scheduling even if MaxSkew is not satisfied.
+                            type: string
+                            default: ScheduleAnyway
+                            enum:
+                              - DoNotSchedule
+                              - ScheduleAnyway
                 tolerations:
                   description: Tolerations are applied to placements, and allow (but do not require) the managed clusters with certain taints to be selected by placements with matching tolerations.
                   type: array
