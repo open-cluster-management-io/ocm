@@ -6,6 +6,7 @@ import (
 	"embed"
 	"fmt"
 	"html/template"
+	"os"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -32,9 +33,6 @@ var HubNameSpace = "open-cluster-management-hub"
 var HubSA = "hub-sa"
 var PublicNamespace = "kube-public"
 var SystemNamespace = "kube-system"
-
-// TODO(ycyaoxdu): not hard-code this
-var kubeconfigpath = ".ocmconfig/cert/kube-aggregator.kubeconfig"
 
 //go:embed *.yaml
 var fs embed.FS
@@ -146,8 +144,10 @@ func Bootstrap(ctx context.Context, discoveryClient discovery.DiscoveryInterface
 		return true, nil
 	}); err == nil {
 		// configmap cluster-info
+		// TODO(ycyaoxdu): this need to be handled
+		kubeconfigpath := os.Getenv("OCM_CONFIG_DIRECTORY") + "/cert" + "/kube-aggregator.kubeconfig"
 		err = clusterinfo.CreateBootstrapConfigMapIfNotExists(kubeClient, kubeconfigpath)
-		if err != nil && errors.IsAlreadyExists(err) {
+		if err != nil && !errors.IsAlreadyExists(err) {
 			// don't klog.Fatal. This only happens when context is cancelled.
 			klog.Errorf("failed to bootstrap cluster-info configmap: %v", err)
 			// nolint:nilerr

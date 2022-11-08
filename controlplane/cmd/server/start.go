@@ -37,6 +37,7 @@ func NewAPIServerCommand() *cobra.Command {
 			verflag.PrintAndExitIfRequested()
 			fs := cmd.Flags()
 
+			// TODO(ycyaoxdu): add DefaultHubRegistrationFeatureGates
 			// add OCM feature gates
 			featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
 			featureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates)
@@ -75,8 +76,8 @@ func NewAPIServerCommand() *cobra.Command {
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name(), logs.SkipLoggingConfigurationFlags())
 	options.AddCustomGlobalFlags(namedFlagSets.FlagSet("generic"))
-	// add flagset embed etcd
-	ee := namedFlagSets.FlagSet("embed etcd")
+	// add flagset ocm global config
+	ee := namedFlagSets.FlagSet("ocm global config")
 	// add enable-embedded-etcd flag
 	ee.BoolVar(&s.Extra.EmbeddedEtcdEnabled, "enable-embedded-etcd", false, "will use embedded etcd, if set to true")
 
