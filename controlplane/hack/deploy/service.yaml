@@ -9,6 +9,6 @@ spec:
     - name: app
       port: 443
       protocol: TCP
-      targetPort: 4443
+      targetPort: 9443
   selector:
     app: ocm-controlplane

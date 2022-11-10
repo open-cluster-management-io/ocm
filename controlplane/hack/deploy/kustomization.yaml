@@ -39,5 +39,13 @@ kind: Kustomization
 secretGenerator:
 - name: controlplane-cert
   files:
-  - kube-serviceaccount.key
-  - client-ca.crt
+  - cert/kube-serviceaccount.key
+  - cert/client-ca.crt
+  - cert/client-ca.key
+  - cert/serving-kube-apiserver.crt
+  - cert/serving-kube-apiserver.key
+  - cert/client-kube-aggregator.crt
+  - cert/client-kube-aggregator.key
+  - cert/kube-aggregator.kubeconfig
+generatorOptions:
+ disableNameSuffixHash: true
