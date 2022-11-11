@@ -78,13 +78,13 @@ func init() {
 }
 
 // Run runs the specified APIServer.  This should never exit.
-func Run(completeOptions CompletedServerRunOptions, stopCh <-chan struct{}) error {
+func Run(completeOptions CompletedServerRunOptions, clientKeyFile string, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
 
 	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
-	server, err := CreateServerChain(completeOptions)
+	server, err := CreateServerChain(completeOptions, clientKeyFile)
 	if err != nil {
 		return err
 	}
@@ -98,7 +98,7 @@ func Run(completeOptions CompletedServerRunOptions, stopCh <-chan struct{}) erro
 }
 
 // CreateServerChain creates the apiservers connected via delegation.
-func CreateServerChain(completedOptions CompletedServerRunOptions) (*aggregatorapiserver.APIAggregator, error) {
+func CreateServerChain(completedOptions CompletedServerRunOptions, clientKeyFile string) (*aggregatorapiserver.APIAggregator, error) {
 	kubeAPIServerConfig, serviceResolver, pluginInitializer, err := CreateKubeAPIServerConfig(completedOptions)
 	if err != nil {
 		return nil, err
@@ -127,7 +127,11 @@ func CreateServerChain(completedOptions CompletedServerRunOptions) (*aggregatora
 	if err != nil {
 		return nil, err
 	}
-	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, apiExtensionsServer.Informers)
+	aggregatorServer, err := createAggregatorServer(
+		aggregatorConfig, kubeAPIServer.GenericAPIServer, apiExtensionsServer.Informers,
+		completedOptions.Authentication.ClientCert.ClientCA,
+		clientKeyFile,
+	)
 	if err != nil {
 		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
 		return nil, err

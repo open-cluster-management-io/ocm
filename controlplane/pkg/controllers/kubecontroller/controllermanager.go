@@ -51,11 +51,15 @@ const (
 	ExternalLoops
 )
 
-func RunKubeControllers(cfg *restclient.Config) error {
+func RunKubeControllers(cfg *restclient.Config, clientCert, clientKey string) error {
 	s, err := options.NewKubeControllerManagerOptions()
 	if err != nil {
 		klog.Fatalf("unable to initialize kube options: %v", err)
 	}
+
+	s.CSRSigningController.ClusterSigningCertFile = clientCert
+	s.CSRSigningController.ClusterSigningKeyFile = clientKey
+
 	config, err := s.Config(cfg)
 	if err != nil {
 		klog.Fatalf("unable to config kube controller options: %v", err)
@@ -165,7 +169,8 @@ type ControllerContext struct {
 type InitFunc func(ctx context.Context, controllerCtx ControllerContext) (controller controller.Interface, enabled bool, err error)
 
 // ControllerInitializersFunc is used to create a collection of initializers
-//  given the loopMode.
+//
+//	given the loopMode.
 type ControllerInitializersFunc func() (initializers map[string]InitFunc)
 
 var _ ControllerInitializersFunc = NewControllerInitializers

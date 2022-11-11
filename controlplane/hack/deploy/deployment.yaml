@@ -18,9 +18,6 @@ spec:
       - name: controlplane
         image: docker.io/yaoyuchen/controlplane:latest
         imagePullPolicy: Always
-        env: 
-        - name: OCM_CONFIG_DIRECTORY
-          value: "/controlplane"
         args:
           - "/ocm-controlplane"
           - "--authorization-mode=RBAC"
@@ -28,6 +25,7 @@ spec:
           - "--enable-bootstrap-token-auth"
           - "--service-account-key-file=/controlplane/cert/kube-serviceaccount.key"
           - "--client-ca-file=/controlplane/cert/client-ca.crt"
+          - "--client-key-file="/controlplane/cert/client-ca.key" \"
           - "--enable-bootstrap-token-auth"
           - "--enable-priority-and-fairness=false" 
           - "--api-audiences="         

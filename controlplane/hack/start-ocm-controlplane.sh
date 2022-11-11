@@ -6,13 +6,8 @@
 KUBE_ROOT=$(pwd)
 # export SERVING_IP=$(ifconfig en0 | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*') # ***en0 for macOS***
 # export SERVING_IP=$(ifconfig eth0 | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*') # ***eth0 for Linux***
-# export OCM_CONFIG_DIRECTORY=$(pwd)/.ocmconfig
 if [ ! $SERVING_IP ] ; then
     echo "SERVING_IP should be set"
-    exit 1
-fi
-if [ ! $OCM_CONFIG_DIRECTORY ] ; then
-    echo "OCM_CONFIG_DIRECTORY should be set"
     exit 1
 fi
 
@@ -200,6 +195,7 @@ function start_apiserver {
     --enable-priority-and-fairness="false" \
     --api-audiences="" \
     --client-ca-file="${CERT_DIR}/client-ca.crt" \
+    --client-key-file="${CERT_DIR}/client-ca.key" \
     --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
     --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
     --service-account-issuer="https://kubernetes.default.svc" \
