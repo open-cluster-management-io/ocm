@@ -1,7 +1,4 @@
 
-# Adds namespace to all resources.
-namespace: ocm-controlplane
-
 # Value of this field is prepended to the
 # names of all resources, e.g. a deployment named
 # "wordpress" becomes "alices-wordpress".
@@ -44,8 +41,9 @@ secretGenerator:
   - cert/client-ca.key
   - cert/serving-kube-apiserver.crt
   - cert/serving-kube-apiserver.key
-  - cert/client-kube-aggregator.crt
-  - cert/client-kube-aggregator.key
   - cert/kube-aggregator.kubeconfig
+- name: controlplane-kubeconfig
+  files:
+  - kubeconfig=cert/kube-aggregator.kubeconfig
 generatorOptions:
  disableNameSuffixHash: true
