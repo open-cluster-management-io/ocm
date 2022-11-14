@@ -18,6 +18,9 @@ Now start to use the controlplane:
 $ clusteradm --kubeconfig=<file to kubeconfig> get token --use-bootstrap-token
 ```
 
+> **Warning**
+> clusteradm version should be v0.4.1 or later
+
 --- 
 
 ## Option2: Run controlplane as a local binary
