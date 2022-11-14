@@ -16,6 +16,7 @@ import (
 	"open-cluster-management.io/ocm-controlplane/pkg/etcd"
 )
 
+// directory to save embedded etcd generated files
 const DefaultDirectory = ".ocmconfig"
 
 type ExtraConfig struct {
@@ -114,7 +115,7 @@ func (c *CompletedOptions) Run() error {
 			}
 		}
 		// set this environment viriable to help set up kube csr controllers
-		os.Setenv("OCM_CONFIG_DIRECTORY", c.Extra.RootDirectory)
+		// os.Setenv("OCM_CONFIG_DIRECTORY", c.Extra.RootDirectory)
 	}
 
 	// set etcd to embeddedetcd info

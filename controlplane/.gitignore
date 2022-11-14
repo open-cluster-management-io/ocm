@@ -17,6 +17,7 @@ go.work
 # Binary output and Config Files
 bin/
 .ocmconfig/ 
+hack/deploy/cert
 
 # IDE config
 .vscode/

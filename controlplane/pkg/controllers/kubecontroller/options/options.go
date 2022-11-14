@@ -46,6 +46,7 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		return nil, err
 	}
 
+	// TODO(ycyaoxdu): this need to be handled
 	// use environment variable to pass the directory
 	certFolder := os.Getenv("OCM_CONFIG_DIRECTORY") + "/cert"
 	componentConfig.CSRSigningController.KubeAPIServerClientSignerConfiguration.CertFile = certFolder + "/" + "client-ca.crt"
