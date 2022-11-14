@@ -146,7 +146,7 @@ function start_apiserver {
     cp ${CERT_DIR}/kube-aggregator.kubeconfig ${CERT_DIR}/kubeconfig
     cp hack/deploy/deployment.yaml hack/deploy/deployment.yaml.tmp
     sed -e 's,API_HOST,'${API_HOST}',' hack/deploy/deployment.yaml
-    ${KUSTOMIZE} build hack/deploy
+    ${KUSTOMIZE} build hack/deploy | ${KUBECTL} apply -f -
     mv hack/deploy/deployment.yaml.tmp hack/deploy/deployment.yaml
 
     echo "Use '${KUBECTL} --kubeconfig=${CERT_DIR}/kubeconfig' to use the aggregated API server" 
