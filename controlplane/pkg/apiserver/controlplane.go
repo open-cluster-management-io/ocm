@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
-	"path/filepath"
 
+	"github.com/spf13/pflag"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -16,25 +15,16 @@ import (
 	"open-cluster-management.io/ocm-controlplane/pkg/etcd"
 )
 
-// directory to save embedded etcd generated files
-const DefaultDirectory = ".ocmconfig"
-
-type ExtraConfig struct {
-	RootDirectory string
-	// use this filed to save the embedded etcd arg
-	EmbeddedEtcdEnabled bool
-}
-
 type Options struct {
 	ServerRunOptions *options.ServerRunOptions
 	EmbeddedEtcd     *EmbeddedEtcd
-	Extra            *ExtraConfig
+	ClientKeyFile    string
 }
 
 type completedOptions struct {
 	ServerRunOptions *kubeapiserver.CompletedServerRunOptions
 	EmbeddedEtcd     *EmbeddedEtcd
-	Extra            *ExtraConfig
+	ClientKeyFile    string
 }
 
 type CompletedOptions struct {
@@ -43,14 +33,10 @@ type CompletedOptions struct {
 
 func NewServerRunOptions() *Options {
 	o := options.NewServerRunOptions()
-	var e *EmbeddedEtcd
 
 	s := Options{
 		ServerRunOptions: o,
-		EmbeddedEtcd:     e,
-		Extra: &ExtraConfig{
-			RootDirectory: DefaultDirectory,
-		},
+		EmbeddedEtcd:     NewEmbeddedEtcd(),
 	}
 	return &s
 }
@@ -58,10 +44,25 @@ func NewServerRunOptions() *Options {
 func (o *Options) Validate(args []string) error {
 	errors := []error{}
 	errors = append(errors, o.ServerRunOptions.Validate()...)
-	if o.Extra.EmbeddedEtcdEnabled {
-		errors = append(errors, o.EmbeddedEtcd.Validate()...)
-	}
+	errors = append(errors, o.EmbeddedEtcd.Validate()...)
 	return utilerrors.NewAggregate(errors)
+}
+
+func (e *Options) AddFlags(fs *pflag.FlagSet) {
+	e.ServerRunOptions.SecureServing.AddFlags(fs)
+	e.ServerRunOptions.Etcd.AddFlags(fs)
+	e.ServerRunOptions.Authentication.AddFlags(fs)
+	e.ServerRunOptions.Authorization.AddFlags(fs)
+	e.ServerRunOptions.Admission.AddFlags(fs)
+	e.ServerRunOptions.GenericServerRunOptions.AddUniversalFlags(fs)
+	e.EmbeddedEtcd.AddFlags(fs)
+
+	fs.StringVar(&e.ClientKeyFile, "client-key-file", e.ClientKeyFile, "client cert key file")
+	fs.StringVar(&e.ServerRunOptions.ServiceAccountSigningKeyFile, "service-account-signing-key-file", e.ServerRunOptions.ServiceAccountSigningKeyFile, ""+
+		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key.")
+	fs.StringVar(&e.ServerRunOptions.ServiceClusterIPRanges, "service-cluster-ip-range", e.ServerRunOptions.ServiceClusterIPRanges, ""+
+		"A CIDR notation IP range from which to assign service cluster IPs. This must not "+
+		"overlap with any IP ranges assigned to nodes or pods. Max of two dual-stack CIDRs is allowed.")
 }
 
 func (o *Options) Complete() (*CompletedOptions, error) {
@@ -70,54 +71,16 @@ func (o *Options) Complete() (*CompletedOptions, error) {
 		return nil, err
 	}
 
-	// check for directory
-	if !filepath.IsAbs(o.Extra.RootDirectory) {
-		pwd, err := os.Getwd()
-		if err != nil {
-			return nil, err
-		}
-		o.Extra.RootDirectory = filepath.Join(pwd, o.Extra.RootDirectory)
-	}
-
-	// set embedded etcd if enabled
-	if o.Extra.EmbeddedEtcdEnabled {
-		o.EmbeddedEtcd = NewEmbeddedEtcd()
-		if !filepath.IsAbs(o.EmbeddedEtcd.Directory) {
-			o.EmbeddedEtcd.Directory = filepath.Join(o.Extra.RootDirectory, o.EmbeddedEtcd.Directory)
-		}
-		o.ServerRunOptions.Etcd.StorageConfig.Transport.ServerList = []string{"localhost:" + o.EmbeddedEtcd.ClientPort}
-		o.EmbeddedEtcd.Enabled = true
-	}
-
 	c := completedOptions{
 		ServerRunOptions: &s,
 		EmbeddedEtcd:     o.EmbeddedEtcd,
-		Extra:            o.Extra,
+		ClientKeyFile:    o.ClientKeyFile,
 	}
 
 	return &CompletedOptions{&c}, nil
 }
 
 func (c *CompletedOptions) Run() error {
-
-	// check for directory
-	if dir := c.Extra.RootDirectory; len(dir) != 0 {
-		if fi, err := os.Stat(dir); err != nil {
-			if !os.IsNotExist(err) {
-				return err
-			}
-			if err := os.MkdirAll(dir, 0755); err != nil {
-				return err
-			}
-		} else {
-			if !fi.IsDir() {
-				return fmt.Errorf("%q is a file, please delete or select another location", dir)
-			}
-		}
-		// set this environment viriable to help set up kube csr controllers
-		// os.Setenv("OCM_CONFIG_DIRECTORY", c.Extra.RootDirectory)
-	}
-
 	// set etcd to embeddedetcd info
 	if c.EmbeddedEtcd != nil && c.EmbeddedEtcd.Enabled {
 		es := &etcd.Server{
@@ -139,5 +102,5 @@ func (c *CompletedOptions) Run() error {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	return kubeapiserver.Run(*c.ServerRunOptions, genericapiserver.SetupSignalHandler())
+	return kubeapiserver.Run(*c.ServerRunOptions, c.ClientKeyFile, genericapiserver.SetupSignalHandler())
 }

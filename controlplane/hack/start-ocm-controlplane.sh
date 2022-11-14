@@ -6,16 +6,13 @@
 KUBE_ROOT=$(pwd)
 # export SERVING_IP=$(ifconfig en0 | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*') # ***en0 for macOS***
 # export SERVING_IP=$(ifconfig eth0 | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*') # ***eth0 for Linux***
-# export OCM_CONFIG_DIRECTORY=$(pwd)/.ocmconfig
 if [ ! $SERVING_IP ] ; then
     echo "SERVING_IP should be set"
     exit 1
 fi
-if [ ! $OCM_CONFIG_DIRECTORY ] ; then
-    echo "OCM_CONFIG_DIRECTORY should be set"
-    exit 1
-fi
 
+# set root dir
+OCM_CONFIG_DIRECTORY=${OCM_CONFIG_DIRECTORY:-".ocmconfig"}
 #  set port
 SERVING_PORT=9443
 # use embedded etcd if set to true
@@ -67,7 +64,7 @@ API_HOST_IP=${API_HOST_IP:-$SERVING_IP}
 API_BIND_ADDR=${API_BIND_ADDR:-"0.0.0.0"}
 
 LOG_DIR=${LOG_DIR:-"/tmp"}
-ROOT_CA_FILE=${CERT_DIR}/server-ca.crt
+ROOT_CA_FILE="server-ca.crt"
 # Reuse certs will skip generate new ca/cert files under CERT_DIR
 # it's useful with PRESERVE_ETCD=true because new ca will make existed service account secrets invalided
 REUSE_CERTS=${REUSE_CERTS:-false}
@@ -199,7 +196,9 @@ function start_apiserver {
     --enable-bootstrap-token-auth \
     --enable-priority-and-fairness="false" \
     --api-audiences="" \
+    --external-hostname="${API_HOST}" \
     --client-ca-file="${CERT_DIR}/client-ca.crt" \
+    --client-key-file="${CERT_DIR}/client-ca.key" \
     --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
     --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
     --service-account-issuer="https://kubernetes.default.svc" \

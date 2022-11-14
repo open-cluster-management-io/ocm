@@ -299,8 +299,8 @@ clusters:
 users:
   - user:
       token: ${token}
-      client-certificate: ${dest_dir}/client-${client_id}.crt
-      client-key: ${dest_dir}/client-${client_id}.key
+      client-certificate: client-${client_id}.crt
+      client-key: client-${client_id}.key
     name: ocm-standalone-controlplane
 contexts:
   - context:

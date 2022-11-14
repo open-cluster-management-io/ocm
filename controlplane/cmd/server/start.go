@@ -8,12 +8,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/component-base/cli/globalflag"
-	"k8s.io/component-base/logs"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue" // for workqueue metric registration
-	"k8s.io/component-base/term"
 	"k8s.io/component-base/version/verflag"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 
 	ocmfeature "open-cluster-management.io/api/feature"
 	"open-cluster-management.io/ocm-controlplane/pkg/apiserver"
@@ -72,21 +68,7 @@ func NewAPIServerCommand() *cobra.Command {
 	}
 
 	fs := cmd.Flags()
-	namedFlagSets := s.ServerRunOptions.Flags()
-	verflag.AddFlags(namedFlagSets.FlagSet("global"))
-	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name(), logs.SkipLoggingConfigurationFlags())
-	options.AddCustomGlobalFlags(namedFlagSets.FlagSet("generic"))
-	// add flagset ocm global config
-	ee := namedFlagSets.FlagSet("ocm global config")
-	// add enable-embedded-etcd flag
-	ee.BoolVar(&s.Extra.EmbeddedEtcdEnabled, "enable-embedded-etcd", false, "will use embedded etcd, if set to true")
-
-	for _, f := range namedFlagSets.FlagSets {
-		fs.AddFlagSet(f)
-	}
-
-	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
-	cliflag.SetUsageAndHelpFunc(cmd, namedFlagSets, cols)
+	s.AddFlags(fs)
 
 	return cmd
 }

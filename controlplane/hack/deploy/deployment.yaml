@@ -18,9 +18,6 @@ spec:
       - name: controlplane
         image: docker.io/yaoyuchen/controlplane:latest
         imagePullPolicy: Always
-        env: 
-        - name: OCM_CONFIG_DIRECTORY
-          value: "/controlplane"
         args:
           - "/ocm-controlplane"
           - "--authorization-mode=RBAC"
@@ -28,23 +25,25 @@ spec:
           - "--enable-bootstrap-token-auth"
           - "--service-account-key-file=/controlplane/cert/kube-serviceaccount.key"
           - "--client-ca-file=/controlplane/cert/client-ca.crt"
+          - "--client-key-file=/controlplane/cert/client-ca.key"
           - "--enable-bootstrap-token-auth"
-          - "--enable-priority-and-fairness=false" 
-          - "--api-audiences="         
-          - "--storage-backend=etcd3" 
+          - "--enable-priority-and-fairness=false"
+          - "--api-audiences="    
+          - "--storage-backend=etcd3"
           - "--v=1"
-          - "--service-account-lookup=false" 
-          - "--service-account-signing-key-file=/controlplane/cert/kube-serviceaccount.key" 
+          - "--service-account-lookup=false"
+          - "--service-account-signing-key-file=/controlplane/cert/kube-serviceaccount.key"
           - "--enable-admission-plugins=NamespaceLifecycle,ServiceAccount,MutatingAdmissionWebhook,ValidatingAdmissionWebhook"
-          - "--disable-admission-plugins=TaintNodesByCondition,Priority,DefaultTolerationSeconds,DefaultStorageClass,PodSecurity,PersistentVolumeClaimResize,RuntimeClass,DefaultIngressClass" 
-          - "--bind-address=0.0.0.0" 
-          - "--secure-port=9443" 
-          - "--tls-cert-file=/controlplane/cert/serving-kube-apiserver.crt" 
-          - "--tls-private-key-file=/controlplane/cert/serving-kube-apiserver.key" 
-          - "--feature-gates=DefaultClusterSet=true" 
-          - "--enable-embedded-etcd=true" 
-          - "--service-cluster-ip-range=10.0.0.0/24"  
+          - "--disable-admission-plugins=TaintNodesByCondition,Priority,DefaultTolerationSeconds,DefaultStorageClass,PodSecurity,PersistentVolumeClaimResize,RuntimeClass,DefaultIngressClass"
+          - "--bind-address=0.0.0.0"
+          - "--secure-port=9443"
+          - "--tls-cert-file=/controlplane/cert/serving-kube-apiserver.crt"
+          - "--tls-private-key-file=/controlplane/cert/serving-kube-apiserver.key"
+          - "--feature-gates=DefaultClusterSet=true"
+          - "--enable-embedded-etcd=true"
+          - "--service-cluster-ip-range=10.0.0.0/24"
           - "--service-account-issuer=https://kubernetes.default.svc"
+          - "--external-hostname=API_HOST"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

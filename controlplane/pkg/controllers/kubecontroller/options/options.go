@@ -1,8 +1,6 @@
 package options
 
 import (
-	"os"
-
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
@@ -45,12 +43,6 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO(ycyaoxdu): this need to be handled
-	// use environment variable to pass the directory
-	certFolder := os.Getenv("OCM_CONFIG_DIRECTORY") + "/cert"
-	componentConfig.CSRSigningController.KubeAPIServerClientSignerConfiguration.CertFile = certFolder + "/" + "client-ca.crt"
-	componentConfig.CSRSigningController.KubeAPIServerClientSignerConfiguration.KeyFile = certFolder + "/" + "client-ca.key"
 
 	s := KubeControllerManagerOptions{
 		Generic: cmoptions.NewGenericControllerManagerConfigurationOptions(&componentConfig.Generic),
