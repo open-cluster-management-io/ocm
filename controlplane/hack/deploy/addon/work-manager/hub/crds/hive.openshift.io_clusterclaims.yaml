@@ -1,0 +1,163 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.0
+  creationTimestamp: null
+  name: clusterclaims.hive.openshift.io
+spec:
+  group: hive.openshift.io
+  names:
+    kind: ClusterClaim
+    listKind: ClusterClaimList
+    plural: clusterclaims
+    singular: clusterclaim
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.clusterPoolName
+      name: Pool
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Pending')].reason
+      name: Pending
+      type: string
+    - jsonPath: .spec.namespace
+      name: ClusterNamespace
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='ClusterRunning')].reason
+      name: ClusterRunning
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: ClusterClaim represents a claim to a cluster from a cluster pool.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ClusterClaimSpec defines the desired state of the ClusterClaim.
+            properties:
+              clusterPoolName:
+                description: ClusterPoolName is the name of the cluster pool from
+                  which to claim a cluster.
+                type: string
+              lifetime:
+                description: Lifetime is the maximum lifetime of the claim after it
+                  is assigned a cluster. If the claim still exists when the lifetime
+                  has elapsed, the claim will be deleted by Hive. This is a Duration
+                  value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
+                format: duration
+                type: string
+              namespace:
+                description: Namespace is the namespace containing the ClusterDeployment
+                  (name will match the namespace) of the claimed cluster. This field
+                  will be set as soon as a suitable cluster can be found, however
+                  that cluster may still be resuming and not yet ready for use. Wait
+                  for the ClusterRunning condition to be true to avoid this issue.
+                type: string
+              subjects:
+                description: Subjects hold references to which to authorize access
+                  to the claimed cluster.
+                items:
+                  description: Subject contains a reference to the object or user
+                    identities a role binding applies to.  This can either hold a
+                    direct API object reference, or a value for non-objects such as
+                    user and group names.
+                  properties:
+                    apiGroup:
+                      description: APIGroup holds the API group of the referenced
+                        subject. Defaults to "" for ServiceAccount subjects. Defaults
+                        to "rbac.authorization.k8s.io" for User and Group subjects.
+                      type: string
+                    kind:
+                      description: Kind of object being referenced. Values defined
+                        by this API group are "User", "Group", and "ServiceAccount".
+                        If the Authorizer does not recognized the kind value, the
+                        Authorizer should report an error.
+                      type: string
+                    name:
+                      description: Name of the object being referenced.
+                      type: string
+                    namespace:
+                      description: Namespace of the referenced object.  If the object
+                        kind is non-namespace, such as "User" or "Group", and this
+                        value is not empty the Authorizer should report an error.
+                      type: string
+                  required:
+                  - kind
+                  - name
+                  type: object
+                type: array
+            required:
+            - clusterPoolName
+            type: object
+          status:
+            description: ClusterClaimStatus defines the observed state of ClusterClaim.
+            properties:
+              conditions:
+                description: Conditions includes more detailed status for the cluster
+                  pool.
+                items:
+                  description: ClusterClaimCondition contains details for the current
+                    condition of a cluster claim.
+                  properties:
+                    lastProbeTime:
+                      description: LastProbeTime is the last time we probed the condition.
+                      format: date-time
+                      type: string
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: Message is a human-readable message indicating
+                        details about last transition.
+                      type: string
+                    reason:
+                      description: Reason is a unique, one-word, CamelCase reason
+                        for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status is the status of the condition.
+                      type: string
+                    type:
+                      description: Type is the type of the condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              lifetime:
+                description: Lifetime is the maximum lifetime of the claim after it
+                  is assigned a cluster. If the claim still exists when the lifetime
+                  has elapsed, the claim will be deleted by Hive.
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

@@ -1,0 +1,45 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: work-manager-addon-manager
+  labels:
+    app: work-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: work-manager
+  template:
+    metadata:
+      labels:
+        app: work-manager
+    spec:
+      containers:
+      - name: work-manager
+        image: quay.io/stolostron/multicloud-manager
+        imagePullPolicy: Always
+        args:
+          - "/controller"
+          - "--enable-agent-deploy=true"
+          - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8000
+          failureThreshold: 3
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8000
+          failureThreshold: 3
+          periodSeconds: 10
+        volumeMounts:
+          - mountPath: /var/run/secrets/hub
+            name: kubeconfig
+            readOnly: true
+      volumes:
+        - name: kubeconfig
+          secret:
+            defaultMode: 420
+            secretName: controlplane-kubeconfig

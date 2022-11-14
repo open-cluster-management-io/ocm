@@ -1,0 +1,549 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.0
+  creationTimestamp: null
+  name: clusterpools.hive.openshift.io
+spec:
+  group: hive.openshift.io
+  names:
+    kind: ClusterPool
+    listKind: ClusterPoolList
+    plural: clusterpools
+    shortNames:
+    - cp
+    singular: clusterpool
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.ready
+      name: Ready
+      type: string
+    - jsonPath: .spec.size
+      name: Size
+      type: string
+    - jsonPath: .spec.baseDomain
+      name: BaseDomain
+      type: string
+    - jsonPath: .spec.imageSetRef.name
+      name: ImageSet
+      type: string
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: ClusterPool represents a pool of clusters that should be kept
+          ready to be given out to users. Clusters are removed from the pool once
+          claimed and then automatically replaced with a new one.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ClusterPoolSpec defines the desired state of the ClusterPool.
+            properties:
+              annotations:
+                additionalProperties:
+                  type: string
+                description: Annotations to be applied to new ClusterDeployments created
+                  for the pool. ClusterDeployments that have already been claimed
+                  will not be affected when this value is modified.
+                type: object
+              baseDomain:
+                description: BaseDomain is the base domain to use for all clusters
+                  created in this pool.
+                type: string
+              claimLifetime:
+                description: ClaimLifetime defines the lifetimes for claims for the
+                  cluster pool.
+                properties:
+                  default:
+                    description: Default is the default lifetime of the claim when
+                      no lifetime is set on the claim itself. This is a Duration value;
+                      see https://pkg.go.dev/time#ParseDuration for accepted formats.
+                    format: duration
+                    type: string
+                  maximum:
+                    description: Maximum is the maximum lifetime of the claim after
+                      it is assigned a cluster. If the claim still exists when the
+                      lifetime has elapsed, the claim will be deleted by Hive. The
+                      lifetime of a claim is the mimimum of the lifetimes set by the
+                      cluster pool and the claim itself. This is a Duration value;
+                      see https://pkg.go.dev/time#ParseDuration for accepted formats.
+                    format: duration
+                    type: string
+                type: object
+              hibernateAfter:
+                description: HibernateAfter will be applied to new ClusterDeployments
+                  created for the pool. HibernateAfter will transition clusters in
+                  the clusterpool to hibernating power state after it has been running
+                  for the given duration. The time that a cluster has been running
+                  is the time since the cluster was installed or the time since the
+                  cluster last came out of hibernation. This is a Duration value;
+                  see https://pkg.go.dev/time#ParseDuration for accepted formats.
+                format: duration
+                type: string
+              imageSetRef:
+                description: ImageSetRef is a reference to a ClusterImageSet. The
+                  release image specified in the ClusterImageSet will be used by clusters
+                  created for this cluster pool.
+                properties:
+                  name:
+                    description: Name is the name of the ClusterImageSet that this
+                      refers to
+                    type: string
+                required:
+                - name
+                type: object
+              installConfigSecretTemplateRef:
+                description: InstallConfigSecretTemplateRef is a secret with the key
+                  install-config.yaml consisting of the content of the install-config.yaml
+                  to be used as a template for all clusters in this pool. Cluster
+                  specific settings (name, basedomain) will be injected dynamically
+                  when the ClusterDeployment install-config Secret is generated.
+                properties:
+                  name:
+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    type: string
+                type: object
+              labels:
+                additionalProperties:
+                  type: string
+                description: Labels to be applied to new ClusterDeployments created
+                  for the pool. ClusterDeployments that have already been claimed
+                  will not be affected when this value is modified.
+                type: object
+              maxConcurrent:
+                description: MaxConcurrent is the maximum number of clusters that
+                  will be provisioned or deprovisioned at an time. This includes the
+                  claimed clusters being deprovisioned. By default there is no limit.
+                format: int32
+                type: integer
+              maxSize:
+                description: MaxSize is the maximum number of clusters that will be
+                  provisioned including clusters that have been claimed and ones waiting
+                  to be used. By default there is no limit.
+                format: int32
+                type: integer
+              platform:
+                description: Platform encompasses the desired platform for the cluster.
+                properties:
+                  agentBareMetal:
+                    description: AgentBareMetal is the configuration used when performing
+                      an Assisted Agent based installation to bare metal.
+                    properties:
+                      agentSelector:
+                        description: AgentSelector is a label selector used for associating
+                          relevant custom resources with this cluster. (Agent, BareMetalHost,
+                          etc)
+                        properties:
+                          matchExpressions:
+                            description: matchExpressions is a list of label selector
+                              requirements. The requirements are ANDed.
+                            items:
+                              description: A label selector requirement is a selector
+                                that contains values, a key, and an operator that
+                                relates the key and values.
+                              properties:
+                                key:
+                                  description: key is the label key that the selector
+                                    applies to.
+                                  type: string
+                                operator:
+                                  description: operator represents a key's relationship
+                                    to a set of values. Valid operators are In, NotIn,
+                                    Exists and DoesNotExist.
+                                  type: string
+                                values:
+                                  description: values is an array of string values.
+                                    If the operator is In or NotIn, the values array
+                                    must be non-empty. If the operator is Exists or
+                                    DoesNotExist, the values array must be empty.
+                                    This array is replaced during a strategic merge
+                                    patch.
+                                  items:
+                                    type: string
+                                  type: array
+                              required:
+                              - key
+                              - operator
+                              type: object
+                            type: array
+                          matchLabels:
+                            additionalProperties:
+                              type: string
+                            description: matchLabels is a map of {key,value} pairs.
+                              A single {key,value} in the matchLabels map is equivalent
+                              to an element of matchExpressions, whose key field is
+                              "key", the operator is "In", and the values array contains
+                              only "value". The requirements are ANDed.
+                            type: object
+                        type: object
+                    required:
+                    - agentSelector
+                    type: object
+                  aws:
+                    description: AWS is the configuration used when installing on
+                      AWS.
+                    properties:
+                      credentialsAssumeRole:
+                        description: CredentialsAssumeRole refers to the IAM role
+                          that must be assumed to obtain AWS account access for the
+                          cluster operations.
+                        properties:
+                          externalID:
+                            description: 'ExternalID is random string generated by
+                              platform so that assume role is protected from confused
+                              deputy problem. more info: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html'
+                            type: string
+                          roleARN:
+                            type: string
+                        required:
+                        - roleARN
+                        type: object
+                      credentialsSecretRef:
+                        description: CredentialsSecretRef refers to a secret that
+                          contains the AWS account access credentials.
+                        properties:
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            type: string
+                        type: object
+                      privateLink:
+                        description: PrivateLink allows uses to enable access to the
+                          cluster's API server using AWS PrivateLink. AWS PrivateLink
+                          includes a pair of VPC Endpoint Service and VPC Endpoint
+                          accross AWS accounts and allows clients to connect to services
+                          using AWS's internal networking instead of the Internet.
+                        properties:
+                          enabled:
+                            type: boolean
+                        required:
+                        - enabled
+                        type: object
+                      region:
+                        description: Region specifies the AWS region where the cluster
+                          will be created.
+                        type: string
+                      userTags:
+                        additionalProperties:
+                          type: string
+                        description: UserTags specifies additional tags for AWS resources
+                          created for the cluster.
+                        type: object
+                    required:
+                    - region
+                    type: object
+                  azure:
+                    description: Azure is the configuration used when installing on
+                      Azure.
+                    properties:
+                      baseDomainResourceGroupName:
+                        description: BaseDomainResourceGroupName specifies the resource
+                          group where the azure DNS zone for the base domain is found
+                        type: string
+                      credentialsSecretRef:
+                        description: CredentialsSecretRef refers to a secret that
+                          contains the Azure account access credentials.
+                        properties:
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            type: string
+                        type: object
+                      region:
+                        description: Region specifies the Azure region where the cluster
+                          will be created.
+                        type: string
+                    required:
+                    - credentialsSecretRef
+                    - region
+                    type: object
+                  baremetal:
+                    description: BareMetal is the configuration used when installing
+                      on bare metal.
+                    properties:
+                      libvirtSSHPrivateKeySecretRef:
+                        description: LibvirtSSHPrivateKeySecretRef is the reference
+                          to the secret that contains the private SSH key to use for
+                          access to the libvirt provisioning host. The SSH private
+                          key is expected to be in the secret data under the "ssh-privatekey"
+                          key.
+                        properties:
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            type: string
+                        type: object
+                    required:
+                    - libvirtSSHPrivateKeySecretRef
+                    type: object
+                  gcp:
+                    description: GCP is the configuration used when installing on
+                      Google Cloud Platform.
+                    properties:
+                      credentialsSecretRef:
+                        description: CredentialsSecretRef refers to a secret that
+                          contains the GCP account access credentials.
+                        properties:
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            type: string
+                        type: object
+                      region:
+                        description: Region specifies the GCP region where the cluster
+                          will be created.
+                        type: string
+                    required:
+                    - credentialsSecretRef
+                    - region
+                    type: object
+                  openstack:
+                    description: OpenStack is the configuration used when installing
+                      on OpenStack
+                    properties:
+                      certificatesSecretRef:
+                        description: "CertificatesSecretRef refers to a secret that
+                          contains CA certificates necessary for communicating with
+                          the OpenStack. There is additional configuration required
+                          for the OpenShift cluster to trust the certificates provided
+                          in this secret. The \"clouds.yaml\" file included in the
+                          credentialsSecretRef Secret must also include a reference
+                          to the certificate bundle file for the OpenShift cluster
+                          being created to trust the OpenStack endpoints. The \"clouds.yaml\"
+                          file must set the \"cacert\" field to either \"/etc/openstack-ca/<key
+                          name containing the trust bundle in credentialsSecretRef
+                          Secret>\" or \"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\".
+                          \n For example, \"\"\"clouds.yaml clouds:   shiftstack:
+                          \    auth: ...     cacert: \"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\"
+                          \"\"\""
+                        properties:
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            type: string
+                        type: object
+                      cloud:
+                        description: Cloud will be used to indicate the OS_CLOUD value
+                          to use the right section from the clouds.yaml in the CredentialsSecretRef.
+                        type: string
+                      credentialsSecretRef:
+                        description: CredentialsSecretRef refers to a secret that
+                          contains the OpenStack account access credentials.
+                        properties:
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            type: string
+                        type: object
+                      trunkSupport:
+                        description: TrunkSupport indicates whether or not to use
+                          trunk ports in your OpenShift cluster.
+                        type: boolean
+                    required:
+                    - cloud
+                    - credentialsSecretRef
+                    type: object
+                  ovirt:
+                    description: Ovirt is the configuration used when installing on
+                      oVirt
+                    properties:
+                      certificatesSecretRef:
+                        description: CertificatesSecretRef refers to a secret that
+                          contains the oVirt CA certificates necessary for communicating
+                          with oVirt.
+                        properties:
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            type: string
+                        type: object
+                      credentialsSecretRef:
+                        description: 'CredentialsSecretRef refers to a secret that
+                          contains the oVirt account access credentials with fields:
+                          ovirt_url, ovirt_username, ovirt_password, ovirt_ca_bundle'
+                        properties:
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            type: string
+                        type: object
+                      ovirt_cluster_id:
+                        description: The target cluster under which all VMs will run
+                        type: string
+                      ovirt_network_name:
+                        description: The target network of all the network interfaces
+                          of the nodes. Omitting defaults to ovirtmgmt network which
+                          is a default network for evert ovirt cluster.
+                        type: string
+                      storage_domain_id:
+                        description: The target storage domain under which all VM
+                          disk would be created.
+                        type: string
+                    required:
+                    - certificatesSecretRef
+                    - credentialsSecretRef
+                    - ovirt_cluster_id
+                    - storage_domain_id
+                    type: object
+                  vsphere:
+                    description: VSphere is the configuration used when installing
+                      on vSphere
+                    properties:
+                      certificatesSecretRef:
+                        description: CertificatesSecretRef refers to a secret that
+                          contains the vSphere CA certificates necessary for communicating
+                          with the VCenter.
+                        properties:
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            type: string
+                        type: object
+                      cluster:
+                        description: Cluster is the name of the cluster virtual machines
+                          will be cloned into.
+                        type: string
+                      credentialsSecretRef:
+                        description: 'CredentialsSecretRef refers to a secret that
+                          contains the vSphere account access credentials: GOVC_USERNAME,
+                          GOVC_PASSWORD fields.'
+                        properties:
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            type: string
+                        type: object
+                      datacenter:
+                        description: Datacenter is the name of the datacenter to use
+                          in the vCenter.
+                        type: string
+                      defaultDatastore:
+                        description: DefaultDatastore is the default datastore to
+                          use for provisioning volumes.
+                        type: string
+                      folder:
+                        description: Folder is the name of the folder that will be
+                          used and/or created for virtual machines.
+                        type: string
+                      network:
+                        description: Network specifies the name of the network to
+                          be used by the cluster.
+                        type: string
+                      vCenter:
+                        description: VCenter is the domain name or IP address of the
+                          vCenter.
+                        type: string
+                    required:
+                    - certificatesSecretRef
+                    - credentialsSecretRef
+                    - datacenter
+                    - defaultDatastore
+                    - vCenter
+                    type: object
+                type: object
+              pullSecretRef:
+                description: PullSecretRef is the reference to the secret to use when
+                  pulling images.
+                properties:
+                  name:
+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    type: string
+                type: object
+              size:
+                description: Size is the default number of clusters that we should
+                  keep provisioned and waiting for use.
+                format: int32
+                minimum: 0
+                type: integer
+              skipMachinePools:
+                description: SkipMachinePools allows creating clusterpools where the
+                  machinepools are not managed by hive after cluster creation
+                type: boolean
+            required:
+            - baseDomain
+            - imageSetRef
+            - platform
+            - size
+            type: object
+          status:
+            description: ClusterPoolStatus defines the observed state of ClusterPool
+            properties:
+              conditions:
+                description: Conditions includes more detailed status for the cluster
+                  pool
+                items:
+                  description: ClusterPoolCondition contains details for the current
+                    condition of a cluster pool
+                  properties:
+                    lastProbeTime:
+                      description: LastProbeTime is the last time we probed the condition.
+                      format: date-time
+                      type: string
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: Message is a human-readable message indicating
+                        details about last transition.
+                      type: string
+                    reason:
+                      description: Reason is a unique, one-word, CamelCase reason
+                        for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status is the status of the condition.
+                      type: string
+                    type:
+                      description: Type is the type of the condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              ready:
+                description: Ready is the number of unclaimed clusters that have been
+                  installed and are ready to be claimed.
+                format: int32
+                type: integer
+              size:
+                description: Size is the number of unclaimed clusters that have been
+                  created for the pool.
+                format: int32
+                type: integer
+            required:
+            - ready
+            - size
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      scale:
+        specReplicasPath: .spec.size
+        statusReplicasPath: .status.size
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

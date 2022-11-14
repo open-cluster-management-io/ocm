@@ -1,0 +1,242 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.0
+  creationTimestamp: null
+  name: clustersyncs.hiveinternal.openshift.io
+spec:
+  group: hiveinternal.openshift.io
+  names:
+    kind: ClusterSync
+    listKind: ClusterSyncList
+    plural: clustersyncs
+    shortNames:
+    - csync
+    singular: clustersync
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[0].reason
+      name: Status
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Failed")].message
+      name: Message
+      priority: 1
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ClusterSync is the status of all of the SelectorSyncSets and
+          SyncSets that apply to a ClusterDeployment.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ClusterSyncSpec defines the desired state of ClusterSync
+            type: object
+          status:
+            description: ClusterSyncStatus defines the observed state of ClusterSync
+            properties:
+              conditions:
+                description: Conditions is a list of conditions associated with syncing
+                  to the cluster.
+                items:
+                  description: ClusterSyncCondition contains details for the current
+                    condition of a ClusterSync
+                  properties:
+                    lastProbeTime:
+                      description: LastProbeTime is the last time we probed the condition.
+                      format: date-time
+                      type: string
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: Message is a human-readable message indicating
+                        details about the last transition.
+                      type: string
+                    reason:
+                      description: Reason is a unique, one-word, CamelCase reason
+                        for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status is the status of the condition.
+                      type: string
+                    type:
+                      description: Type is the type of the condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              firstSuccessTime:
+                description: FirstSuccessTime is the time we first successfully applied
+                  all (selector)syncsets to a cluster.
+                format: date-time
+                type: string
+              selectorSyncSets:
+                description: SelectorSyncSets is the sync status of all of the SelectorSyncSets
+                  for the cluster.
+                items:
+                  description: SyncStatus is the status of applying a specific SyncSet
+                    or SelectorSyncSet to the cluster.
+                  properties:
+                    failureMessage:
+                      description: FailureMessage is a message describing why the
+                        SyncSet or SelectorSyncSet could not be applied. This is only
+                        set when Result is Failure.
+                      type: string
+                    firstSuccessTime:
+                      description: FirstSuccessTime is the time when the SyncSet or
+                        SelectorSyncSet was first successfully applied to the cluster.
+                      format: date-time
+                      type: string
+                    lastTransitionTime:
+                      description: LastTransitionTime is the time when this status
+                        last changed.
+                      format: date-time
+                      type: string
+                    name:
+                      description: Name is the name of the SyncSet or SelectorSyncSet.
+                      type: string
+                    observedGeneration:
+                      description: ObservedGeneration is the generation of the SyncSet
+                        or SelectorSyncSet that was last observed.
+                      format: int64
+                      type: integer
+                    resourcesToDelete:
+                      description: ResourcesToDelete is the list of resources in the
+                        cluster that should be deleted when the SyncSet or SelectorSyncSet
+                        is deleted or is no longer matched to the cluster.
+                      items:
+                        description: SyncResourceReference is a reference to a resource
+                          that is synced to a cluster via a SyncSet or SelectorSyncSet.
+                        properties:
+                          apiVersion:
+                            description: APIVersion is the Group and Version of the
+                              resource.
+                            type: string
+                          kind:
+                            description: Kind is the Kind of the resource.
+                            type: string
+                          name:
+                            description: Name is the name of the resource.
+                            type: string
+                          namespace:
+                            description: Namespace is the namespace of the resource.
+                            type: string
+                        required:
+                        - apiVersion
+                        - name
+                        type: object
+                      type: array
+                    result:
+                      description: Result is the result of the last attempt to apply
+                        the SyncSet or SelectorSyncSet to the cluster.
+                      enum:
+                      - Success
+                      - Failure
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - name
+                  - observedGeneration
+                  - result
+                  type: object
+                type: array
+              syncSets:
+                description: SyncSets is the sync status of all of the SyncSets for
+                  the cluster.
+                items:
+                  description: SyncStatus is the status of applying a specific SyncSet
+                    or SelectorSyncSet to the cluster.
+                  properties:
+                    failureMessage:
+                      description: FailureMessage is a message describing why the
+                        SyncSet or SelectorSyncSet could not be applied. This is only
+                        set when Result is Failure.
+                      type: string
+                    firstSuccessTime:
+                      description: FirstSuccessTime is the time when the SyncSet or
+                        SelectorSyncSet was first successfully applied to the cluster.
+                      format: date-time
+                      type: string
+                    lastTransitionTime:
+                      description: LastTransitionTime is the time when this status
+                        last changed.
+                      format: date-time
+                      type: string
+                    name:
+                      description: Name is the name of the SyncSet or SelectorSyncSet.
+                      type: string
+                    observedGeneration:
+                      description: ObservedGeneration is the generation of the SyncSet
+                        or SelectorSyncSet that was last observed.
+                      format: int64
+                      type: integer
+                    resourcesToDelete:
+                      description: ResourcesToDelete is the list of resources in the
+                        cluster that should be deleted when the SyncSet or SelectorSyncSet
+                        is deleted or is no longer matched to the cluster.
+                      items:
+                        description: SyncResourceReference is a reference to a resource
+                          that is synced to a cluster via a SyncSet or SelectorSyncSet.
+                        properties:
+                          apiVersion:
+                            description: APIVersion is the Group and Version of the
+                              resource.
+                            type: string
+                          kind:
+                            description: Kind is the Kind of the resource.
+                            type: string
+                          name:
+                            description: Name is the name of the resource.
+                            type: string
+                          namespace:
+                            description: Namespace is the namespace of the resource.
+                            type: string
+                        required:
+                        - apiVersion
+                        - name
+                        type: object
+                      type: array
+                    result:
+                      description: Result is the result of the last attempt to apply
+                        the SyncSet or SelectorSyncSet to the cluster.
+                      enum:
+                      - Success
+                      - Failure
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - name
+                  - observedGeneration
+                  - result
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

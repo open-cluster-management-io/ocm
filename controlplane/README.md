@@ -1,33 +1,73 @@
 # Get started 
 
-## Option1: Deploy controlplane on Openshift Cluster
+## Install controlplane
 
-First set `API_HOST` environment variable:
-```
-$ export API_HOST=ocm-controlplane-<namespace>.<your ocp cluster to deploy>
+### Option 1: Deploy controlplane on Openshift Cluster
+
+#### Build image
+
+```bash
+$ export IMAGE_NAME=<customized image. default is quay.io/open-cluster-management/controlplane:latest>
+$ make image
 ```
 
-Second run the deploy script to deploy:
-```
+#### Install 
+
+Set environment variables firtly and then deploy
+* `HUB_NAME` (optional) is the namespace where the controlplane is deployed in. The default is `ocm-controlplane`.
+* `API_HOST_POSTFIX` (required) is the rouute domain of the OCP.And the format of API server of controlplane is `ocm-controlplane-${HUB_NAME}.${API_HOST_POSTFIX}`. 
+* `IMAGE_NAME` (optional) is the customized image which can override the default image `quay.io/open-cluster-management/controlplane:latest`.
+
+For example: 
+    ```bash
+    $ export HUB_NAME=<hub name>
+    $ export API_HOST_POSTFIX=<your ocp cluster route domain>
+    $ export IMAGE_NAME=<your image>
+    $ make deploy
+    ```
+
+### Option 2: Run controlplane as a local binary
+
+```bash
 $ cd controlplane
-$ hack/deploy-ocm-controlplane.sh
+$ make vendor
+$ make build
+$ make run
 ```
 
-Now start to use the controlplane:
-```
-$ clusteradm --kubeconfig=<file to kubeconfig> get token --use-bootstrap-token
+## Access the controlplane
+
+The kubeconfig file of the controlplane is in the dir `hack/deploy/cert-${HUB_NAME}/kubeconfig`.
+
+You can use clusteradm to access and join a cluster.
+```bash
+$ clusteradm --kubeconfig=<kubeconfig file> get token --use-bootstrap-token
+$ clusteradm join --hub-token <hub token> --hub-apiserver <hub apiserver> --cluster-name <cluster_name>
+$ clusteradm --kubeconfig=<kubeconfig file> accept --clusters <cluster_name>
 ```
 
 > **Warning**
 > clusteradm version should be v0.4.1 or later
 
---- 
+## Install add-on
 
-## Option2: Run controlplane as a local binary
+Currently we support to install work-manager and managed-serviceaccount add-on on the controlplane.
 
+```bash
+$ make deploy-work-manager-addon
+$ make deploy-managed-serviceaccount-addon
 ```
-$ cd controlplane
-$ make vendor
-$ make build
-$ make run
+
+## Clean up the deploy
+
+```bash
+$ make destory
+```
+
+## Install all
+```bash
+$ export HUB_NAME=<hub name>
+$ export API_HOST_POSTFIX=<your ocp cluster route domain>
+$ export IMAGE_NAME=<your image>
+$ make deploy-all
 ```

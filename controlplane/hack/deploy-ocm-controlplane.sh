@@ -14,13 +14,18 @@ if [ ! $KUSTOMIZE >& /dev/null ] ; then
   exit 1
 fi
 
+HUB_NAME=${HUB_NAME:ocm-controlplane}
+IMAGE_NAME=${IMAGE_NAME:quay.io/open-cluster-management/controlplane}
+API_HOST_POSTFIX=${HOST_POSTFIX:}
+API_HOST=ocm-controlplane-${HUB_NAME}.${API_HOST_POSTFIX}
 KUBE_ROOT=$(pwd)
-if [ ! $API_HOST ] ; then
-    echo "API_HOST should be set"
+if [ ! $API_HOST_POSTFIX ] ; then
+    echo "API_HOST_POSTFIX should be set"
     exit 1
 fi
 
-export OCM_CONFIG_DIRECTORY="$(pwd)/hack/deploy"
+export OCM_DEPLOY_DIRECTORY="$(pwd)/hack/deploy"
+export OCM_CONFIG_DIRECTORY="$(pwd)/hack/deploy/controlplane"
 #  set port
 SERVING_PORT=9443
 # use embedded etcd if set to true
@@ -99,6 +104,7 @@ REUSE_CERTS=${REUSE_CERTS:-false}
 
 
 # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
+rm -r "${CERT_DIR}" &>/dev/null 
 mkdir -p "${CERT_DIR}" &>/dev/null || sudo mkdir -p "${CERT_DIR}"
 CONTROLPLANE_SUDO=$(test -w "${CERT_DIR}" || echo "sudo -E")
 
@@ -144,17 +150,43 @@ function start_apiserver {
     fi
 
     cp ${CERT_DIR}/kube-aggregator.kubeconfig ${CERT_DIR}/kubeconfig
-    cp hack/deploy/deployment.yaml hack/deploy/deployment.yaml.tmp
-    sed -e 's,API_HOST,'${API_HOST}',' hack/deploy/deployment.yaml
-    ${KUSTOMIZE} build hack/deploy | ${KUBECTL} apply -f -
-    mv hack/deploy/deployment.yaml.tmp hack/deploy/deployment.yaml
+    cp hack/deploy/controlplane/deployment.yaml hack/deploy/controlplane/deployment.yaml.tmp
+    cp hack/deploy/controlplane/kustomization.yaml  hack/deploy/controlplane/kustomization.yaml.tmp
+    sed -e 's,API_HOST,'${API_HOST}',' hack/deploy/controlplane/deployment.yaml
+    cd hack/deploy/controlplane && ${KUSTOMIZE} edit set namespace ${HUB_NAME} && ${KUSTOMIZE} edit set image quay.io/open-cluster-management/controlplane=${IMAGE_NAME}
+    cd ../../../
+    ${KUSTOMIZE} build hack/deploy/controlplane | ${KUBECTL} apply -f -
+    mv hack/deploy/controlplane/deployment.yaml.tmp hack/deploy/controlplane/deployment.yaml
+    mv hack/deploy/controlplane/kustomization.yaml.tmp hack/deploy/controlplane/kustomization.yaml
 
-    echo "Use '${KUBECTL} --kubeconfig=${CERT_DIR}/kubeconfig' to use the aggregated API server" 
+    cp -rf ${CERT_DIR} ${OCM_DEPLOY_DIRECTORY}/cert-${HUB_NAME}
+
+
+    echo "Use '${KUBECTL} --kubeconfig=${OCM_DEPLOY_DIRECTORY}/cert-${HUB_NAME}/kubeconfig' to use the aggregated API server" 
 }
 
+function check_ocm-controlplane {
+    for i in {1..10}; do
+        echo "$i  Checking ocm-controlplane"
+        RESULT=$(${KUBECTL} --kubeconfig=${OCM_DEPLOY_DIRECTORY}/cert-${HUB_NAME}/kubeconfig api-resources | grep managedclusters)
+        if [ -n "${RESULT}" ]; then
+            echo "!!!!! ocm-controlplane ${HUB_NAME} is ready !!!!!"
+            break
+        fi
+
+        if [ $i -eq 10 ]; then
+            echo "!!!!!!!!!!  the ocm-controlplane ${HUB_NAME} is not ready within 30s"
+            ${KUBECTL} -n ${HUB_NAME} get pods
+
+            exit 1
+        fi
+        sleep 2
+  done
+}
 
 kube::util::test_openssl_installed
 kube::util::ensure-cfssl
 
 set_service_accounts
 start_apiserver
+check_ocm-controlplane
