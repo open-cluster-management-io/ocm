@@ -33,7 +33,7 @@ In addition, developers can leverage [Addon framework](https://github.com/open-c
 * Centrally create, update, and delete Kubernetes clusters across multiple private and public clouds.
 * Automatically deploy applications to specific clusters by subscribing to different workload (resource) channels, such as GitHub, Helm repository, ObjectStore, and resource templates.
 
-The application model defines a Kubernetes-first way of describing the application. Your existing Kubernetes apps or `kustomized` apps can be adapted with the addition of a few new objects: [Channel](https://github.com/open-cluster-management-io/multicloud-operators-channel), and [Subscription](https://github.com/open-cluster-management-io/multicloud-operators-subscription). Changes made to the app are then easily delivered to managed clusters based on the dynamic placement engine. See [deploy a helm chart][solutions/deploy-a-helm-chart] on how
+The application model defines a Kubernetes-first way of describing the application. Your existing Kubernetes apps or `kustomized` apps can be adapted with the addition of a few new objects: [Channel](https://github.com/open-cluster-management-io/multicloud-operators-channel), and [Subscription](https://github.com/open-cluster-management-io/multicloud-operators-subscription). Changes made to the app are then easily delivered to managed clusters based on the dynamic placement engine. See [deploy a helm chart](solutions/deploy-a-helm-chart) on how
 to install application manager addon in OCM and deploy helm charts in multiple clusters.
 
 ### GRC: Governance, Risk and Compliance across Kubernetes clusters
@@ -57,7 +57,7 @@ We are constantly working with other open source projects to make multicluster m
 
 - [Submariner](https://submariner.io/) is a project that provides multicluster networking connectivity. Users can benefit from a [Submariner](https://submariner.io/) addon, which automates the deployment and management of multicluster networking.
 - [Clusternet](http://github.com/clusternet/clusternet) is another project that provides multicluster orchestration, which can be easily plug into OCM with [clusternet addon](https://github.com/skeeey/clusternet-addon)
-- [KubeVela](https://kubevela.io/) is a modern application delivery platform that makes deploying and operating applications across today's hybrid, multi-cloud environments easier, faster and more reliable. Note that OCM is also available as an [vela addon](https://github.com/oam-dev/catalog/tree/master/addons/ocm-cluster-manager) in KubeVela.
+- [KubeVela](https://kubevela.io/) is a modern application delivery platform that makes deploying and operating applications across today's hybrid, multi-cloud environments easier, faster and more reliable. Note that OCM is also available as an [vela addon](https://github.com/kubevela/catalog/tree/master/addons/ocm-hub-control-plane) in KubeVela.
 
 ### Get connected
 
@@ -67,4 +67,4 @@ See the following options to connect with the community:
  - [Slack](https://kubernetes.slack.com/archives/C01GE7YSUUF)
  - [Mailing group](https://groups.google.com/g/open-cluster-management)
  - [Community meetings](https://github.com/open-cluster-management-io/community/projects/1)
- - [YouTube channel](https://www.youtube.com/channel/UC7xxOh2jBM5Jfwt3fsBzOZw)
+ - [YouTube channel](https://www.youtube.com/c/OpenClusterManagement)

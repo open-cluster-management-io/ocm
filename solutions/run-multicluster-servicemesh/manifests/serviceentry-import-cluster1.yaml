@@ -1,0 +1,23 @@
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: reviews.bookinfo.svc.cluster2.global
+  namespace: istio-system
+spec:
+  addresses:
+  - 255.51.210.11
+  endpoints:
+  - address: ${CLUSTER2_HOST_IP}
+    labels:
+      app: reviews
+      version: v3
+    ports:
+      http: ${EASTWESTGW_NODEPORT}
+  hosts:
+  - reviews.bookinfo.svc.cluster2.global
+  location: MESH_INTERNAL
+  ports:
+  - name: http
+    number: 9080
+    protocol: HTTP
+  resolution: STATIC

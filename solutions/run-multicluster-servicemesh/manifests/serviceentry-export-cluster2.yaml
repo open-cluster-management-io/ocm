@@ -1,0 +1,23 @@
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: reviews.bookinfo.svc.cluster2.global
+  namespace: istio-system
+spec:
+  endpoints:
+  - address: ${REVIEW_V3_IP}
+    labels:
+      app: reviews
+      version: v3
+    ports:
+      http: 9080
+  exportTo:
+  - .
+  hosts:
+  - reviews.bookinfo.svc.cluster2.global
+  location: MESH_INTERNAL
+  ports:
+  - name: http
+    number: 9080
+    protocol: HTTP
+  resolution: STATIC

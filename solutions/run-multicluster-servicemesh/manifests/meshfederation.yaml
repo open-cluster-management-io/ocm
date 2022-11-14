@@ -1,0 +1,14 @@
+apiVersion: mesh.open-cluster-management.io/v1alpha1
+kind: MeshFederation
+metadata:
+  name: istio-federation
+  namespace: open-cluster-management
+spec:
+  meshPeers:
+  - peers:
+    - name: cluster1-istio
+      cluster: cluster1
+    - name: cluster2-istio
+      cluster: cluster2
+  trustConfig:
+    trustType: Complete

@@ -1,0 +1,6 @@
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: guestbook-app-placement
+  namespace: argocd
+spec: {}

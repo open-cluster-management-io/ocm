@@ -1,7 +1,4 @@
 #!/bin/bash
-
-cd $(dirname ${BASH_SOURCE})
-
 set -e
 
 hub=${CLUSTER1:-hub}
@@ -13,8 +10,8 @@ c1ctx="kind-${c1}"
 c2ctx="kind-${c2}"
 
 kind create cluster --name "${hub}"
-kind create cluster --name "${c1}"
-kind create cluster --name "${c2}"
+kind create cluster --name "${c1}" --config cluster1-config.yaml
+kind create cluster --name "${c2}" --config cluster2-config.yaml
 
 kubectl config use ${hubctx}
 echo "Initialize the ocm hub cluster"
@@ -32,4 +29,4 @@ kubectl config use ${hubctx}
 echo "Accept join of cluster1 and cluster2"
 clusteradm accept --clusters ${c1},${c2} --wait
 
-kubectl get managedclusters --all-namespaces
+kubectl get managedclusters
