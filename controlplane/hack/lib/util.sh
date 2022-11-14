@@ -283,24 +283,26 @@ EOF
 function kube::util::write_client_kubeconfig {
     local sudo=$1
     local dest_dir=$2
-    local ca_file=$3
+    local ca=`cat $3 | base64 -w0`
     local api_host=$4
     local api_port=$5
     local client_id=$6
     local token=${7:-}
+    local client_ca=`cat ${dest_dir}/client-${client_id}.crt | base64 -w0`
+    local client_key=`cat ${dest_dir}/client-${client_id}.key | base64 -w0`
     cat <<EOF | ${sudo} tee "${dest_dir}"/"${client_id}".kubeconfig > /dev/null
 apiVersion: v1
 kind: Config
 clusters:
   - cluster:
-      certificate-authority: ${ca_file}
+      certificate-authority-data: ${ca}
       server: https://${api_host}:${api_port}/
     name: hub
 users:
   - user:
       token: ${token}
-      client-certificate: client-${client_id}.crt
-      client-key: client-${client_id}.key
+      client-certificate-data: ${client_ca}
+      client-key-data: ${client_key}
     name: ocm-standalone-controlplane
 contexts:
   - context:

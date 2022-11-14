@@ -79,7 +79,7 @@ set +e
 API_PORT=${API_PORT:-0}
 API_SECURE_PORT=${API_SECURE_PORT:-$SERVING_PORT}
 API_HOST=${API_HOST:-""}
-API_HOST_IP=${API_HOST_IP:-$SERVING_IP}
+API_HOST_IP=${API_HOST_IP:-"127.0.0.1"}
 ADVERTISE_ADDRESS=${ADVERTISE_ADDRESS:-""}
 NODE_PORT_RANGE=${NODE_PORT_RANGE:-""}
 API_BIND_ADDR=${API_BIND_ADDR:-"0.0.0.0"}
@@ -134,7 +134,7 @@ function generate_certs {
     # TODO remove masters and add rolebinding
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kube-aggregator system:kube-aggregator system:masters
     # TODO(ycyaoxdu): should write data( rather than) file in kubeconfig
-    kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kube-aggregator
+    kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "443" kube-aggregator
 }
 
 function start_apiserver {
@@ -144,7 +144,6 @@ function start_apiserver {
     fi
 
     cp ${CERT_DIR}/kube-aggregator.kubeconfig ${CERT_DIR}/kubeconfig
-    sed -e 's,9443,443,g' ${CERT_DIR}/kubeconfig
     cp hack/deploy/deployment.yaml hack/deploy/deployment.yaml.tmp
     sed -e 's,API_HOST,'${API_HOST}',' hack/deploy/deployment.yaml
     ${KUSTOMIZE} build hack/deploy
