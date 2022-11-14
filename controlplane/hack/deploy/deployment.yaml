@@ -41,6 +41,7 @@ spec:
           - "--tls-private-key-file=/controlplane/cert/serving-kube-apiserver.key"
           - "--feature-gates=DefaultClusterSet=true"
           - "--enable-embedded-etcd=true"
+          - "--etcd-servers=https://127.0.0.1:2379"
           - "--service-cluster-ip-range=10.0.0.0/24"
           - "--service-account-issuer=https://kubernetes.default.svc"
           - "--external-hostname=API_HOST"
