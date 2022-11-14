@@ -213,6 +213,7 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		// bootstrap ocm hub resources
 		if err := ocmcontrollerresources.Bootstrap(
 			goContext(context),
+			aggregatorConfig.GenericConfig.Config,
 			apiextensionsClient.Discovery(),
 			dynamicClient,
 			kubeClient,
