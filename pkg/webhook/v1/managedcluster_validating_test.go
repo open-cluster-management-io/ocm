@@ -207,6 +207,30 @@ func TestValidateUpdate(t *testing.T) {
 			},
 		},
 		{
+			name:                   "validate update other fields without accept permission",
+			expectedError:          false,
+			allowUpdateAcceptField: false,
+			cluster: &v1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "set-1",
+				},
+				Spec: v1.ManagedClusterSpec{
+					HubAcceptsClient: true,
+				},
+			},
+			oldCluster: &v1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "set-1",
+					Labels: map[string]string{
+						"k": "v",
+					},
+				},
+				Spec: v1.ManagedClusterSpec{
+					HubAcceptsClient: true,
+				},
+			},
+		},
+		{
 			name:                   "validate updating an accepted ManagedCluster with permission",
 			expectedError:          false,
 			allowUpdateAcceptField: true,

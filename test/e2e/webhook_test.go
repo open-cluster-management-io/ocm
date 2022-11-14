@@ -260,6 +260,35 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				gomega.Expect(u.deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
 			})
+			ginkgo.It("Should accept the request when update managed cluster other field by unauthorized user", func() {
+				sa := fmt.Sprintf("webhook-sa-%s", rand.String(6))
+				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
+
+				ginkgo.By(fmt.Sprintf("update an managed cluster %q label with unauthorized service account %q", clusterName, sa))
+
+				// prepare an unauthorized cluster client from a service account who can create/get/update ManagedCluster
+				// but cannot change the ManagedCluster HubAcceptsClient field
+				unauthorizedClient, err := buildClusterClient(saNamespace, sa, []rbacv1.PolicyRule{
+					{
+						APIGroups: []string{"cluster.open-cluster-management.io"},
+						Resources: []string{"managedclusters"},
+						Verbs:     []string{"create", "get", "update"},
+					},
+				}, nil)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				managedCluster := newManagedCluster(clusterName, true, validURL)
+				managedCluster, err = clusterClient.ClusterV1().ManagedClusters().Create(context.TODO(), managedCluster, metav1.CreateOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				updatedManagedCluster := managedCluster.DeepCopy()
+				updatedManagedCluster.Labels = map[string]string{
+					"k": "v",
+				}
+				_, err = unauthorizedClient.ClusterV1().ManagedClusters().Update(context.TODO(), updatedManagedCluster, metav1.UpdateOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(u.deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
+			})
 
 			ginkgo.It("Should accept the request when creating a managed cluster with clusterset specified by authorized user", func() {
 				clusterSetName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))

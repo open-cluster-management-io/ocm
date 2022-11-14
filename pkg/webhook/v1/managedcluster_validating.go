@@ -78,10 +78,12 @@ func (r *ManagedClusterWebhook) ValidateUpdate(ctx context.Context, oldObj, newO
 
 	// the HubAcceptsClient field is changed, we need to check the request user whether
 	// has been allowed to change the HubAcceptsClient field with SubjectAccessReview api
-	if managedCluster.Spec.HubAcceptsClient {
-		err := r.allowUpdateAcceptField(managedCluster.Name, req.UserInfo)
-		if err != nil {
-			return err
+	if managedCluster.Spec.HubAcceptsClient != oldManagedCluster.Spec.HubAcceptsClient {
+		if managedCluster.Spec.HubAcceptsClient {
+			err := r.allowUpdateAcceptField(managedCluster.Name, req.UserInfo)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
