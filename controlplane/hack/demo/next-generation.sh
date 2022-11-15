@@ -20,7 +20,7 @@
 #
 # speed at which to simulate typing. bigger num = faster
 #
-# TYPE_SPEED=20
+TYPE_SPEED=40
 
 #
 # custom prompt
@@ -70,11 +70,15 @@ for i in $(seq 1 "${number}"); do
   token=$(echo $output | awk -F ' ' '{print $1}' | awk -F '=' '{print $2}')
   p "join to the control plane"
   pei "clusteradm --kubeconfig=${CERTS_DIR}/mc1-kubeconfig join --hub-token $token --hub-apiserver https://$API_HOST --cluster-name $namespace-mc1"
-  PROMPT_TIMEOUT=5
+  PROMPT_TIMEOUT=10
   wait
   pei "clusteradm --kubeconfig=${CERTS_DIR}/kubeconfig accept --clusters $namespace-mc1"
 
   pei "oc --kubeconfig=${CERTS_DIR}/kubeconfig get managedcluster"
+  
+  PROMPT_TIMEOUT=10
+  wait
+  pei "oc --kubeconfig=${CERTS_DIR}/kubeconfig get managedclusteraddon -n $namespace-mc1"
 
 done
 

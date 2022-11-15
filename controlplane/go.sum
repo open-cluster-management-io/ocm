@@ -1560,8 +1560,8 @@ open-cluster-management.io/clusteradm v0.4.0 h1:UqTgXy7o/Tps1tJNNHbkjVRCFP+4cvn7
 open-cluster-management.io/clusteradm v0.4.0/go.mod h1:nodp4RjHy/94guw4eLiYiZzpmk1D5ExXnZogGSHygoA=
 open-cluster-management.io/placement v0.9.0 h1:pLt8iUboxDdL++i0fcrJu/gm0pvdV5vIeJFJSddcs3w=
 open-cluster-management.io/placement v0.9.0/go.mod h1:SK7KuFptb3rj2che6FKjyjWj0w4VyDS1atHQcZVnX6U=
-open-cluster-management.io/registration v0.9.1-0.20221104092257-2e1c039a8e17 h1:3TGSnpa0pXd/XJh9HUe6s+DvOFI8oHEckiJ9AYcX2JA=
-open-cluster-management.io/registration v0.9.1-0.20221104092257-2e1c039a8e17/go.mod h1:SjNENYFNsvCo5J0KeXqur7c+/EqEps1w5oaZUW+2GoI=
+open-cluster-management.io/registration v0.9.1-0.20221114013223-9878ed071a3b h1:UVMyYSjCn0VakSC/MGX2THCp0D1HjR7iferG4EhCxtA=
+open-cluster-management.io/registration v0.9.1-0.20221114013223-9878ed071a3b/go.mod h1:SjNENYFNsvCo5J0KeXqur7c+/EqEps1w5oaZUW+2GoI=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 rsc.io/pdf v0.1.1/go.mod h1:n8OzWcQ6Sp37PL01nO98y4iUCRdTGarVfzxY20ICaU4=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=

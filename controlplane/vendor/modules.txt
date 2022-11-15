@@ -1729,7 +1729,6 @@ k8s.io/component-base/metrics/prometheus/restclient
 k8s.io/component-base/metrics/prometheus/version
 k8s.io/component-base/metrics/prometheus/workqueue
 k8s.io/component-base/metrics/testutil
-k8s.io/component-base/term
 k8s.io/component-base/traces
 k8s.io/component-base/version
 k8s.io/component-base/version/verflag
@@ -2427,7 +2426,7 @@ open-cluster-management.io/placement/pkg/plugins/predicate
 open-cluster-management.io/placement/pkg/plugins/resource
 open-cluster-management.io/placement/pkg/plugins/steady
 open-cluster-management.io/placement/pkg/plugins/tainttoleration
-# open-cluster-management.io/registration v0.9.1-0.20221104092257-2e1c039a8e17
+# open-cluster-management.io/registration v0.9.1-0.20221114013223-9878ed071a3b
 ## explicit; go 1.19
 open-cluster-management.io/registration/pkg/features
 open-cluster-management.io/registration/pkg/helpers
