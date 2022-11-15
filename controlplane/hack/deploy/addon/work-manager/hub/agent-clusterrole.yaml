@@ -1,0 +1,29 @@
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: managed-cluster-workmgr
+rules:
+  - apiGroups: ["","events.k8s.io"]
+    resources: ["events"]
+    verbs: ["create", "update", "patch"]
+  - apiGroups: ["action.open-cluster-management.io"]
+    resources: ["managedclusteractions"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["action.open-cluster-management.io"]
+    resources: ["managedclusteractions/status"]
+    verbs: ["update", "patch"]
+  - apiGroups: ["internal.open-cluster-management.io"]
+    resources: ["managedclusterinfos"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["internal.open-cluster-management.io"]
+    resources: ["managedclusterinfos/status"]
+    verbs: ["update", "patch"]
+  - apiGroups: ["view.open-cluster-management.io"]
+    resources: ["managedclusterviews"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["view.open-cluster-management.io"]
+    resources: ["managedclusterviews/status"]
+    verbs: ["update", "patch"]
+  - apiGroups: ["proxy.open-cluster-management.io"]
+    resources: ["clusterstatuses/aggregator"]
+    verbs: ["get", "create"]

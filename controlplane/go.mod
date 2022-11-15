@@ -21,7 +21,7 @@ require (
 	open-cluster-management.io/api v0.9.0
 	open-cluster-management.io/clusteradm v0.4.0
 	open-cluster-management.io/placement v0.9.0
-	open-cluster-management.io/registration v0.9.1-0.20221104092257-2e1c039a8e17
+	open-cluster-management.io/registration v0.9.1-0.20221114013223-9878ed071a3b
 	sigs.k8s.io/controller-runtime v0.12.3
 )
 

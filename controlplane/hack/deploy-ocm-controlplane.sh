@@ -160,17 +160,14 @@ function start_apiserver {
     mv hack/deploy/controlplane/kustomization.yaml.tmp hack/deploy/controlplane/kustomization.yaml
 
     cp -rf ${CERT_DIR} ${OCM_DEPLOY_DIRECTORY}/cert-${HUB_NAME}
-
-
-    echo "Use '${KUBECTL} --kubeconfig=${OCM_DEPLOY_DIRECTORY}/cert-${HUB_NAME}/kubeconfig' to use the aggregated API server" 
 }
 
 function check_ocm-controlplane {
     for i in {1..10}; do
-        echo "$i  Checking ocm-controlplane"
+        echo "Checking ocm-controlplane..."
         RESULT=$(${KUBECTL} --kubeconfig=${OCM_DEPLOY_DIRECTORY}/cert-${HUB_NAME}/kubeconfig api-resources | grep managedclusters)
         if [ -n "${RESULT}" ]; then
-            echo "!!!!! ocm-controlplane ${HUB_NAME} is ready !!!!!"
+            echo "#### ocm-controlplane ${HUB_NAME} is ready ####"
             break
         fi
 
@@ -190,3 +187,5 @@ kube::util::ensure-cfssl
 set_service_accounts
 start_apiserver
 check_ocm-controlplane
+echo "#### Use '${KUBECTL} --kubeconfig=${OCM_DEPLOY_DIRECTORY}/cert-${HUB_NAME}/kubeconfig' to use the aggregated API server. ####" 
+echo ""
