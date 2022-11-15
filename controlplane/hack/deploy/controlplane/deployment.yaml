@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: controlplane
-        image: docker.io/yaoyuchen/controlplane:latest
+        image: quay.io/open-cluster-management/controlplane
         imagePullPolicy: Always
         args:
           - "/ocm-controlplane"

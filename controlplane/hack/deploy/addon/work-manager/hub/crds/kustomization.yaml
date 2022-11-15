@@ -1,0 +1,10 @@
+resources:
+- action.open-cluster-management.io_managedclusteractions.crd.yaml
+- hive.openshift.io_clusterclaims.yaml
+- hive.openshift.io_clusterdeployments.yaml
+- hive.openshift.io_clusterpools.yaml
+- hive.openshift.io_syncsets.yaml
+- hiveinternal.openshift.io_clustersyncs.yaml
+- imageregistry.open-cluster-management.io_managedclusterimageregistries.crd.yaml
+- internal.open-cluster-management.io_managedclusterinfos.crd.yaml
+- view.open-cluster-management.io_managedclusterviews.crd.yaml

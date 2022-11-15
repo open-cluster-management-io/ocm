@@ -20,18 +20,18 @@
 # this is used in "make deploy" for developers and should mimic what OLM deploys
 # for you. CRDs are an exception to this as we don't want to have to list them all
 # here. These are deployed via a "make install" dependency.
-
-resources:
-- ./deployment.yaml
-- ./service.yaml
-- ./route.yaml
-
-images:
-- name: quay.io/open-cluster-management/controlplane:latest
-  newName: quay.io/open-cluster-management/controlplane
-  newTag: latest
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+
+resources:
+- deployment.yaml
+- service.yaml
+- route.yaml
+
+images:
+- name: quay.io/open-cluster-management/controlplane
+  newName: quay.io/open-cluster-management/controlplane
+  newTag: latest
 
 secretGenerator:
 - name: controlplane-cert

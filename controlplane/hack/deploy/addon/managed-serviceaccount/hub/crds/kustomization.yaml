@@ -1,0 +1,2 @@
+resources:
+- authentication.open-cluster-management.io_managedserviceaccounts.yaml

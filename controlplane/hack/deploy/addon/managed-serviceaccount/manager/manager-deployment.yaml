@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: managed-serviceaccount-addon-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      open-cluster-management.io/addon: managed-serviceaccount
+  template:
+    metadata:
+      labels:
+        open-cluster-management.io/addon: managed-serviceaccount
+    spec:
+      containers:
+        - name: manager
+          image: quay.io/open-cluster-management/managed-serviceaccount:latest
+          imagePullPolicy: Always
+          command:
+            - /manager
+          args:
+            - --leader-elect=true
+            - --agent-image-name=quay.io/open-cluster-management/managed-serviceaccount:latest
+            - --agent-install-all=true
+            - --feature-gates=EphemeralIdentity=false
+            - --kubeconfig=/var/run/secrets/hub/kubeconfig
+          volumeMounts:
+            - mountPath: /var/run/secrets/hub
+              name: kubeconfig
+              readOnly: true
+      volumes:
+        - name: kubeconfig
+          secret:
+            defaultMode: 420
+            secretName: controlplane-kubeconfig

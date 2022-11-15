@@ -1,0 +1,180 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.0
+  creationTimestamp: null
+  name: syncsets.hive.openshift.io
+spec:
+  group: hive.openshift.io
+  names:
+    kind: SyncSet
+    listKind: SyncSetList
+    plural: syncsets
+    shortNames:
+    - ss
+    singular: syncset
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: SyncSet is the Schema for the SyncSet API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SyncSetSpec defines the SyncSetCommonSpec resources and patches
+              to sync along with ClusterDeploymentRefs indicating which clusters the
+              SyncSet applies to in the SyncSet's namespace.
+            properties:
+              applyBehavior:
+                description: ApplyBehavior indicates how resources in this syncset
+                  will be applied to the target cluster. The default value of "Apply"
+                  indicates that resources should be applied using the 'oc apply'
+                  command. If no value is set, "Apply" is assumed. A value of "CreateOnly"
+                  indicates that the resource will only be created if it does not
+                  already exist in the target cluster. Otherwise, it will be left
+                  alone. A value of "CreateOrUpdate" indicates that the resource will
+                  be created/updated without the use of the 'oc apply' command, allowing
+                  larger resources to be synced, but losing some functionality of
+                  the 'oc apply' command such as the ability to remove annotations,
+                  labels, and other map entries in general.
+                enum:
+                - ""
+                - Apply
+                - CreateOnly
+                - CreateOrUpdate
+                type: string
+              clusterDeploymentRefs:
+                description: ClusterDeploymentRefs is the list of LocalObjectReference
+                  indicating which clusters the SyncSet applies to in the SyncSet's
+                  namespace.
+                items:
+                  description: LocalObjectReference contains enough information to
+                    let you locate the referenced object inside the same namespace.
+                  properties:
+                    name:
+                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        TODO: Add other useful fields. apiVersion, kind, uid?'
+                      type: string
+                  type: object
+                type: array
+              patches:
+                description: Patches is the list of patches to apply.
+                items:
+                  description: SyncObjectPatch represents a patch to be applied to
+                    a specific object
+                  properties:
+                    apiVersion:
+                      description: APIVersion is the Group and Version of the object
+                        to be patched.
+                      type: string
+                    kind:
+                      description: Kind is the Kind of the object to be patched.
+                      type: string
+                    name:
+                      description: Name is the name of the object to be patched.
+                      type: string
+                    namespace:
+                      description: Namespace is the Namespace in which the object
+                        to patch exists. Defaults to the SyncSet's Namespace.
+                      type: string
+                    patch:
+                      description: Patch is the patch to apply.
+                      type: string
+                    patchType:
+                      description: PatchType indicates the PatchType as "strategic"
+                        (default), "json", or "merge".
+                      type: string
+                  required:
+                  - apiVersion
+                  - kind
+                  - name
+                  - patch
+                  type: object
+                type: array
+              resourceApplyMode:
+                description: ResourceApplyMode indicates if the Resource apply mode
+                  is "Upsert" (default) or "Sync". ApplyMode "Upsert" indicates create
+                  and update. ApplyMode "Sync" indicates create, update and delete.
+                type: string
+              resources:
+                description: Resources is the list of objects to sync from RawExtension
+                  definitions.
+                items:
+                  type: object
+                  x-kubernetes-embedded-resource: true
+                  x-kubernetes-preserve-unknown-fields: true
+                type: array
+              secretMappings:
+                description: Secrets is the list of secrets to sync along with their
+                  respective destinations.
+                items:
+                  description: SecretMapping defines a source and destination for
+                    a secret to be synced by a SyncSet
+                  properties:
+                    sourceRef:
+                      description: SourceRef specifies the name and namespace of a
+                        secret on the management cluster
+                      properties:
+                        name:
+                          description: Name is the name of the secret
+                          type: string
+                        namespace:
+                          description: Namespace is the namespace where the secret
+                            lives. If not present for the source secret reference,
+                            it is assumed to be the same namespace as the syncset
+                            with the reference.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    targetRef:
+                      description: TargetRef specifies the target name and namespace
+                        of the secret on the target cluster
+                      properties:
+                        name:
+                          description: Name is the name of the secret
+                          type: string
+                        namespace:
+                          description: Namespace is the namespace where the secret
+                            lives. If not present for the source secret reference,
+                            it is assumed to be the same namespace as the syncset
+                            with the reference.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                  required:
+                  - sourceRef
+                  - targetRef
+                  type: object
+                type: array
+            required:
+            - clusterDeploymentRefs
+            type: object
+          status:
+            description: SyncSetStatus defines the observed state of a SyncSet
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

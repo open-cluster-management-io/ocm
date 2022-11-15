@@ -1,0 +1,8 @@
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ClusterManagementAddOn
+metadata:
+  name: managed-serviceaccount
+spec:
+  addOnMeta:
+    displayName: managed-serviceaccount
+    description: managed-serviceaccount
