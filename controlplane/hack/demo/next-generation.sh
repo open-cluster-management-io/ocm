@@ -30,6 +30,8 @@
 DEMO_PROMPT="${GREEN}➜ ${CYAN}\W ${COLOR_RESET}"
 ROOT_DIR="$(pwd)"
 number=${1:-$1}
+HOST_POSTFIX=${HOST_POSTFIX:-""}
+export IMAGE_NAME="quay.io/clyang82/controlplane:latest"
 
 if [[ "$2" == "clean" ]]; then
   for i in $(seq 1 "${number}"); do
@@ -55,8 +57,6 @@ for i in $(seq 1 "${number}"); do
   namespace=ocm-controlplane-$i
   p "deploy standalone controlplane and addons(workmgr and managedserviceaccount) in namespace ${namespace}"
   export HUB_NAME="${namespace}"
-  export IMAGE_NAME="quay.io/clyang82/controlplane:latest"
-  export HOST_POSTFIX="apps.obs-hub-of-hubs-aws-410-sno-58mqd.scale.red-chesterfield.com"
   API_HOST="ocm-controlplane-${HUB_NAME}.${HOST_POSTFIX}"
   pei "cd ../.. && make deploy-all"
   cd ${ROOT_DIR}
