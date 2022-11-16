@@ -14,7 +14,6 @@ import (
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog/v2"
 
-	ocmfeature "open-cluster-management.io/api/feature"
 	"open-cluster-management.io/ocm-controlplane/pkg/apiserver"
 	"open-cluster-management.io/ocm-controlplane/pkg/apiserver/options"
 )
@@ -37,10 +36,7 @@ func NewAPIServerCommand() *cobra.Command {
 			verflag.PrintAndExitIfRequested()
 			fs := cmd.Flags()
 
-			// TODO(ycyaoxdu): add DefaultHubRegistrationFeatureGates
-			// add OCM feature gates
 			featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
-			featureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates)
 
 			// Activate logging as soon as possible, after that
 			// show flags with the final logging configuration.

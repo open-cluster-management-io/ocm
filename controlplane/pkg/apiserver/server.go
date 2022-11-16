@@ -72,12 +72,15 @@ import (
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	ocmfeature "open-cluster-management.io/api/feature"
 	"open-cluster-management.io/ocm-controlplane/pkg/apiserver/options"
 	"open-cluster-management.io/ocm-controlplane/pkg/etcd"
 )
 
 func init() {
 	utilruntime.Must(logs.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	utilruntime.Must(utilfeature.DefaultMutableFeatureGate.Add(ocmfeature.DefaultHubWorkFeatureGates))
+	utilruntime.Must(utilfeature.DefaultMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates))
 }
 
 // CreateServerChain creates the apiservers connected via delegation.
