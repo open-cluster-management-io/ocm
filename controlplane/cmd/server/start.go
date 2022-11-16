@@ -1,23 +1,27 @@
 package server
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/apiserver/pkg/server"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue" // for workqueue metric registration
 	"k8s.io/component-base/version/verflag"
+	"k8s.io/klog/v2"
 
 	ocmfeature "open-cluster-management.io/api/feature"
 	"open-cluster-management.io/ocm-controlplane/pkg/apiserver"
+	"open-cluster-management.io/ocm-controlplane/pkg/apiserver/options"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
-	s := apiserver.NewServerRunOptions()
+	s := options.NewServerRunOptions()
 	cmd := &cobra.Command{
 		Use: "ocm-apiserver",
 
@@ -40,13 +44,13 @@ func NewAPIServerCommand() *cobra.Command {
 
 			// Activate logging as soon as possible, after that
 			// show flags with the final logging configuration.
-			if err := s.ServerRunOptions.Logs.ValidateAndApply(featureGate); err != nil {
+			if err := s.Logs.ValidateAndApply(featureGate); err != nil {
 				return err
 			}
 			cliflag.PrintFlags(fs)
 
 			// set default options
-			completedOptions, err := s.Complete()
+			completedOptions, err := apiserver.Complete(s)
 			if err != nil {
 				return err
 			}
@@ -55,7 +59,15 @@ func NewAPIServerCommand() *cobra.Command {
 				return err
 			}
 
-			return completedOptions.Run()
+			shutdownCtx, cancel := context.WithCancel(context.TODO())
+			shutdownHandler := server.SetupSignalHandler()
+			go func() {
+				defer cancel()
+				<-shutdownHandler
+				klog.Infof("Received SIGTERM or SIGINT signal, shutting down controller.")
+			}()
+
+			return completedOptions.Run(shutdownCtx)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
