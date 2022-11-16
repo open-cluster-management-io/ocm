@@ -36,6 +36,7 @@ import (
 )
 
 type Tester struct {
+	kubeconfigPath                   string
 	KubeClient                       kubernetes.Interface
 	ClusterCfg                       *rest.Config
 	OperatorClient                   operatorclient.Interface
@@ -58,9 +59,9 @@ type Tester struct {
 // kubeconfigPath is the path of kubeconfig file, will be get from env "KUBECONFIG" by default.
 // bootstrapHubSecret is the bootstrap hub kubeconfig secret, and the format is "namespace/secretName".
 // Default of bootstrapHubSecret is helpers.KlusterletDefaultNamespace/helpers.BootstrapHubKubeConfig.
-func NewTester(kubeconfigPath string) (*Tester, error) {
-	var err error
+func NewTester(kubeconfigPath string) *Tester {
 	var tester = Tester{
+		kubeconfigPath:                   kubeconfigPath,
 		EventuallyTimeout:                60 * time.Second, // seconds
 		EventuallyInterval:               1 * time.Second,  // seconds
 		clusterManagerNamespace:          helpers.ClusterManagerDefaultNamespace,
@@ -73,35 +74,45 @@ func NewTester(kubeconfigPath string) (*Tester, error) {
 		klusterletOperator:               "klusterlet",
 	}
 
-	if kubeconfigPath == "" {
+	return &tester
+}
+
+func (t *Tester) Init() error {
+	var kubeconfigPath string
+	var err error
+
+	if t.kubeconfigPath == "" {
 		kubeconfigPath = os.Getenv("KUBECONFIG")
-	}
-	if tester.ClusterCfg, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath); err != nil {
-		klog.Errorf("failed to get ClusterCfg from path %v . %v", kubeconfigPath, err)
-		return nil, err
-	}
-	if tester.KubeClient, err = kubernetes.NewForConfig(tester.ClusterCfg); err != nil {
-		klog.Errorf("failed to get KubeClient. %v", err)
-		return nil, err
-	}
-	if tester.OperatorClient, err = operatorclient.NewForConfig(tester.ClusterCfg); err != nil {
-		klog.Errorf("failed to get OperatorClient. %v", err)
-		return nil, err
-	}
-	if tester.ClusterClient, err = clusterclient.NewForConfig(tester.ClusterCfg); err != nil {
-		klog.Errorf("failed to get ClusterClient. %v", err)
-		return nil, err
-	}
-	if tester.WorkClient, err = workv1client.NewForConfig(tester.ClusterCfg); err != nil {
-		klog.Errorf("failed to get WorkClient. %v", err)
-		return nil, err
-	}
-	if tester.AddOnClinet, err = addonclient.NewForConfig(tester.ClusterCfg); err != nil {
-		klog.Errorf("failed to get AddOnClinet. %v", err)
-		return nil, err
+	} else {
+		kubeconfigPath = t.kubeconfigPath
 	}
 
-	return &tester, nil
+	if t.ClusterCfg, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath); err != nil {
+		klog.Errorf("failed to get ClusterCfg from path %v . %v", kubeconfigPath, err)
+		return err
+	}
+	if t.KubeClient, err = kubernetes.NewForConfig(t.ClusterCfg); err != nil {
+		klog.Errorf("failed to get KubeClient. %v", err)
+		return err
+	}
+	if t.OperatorClient, err = operatorclient.NewForConfig(t.ClusterCfg); err != nil {
+		klog.Errorf("failed to get OperatorClient. %v", err)
+		return err
+	}
+	if t.ClusterClient, err = clusterclient.NewForConfig(t.ClusterCfg); err != nil {
+		klog.Errorf("failed to get ClusterClient. %v", err)
+		return err
+	}
+	if t.WorkClient, err = workv1client.NewForConfig(t.ClusterCfg); err != nil {
+		klog.Errorf("failed to get WorkClient. %v", err)
+		return err
+	}
+	if t.AddOnClinet, err = addonclient.NewForConfig(t.ClusterCfg); err != nil {
+		klog.Errorf("failed to get AddOnClinet. %v", err)
+		return err
+	}
+
+	return nil
 }
 
 func (t *Tester) SetEventuallyTimeout(timeout time.Duration) *Tester {

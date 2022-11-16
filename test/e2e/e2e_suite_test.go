@@ -3,18 +3,14 @@ package e2e
 import (
 	"testing"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var t *Tester
 
 func TestE2E(tt *testing.T) {
-	var err error
-	t, err = NewTester("")
-	if err != nil {
-		tt.Fatalf("failed to new tester. error:%v", err)
-	}
+	t = NewTester("")
 
 	OutputFail := func(message string, callerSkip ...int) {
 		t.OutputDebugLogs()
@@ -30,6 +26,8 @@ func TestE2E(tt *testing.T) {
 // - KUBECONFIG is the location of the kubeconfig file to use
 var _ = BeforeSuite(func() {
 	var err error
+
+	Expect(t.Init()).ToNot(HaveOccurred())
 
 	Eventually(t.CheckClusterManagerStatus, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
 

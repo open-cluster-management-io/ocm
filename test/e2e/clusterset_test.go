@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
-	ginkgo "github.com/onsi/ginkgo"
+	ginkgo "github.com/onsi/ginkgo/v2"
 	gomega "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"

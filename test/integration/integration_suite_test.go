@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
@@ -19,7 +19,6 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -31,7 +30,7 @@ import (
 
 func TestIntegration(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Integration Suite", []ginkgo.Reporter{printer.NewlineReporter{}})
+	ginkgo.RunSpecs(t, "Integration Suite")
 }
 
 const (
@@ -63,7 +62,7 @@ var (
 var envCancel context.CancelFunc
 var envCtx context.Context
 
-var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
+var _ = ginkgo.BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
 
 	ginkgo.By("bootstrapping test environment")
@@ -180,9 +179,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 
 	go ServiceAccountCtl(envCtx, kubeClient)
 	go ServiceAccountCtl(envCtx, hostedKubeClient)
-
-	close(done)
-}, 60)
+})
 
 var _ = ginkgo.AfterSuite(func() {
 	ginkgo.By("tearing down the test environment")
