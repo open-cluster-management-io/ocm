@@ -2,8 +2,9 @@
 
 ## Prerequisites
 1. Connect to an OpenShift cluster
-2. Download [demo-magic.sh](https://raw.githubusercontent.com/paxtonhare/demo-magic/master/demo-magic.sh) and save it to this directory.
-3. export HOST_POSTFIX environment variable to the route domain of your OpenShift cluster.
+2. Export HOST_POSTFIX environment variable to the route domain of your OpenShift cluster.
+3. Install the latest [clusteradm](https://github.com/open-cluster-management-io/clusteradm#install-the-clusteradm-command-line)
+4. Install the latest [kustomize](https://kubectl.docs.kubernetes.io/installation/kustomize/binaries/)
 
 ## Install
 
