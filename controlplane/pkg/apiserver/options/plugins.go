@@ -40,9 +40,9 @@ var AllOrderedPlugins = []string{
 	certsubjectrestriction.PluginName, // CertificateSubjectRestriction
 
 	// self-defined plugins
-	managedclustermutating.PluginName,
-	managedclustervalidating.PluginName,
-	managedclustersetbindingvalidating.PluginName,
+	managedclustermutating.PluginName,             // ManagedClusterMutating
+	managedclustervalidating.PluginName,           // ManagedClusterValidating
+	managedclustersetbindingvalidating.PluginName, // ManagedClusterSetBindingValidating
 	// new admission plugins should generally be inserted above here
 	// webhook, resourcequota, and deny plugins must go at the end
 
