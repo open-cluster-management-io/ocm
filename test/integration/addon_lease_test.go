@@ -6,7 +6,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"

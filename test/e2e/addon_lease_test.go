@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	ginkgo "github.com/onsi/ginkgo"
+	ginkgo "github.com/onsi/ginkgo/v2"
 	gomega "github.com/onsi/gomega"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"

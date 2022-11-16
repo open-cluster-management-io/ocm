@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	ginkgo "github.com/onsi/ginkgo"
+	ginkgo "github.com/onsi/ginkgo/v2"
 	gomega "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"

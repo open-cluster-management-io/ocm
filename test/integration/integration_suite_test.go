@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -33,7 +33,6 @@ import (
 	"open-cluster-management.io/registration/test/integration/util"
 
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
@@ -64,7 +63,7 @@ var cancel context.CancelFunc
 
 func TestIntegration(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Integration Suite", []ginkgo.Reporter{printer.NewlineReporter{}})
+	ginkgo.RunSpecs(t, "Integration Suite")
 }
 
 var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
@@ -165,7 +164,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	}()
 
 	close(done)
-}, 60)
+})
 
 var _ = ginkgo.AfterSuite(func() {
 	ginkgo.By("tearing down the test environment")
