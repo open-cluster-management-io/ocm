@@ -15,6 +15,7 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 var (
@@ -32,6 +33,7 @@ func (c *Options) RunWebhookServer() error {
 		Port:                   c.Port,
 		HealthProbeBindAddress: ":8000",
 		CertDir:                c.CertDir,
+		WebhookServer:          &webhook.Server{TLSMinVersion: "1.2"},
 	})
 
 	if err != nil {
