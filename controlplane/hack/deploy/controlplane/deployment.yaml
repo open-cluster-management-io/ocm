@@ -34,7 +34,6 @@ spec:
           - "--service-account-lookup=false"
           - "--service-account-signing-key-file=/controlplane/cert/kube-serviceaccount.key"
           - "--enable-admission-plugins=NamespaceLifecycle,ServiceAccount,MutatingAdmissionWebhook,ValidatingAdmissionWebhook"
-          - "--disable-admission-plugins=TaintNodesByCondition,Priority,DefaultTolerationSeconds,DefaultStorageClass,PodSecurity,PersistentVolumeClaimResize,RuntimeClass,DefaultIngressClass"
           - "--bind-address=0.0.0.0"
           - "--secure-port=9443"
           - "--tls-cert-file=/controlplane/cert/serving-kube-apiserver.crt"
