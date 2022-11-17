@@ -8,11 +8,6 @@ spec:
   service:
     name: cluster-manager-work-webhook
     namespace: {{ .ClusterManagerNamespace }}
-    {{if eq .WorkWebhook.Port 0}}
-    port: 443 
-    {{else}}
     port: {{.WorkWebhook.Port}}
-    {{end}}
-  caBundle: {{ .WorkAPIServiceCABundle }}
   groupPriorityMinimum: 10000
   versionPriority: 20

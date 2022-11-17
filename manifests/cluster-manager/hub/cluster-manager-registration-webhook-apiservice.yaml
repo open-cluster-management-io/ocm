@@ -8,11 +8,6 @@ spec:
   service:
     name: cluster-manager-registration-webhook
     namespace: {{ .ClusterManagerNamespace }}
-    {{if eq .RegistrationWebhook.Port 0}}
-    port: 443 
-    {{else}}
     port: {{.RegistrationWebhook.Port}}
-    {{end}}
-  caBundle: {{ .RegistrationAPIServiceCABundle }}
   groupPriorityMinimum: 10000
   versionPriority: 20

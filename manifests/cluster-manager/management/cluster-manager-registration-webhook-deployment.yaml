@@ -94,13 +94,22 @@ spec:
           name: kubeconfig
           readOnly: true
         {{ end }}
-      {{ if not .HostedMode }}
-      - name: {{ .ClusterManagerName }}-registration-conversion-webhook
+      - name: {{ .ClusterManagerName }}-webhook
         image: {{ .RegistrationImage }}
         args:
         - /registration
         - "webhook-server"
         - "port=9443"
+        {{ if gt (len .RegistrationFeatureGates) 0 }}
+        {{range .RegistrationFeatureGates}}
+        - {{ . }}
+        {{ end }}
+        {{ else }}
+        - "--feature-gates=DefaultClusterSet=true"
+        {{ end }}
+        {{ if .HostedMode }}
+        - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
+        {{ end }}
         imagePullPolicy: Always
         resources:
           requests:
@@ -133,7 +142,11 @@ spec:
         - mountPath: /tmp/k8s-webhook-server/serving-certs
           name: webhook-secret
           readOnly: true
-      {{ end }}
+        {{ if .HostedMode }}
+        - mountPath: /var/run/secrets/hub
+          name: kubeconfig
+          readOnly: true
+        {{ end }}
       volumes:
       - name: webhook-secret
         secret:

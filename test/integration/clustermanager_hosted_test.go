@@ -7,23 +7,34 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
-	v1 "open-cluster-management.io/api/operator/v1"
-
-	appsv1 "k8s.io/api/apps/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/util/cert"
-
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
-
+	v1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
 	"open-cluster-management.io/registration-operator/test/integration/util"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/cert"
 )
+
+func updateDeploymentStatus(kubeClient kubernetes.Interface, namespace, deploymentName string) {
+	deployment, err := kubeClient.AppsV1().Deployments(namespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	deployment.Status.Replicas = *deployment.Spec.Replicas
+	deployment.Status.ReadyReplicas = *deployment.Spec.Replicas
+	deployment.Status.ObservedGeneration = *&deployment.Generation
+	_, err = kubeClient.AppsV1().Deployments(namespace).UpdateStatus(context.Background(), deployment, metav1.UpdateOptions{})
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+}
 
 var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 	var hostedCtx context.Context
 	var hostedCancel context.CancelFunc
 	var hubRegistrationDeployment = fmt.Sprintf("%s-registration-controller", clusterManagerName)
+	var hubRegistrationWebhookDeployment = fmt.Sprintf("%s-registration-webhook", clusterManagerName)
+	var hubWorkWebhookDeployment = fmt.Sprintf("%s-work-webhook", clusterManagerName)
 
 	ginkgo.BeforeEach(func() {
 		hostedCtx, hostedCancel = context.WithCancel(context.Background())
@@ -143,7 +154,6 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
-			hubRegistrationWebhookDeployment := fmt.Sprintf("%s-registration-webhook", clusterManagerName)
 			gomega.Eventually(func() error {
 				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationWebhookDeployment, metav1.GetOptions{}); err != nil {
 					return err
@@ -151,7 +161,6 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
-			hubWorkWebhookDeployment := fmt.Sprintf("%s-work-webhook", clusterManagerName)
 			gomega.Eventually(func() error {
 				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubWorkWebhookDeployment, metav1.GetOptions{}); err != nil {
 					return err
@@ -209,6 +218,13 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 
 			// Check validating webhook
 			registrationValidtingWebhook := "managedclustervalidators.admission.cluster.open-cluster-management.io"
+
+			//Should not apply the webhook config if the replica and observed is not set
+			_, err := hostedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(hostedCtx, registrationValidtingWebhook, metav1.GetOptions{})
+			gomega.Expect(err).To(gomega.HaveOccurred())
+
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubRegistrationWebhookDeployment)
+
 			gomega.Eventually(func() error {
 				if _, err := hostedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(hostedCtx, registrationValidtingWebhook, metav1.GetOptions{}); err != nil {
 					return err
@@ -217,6 +233,13 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
 			workValidtingWebhook := "manifestworkvalidators.admission.work.open-cluster-management.io"
+			//Should not apply the webhook config if the replica and observed is not set
+			_, err = hostedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(hostedCtx, workValidtingWebhook, metav1.GetOptions{})
+
+			gomega.Expect(err).To(gomega.HaveOccurred())
+
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubWorkWebhookDeployment)
+
 			gomega.Eventually(func() error {
 				if _, err := hostedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(hostedCtx, workValidtingWebhook, metav1.GetOptions{}); err != nil {
 					return err
@@ -267,6 +290,8 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubRegistrationWebhookDeployment)
+
 			// Check if generations are correct
 			gomega.Eventually(func() error {
 				actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(hostedCtx, clusterManagerName, metav1.GetOptions{})
@@ -287,12 +312,11 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 35 {
-					return fmt.Errorf("should get 35 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 34 {
+					return fmt.Errorf("should get 34 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
-
 		})
 
 		ginkgo.It("Deployment should be added nodeSelector and toleration when add nodePlacement into clustermanager", func() {
@@ -334,6 +358,10 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 
 				return fmt.Errorf("no key equals to node-role.kubernetes.io/infra")
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubRegistrationWebhookDeployment)
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubWorkWebhookDeployment)
+
 		})
 		ginkgo.It("Deployment should be reconciled when manually updated", func() {
 			gomega.Eventually(func() error {

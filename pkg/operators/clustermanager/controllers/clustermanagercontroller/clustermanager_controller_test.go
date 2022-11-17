@@ -87,9 +87,62 @@ func newTestController(t *testing.T, clustermanager *operatorapiv1.ClusterManage
 	}
 }
 
-func setup(t *testing.T, tc *testController, crds ...runtime.Object) {
+func setWebhookDeployment(clusterManagerName, clusterManagerNamespace string) []runtime.Object {
+	var replicas = int32(1)
+
+	return []runtime.Object{
+		&appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       clusterManagerName + "-registration-webhook",
+				Namespace:  clusterManagerNamespace,
+				Generation: 1,
+			},
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: clusterManagerName + "-webhook",
+							},
+						},
+					},
+				},
+				Replicas: &replicas,
+			},
+			Status: appsv1.DeploymentStatus{
+				ReadyReplicas:      replicas,
+				ObservedGeneration: 1,
+			},
+		},
+		&appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       clusterManagerName + "-work-webhook",
+				Namespace:  clusterManagerNamespace,
+				Generation: 1,
+			},
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: clusterManagerName + "-webhook",
+							},
+						},
+					},
+				},
+				Replicas: &replicas,
+			},
+			Status: appsv1.DeploymentStatus{
+				ReadyReplicas:      replicas,
+				ObservedGeneration: 1,
+			},
+		},
+	}
+}
+
+func setup(t *testing.T, tc *testController, cd []runtime.Object, crds ...runtime.Object) {
 	fakeHubKubeClient := fakekube.NewSimpleClientset()
-	fakeManagementKubeClient := fakekube.NewSimpleClientset()
+	fakeManagementKubeClient := fakekube.NewSimpleClientset(cd...)
 	fakeAPIExtensionClient := fakeapiextensions.NewSimpleClientset(crds...)
 	fakeAPIRegistrationClient := fakeapiregistration.NewSimpleClientset()
 	fakeMigrationClient := fakemigrationclient.NewSimpleClientset()
@@ -134,7 +187,9 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.Cl
 func TestSyncDeploy(t *testing.T) {
 	clusterManager := newClusterManager("testhub")
 	tc := newTestController(t, clusterManager)
-	setup(t, tc)
+	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
+	cd := setWebhookDeployment(clusterManager.Name, clusterManagerNamespace)
+	setup(t, tc, cd)
 
 	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
 
@@ -154,7 +209,7 @@ func TestSyncDeploy(t *testing.T) {
 
 	// Check if resources are created as expected
 	// We expect creat the namespace twice respectively in the management cluster and the hub cluster.
-	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 24)
+	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 23)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager)
 	}
@@ -169,24 +224,46 @@ func TestSyncDeploy(t *testing.T) {
 	}
 	// Check if resources are created as expected
 	testinghelper.AssertEqualNumber(t, len(createCRDObjects), 10)
+}
 
-	createAPIServiceObjects := []runtime.Object{}
-	apiServiceActions := tc.apiRegistrationClient.Actions()
-	for _, action := range apiServiceActions {
+func TestSyncDeployNoWebhook(t *testing.T) {
+	clusterManager := newClusterManager("testhub")
+	tc := newTestController(t, clusterManager)
+	setup(t, tc, nil)
+
+	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
+
+	err := tc.clusterManagerController.sync(ctx, syncContext)
+	if err != nil {
+		t.Fatalf("Expected no error when sync, %v", err)
+	}
+
+	createKubeObjects := []runtime.Object{}
+	kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...) // record objects from both hub and management cluster
+	for _, action := range kubeActions {
 		if action.GetVerb() == "create" {
 			object := action.(clienttesting.CreateActionImpl).Object
-			createAPIServiceObjects = append(createAPIServiceObjects, object)
+			createKubeObjects = append(createKubeObjects, object)
+		}
+	}
+
+	// Check if resources are created as expected
+	// We expect creat the namespace twice respectively in the management cluster and the hub cluster.
+	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 20)
+	for _, object := range createKubeObjects {
+		ensureObject(t, object, clusterManager)
+	}
+
+	createCRDObjects := []runtime.Object{}
+	crdActions := tc.apiExtensionClient.Actions()
+	for _, action := range crdActions {
+		if action.GetVerb() == "create" {
+			object := action.(clienttesting.CreateActionImpl).Object
+			createCRDObjects = append(createCRDObjects, object)
 		}
 	}
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(createAPIServiceObjects), 2)
-
-	clusterManagerAction := tc.operatorClient.Actions()
-	testinghelper.AssertEqualNumber(t, len(clusterManagerAction), 2)
-	testinghelper.AssertAction(t, clusterManagerAction[1], "update")
-	testinghelper.AssertOnlyConditions(
-		t, clusterManagerAction[1].(clienttesting.UpdateActionImpl).Object,
-		testinghelper.NamedCondition(clusterManagerApplied, "ClusterManagerApplied", metav1.ConditionTrue))
+	testinghelper.AssertEqualNumber(t, len(createCRDObjects), 10)
 }
 
 // TestSyncDelete test cleanup hub deploy
@@ -196,7 +273,7 @@ func TestSyncDelete(t *testing.T) {
 	clusterManager.ObjectMeta.SetDeletionTimestamp(&now)
 
 	tc := newTestController(t, clusterManager)
-	setup(t, tc)
+	setup(t, tc, nil)
 
 	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
 	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
@@ -214,7 +291,7 @@ func TestSyncDelete(t *testing.T) {
 			deleteKubeActions = append(deleteKubeActions, deleteKubeAction)
 		}
 	}
-	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 20) // delete namespace both from the hub cluster and the mangement cluster
+	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 21) // delete namespace both from the hub cluster and the mangement cluster
 
 	deleteCRDActions := []clienttesting.DeleteActionImpl{}
 	crdActions := tc.apiExtensionClient.Actions()
@@ -258,7 +335,7 @@ func TestDeleteCRD(t *testing.T) {
 	}
 
 	tc := newTestController(t, clusterManager)
-	setup(t, tc, crd)
+	setup(t, tc, nil, crd)
 
 	// Return crd with the first get, and return not found with the 2nd get
 	getCount := 0

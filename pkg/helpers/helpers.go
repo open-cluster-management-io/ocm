@@ -273,8 +273,7 @@ func ApplyValidatingWebhookConfiguration(
 	if !*modified {
 		return existing, false, nil
 	}
-
-	actual, err := client.ValidatingWebhookConfigurations().Update(context.TODO(), existingCopy, metav1.UpdateOptions{})
+	actual, err := client.ValidatingWebhookConfigurations().Update(context.TODO(), existing, metav1.UpdateOptions{})
 	return actual, true, err
 }
 
@@ -301,7 +300,7 @@ func ApplyMutatingWebhookConfiguration(
 		return existing, false, nil
 	}
 
-	actual, err := client.MutatingWebhookConfigurations().Update(context.TODO(), existingCopy, metav1.UpdateOptions{})
+	actual, err := client.MutatingWebhookConfigurations().Update(context.TODO(), existing, metav1.UpdateOptions{})
 	return actual, true, err
 }
 

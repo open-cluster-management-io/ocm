@@ -160,8 +160,7 @@ We mainly provide deployment in two scenarios:
       selector:
         app: cluster-manager-registration-webhook
       ports:
-        - port: 443
-          targetPort: 6443
+        - port: 9443
           nodePort: 30443
     ---
     apiVersion: v1
@@ -174,8 +173,7 @@ We mainly provide deployment in two scenarios:
       selector:
         app: cluster-manager-work-webhook
       ports:
-        - port: 443
-          targetPort: 6443
+        - port: 9443
           nodePort: 31443
     EOF
     ```

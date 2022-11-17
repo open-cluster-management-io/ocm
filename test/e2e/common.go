@@ -492,16 +492,33 @@ func (t *Tester) CheckHubReady() error {
 		Get(context.TODO(), t.hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
 		return err
 	}
+	gomega.Eventually(func() error {
+		registrationWebhookDeployment, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
+			Get(context.TODO(), t.hubRegistrationWebhookDeployment, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		replicas := *registrationWebhookDeployment.Spec.Replicas
+		readyReplicas := registrationWebhookDeployment.Status.ReadyReplicas
+		if readyReplicas != replicas {
+			return fmt.Errorf("deployment %s should have %d but got %d ready replicas", t.hubRegistrationWebhookDeployment, replicas, readyReplicas)
+		}
+		return nil
+	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeNil())
 
-	if _, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
-		Get(context.TODO(), t.hubRegistrationWebhookDeployment, metav1.GetOptions{}); err != nil {
-		return err
-	}
-
-	if _, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
-		Get(context.TODO(), t.hubWorkWebhookDeployment, metav1.GetOptions{}); err != nil {
-		return err
-	}
+	gomega.Eventually(func() error {
+		workWebhookDeployment, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
+			Get(context.TODO(), t.hubWorkWebhookDeployment, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		replicas := *workWebhookDeployment.Spec.Replicas
+		readyReplicas := workWebhookDeployment.Status.ReadyReplicas
+		if readyReplicas != replicas {
+			return fmt.Errorf("deployment %s should have %d but got %d ready replicas", t.hubWorkWebhookDeployment, replicas, readyReplicas)
+		}
+		return nil
+	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeNil())
 
 	if _, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
 		Get(context.TODO(), t.hubPlacementDeployment, metav1.GetOptions{}); err != nil {

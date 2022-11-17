@@ -1,15 +1,15 @@
 apiVersion: admissionregistration.k8s.io/v1
-kind: MutatingWebhookConfiguration
+kind: ValidatingWebhookConfiguration
 metadata:
-  name: managedclustermutators.admission.cluster.open-cluster-management.io
+  name: managedclustersetbindingv1beta1validators.admission.cluster.open-cluster-management.io
 webhooks:
-- name: managedclustermutators.admission.cluster.open-cluster-management.io
+- name: managedclustersetbindingv1beta1validators.admission.cluster.open-cluster-management.io
   failurePolicy: Fail
   clientConfig:
     service:
       namespace: {{ .ClusterManagerNamespace }}
       name: cluster-manager-registration-webhook
-      path: /mutate-cluster-open-cluster-management-io-v1-managedcluster
+      path: /validate-cluster-open-cluster-management-io-v1beta1-managedclustersetbinding
       port: {{.RegistrationWebhook.Port}}
     caBundle: {{ .RegistrationAPIServiceCABundle }}
   rules:
@@ -19,9 +19,9 @@ webhooks:
     apiGroups:
     - cluster.open-cluster-management.io
     apiVersions:
-    - "*"
+    - v1beta1
     resources:
-    - managedclusters
+    - managedclustersetbindings
   admissionReviewVersions: ["v1beta1","v1"]
   sideEffects: None
   timeoutSeconds: 10

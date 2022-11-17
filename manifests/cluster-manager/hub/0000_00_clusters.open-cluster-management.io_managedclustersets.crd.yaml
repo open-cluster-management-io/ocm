@@ -12,7 +12,7 @@ spec:
           name: cluster-manager-registration-webhook
           namespace: {{ .ClusterManagerNamespace }}
           path: /convert
-          port: 9443
+          port: {{.RegistrationWebhook.Port}}
       conversionReviewVersions:
       - v1beta1
       - v1beta2
