@@ -1,0 +1,6 @@
+resources:
+- apps.open-cluster-management.io_placementrules_crd.yaml
+- policy.open-cluster-management.io_placementbindings.yaml
+- policy.open-cluster-management.io_policies.yaml
+- policy.open-cluster-management.io_policyautomations.yaml
+- policy.open-cluster-management.io_policysets.yaml

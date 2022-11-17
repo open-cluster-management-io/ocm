@@ -1,0 +1,247 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.1
+  creationTimestamp: null
+  name: policies.policy.open-cluster-management.io
+spec:
+  group: policy.open-cluster-management.io
+  names:
+    kind: Policy
+    listKind: PolicyList
+    plural: policies
+    shortNames:
+    - plc
+    singular: policy
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.remediationAction
+      name: Remediation action
+      type: string
+    - jsonPath: .status.compliant
+      name: Compliance state
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: Policy is the Schema for the policies API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PolicySpec defines the desired state of Policy
+            properties:
+              dependencies:
+                description: PolicyDependencies that apply to each template in this
+                  Policy
+                items:
+                  description: Each PolicyDepenency defines an object reference which
+                    must be in a certain compliance state before the policy should
+                    be created.
+                  properties:
+                    apiVersion:
+                      description: 'APIVersion defines the versioned schema of this
+                        representation of an object. Servers should convert recognized
+                        schemas to the latest internal value, and may reject unrecognized
+                        values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                      type: string
+                    compliance:
+                      description: The ComplianceState (at path .status.compliant)
+                        required before the policy should be created
+                      type: string
+                    kind:
+                      description: 'Kind is a string value representing the REST resource
+                        this object represents. Servers may infer this from the endpoint
+                        the client submits requests to. Cannot be updated. In CamelCase.
+                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                      type: string
+                    name:
+                      description: The name of the object to be checked
+                      type: string
+                    namespace:
+                      description: The namespace of the object to be checked (optional)
+                      type: string
+                  required:
+                  - compliance
+                  - name
+                  type: object
+                type: array
+              disabled:
+                description: This provides the ability to enable and disable your
+                  policies.
+                type: boolean
+              policy-templates:
+                description: Used to create one or more policies to apply to a managed
+                  cluster
+                items:
+                  description: PolicyTemplate template for custom security policy
+                  properties:
+                    extraDependencies:
+                      description: Additional PolicyDependencies that only apply to
+                        this template
+                      items:
+                        description: Each PolicyDepenency defines an object reference
+                          which must be in a certain compliance state before the policy
+                          should be created.
+                        properties:
+                          apiVersion:
+                            description: 'APIVersion defines the versioned schema
+                              of this representation of an object. Servers should
+                              convert recognized schemas to the latest internal value,
+                              and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                            type: string
+                          compliance:
+                            description: The ComplianceState (at path .status.compliant)
+                              required before the policy should be created
+                            type: string
+                          kind:
+                            description: 'Kind is a string value representing the
+                              REST resource this object represents. Servers may infer
+                              this from the endpoint the client submits requests to.
+                              Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                            type: string
+                          name:
+                            description: The name of the object to be checked
+                            type: string
+                          namespace:
+                            description: The namespace of the object to be checked
+                              (optional)
+                            type: string
+                        required:
+                        - compliance
+                        - name
+                        type: object
+                      type: array
+                    ignorePending:
+                      description: Ignore this template's Pending status when calculating
+                        the overall Policy status
+                      type: boolean
+                    objectDefinition:
+                      description: A Kubernetes object defining the policy to apply
+                        to a managed cluster
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                  required:
+                  - objectDefinition
+                  type: object
+                type: array
+              remediationAction:
+                description: This value (Enforce or Inform) will override the remediationAction
+                  on each template
+                enum:
+                - Inform
+                - inform
+                - Enforce
+                - enforce
+                type: string
+            required:
+            - disabled
+            - policy-templates
+            type: object
+          status:
+            description: PolicyStatus defines the observed state of Policy
+            properties:
+              compliant:
+                description: ComplianceState shows the state of enforcement
+                enum:
+                - Compliant
+                - Pending
+                - NonCompliant
+                type: string
+              details:
+                items:
+                  description: DetailsPerTemplate defines compliance details and history
+                  properties:
+                    compliant:
+                      description: ComplianceState shows the state of enforcement
+                      type: string
+                    history:
+                      items:
+                        description: ComplianceHistory defines compliance details
+                          history
+                        properties:
+                          eventName:
+                            type: string
+                          lastTimestamp:
+                            format: date-time
+                            type: string
+                          message:
+                            type: string
+                        type: object
+                      type: array
+                    templateMeta:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                  type: object
+                type: array
+              placement:
+                items:
+                  description: Placement defines the placement results
+                  properties:
+                    decisions:
+                      items:
+                        description: PlacementDecision defines the decision made by
+                          controller
+                        properties:
+                          clusterName:
+                            type: string
+                          clusterNamespace:
+                            type: string
+                        type: object
+                      type: array
+                    placement:
+                      type: string
+                    placementBinding:
+                      type: string
+                    placementRule:
+                      type: string
+                    policySet:
+                      type: string
+                  type: object
+                type: array
+              status:
+                items:
+                  description: CompliancePerClusterStatus defines compliance per cluster
+                    status
+                  properties:
+                    clustername:
+                      type: string
+                    clusternamespace:
+                      type: string
+                    compliant:
+                      description: ComplianceState shows the state of enforcement
+                      type: string
+                  type: object
+                type: array
+            type: object
+        required:
+        - metadata
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

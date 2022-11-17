@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: grc
+    app.kubernetes.io/instance: grc
+    app.kubernetes.io/name: grc
+    component: ocm-policy-propagator
+    release: grc
+  name: grc-policy-propagator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grc
+      component: ocm-policy-propagator
+      release: grc
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: grc
+        app.kubernetes.io/instance: grc
+        app.kubernetes.io/name: grc
+        component: ocm-policy-propagator
+        name: governance-policy-propagator
+        ocm-antiaffinity-selector: grcpolicypropagator
+        release: grc
+    spec:
+      containers:
+      - args:
+        - --secure-listen-address=0.0.0.0:8443
+        - --upstream=http://127.0.0.1:8383/
+        - --logtostderr=true
+        - --v=6
+        - --tls-cert-file=/var/run/policy-metrics-cert/tls.crt
+        - --tls-private-key-file=/var/run/policy-metrics-cert/tls.key
+        - --tls-min-version=VersionTLS13
+        image: quay.io/open-cluster-management/kube-rbac-proxy:2.5.0-SNAPSHOT-2022-01-04-13-45-55
+        imagePullPolicy: IfNotPresent
+        name: kube-rbac-proxy
+        ports:
+        - containerPort: 8443
+          name: https
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /var/run/policy-metrics-cert
+          name: metrics-cert
+          readOnly: true
+      - command:
+        - governance-policy-propagator
+        - --kubeconfig=/var/run/secrets/hub/kubeconfig
+        env:
+        - name: WATCH_NAMESPACE
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: OPERATOR_NAME
+          value: governance-policy-propagator
+        image: quay.io/open-cluster-management/governance-policy-propagator:latest
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - ls
+          failureThreshold: 3
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: governance-policy-propagator
+        readinessProbe:
+          exec:
+            command:
+            - ls
+          failureThreshold: 3
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp
+        - mountPath: /var/run/secrets/hub
+          name: kubeconfig
+          readOnly: true
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: grc-sa
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/infra
+        operator: Exists
+      volumes:
+      - emptyDir: {}
+        name: tmp
+      - name: metrics-cert
+        secret:
+          defaultMode: 420
+          secretName: grc-metrics-cert
+      - name: kubeconfig
+        secret:
+          defaultMode: 420
+          secretName: controlplane-kubeconfig
