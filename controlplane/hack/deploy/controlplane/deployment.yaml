@@ -21,7 +21,6 @@ spec:
         args:
           - "/ocm-controlplane"
           - "--authorization-mode=RBAC"
-          - "--feature-gates=DefaultClusterSet=true"
           - "--enable-bootstrap-token-auth"
           - "--service-account-key-file=/controlplane/cert/kube-serviceaccount.key"
           - "--client-ca-file=/controlplane/cert/client-ca.crt"
@@ -38,7 +37,7 @@ spec:
           - "--secure-port=9443"
           - "--tls-cert-file=/controlplane/cert/serving-kube-apiserver.crt"
           - "--tls-private-key-file=/controlplane/cert/serving-kube-apiserver.key"
-          - "--feature-gates=DefaultClusterSet=true"
+          - "--feature-gates=DefaultClusterSet=true,OpenAPIV3=false"
           - "--enable-embedded-etcd=true"
           - "--etcd-servers=https://127.0.0.1:2379"
           - "--service-cluster-ip-range=10.0.0.0/24"
