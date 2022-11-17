@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	ginkgo "github.com/onsi/ginkgo"
+	ginkgo "github.com/onsi/ginkgo/v2"
 	gomega "github.com/onsi/gomega"
 
 	"k8s.io/client-go/kubernetes"
