@@ -281,15 +281,22 @@ EOF
 
 # creates a self-contained kubeconfig: args are sudo, dest-dir, ca file, host, port, client id, token(optional)
 function kube::util::write_client_kubeconfig {
+    local base64cmd
+    base64cmd="base64 -w0"
+    if [[ "$(uname)" == "Darwin" ]]; then
+        base64cmd="base64"
+    fi
+
     local sudo=$1
     local dest_dir=$2
-    local ca=`cat $3 | base64 -w0`
+    local ca=`cat ${dest_dir}/$3 | ${base64cmd}`
     local api_host=$4
     local api_port=$5
     local client_id=$6
     local token=${7:-}
-    local client_ca=`cat ${dest_dir}/client-${client_id}.crt | base64 -w0`
-    local client_key=`cat ${dest_dir}/client-${client_id}.key | base64 -w0`
+    local client_ca=`cat ${dest_dir}/client-${client_id}.crt | ${base64cmd}`
+    local client_key=`cat ${dest_dir}/client-${client_id}.key | ${base64cmd}`
+
     cat <<EOF | ${sudo} tee "${dest_dir}"/"${client_id}".kubeconfig > /dev/null
 apiVersion: v1
 kind: Config

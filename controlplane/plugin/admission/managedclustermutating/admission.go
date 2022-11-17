@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -74,15 +75,28 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	oldRaw := runtime.RawExtension{}
 	err := admissionutil.Convert_runtime_Object_To_runtime_RawExtension_Raw(&old, &oldRaw)
 	if err != nil {
-		return fmt.Errorf("error occured in ManagedClusterMutating: failed to convert Object to RawExtension.")
+		return fmt.Errorf("error occured in ManagedClusterMutating: failed to convert Object to RawExtension")
 	}
 	ar.Request.OldObject = oldRaw
 
-	r := runtimeadmission.Request{AdmissionRequest: *ar.Request}
-	admissionContext := runtimeadmission.NewContextWithRequest(ctx, r)
-	if err := p.webhook.Default(admissionContext, a.GetObject()); err != nil {
+	cluster := &clusterv1api.ManagedCluster{}
+	obj := a.GetObject().(*unstructured.Unstructured)
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster)
+	if err != nil {
 		return err
 	}
+
+	r := runtimeadmission.Request{AdmissionRequest: *ar.Request}
+	admissionContext := runtimeadmission.NewContextWithRequest(ctx, r)
+	if err := p.webhook.Default(admissionContext, cluster); err != nil {
+		return err
+	}
+
+	updated, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cluster)
+	if err != nil {
+		return err
+	}
+	obj.Object = updated
 
 	return nil
 }
