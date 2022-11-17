@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/admission"
@@ -79,11 +81,25 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 
 	r := runtimeadmission.Request{AdmissionRequest: *ar.Request}
 	admissionContext := runtimeadmission.NewContextWithRequest(ctx, r)
+
+	cluster := &clusterv1api.ManagedCluster{}
+	obj := a.GetObject().(*unstructured.Unstructured)
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster)
+	if err != nil {
+		return err
+	}
+
 	switch a.GetOperation() {
 	case admission.Create:
-		return p.webhook.ValidateCreate(admissionContext, a.GetObject())
+		return p.webhook.ValidateCreate(admissionContext, cluster)
 	case admission.Update:
-		return p.webhook.ValidateUpdate(admissionContext, a.GetOldObject(), a.GetObject())
+		oldCluster := &clusterv1api.ManagedCluster{}
+		oldObj := a.GetOldObject().(*unstructured.Unstructured)
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(oldObj.Object, oldCluster)
+		if err != nil {
+			return err
+		}
+		return p.webhook.ValidateUpdate(admissionContext, oldCluster, cluster)
 	}
 
 	return nil
