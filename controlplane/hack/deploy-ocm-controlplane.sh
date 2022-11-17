@@ -95,7 +95,7 @@ API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-/(.*)+$}
 # Use to increase verbosity on particular files, e.g. LOG_SPEC=token_controller*=5,other_controller*=4
 LOG_SPEC=${LOG_SPEC:-""}
 LOG_DIR=${LOG_DIR:-"/tmp"}
-ROOT_CA_FILE=${CERT_DIR}/serving-kube-apiserver.crt
+ROOT_CA_FILE="serving-kube-apiserver.crt"
 CLUSTER_SIGNING_CERT_FILE=${CLUSTER_SIGNING_CERT_FILE:-"${CERT_DIR}/client-ca.crt"}
 CLUSTER_SIGNING_KEY_FILE=${CLUSTER_SIGNING_KEY_FILE:-"${CERT_DIR}/client-ca.key"}
 # Reuse certs will skip generate new ca/cert files under CERT_DIR
