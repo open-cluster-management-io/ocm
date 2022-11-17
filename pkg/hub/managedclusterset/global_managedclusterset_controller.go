@@ -13,37 +13,37 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
-	clustersetv1beta1 "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta1"
-	clusterinformerv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
-	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clustersetv1beta2 "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta2"
+	clusterinformerv1beta2 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta2"
+	clusterlisterv1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
+	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
 const (
 	GlobalManagedClusterSetName = "global"
 )
 
-var GlobalManagedClusterSet = &clusterv1beta1.ManagedClusterSet{
+var GlobalManagedClusterSet = &clusterv1beta2.ManagedClusterSet{
 	ObjectMeta: metav1.ObjectMeta{
 		Name: GlobalManagedClusterSetName,
 	},
-	Spec: clusterv1beta1.ManagedClusterSetSpec{
-		ClusterSelector: clusterv1beta1.ManagedClusterSelector{
-			SelectorType:  clusterv1beta1.LabelSelector,
+	Spec: clusterv1beta2.ManagedClusterSetSpec{
+		ClusterSelector: clusterv1beta2.ManagedClusterSelector{
+			SelectorType:  clusterv1beta2.LabelSelector,
 			LabelSelector: &metav1.LabelSelector{},
 		},
 	},
 }
 
 type globalManagedClusterSetController struct {
-	clusterSetClient clustersetv1beta1.ClusterV1beta1Interface
-	clusterSetLister clusterlisterv1beta1.ManagedClusterSetLister
+	clusterSetClient clustersetv1beta2.ClusterV1beta2Interface
+	clusterSetLister clusterlisterv1beta2.ManagedClusterSetLister
 	eventRecorder    events.Recorder
 }
 
 func NewGlobalManagedClusterSetController(
-	clusterSetClient clustersetv1beta1.ClusterV1beta1Interface,
-	clusterSetInformer clusterinformerv1beta1.ManagedClusterSetInformer,
+	clusterSetClient clustersetv1beta2.ClusterV1beta2Interface,
+	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer,
 	recorder events.Recorder) factory.Controller {
 
 	c := &globalManagedClusterSetController{
@@ -99,7 +99,7 @@ func (c *globalManagedClusterSetController) sync(ctx context.Context, syncCtx fa
 }
 
 // applyGlobalClusterSet syncs global cluster set.
-func (c *globalManagedClusterSetController) applyGlobalClusterSet(ctx context.Context, originalGlobalClusterSet *clusterv1beta1.ManagedClusterSet) error {
+func (c *globalManagedClusterSetController) applyGlobalClusterSet(ctx context.Context, originalGlobalClusterSet *clusterv1beta2.ManagedClusterSet) error {
 	globalClusterSet := originalGlobalClusterSet.DeepCopy()
 
 	// if the annotation has set to disable, global clusterset controller will not work.

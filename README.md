@@ -116,7 +116,7 @@ You can find more details for cluster join process from this [design doc](https:
 1. Create a cluster set by `ManagedClusterSet` API
   ```
   cat << EOF | kubectl apply -f -
-  apiVersion: cluster.open-cluster-management.io/v1beta1
+  apiVersion: cluster.open-cluster-management.io/v1beta2
   kind: ManagedClusterSet
   metadata:
     name: clusterset1

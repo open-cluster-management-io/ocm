@@ -10,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
 var _ = ginkgo.Describe("ManagedClusterSet", func() {
@@ -19,24 +19,24 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 			suffix := rand.String(6)
 			ginkgo.By("Create a ManagedClusterSet")
 			managedClusterSetName := fmt.Sprintf("cs1-%s", suffix)
-			managedClusterSet := &clusterv1beta1.ManagedClusterSet{
+			managedClusterSet := &clusterv1beta2.ManagedClusterSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: managedClusterSetName,
 				},
 			}
 
-			_, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
+			_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Check if ManagedClusterSet is reconciled")
 			gomega.Eventually(func() bool {
-				managedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+				managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
 
 				for _, condition := range managedClusterSet.Status.Conditions {
-					if condition.Type != clusterv1beta1.ManagedClusterSetConditionEmpty {
+					if condition.Type != clusterv1beta2.ManagedClusterSetConditionEmpty {
 						continue
 					}
 					if condition.Status != metav1.ConditionTrue {
@@ -56,7 +56,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: managedClusterName,
 					Labels: map[string]string{
-						clusterv1beta1.ClusterSetLabel: managedClusterSetName,
+						clusterv1beta2.ClusterSetLabel: managedClusterSetName,
 					},
 				},
 				Spec: clusterv1.ManagedClusterSpec{
@@ -69,12 +69,12 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 
 			ginkgo.By("Check if ManagedClusterSet is reconciled again")
 			gomega.Eventually(func() bool {
-				managedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+				managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
 				for _, condition := range managedClusterSet.Status.Conditions {
-					if condition.Type != clusterv1beta1.ManagedClusterSetConditionEmpty {
+					if condition.Type != clusterv1beta2.ManagedClusterSetConditionEmpty {
 						continue
 					}
 					if condition.Status != metav1.ConditionFalse {
@@ -90,12 +90,12 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 
 			ginkgo.By("Move the cluster to another ManagedClusterSet and check if the original one is empty again")
 			// create another clusterset
-			managedClusterSet = &clusterv1beta1.ManagedClusterSet{
+			managedClusterSet = &clusterv1beta2.ManagedClusterSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("cs2-%s", suffix),
 				},
 			}
-			_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
+			_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			gomega.Eventually(func() error {
@@ -105,7 +105,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 					return err
 				}
 				managedCluster.Labels = map[string]string{
-					clusterv1beta1.ClusterSetLabel: managedClusterSet.Name,
+					clusterv1beta2.ClusterSetLabel: managedClusterSet.Name,
 				}
 				_, err := clusterClient.ClusterV1().ManagedClusters().Update(context.Background(), managedCluster, metav1.UpdateOptions{})
 				return err
@@ -113,12 +113,12 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 
 			// check if the new clusterset synced
 			gomega.Eventually(func() bool {
-				managedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSet.Name, metav1.GetOptions{})
+				managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSet.Name, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
 				for _, condition := range managedClusterSet.Status.Conditions {
-					if condition.Type != clusterv1beta1.ManagedClusterSetConditionEmpty {
+					if condition.Type != clusterv1beta2.ManagedClusterSetConditionEmpty {
 						continue
 					}
 					if condition.Status != metav1.ConditionFalse {
@@ -134,12 +134,12 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 
 			// check if the original clusterset synced
 			gomega.Eventually(func() error {
-				managedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+				managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
-				cond := meta.FindStatusCondition(managedClusterSet.Status.Conditions, clusterv1beta1.ManagedClusterSetConditionEmpty)
+				cond := meta.FindStatusCondition(managedClusterSet.Status.Conditions, clusterv1beta2.ManagedClusterSetConditionEmpty)
 				if cond == nil {
 					return fmt.Errorf("clusterset empty condition is not found")
 				}
@@ -160,29 +160,29 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 		suffix := rand.String(6)
 		ginkgo.By("Create a ManagedClusterSet")
 		managedClusterSetName := fmt.Sprintf("cs1-%s", suffix)
-		managedClusterSet := &clusterv1beta1.ManagedClusterSet{
+		managedClusterSet := &clusterv1beta2.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: managedClusterSetName,
 			},
-			Spec: clusterv1beta1.ManagedClusterSetSpec{
-				ClusterSelector: clusterv1beta1.ManagedClusterSelector{
-					SelectorType: clusterv1beta1.LegacyClusterSetLabel,
+			Spec: clusterv1beta2.ManagedClusterSetSpec{
+				ClusterSelector: clusterv1beta2.ManagedClusterSelector{
+					SelectorType: clusterv1beta2.ExclusiveClusterSetLabel,
 				},
 			},
 		}
 
-		_, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
+		_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ginkgo.By("Check if ManagedClusterSet is reconciled")
 		gomega.Eventually(func() bool {
-			managedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
 
 			for _, condition := range managedClusterSet.Status.Conditions {
-				if condition.Type != clusterv1beta1.ManagedClusterSetConditionEmpty {
+				if condition.Type != clusterv1beta2.ManagedClusterSetConditionEmpty {
 					continue
 				}
 				if condition.Status != metav1.ConditionTrue {
@@ -202,7 +202,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: managedClusterName,
 				Labels: map[string]string{
-					clusterv1beta1.ClusterSetLabel: managedClusterSetName,
+					clusterv1beta2.ClusterSetLabel: managedClusterSetName,
 				},
 			},
 			Spec: clusterv1.ManagedClusterSpec{
@@ -215,12 +215,12 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 
 		ginkgo.By("Check if ManagedClusterSet is reconciled again")
 		gomega.Eventually(func() bool {
-			managedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
 			for _, condition := range managedClusterSet.Status.Conditions {
-				if condition.Type != clusterv1beta1.ManagedClusterSetConditionEmpty {
+				if condition.Type != clusterv1beta2.ManagedClusterSetConditionEmpty {
 					continue
 				}
 				if condition.Status != metav1.ConditionFalse {
@@ -236,12 +236,12 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 
 		ginkgo.By("Move the cluster to another ManagedClusterSet and check if the original one is empty again")
 		// create another clusterset
-		managedClusterSet = &clusterv1beta1.ManagedClusterSet{
+		managedClusterSet = &clusterv1beta2.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("cs2-%s", suffix),
 			},
 		}
-		_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
@@ -251,7 +251,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 				return err
 			}
 			managedCluster.Labels = map[string]string{
-				clusterv1beta1.ClusterSetLabel: managedClusterSet.Name,
+				clusterv1beta2.ClusterSetLabel: managedClusterSet.Name,
 			}
 			_, err := clusterClient.ClusterV1().ManagedClusters().Update(context.Background(), managedCluster, metav1.UpdateOptions{})
 			return err
@@ -259,12 +259,12 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 
 		// check if the new clusterset synced
 		gomega.Eventually(func() bool {
-			managedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSet.Name, metav1.GetOptions{})
+			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSet.Name, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
 			for _, condition := range managedClusterSet.Status.Conditions {
-				if condition.Type != clusterv1beta1.ManagedClusterSetConditionEmpty {
+				if condition.Type != clusterv1beta2.ManagedClusterSetConditionEmpty {
 					continue
 				}
 				if condition.Status != metav1.ConditionFalse {
@@ -280,12 +280,12 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 
 		// check if the original clusterset synced
 		gomega.Eventually(func() error {
-			managedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 
-			cond := meta.FindStatusCondition(managedClusterSet.Status.Conditions, clusterv1beta1.ManagedClusterSetConditionEmpty)
+			cond := meta.FindStatusCondition(managedClusterSet.Status.Conditions, clusterv1beta2.ManagedClusterSetConditionEmpty)
 			if cond == nil {
 				return fmt.Errorf("clusterset empty condition is not found")
 			}
@@ -305,13 +305,13 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 		suffix := rand.String(6)
 		ginkgo.By("Create a ManagedClusterSet")
 		managedClusterSetName := fmt.Sprintf("cs1-%s", suffix)
-		managedClusterSet := &clusterv1beta1.ManagedClusterSet{
+		managedClusterSet := &clusterv1beta2.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: managedClusterSetName,
 			},
-			Spec: clusterv1beta1.ManagedClusterSetSpec{
-				ClusterSelector: clusterv1beta1.ManagedClusterSelector{
-					SelectorType: clusterv1beta1.LabelSelector,
+			Spec: clusterv1beta2.ManagedClusterSetSpec{
+				ClusterSelector: clusterv1beta2.ManagedClusterSelector{
+					SelectorType: clusterv1beta2.LabelSelector,
 					LabelSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"vendor": "openShift",
@@ -321,18 +321,18 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 			},
 		}
 
-		_, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
+		_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ginkgo.By("Check if ManagedClusterSet is reconciled")
 		gomega.Eventually(func() bool {
-			managedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
 
 			for _, condition := range managedClusterSet.Status.Conditions {
-				if condition.Type != clusterv1beta1.ManagedClusterSetConditionEmpty {
+				if condition.Type != clusterv1beta2.ManagedClusterSetConditionEmpty {
 					continue
 				}
 				if condition.Status != metav1.ConditionTrue {
@@ -365,12 +365,12 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 
 		ginkgo.By("Check if ManagedClusterSet is reconciled again")
 		gomega.Eventually(func() bool {
-			managedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
 			for _, condition := range managedClusterSet.Status.Conditions {
-				if condition.Type != clusterv1beta1.ManagedClusterSetConditionEmpty {
+				if condition.Type != clusterv1beta2.ManagedClusterSetConditionEmpty {
 					continue
 				}
 				if condition.Status != metav1.ConditionFalse {
@@ -386,13 +386,13 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 
 		ginkgo.By("Create a new ManagedClusterSet")
 		newManagedClusterSetName := fmt.Sprintf("cs2-%s", suffix)
-		newManagedClusterSet := &clusterv1beta1.ManagedClusterSet{
+		newManagedClusterSet := &clusterv1beta2.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: newManagedClusterSetName,
 			},
-			Spec: clusterv1beta1.ManagedClusterSetSpec{
-				ClusterSelector: clusterv1beta1.ManagedClusterSelector{
-					SelectorType: clusterv1beta1.LabelSelector,
+			Spec: clusterv1beta2.ManagedClusterSetSpec{
+				ClusterSelector: clusterv1beta2.ManagedClusterSelector{
+					SelectorType: clusterv1beta2.LabelSelector,
 					LabelSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"region": "apac",
@@ -402,7 +402,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 			},
 		}
 
-		_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), newManagedClusterSet, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), newManagedClusterSet, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
@@ -420,12 +420,12 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 
 		// check if the new clusterset synced
 		gomega.Eventually(func() bool {
-			newManagedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), newManagedClusterSet.Name, metav1.GetOptions{})
+			newManagedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), newManagedClusterSet.Name, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
 			for _, condition := range managedClusterSet.Status.Conditions {
-				if condition.Type != clusterv1beta1.ManagedClusterSetConditionEmpty {
+				if condition.Type != clusterv1beta2.ManagedClusterSetConditionEmpty {
 					continue
 				}
 				if condition.Status != metav1.ConditionFalse {
@@ -441,12 +441,12 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 
 		// check if the original clusterset synced
 		gomega.Eventually(func() error {
-			managedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 
-			cond := meta.FindStatusCondition(managedClusterSet.Status.Conditions, clusterv1beta1.ManagedClusterSetConditionEmpty)
+			cond := meta.FindStatusCondition(managedClusterSet.Status.Conditions, clusterv1beta2.ManagedClusterSetConditionEmpty)
 			if cond == nil {
 				return fmt.Errorf("clusterset empty condition is not found")
 			}
@@ -484,29 +484,29 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 
 		ginkgo.By("Create a ManagedClusterSet")
 		managedClusterSetName := fmt.Sprintf("cs1-%s", suffix)
-		managedClusterSet := &clusterv1beta1.ManagedClusterSet{
+		managedClusterSet := &clusterv1beta2.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: managedClusterSetName,
 			},
-			Spec: clusterv1beta1.ManagedClusterSetSpec{
-				ClusterSelector: clusterv1beta1.ManagedClusterSelector{
-					SelectorType:  clusterv1beta1.LabelSelector,
+			Spec: clusterv1beta2.ManagedClusterSetSpec{
+				ClusterSelector: clusterv1beta2.ManagedClusterSelector{
+					SelectorType:  clusterv1beta2.LabelSelector,
 					LabelSelector: &metav1.LabelSelector{},
 				},
 			},
 		}
 
-		_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), managedClusterSet, metav1.CreateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ginkgo.By("Check if ManagedClusterSet is reconciled")
 		gomega.Eventually(func() bool {
-			managedClusterSet, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
+			managedClusterSet, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), managedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
 			for _, condition := range managedClusterSet.Status.Conditions {
-				if condition.Type != clusterv1beta1.ManagedClusterSetConditionEmpty {
+				if condition.Type != clusterv1beta2.ManagedClusterSetConditionEmpty {
 					continue
 				}
 				if condition.Status != metav1.ConditionFalse {

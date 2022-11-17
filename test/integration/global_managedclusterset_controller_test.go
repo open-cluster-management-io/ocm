@@ -17,7 +17,7 @@ var _ = ginkgo.Describe("GlobalManagedClusterSet", func() {
 	ginkgo.It("should create GlobalManagedClusterSet successfully", func() {
 		ginkgo.By("check whether GlobalManagedClusterSet is created")
 		gomega.Eventually(func() error {
-			mcs, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
+			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -32,7 +32,7 @@ var _ = ginkgo.Describe("GlobalManagedClusterSet", func() {
 
 	ginkgo.It("should reconcile GlobalManagedClusterSet successfully if it changed", func() {
 		ginkgo.By("check whether GlobalManagedClusterSet is reconciled after changed")
-		mcs, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
+		mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		updateMcs := mcs.DeepCopy()
@@ -41,11 +41,11 @@ var _ = ginkgo.Describe("GlobalManagedClusterSet", func() {
 				"vendor": "openshift",
 			},
 		}
-		_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Update(context.TODO(), updateMcs, metav1.UpdateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Update(context.TODO(), updateMcs, metav1.UpdateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			mcs, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
+			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -58,7 +58,7 @@ var _ = ginkgo.Describe("GlobalManagedClusterSet", func() {
 
 	ginkgo.It("should not change users labels/annotations in GlobalManagedClusterSet", func() {
 		ginkgo.By("check whether GlobalManagedClusterSet labels/annotations reconciled after changed")
-		mcs, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
+		mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		updateMcs := mcs.DeepCopy()
@@ -73,11 +73,11 @@ var _ = ginkgo.Describe("GlobalManagedClusterSet", func() {
 				"vendor": "openshift",
 			},
 		}
-		_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Update(context.TODO(), updateMcs, metav1.UpdateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Update(context.TODO(), updateMcs, metav1.UpdateOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			mcs, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
+			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -90,12 +90,12 @@ var _ = ginkgo.Describe("GlobalManagedClusterSet", func() {
 
 	ginkgo.It("should recreate GlobalManagedClusterSet successfully after deleted", func() {
 		ginkgo.By("delete GlobalManagedClusterSet")
-		err := clusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.DeleteOptions{})
+		err := clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.DeleteOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "try to delete GlobalManagedClusterSet error")
 
 		ginkgo.By("check whether GlobalManagedClusterSet is recreated")
 		gomega.Eventually(func() error {
-			mcs, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
+			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.GlobalManagedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}

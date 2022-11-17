@@ -14,7 +14,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
 // ManagedClusterSetBindingValidatingAdmissionHook will validate the creating/updating ManagedClusterSetBinding request.
@@ -48,7 +48,7 @@ func (a *ManagedClusterSetBindingValidatingAdmissionHook) Validate(admissionSpec
 		return acceptRequest()
 	}
 
-	binding := &clusterv1beta1.ManagedClusterSetBinding{}
+	binding := &clusterv1beta2.ManagedClusterSetBinding{}
 	if err := json.Unmarshal(admissionSpec.Object.Raw, binding); err != nil {
 		return denyRequest(http.StatusBadRequest, metav1.StatusReasonBadRequest,
 			fmt.Sprintf("Unable to unmarshal the ManagedClusterSetBinding object: %v", err))

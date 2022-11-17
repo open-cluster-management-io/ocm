@@ -14,7 +14,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 )
 
@@ -22,7 +22,7 @@ func TestSync(t *testing.T) {
 	cases := []struct {
 		name              string
 		clusterSets       []runtime.Object
-		clusterSetBinding *clusterv1beta1.ManagedClusterSetBinding
+		clusterSetBinding *clusterv1beta2.ManagedClusterSetBinding
 		validateActions   func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
@@ -38,14 +38,14 @@ func TestSync(t *testing.T) {
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, actions, "patch")
 				patchData := actions[0].(clienttesting.PatchActionImpl).Patch
-				binding := &clusterv1beta1.ManagedClusterSetBinding{}
+				binding := &clusterv1beta2.ManagedClusterSetBinding{}
 				err := json.Unmarshal(patchData, binding)
 				if err != nil {
 					t.Fatal(err)
 				}
 
 				testinghelpers.AssertCondition(t, binding.Status.Conditions, metav1.Condition{
-					Type:   clusterv1beta1.ClusterSetBindingBoundType,
+					Type:   clusterv1beta2.ClusterSetBindingBoundType,
 					Status: metav1.ConditionFalse,
 					Reason: "ClusterSetNotFound",
 				})
@@ -58,14 +58,14 @@ func TestSync(t *testing.T) {
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, actions, "patch")
 				patchData := actions[0].(clienttesting.PatchActionImpl).Patch
-				binding := &clusterv1beta1.ManagedClusterSetBinding{}
+				binding := &clusterv1beta2.ManagedClusterSetBinding{}
 				err := json.Unmarshal(patchData, binding)
 				if err != nil {
 					t.Fatal(err)
 				}
 
 				testinghelpers.AssertCondition(t, binding.Status.Conditions, metav1.Condition{
-					Type:   clusterv1beta1.ClusterSetBindingBoundType,
+					Type:   clusterv1beta2.ClusterSetBindingBoundType,
 					Status: metav1.ConditionTrue,
 					Reason: "ClusterSetBound",
 				})
@@ -74,10 +74,10 @@ func TestSync(t *testing.T) {
 		{
 			name:        "no update",
 			clusterSets: []runtime.Object{newManagedClusterSet("test")},
-			clusterSetBinding: func() *clusterv1beta1.ManagedClusterSetBinding {
+			clusterSetBinding: func() *clusterv1beta2.ManagedClusterSetBinding {
 				binding := newManagedClusterSetBinding("test", "testns")
 				meta.SetStatusCondition(&binding.Status.Conditions, metav1.Condition{
-					Type:   clusterv1beta1.ClusterSetBindingBoundType,
+					Type:   clusterv1beta2.ClusterSetBindingBoundType,
 					Status: metav1.ConditionTrue,
 					Reason: "ClusterSetBound",
 				})
@@ -96,18 +96,18 @@ func TestSync(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(objects...)
 			informerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, 5*time.Minute)
 			for _, clusterset := range c.clusterSets {
-				if err := informerFactory.Cluster().V1beta1().ManagedClusterSets().Informer().GetStore().Add(clusterset); err != nil {
+				if err := informerFactory.Cluster().V1beta2().ManagedClusterSets().Informer().GetStore().Add(clusterset); err != nil {
 					t.Fatal(err)
 				}
 			}
-			if err := informerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Informer().GetStore().Add(c.clusterSetBinding); err != nil {
+			if err := informerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Informer().GetStore().Add(c.clusterSetBinding); err != nil {
 				t.Fatal(err)
 			}
 
 			ctrl := managedClusterSetBindingController{
 				clusterClient:           clusterClient,
-				clusterSetBindingLister: informerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Lister(),
-				clusterSetLister:        informerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
+				clusterSetBindingLister: informerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
+				clusterSetLister:        informerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
 				eventRecorder:           eventstesting.NewTestingEventRecorder(t),
 			}
 
@@ -126,7 +126,7 @@ func TestSync(t *testing.T) {
 func TestEnqueue(t *testing.T) {
 	cases := []struct {
 		name               string
-		clusterSet         *clusterv1beta1.ManagedClusterSet
+		clusterSet         *clusterv1beta2.ManagedClusterSet
 		clusterSetBindings []runtime.Object
 		expectedQueueSize  int
 	}{
@@ -158,7 +158,7 @@ func TestEnqueue(t *testing.T) {
 
 			clusterClient := clusterfake.NewSimpleClientset(objects...)
 			informerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, 5*time.Minute)
-			err := informerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Informer().AddIndexers(cache.Indexers{
+			err := informerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Informer().AddIndexers(cache.Indexers{
 				byClusterSet: indexByClusterset,
 			})
 
@@ -167,7 +167,7 @@ func TestEnqueue(t *testing.T) {
 			}
 
 			for _, binding := range c.clusterSetBindings {
-				if err := informerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Informer().GetStore().Add(binding); err != nil {
+				if err := informerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Informer().GetStore().Add(binding); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -175,7 +175,7 @@ func TestEnqueue(t *testing.T) {
 			syncCtx := testinghelpers.NewFakeSyncContext(t, "fake")
 
 			ctrl := managedClusterSetBindingController{
-				clusterSetBindingIndexers: informerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Informer().GetIndexer(),
+				clusterSetBindingIndexers: informerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Informer().GetIndexer(),
 				queue:                     syncCtx.Queue(),
 			}
 
@@ -188,8 +188,8 @@ func TestEnqueue(t *testing.T) {
 	}
 }
 
-func newManagedClusterSet(name string) *clusterv1beta1.ManagedClusterSet {
-	clusterSet := &clusterv1beta1.ManagedClusterSet{
+func newManagedClusterSet(name string) *clusterv1beta2.ManagedClusterSet {
+	clusterSet := &clusterv1beta2.ManagedClusterSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -198,13 +198,13 @@ func newManagedClusterSet(name string) *clusterv1beta1.ManagedClusterSet {
 	return clusterSet
 }
 
-func newManagedClusterSetBinding(name, namespace string) *clusterv1beta1.ManagedClusterSetBinding {
-	return &clusterv1beta1.ManagedClusterSetBinding{
+func newManagedClusterSetBinding(name, namespace string) *clusterv1beta2.ManagedClusterSetBinding {
+	return &clusterv1beta2.ManagedClusterSetBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
-		Spec: clusterv1beta1.ManagedClusterSetBindingSpec{
+		Spec: clusterv1beta2.ManagedClusterSetBindingSpec{
 			ClusterSet: name,
 		},
 	}

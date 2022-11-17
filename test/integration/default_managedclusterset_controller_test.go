@@ -18,7 +18,7 @@ var _ = ginkgo.Describe("DefaultManagedClusterSet", func() {
 
 		ginkgo.By("check whether DefaultManagedClusterSet is created")
 		gomega.Eventually(func() error {
-			mcs, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.TODO(), setcontroller.DefaultManagedClusterSetName, metav1.GetOptions{})
+			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.DefaultManagedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -34,12 +34,12 @@ var _ = ginkgo.Describe("DefaultManagedClusterSet", func() {
 	ginkgo.It("should recreate DefaultManagedClusterSet successfully after deleted", func() {
 
 		ginkgo.By("delete DefaultManagedClusterSet")
-		err := clusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.TODO(), setcontroller.DefaultManagedClusterSetName, metav1.DeleteOptions{})
+		err := clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.TODO(), setcontroller.DefaultManagedClusterSetName, metav1.DeleteOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "try to delete DefaultManagedClusterSet error")
 
 		ginkgo.By("check whether DefaultManagedClusterSet is recreated")
 		gomega.Eventually(func() error {
-			mcs, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.TODO(), setcontroller.DefaultManagedClusterSetName, metav1.GetOptions{})
+			mcs, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.TODO(), setcontroller.DefaultManagedClusterSetName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}

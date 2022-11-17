@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	ocmfeature "open-cluster-management.io/api/feature"
 	"strings"
 	"time"
+
+	ocmfeature "open-cluster-management.io/api/feature"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,7 +16,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta1"
 	"open-cluster-management.io/registration/pkg/helpers"
 )
 
@@ -122,14 +123,14 @@ func (a *ManagedClusterMutatingAdmissionHook) addDefaultClusterSetLabel(managedC
 				Operation: "add",
 				Path:      "/metadata/labels",
 				Value: map[string]string{
-					clusterv1beta1.ClusterSetLabel: defaultClusterSetName,
+					clusterv1beta2.ClusterSetLabel: defaultClusterSetName,
 				},
 			},
 		}
 		return jsonPatches, status
 	}
 
-	clusterSetName, ok := managedCluster.Labels[clusterv1beta1.ClusterSetLabel]
+	clusterSetName, ok := managedCluster.Labels[clusterv1beta2.ClusterSetLabel]
 	// Clusterset label do not exist
 	if !ok {
 		jsonPatches = []jsonPatchOperation{

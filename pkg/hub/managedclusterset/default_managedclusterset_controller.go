@@ -13,10 +13,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
-	clustersetv1beta1 "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta1"
-	clusterinformerv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
-	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clustersetv1beta2 "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta2"
+	clusterinformerv1beta2 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta2"
+	clusterlisterv1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
+	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
 const (
@@ -24,26 +24,26 @@ const (
 	DefaultManagedClusterSetName = "default"
 )
 
-var DefaultManagedClusterSet = &clusterv1beta1.ManagedClusterSet{
+var DefaultManagedClusterSet = &clusterv1beta2.ManagedClusterSet{
 	ObjectMeta: metav1.ObjectMeta{
 		Name: DefaultManagedClusterSetName,
 	},
-	Spec: clusterv1beta1.ManagedClusterSetSpec{
-		ClusterSelector: clusterv1beta1.ManagedClusterSelector{
-			SelectorType: clusterv1beta1.LegacyClusterSetLabel,
+	Spec: clusterv1beta2.ManagedClusterSetSpec{
+		ClusterSelector: clusterv1beta2.ManagedClusterSelector{
+			SelectorType: clusterv1beta2.ExclusiveClusterSetLabel,
 		},
 	},
 }
 
 type defaultManagedClusterSetController struct {
-	clusterSetClient clustersetv1beta1.ClusterV1beta1Interface
-	clusterSetLister clusterlisterv1beta1.ManagedClusterSetLister
+	clusterSetClient clustersetv1beta2.ClusterV1beta2Interface
+	clusterSetLister clusterlisterv1beta2.ManagedClusterSetLister
 	eventRecorder    events.Recorder
 }
 
 func NewDefaultManagedClusterSetController(
-	clusterSetClient clustersetv1beta1.ClusterV1beta1Interface,
-	clusterSetInformer clusterinformerv1beta1.ManagedClusterSetInformer,
+	clusterSetClient clustersetv1beta2.ClusterV1beta2Interface,
+	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer,
 	recorder events.Recorder) factory.Controller {
 
 	c := &defaultManagedClusterSetController{
@@ -100,7 +100,7 @@ func (c *defaultManagedClusterSetController) sync(ctx context.Context, syncCtx f
 }
 
 // syncDefaultClusterSet syncs default cluster set.
-func (c *defaultManagedClusterSetController) syncDefaultClusterSet(ctx context.Context, originalDefaultClusterSet *clusterv1beta1.ManagedClusterSet) error {
+func (c *defaultManagedClusterSetController) syncDefaultClusterSet(ctx context.Context, originalDefaultClusterSet *clusterv1beta2.ManagedClusterSet) error {
 	defaultClusterSet := originalDefaultClusterSet.DeepCopy()
 
 	// if the annotation has set to disable, default clusterset controller will not work.
@@ -124,7 +124,7 @@ func (c *defaultManagedClusterSetController) syncDefaultClusterSet(ctx context.C
 	return nil
 }
 
-func hasAnnotation(set *clusterv1beta1.ManagedClusterSet, key, value string) bool {
+func hasAnnotation(set *clusterv1beta2.ManagedClusterSet, key, value string) bool {
 	if set.Annotations == nil {
 		return false
 	}

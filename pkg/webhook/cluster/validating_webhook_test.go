@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
@@ -317,7 +317,7 @@ func newManagedClusterObjWithClientConfigs(clientConfig clusterv1.ClientConfig) 
 func newManagedClusterObjWithClientSet(clusterSetName string) runtime.RawExtension {
 	managedCluster := testinghelpers.NewManagedCluster()
 	managedCluster.Labels = map[string]string{
-		clusterv1beta1.ClusterSetLabel: clusterSetName,
+		clusterv1beta2.ClusterSetLabel: clusterSetName,
 	}
 	clusterObj, _ := json.Marshal(managedCluster)
 	return runtime.RawExtension{

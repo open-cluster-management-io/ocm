@@ -132,14 +132,14 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	managedClusterSetController := managedclusterset.NewManagedClusterSetController(
 		clusterClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
-		clusterInformers.Cluster().V1beta1().ManagedClusterSets(),
+		clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
 		controllerContext.EventRecorder,
 	)
 
 	managedClusterSetBindingController := managedclustersetbinding.NewManagedClusterSetBindingController(
 		clusterClient,
-		clusterInformers.Cluster().V1beta1().ManagedClusterSets(),
-		clusterInformers.Cluster().V1beta1().ManagedClusterSetBindings(),
+		clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
+		clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings(),
 		controllerContext.EventRecorder,
 	)
 
@@ -167,13 +167,13 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	var defaultManagedClusterSetController, globalManagedClusterSetController factory.Controller
 	if features.DefaultHubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
 		defaultManagedClusterSetController = managedclusterset.NewDefaultManagedClusterSetController(
-			clusterClient.ClusterV1beta1(),
-			clusterInformers.Cluster().V1beta1().ManagedClusterSets(),
+			clusterClient.ClusterV1beta2(),
+			clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
 			controllerContext.EventRecorder,
 		)
 		globalManagedClusterSetController = managedclusterset.NewGlobalManagedClusterSetController(
-			clusterClient.ClusterV1beta1(),
-			clusterInformers.Cluster().V1beta1().ManagedClusterSets(),
+			clusterClient.ClusterV1beta2(),
+			clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
 			controllerContext.EventRecorder,
 		)
 	}

@@ -12,21 +12,21 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 )
 
 func TestSyncGlobalClusterSet(t *testing.T) {
 
-	var editedGlobalManagedClusterSetSpec = clusterv1beta1.ManagedClusterSetSpec{
-		ClusterSelector: clusterv1beta1.ManagedClusterSelector{
+	var editedGlobalManagedClusterSetSpec = clusterv1beta2.ManagedClusterSetSpec{
+		ClusterSelector: clusterv1beta2.ManagedClusterSelector{
 			SelectorType: "non-LegacyClusterSetLabel",
 		},
 	}
 
 	cases := []struct {
 		name               string
-		existingClusterSet *clusterv1beta1.ManagedClusterSet
+		existingClusterSet *clusterv1beta2.ManagedClusterSet
 		validateActions    func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
@@ -42,7 +42,7 @@ func TestSyncGlobalClusterSet(t *testing.T) {
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 
 				testinghelpers.AssertActions(t, actions, "update")
-				clusterset := actions[0].(clienttesting.UpdateAction).GetObject().(*clusterv1beta1.ManagedClusterSet)
+				clusterset := actions[0].(clienttesting.UpdateAction).GetObject().(*clusterv1beta2.ManagedClusterSet)
 				// if spec not rollbacked, error
 				if !equality.Semantic.DeepEqual(clusterset.Spec, GlobalManagedClusterSet.Spec) {
 					t.Errorf("Failed to rollback global managed cluster set spec after it is edited")
@@ -54,7 +54,7 @@ func TestSyncGlobalClusterSet(t *testing.T) {
 			// global cluster set should be created if it is deleted.
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testinghelpers.AssertActions(t, actions, "create")
-				clusterset := actions[0].(clienttesting.CreateAction).GetObject().(*clusterv1beta1.ManagedClusterSet)
+				clusterset := actions[0].(clienttesting.CreateAction).GetObject().(*clusterv1beta2.ManagedClusterSet)
 				if clusterset.ObjectMeta.Name != GlobalManagedClusterSetName {
 					t.Errorf("Failed to create global managed cluster set")
 				}
@@ -81,14 +81,14 @@ func TestSyncGlobalClusterSet(t *testing.T) {
 			informerFactory := clusterinformers.NewSharedInformerFactory(clusterSetClient, 5*time.Minute)
 
 			if c.existingClusterSet != nil {
-				if err := informerFactory.Cluster().V1beta1().ManagedClusterSets().Informer().GetStore().Add(c.existingClusterSet); err != nil {
+				if err := informerFactory.Cluster().V1beta2().ManagedClusterSets().Informer().GetStore().Add(c.existingClusterSet); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			ctrl := globalManagedClusterSetController{
-				clusterSetClient: clusterSetClient.ClusterV1beta1(),
-				clusterSetLister: informerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
+				clusterSetClient: clusterSetClient.ClusterV1beta2(),
+				clusterSetLister: informerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
 				eventRecorder:    eventstesting.NewTestingEventRecorder(t),
 			}
 
@@ -102,8 +102,8 @@ func TestSyncGlobalClusterSet(t *testing.T) {
 	}
 }
 
-func newGlobalManagedClusterSet(name string, spec clusterv1beta1.ManagedClusterSetSpec, terminating bool) *clusterv1beta1.ManagedClusterSet {
-	clusterSet := &clusterv1beta1.ManagedClusterSet{
+func newGlobalManagedClusterSet(name string, spec clusterv1beta2.ManagedClusterSetSpec, terminating bool) *clusterv1beta2.ManagedClusterSet {
+	clusterSet := &clusterv1beta2.ManagedClusterSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -117,8 +117,8 @@ func newGlobalManagedClusterSet(name string, spec clusterv1beta1.ManagedClusterS
 	return clusterSet
 }
 
-func newGlobalManagedClusterSetWithAnnotation(name string, k, v string, spec clusterv1beta1.ManagedClusterSetSpec, terminating bool) *clusterv1beta1.ManagedClusterSet {
-	clusterSet := &clusterv1beta1.ManagedClusterSet{
+func newGlobalManagedClusterSetWithAnnotation(name string, k, v string, spec clusterv1beta2.ManagedClusterSetSpec, terminating bool) *clusterv1beta2.ManagedClusterSet {
+	clusterSet := &clusterv1beta2.ManagedClusterSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{

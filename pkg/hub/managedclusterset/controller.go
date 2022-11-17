@@ -18,18 +18,18 @@ import (
 	"k8s.io/klog/v2"
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterinformerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
-	clusterinformerv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
+	clusterinformerv1beta2 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta2"
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
-	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
+	clusterlisterv1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
 	v1 "open-cluster-management.io/api/cluster/v1"
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
 // managedClusterSetController reconciles instances of ManagedClusterSet on the hub.
 type managedClusterSetController struct {
 	clusterClient    clientset.Interface
 	clusterLister    clusterlisterv1.ManagedClusterLister
-	clusterSetLister clusterlisterv1beta1.ManagedClusterSetLister
+	clusterSetLister clusterlisterv1beta2.ManagedClusterSetLister
 	eventRecorder    events.Recorder
 	queue            workqueue.RateLimitingInterface
 }
@@ -38,7 +38,7 @@ type managedClusterSetController struct {
 func NewManagedClusterSetController(
 	clusterClient clientset.Interface,
 	clusterInformer clusterinformerv1.ManagedClusterInformer,
-	clusterSetInformer clusterinformerv1beta1.ManagedClusterSetInformer,
+	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer,
 	recorder events.Recorder) factory.Controller {
 
 	controllerName := "managed-clusterset-controller"
@@ -136,16 +136,16 @@ func (c *managedClusterSetController) sync(ctx context.Context, syncCtx factory.
 }
 
 // syncClusterSet syncs a particular cluster set
-func (c *managedClusterSetController) syncClusterSet(ctx context.Context, originalClusterSet *clusterv1beta1.ManagedClusterSet) error {
+func (c *managedClusterSetController) syncClusterSet(ctx context.Context, originalClusterSet *clusterv1beta2.ManagedClusterSet) error {
 	clusterSet := originalClusterSet.DeepCopy()
-	clusters, err := clusterv1beta1.GetClustersFromClusterSet(clusterSet, c.clusterLister)
+	clusters, err := clusterv1beta2.GetClustersFromClusterSet(clusterSet, c.clusterLister)
 	if err != nil {
 		return err
 	}
 	count := len(clusters)
 	// update clusterset status
 	emptyCondition := metav1.Condition{
-		Type: clusterv1beta1.ManagedClusterSetConditionEmpty,
+		Type: clusterv1beta2.ManagedClusterSetConditionEmpty,
 	}
 	if count == 0 {
 		emptyCondition.Status = metav1.ConditionTrue
@@ -163,7 +163,7 @@ func (c *managedClusterSetController) syncClusterSet(ctx context.Context, origin
 		return nil
 	}
 
-	_, err = c.clusterClient.ClusterV1beta1().ManagedClusterSets().UpdateStatus(ctx, clusterSet, metav1.UpdateOptions{})
+	_, err = c.clusterClient.ClusterV1beta2().ManagedClusterSets().UpdateStatus(ctx, clusterSet, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update status of ManagedClusterSet %q: %w", clusterSet.Name, err)
 	}
@@ -173,7 +173,7 @@ func (c *managedClusterSetController) syncClusterSet(ctx context.Context, origin
 
 // enqueueClusterClusterSet enqueue a cluster related clusterset
 func (c *managedClusterSetController) enqueueClusterClusterSet(cluster *v1.ManagedCluster) {
-	clusterSets, err := clusterv1beta1.GetClusterSetsOfCluster(cluster, c.clusterSetLister)
+	clusterSets, err := clusterv1beta2.GetClusterSetsOfCluster(cluster, c.clusterSetLister)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error to get GetClusterSetsOfCluster. Error %v", err))
 		return
@@ -186,12 +186,12 @@ func (c *managedClusterSetController) enqueueClusterClusterSet(cluster *v1.Manag
 // enqueueUpdateClusterClusterSet get the oldCluster related clustersets and newCluster related clustersets,
 // then enqueue the diff clustersets(added clustersets and removed clustersets)
 func (c *managedClusterSetController) enqueueUpdateClusterClusterSet(oldCluster, newCluster *v1.ManagedCluster) {
-	oldClusterSets, err := clusterv1beta1.GetClusterSetsOfCluster(oldCluster, c.clusterSetLister)
+	oldClusterSets, err := clusterv1beta2.GetClusterSetsOfCluster(oldCluster, c.clusterSetLister)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error to get GetClusterSetsOfCluster. Error %v", err))
 		return
 	}
-	newClusterSets, err := clusterv1beta1.GetClusterSetsOfCluster(newCluster, c.clusterSetLister)
+	newClusterSets, err := clusterv1beta2.GetClusterSetsOfCluster(newCluster, c.clusterSetLister)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error to get GetClusterSetsOfCluster. Error %v", err))
 		return
@@ -204,7 +204,7 @@ func (c *managedClusterSetController) enqueueUpdateClusterClusterSet(oldCluster,
 }
 
 // getDiffClusterSetsNames return the diff clustersets names
-func getDiffClusterSetsNames(oldSets, newSets []*clusterv1beta1.ManagedClusterSet) sets.String {
+func getDiffClusterSetsNames(oldSets, newSets []*clusterv1beta2.ManagedClusterSet) sets.String {
 	oldSetsMap := sets.NewString()
 	newSetsMap := sets.NewString()
 

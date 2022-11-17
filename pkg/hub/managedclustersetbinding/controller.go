@@ -19,9 +19,9 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
-	clusterinformerv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
-	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterinformerv1beta2 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta2"
+	clusterlisterv1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
+	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
 const (
@@ -31,8 +31,8 @@ const (
 // managedClusterSetController reconciles instances of ManagedClusterSet on the hub.
 type managedClusterSetBindingController struct {
 	clusterClient             clientset.Interface
-	clusterSetBindingLister   clusterlisterv1beta1.ManagedClusterSetBindingLister
-	clusterSetLister          clusterlisterv1beta1.ManagedClusterSetLister
+	clusterSetBindingLister   clusterlisterv1beta2.ManagedClusterSetBindingLister
+	clusterSetLister          clusterlisterv1beta2.ManagedClusterSetLister
 	clusterSetBindingIndexers cache.Indexer
 	queue                     workqueue.RateLimitingInterface
 	eventRecorder             events.Recorder
@@ -40,8 +40,8 @@ type managedClusterSetBindingController struct {
 
 func NewManagedClusterSetBindingController(
 	clusterClient clientset.Interface,
-	clusterSetInformer clusterinformerv1beta1.ManagedClusterSetInformer,
-	clusterSetBindingInformer clusterinformerv1beta1.ManagedClusterSetBindingInformer,
+	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer,
+	clusterSetBindingInformer clusterinformerv1beta2.ManagedClusterSetBindingInformer,
 	recorder events.Recorder) factory.Controller {
 
 	controllerName := "managed-clusterset-binding-controller"
@@ -86,7 +86,7 @@ func NewManagedClusterSetBindingController(
 }
 
 func indexByClusterset(obj interface{}) ([]string, error) {
-	binding, ok := obj.(*clusterv1beta1.ManagedClusterSetBinding)
+	binding, ok := obj.(*clusterv1beta2.ManagedClusterSetBinding)
 	if !ok {
 		return []string{}, fmt.Errorf("obj is supposed to be a ManagedClusterSetBinding, but is %T", obj)
 	}
@@ -94,15 +94,15 @@ func indexByClusterset(obj interface{}) ([]string, error) {
 	return []string{binding.Spec.ClusterSet}, nil
 }
 
-func (c *managedClusterSetBindingController) getClusterBindingsByClusterSet(name string) ([]*clusterv1beta1.ManagedClusterSetBinding, error) {
+func (c *managedClusterSetBindingController) getClusterBindingsByClusterSet(name string) ([]*clusterv1beta2.ManagedClusterSetBinding, error) {
 	objs, err := c.clusterSetBindingIndexers.ByIndex(byClusterSet, name)
 	if err != nil {
 		return nil, err
 	}
 
-	bindings := make([]*clusterv1beta1.ManagedClusterSetBinding, len(objs))
+	bindings := make([]*clusterv1beta2.ManagedClusterSetBinding, len(objs))
 	for _, obj := range objs {
-		binding := obj.(*clusterv1beta1.ManagedClusterSetBinding)
+		binding := obj.(*clusterv1beta2.ManagedClusterSetBinding)
 		bindings = append(bindings, binding)
 	}
 
@@ -163,7 +163,7 @@ func (c *managedClusterSetBindingController) sync(ctx context.Context, syncCtx f
 	switch {
 	case errors.IsNotFound(err):
 		meta.SetStatusCondition(&bindingCopy.Status.Conditions, metav1.Condition{
-			Type:   clusterv1beta1.ClusterSetBindingBoundType,
+			Type:   clusterv1beta2.ClusterSetBindingBoundType,
 			Status: metav1.ConditionFalse,
 			Reason: "ClusterSetNotFound",
 		})
@@ -173,7 +173,7 @@ func (c *managedClusterSetBindingController) sync(ctx context.Context, syncCtx f
 	}
 
 	meta.SetStatusCondition(&bindingCopy.Status.Conditions, metav1.Condition{
-		Type:   clusterv1beta1.ClusterSetBindingBoundType,
+		Type:   clusterv1beta2.ClusterSetBindingBoundType,
 		Status: metav1.ConditionTrue,
 		Reason: "ClusterSetBound",
 	})
@@ -181,13 +181,13 @@ func (c *managedClusterSetBindingController) sync(ctx context.Context, syncCtx f
 	return c.patchCondition(ctx, binding, bindingCopy)
 }
 
-func (c *managedClusterSetBindingController) patchCondition(ctx context.Context, old, new *clusterv1beta1.ManagedClusterSetBinding) error {
+func (c *managedClusterSetBindingController) patchCondition(ctx context.Context, old, new *clusterv1beta2.ManagedClusterSetBinding) error {
 	if equality.Semantic.DeepEqual(old.Status.Conditions, new.Status.Conditions) {
 		return nil
 	}
 
-	oldData, err := json.Marshal(clusterv1beta1.ManagedClusterSetBinding{
-		Status: clusterv1beta1.ManagedClusterSetBindingStatus{
+	oldData, err := json.Marshal(clusterv1beta2.ManagedClusterSetBinding{
+		Status: clusterv1beta2.ManagedClusterSetBindingStatus{
 			Conditions: old.Status.Conditions,
 		},
 	})
@@ -195,12 +195,12 @@ func (c *managedClusterSetBindingController) patchCondition(ctx context.Context,
 		return fmt.Errorf("failed to Marshal old data for workspace %s: %w", old.Name, err)
 	}
 
-	newData, err := json.Marshal(clusterv1beta1.ManagedClusterSetBinding{
+	newData, err := json.Marshal(clusterv1beta2.ManagedClusterSetBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             old.UID,
 			ResourceVersion: old.ResourceVersion,
 		}, // to ensure they appear in the patch as preconditions
-		Status: clusterv1beta1.ManagedClusterSetBindingStatus{
+		Status: clusterv1beta2.ManagedClusterSetBindingStatus{
 			Conditions: new.Status.Conditions,
 		},
 	})
@@ -215,6 +215,6 @@ func (c *managedClusterSetBindingController) patchCondition(ctx context.Context,
 
 	c.eventRecorder.Eventf("PatchClusterSetBindingCondition", "patch clustersetbinding %s/%s condition", new.Namespace, new.Name)
 
-	_, err = c.clusterClient.ClusterV1beta1().ManagedClusterSetBindings(new.Namespace).Patch(ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	_, err = c.clusterClient.ClusterV1beta2().ManagedClusterSetBindings(new.Namespace).Patch(ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	return err
 }

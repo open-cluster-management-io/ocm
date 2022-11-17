@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
 var _ = ginkgo.Describe("ManagedClusterSetBinding", func() {
@@ -34,11 +34,11 @@ var _ = ginkgo.Describe("ManagedClusterSetBinding", func() {
 			gomega.Eventually(func() error {
 				clusterSetName := fmt.Sprintf("clusterset-%s", rand.String(6))
 				managedClusterSetBinding := newManagedClusterSetBinding(namespace, clusterSetName, clusterSetName)
-				_, err := clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Create(context.TODO(), managedClusterSetBinding, metav1.CreateOptions{})
+				_, err := clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.TODO(), managedClusterSetBinding, metav1.CreateOptions{})
 				if err != nil {
 					return err
 				}
-				return clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Delete(context.TODO(), clusterSetName, metav1.DeleteOptions{})
+				return clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Delete(context.TODO(), clusterSetName, metav1.DeleteOptions{})
 			}, 60*time.Second, 1*time.Second).Should(gomega.Succeed())
 		})
 
@@ -53,55 +53,55 @@ var _ = ginkgo.Describe("ManagedClusterSetBinding", func() {
 		ginkgo.It("should bound a ManagedClusterSetBinding", func() {
 			clusterSetName := fmt.Sprintf("clusterset-%s", rand.String(6))
 			managedClusterSetBinding := newManagedClusterSetBinding(namespace, clusterSetName, clusterSetName)
-			_, err := clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Create(context.TODO(), managedClusterSetBinding, metav1.CreateOptions{})
+			_, err := clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.TODO(), managedClusterSetBinding, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// make sure the managedclustersetbinding status is correct
 			gomega.Eventually(func() error {
-				binding, err := clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Get(context.TODO(), clusterSetName, metav1.GetOptions{})
+				binding, err := clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Get(context.TODO(), clusterSetName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
-				if !meta.IsStatusConditionFalse(binding.Status.Conditions, clusterv1beta1.ClusterSetBindingBoundType) {
+				if !meta.IsStatusConditionFalse(binding.Status.Conditions, clusterv1beta2.ClusterSetBindingBoundType) {
 					return fmt.Errorf("binding %s/%s condition should be false", namespace, clusterSetName)
 				}
 				return nil
 			}, 60*time.Second, 1*time.Second).Should(gomega.Succeed())
 
-			managedClusterSet := &clusterv1beta1.ManagedClusterSet{
+			managedClusterSet := &clusterv1beta2.ManagedClusterSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: clusterSetName,
 				},
 			}
 
-			_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.TODO(), managedClusterSet, metav1.CreateOptions{})
+			_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.TODO(), managedClusterSet, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// make sure the managedclustersetbinding status is correct
 			gomega.Eventually(func() error {
-				binding, err := clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Get(context.TODO(), clusterSetName, metav1.GetOptions{})
+				binding, err := clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Get(context.TODO(), clusterSetName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
-				if !meta.IsStatusConditionTrue(binding.Status.Conditions, clusterv1beta1.ClusterSetBindingBoundType) {
+				if !meta.IsStatusConditionTrue(binding.Status.Conditions, clusterv1beta2.ClusterSetBindingBoundType) {
 					return fmt.Errorf("binding %s/%s condition should be true", namespace, clusterSetName)
 				}
 				return nil
 			}, 60*time.Second, 1*time.Second).Should(gomega.Succeed())
 
-			err = clusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.TODO(), clusterSetName, metav1.DeleteOptions{})
+			err = clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.TODO(), clusterSetName, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// make sure the managedclustersetbinding status is correct
 			gomega.Eventually(func() error {
-				binding, err := clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Get(context.TODO(), clusterSetName, metav1.GetOptions{})
+				binding, err := clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Get(context.TODO(), clusterSetName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
-				if !meta.IsStatusConditionFalse(binding.Status.Conditions, clusterv1beta1.ClusterSetBindingBoundType) {
+				if !meta.IsStatusConditionFalse(binding.Status.Conditions, clusterv1beta2.ClusterSetBindingBoundType) {
 					return fmt.Errorf("binding %s/%s condition should be false", namespace, clusterSetName)
 				}
 				return nil

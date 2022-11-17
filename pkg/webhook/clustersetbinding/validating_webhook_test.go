@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
 var managedclustersetbindingSchema = metav1.GroupVersionResource{
@@ -154,13 +154,13 @@ func TestManagedClusterValidate(t *testing.T) {
 }
 
 func newManagedClusterSetBindingObj(namespace, name, clusterSetName string, labels map[string]string) runtime.RawExtension {
-	managedClusterSetBinding := &clusterv1beta1.ManagedClusterSetBinding{
+	managedClusterSetBinding := &clusterv1beta2.ManagedClusterSetBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 			Labels:    labels,
 		},
-		Spec: clusterv1beta1.ManagedClusterSetBindingSpec{
+		Spec: clusterv1beta2.ManagedClusterSetBindingSpec{
 			ClusterSet: clusterSetName,
 		},
 	}
