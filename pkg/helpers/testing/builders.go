@@ -12,6 +12,7 @@ import (
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
 type placementBuilder struct {
@@ -291,12 +292,12 @@ func (b *managedClusterBuilder) Build() *clusterapiv1.ManagedCluster {
 }
 
 type managedClusterSetBuilder struct {
-	clusterset *clusterapiv1beta1.ManagedClusterSet
+	clusterset *clusterapiv1beta2.ManagedClusterSet
 }
 
 func NewClusterSet(clusterSetName string) *managedClusterSetBuilder {
 	return &managedClusterSetBuilder{
-		clusterset: &clusterapiv1beta1.ManagedClusterSet{
+		clusterset: &clusterapiv1beta2.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: clusterSetName,
 			},
@@ -304,22 +305,22 @@ func NewClusterSet(clusterSetName string) *managedClusterSetBuilder {
 	}
 }
 
-func (b *managedClusterSetBuilder) WithClusterSelector(clusterSelector clusterapiv1beta1.ManagedClusterSelector) *managedClusterSetBuilder {
+func (b *managedClusterSetBuilder) WithClusterSelector(clusterSelector clusterapiv1beta2.ManagedClusterSelector) *managedClusterSetBuilder {
 	b.clusterset.Spec.ClusterSelector = clusterSelector
 	return b
 }
 
-func (b *managedClusterSetBuilder) Build() *clusterapiv1beta1.ManagedClusterSet {
+func (b *managedClusterSetBuilder) Build() *clusterapiv1beta2.ManagedClusterSet {
 	return b.clusterset
 }
 
-func NewClusterSetBinding(namespace, clusterSetName string) *clusterapiv1beta1.ManagedClusterSetBinding {
-	return &clusterapiv1beta1.ManagedClusterSetBinding{
+func NewClusterSetBinding(namespace, clusterSetName string) *clusterapiv1beta2.ManagedClusterSetBinding {
+	return &clusterapiv1beta2.ManagedClusterSetBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      clusterSetName,
 		},
-		Spec: clusterapiv1beta1.ManagedClusterSetBindingSpec{
+		Spec: clusterapiv1beta2.ManagedClusterSetBindingSpec{
 			ClusterSet: clusterSetName,
 		},
 	}

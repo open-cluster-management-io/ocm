@@ -73,7 +73,7 @@ Create a `ManagedClusterSet`.
 
 ```sh
 cat <<EOF | kubectl apply -f -
-apiVersion: cluster.open-cluster-management.io/v1alpha1
+apiVersion: cluster.open-cluster-management.io/v1beta2
 kind: ManagedClusterSet
 metadata:
   name: clusterset1
@@ -100,7 +100,7 @@ Create a `ManagedClusterSetBinding` to bind the `ManagedClusterSet` to the defau
 
 ```sh
 cat <<EOF | kubectl apply -f -
-apiVersion: cluster.open-cluster-management.io/v1alpha1
+apiVersion: cluster.open-cluster-management.io/v1beta2
 kind: ManagedClusterSetBinding
 metadata:
   name: clusterset1
@@ -114,7 +114,7 @@ Now create a `Placement`:
 
 ```sh
 cat <<EOF | kubectl apply -f -
-apiVersion: cluster.open-cluster-management.io/v1alpha1
+apiVersion: cluster.open-cluster-management.io/v1beta1
 kind: Placement
 metadata:
   name: placement1

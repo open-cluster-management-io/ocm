@@ -12,6 +12,8 @@ import (
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+
 	"open-cluster-management.io/placement/test/integration/util"
 )
 
@@ -47,8 +49,8 @@ var _ = ginkgo.Describe("Placement", func() {
 
 	ginkgo.AfterEach(func() {
 		ginkgo.By("Delete managedclusterset")
-		clusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.Background(), clusterSet1Name, metav1.DeleteOptions{})
-		clusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.Background(), clusterSetGlobal, metav1.DeleteOptions{})
+		clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.Background(), clusterSet1Name, metav1.DeleteOptions{})
+		clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.Background(), clusterSetGlobal, metav1.DeleteOptions{})
 
 		ginkgo.By("Delete managedclusters")
 		clusterClient.ClusterV1().ManagedClusters().DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{
@@ -132,35 +134,35 @@ var _ = ginkgo.Describe("Placement", func() {
 
 	assertCreatingClusterSet := func(clusterSetName string, matchLabel map[string]string) {
 		ginkgo.By("Create clusterset")
-		clusterset := &clusterapiv1beta1.ManagedClusterSet{
+		clusterset := &clusterapiv1beta2.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: clusterSetName,
 			},
 		}
 		if matchLabel != nil {
-			clusterset.Spec.ClusterSelector = clusterapiv1beta1.ManagedClusterSelector{
-				SelectorType: clusterapiv1beta1.LabelSelector,
+			clusterset.Spec.ClusterSelector = clusterapiv1beta2.ManagedClusterSelector{
+				SelectorType: clusterapiv1beta2.LabelSelector,
 				LabelSelector: &metav1.LabelSelector{
 					MatchLabels: matchLabel,
 				},
 			}
 		}
-		_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 
 	assertCreatingClusterSetBinding := func(clusterSetName string) {
 		ginkgo.By("Create clustersetbinding")
-		csb := &clusterapiv1beta1.ManagedClusterSetBinding{
+		csb := &clusterapiv1beta2.ManagedClusterSetBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      clusterSetName,
 			},
-			Spec: clusterapiv1beta1.ManagedClusterSetBindingSpec{
+			Spec: clusterapiv1beta2.ManagedClusterSetBindingSpec{
 				ClusterSet: clusterSetName,
 			},
 		}
-		_, err = clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 

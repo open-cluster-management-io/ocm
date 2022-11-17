@@ -11,7 +11,7 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
-	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	testinghelpers "open-cluster-management.io/placement/pkg/helpers/testing"
 )
 
@@ -47,7 +47,7 @@ func TestEnqueuePlacementsByClusterSet(t *testing.T) {
 			queuedKeys := sets.NewString()
 			err := enqueuePlacementsByClusterSet(
 				c.clusterSetName,
-				clusterInformerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Lister(),
+				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
 				clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
 				func(namespace, name string) {
 					queuedKeys.Insert(fmt.Sprintf("%s/%s", namespace, name))
@@ -89,8 +89,8 @@ func TestOnClusterSetAdd(t *testing.T) {
 		},
 		{
 			name: "clusterset selector type is LabelSelector",
-			obj: testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{
-				SelectorType: clusterapiv1beta1.LabelSelector,
+			obj: testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta2.ManagedClusterSelector{
+				SelectorType: clusterapiv1beta2.LabelSelector,
 				LabelSelector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"cloud": "Amazon",
@@ -114,7 +114,7 @@ func TestOnClusterSetAdd(t *testing.T) {
 
 			queuedKeys := sets.NewString()
 			handler := &clusterSetEventHandler{
-				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Lister(),
+				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
 				placementLister:         clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
 				enqueuePlacementFunc: func(namespace, name string) {
 					queuedKeys.Insert(fmt.Sprintf("%s/%s", namespace, name))
@@ -154,8 +154,8 @@ func TestOnClusterSetDelete(t *testing.T) {
 		},
 		{
 			name: "clusterset selector type is LabelSelector",
-			obj: testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{
-				SelectorType: clusterapiv1beta1.LabelSelector,
+			obj: testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta2.ManagedClusterSelector{
+				SelectorType: clusterapiv1beta2.LabelSelector,
 				LabelSelector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"cloud": "Amazon",
@@ -202,7 +202,7 @@ func TestOnClusterSetDelete(t *testing.T) {
 
 			queuedKeys := sets.NewString()
 			handler := &clusterSetEventHandler{
-				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Lister(),
+				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
 				placementLister:         clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
 				enqueuePlacementFunc: func(namespace, name string) {
 					queuedKeys.Insert(fmt.Sprintf("%s/%s", namespace, name))

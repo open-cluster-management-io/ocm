@@ -57,7 +57,7 @@ func TestOnClusterSetBindingChange(t *testing.T) {
 
 			queuedKeys := sets.NewString()
 			handler := &clusterSetBindingEventHandler{
-				clusterSetLister: clusterInformerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
+				clusterSetLister: clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
 				placementLister:  clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
 				enqueuePlacementFunc: func(namespace, name string) {
 					queuedKeys.Insert(fmt.Sprintf("%s/%s", namespace, name))
@@ -176,7 +176,7 @@ func TestOnClusterSetBindingDelete(t *testing.T) {
 
 			queuedKeys := sets.NewString()
 			handler := &clusterSetBindingEventHandler{
-				clusterSetLister: clusterInformerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
+				clusterSetLister: clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
 				placementLister:  clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
 				enqueuePlacementFunc: func(namespace, name string) {
 					queuedKeys.Insert(fmt.Sprintf("%s/%s", namespace, name))

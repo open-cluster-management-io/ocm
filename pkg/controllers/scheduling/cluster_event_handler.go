@@ -9,13 +9,15 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
+	clusterlisterv1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
+
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
-	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
 type clusterEventHandler struct {
-	clusterSetLister        clusterlisterv1beta1.ManagedClusterSetLister
-	clusterSetBindingLister clusterlisterv1beta1.ManagedClusterSetBindingLister
+	clusterSetLister        clusterlisterv1beta2.ManagedClusterSetLister
+	clusterSetBindingLister clusterlisterv1beta2.ManagedClusterSetBindingLister
 	placementLister         clusterlisterv1beta1.PlacementLister
 	enqueuePlacementFunc    enqueuePlacementFunc
 }
@@ -92,7 +94,7 @@ func (h *clusterEventHandler) onChange(obj interface{}) {
 // of the clusterset.
 func (h *clusterEventHandler) getClusterSetNames(cluster metav1.Object) ([]string, error) {
 	clusterSetNames := []string{}
-	clusterSets, err := clusterapiv1beta1.GetClusterSetsOfCluster(cluster.(*clusterapiv1.ManagedCluster), h.clusterSetLister)
+	clusterSets, err := clusterapiv1beta2.GetClusterSetsOfCluster(cluster.(*clusterapiv1.ManagedCluster), h.clusterSetLister)
 	if err != nil {
 		return clusterSetNames, err
 	}

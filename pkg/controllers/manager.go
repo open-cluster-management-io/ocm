@@ -58,8 +58,8 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	schedulingController := scheduling.NewSchedulingController(
 		clusterClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
-		clusterInformers.Cluster().V1beta1().ManagedClusterSets(),
-		clusterInformers.Cluster().V1beta1().ManagedClusterSetBindings(),
+		clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
+		clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings(),
 		clusterInformers.Cluster().V1beta1().Placements(),
 		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
 		scheduler,
@@ -69,8 +69,8 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	schedulingControllerResync := scheduling.NewSchedulingControllerResync(
 		clusterClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
-		clusterInformers.Cluster().V1beta1().ManagedClusterSets(),
-		clusterInformers.Cluster().V1beta1().ManagedClusterSetBindings(),
+		clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
+		clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings(),
 		clusterInformers.Cluster().V1beta1().Placements(),
 		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
 		scheduler,

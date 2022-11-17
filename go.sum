@@ -1183,8 +1183,8 @@ k8s.io/utils v0.0.0-20210802155522-efc7438f0176/go.mod h1:jPW/WVKK9YHAvNhRxK0md/
 k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
 k8s.io/utils v0.0.0-20220713171938-56c0de1e6f5e h1:W1yba+Bpkwb5BatGKZALQ1yylhwnuD6CkYmrTibyLDM=
 k8s.io/utils v0.0.0-20220713171938-56c0de1e6f5e/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
-open-cluster-management.io/api v0.8.1-0.20220909075958-efae592d4408 h1:0hp7Ye9u6aqBaDiJj6vcPLvVwn/AwE7oES/CZ1YXqK4=
-open-cluster-management.io/api v0.8.1-0.20220909075958-efae592d4408/go.mod h1:+OEARSAl2jIhuLItUcS30UgLA3khmA9ihygLVxzEn+U=
+open-cluster-management.io/api v0.8.1-0.20221008072653-71a179ef201c h1:/dSgwFbqfjdMwcysWDAb/VuaYocGDI7IdDJZz8pQXQM=
+open-cluster-management.io/api v0.8.1-0.20221008072653-71a179ef201c/go.mod h1:+OEARSAl2jIhuLItUcS30UgLA3khmA9ihygLVxzEn+U=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
 rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=

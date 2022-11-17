@@ -14,6 +14,8 @@ import (
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+
 	"open-cluster-management.io/placement/test/integration/util"
 )
 
@@ -97,24 +99,24 @@ var _ = ginkgo.Describe("Placement scalability test", func() {
 
 	assertBindingClusterSet := func() error {
 		ginkgo.By("Create clusterset/clustersetbinding")
-		clusterset := &clusterapiv1beta1.ManagedClusterSet{
+		clusterset := &clusterapiv1beta2.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: clusterSetName,
 			},
 		}
-		_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		csb := &clusterapiv1beta1.ManagedClusterSetBinding{
+		csb := &clusterapiv1beta2.ManagedClusterSetBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      clusterSetName,
 			},
-			Spec: clusterapiv1beta1.ManagedClusterSetBindingSpec{
+			Spec: clusterapiv1beta2.ManagedClusterSetBindingSpec{
 				ClusterSet: clusterSetName,
 			},
 		}
-		_, err = clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		return err
@@ -232,7 +234,7 @@ var _ = ginkgo.Describe("Placement scalability test", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By("Delete managedclusterset")
-		clusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.Background(), clusterSetName, metav1.DeleteOptions{})
+		clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.Background(), clusterSetName, metav1.DeleteOptions{})
 
 		ginkgo.By("Delete managedclusters")
 		clusterClient.ClusterV1().ManagedClusters().DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{

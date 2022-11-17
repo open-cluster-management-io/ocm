@@ -27,10 +27,15 @@ import (
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterinformerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterinformerv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
+	clusterinformerv1beta2 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta2"
+
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
+	clusterlisterv1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+
 	"open-cluster-management.io/placement/pkg/controllers/framework"
 )
 
@@ -51,8 +56,8 @@ type enqueuePlacementFunc func(namespace, name string)
 type schedulingController struct {
 	clusterClient           clusterclient.Interface
 	clusterLister           clusterlisterv1.ManagedClusterLister
-	clusterSetLister        clusterlisterv1beta1.ManagedClusterSetLister
-	clusterSetBindingLister clusterlisterv1beta1.ManagedClusterSetBindingLister
+	clusterSetLister        clusterlisterv1beta2.ManagedClusterSetLister
+	clusterSetBindingLister clusterlisterv1beta2.ManagedClusterSetBindingLister
 	placementLister         clusterlisterv1beta1.PlacementLister
 	placementDecisionLister clusterlisterv1beta1.PlacementDecisionLister
 	enqueuePlacementFunc    enqueuePlacementFunc
@@ -64,8 +69,8 @@ type schedulingController struct {
 func NewSchedulingController(
 	clusterClient clusterclient.Interface,
 	clusterInformer clusterinformerv1.ManagedClusterInformer,
-	clusterSetInformer clusterinformerv1beta1.ManagedClusterSetInformer,
-	clusterSetBindingInformer clusterinformerv1beta1.ManagedClusterSetBindingInformer,
+	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer,
+	clusterSetBindingInformer clusterinformerv1beta2.ManagedClusterSetBindingInformer,
 	placementInformer clusterinformerv1beta1.PlacementInformer,
 	placementDecisionInformer clusterinformerv1beta1.PlacementDecisionInformer,
 	scheduler Scheduler,
@@ -156,8 +161,8 @@ func NewSchedulingController(
 func NewSchedulingControllerResync(
 	clusterClient clusterclient.Interface,
 	clusterInformer clusterinformerv1.ManagedClusterInformer,
-	clusterSetInformer clusterinformerv1beta1.ManagedClusterSetInformer,
-	clusterSetBindingInformer clusterinformerv1beta1.ManagedClusterSetBindingInformer,
+	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer,
+	clusterSetBindingInformer clusterinformerv1beta2.ManagedClusterSetBindingInformer,
 	placementInformer clusterinformerv1beta1.PlacementInformer,
 	placementDecisionInformer clusterinformerv1beta1.PlacementDecisionInformer,
 	scheduler Scheduler,
@@ -323,7 +328,7 @@ func (c *schedulingController) syncPlacement(ctx context.Context, syncCtx factor
 }
 
 // getManagedClusterSetBindings returns all bindings found in the placement namespace.
-func (c *schedulingController) getValidManagedClusterSetBindings(placementNamespace string) ([]*clusterapiv1beta1.ManagedClusterSetBinding, error) {
+func (c *schedulingController) getValidManagedClusterSetBindings(placementNamespace string) ([]*clusterapiv1beta2.ManagedClusterSetBinding, error) {
 	// get all clusterset bindings under the placement namespace
 	bindings, err := c.clusterSetBindingLister.ManagedClusterSetBindings(placementNamespace).List(labels.Everything())
 	if err != nil {
@@ -333,7 +338,7 @@ func (c *schedulingController) getValidManagedClusterSetBindings(placementNamesp
 		bindings = nil
 	}
 
-	validBindings := []*clusterapiv1beta1.ManagedClusterSetBinding{}
+	validBindings := []*clusterapiv1beta2.ManagedClusterSetBinding{}
 	for _, binding := range bindings {
 		// ignore clustersetbinding refers to a non-existent clusterset
 		_, err := c.clusterSetLister.Get(binding.Name)
@@ -350,7 +355,7 @@ func (c *schedulingController) getValidManagedClusterSetBindings(placementNamesp
 }
 
 // getEligibleClusterSets returns the names of clusterset that eligible for the placement
-func (c *schedulingController) getEligibleClusterSets(placement *clusterapiv1beta1.Placement, bindings []*clusterapiv1beta1.ManagedClusterSetBinding) []string {
+func (c *schedulingController) getEligibleClusterSets(placement *clusterapiv1beta1.Placement, bindings []*clusterapiv1beta2.ManagedClusterSetBinding) []string {
 	// filter out invaid clustersetbindings
 	clusterSetNames := sets.NewString()
 	for _, binding := range bindings {
@@ -385,7 +390,7 @@ func (c *schedulingController) getAvailableClusters(clusterSetNames []string) ([
 		if err != nil {
 			return nil, err
 		}
-		clusters, err := clusterapiv1beta1.GetClustersFromClusterSet(clusterSet, c.clusterLister)
+		clusters, err := clusterapiv1beta2.GetClustersFromClusterSet(clusterSet, c.clusterLister)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get clusterset: %v, clusters, Error: %v", clusterSet.Name, err)
 		}

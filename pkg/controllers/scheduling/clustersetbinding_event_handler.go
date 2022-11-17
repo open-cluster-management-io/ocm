@@ -12,11 +12,13 @@ import (
 	"k8s.io/klog/v2"
 
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
-	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterlisterv1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
+
+	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
 type clusterSetBindingEventHandler struct {
-	clusterSetLister     clusterlisterv1beta1.ManagedClusterSetLister
+	clusterSetLister     clusterlisterv1beta2.ManagedClusterSetLister
 	placementLister      clusterlisterv1beta1.PlacementLister
 	enqueuePlacementFunc enqueuePlacementFunc
 }
@@ -31,7 +33,7 @@ func (h *clusterSetBindingEventHandler) OnUpdate(oldObj, newObj interface{}) {
 
 func (h *clusterSetBindingEventHandler) OnDelete(obj interface{}) {
 	switch t := obj.(type) {
-	case *clusterapiv1beta1.ManagedClusterSetBinding:
+	case *clusterapiv1beta2.ManagedClusterSetBinding:
 		h.onChange(obj)
 	case cache.DeletedFinalStateUnknown:
 		h.onChange(t.Obj)

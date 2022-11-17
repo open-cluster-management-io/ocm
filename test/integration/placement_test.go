@@ -18,6 +18,8 @@ import (
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+
 	controllers "open-cluster-management.io/placement/pkg/controllers"
 	scheduling "open-cluster-management.io/placement/pkg/controllers/scheduling"
 	"open-cluster-management.io/placement/test/integration/util"
@@ -230,65 +232,65 @@ var _ = ginkgo.Describe("Placement", func() {
 
 	assertBindingClusterSet := func(clusterSetName string) {
 		ginkgo.By("Create clusterset/clustersetbinding")
-		clusterset := &clusterapiv1beta1.ManagedClusterSet{
+		clusterset := &clusterapiv1beta2.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: clusterSetName,
 			},
 		}
-		_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		csb := &clusterapiv1beta1.ManagedClusterSetBinding{
+		csb := &clusterapiv1beta2.ManagedClusterSetBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      clusterSetName,
 			},
-			Spec: clusterapiv1beta1.ManagedClusterSetBindingSpec{
+			Spec: clusterapiv1beta2.ManagedClusterSetBindingSpec{
 				ClusterSet: clusterSetName,
 			},
 		}
-		_, err = clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 
 	assertCreatingClusterSet := func(clusterSetName string) {
 		ginkgo.By(fmt.Sprintf("Create clusterset %s", clusterSetName))
-		clusterset := &clusterapiv1beta1.ManagedClusterSet{
+		clusterset := &clusterapiv1beta2.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: clusterSetName,
 			},
 		}
-		_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 
 	assertCreatingLabelSelectorClusterSet := func(clusterSetName string, matchLabel map[string]string) {
 		ginkgo.By(fmt.Sprintf("Create clusterset %s", clusterSetName))
-		clusterset := &clusterapiv1beta1.ManagedClusterSet{
+		clusterset := &clusterapiv1beta2.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: clusterSetName,
 			},
-			Spec: clusterapiv1beta1.ManagedClusterSetSpec{
-				ClusterSelector: clusterapiv1beta1.ManagedClusterSelector{
-					SelectorType: clusterapiv1beta1.LabelSelector,
+			Spec: clusterapiv1beta2.ManagedClusterSetSpec{
+				ClusterSelector: clusterapiv1beta2.ManagedClusterSelector{
+					SelectorType: clusterapiv1beta2.LabelSelector,
 					LabelSelector: &metav1.LabelSelector{
 						MatchLabels: matchLabel,
 					},
 				},
 			},
 		}
-		_, err = clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 
 	assertDeletingClusterSet := func(clusterSetName string) {
 		ginkgo.By(fmt.Sprintf("Delete clusterset %s", clusterSetName))
-		err = clusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.Background(), clusterSetName, metav1.DeleteOptions{})
+		err = clusterClient.ClusterV1beta2().ManagedClusterSets().Delete(context.Background(), clusterSetName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By("Check if clusterset is gone")
 		gomega.Eventually(func() bool {
-			_, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Get(context.Background(), clusterSetName, metav1.GetOptions{})
+			_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Get(context.Background(), clusterSetName, metav1.GetOptions{})
 			if err == nil {
 				return false
 			}
@@ -298,27 +300,27 @@ var _ = ginkgo.Describe("Placement", func() {
 
 	assertCreatingClusterSetBinding := func(clusterSetName string) {
 		ginkgo.By(fmt.Sprintf("Create clustersetbinding %s", clusterSetName))
-		csb := &clusterapiv1beta1.ManagedClusterSetBinding{
+		csb := &clusterapiv1beta2.ManagedClusterSetBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      clusterSetName,
 			},
-			Spec: clusterapiv1beta1.ManagedClusterSetBindingSpec{
+			Spec: clusterapiv1beta2.ManagedClusterSetBindingSpec{
 				ClusterSet: clusterSetName,
 			},
 		}
-		_, err = clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
+		_, err = clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 
 	assertDeletingClusterSetBinding := func(clusterSetName string) {
 		ginkgo.By(fmt.Sprintf("Delete clustersetbinding %s", clusterSetName))
-		err = clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Delete(context.Background(), clusterSetName, metav1.DeleteOptions{})
+		err = clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Delete(context.Background(), clusterSetName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By("Check if clustersetbinding is gone")
 		gomega.Eventually(func() bool {
-			_, err := clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Get(context.Background(), clusterSetName, metav1.GetOptions{})
+			_, err := clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Get(context.Background(), clusterSetName, metav1.GetOptions{})
 			if err == nil {
 				return false
 			}

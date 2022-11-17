@@ -16,6 +16,8 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+
 	"open-cluster-management.io/placement/pkg/controllers/framework"
 	testinghelpers "open-cluster-management.io/placement/pkg/helpers/testing"
 )
@@ -205,8 +207,8 @@ func TestSchedulingController_sync(t *testing.T) {
 			ctrl := schedulingController{
 				clusterClient:           clusterClient,
 				clusterLister:           clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				clusterSetLister:        clusterInformerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
-				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Lister(),
+				clusterSetLister:        clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
+				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
 				placementLister:         clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
 				placementDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
 				scheduler:               s,
@@ -259,8 +261,8 @@ func TestGetValidManagedClusterSetBindings(t *testing.T) {
 			clusterInformerFactory := testinghelpers.NewClusterInformerFactory(clusterClient, c.initObjs...)
 
 			ctrl := &schedulingController{
-				clusterSetLister:        clusterInformerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
-				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Lister(),
+				clusterSetLister:        clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
+				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
 			}
 			bindings, err := ctrl.getValidManagedClusterSetBindings(placementNamespace)
 			if err != nil {
@@ -286,14 +288,14 @@ func TestGetValidManagedClusterSets(t *testing.T) {
 	cases := []struct {
 		name                    string
 		placement               *clusterapiv1beta1.Placement
-		bindings                []*clusterapiv1beta1.ManagedClusterSetBinding
+		bindings                []*clusterapiv1beta2.ManagedClusterSetBinding
 		initObjs                []runtime.Object
 		expectedClusterSetNames []string
 	}{
 		{
 			name:      "no clusterset bindings",
 			placement: testinghelpers.NewPlacement("ns1", "test").WithClusterSets("clusterset1", "clusterset2").Build(),
-			bindings:  []*clusterapiv1beta1.ManagedClusterSetBinding{},
+			bindings:  []*clusterapiv1beta2.ManagedClusterSetBinding{},
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet("clusterset2").Build(),
 				testinghelpers.NewClusterSet("clusterset3").Build(),
@@ -303,7 +305,7 @@ func TestGetValidManagedClusterSets(t *testing.T) {
 		{
 			name:      "no placement clusterset",
 			placement: testinghelpers.NewPlacement("ns1", "test").Build(),
-			bindings: []*clusterapiv1beta1.ManagedClusterSetBinding{
+			bindings: []*clusterapiv1beta2.ManagedClusterSetBinding{
 				testinghelpers.NewClusterSetBinding(placementNamespace, "clusterset1"),
 				testinghelpers.NewClusterSetBinding(placementNamespace, "clusterset2"),
 			},
@@ -316,7 +318,7 @@ func TestGetValidManagedClusterSets(t *testing.T) {
 		{
 			name:      "intersection of clusterset bindings and placement clusterset",
 			placement: testinghelpers.NewPlacement("ns1", "test").WithClusterSets("clusterset1", "clusterset2").Build(),
-			bindings: []*clusterapiv1beta1.ManagedClusterSetBinding{
+			bindings: []*clusterapiv1beta2.ManagedClusterSetBinding{
 				testinghelpers.NewClusterSetBinding(placementNamespace, "clusterset2"),
 				testinghelpers.NewClusterSetBinding(placementNamespace, "clusterset3"),
 			},
@@ -334,8 +336,8 @@ func TestGetValidManagedClusterSets(t *testing.T) {
 			clusterInformerFactory := testinghelpers.NewClusterInformerFactory(clusterClient, c.initObjs...)
 
 			ctrl := &schedulingController{
-				clusterSetLister:        clusterInformerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
-				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Lister(),
+				clusterSetLister:        clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
+				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
 			}
 			actualClusterSetNames := ctrl.getEligibleClusterSets(c.placement, c.bindings)
 
@@ -389,7 +391,7 @@ func TestGetAvailableClusters(t *testing.T) {
 			name:            "clusterset has default ClusterSelector",
 			clusterSetNames: []string{"clusterset1"},
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{}).Build(),
+				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta2.ManagedClusterSelector{}).Build(),
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset1").Build(),
 			},
 			expectedClusterNames: []string{"cluster1"},
@@ -398,8 +400,8 @@ func TestGetAvailableClusters(t *testing.T) {
 			name:            "clusterset has Legacy set label ClusterSelector",
 			clusterSetNames: []string{"clusterset1"},
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{
-					SelectorType: clusterapiv1beta1.LegacyClusterSetLabel,
+				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta2.ManagedClusterSelector{
+					SelectorType: clusterapiv1beta2.ExclusiveClusterSetLabel,
 				}).Build(),
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset1").Build(),
 			},
@@ -409,8 +411,8 @@ func TestGetAvailableClusters(t *testing.T) {
 			name:            "clusterset has labelSelector type ClusterSelector",
 			clusterSetNames: []string{"clusterset1"},
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{
-					SelectorType: clusterapiv1beta1.LabelSelector,
+				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta2.ManagedClusterSelector{
+					SelectorType: clusterapiv1beta2.LabelSelector,
 					LabelSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"vendor": "openShift",
@@ -426,8 +428,8 @@ func TestGetAvailableClusters(t *testing.T) {
 			name:            "clusterset has labelSelector type ClusterSelector(select everything)",
 			clusterSetNames: []string{"clusterset1"},
 			initObjs: []runtime.Object{
-				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta1.ManagedClusterSelector{
-					SelectorType:  clusterapiv1beta1.LabelSelector,
+				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(clusterapiv1beta2.ManagedClusterSelector{
+					SelectorType:  clusterapiv1beta2.LabelSelector,
 					LabelSelector: &metav1.LabelSelector{},
 				}).Build(),
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset1").Build(),
@@ -440,7 +442,7 @@ func TestGetAvailableClusters(t *testing.T) {
 			clusterSetNames: []string{"clusterset1"},
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet("clusterset1").WithClusterSelector(
-					clusterapiv1beta1.ManagedClusterSelector{
+					clusterapiv1beta2.ManagedClusterSelector{
 						SelectorType: "errorType",
 					},
 				).Build(),
@@ -463,7 +465,7 @@ func TestGetAvailableClusters(t *testing.T) {
 
 			ctrl := &schedulingController{
 				clusterLister:    clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				clusterSetLister: clusterInformerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
+				clusterSetLister: clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
 			}
 
 			clusters, _ := ctrl.getAvailableClusters(c.clusterSetNames)
@@ -759,8 +761,8 @@ func TestBind(t *testing.T) {
 			ctrl := schedulingController{
 				clusterClient:           clusterClient,
 				clusterLister:           clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				clusterSetLister:        clusterInformerFactory.Cluster().V1beta1().ManagedClusterSets().Lister(),
-				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta1().ManagedClusterSetBindings().Lister(),
+				clusterSetLister:        clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
+				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
 				placementLister:         clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
 				placementDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
 				scheduler:               s,

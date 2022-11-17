@@ -17,6 +17,8 @@ import (
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+
 	controllers "open-cluster-management.io/placement/pkg/controllers"
 	scheduling "open-cluster-management.io/placement/pkg/controllers/scheduling"
 	"open-cluster-management.io/placement/test/integration/util"
@@ -143,27 +145,27 @@ func createNamespace(namespace string) {
 
 func createClusters(namespace, name string, num int) {
 	// Create ManagedClusterSet
-	clusterset := &clusterapiv1beta1.ManagedClusterSet{
+	clusterset := &clusterapiv1beta2.ManagedClusterSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 	}
-	_, err := clusterClient.ClusterV1beta1().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
+	_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
 	if err != nil {
 		klog.Fatalf("%v", err)
 	}
 
 	// Create ManagedClusterSetBinding
-	csb := &clusterapiv1beta1.ManagedClusterSetBinding{
+	csb := &clusterapiv1beta2.ManagedClusterSetBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},
-		Spec: clusterapiv1beta1.ManagedClusterSetBindingSpec{
+		Spec: clusterapiv1beta2.ManagedClusterSetBindingSpec{
 			ClusterSet: name,
 		},
 	}
-	_, err = clusterClient.ClusterV1beta1().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
+	_, err = clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
 	if err != nil {
 		klog.Fatalf("%v", err)
 	}
