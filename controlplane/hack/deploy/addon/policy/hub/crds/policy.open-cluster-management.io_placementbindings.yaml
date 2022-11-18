@@ -1,0 +1,104 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.1
+  creationTimestamp: null
+  name: placementbindings.policy.open-cluster-management.io
+spec:
+  group: policy.open-cluster-management.io
+  names:
+    kind: PlacementBinding
+    listKind: PlacementBindingList
+    plural: placementbindings
+    shortNames:
+    - pb
+    singular: placementbinding
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: PlacementBinding is the Schema for the placementbindings API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          placementRef:
+            description: PlacementSubject defines the resource that can be used as
+              PlacementBinding placementRef
+            properties:
+              apiGroup:
+                enum:
+                - apps.open-cluster-management.io
+                - cluster.open-cluster-management.io
+                minLength: 1
+                type: string
+              kind:
+                enum:
+                - PlacementRule
+                - Placement
+                minLength: 1
+                type: string
+              name:
+                minLength: 1
+                type: string
+            required:
+            - apiGroup
+            - kind
+            - name
+            type: object
+          status:
+            description: PlacementBindingStatus defines the observed state of PlacementBinding
+            type: object
+          subjects:
+            items:
+              description: Subject defines the resource that can be used as PlacementBinding
+                subject
+              properties:
+                apiGroup:
+                  enum:
+                  - policy.open-cluster-management.io
+                  minLength: 1
+                  type: string
+                kind:
+                  enum:
+                  - Policy
+                  - PolicySet
+                  minLength: 1
+                  type: string
+                name:
+                  minLength: 1
+                  type: string
+              required:
+              - apiGroup
+              - kind
+              - name
+              type: object
+            minItems: 1
+            type: array
+        required:
+        - placementRef
+        - subjects
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

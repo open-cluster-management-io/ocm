@@ -1,0 +1,140 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.1
+  creationTimestamp: null
+  name: policyautomations.policy.open-cluster-management.io
+spec:
+  group: policy.open-cluster-management.io
+  names:
+    kind: PolicyAutomation
+    listKind: PolicyAutomationList
+    plural: policyautomations
+    shortNames:
+    - plca
+    singular: policyautomation
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: PolicyAutomation is the Schema for the policyautomations API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PolicyAutomationSpec defines the desired state of PolicyAutomation
+            properties:
+              automationDef:
+                description: AutomationDef defines the automation to invoke
+                properties:
+                  extra_vars:
+                    description: ExtraVars is passed to the Ansible job at execution
+                      time and is a known Ansible entity.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  jobTtl:
+                    description: JobTTL sets the time to live for the Kubernetes AnsibleJob
+                      object after the Ansible job run has finished.
+                    type: integer
+                  name:
+                    description: Name of the Ansible Template to run in Tower as a
+                      job
+                    minLength: 1
+                    type: string
+                  policyViolationContextLimit:
+                    description: The maximum number of violating cluster contexts
+                      that will be provided to the Ansible job as extra variables.
+                      When policyViolationContextLimit is set to 0, it means no limit.
+                      The default value is 1000.
+                    minimum: 0
+                    type: integer
+                  secret:
+                    description: TowerSecret is the name of the secret that contains
+                      the Ansible Automation Platform credential.
+                    minLength: 1
+                    type: string
+                  type:
+                    description: Type of the automation to invoke
+                    type: string
+                required:
+                - name
+                - secret
+                type: object
+              delayAfterRunSeconds:
+                description: DelayAfterRunSeconds sets the minimum number of seconds
+                  before an automation can run again due to a new violation on the
+                  same managed cluster. This only applies to the EveryEvent Mode.  The
+                  default value is 0.
+                minimum: 0
+                type: integer
+              eventHook:
+                description: EventHook decides when automation is going to be triggered
+                enum:
+                - noncompliant
+                type: string
+              mode:
+                description: Mode decides how automation is going to be triggered
+                enum:
+                - once
+                - everyEvent
+                - disabled
+                type: string
+              policyRef:
+                description: PolicyRef is the name of the policy that this automation
+                  resource is bound to.
+                type: string
+              rescanAfter:
+                description: RescanAfter is reserved for future use.
+                type: string
+            required:
+            - automationDef
+            - mode
+            - policyRef
+            type: object
+          status:
+            description: PolicyAutomationStatus defines the observed state of PolicyAutomation
+            properties:
+              clustersWithEvent:
+                additionalProperties:
+                  description: PolicyAutomation events on each target cluster
+                  properties:
+                    automationStartTime:
+                      description: Policy automation start time for everyEvent mode
+                      type: string
+                    eventTime:
+                      description: The last policy compliance transition event time
+                      type: string
+                  required:
+                  - automationStartTime
+                  - eventTime
+                  type: object
+                description: Cluster name as the key of ClustersWithEvent
+                type: object
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
