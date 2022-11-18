@@ -9,7 +9,7 @@ kubectl apply -k deploy/addon/managed-serviceaccount/hub --kubeconfig=<standalon
 2. Install manifests on the hosting cluster
 
 ```bash
-cd deploy/standalone/manager && kustomize edit set namespace $HUB_NAME
+cd deploy/addon/managed-serviceaccount/manager && kustomize edit set namespace $HUB_NAME
 
 kubectl apply -k deploy/addon/managed-serviceaccount/manager 
 ```

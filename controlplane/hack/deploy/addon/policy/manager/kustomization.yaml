@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- addon-deployment.yaml
+- propagator-deployment.yaml
+- propagator-metrics-service.yaml
+- role.yaml
+- rolebinding.yaml
+- serviceaccount.yaml
+
+images:
+- name: quay.io/open-cluster-management/governance-policy-addon-controller:latest
+  newName: quay.io/zhiweiyin/governance-policy-addon-controller
+  newTag: latest
+- name: quay.io/open-cluster-management/governance-policy-propagator:latest
+  newName: quay.io/morvencao/governance-policy-propagator
+  newTag: latest
