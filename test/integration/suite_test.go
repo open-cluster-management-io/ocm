@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	"k8s.io/client-go/kubernetes"
@@ -42,7 +42,7 @@ func TestIntegration(t *testing.T) {
 	ginkgo.RunSpecs(t, "Integration Suite")
 }
 
-var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
+var _ = ginkgo.BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
 	ginkgo.By("bootstrapping test environment")
 
@@ -79,9 +79,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	spokeWorkClient, err = workclientset.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-	close(done)
-}, 60)
+})
 
 var _ = ginkgo.AfterSuite(func() {
 	ginkgo.By("tearing down the test environment")
