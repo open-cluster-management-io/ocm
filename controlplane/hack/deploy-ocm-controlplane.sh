@@ -16,13 +16,25 @@ fi
 
 HUB_NAME=${HUB_NAME:-"ocm-controlplane"}
 IMAGE_NAME=${IMAGE_NAME:-"quay.io/open-cluster-management/controlplane"}
-API_HOST_POSTFIX=${API_HOST_POSTFIX:-}
-API_HOST="ocm-controlplane-${HUB_NAME}.${API_HOST_POSTFIX}"
-KUBE_ROOT=$(pwd)
+
+# this is needed for the controlplane deploy
+echo "* Testing connection"
+HOST_URL=$(${KUBECTL} -n openshift-console get routes console -o jsonpath='{.status.ingress[0].routerCanonicalHostname}')
+if [ $? -ne 0 ]; then
+    echo "ERROR: Make sure you are logged into an OpenShift Container Platform before running this script"
+    exit 1
+fi
+
+# shorten to the basedomain
+DEFAULT_HOST_POSTFIX=${HOST_URL/#router-default./}
+API_HOST_POSTFIX=${API_HOST_POSTFIX:-$DEFAULT_HOST_POSTFIX}
 if [ ! $API_HOST_POSTFIX ] ; then
     echo "API_HOST_POSTFIX should be set"
     exit 1
 fi
+API_HOST="ocm-controlplane-${HUB_NAME}.${API_HOST_POSTFIX}"
+KUBE_ROOT=$(pwd)
+
 
 export OCM_DEPLOY_DIRECTORY="$(pwd)/hack/deploy"
 export OCM_CONFIG_DIRECTORY="$(pwd)/hack/deploy/controlplane"

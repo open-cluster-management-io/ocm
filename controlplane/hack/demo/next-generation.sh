@@ -30,8 +30,19 @@ TYPE_SPEED=40
 DEMO_PROMPT="${GREEN}➜ ${CYAN}\W ${COLOR_RESET}"
 ROOT_DIR="$(pwd)"
 number=${1:-$1}
-HOST_POSTFIX=${HOST_POSTFIX:-""}
 export IMAGE_NAME="quay.io/clyang82/controlplane:latest"
+
+# this is needed for the controlplane deploy
+echo "* Testing connection"
+HOST_URL=$(oc -n openshift-console get routes console -o jsonpath='{.status.ingress[0].routerCanonicalHostname}')
+if [ $? -ne 0 ]; then
+    echo "ERROR: Make sure you are logged into an OpenShift Container Platform before running this script"
+    exit
+fi
+
+# shorten to the basedomain
+DEFAULT_HOST_POSTFIX=${HOST_URL/#router-default./}
+HOST_POSTFIX=${HOST_POSTFIX:-$DEFAULT_HOST_POSTFIX}
 
 if [[ "$2" == "clean" ]]; then
   for i in $(seq 1 "${number}"); do
