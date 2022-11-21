@@ -42,14 +42,11 @@ to install application manager addon in OCM and deploy helm charts in multiple c
 
 Policy controllers allow the declarative expression of a desired condition that can be audited or enforced against a set of managed clusters. _Policies_ allow you to drive cross-cluster configuration or validate that a certain configuration explicitly does not exist.
 
-
 The following repositories describe the underlying API and controllers for the GRC model:
 
-* https://github.com/open-cluster-management-io/config-policy-controller
-* https://github.com/open-cluster-management-io/governance-policy-status-sync
-* https://github.com/open-cluster-management-io/governance-policy-spec-sync
-* https://github.com/open-cluster-management-io/governance-policy-template-sync
-* https://github.com/open-cluster-management-io/governance-policy-propagator
+* [config-policy-controller](https://github.com/open-cluster-management-io/config-policy-controller)
+* [governance-policy-framework-addon](https://github.com/open-cluster-management-io/governance-policy-framework-addon)
+* [governance-policy-propagator](https://github.com/open-cluster-management-io/governance-policy-propagator)
 
 ### More external integrations
 
