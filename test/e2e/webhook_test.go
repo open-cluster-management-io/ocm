@@ -259,6 +259,7 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				gomega.Expect(u.deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
 			})
+
 			ginkgo.It("Should accept the request when update managed cluster other field by unauthorized user", func() {
 				sa := fmt.Sprintf("webhook-sa-%s", rand.String(6))
 				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
@@ -277,16 +278,21 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				managedCluster := newManagedCluster(clusterName, true, validURL)
+
 				managedCluster, err = clusterClient.ClusterV1().ManagedClusters().Create(context.TODO(), managedCluster, metav1.CreateOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-				managedCluster, err = clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), managedCluster.Name, metav1.GetOptions{})
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-				updatedManagedCluster := managedCluster.DeepCopy()
-				updatedManagedCluster.Labels = map[string]string{
-					"k": "v",
-				}
-				_, err = unauthorizedClient.ClusterV1().ManagedClusters().Update(context.TODO(), updatedManagedCluster, metav1.UpdateOptions{})
+				err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+					managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), managedCluster.Name, metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+					managedCluster.Labels = map[string]string{
+						"k": "v",
+					}
+					_, err = unauthorizedClient.ClusterV1().ManagedClusters().Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
+					return err
+				})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				gomega.Expect(u.deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())

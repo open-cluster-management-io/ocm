@@ -177,8 +177,7 @@ func indexByClusterFunc(obj interface{}) ([]string, error) {
 	}
 
 	// should not contain addon key
-	_, ok = accessor.GetLabels()[clientcert.AddonNameLabel]
-	if !ok {
+	if _, ok := accessor.GetLabels()[clientcert.AddonNameLabel]; ok {
 		return []string{}, nil
 	}
 
