@@ -1,28 +1,21 @@
+# permissions to do leader election.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  labels:
-    app: grc
-    app.kubernetes.io/instance: grc
-    app.kubernetes.io/name: grc
-    chart: grc-chart-2.7.0
-    component: ocm-grc-role
-    release: grc
-  name: grc-role
+  name: open-cluster-management:policy-controller:addon-manager
 rules:
 - apiGroups:
   - ""
   resources:
   - configmaps
-  - secrets
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
   - coordination.k8s.io
   resources:
@@ -35,3 +28,10 @@ rules:
   - update
   - patch
   - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch

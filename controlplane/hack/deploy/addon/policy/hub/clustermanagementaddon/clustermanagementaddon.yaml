@@ -1,0 +1,8 @@
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ClusterManagementAddOn
+metadata:
+  name: config-policy-controller
+spec:
+  addOnMeta:
+    description: Audits k8s resources and remediates violation based on configuration policies.
+    displayName: Config Policy Addon

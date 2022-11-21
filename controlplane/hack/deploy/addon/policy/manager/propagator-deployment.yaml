@@ -100,7 +100,7 @@ spec:
           readOnly: true
       securityContext:
         runAsNonRoot: true
-      serviceAccountName: grc-sa
+      serviceAccountName: policy-sa
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/infra

@@ -66,11 +66,13 @@ deploy-managed-serviceaccount-addon:
 	$(KUSTOMIZE) build hack/deploy/addon/managed-serviceaccount/manager | $(KUBECTL) apply -f -
 	mv hack/deploy/addon/managed-serviceaccount/manager/kustomization.yaml.tmp hack/deploy/addon/managed-serviceaccount/manager/kustomization.yaml
 
-deploy-policy-propagator:
+deploy-policy-addon:
 	$(KUBECTL) apply -k hack/deploy/addon/policy/hub --kubeconfig=hack/deploy/cert-$(HUB_NAME)/kubeconfig
-	cp hack/deploy/addon/policy/propagator/kustomization.yaml hack/deploy/addon/policy/propagator/kustomization.yaml.tmp
-	cd hack/deploy/addon/policy/propagator && $(KUSTOMIZE) edit set namespace $(HUB_NAME)
-	$(KUSTOMIZE) build hack/deploy/addon/policy/propagator | $(KUBECTL) apply -f -
-	mv hack/deploy/addon/policy/propagator/kustomization.yaml.tmp hack/deploy/addon/policy/propagator/kustomization.yaml
+	cp hack/deploy/addon/policy/manager/kustomization.yaml hack/deploy/addon/policy/manager/kustomization.yaml.tmp
+	cd hack/deploy/addon/policy/manager && $(KUSTOMIZE) edit set namespace $(HUB_NAME)
+	$(KUSTOMIZE) build hack/deploy/addon/policy/manager | $(KUBECTL) apply -f -
+	mv hack/deploy/addon/policy/manager/kustomization.yaml.tmp hack/deploy/addon/policy/manager/kustomization.yaml
 
-deploy-all: deploy deploy-work-manager-addon deploy-managed-serviceaccount-addon deploy-policy-propagator
+
+deploy-all: deploy deploy-work-manager-addon deploy-managed-serviceaccount-addon deploy-policy-addon
+
