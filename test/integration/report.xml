@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+  <testsuite name="Integration Suite" tests="42" failures="0" errors="0" time="0.004">
+      <testcase name="ManifestWork Update Strategy Create only strategy deployed resource should not be updated when work is updated" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Update Strategy Server side apply strategy deployed resource should be applied when work is updated" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Update Strategy Server side apply strategy should get conflict if a field is taken by another manager" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Update Strategy Server side apply strategy two manifest works with different field manager" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Update Strategy Server side apply strategy with delete options" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Status Feedback Deployment Status feedback should return well known statuses" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Status Feedback Deployment Status feedback should return statuses by JSONPaths" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Status Feedback Deployment Status feedback should return none for resources with no wellKnowne status" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Status Feedback Resource sharing and adoption between manifestworks shared resource between the manifestwork should be kept when one manifestwork is deleted" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Status Feedback Resource sharing and adoption between manifestworks shared resource between the manifestwork should be kept when the shared resource is removed from one manifestwork" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Status Feedback Delete options Orphan deletion of the whole manifestwork" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Status Feedback Delete options Selectively Orphan deletion of the manifestwork" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Status Feedback Delete options Keep the resource when remove it from manifests with orphan deletion option" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Status Feedback Delete options Clean the resource when orphan deletion option is removed" classname="Integration Suite" time="0"></testcase>
+      <testcase name="Unmanaged ApplieManifestWork Should delete unmanaged applied work should keep old appliemanifestwork with different agent id" classname="Integration Suite" time="0"></testcase>
+      <testcase name="Unmanaged ApplieManifestWork Should delete unmanaged applied work should remove old appliemanifestwork if applied again on new hub" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork With a single manifest should create work and then apply it successfully" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork With a single manifest should update work and then apply it successfully" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork With a single manifest should delete work successfully" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork With multiple manifests should create work and then apply it successfully" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork With multiple manifests should update work and then apply it successfully" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork With multiple manifests should delete work successfully" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork With CRD and CR in manifests should create CRD and CR successfully" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork With CRD and CR in manifests should merge annotation of existing CR" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork With CRD and CR in manifests should keep the finalizer unchanged of existing CR" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork With CRD and CR in manifests should delete CRD and CR successfully" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork With Service Account, Role, RoleBinding and Deployment in manifests should create Service Account, Role, RoleBinding and Deployment successfully" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork With Service Account, Role, RoleBinding and Deployment in manifests should update Service Account and Deployment successfully" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Foreground deletion should remove applied resource for stale manifest from list once the resource is gone" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Foreground deletion should delete manifest work eventually after all applied resources are gone" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Foreground deletion should delete applied manifest work if it is orphan" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Executor Subject Apply the resource with executor Executor does not have permission" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Executor Subject Apply the resource with executor Executor does not have permission to partial resources" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Executor Subject Apply the resource with executor Executor has permission for all resources" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Executor Subject Apply the resource with executor deleting validating Executor does not have delete permission and delete option is foreground" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Executor Subject Apply the resource with executor deleting validating Executor does not have delete permission and delete option is orphan" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Executor Subject Apply the resource with executor deleting validating Executor does not have delete permission and delete option is selectively orphan" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Executor Subject Apply the resource with executor escalation validating no permission" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Executor Subject Apply the resource with executor escalation validating no permission for already existing resource" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Executor Subject Apply the resource with executor escalation validating with permission" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Executor Subject Apply the resource with executor escalation validating with permission for already exist resource" classname="Integration Suite" time="0"></testcase>
+      <testcase name="ManifestWork Executor Subject Caches are in effect Permission change" classname="Integration Suite" time="0"></testcase>
+  </testsuite>

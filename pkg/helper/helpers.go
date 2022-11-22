@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -462,4 +463,47 @@ func OwnedByTheWork(gvr schema.GroupVersionResource,
 	}
 
 	return true
+}
+
+// BuildResourceMeta builds manifest resource meta for the object
+func BuildResourceMeta(
+	index int,
+	object runtime.Object,
+	restMapper meta.RESTMapper) (workapiv1.ManifestResourceMeta, schema.GroupVersionResource, error) {
+	resourceMeta := workapiv1.ManifestResourceMeta{
+		Ordinal: int32(index),
+	}
+
+	if object == nil || reflect.ValueOf(object).IsNil() {
+		return resourceMeta, schema.GroupVersionResource{}, nil
+	}
+
+	// set gvk
+	gvk, err := GuessObjectGroupVersionKind(object)
+	if err != nil {
+		return resourceMeta, schema.GroupVersionResource{}, err
+	}
+	resourceMeta.Group = gvk.Group
+	resourceMeta.Version = gvk.Version
+	resourceMeta.Kind = gvk.Kind
+
+	// set namespace/name
+	if accessor, e := meta.Accessor(object); e != nil {
+		err = fmt.Errorf("cannot access metadata of %v: %w", object, e)
+	} else {
+		resourceMeta.Namespace = accessor.GetNamespace()
+		resourceMeta.Name = accessor.GetName()
+	}
+
+	// set resource
+	if restMapper == nil {
+		return resourceMeta, schema.GroupVersionResource{}, err
+	}
+	mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return resourceMeta, schema.GroupVersionResource{}, fmt.Errorf("the server doesn't have a resource type %q", gvk.Kind)
+	}
+
+	resourceMeta.Resource = mapping.Resource.Resource
+	return resourceMeta, mapping.Resource, err
 }

@@ -21,9 +21,10 @@ import (
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
 	"open-cluster-management.io/work/pkg/helper"
 	"open-cluster-management.io/work/pkg/spoke/apply"
-	"open-cluster-management.io/work/pkg/spoke/auth"
+	"open-cluster-management.io/work/pkg/spoke/auth/basic"
 	"open-cluster-management.io/work/pkg/spoke/controllers"
 	"open-cluster-management.io/work/pkg/spoke/spoketesting"
 )
@@ -45,7 +46,7 @@ func newController(t *testing.T, work *workapiv1.ManifestWork, appliedWork *work
 		appliedManifestWorkClient: fakeWorkClient.WorkV1().AppliedManifestWorks(),
 		appliedManifestWorkLister: workInformerFactory.Work().V1().AppliedManifestWorks().Lister(),
 		restMapper:                mapper,
-		validator:                 auth.NewExecutorValidator(nil, spokeKubeClient),
+		validator:                 basic.NewSARValidator(nil, spokeKubeClient),
 	}
 
 	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(work); err != nil {
@@ -703,7 +704,7 @@ func TestBuildResourceMeta(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			actual, _, err := buildResourceMeta(0, c.object, c.restMapper)
+			actual, _, err := helper.BuildResourceMeta(0, c.object, c.restMapper)
 			if err != nil {
 				t.Errorf("Should be success with no err: %v", err)
 			}
@@ -734,7 +735,7 @@ func TestBuildManifestResourceMeta(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			actual, _, err := buildResourceMeta(0, c.manifestObject, c.restMapper)
+			actual, _, err := helper.BuildResourceMeta(0, c.manifestObject, c.restMapper)
 			if err != nil {
 				t.Errorf("Should be success with no err: %v", err)
 			}

@@ -1,4 +1,4 @@
-package auth
+package basic
 
 import (
 	"context"
@@ -48,7 +48,7 @@ func TestValidate(t *testing.T) {
 			},
 			expect: fmt.Errorf("the executor service account is nil"),
 		},
-		"forbideen": {
+		"forbidden": {
 			executor: &workapiv1.ManifestWorkExecutor{
 				Subject: workapiv1.ManifestWorkExecutorSubject{
 					Type: workapiv1.ExecutorSubjectTypeServiceAccount,
@@ -102,7 +102,7 @@ func TestValidate(t *testing.T) {
 			return false, nil, nil
 		},
 	)
-	validator := NewExecutorValidator(nil, kubeClient)
+	validator := NewSARValidator(nil, kubeClient)
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
 			err := validator.Validate(context.TODO(), test.executor, gvr, test.namespace, test.name, true, nil)
@@ -126,7 +126,7 @@ func TestValidateEscalation(t *testing.T) {
 		obj       *unstructured.Unstructured
 		expect    error
 	}{
-		"forbideen": {
+		"forbidden": {
 			executor: &workapiv1.ManifestWorkExecutor{
 				Subject: workapiv1.ManifestWorkExecutorSubject{
 					Type: workapiv1.ExecutorSubjectTypeServiceAccount,
@@ -187,7 +187,7 @@ func TestValidateEscalation(t *testing.T) {
 			}
 			return false, nil, nil
 		})
-	validator := &sarValidator{
+	validator := &SarValidator{
 		kubeClient: kubeClient,
 		newImpersonateClientFunc: func(config *rest.Config, username string) (dynamic.Interface, error) {
 			return dynamicClient, nil

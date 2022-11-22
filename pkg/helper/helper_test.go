@@ -3,6 +3,8 @@ package helper
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -19,6 +21,8 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
+	"open-cluster-management.io/work/pkg/spoke/spoketesting"
 )
 
 func newCondition(name, status, reason, message string, lastTransition *metav1.Time) metav1.Condition {
@@ -703,6 +707,88 @@ func TestOwnedByTheWork(t *testing.T) {
 
 			if own != c.expected {
 				t.Errorf("Expect owned by the work is %v, but got %v", c.expected, own)
+			}
+		})
+	}
+}
+
+func TestBuildResourceMeta(t *testing.T) {
+	restMapper := spoketesting.NewFakeRestMapper()
+
+	cases := []struct {
+		name         string
+		index        int
+		obj          runtime.Object
+		expectedErr  error
+		expectedGVR  schema.GroupVersionResource
+		expectedMeta workapiv1.ManifestResourceMeta
+	}{
+		{
+			name:        "object nil",
+			index:       0,
+			obj:         nil,
+			expectedErr: nil,
+			expectedGVR: schema.GroupVersionResource{},
+			expectedMeta: workapiv1.ManifestResourceMeta{
+				Ordinal: int32(0),
+			},
+		},
+		{
+			name:        "secret success",
+			index:       1,
+			obj:         spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
+			expectedErr: nil,
+			expectedGVR: schema.GroupVersionResource{
+				Group:    "",
+				Version:  "v1",
+				Resource: "secrets",
+			},
+			expectedMeta: workapiv1.ManifestResourceMeta{
+				Ordinal:   int32(1),
+				Group:     "",
+				Version:   "v1",
+				Kind:      "Secret",
+				Resource:  "secrets",
+				Namespace: "ns1",
+				Name:      "test",
+			},
+		},
+		{
+			name:        "unknow object type",
+			index:       1,
+			obj:         spoketesting.NewUnstructured("test/v1", "NewObject", "ns1", "test"),
+			expectedErr: fmt.Errorf("the server doesn't have a resource type %q", "NewObject"),
+			expectedGVR: schema.GroupVersionResource{},
+			expectedMeta: workapiv1.ManifestResourceMeta{
+				Ordinal:   int32(1),
+				Group:     "test",
+				Version:   "v1",
+				Kind:      "NewObject",
+				Namespace: "ns1",
+				Name:      "test",
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			meta, gvr, err := BuildResourceMeta(c.index, c.obj, restMapper)
+			if c.expectedErr == nil {
+				if err != nil {
+					t.Errorf("Case name: %s, expect error nil, but got %v", c.name, err)
+				}
+			} else if err == nil {
+				t.Errorf("Case name: %s, expect error %s, but got nil", c.name, c.expectedErr)
+			} else if c.expectedErr.Error() != err.Error() {
+				t.Errorf("Case name: %s, expect error %s, but got %s", c.name, c.expectedErr, err)
+			}
+
+			if !reflect.DeepEqual(c.expectedGVR, gvr) {
+				t.Errorf("Case name: %s, expect gvr %v, but got %v", c.name, c.expectedGVR, gvr)
+			}
+
+			if !reflect.DeepEqual(c.expectedMeta, meta) {
+				t.Errorf("Case name: %s, expect meta %v, but got %v", c.name, c.expectedMeta, meta)
 			}
 		})
 	}

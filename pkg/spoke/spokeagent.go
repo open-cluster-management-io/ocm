@@ -5,13 +5,16 @@ import (
 	"fmt"
 	"time"
 
+	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
+	ocmfeature "open-cluster-management.io/api/feature"
+	"open-cluster-management.io/work/pkg/features"
 	"open-cluster-management.io/work/pkg/helper"
 	"open-cluster-management.io/work/pkg/spoke/auth"
 	"open-cluster-management.io/work/pkg/spoke/controllers/appliedmanifestcontroller"
 	"open-cluster-management.io/work/pkg/spoke/controllers/finalizercontroller"
 	"open-cluster-management.io/work/pkg/spoke/controllers/manifestcontroller"
 	"open-cluster-management.io/work/pkg/spoke/controllers/statuscontroller"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/cobra"
@@ -20,9 +23,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-
-	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
-	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
 // WorkloadAgentOptions defines the flags for workload agent
@@ -48,6 +49,7 @@ func NewWorkloadAgentOptions() *WorkloadAgentOptions {
 // AddFlags register and binds the default flags
 func (o *WorkloadAgentOptions) AddFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
+	features.DefaultSpokeMutableFeatureGate.AddFlag(flags)
 	// This command only supports reading from config
 	flags.StringVar(&o.HubKubeconfigFile, "hub-kubeconfig", o.HubKubeconfigFile, "Location of kubeconfig file to connect to hub cluster.")
 	flags.StringVar(&o.SpokeKubeconfigFile, "spoke-kubeconfig", o.SpokeKubeconfigFile,
@@ -111,7 +113,15 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 		return err
 	}
 
-	validator := auth.NewExecutorValidator(spokeRestConfig, spokeKubeClient)
+	validator := auth.NewFactory(
+		spokeRestConfig,
+		spokeKubeClient,
+		workInformerFactory.Work().V1().ManifestWorks(),
+		o.SpokeClusterName,
+		controllerContext.EventRecorder,
+		restMapper,
+	).NewExecutorValidator(ctx, features.DefaultSpokeMutableFeatureGate.Enabled(ocmfeature.ExecutorValidatingCaches))
+
 	manifestWorkController := manifestcontroller.NewManifestWorkController(
 		ctx,
 		controllerContext.EventRecorder,
