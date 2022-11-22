@@ -16,7 +16,7 @@ fi
 
 HUB_NAME=${HUB_NAME:-"ocm-controlplane"}
 IMAGE_NAME=${IMAGE_NAME:-"quay.io/open-cluster-management/controlplane"}
-API_HOST_POSTFIX=${HOST_POSTFIX:-}
+API_HOST_POSTFIX=${API_HOST_POSTFIX:-}
 API_HOST="ocm-controlplane-${HUB_NAME}.${API_HOST_POSTFIX}"
 KUBE_ROOT=$(pwd)
 if [ ! $API_HOST_POSTFIX ] ; then
