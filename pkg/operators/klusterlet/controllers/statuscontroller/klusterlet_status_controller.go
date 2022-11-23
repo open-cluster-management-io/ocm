@@ -94,9 +94,7 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 	workDesiredCondition.ObservedGeneration = klusterlet.Generation
 
 	_, _, err = helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
-		helpers.UpdateKlusterletConditionFn(availableCondition),
-		helpers.UpdateKlusterletConditionFn(registrationDesiredCondition),
-		helpers.UpdateKlusterletConditionFn(workDesiredCondition),
+		helpers.UpdateKlusterletConditionFn(availableCondition, registrationDesiredCondition, workDesiredCondition),
 	)
 	return err
 }

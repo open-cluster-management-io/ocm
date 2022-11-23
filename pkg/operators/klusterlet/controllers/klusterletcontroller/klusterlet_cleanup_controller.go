@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"github.com/openshift/library-go/pkg/assets"
+	"open-cluster-management.io/registration-operator/manifests"
 	"reflect"
 	"strings"
 
@@ -386,4 +388,32 @@ func removeFinalizer(obj runtime.Object, finalizerName string) bool {
 		accessor.SetFinalizers(newFinalizers)
 	}
 	return found
+}
+
+func removeStaticResources(ctx context.Context,
+	kubeClient kubernetes.Interface,
+	apiExtensionClient apiextensionsclient.Interface,
+	resources []string,
+	config klusterletConfig) error {
+	for _, file := range resources {
+		err := helpers.CleanUpStaticObject(
+			ctx,
+			kubeClient,
+			apiExtensionClient,
+			nil,
+			func(name string) ([]byte, error) {
+				template, err := manifests.KlusterletManifestFiles.ReadFile(name)
+				if err != nil {
+					return nil, err
+				}
+				return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
+			},
+			file,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

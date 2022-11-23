@@ -506,16 +506,14 @@ func TestSyncDeploy(t *testing.T) {
 	}
 
 	operatorAction := controller.operatorClient.Actions()
-	if len(operatorAction) != 4 {
+	if len(operatorAction) != 2 {
 		t.Errorf("Expect 4 actions in the sync loop, actual %#v", operatorAction)
 	}
 
 	testinghelper.AssertGet(t, operatorAction[0], "operator.open-cluster-management.io", "v1", "klusterlets")
 	testinghelper.AssertAction(t, operatorAction[1], "update")
-	testinghelper.AssertGet(t, operatorAction[2], "operator.open-cluster-management.io", "v1", "klusterlets")
-	testinghelper.AssertAction(t, operatorAction[3], "update")
 	testinghelper.AssertOnlyConditions(
-		t, operatorAction[3].(clienttesting.UpdateActionImpl).Object,
+		t, operatorAction[1].(clienttesting.UpdateActionImpl).Object,
 		testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
 		testinghelper.NamedCondition(spokeRegistrationFeatureGatesValid, "FeatureGatesAllValid", metav1.ConditionTrue))
 }
@@ -608,23 +606,19 @@ func TestSyncDeployHosted(t *testing.T) {
 		klog.Infof("operator actions, verb:%v \t resource:%v \t namespace:%v", action.GetVerb(), action.GetResource(), action.GetNamespace())
 	}
 
-	if len(operatorAction) != 5 {
-		t.Errorf("Expect 5 actions in the sync loop, actual %#v", len(operatorAction))
+	if len(operatorAction) != 3 {
+		t.Errorf("Expect 3 actions in the sync loop, actual %#v", len(operatorAction))
 	}
 
 	testinghelper.AssertGet(t, operatorAction[0], "operator.open-cluster-management.io", "v1", "klusterlets")
-	testinghelper.AssertAction(t, operatorAction[1], "update")
-	testinghelper.AssertGet(t, operatorAction[2], "operator.open-cluster-management.io", "v1", "klusterlets")
-	testinghelper.AssertGet(t, operatorAction[3], "operator.open-cluster-management.io", "v1", "klusterlets")
-	testinghelper.AssertAction(t, operatorAction[4], "update")
+	testinghelper.AssertGet(t, operatorAction[1], "operator.open-cluster-management.io", "v1", "klusterlets")
+	testinghelper.AssertAction(t, operatorAction[2], "update")
 
 	conditionReady := testinghelper.NamedCondition(klusterletReadyToApply, "KlusterletPrepared", metav1.ConditionTrue)
 	conditionApplied := testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue)
 	conditionFeaturesValid := testinghelper.NamedCondition(spokeRegistrationFeatureGatesValid, "FeatureGatesAllValid", metav1.ConditionTrue)
 	testinghelper.AssertOnlyConditions(
-		t, operatorAction[1].(clienttesting.UpdateActionImpl).Object, conditionReady, conditionFeaturesValid)
-	testinghelper.AssertOnlyConditions(
-		t, operatorAction[4].(clienttesting.UpdateActionImpl).Object, conditionReady, conditionApplied, conditionFeaturesValid)
+		t, operatorAction[2].(clienttesting.UpdateActionImpl).Object, conditionReady, conditionApplied, conditionFeaturesValid)
 }
 
 func TestSyncDeployHostedCreateAgentNamespace(t *testing.T) {
@@ -777,15 +771,13 @@ func TestClusterNameChange(t *testing.T) {
 	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "create", "", "cluster1", 1)
 
 	operatorAction := controller.operatorClient.Actions()
-	if len(operatorAction) != 4 {
-		t.Errorf("Expect 4 actions in the sync loop, actual %#v", operatorAction)
+	if len(operatorAction) != 2 {
+		t.Errorf("Expect 2 actions in the sync loop, actual %#v", operatorAction)
 	}
 
 	testinghelper.AssertGet(t, operatorAction[0], "operator.open-cluster-management.io", "v1", "klusterlets")
 	testinghelper.AssertAction(t, operatorAction[1], "update")
-	testinghelper.AssertGet(t, operatorAction[2], "operator.open-cluster-management.io", "v1", "klusterlets")
-	testinghelper.AssertAction(t, operatorAction[3], "update")
-	updatedKlusterlet := operatorAction[3].(clienttesting.UpdateActionImpl).Object.(*operatorapiv1.Klusterlet)
+	updatedKlusterlet := operatorAction[1].(clienttesting.UpdateActionImpl).Object.(*operatorapiv1.Klusterlet)
 	testinghelper.AssertOnlyGenerationStatuses(
 		t, updatedKlusterlet,
 		testinghelper.NamedDeploymentGenerationStatus("klusterlet-registration-agent", "testns", 0),
@@ -926,16 +918,14 @@ func TestDeployOnKube111(t *testing.T) {
 	}
 
 	operatorAction := controller.operatorClient.Actions()
-	if len(operatorAction) != 4 {
+	if len(operatorAction) != 2 {
 		t.Errorf("Expect 4 actions in the sync loop, actual %#v", operatorAction)
 	}
 
 	testinghelper.AssertGet(t, operatorAction[0], "operator.open-cluster-management.io", "v1", "klusterlets")
 	testinghelper.AssertAction(t, operatorAction[1], "update")
-	testinghelper.AssertGet(t, operatorAction[2], "operator.open-cluster-management.io", "v1", "klusterlets")
-	testinghelper.AssertAction(t, operatorAction[3], "update")
 	testinghelper.AssertOnlyConditions(
-		t, operatorAction[3].(clienttesting.UpdateActionImpl).Object,
+		t, operatorAction[1].(clienttesting.UpdateActionImpl).Object,
 		testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
 		testinghelper.NamedCondition(spokeRegistrationFeatureGatesValid, "FeatureGatesAllValid", metav1.ConditionTrue))
 

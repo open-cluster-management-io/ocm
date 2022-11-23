@@ -320,20 +320,24 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 		})
 
 		ginkgo.It("Deployment should be added nodeSelector and toleration when add nodePlacement into clustermanager", func() {
-			clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			clusterManager.Spec.NodePlacement = v1.NodePlacement{
-				NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
-				Tolerations: []corev1.Toleration{
-					{
-						Key:      "node-role.kubernetes.io/infra",
-						Operator: corev1.TolerationOpExists,
-						Effect:   corev1.TaintEffectNoSchedule,
+			gomega.Eventually(func() error {
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				clusterManager.Spec.NodePlacement = v1.NodePlacement{
+					NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
+					Tolerations: []corev1.Toleration{
+						{
+							Key:      "node-role.kubernetes.io/infra",
+							Operator: corev1.TolerationOpExists,
+							Effect:   corev1.TaintEffectNoSchedule,
+						},
 					},
-				},
-			}
-			_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				}
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
 			gomega.Eventually(func() error {
 				actual, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
