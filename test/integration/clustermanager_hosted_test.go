@@ -20,19 +20,25 @@ import (
 )
 
 func updateDeploymentStatus(kubeClient kubernetes.Interface, namespace, deploymentName string) {
-	deployment, err := kubeClient.AppsV1().Deployments(namespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	deployment.Status.Replicas = *deployment.Spec.Replicas
-	deployment.Status.ReadyReplicas = *deployment.Spec.Replicas
-	deployment.Status.ObservedGeneration = *&deployment.Generation
-	_, err = kubeClient.AppsV1().Deployments(namespace).UpdateStatus(context.Background(), deployment, metav1.UpdateOptions{})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	gomega.Eventually(func() error {
+		deployment, err := kubeClient.AppsV1().Deployments(namespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		deployment.Status.Replicas = *deployment.Spec.Replicas
+		deployment.Status.ReadyReplicas = *deployment.Spec.Replicas
+		deployment.Status.AvailableReplicas = *deployment.Spec.Replicas
+		deployment.Status.ObservedGeneration = deployment.Generation
+		_, err = kubeClient.AppsV1().Deployments(namespace).UpdateStatus(context.Background(), deployment, metav1.UpdateOptions{})
+		return err
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 }
 
 var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 	var hostedCtx context.Context
 	var hostedCancel context.CancelFunc
 	var hubRegistrationDeployment = fmt.Sprintf("%s-registration-controller", clusterManagerName)
+	var hubPlacementDeployment = fmt.Sprintf("%s-placement-controller", clusterManagerName)
 	var hubRegistrationWebhookDeployment = fmt.Sprintf("%s-registration-webhook", clusterManagerName)
 	var hubWorkWebhookDeployment = fmt.Sprintf("%s-work-webhook", clusterManagerName)
 
@@ -67,6 +73,9 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 	})
 
 	ginkgo.AfterEach(func() {
+		// delete deployment for clustermanager here so tests are not impacted with each other
+		err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		if hostedCancel != nil {
 			hostedCancel()
 		}
@@ -154,6 +163,9 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubRegistrationDeployment)
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubPlacementDeployment)
+
 			gomega.Eventually(func() error {
 				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationWebhookDeployment, metav1.GetOptions{}); err != nil {
 					return err
@@ -223,7 +235,12 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 			_, err := hostedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(hostedCtx, registrationValidtingWebhook, metav1.GetOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 
+			workValidtingWebhook := "manifestworkvalidators.admission.work.open-cluster-management.io"
+			//Should not apply the webhook config if the replica and observed is not set
+			_, err = hostedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(hostedCtx, workValidtingWebhook, metav1.GetOptions{})
+
 			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubRegistrationWebhookDeployment)
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubWorkWebhookDeployment)
 
 			gomega.Eventually(func() error {
 				if _, err := hostedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(hostedCtx, registrationValidtingWebhook, metav1.GetOptions{}); err != nil {
@@ -232,13 +249,7 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
-			workValidtingWebhook := "manifestworkvalidators.admission.work.open-cluster-management.io"
-			//Should not apply the webhook config if the replica and observed is not set
-			_, err = hostedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(hostedCtx, workValidtingWebhook, metav1.GetOptions{})
-
 			gomega.Expect(err).To(gomega.HaveOccurred())
-
-			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubWorkWebhookDeployment)
 
 			gomega.Eventually(func() error {
 				if _, err := hostedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(hostedCtx, workValidtingWebhook, metav1.GetOptions{}); err != nil {
@@ -272,11 +283,15 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
-			clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(hostedCtx, clusterManagerName, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			clusterManager.Spec.RegistrationImagePullSpec = "testimage:latest"
-			_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(hostedCtx, clusterManager, metav1.UpdateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Eventually(func() error {
+				clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(hostedCtx, clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				clusterManager.Spec.RegistrationImagePullSpec = "testimage:latest"
+				_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(hostedCtx, clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
 			gomega.Eventually(func() error {
 				actual, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{})
@@ -290,7 +305,10 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubRegistrationDeployment)
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubPlacementDeployment)
 			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubRegistrationWebhookDeployment)
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubWorkWebhookDeployment)
 
 			// Check if generations are correct
 			gomega.Eventually(func() error {
@@ -320,20 +338,24 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 		})
 
 		ginkgo.It("Deployment should be added nodeSelector and toleration when add nodePlacement into clustermanager", func() {
-			clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(hostedCtx, clusterManagerName, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			clusterManager.Spec.NodePlacement = v1.NodePlacement{
-				NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
-				Tolerations: []corev1.Toleration{
-					{
-						Key:      "node-role.kubernetes.io/infra",
-						Operator: corev1.TolerationOpExists,
-						Effect:   corev1.TaintEffectNoSchedule,
+			gomega.Eventually(func() error {
+				clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(hostedCtx, clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				clusterManager.Spec.NodePlacement = v1.NodePlacement{
+					NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
+					Tolerations: []corev1.Toleration{
+						{
+							Key:      "node-role.kubernetes.io/infra",
+							Operator: corev1.TolerationOpExists,
+							Effect:   corev1.TaintEffectNoSchedule,
+						},
 					},
-				},
-			}
-			_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(hostedCtx, clusterManager, metav1.UpdateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				}
+				_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(hostedCtx, clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
 			gomega.Eventually(func() error {
 				actual, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{})
@@ -359,6 +381,8 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				return fmt.Errorf("no key equals to node-role.kubernetes.io/infra")
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubRegistrationDeployment)
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubPlacementDeployment)
 			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubRegistrationWebhookDeployment)
 			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubWorkWebhookDeployment)
 
@@ -421,13 +445,10 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 			util.AssertClusterManagerCondition(clusterManagerName, hostedOperatorClient, "HubRegistrationDegraded", "UnavailableRegistrationPod", metav1.ConditionTrue)
 
 			// Update replica of deployment
-			registrationDeployment, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			registrationDeployment.Status.AvailableReplicas = 3
-			registrationDeployment.Status.Replicas = 3
-			registrationDeployment.Status.ReadyReplicas = 3
-			_, err = hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).UpdateStatus(hostedCtx, registrationDeployment, metav1.UpdateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubRegistrationWebhookDeployment)
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubWorkWebhookDeployment)
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubRegistrationDeployment)
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubPlacementDeployment)
 
 			// The cluster manager should be functional at last
 			util.AssertClusterManagerCondition(clusterManagerName, hostedOperatorClient, "HubRegistrationDegraded", "RegistrationFunctional", metav1.ConditionFalse)

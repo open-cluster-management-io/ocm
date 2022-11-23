@@ -310,14 +310,14 @@ func ApplyDeployment(
 	generationStatuses []operatorapiv1.GenerationStatus,
 	nodePlacement operatorapiv1.NodePlacement,
 	manifests resourceapply.AssetFunc,
-	recorder events.Recorder, file string) (operatorapiv1.GenerationStatus, error) {
+	recorder events.Recorder, file string) (*appsv1.Deployment, operatorapiv1.GenerationStatus, error) {
 	deploymentBytes, err := manifests(file)
 	if err != nil {
-		return operatorapiv1.GenerationStatus{}, err
+		return nil, operatorapiv1.GenerationStatus{}, err
 	}
 	deployment, _, err := genericCodec.Decode(deploymentBytes, nil, nil)
 	if err != nil {
-		return operatorapiv1.GenerationStatus{}, fmt.Errorf("%q: %v", file, err)
+		return nil, operatorapiv1.GenerationStatus{}, fmt.Errorf("%q: %v", file, err)
 	}
 	generationStatus := NewGenerationStatus(appsv1.SchemeGroupVersion.WithResource("deployments"), deployment)
 	currentGenerationStatus := FindGenerationStatus(generationStatuses, generationStatus)
@@ -335,14 +335,14 @@ func ApplyDeployment(
 		recorder,
 		deployment.(*appsv1.Deployment), generationStatus.LastGeneration)
 	if err != nil {
-		return generationStatus, fmt.Errorf("%q (%T): %v", file, deployment, err)
+		return updatedDeployment, generationStatus, fmt.Errorf("%q (%T): %v", file, deployment, err)
 	}
 
 	if updated {
 		generationStatus.LastGeneration = updatedDeployment.ObjectMeta.Generation
 	}
 
-	return generationStatus, nil
+	return updatedDeployment, generationStatus, nil
 }
 
 func ApplyEndpoints(ctx context.Context, client coreclientv1.EndpointsGetter, required *corev1.Endpoints) (*corev1.Endpoints, bool, error) {

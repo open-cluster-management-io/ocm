@@ -87,7 +87,7 @@ func newTestController(t *testing.T, clustermanager *operatorapiv1.ClusterManage
 	}
 }
 
-func setWebhookDeployment(clusterManagerName, clusterManagerNamespace string) []runtime.Object {
+func setDeployment(clusterManagerName, clusterManagerNamespace string) []runtime.Object {
 	var replicas = int32(1)
 
 	return []runtime.Object{
@@ -116,6 +116,29 @@ func setWebhookDeployment(clusterManagerName, clusterManagerNamespace string) []
 		},
 		&appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
+				Name:       clusterManagerName + "-registration-controller",
+				Namespace:  clusterManagerNamespace,
+				Generation: 1,
+			},
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "hub-registration-controller",
+							},
+						},
+					},
+				},
+				Replicas: &replicas,
+			},
+			Status: appsv1.DeploymentStatus{
+				ReadyReplicas:      replicas,
+				ObservedGeneration: 1,
+			},
+		},
+		&appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:       clusterManagerName + "-work-webhook",
 				Namespace:  clusterManagerNamespace,
 				Generation: 1,
@@ -126,6 +149,29 @@ func setWebhookDeployment(clusterManagerName, clusterManagerNamespace string) []
 						Containers: []corev1.Container{
 							{
 								Name: clusterManagerName + "-webhook",
+							},
+						},
+					},
+				},
+				Replicas: &replicas,
+			},
+			Status: appsv1.DeploymentStatus{
+				ReadyReplicas:      replicas,
+				ObservedGeneration: 1,
+			},
+		},
+		&appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       clusterManagerName + "-placement-controller",
+				Namespace:  clusterManagerNamespace,
+				Generation: 1,
+			},
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "clustermanager-placement-controller",
 							},
 						},
 					},
@@ -188,7 +234,7 @@ func TestSyncDeploy(t *testing.T) {
 	clusterManager := newClusterManager("testhub")
 	tc := newTestController(t, clusterManager)
 	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
-	cd := setWebhookDeployment(clusterManager.Name, clusterManagerNamespace)
+	cd := setDeployment(clusterManager.Name, clusterManagerNamespace)
 	setup(t, tc, cd)
 
 	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
@@ -209,7 +255,7 @@ func TestSyncDeploy(t *testing.T) {
 
 	// Check if resources are created as expected
 	// We expect creat the namespace twice respectively in the management cluster and the hub cluster.
-	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 23)
+	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 21)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager)
 	}

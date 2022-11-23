@@ -19,7 +19,6 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 )
 
 const registrationDegraded = "HubRegistrationDegraded"
@@ -73,94 +72,76 @@ func (s *clusterManagerStatusController) sync(ctx context.Context, controllerCon
 		return err
 	}
 
-	errs := []error{}
-	if err := s.updateStatusOfRegistration(ctx, clusterManager.Name, clusterManagerNamespace); err != nil {
-		errs = append(errs, err)
-	}
+	registrationCond := s.updateStatusOfRegistration(ctx, clusterManager.Name, clusterManagerNamespace)
+	registrationCond.ObservedGeneration = clusterManager.Generation
+	placementCond := s.updateStatusOfPlacement(ctx, clusterManager.Name, clusterManagerNamespace)
+	placementCond.ObservedGeneration = clusterManager.Generation
 
-	if err := s.updateStatusOfPlacement(ctx, clusterManager.Name, clusterManagerNamespace); err != nil {
-		errs = append(errs, err)
-	}
+	_, _, err = helpers.UpdateClusterManagerStatus(ctx, s.clusterManagerClient, clusterManagerName,
+		helpers.UpdateClusterManagerConditionFn(registrationCond, placementCond),
+	)
 
-	return operatorhelpers.NewMultiLineAggregate(errs)
+	return err
 }
 
 // updateStatusOfRegistration checks registration deployment status and updates condition of clustermanager
-func (s *clusterManagerStatusController) updateStatusOfRegistration(ctx context.Context, clusterManagerName, clusterManagerNamespace string) error {
+func (s *clusterManagerStatusController) updateStatusOfRegistration(ctx context.Context, clusterManagerName, clusterManagerNamespace string) metav1.Condition {
 	// Check registration deployment status
 	registrationDeploymentName := fmt.Sprintf("%s-registration-controller", clusterManagerName)
 	registrationDeployment, err := s.deploymentLister.Deployments(clusterManagerNamespace).Get(registrationDeploymentName)
 	if err != nil {
-		_, _, err := helpers.UpdateClusterManagerStatus(ctx, s.clusterManagerClient, clusterManagerName,
-			helpers.UpdateClusterManagerConditionFn(metav1.Condition{
-				Type:    registrationDegraded,
-				Status:  metav1.ConditionTrue,
-				Reason:  "GetRegistrationDeploymentFailed",
-				Message: fmt.Sprintf("Failed to get registration deployment %q %q: %v", clusterManagerNamespace, registrationDeploymentName, err),
-			}),
-		)
-		return err
+		return metav1.Condition{
+			Type:    registrationDegraded,
+			Status:  metav1.ConditionTrue,
+			Reason:  "GetRegistrationDeploymentFailed",
+			Message: fmt.Sprintf("Failed to get registration deployment %q %q: %v", clusterManagerNamespace, registrationDeploymentName, err),
+		}
 	}
 
 	if unavailablePod := helpers.NumOfUnavailablePod(registrationDeployment); unavailablePod > 0 {
-		_, _, err := helpers.UpdateClusterManagerStatus(ctx, s.clusterManagerClient, clusterManagerName,
-			helpers.UpdateClusterManagerConditionFn(metav1.Condition{
-				Type:    registrationDegraded,
-				Status:  metav1.ConditionTrue,
-				Reason:  "UnavailableRegistrationPod",
-				Message: fmt.Sprintf("%v of requested instances are unavailable of registration deployment %q %q", unavailablePod, clusterManagerNamespace, registrationDeploymentName),
-			}),
-		)
-		return err
+		return metav1.Condition{
+			Type:    registrationDegraded,
+			Status:  metav1.ConditionTrue,
+			Reason:  "UnavailableRegistrationPod",
+			Message: fmt.Sprintf("%v of requested instances are unavailable of registration deployment %q %q", unavailablePod, clusterManagerNamespace, registrationDeploymentName),
+		}
 	}
 
-	_, _, err = helpers.UpdateClusterManagerStatus(ctx, s.clusterManagerClient, clusterManagerName,
-		helpers.UpdateClusterManagerConditionFn(metav1.Condition{
-			Type:    registrationDegraded,
-			Status:  metav1.ConditionFalse,
-			Reason:  "RegistrationFunctional",
-			Message: "Registration is managing credentials",
-		}),
-	)
-	return err
+	return metav1.Condition{
+		Type:    registrationDegraded,
+		Status:  metav1.ConditionFalse,
+		Reason:  "RegistrationFunctional",
+		Message: "Registration is managing credentials",
+	}
 }
 
 // updateStatusOfRegistration checks placement deployment status and updates condition of clustermanager
-func (s *clusterManagerStatusController) updateStatusOfPlacement(ctx context.Context, clusterManagerName, clusterManagerNamespace string) error {
+func (s *clusterManagerStatusController) updateStatusOfPlacement(ctx context.Context, clusterManagerName, clusterManagerNamespace string) metav1.Condition {
 	// Check registration deployment status
 	placementDeploymentName := fmt.Sprintf("%s-placement-controller", clusterManagerName)
 	placementDeployment, err := s.deploymentLister.Deployments(clusterManagerNamespace).Get(placementDeploymentName)
 	if err != nil {
-		_, _, err := helpers.UpdateClusterManagerStatus(ctx, s.clusterManagerClient, clusterManagerName,
-			helpers.UpdateClusterManagerConditionFn(metav1.Condition{
-				Type:    placementDegraded,
-				Status:  metav1.ConditionTrue,
-				Reason:  "GetPlacementDeploymentFailed",
-				Message: fmt.Sprintf("Failed to get placement deployment %q %q: %v", clusterManagerNamespace, placementDeploymentName, err),
-			}),
-		)
-		return err
+		return metav1.Condition{
+			Type:    placementDegraded,
+			Status:  metav1.ConditionTrue,
+			Reason:  "GetPlacementDeploymentFailed",
+			Message: fmt.Sprintf("Failed to get placement deployment %q %q: %v", clusterManagerNamespace, placementDeploymentName, err),
+		}
 	}
 
 	if unavailablePod := helpers.NumOfUnavailablePod(placementDeployment); unavailablePod > 0 {
-		_, _, err := helpers.UpdateClusterManagerStatus(ctx, s.clusterManagerClient, clusterManagerName,
-			helpers.UpdateClusterManagerConditionFn(metav1.Condition{
-				Type:    placementDegraded,
-				Status:  metav1.ConditionTrue,
-				Reason:  "UnavailablePlacementPod",
-				Message: fmt.Sprintf("%v of requested instances are unavailable of placement deployment %q %q", unavailablePod, clusterManagerNamespace, placementDeploymentName),
-			}),
-		)
-		return err
+		return metav1.Condition{
+			Type:    placementDegraded,
+			Status:  metav1.ConditionTrue,
+			Reason:  "UnavailablePlacementPod",
+			Message: fmt.Sprintf("%v of requested instances are unavailable of placement deployment %q %q", unavailablePod, clusterManagerNamespace, placementDeploymentName),
+		}
 	}
 
-	_, _, err = helpers.UpdateClusterManagerStatus(ctx, s.clusterManagerClient, clusterManagerName,
-		helpers.UpdateClusterManagerConditionFn(metav1.Condition{
-			Type:    placementDegraded,
-			Status:  metav1.ConditionFalse,
-			Reason:  "PlacementFunctional",
-			Message: "Placement is scheduling placement decisions",
-		}),
-	)
-	return err
+	return metav1.Condition{
+		Type:    placementDegraded,
+		Status:  metav1.ConditionFalse,
+		Reason:  "PlacementFunctional",
+		Message: "Placement is scheduling placement decisions",
+	}
 }

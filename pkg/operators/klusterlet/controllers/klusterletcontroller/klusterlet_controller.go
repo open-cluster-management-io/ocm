@@ -478,7 +478,7 @@ func (n *klusterletController) getClusterNameFromHubKubeConfigSecret(ctx context
 func (n *klusterletController) applyDeployment(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, config *klusterletConfig, deploymentFile string, recorder events.Recorder) (
 	[]operatorapiv1.RelatedResourceMeta, operatorapiv1.GenerationStatus, error) {
 	var relatedResources []operatorapiv1.RelatedResourceMeta
-	generationStatus, err := helpers.ApplyDeployment(
+	_, generationStatus, err := helpers.ApplyDeployment(
 		ctx,
 		n.kubeClient,
 		klusterlet.Status.Generations,

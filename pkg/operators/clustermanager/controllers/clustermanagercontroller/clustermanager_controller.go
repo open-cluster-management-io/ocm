@@ -3,10 +3,10 @@ package clustermanagercontroller
 import (
 	"context"
 	"encoding/base64"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	errorhelpers "errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -18,11 +18,9 @@ import (
 	"k8s.io/klog/v2"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
-	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
-	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
@@ -35,108 +33,13 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/registration-operator/manifests"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
-	"open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/migrationcontroller"
-
 	migrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/typed/migration/v1alpha1"
 )
 
-var (
-	// crdNames is the list of CRDs to be wiped out before deleting other resources when clusterManager is deleted.
-	// The order of the list matters, the managedclusteraddon crd needs to be deleted at first so all addon related
-	// manifestwork is deleted, then other manifestworks.
-	crdNames = []string{
-		"managedclusteraddons.addon.open-cluster-management.io",
-		"manifestworks.work.open-cluster-management.io",
-		"managedclusters.cluster.open-cluster-management.io",
-	}
-
-	namespaceResource = "cluster-manager/cluster-manager-namespace.yaml"
-
-	// crdResourceFiles should be deployed in the hub cluster
-	hubCRDResourceFiles = []string{
-		"cluster-manager/hub/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml",
-		"cluster-manager/hub/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml",
-		"cluster-manager/hub/0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml",
-		"cluster-manager/hub/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml",
-		"cluster-manager/hub/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml",
-		"cluster-manager/hub/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml",
-		"cluster-manager/hub/0000_02_clusters.open-cluster-management.io_placements.crd.yaml",
-		"cluster-manager/hub/0000_02_addon.open-cluster-management.io_addondeploymentconfigs.crd.yaml",
-		"cluster-manager/hub/0000_03_clusters.open-cluster-management.io_placementdecisions.crd.yaml",
-		"cluster-manager/hub/0000_05_clusters.open-cluster-management.io_addonplacementscores.crd.yaml",
-	}
-
-	// removed CRD StoredVersions
-	removedCRDStoredVersions = map[string]string{
-		"placements.cluster.open-cluster-management.io":                "v1alpha1",
-		"placementdecisions.cluster.open-cluster-management.io":        "v1alpha1",
-		"managedclustersets.cluster.open-cluster-management.io":        "v1alpha1",
-		"managedclustersetbindings.cluster.open-cluster-management.io": "v1alpha1",
-	}
-
-	// The hubWebhookResourceFiles should be deployed in the hub cluster
-	// The service should may point to a external url which represent the webhook-server's address.
-	hubRegistrationWebhookResourceFiles = []string{
-		"cluster-manager/hub/cluster-manager-registration-webhook-validatingconfiguration.yaml",
-		"cluster-manager/hub/cluster-manager-registration-webhook-mutatingconfiguration.yaml",
-		"cluster-manager/hub/cluster-manager-registration-webhook-clustersetbinding-validatingconfiguration.yaml",
-		"cluster-manager/hub/cluster-manager-registration-webhook-clustersetbinding-validatingconfiguration-v1beta1.yaml",
-	}
-	hubWorkWebhookResourceFiles = []string{
-		"cluster-manager/hub/cluster-manager-work-webhook-validatingconfiguration.yaml",
-	}
-
-	// The apiservice resources should be deleted
-	hubApiserviceFiles = []string{
-		"cluster-manager/hub/cluster-manager-work-webhook-apiservice.yaml",
-		"cluster-manager/hub/cluster-manager-registration-webhook-apiservice.yaml",
-	}
-
-	// The hubHostedWebhookServiceFiles should only be deployed on the hub cluster when the deploy mode is hosted.
-	hubDefaultWebhookServiceFiles = []string{
-		"cluster-manager/hub/cluster-manager-registration-webhook-service.yaml",
-		"cluster-manager/hub/cluster-manager-work-webhook-service.yaml",
-	}
-	hubHostedWebhookServiceFiles = []string{
-		"cluster-manager/hub/cluster-manager-registration-webhook-service-hosted.yaml",
-		"cluster-manager/hub/cluster-manager-work-webhook-service-hosted.yaml",
-	}
-	// hubHostedWebhookEndpointFiles only apply when the deploy mode is hosted and address is IPFormat.
-	hubHostedWebhookEndpointRegistration = "cluster-manager/hub/cluster-manager-registration-webhook-endpoint-hosted.yaml"
-	hubHostedWebhookEndpointWork         = "cluster-manager/hub/cluster-manager-work-webhook-endpoint-hosted.yaml"
-
-	// The hubRbacResourceFiles should be deployed in the hub cluster.
-	hubRbacResourceFiles = []string{
-		// registration
-		"cluster-manager/hub/cluster-manager-registration-clusterrole.yaml",
-		"cluster-manager/hub/cluster-manager-registration-clusterrolebinding.yaml",
-		"cluster-manager/hub/cluster-manager-registration-serviceaccount.yaml",
-		// registration-webhook
-		"cluster-manager/hub/cluster-manager-registration-webhook-clusterrole.yaml",
-		"cluster-manager/hub/cluster-manager-registration-webhook-clusterrolebinding.yaml",
-		"cluster-manager/hub/cluster-manager-registration-webhook-serviceaccount.yaml",
-		// work-webhook
-		"cluster-manager/hub/cluster-manager-work-webhook-clusterrole.yaml",
-		"cluster-manager/hub/cluster-manager-work-webhook-clusterrolebinding.yaml",
-		"cluster-manager/hub/cluster-manager-work-webhook-serviceaccount.yaml",
-		// placement
-		"cluster-manager/hub/cluster-manager-placement-clusterrole.yaml",
-		"cluster-manager/hub/cluster-manager-placement-clusterrolebinding.yaml",
-		"cluster-manager/hub/cluster-manager-placement-serviceaccount.yaml",
-	}
-
-	// All deployments should be deployed in the management cluster.
-	deploymentFiles = []string{
-		"cluster-manager/management/cluster-manager-registration-deployment.yaml",
-		"cluster-manager/management/cluster-manager-registration-webhook-deployment.yaml",
-		"cluster-manager/management/cluster-manager-work-webhook-deployment.yaml",
-		"cluster-manager/management/cluster-manager-placement-deployment.yaml",
-	}
-)
-
 const (
-	clusterManagerFinalizer = "operator.open-cluster-management.io/cluster-manager-cleanup"
-	clusterManagerApplied   = "Applied"
+	clusterManagerFinalizer   = "operator.open-cluster-management.io/cluster-manager-cleanup"
+	clusterManagerApplied     = "Applied"
+	clusterManagerProgressing = "Progressing"
 
 	caBundleConfigmap = "ca-bundle-configmap"
 
@@ -155,10 +58,22 @@ type clusterManagerController struct {
 	recorder             events.Recorder
 	cache                resourceapply.ResourceCache
 	// For testcases which don't need these functions, we could set fake funcs
-	generateHubClusterClients func(hubConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, apiregistrationclient.APIServicesGetter, migrationclient.StorageVersionMigrationsGetter, error)
 	ensureSAKubeconfigs       func(ctx context.Context, clusterManagerName, clusterManagerNamespace string, hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error
+	generateHubClusterClients func(hubConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, apiregistrationclient.APIServicesGetter, migrationclient.StorageVersionMigrationsGetter, error)
 	skipRemoveCRDs            bool
 }
+
+type clusterManagerReconcile interface {
+	reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager, config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error)
+	clean(ctx context.Context, cm *operatorapiv1.ClusterManager, config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error)
+}
+
+type reconcileState int64
+
+const (
+	reconcileStop reconcileState = iota
+	reconcileContinue
+)
 
 // NewClusterManagerController construct cluster manager hub controller
 func NewClusterManagerController(
@@ -267,11 +182,15 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		RegistrationImage:       clusterManager.Spec.RegistrationImagePullSpec,
 		WorkImage:               clusterManager.Spec.WorkImagePullSpec,
 		PlacementImage:          clusterManager.Spec.PlacementImagePullSpec,
-		Replica:                 helpers.DetermineReplica(ctx, n.operatorKubeClient, clusterManagerMode, nil),
+		Replica:                 helpers.DetermineReplica(ctx, n.operatorKubeClient, clusterManager.Spec.DeployOption.Mode, nil),
 		HostedMode:              clusterManager.Spec.DeployOption.Mode == operatorapiv1.InstallModeHosted,
+		RegistrationWebhook: manifests.Webhook{
+			Port: defaultWebhookPort,
+		},
+		WorkWebhook: manifests.Webhook{
+			Port: defaultWebhookPort,
+		},
 	}
-
-	conditions := &clusterManager.Status.Conditions
 
 	// If there are some invalid feature gates of registration, will output
 	// condition `ValidRegistrationFeatureGates` False in ClusterManager.
@@ -282,7 +201,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 			return err
 		}
 		config.RegistrationFeatureGates = featureGates
-		meta.SetStatusCondition(conditions, condition)
+		meta.SetStatusCondition(&clusterManager.Status.Conditions, condition)
 	}
 	// If there are some invalid feature gates of work, will output
 	// condition `ValidWorkFeatureGates` False in ClusterManager.
@@ -293,12 +212,8 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 			return err
 		}
 		config.WorkFeatureGates = featureGates
-		meta.SetStatusCondition(conditions, condition)
+		meta.SetStatusCondition(&clusterManager.Status.Conditions, condition)
 	}
-
-	//Set default port
-	config.RegistrationWebhook.Port = defaultWebhookPort
-	config.WorkWebhook.Port = defaultWebhookPort
 
 	// If we are deploying in the hosted mode, it requires us to create webhook in a different way with the default mode.
 	// In the hosted mode, the webhook servers is running in the management cluster but the users are accessing the hub cluster.
@@ -335,22 +250,24 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	}
 	managementClient := n.operatorKubeClient // We assume that operator is always running on the management cluster.
 
-	// If the ClusterManager is deleting, we remove its related resources on hub
-	if !clusterManager.DeletionTimestamp.IsZero() {
-		if err := cleanUpHub(ctx, controllerContext, clusterManagerMode, hubClient, hubApiExtensionClient, hubApiRegistrationClient, config, n.skipRemoveCRDs); err != nil {
-			return err
-		}
-		if err := cleanUpManagement(ctx, controllerContext, managementClient, config); err != nil {
-			return err
-		}
-		return removeClusterManagerFinalizer(ctx, n.clusterManagerClient, clusterManager)
+	var errs []error
+	reconcilers := []clusterManagerReconcile{
+		&crdReconcile{cache: n.cache, recorder: n.recorder, hubAPIExtensionClient: hubApiExtensionClient, hubMigrationClient: hubMigrationClient, skipRemoveCRDs: n.skipRemoveCRDs},
+		&hubReoncile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient, hubAPIRegistrationClient: hubApiRegistrationClient},
+		&runtimeReconcile{cache: n.cache, recorder: n.recorder, hubKubeConfig: hubKubeConfig, hubKubeClient: hubClient, kubeClient: managementClient, ensureSAKubeconfigs: n.ensureSAKubeconfigs},
+		&webhookReconcile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient, kubeClient: managementClient},
 	}
 
-	var relatedResources []operatorapiv1.RelatedResourceMeta
-
-	// update CRD StoredVersion
-	if err := updateStoredVersion(ctx, hubApiExtensionClient, hubMigrationClient); err != nil {
-		return err
+	// If the ClusterManager is deleting, we remove its related resources on hub
+	if !clusterManager.DeletionTimestamp.IsZero() {
+		for _, reconciler := range reconcilers {
+			// TODO should handle requeu error differently
+			clusterManager, _, err = reconciler.clean(ctx, clusterManager, config)
+			if err != nil {
+				return err
+			}
+		}
+		return removeClusterManagerFinalizer(ctx, n.clusterManagerClient, clusterManager)
 	}
 
 	//get caBundle
@@ -370,84 +287,44 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	config.RegistrationAPIServiceCABundle = encodedCaBundle
 	config.WorkAPIServiceCABundle = encodedCaBundle
 
-	// Apply resources on the hub cluster
-	hubAppliedErrs, err := applyHubResources(
-		ctx,
-		clusterManagerNamespace,
-		clusterManagerMode,
-		config,
-		&relatedResources,
-		hubClient, hubApiExtensionClient, hubApiRegistrationClient,
-		n.recorder, n.cache)
-	if err != nil {
-		return err
-	}
-
-	// Apply resources on the management cluster
-	currentGenerations, managementAppliedErrs, err := applyManagementResources(
-		ctx,
-		clusterManager,
-		config,
-		&relatedResources,
-		hubClient, hubKubeConfig,
-		managementClient, n.recorder, n.cache, n.ensureSAKubeconfigs,
-	)
-	if err != nil {
-		return err
-	}
-	errs := append(hubAppliedErrs, managementAppliedErrs...)
-
-	//Check registration and work webhook pod running, then apply webhook config files
-	registrationWebhookName := clusterManagerName + "-registration-webhook"
-	workWebhookName := clusterManagerName + "-work-webhook"
-	rqe := helpers.RequeueError{}
-
-	err = applyWebhookConfig(ctx, registrationWebhookName, hubRegistrationWebhookResourceFiles, &relatedResources, config, hubClient, managementClient, n.recorder, n.cache)
-	if err != nil {
+	for _, reconciler := range reconcilers {
+		var state reconcileState
+		var rqe *helpers.RequeueError
+		clusterManager, state, err = reconciler.reconcile(ctx, clusterManager, config)
 		if errorhelpers.As(err, &rqe) {
-			klog.Warning("Apply webhook config %v fail. Error: %v", registrationWebhookName, err)
-			controllerContext.Queue().AddAfter(clusterManagerName, err.(helpers.RequeueError).RequeueTime)
-		} else {
+			controllerContext.Queue().AddAfter(clusterManagerName, rqe.RequeueTime)
+		} else if err != nil {
 			errs = append(errs, err)
 		}
-	}
-
-	err = applyWebhookConfig(ctx, workWebhookName, hubWorkWebhookResourceFiles, &relatedResources, config, hubClient, managementClient, n.recorder, n.cache)
-	if err != nil {
-		if errorhelpers.As(err, &rqe) {
-			klog.Warning("Apply webhook config %v fail. Error: %v", registrationWebhookName, err)
-			controllerContext.Queue().AddAfter(clusterManagerName, err.(helpers.RequeueError).RequeueTime)
-		} else {
-			errs = append(errs, err)
+		if state == reconcileStop {
+			break
 		}
 	}
 
 	// Update status
-	observedGeneration := clusterManager.Status.ObservedGeneration
+	var conds []metav1.Condition
 	if len(errs) == 0 {
-		meta.SetStatusCondition(conditions, metav1.Condition{
+		conds = append(conds, metav1.Condition{
 			Type:    clusterManagerApplied,
 			Status:  metav1.ConditionTrue,
 			Reason:  "ClusterManagerApplied",
 			Message: "Components of cluster manager are applied",
 		})
-		observedGeneration = clusterManager.Generation
-	} else {
-		meta.SetStatusCondition(conditions, metav1.Condition{
-			Type:    clusterManagerApplied,
-			Status:  metav1.ConditionFalse,
-			Reason:  "ClusterManagerApplyFailed",
-			Message: "Components of cluster manager fail to be applied",
-		})
+	} else if cond := meta.FindStatusCondition(clusterManager.Status.Conditions, clusterManagerApplied); cond != nil {
+		conds = append(conds, *cond)
+	}
+
+	if cond := meta.FindStatusCondition(clusterManager.Status.Conditions, clusterManagerProgressing); cond != nil {
+		conds = append(conds, *cond)
 	}
 
 	_, _, updatedErr := helpers.UpdateClusterManagerStatus(
 		ctx, n.clusterManagerClient, clusterManager.Name,
-		helpers.UpdateClusterManagerConditionFn(*conditions...),
-		helpers.UpdateClusterManagerGenerationsFn(currentGenerations...),
-		helpers.UpdateClusterManagerRelatedResourcesFn(relatedResources...),
+		helpers.UpdateClusterManagerConditionFn(conds...),
+		helpers.UpdateClusterManagerGenerationsFn(clusterManager.Status.Generations...),
+		helpers.UpdateClusterManagerRelatedResourcesFn(clusterManager.Status.RelatedResources...),
 		func(oldStatus *operatorapiv1.ClusterManagerStatus) error {
-			oldStatus.ObservedGeneration = observedGeneration
+			oldStatus.ObservedGeneration = clusterManager.Generation
 			return nil
 		},
 	)
@@ -455,240 +332,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		errs = append(errs, updatedErr)
 	}
 
-	return operatorhelpers.NewMultiLineAggregate(errs)
-}
-
-func applyHubResources(
-	ctx context.Context,
-	clusterManagerNamespace string,
-	clusterManagerMode operatorapiv1.InstallMode,
-	manifestsConfig manifests.HubConfig, // used to render templates
-	relatedResources *[]operatorapiv1.RelatedResourceMeta,
-	// hub clients
-	hubClient kubernetes.Interface, hubApiExtensionClient apiextensionsclient.Interface, hubApiRegistrationClient apiregistrationclient.APIServicesGetter,
-	recorder events.Recorder,
-	cache resourceapply.ResourceCache,
-) (appliedErrs []error, err error) {
-	// Try to load ca bundle from configmap
-	// If the configmap is found, populate it into configmap.
-	// If the configmap not found yet, skip this and apply other resources first.
-
-	// Apply hub cluster resources
-	hubResources := getHubResources(clusterManagerMode, manifestsConfig.RegistrationWebhook.IsIPFormat, manifestsConfig.WorkWebhook.IsIPFormat, false)
-	resourceResults := helpers.ApplyDirectly(
-		ctx,
-		hubClient,
-		hubApiExtensionClient,
-		hubApiRegistrationClient,
-		nil,
-		recorder,
-		cache,
-		func(name string) ([]byte, error) {
-			template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
-			if err != nil {
-				return nil, err
-			}
-			objData := assets.MustCreateAssetFromTemplate(name, template, manifestsConfig).Data
-			helpers.SetRelatedResourcesStatusesWithObj(relatedResources, objData)
-			return objData, nil
-		},
-		hubResources...,
-	)
-	for _, result := range resourceResults {
-		if result.Error != nil {
-			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
-		}
-	}
-
-	return appliedErrs, nil
-}
-
-func applyWebhookConfig(
-	ctx context.Context,
-	webhookDeploymentName string,
-	webhookResourceFiles []string,
-	relatedResources *[]operatorapiv1.RelatedResourceMeta,
-	manifestsConfig manifests.HubConfig,
-	// hub clients
-	hubClient kubernetes.Interface,
-	managementKubeClient kubernetes.Interface,
-	recorder events.Recorder,
-	cache resourceapply.ResourceCache,
-) error {
-	var appliedErrs []error
-	//Check registration webhook running
-	err := checkWebhookPodRunning(manifestsConfig.ClusterManagerNamespace, managementKubeClient, webhookDeploymentName)
-	if err != nil {
-		return err
-	}
-
-	// If all webhook pod running , then apply webhook config files
-	resourceResults := helpers.ApplyDirectly(
-		ctx,
-		hubClient,
-		nil,
-		nil,
-		nil,
-		recorder,
-		cache,
-		func(name string) ([]byte, error) {
-			template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
-			if err != nil {
-				return nil, err
-			}
-			objData := assets.MustCreateAssetFromTemplate(name, template, manifestsConfig).Data
-			helpers.SetRelatedResourcesStatusesWithObj(relatedResources, objData)
-			return objData, nil
-		},
-		webhookResourceFiles...,
-	)
-	for _, result := range resourceResults {
-		if result.Error != nil {
-			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
-		}
-	}
-	return operatorhelpers.NewMultiLineAggregate(appliedErrs)
-}
-
-func checkWebhookPodRunning(clusterManagerNamespace string, managementKubeClient kubernetes.Interface, webhookName string) error {
-	webhookDeployment, err := managementKubeClient.AppsV1().Deployments(clusterManagerNamespace).Get(context.Background(),
-		webhookName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	if webhookDeployment.Generation != webhookDeployment.Status.ObservedGeneration {
-		return helpers.NewRequeueError(fmt.Sprintf("New %v webhook deployment not observed. Expect generation:%v, Observed Generation:%v", webhookName, webhookDeployment.Generation, webhookDeployment.Status.ObservedGeneration), clusterManagerReSyncTime)
-	}
-	replicas := *webhookDeployment.Spec.Replicas
-	readyReplicas := webhookDeployment.Status.ReadyReplicas
-
-	if readyReplicas != replicas {
-		return helpers.NewRequeueError(fmt.Sprintf("Deployment %s not ready. Replica:%v, ReadyReplicas:%v", webhookName, replicas, readyReplicas), clusterManagerReSyncTime)
-	}
-	return nil
-}
-
-func applyManagementResources(
-	ctx context.Context,
-	clusterManager *operatorapiv1.ClusterManager,
-	manifestsConfig manifests.HubConfig,
-	relatedResources *[]operatorapiv1.RelatedResourceMeta,
-	hubClient kubernetes.Interface, hubKubeConfig *rest.Config,
-	managementKubeClient kubernetes.Interface,
-	recorder events.Recorder,
-	cache resourceapply.ResourceCache,
-	ensureSAKubeconfigs func(ctx context.Context, clusterManagerName, clusterManagerNamespace string, hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error,
-) (currentGenerations []operatorapiv1.GenerationStatus, appliedErrs []error, err error) {
-	// Apply management cluster resources(namespace and deployments).
-	// Note: the certrotation-controller will create CABundle after the namespace applied.
-	// And CABundle is used to render apiservice resources.
-	managementResources := []string{namespaceResource}
-	resourceResults := helpers.ApplyDirectly(
-		ctx,
-		managementKubeClient, nil, nil, nil,
-		recorder,
-		cache,
-		func(name string) ([]byte, error) {
-			template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
-			if err != nil {
-				return nil, err
-			}
-			objData := assets.MustCreateAssetFromTemplate(name, template, manifestsConfig).Data
-			helpers.SetRelatedResourcesStatusesWithObj(relatedResources, objData)
-			return objData, nil
-		},
-		managementResources...,
-	)
-	for _, result := range resourceResults {
-		if result.Error != nil {
-			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
-		}
-	}
-
-	clusterManagerName := clusterManager.Name
-	clusterManagerMode := clusterManager.Spec.DeployOption.Mode
-	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManagerName, clusterManagerMode)
-
-	// In the Hosted mode, ensure the rbac kubeconfig secrets is existed for deployments to mount.
-	// In this step, we get serviceaccount token from the hub cluster to form a kubeconfig and set it as a secret on the management cluster.
-	// Before this step, the serviceaccounts in the hub cluster and the namespace in the management cluster should be applied first.
-	if clusterManagerMode == operatorapiv1.InstallModeHosted {
-		err = ensureSAKubeconfigs(ctx, clusterManagerName, clusterManagerNamespace,
-			hubKubeConfig, hubClient, managementKubeClient, recorder)
-		if err != nil {
-			return currentGenerations, appliedErrs, err
-		}
-	}
-
-	for _, file := range deploymentFiles {
-		currentGeneration, err := helpers.ApplyDeployment(
-			ctx,
-			managementKubeClient,
-			clusterManager.Status.Generations,
-			clusterManager.Spec.NodePlacement,
-			func(name string) ([]byte, error) {
-				template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
-				if err != nil {
-					return nil, err
-				}
-				objData := assets.MustCreateAssetFromTemplate(name, template, manifestsConfig).Data
-				helpers.SetRelatedResourcesStatusesWithObj(relatedResources, objData)
-				return objData, nil
-			},
-			recorder,
-			file)
-		if err != nil {
-			appliedErrs = append(appliedErrs, err)
-		}
-		currentGenerations = append(currentGenerations, currentGeneration)
-	}
-
-	return currentGenerations, appliedErrs, nil
-}
-
-// updateStoredVersion update(remove) deleted api version from CRD status.StoredVersions
-func updateStoredVersion(ctx context.Context, apiExtensionClient apiextensionsclient.Interface, hubMigrationClient migrationclient.StorageVersionMigrationsGetter) error {
-	for name, version := range removedCRDStoredVersions {
-		// Check migration status before update CRD stored version
-		// If CRD's StorageVersionMigration is not found, it means that the previous or the current release CRD doesn't need migration, and can contiue to update the CRD's stored version.
-		// If CRD's StorageVersionMigration is found and the status is success, it means that the current CRs were migrated successfully, and can contiue to update the CRD's stored version.
-		// Other cases, for example, the migration failed, we should not contiue to update the stored version, that will caused the stored old version CRs inconsistent with latest CRD.
-		svmStatus, err := migrationcontroller.IsStorageVersionMigrationSucceeded(hubMigrationClient, name)
-		if svmStatus == false && !errors.IsNotFound(err) {
-			return fmt.Errorf("failed to updateStoredVersion as StorageVersionMigrations %v: %v", name, err)
-		}
-
-		// retrieve CRD
-		crd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			continue
-		}
-		if err != nil {
-			klog.Warningf("faield to get CRD %v: %v", crd.Name, err)
-			continue
-		}
-
-		// remove v1alpha1 from its status
-		oldStoredVersions := crd.Status.StoredVersions
-		newStoredVersions := make([]string, 0, len(oldStoredVersions))
-		for _, stored := range oldStoredVersions {
-			if stored != version {
-				newStoredVersions = append(newStoredVersions, stored)
-			}
-		}
-
-		if !reflect.DeepEqual(oldStoredVersions, newStoredVersions) {
-			crd.Status.StoredVersions = newStoredVersions
-			// update the status sub-resource
-			crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().UpdateStatus(ctx, crd, metav1.UpdateOptions{})
-			if err != nil {
-				return err
-			}
-			klog.V(4).Infof("updated CRD %v status storedVersions: %v", crd.Name, crd.Status.StoredVersions)
-		}
-	}
-
-	return nil
+	return utilerrors.NewAggregate(errs)
 }
 
 func removeClusterManagerFinalizer(ctx context.Context, clusterManagerClient operatorv1client.ClusterManagerInterface, deploy *operatorapiv1.ClusterManager) error {
@@ -706,99 +350,6 @@ func removeClusterManagerFinalizer(ctx context.Context, clusterManagerClient ope
 		return err
 	}
 
-	return nil
-}
-
-// removeCRD removes crd, and check if crd resource is removed. Since the related cr is still being deleted,
-// it will check the crd existence after deletion, and only return nil when crd is not found.
-func removeCRD(ctx context.Context, apiExtensionClient apiextensionsclient.Interface, name string) error {
-	err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Delete(
-		ctx, name, metav1.DeleteOptions{})
-	switch {
-	case errors.IsNotFound(err):
-		return nil
-	case err != nil:
-		return err
-	}
-
-	_, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
-	switch {
-	case errors.IsNotFound(err):
-		return nil
-	case err != nil:
-		return err
-	}
-
-	return fmt.Errorf("CRD %s is still being deleted", name)
-}
-
-func cleanUpHub(ctx context.Context, controllerContext factory.SyncContext,
-	mode operatorapiv1.InstallMode,
-	kubeClient kubernetes.Interface, apiExtensionClient apiextensionsclient.Interface, apiRegistrationClient apiregistrationclient.APIServicesGetter,
-	config manifests.HubConfig, skipRemoveCRDs bool) error {
-
-	if !skipRemoveCRDs {
-		// Remove crd
-		for _, name := range crdNames {
-			err := removeCRD(ctx, apiExtensionClient, name)
-			if err != nil {
-				return err
-			}
-			controllerContext.Recorder().Eventf("CRDDeleted", "crd %s is deleted", name)
-		}
-	}
-
-	// Remove All Static files
-	// API service should be deleted in 0.10.0
-	// TODO: should remove apiservice files future
-	hubResources := append(getHubResources(mode, config.RegistrationWebhook.IsIPFormat, config.WorkWebhook.IsIPFormat, skipRemoveCRDs), hubApiserviceFiles...)
-	hubResources = append(hubResources, hubRegistrationWebhookResourceFiles...)
-	hubResources = append(hubResources, hubWorkWebhookResourceFiles...)
-
-	for _, file := range hubResources {
-		err := helpers.CleanUpStaticObject(
-			ctx,
-			kubeClient,
-			apiExtensionClient,
-			apiRegistrationClient,
-			func(name string) ([]byte, error) {
-				template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
-				if err != nil {
-					return nil, err
-				}
-				return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
-			},
-			file,
-		)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func cleanUpManagement(ctx context.Context, controllerContext factory.SyncContext,
-	kubeClient kubernetes.Interface, config manifests.HubConfig) error {
-	// Remove All Static files
-	managementResources := []string{namespaceResource} // because namespace is removed, we don't need to remove deployments explicitly
-	for _, file := range managementResources {
-		err := helpers.CleanUpStaticObject(
-			ctx,
-			kubeClient, nil, nil,
-			func(name string) ([]byte, error) {
-				template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
-				if err != nil {
-					return nil, err
-				}
-				return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
-			},
-			file,
-		)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -841,39 +392,6 @@ func ensureSAKubeconfigs(ctx context.Context, clusterManagerName, clusterManager
 		}
 	}
 	return nil
-}
-
-// getSAs return serviceaccount names of all hub components
-func getSAs(clusterManagerName string) []string {
-	return []string{
-		clusterManagerName + "-registration-controller-sa",
-		clusterManagerName + "-registration-webhook-sa",
-		clusterManagerName + "-work-webhook-sa",
-		clusterManagerName + "-placement-controller-sa",
-	}
-}
-
-func getHubResources(mode operatorapiv1.InstallMode, isRegistrationIPFormat, isWorkIPFormat, skipAddCRDs bool) []string {
-	hubResources := []string{namespaceResource}
-	if !skipAddCRDs {
-		hubResources = append(hubResources, hubCRDResourceFiles...)
-	}
-
-	hubResources = append(hubResources, hubRbacResourceFiles...)
-
-	// the hubHostedWebhookServiceFiles are only used in hosted mode
-	if mode == operatorapiv1.InstallModeHosted {
-		hubResources = append(hubResources, hubHostedWebhookServiceFiles...)
-		if isRegistrationIPFormat {
-			hubResources = append(hubResources, hubHostedWebhookEndpointRegistration)
-		}
-		if isWorkIPFormat {
-			hubResources = append(hubResources, hubHostedWebhookEndpointWork)
-		}
-	} else {
-		hubResources = append(hubResources, hubDefaultWebhookServiceFiles...)
-	}
-	return hubResources
 }
 
 // TODO: support IPV6 address

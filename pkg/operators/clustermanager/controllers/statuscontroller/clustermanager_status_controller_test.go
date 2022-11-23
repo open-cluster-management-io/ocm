@@ -96,16 +96,12 @@ func TestSyncStatus(t *testing.T) {
 				newPlacementDeployment(3, 0),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelper.AssertEqualNumber(t, len(actions), 4)
+				testinghelper.AssertEqualNumber(t, len(actions), 2)
 				testinghelper.AssertGet(t, actions[0], "operator.open-cluster-management.io", "v1", "clustermanagers")
 				testinghelper.AssertAction(t, actions[1], "update")
 				expectedCondition1 := testinghelper.NamedCondition(registrationDegraded, "GetRegistrationDeploymentFailed", metav1.ConditionTrue)
-				testinghelper.AssertOnlyConditions(t, actions[1].(clienttesting.UpdateActionImpl).Object, expectedCondition1)
-
-				testinghelper.AssertGet(t, actions[2], "operator.open-cluster-management.io", "v1", "clustermanagers")
-				testinghelper.AssertAction(t, actions[3], "update")
 				expectedCondition2 := testinghelper.NamedCondition(placementDegraded, "UnavailablePlacementPod", metav1.ConditionTrue)
-				testinghelper.AssertOnlyConditions(t, actions[3].(clienttesting.UpdateActionImpl).Object, expectedCondition1, expectedCondition2)
+				testinghelper.AssertOnlyConditions(t, actions[1].(clienttesting.UpdateActionImpl).Object, expectedCondition1, expectedCondition2)
 			},
 		},
 		{
@@ -117,16 +113,12 @@ func TestSyncStatus(t *testing.T) {
 				newPlacementDeployment(3, 3),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelper.AssertEqualNumber(t, len(actions), 4)
+				testinghelper.AssertEqualNumber(t, len(actions), 2)
 				testinghelper.AssertGet(t, actions[0], "operator.open-cluster-management.io", "v1", "clustermanagers")
 				testinghelper.AssertAction(t, actions[1], "update")
 				expectedCondition1 := testinghelper.NamedCondition(registrationDegraded, "UnavailableRegistrationPod", metav1.ConditionTrue)
-				testinghelper.AssertOnlyConditions(t, actions[1].(clienttesting.UpdateActionImpl).Object, expectedCondition1)
-
-				testinghelper.AssertGet(t, actions[2], "operator.open-cluster-management.io", "v1", "clustermanagers")
-				testinghelper.AssertAction(t, actions[3], "update")
 				expectedCondition2 := testinghelper.NamedCondition(placementDegraded, "PlacementFunctional", metav1.ConditionFalse)
-				testinghelper.AssertOnlyConditions(t, actions[3].(clienttesting.UpdateActionImpl).Object, expectedCondition1, expectedCondition2)
+				testinghelper.AssertOnlyConditions(t, actions[1].(clienttesting.UpdateActionImpl).Object, expectedCondition1, expectedCondition2)
 			},
 		},
 		{
@@ -135,16 +127,12 @@ func TestSyncStatus(t *testing.T) {
 			clusterManagers: []runtime.Object{newClusterManager()},
 			deployments:     []runtime.Object{newRegistrationDeployment(3, 3)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelper.AssertEqualNumber(t, len(actions), 4)
+				testinghelper.AssertEqualNumber(t, len(actions), 2)
 				testinghelper.AssertGet(t, actions[0], "operator.open-cluster-management.io", "v1", "clustermanagers")
 				testinghelper.AssertAction(t, actions[1], "update")
 				expectedCondition1 := testinghelper.NamedCondition(registrationDegraded, "RegistrationFunctional", metav1.ConditionFalse)
-				testinghelper.AssertOnlyConditions(t, actions[1].(clienttesting.UpdateActionImpl).Object, expectedCondition1)
-
-				testinghelper.AssertGet(t, actions[2], "operator.open-cluster-management.io", "v1", "clustermanagers")
-				testinghelper.AssertAction(t, actions[3], "update")
 				expectedCondition2 := testinghelper.NamedCondition(placementDegraded, "GetPlacementDeploymentFailed", metav1.ConditionTrue)
-				testinghelper.AssertOnlyConditions(t, actions[3].(clienttesting.UpdateActionImpl).Object, expectedCondition1, expectedCondition2)
+				testinghelper.AssertOnlyConditions(t, actions[1].(clienttesting.UpdateActionImpl).Object, expectedCondition1, expectedCondition2)
 			},
 		},
 	}

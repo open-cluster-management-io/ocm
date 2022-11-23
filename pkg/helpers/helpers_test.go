@@ -1007,7 +1007,7 @@ func TestApplyDeployment(t *testing.T) {
 	for _, c := range testcases {
 		t.Run(c.name, func(t *testing.T) {
 			fakeKubeClient := fakekube.NewSimpleClientset()
-			_, err := ApplyDeployment(
+			_, _, err := ApplyDeployment(
 				context.TODO(),
 				fakeKubeClient, []operatorapiv1.GenerationStatus{}, c.nodePlacement,
 				func(name string) ([]byte, error) {
