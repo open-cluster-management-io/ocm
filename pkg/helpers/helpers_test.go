@@ -161,54 +161,45 @@ func TestUpdateStatusCondition(t *testing.T) {
 	}
 }
 
-func TestReplaceKlusterletConditionFn(t *testing.T) {
+func TestRemoveKlusterletConditionFn(t *testing.T) {
 	cases := []struct {
 		name               string
 		startingConditions []metav1.Condition
-		newCondition       metav1.Condition
 		removeType         string
 		expectedUpdated    bool
 		expectedConditions []metav1.Condition
 	}{
 		{
-			name: "replace empty",
+			name: "remove empty",
 			startingConditions: []metav1.Condition{
 				newCondition("two", "True", "my-reason", "my-message", nil),
 			},
-			newCondition:    newCondition("one", "True", "my-reason", "my-message", nil),
-			expectedUpdated: true,
+			expectedUpdated: false,
 			expectedConditions: []metav1.Condition{
 				newCondition("two", "True", "my-reason", "my-message", nil),
-				newCondition("one", "True", "my-reason", "my-message", nil),
 			},
 		},
 		{
-			name: "replace an existing type",
+			name: "remove an existing type",
 			startingConditions: []metav1.Condition{
 				newCondition("two", "True", "my-reason", "my-message", nil),
 			},
-			newCondition:    newCondition("one", "True", "my-reason", "my-message", nil),
-			removeType:      "two",
-			expectedUpdated: true,
-			expectedConditions: []metav1.Condition{
-				newCondition("one", "True", "my-reason", "my-message", nil),
-			},
+			removeType:         "two",
+			expectedUpdated:    true,
+			expectedConditions: []metav1.Condition{},
 		},
 		{
 			name: "replace a non-existing type",
 			startingConditions: []metav1.Condition{
 				newCondition("two", "True", "my-reason", "my-message", nil),
 			},
-			newCondition:    newCondition("one", "True", "my-reason", "my-message", nil),
 			removeType:      "three",
-			expectedUpdated: true,
+			expectedUpdated: false,
 			expectedConditions: []metav1.Condition{
 				newCondition("two", "True", "my-reason", "my-message", nil),
-				newCondition("one", "True", "my-reason", "my-message", nil),
 			},
 		},
 	}
-
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fakeOperatorClient := opereatorfake.NewSimpleClientset(
@@ -225,12 +216,11 @@ func TestReplaceKlusterletConditionFn(t *testing.T) {
 					},
 				},
 			)
-
 			klusterletstatus, updated, err := UpdateKlusterletStatus(
 				context.TODO(),
 				fakeOperatorClient.OperatorV1().Klusterlets(),
 				"testmanagedcluster",
-				ReplaceKlusterletConditionFn(c.removeType, c.newCondition),
+				RemoveKlusterletConditionFn(c.removeType),
 			)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
@@ -238,10 +228,8 @@ func TestReplaceKlusterletConditionFn(t *testing.T) {
 			if updated != c.expectedUpdated {
 				t.Errorf("expected %t, but %t", c.expectedUpdated, updated)
 			}
-
 			for i := range c.expectedConditions {
 				expected := c.expectedConditions[i]
-
 				klusterletactual := klusterletstatus.Conditions[i]
 				if expected.LastTransitionTime == (metav1.Time{}) {
 					klusterletactual.LastTransitionTime = metav1.Time{}
@@ -1754,14 +1742,14 @@ func TestFeatureGatesArgs(t *testing.T) {
 	}{
 		{
 			name:              "empty input feature gates",
-			component:         ComponentHubRegistrationKey,
+			component:         componentKeyHubRegistration,
 			inputFeatureGates: []operatorapiv1.FeatureGate{},
 			expect1:           []string{},
 			expect2:           []string{},
 		},
 		{
 			name:      "valid input feature gates",
-			component: ComponentSpokeRegistrationKey,
+			component: componentKeySpokeRegistration,
 			inputFeatureGates: []operatorapiv1.FeatureGate{
 				{
 					Feature: "AddonManagement",
@@ -1777,7 +1765,7 @@ func TestFeatureGatesArgs(t *testing.T) {
 		},
 		{
 			name:      "invalid input feature gates",
-			component: ComponentSpokeRegistrationKey,
+			component: componentKeySpokeRegistration,
 			inputFeatureGates: []operatorapiv1.FeatureGate{
 				{
 					Feature: "AddonManagementInvalid",
@@ -1791,7 +1779,7 @@ func TestFeatureGatesArgs(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			output1, output2 := FeatureGatesArgs(tc.inputFeatureGates, tc.component)
+			output1, output2 := featureGatesArgs(tc.inputFeatureGates, tc.component)
 			if len(output1) == len(tc.expect1) && len(output2) == len(tc.expect2) {
 				return
 			}

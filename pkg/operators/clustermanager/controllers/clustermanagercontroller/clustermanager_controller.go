@@ -6,8 +6,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	errorhelpers "errors"
-	"fmt"
-	"strings"
 	"time"
 
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -43,10 +41,8 @@ const (
 
 	caBundleConfigmap = "ca-bundle-configmap"
 
-	hubRegistrationFeatureGatesValid = "ValidRegistrationFeatureGates"
-	hubWorkFeatureGatesValid         = "ValidWorkFeatureGates"
-	defaultWebhookPort               = int32(9443)
-	clusterManagerReSyncTime         = 5 * time.Second
+	defaultWebhookPort       = int32(9443)
+	clusterManagerReSyncTime = 5 * time.Second
 )
 
 type clusterManagerController struct {
@@ -119,46 +115,6 @@ func NewClusterManagerController(
 		ToController("ClusterManagerController", recorder)
 }
 
-func (n *clusterManagerController) checkFeatureGate(
-	ctx context.Context,
-	clusterManagerName string,
-	featureGates []operatorapiv1.FeatureGate,
-	component string) ([]string, metav1.Condition, error) {
-
-	var conditionType, featureGateKey string
-	switch component {
-	case "registration":
-		conditionType = hubRegistrationFeatureGatesValid
-		featureGateKey = helpers.ComponentHubRegistrationKey
-	case "work":
-		conditionType = hubWorkFeatureGatesValid
-		featureGateKey = helpers.ComponentHubWorkKey
-	default:
-		return nil, metav1.Condition{}, fmt.Errorf("not supported component: %s", component)
-	}
-
-	if len(featureGates) > 0 {
-		featureGateArgs, invalidFeatureGates := helpers.FeatureGatesArgs(featureGates, featureGateKey)
-		if len(invalidFeatureGates) == 0 {
-			return featureGateArgs, metav1.Condition{
-				Type:    conditionType,
-				Status:  metav1.ConditionTrue,
-				Reason:  "FeatureGatesAllValid",
-				Message: fmt.Sprintf("%s feature gates of cluster manager are all valid", strings.ToUpper(component[:1])+component[1:]),
-			}, nil
-		} else {
-			invalidFGErr := fmt.Errorf("there are some invalid feature gates of %s: %v ", component, invalidFeatureGates)
-			_, _, updateError := helpers.UpdateClusterManagerStatus(ctx, n.clusterManagerClient, clusterManagerName, helpers.UpdateClusterManagerConditionFn(metav1.Condition{
-				Type: conditionType, Status: metav1.ConditionFalse, Reason: "InvalidFeatureGatesExisting",
-				Message: invalidFGErr.Error(),
-			}))
-			return nil, metav1.Condition{}, updateError
-		}
-	}
-
-	return nil, metav1.Condition{}, nil
-}
-
 func (n *clusterManagerController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	clusterManagerName := controllerContext.QueueKey()
 	klog.V(4).Infof("Reconciling ClusterManager %q", clusterManagerName)
@@ -192,28 +148,13 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		},
 	}
 
-	// If there are some invalid feature gates of registration, will output
-	// condition `ValidRegistrationFeatureGates` False in ClusterManager.
-	if clusterManager.Spec.RegistrationConfiguration != nil {
-		featureGates, condition, err := n.checkFeatureGate(ctx, clusterManagerName,
-			clusterManager.Spec.RegistrationConfiguration.FeatureGates, "registration")
-		if err != nil {
-			return err
-		}
-		config.RegistrationFeatureGates = featureGates
-		meta.SetStatusCondition(&clusterManager.Status.Conditions, condition)
-	}
-	// If there are some invalid feature gates of work, will output
-	// condition `ValidWorkFeatureGates` False in ClusterManager.
-	if clusterManager.Spec.WorkConfiguration != nil {
-		featureGates, condition, err := n.checkFeatureGate(ctx, clusterManagerName,
-			clusterManager.Spec.WorkConfiguration.FeatureGates, "work")
-		if err != nil {
-			return err
-		}
-		config.WorkFeatureGates = featureGates
-		meta.SetStatusCondition(&clusterManager.Status.Conditions, condition)
-	}
+	var featureGateCondition metav1.Condition
+	// If there are some invalid feature gates of registration or work, will output
+	// condition `ValidFeatureGates` False in ClusterManager.
+	config.RegistrationFeatureGates, config.WorkFeatureGates, featureGateCondition = helpers.CheckFeatureGates(
+		helpers.OperatorTypeClusterManager,
+		clusterManager.Spec.RegistrationConfiguration,
+		clusterManager.Spec.WorkConfiguration)
 
 	// If we are deploying in the hosted mode, it requires us to create webhook in a different way with the default mode.
 	// In the hosted mode, the webhook servers is running in the management cluster but the users are accessing the hub cluster.
@@ -302,7 +243,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	}
 
 	// Update status
-	var conds []metav1.Condition
+	var conds []metav1.Condition = []metav1.Condition{featureGateCondition}
 	if len(errs) == 0 {
 		conds = append(conds, metav1.Condition{
 			Type:    clusterManagerApplied,

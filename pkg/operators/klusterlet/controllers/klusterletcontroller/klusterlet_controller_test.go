@@ -515,7 +515,8 @@ func TestSyncDeploy(t *testing.T) {
 	testinghelper.AssertOnlyConditions(
 		t, operatorAction[1].(clienttesting.UpdateActionImpl).Object,
 		testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
-		testinghelper.NamedCondition(spokeRegistrationFeatureGatesValid, "FeatureGatesAllValid", metav1.ConditionTrue))
+		testinghelper.NamedCondition(helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue),
+	)
 }
 
 // TestSyncDeployHosted test deployment of klusterlet components in hosted mode
@@ -616,9 +617,11 @@ func TestSyncDeployHosted(t *testing.T) {
 
 	conditionReady := testinghelper.NamedCondition(klusterletReadyToApply, "KlusterletPrepared", metav1.ConditionTrue)
 	conditionApplied := testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue)
-	conditionFeaturesValid := testinghelper.NamedCondition(spokeRegistrationFeatureGatesValid, "FeatureGatesAllValid", metav1.ConditionTrue)
+	conditionFeaturesValid := testinghelper.NamedCondition(
+		helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue)
 	testinghelper.AssertOnlyConditions(
-		t, operatorAction[2].(clienttesting.UpdateActionImpl).Object, conditionReady, conditionApplied, conditionFeaturesValid)
+		t, operatorAction[2].(clienttesting.UpdateActionImpl).Object, conditionReady, conditionApplied,
+		conditionFeaturesValid)
 }
 
 func TestSyncDeployHostedCreateAgentNamespace(t *testing.T) {
@@ -927,7 +930,8 @@ func TestDeployOnKube111(t *testing.T) {
 	testinghelper.AssertOnlyConditions(
 		t, operatorAction[1].(clienttesting.UpdateActionImpl).Object,
 		testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
-		testinghelper.NamedCondition(spokeRegistrationFeatureGatesValid, "FeatureGatesAllValid", metav1.ConditionTrue))
+		testinghelper.NamedCondition(helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue),
+	)
 
 	// Delete the klusterlet
 	now := metav1.Now()

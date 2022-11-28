@@ -11,6 +11,8 @@ import (
 	clientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1 "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	fakeworkv1 "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1/fake"
+	workv1alpha1 "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1alpha1"
+	fakeworkv1alpha1 "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1alpha1/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -66,4 +68,9 @@ var (
 // WorkV1 retrieves the WorkV1Client
 func (c *Clientset) WorkV1() workv1.WorkV1Interface {
 	return &fakeworkv1.FakeWorkV1{Fake: &c.Fake}
+}
+
+// WorkV1alpha1 retrieves the WorkV1alpha1Client
+func (c *Clientset) WorkV1alpha1() workv1alpha1.WorkV1alpha1Interface {
+	return &fakeworkv1alpha1.FakeWorkV1alpha1{Fake: &c.Fake}
 }

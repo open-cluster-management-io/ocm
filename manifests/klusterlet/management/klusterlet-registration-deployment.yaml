@@ -57,8 +57,6 @@ spec:
           {{range .RegistrationFeatureGates}}
           - {{ . }}
           {{end}}
-          {{ else }}
-          - "--feature-gates=AddonManagement=true"
           {{ end }}
           {{if .ExternalServerURL}}
           - "--spoke-external-server-urls={{ .ExternalServerURL }}"

@@ -42,9 +42,6 @@ const (
 	hubConnectionDegraded        = "HubConnectionDegraded"
 	hubKubeConfigSecretMissing   = "HubKubeConfigSecretMissing"
 	appliedManifestWorkFinalizer = "cluster.open-cluster-management.io/applied-manifest-work-cleanup"
-
-	spokeRegistrationFeatureGatesInvalid = "InvalidRegistrationFeatureGates"
-	spokeRegistrationFeatureGatesValid   = "ValidRegistrationFeatureGates"
 )
 
 type klusterletController struct {
@@ -147,6 +144,7 @@ type klusterletConfig struct {
 	InstallMode                                 operatorapiv1.InstallMode
 
 	RegistrationFeatureGates []string
+	WorkFeatureGates         []string
 
 	HubApiServerHostAlias *operatorapiv1.HubApiServerHostAlias
 }
@@ -203,34 +201,6 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		appliedManifestWorkClient: n.appliedManifestWorkClient,
 	}
 
-	// If there are some invalid feature gates of registration, will output condition `ValidRegistrationFeatureGates` False in Klusterlet.
-	featureGateCondition := metav1.Condition{
-		Type: spokeRegistrationFeatureGatesValid, Status: metav1.ConditionTrue, Reason: "FeatureGatesAllValid",
-		Message: "Registration feature gates of klusterlet are all valid",
-	}
-
-	if klusterlet.Spec.RegistrationConfiguration != nil && len(klusterlet.Spec.RegistrationConfiguration.FeatureGates) > 0 {
-		featureGateArgs, invalidFeatureGates := helpers.FeatureGatesArgs(
-			klusterlet.Spec.RegistrationConfiguration.FeatureGates, helpers.ComponentSpokeRegistrationKey)
-		if len(invalidFeatureGates) == 0 {
-			config.RegistrationFeatureGates = featureGateArgs
-		} else {
-			featureGateCondition = metav1.Condition{
-				Type: spokeRegistrationFeatureGatesValid, Status: metav1.ConditionFalse, Reason: "InvalidFeatureGatesExisting",
-				Message: fmt.Sprintf("there are some invalid feature gates of registration: %s", strings.Join(invalidFeatureGates, ",")),
-			}
-
-			_, updated, updatedErr := helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName,
-				// TODO: after the 0.10.0 is released, change back to UpdateKlusterletConditionFn
-				helpers.ReplaceKlusterletConditionFn(
-					spokeRegistrationFeatureGatesInvalid, featureGateCondition),
-			)
-			if updated {
-				return updatedErr
-			}
-		}
-	}
-
 	if config.InstallMode == operatorapiv1.InstallModeHosted {
 		managedClusterClients, err = n.buildManagedClusterClientsHostedMode(ctx,
 			n.kubeClient, config.AgentNamespace, config.ExternalManagedKubeConfigSecret)
@@ -267,6 +237,17 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		// wait for the external managed kubeconfig to exist to apply resources on the manged cluster
 		return nil
 	}
+
+	var featureGateCondition metav1.Condition
+	// If there are some invalid feature gates of registration or work, will output condition `ValidFeatureGates`
+	// False in Klusterlet.
+	// TODO: For the work feature gates, when splitting permissions in the future, if the ExecutorValidatingCaches
+	//       function is enabled, additional permissions for get, list, and watch RBAC resources required by this
+	//       function need to be applied
+	config.RegistrationFeatureGates, config.WorkFeatureGates, featureGateCondition = helpers.CheckFeatureGates(
+		helpers.OperatorTypeKlusterlet,
+		klusterlet.Spec.RegistrationConfiguration,
+		klusterlet.Spec.WorkConfiguration)
 
 	reconcilers := []klusterletReconcile{
 		&crdReconcile{
@@ -318,9 +299,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 	// If we get here, we have successfully applied everything and should indicate that
 	_, _, _ = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName,
-		// TODO: after the 0.10.0 is released, change back to UpdateKlusterletConditionFn
-		helpers.ReplaceKlusterletConditionFn(
-			spokeRegistrationFeatureGatesInvalid, featureGateCondition, *appliedCondition),
+		helpers.UpdateKlusterletConditionFn(featureGateCondition, *appliedCondition),
 		helpers.UpdateKlusterletGenerationsFn(klusterlet.Status.Generations...),
 		helpers.UpdateKlusterletRelatedResourcesFn(klusterlet.Status.RelatedResources...),
 		func(oldStatus *operatorapiv1.KlusterletStatus) error {

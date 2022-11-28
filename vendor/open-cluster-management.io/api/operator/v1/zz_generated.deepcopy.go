@@ -314,6 +314,11 @@ func (in *KlusterletSpec) DeepCopyInto(out *KlusterletSpec) {
 		*out = new(RegistrationConfiguration)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.WorkConfiguration != nil {
+		in, out := &in.WorkConfiguration, &out.WorkConfiguration
+		*out = new(WorkConfiguration)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.HubApiServerHostAlias != nil {
 		in, out := &in.HubApiServerHostAlias, &out.HubApiServerHostAlias
 		*out = new(HubApiServerHostAlias)

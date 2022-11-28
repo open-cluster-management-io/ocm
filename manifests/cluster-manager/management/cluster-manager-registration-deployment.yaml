@@ -49,8 +49,6 @@ spec:
           {{range .RegistrationFeatureGates}}
           - {{ . }}
           {{ end }}
-          {{ else }}
-          - "--feature-gates=DefaultClusterSet=true"
           {{ end }}
           {{ if .HostedMode }}
           - "--kubeconfig=/var/run/secrets/hub/kubeconfig"

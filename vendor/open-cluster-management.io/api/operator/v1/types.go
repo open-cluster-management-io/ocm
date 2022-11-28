@@ -341,6 +341,10 @@ type KlusterletSpec struct {
 	// +optional
 	RegistrationConfiguration *RegistrationConfiguration `json:"registrationConfiguration,omitempty"`
 
+	// WorkConfiguration contains the configuration of work
+	// +optional
+	WorkConfiguration *WorkConfiguration `json:"workConfiguration,omitempty"`
+
 	// HubApiServerHostAlias contains the host alias for hub api server.
 	// registration-agent and work-agent will use it to communicate with hub api server.
 	// +optional

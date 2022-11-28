@@ -451,7 +451,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
-			// both serving cert and signing cert should aways be valid
+			// both serving cert and signing cert should always be valid
 			gomega.Consistently(func() error {
 				configmap, err := kubeClient.CoreV1().ConfigMaps(hubNamespace).Get(context.Background(), "ca-bundle-configmap", metav1.GetOptions{})
 				if err != nil {
@@ -510,6 +510,33 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				}
 				return nil
 			}, eventuallyTimeout*3, eventuallyInterval*3).Should(gomega.BeNil())
+		})
+	})
+
+	ginkgo.Context("Cluster manager feature gates", func() {
+		ginkgo.It("should be set correctly", func() {
+			gomega.Eventually(func() error {
+				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(),
+					hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
+					return err
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			util.AssertClusterManagerCondition(clusterManagerName, operatorClient,
+				helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue)
+
+			registrationDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(),
+				hubRegistrationDeployment, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(registrationDeployment.Spec.Template.Spec.Containers[0].Args).Should(
+				gomega.ContainElement("--feature-gates=DefaultClusterSet=true"))
+
+			workDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(),
+				hubWorkWebhookDeployment, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(workDeployment.Spec.Template.Spec.Containers[0].Args).Should(
+				gomega.ContainElement("--feature-gates=NilExecutorValidating=true"))
 		})
 	})
 })

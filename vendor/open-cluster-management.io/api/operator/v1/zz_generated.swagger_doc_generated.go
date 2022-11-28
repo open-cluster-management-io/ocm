@@ -150,6 +150,7 @@ var map_KlusterletSpec = map[string]string{
 	"nodePlacement":             "NodePlacement enables explicit control over the scheduling of the deployed pods.",
 	"deployOption":              "DeployOption contains the options of deploying a klusterlet",
 	"registrationConfiguration": "RegistrationConfiguration contains the configuration of registration",
+	"workConfiguration":         "WorkConfiguration contains the configuration of work",
 	"hubApiServerHostAlias":     "HubApiServerHostAlias contains the host alias for hub api server. registration-agent and work-agent will use it to communicate with hub api server.",
 }
 
