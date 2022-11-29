@@ -66,6 +66,8 @@ var _ = ginkgo.Describe("Placement", func() {
 		}
 		err := kubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		assertCleanupClusters()
 	})
 
 	ginkgo.Context("Scheduling", func() {
@@ -74,6 +76,7 @@ var _ = ginkgo.Describe("Placement", func() {
 			err = clusterClient.ClusterV1beta1().Placements(namespace).Delete(context.Background(), placementName, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			assertPlacementDeleted(placementName, namespace)
+
 		})
 
 		ginkgo.It("Should re-create placementdecisions successfully once placementdecisions are deleted", func() {
@@ -334,6 +337,24 @@ var _ = ginkgo.Describe("Placement", func() {
 
 			assertNumberOfDecisions(placementName, namespace, 5)
 			assertPlacementConditionSatisfied(placementName, namespace, 5, false)
+		})
+
+		ginkgo.It("Should schedule successfully with global clusterset(labelselector type clusterset without label selector)", func() {
+			assertCreatingClusterSet("global")
+			assertCreatingClusterSetBinding("global", namespace)
+			clusters1 := assertCreatingClusters(clusterName+"1", 1)
+			clusters2 := assertCreatingClusters(clusterName+"2", 1)
+			assertCreatingPlacementWithDecision(placementName, namespace, noc(2), 2, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
+
+			assertNumberOfDecisions(placementName, namespace, 2)
+			assertPlacementConditionSatisfied(placementName, namespace, 2, true)
+
+			ginkgo.By("Delete the cluster")
+			assertDeletingClusters(clusters1...)
+			assertNumberOfDecisions(placementName, namespace, 1)
+
+			assertDeletingClusters(clusters2...)
+			assertNumberOfDecisions(placementName, namespace, 0)
 		})
 
 	})

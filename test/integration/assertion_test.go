@@ -209,16 +209,17 @@ func assertCreatingClusterSet(clusterSetName string, labels ...string) {
 			Name:   clusterSetName,
 			Labels: map[string]string{},
 		},
-		Spec: clusterapiv1beta2.ManagedClusterSetSpec{},
+		Spec: clusterapiv1beta2.ManagedClusterSetSpec{
+			ClusterSelector: clusterapiv1beta2.ManagedClusterSelector{
+				SelectorType: clusterapiv1beta2.LabelSelector,
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{},
+				},
+			},
+		},
 	}
 
 	if len(labels) > 0 {
-		clusterset.Spec.ClusterSelector = clusterapiv1beta2.ManagedClusterSelector{
-			SelectorType: clusterapiv1beta2.LabelSelector,
-			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{},
-			},
-		}
 		for i := 1; i < len(labels); i += 2 {
 			clusterset.Spec.ClusterSelector.LabelSelector.MatchLabels[labels[i-1]] = labels[i]
 		}
@@ -299,6 +300,20 @@ func assertCreatingClusters(clusterSetName string, num int, labels ...string) []
 	})
 
 	return names
+}
+
+func assertCleanupClusters() []string {
+	ginkgo.By("Cleanup all managed clusters")
+	var clusterNames []string
+	clusters, err := clusterClient.ClusterV1().ManagedClusters().List(context.Background(), metav1.ListOptions{})
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	for _, cluster := range clusters.Items {
+		clusterNames = append(clusterNames, cluster.Name)
+	}
+
+	assertDeletingClusters(clusterNames...)
+
+	return clusterNames
 }
 
 func assertUpdatingClusterWithClusterResources(managedClusterName string, res []string) {

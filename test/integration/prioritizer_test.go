@@ -178,6 +178,48 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[0], clusterNames[2]})
 		})
 
+		ginkgo.It("Should schedule successfully based on SchedulePolicy balance", func() {
+			// cluster settings
+			clusterResources := make([][]string, 3)
+			clusterResources[0] = []string{"10", "10", "50", "100"}
+			clusterResources[1] = []string{"7", "10", "90", "100"}
+			clusterResources[2] = []string{"9", "10", "80", "100"}
+
+			// placement settings
+			prioritizerPolicy := clusterapiv1beta1.PrioritizerPolicy{
+				Mode: clusterapiv1beta1.PrioritizerPolicyModeExact,
+				Configurations: []clusterapiv1beta1.PrioritizerConfig{
+					{
+						ScoreCoordinate: &clusterapiv1beta1.ScoreCoordinate{
+							Type:    clusterapiv1beta1.ScoreCoordinateTypeBuiltIn,
+							BuiltIn: "Balance",
+						},
+						Weight: 2,
+					},
+					{
+						ScoreCoordinate: &clusterapiv1beta1.ScoreCoordinate{
+							Type:    clusterapiv1beta1.ScoreCoordinateTypeBuiltIn,
+							BuiltIn: "ResourceAllocatableCPU",
+						},
+						Weight: 1,
+					},
+				},
+			}
+			//Creating the clusters with resources
+			assertBindingClusterSet(clusterSet1Name, namespace)
+			clusterNames := assertCreatingClusters(clusterSet1Name, 3)
+			for i, name := range clusterNames {
+				assertUpdatingClusterWithClusterResources(name, clusterResources[i])
+			}
+
+			ginkgo.By("Adding fake placement decisions")
+			assertCreatingPlacementDecision("fake-1", namespace, []string{clusterNames[0]})
+
+			//Checking the result of the placement
+			assertCreatingPlacementWithDecision(placementName, namespace, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
+			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[1], clusterNames[2]})
+		})
+
 		ginkgo.It("Should re-schedule successfully once a new cluster with resources added/deleted", func() {
 			// cluster settings
 			clusterResources := make([][]string, 3)

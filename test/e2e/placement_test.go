@@ -215,12 +215,16 @@ var _ = ginkgo.Describe("Placement", func() {
 		assertCreatingPlacement(placementName, noc(10), 5)
 
 		ginkgo.By("Reduce NOC of the placement")
-		placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		noc := int32(6)
-		placement.Spec.NumberOfClusters = &noc
-		placement, err = clusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gomega.Eventually(func() error {
+			placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			noc := int32(6)
+			placement.Spec.NumberOfClusters = &noc
+			_, err = clusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		assertNumberOfDecisions(placementName, 5)
 		assertPlacementStatus(placementName, 5, false)
@@ -255,21 +259,25 @@ var _ = ginkgo.Describe("Placement", func() {
 		assertCreatingPlacement(placementName, nil, 1)
 
 		ginkgo.By("Add cluster predicate")
-		placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		placement.Spec.Predicates = []clusterapiv1beta1.ClusterPredicate{
-			{
-				RequiredClusterSelector: clusterapiv1beta1.ClusterSelector{
-					LabelSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"a": "b",
+		gomega.Eventually(func() error {
+			placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			placement.Spec.Predicates = []clusterapiv1beta1.ClusterPredicate{
+				{
+					RequiredClusterSelector: clusterapiv1beta1.ClusterSelector{
+						LabelSelector: metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"a": "b",
+							},
 						},
 					},
 				},
-			},
-		}
-		placement, err = clusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			}
+			_, err = clusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		assertNumberOfDecisions(placementName, 0)
 		assertPlacementStatus(placementName, 0, false)

@@ -81,7 +81,7 @@ func (s *Status) AsError() error {
 	return errors.New(s.Message())
 }
 
-// FailedPlugin returns the failed plugin name.
+// Plugin returns the plugin name.
 func (s *Status) Plugin() string {
 	return s.plugin
 }

@@ -239,7 +239,7 @@ func (s *pluginScheduler) Schedule(
 
 		// The final score is a sum of each prioritizer score * weight.
 		// A higher weight indicates that the prioritizer weights more in the cluster selection,
-		// while 0 weight indicate thats the prioritizer is disabled.
+		// while 0 weight indicate that the prioritizer is disabled.
 		for name, val := range score {
 			scoreSum[name] = scoreSum[name] + val*int64(weight)
 		}

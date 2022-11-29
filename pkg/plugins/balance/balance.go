@@ -15,7 +15,7 @@ const (
 	placementLabel = "cluster.open-cluster-management.io/placement"
 	description    = `
 	Balance prioritizer balance the number of decisions among the clusters. The cluster
-	with the highest number of decison is given the lowest score, while the empty cluster is given
+	with the highest number of decision is given the lowest score, while the empty cluster is given
 	the highest score.
 	`
 )

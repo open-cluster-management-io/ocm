@@ -65,7 +65,7 @@ type schedulingController struct {
 	recorder                kevents.EventRecorder
 }
 
-// NewDecisionSchedulingController return an instance of schedulingController
+// NewSchedulingController return an instance of schedulingController
 func NewSchedulingController(
 	clusterClient clusterclient.Interface,
 	clusterInformer clusterinformerv1.ManagedClusterInformer,

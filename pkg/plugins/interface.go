@@ -29,13 +29,13 @@ const (
 // Plugin is the parent type for all the scheduling plugins.
 type Plugin interface {
 	Name() string
-	// Set is to set the placement for the current scheduling.
+	// Description of the plugin
 	Description() string
 	// RequeueAfter returns the requeue time interval of the placement
 	RequeueAfter(ctx context.Context, placement *clusterapiv1beta1.Placement) (PluginRequeueResult, *framework.Status)
 }
 
-// Fitler defines a filter plugin that filter unsatisfied cluster.
+// Filter defines a filter plugin that filter unsatisfied cluster.
 type Filter interface {
 	Plugin
 
@@ -44,7 +44,7 @@ type Filter interface {
 }
 
 // Prioritizer defines a prioritizer plugin that score each cluster. The score is normalized
-// as a floating betwween 0 and 1.
+// as a floating between 0 and 1.
 type Prioritizer interface {
 	Plugin
 
