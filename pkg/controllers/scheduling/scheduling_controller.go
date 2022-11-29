@@ -26,6 +26,7 @@ import (
 	"k8s.io/klog/v2"
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterinformerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
+	clusterinformerv1alpha1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1alpha1"
 	clusterinformerv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
 	clusterinformerv1beta2 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta2"
 
@@ -60,7 +61,6 @@ type schedulingController struct {
 	clusterSetBindingLister clusterlisterv1beta2.ManagedClusterSetBindingLister
 	placementLister         clusterlisterv1beta1.PlacementLister
 	placementDecisionLister clusterlisterv1beta1.PlacementDecisionLister
-	enqueuePlacementFunc    enqueuePlacementFunc
 	scheduler               Scheduler
 	recorder                kevents.EventRecorder
 }
@@ -73,13 +73,13 @@ func NewSchedulingController(
 	clusterSetBindingInformer clusterinformerv1beta2.ManagedClusterSetBindingInformer,
 	placementInformer clusterinformerv1beta1.PlacementInformer,
 	placementDecisionInformer clusterinformerv1beta1.PlacementDecisionInformer,
+	placementScoreInformer clusterinformerv1alpha1.AddOnPlacementScoreInformer,
 	scheduler Scheduler,
 	recorder events.Recorder, krecorder kevents.EventRecorder,
 ) factory.Controller {
 	syncCtx := factory.NewSyncContext(schedulingControllerName, recorder)
-	enqueuePlacementFunc := func(namespace, name string) {
-		syncCtx.Queue().Add(fmt.Sprintf("%s/%s", namespace, name))
-	}
+
+	enQueuer := newEnqueuer(syncCtx.Queue(), clusterInformer, clusterSetInformer, placementInformer, clusterSetBindingInformer)
 
 	// build controller
 	c := &schedulingController{
@@ -89,7 +89,6 @@ func NewSchedulingController(
 		clusterSetBindingLister: clusterSetBindingInformer.Lister(),
 		placementLister:         placementInformer.Lister(),
 		placementDecisionLister: placementDecisionInformer.Lister(),
-		enqueuePlacementFunc:    enqueuePlacementFunc,
 		recorder:                krecorder,
 		scheduler:               scheduler,
 	}
@@ -101,10 +100,7 @@ func NewSchedulingController(
 	// controller booting. But that should not cause any problem because all existing
 	// placements will be enqueued by the controller anyway when booting.
 	clusterInformer.Informer().AddEventHandler(&clusterEventHandler{
-		clusterSetLister:        clusterSetInformer.Lister(),
-		clusterSetBindingLister: clusterSetBindingInformer.Lister(),
-		placementLister:         placementInformer.Lister(),
-		enqueuePlacementFunc:    enqueuePlacementFunc,
+		enqueuer: enQueuer,
 	})
 
 	// setup event handler for clusterset informer
@@ -113,10 +109,12 @@ func NewSchedulingController(
 	// informers/listers of clustersetbinding/placement are synced during controller
 	// booting. But that should not cause any problem because all existing placements will
 	// be enqueued by the controller anyway when booting.
-	clusterSetInformer.Informer().AddEventHandler(&clusterSetEventHandler{
-		clusterSetBindingLister: clusterSetBindingInformer.Lister(),
-		placementLister:         placementInformer.Lister(),
-		enqueuePlacementFunc:    enqueuePlacementFunc,
+	clusterSetInformer.Informer().AddEventHandler(&cache.ResourceEventHandlerFuncs{
+		AddFunc: enQueuer.enqueueClusterSet,
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			enQueuer.enqueueClusterSet(newObj)
+		},
+		DeleteFunc: enQueuer.enqueueClusterSet,
 	})
 
 	// setup event handler for clustersetbinding informer
@@ -125,10 +123,21 @@ func NewSchedulingController(
 	// the informers/listers of clusterset/placement are synced during controller booting. But
 	// that should not cause any problem because all existing placements will be enqueued by
 	// the controller anyway when booting.
-	clusterSetBindingInformer.Informer().AddEventHandler(&clusterSetBindingEventHandler{
-		clusterSetLister:     clusterSetInformer.Lister(),
-		placementLister:      placementInformer.Lister(),
-		enqueuePlacementFunc: enqueuePlacementFunc,
+	clusterSetBindingInformer.Informer().AddEventHandler(&cache.ResourceEventHandlerFuncs{
+		AddFunc: enQueuer.enqueueClusterSetBinding,
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			enQueuer.enqueueClusterSetBinding(newObj)
+		},
+		DeleteFunc: enQueuer.enqueueClusterSetBinding,
+	})
+
+	// setup event handler for placementscore informer
+	placementScoreInformer.Informer().AddEventHandler(&cache.ResourceEventHandlerFuncs{
+		AddFunc: enQueuer.enqueuePlacementScore,
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			enQueuer.enqueuePlacementScore(newObj)
+		},
+		DeleteFunc: enQueuer.enqueuePlacementScore,
 	})
 
 	return factory.New().
@@ -153,82 +162,9 @@ func NewSchedulingController(
 			}
 			return false
 		}, placementDecisionInformer.Informer()).
-		WithBareInformers(clusterInformer.Informer(), clusterSetInformer.Informer(), clusterSetBindingInformer.Informer()).
+		WithBareInformers(clusterInformer.Informer(), clusterSetInformer.Informer(), clusterSetBindingInformer.Informer(), placementScoreInformer.Informer()).
 		WithSync(c.sync).
 		ToController(schedulingControllerName, recorder)
-}
-
-func NewSchedulingControllerResync(
-	clusterClient clusterclient.Interface,
-	clusterInformer clusterinformerv1.ManagedClusterInformer,
-	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer,
-	clusterSetBindingInformer clusterinformerv1beta2.ManagedClusterSetBindingInformer,
-	placementInformer clusterinformerv1beta1.PlacementInformer,
-	placementDecisionInformer clusterinformerv1beta1.PlacementDecisionInformer,
-	scheduler Scheduler,
-	recorder events.Recorder, krecorder kevents.EventRecorder,
-) factory.Controller {
-	syncCtx := factory.NewSyncContext(schedulingControllerResyncName, recorder)
-	enqueuePlacementFunc := func(namespace, name string) {
-		syncCtx.Queue().Add(fmt.Sprintf("%s/%s", namespace, name))
-	}
-
-	// build controller
-	c := &schedulingController{
-		clusterClient:           clusterClient,
-		clusterLister:           clusterInformer.Lister(),
-		clusterSetLister:        clusterSetInformer.Lister(),
-		clusterSetBindingLister: clusterSetBindingInformer.Lister(),
-		placementLister:         placementInformer.Lister(),
-		placementDecisionLister: placementDecisionInformer.Lister(),
-		enqueuePlacementFunc:    enqueuePlacementFunc,
-		recorder:                krecorder,
-		scheduler:               scheduler,
-	}
-
-	return factory.New().
-		WithSyncContext(syncCtx).
-		WithSync(c.resync).
-		ResyncEvery(ResyncInterval).
-		ToController(schedulingControllerResyncName, recorder)
-
-}
-
-// Resync the placement which depends on AddOnPlacementScore periodically
-func (c *schedulingController) resync(ctx context.Context, syncCtx factory.SyncContext) error {
-	queueKey := syncCtx.QueueKey()
-	klog.V(4).Infof("Resync placement %q", queueKey)
-
-	if queueKey == "key" {
-		placements, err := c.placementLister.List(labels.Everything())
-		if err != nil {
-			return err
-		}
-
-		for _, placement := range placements {
-			for _, config := range placement.Spec.PrioritizerPolicy.Configurations {
-				if config.ScoreCoordinate != nil && config.ScoreCoordinate.Type == clusterapiv1beta1.ScoreCoordinateTypeAddOn {
-					key, _ := cache.MetaNamespaceKeyFunc(placement)
-					klog.V(4).Infof("Requeue placement %s", key)
-					syncCtx.Queue().Add(key)
-					break
-				}
-			}
-		}
-
-		return nil
-	} else {
-		placement, err := c.getPlacement(queueKey)
-		if errors.IsNotFound(err) {
-			// no work if placement is deleted
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		// Do not pass syncCtx to syncPlacement, since don't want to requeue the placement when resyncing the placement.
-		return c.syncPlacement(ctx, nil, placement)
-	}
 }
 
 func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {

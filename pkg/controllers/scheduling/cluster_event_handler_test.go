@@ -1,7 +1,7 @@
 package scheduling
 
 import (
-	"fmt"
+	"k8s.io/client-go/util/workqueue"
 	"strings"
 	"testing"
 
@@ -93,19 +93,24 @@ func TestOnClusterChange(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := testinghelpers.NewClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
 
+			syncCtx := testinghelpers.NewFakeSyncContext(t, "fake")
+			q := newEnqueuer(
+				syncCtx.Queue(),
+				clusterInformerFactory.Cluster().V1().ManagedClusters(),
+				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets(),
+				clusterInformerFactory.Cluster().V1beta1().Placements(),
+				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings(),
+			)
 			queuedKeys := sets.NewString()
-			handler := &clusterEventHandler{
-				clusterSetLister:        clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
-				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
-				placementLister:         clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
-				enqueuePlacementFunc: func(namespace, name string) {
-					queuedKeys.Insert(fmt.Sprintf("%s/%s", namespace, name))
-				},
+			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.RateLimitingInterface) {
+				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+				queuedKeys.Insert(key)
 			}
+			q.enqueuePlacementFunc = fakeEnqueuePlacement
 
-			handler.onChange(c.obj)
+			q.enqueueCluster(c.obj)
 			expectedQueuedKeys := sets.NewString(c.queuedKeys...)
 			if !queuedKeys.Equal(expectedQueuedKeys) {
 				t.Errorf("expected queued placements %q, but got %s", strings.Join(expectedQueuedKeys.List(), ","), strings.Join(queuedKeys.List(), ","))
@@ -247,16 +252,24 @@ func TestOnClusterUpdate(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := testinghelpers.NewClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
 
+			syncCtx := testinghelpers.NewFakeSyncContext(t, "fake")
+			q := newEnqueuer(
+				syncCtx.Queue(),
+				clusterInformerFactory.Cluster().V1().ManagedClusters(),
+				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets(),
+				clusterInformerFactory.Cluster().V1beta1().Placements(),
+				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings(),
+			)
 			queuedKeys := sets.NewString()
+			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.RateLimitingInterface) {
+				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+				queuedKeys.Insert(key)
+			}
+			q.enqueuePlacementFunc = fakeEnqueuePlacement
 			handler := &clusterEventHandler{
-				clusterSetLister:        clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
-				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
-				placementLister:         clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
-				enqueuePlacementFunc: func(namespace, name string) {
-					queuedKeys.Insert(fmt.Sprintf("%s/%s", namespace, name))
-				},
+				enqueuer: q,
 			}
 
 			handler.OnUpdate(c.oldObj, c.newObj)
@@ -339,16 +352,24 @@ func TestOnClusterDelete(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := testinghelpers.NewClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
 
+			syncCtx := testinghelpers.NewFakeSyncContext(t, "fake")
+			q := newEnqueuer(
+				syncCtx.Queue(),
+				clusterInformerFactory.Cluster().V1().ManagedClusters(),
+				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets(),
+				clusterInformerFactory.Cluster().V1beta1().Placements(),
+				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings(),
+			)
 			queuedKeys := sets.NewString()
+			fakeEnqueuePlacement := func(obj interface{}, queue workqueue.RateLimitingInterface) {
+				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+				queuedKeys.Insert(key)
+			}
+			q.enqueuePlacementFunc = fakeEnqueuePlacement
 			handler := &clusterEventHandler{
-				clusterSetLister:        clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
-				clusterSetBindingLister: clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Lister(),
-				placementLister:         clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
-				enqueuePlacementFunc: func(namespace, name string) {
-					queuedKeys.Insert(fmt.Sprintf("%s/%s", namespace, name))
-				},
+				enqueuer: q,
 			}
 
 			handler.OnDelete(c.obj)

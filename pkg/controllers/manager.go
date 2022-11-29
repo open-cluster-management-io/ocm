@@ -62,17 +62,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings(),
 		clusterInformers.Cluster().V1beta1().Placements(),
 		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
-		scheduler,
-		controllerContext.EventRecorder, recorder,
-	)
-
-	schedulingControllerResync := scheduling.NewSchedulingControllerResync(
-		clusterClient,
-		clusterInformers.Cluster().V1().ManagedClusters(),
-		clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
-		clusterInformers.Cluster().V1beta2().ManagedClusterSetBindings(),
-		clusterInformers.Cluster().V1beta1().Placements(),
-		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
+		clusterInformers.Cluster().V1alpha1().AddOnPlacementScores(),
 		scheduler,
 		controllerContext.EventRecorder, recorder,
 	)
@@ -80,7 +70,6 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	go clusterInformers.Start(ctx.Done())
 
 	go schedulingController.Run(ctx, 1)
-	go schedulingControllerResync.Run(ctx, 1)
 
 	<-ctx.Done()
 	return nil
