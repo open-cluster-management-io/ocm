@@ -664,6 +664,50 @@ func TestReconcile(t *testing.T) {
 			},
 			validateAddonActions: addontesting.AssertNoActions,
 		},
+		{
+			name:    "correct the configuration",
+			syncKey: "cluster1/test",
+			managedClusteraddon: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test"))
+					addon.Status.Conditions = []metav1.Condition{
+						{
+							Type:    UnsupportedConfigurationType,
+							Status:  metav1.ConditionFalse,
+							Message: "the supported config resources are required in ClusterManagementAddon",
+						},
+					}
+					return addon
+				}(),
+			},
+			clusterManagementAddon: []runtime.Object{
+				func() *addonapiv1alpha1.ClusterManagementAddOn {
+					clusterManagementAddon := addontesting.NewClusterManagementAddon("test", "", "")
+					clusterManagementAddon.Spec.SupportedConfigs = []addonapiv1alpha1.ConfigMeta{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "configs.test",
+								Resource: "testconfigs",
+							},
+						},
+					}
+					return clusterManagementAddon
+				}(),
+			},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{
+				name:       "test",
+				configGVRs: []schema.GroupVersionResource{{Group: "configs.test", Resource: "testconfigs"}},
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "update")
+				actual := actions[0].(clienttesting.UpdateActionImpl).Object
+				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, UnsupportedConfigurationType) {
+					t.Errorf("expeted unsupported config condition is false, but failed %v", addOn.Status)
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {

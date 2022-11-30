@@ -126,6 +126,18 @@ func (c *clusterManagementController) sync(ctx context.Context, syncCtx factory.
 		return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
 	}
 
+	// Update unsupported configuration condition if configuration becomes corrected
+	unsupportedConfigCondition := meta.FindStatusCondition(addon.Status.Conditions, UnsupportedConfigurationType)
+	if unsupportedConfigCondition != nil {
+		meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
+			Type:    UnsupportedConfigurationType,
+			Status:  metav1.ConditionFalse,
+			Reason:  "ConfigurationSupported",
+			Message: "the config resources are supported",
+		})
+		modified = true
+	}
+
 	if !modified {
 		return nil
 	}
@@ -191,7 +203,7 @@ func mergeConfigReferences(
 	}
 
 	if len(expectedConfigReferences) == 0 {
-		// the config name is not defined, ignore
+		// the config references are not defined, ignore
 		return nil
 	}
 

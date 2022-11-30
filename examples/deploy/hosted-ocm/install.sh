@@ -85,6 +85,8 @@ ${KUBECTL} apply -k "$WORK_DIR/registration-operator/deploy/cluster-manager/conf
 ${KUBECTL} apply -k "$WORK_DIR/registration-operator/deploy/klusterlet/config/manifests"
 rm -rf "$WORK_DIR/registration-operator"
 
+${KUBECTL} get ns open-cluster-management-agent || ${KUBECTL} create ns open-cluster-management-agent
+
 cat << EOF | ${KUBECTL} apply -f -
 apiVersion: operator.open-cluster-management.io/v1
 kind: Klusterlet
