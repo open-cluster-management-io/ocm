@@ -42,7 +42,7 @@ func NewWorkloadAgentOptions() *WorkloadAgentOptions {
 	return &WorkloadAgentOptions{
 		QPS:                50,
 		Burst:              100,
-		StatusSyncInterval: 30 * time.Second,
+		StatusSyncInterval: 10 * time.Second,
 	}
 }
 
