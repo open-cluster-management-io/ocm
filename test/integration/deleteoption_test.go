@@ -195,7 +195,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 					}
 				}
 
-				return fmt.Errorf("Resource name or uid in appliedmanifestwork does not match")
+				return fmt.Errorf("resource name or uid in appliedmanifestwork does not match")
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			gomega.Eventually(func() error {
@@ -221,20 +221,20 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// Ensure the resource is not tracked by the appliedmanifestwork.
-			gomega.Eventually(func() bool {
+			gomega.Eventually(func() error {
 				appliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
-					return false
+					return err
 				}
 
 				for _, appliedResource := range appliedManifestWork.Status.AppliedResources {
 					if appliedResource.Name == "cm1" {
-						return false
+						return fmt.Errorf("found applied resouce name cm1")
 					}
 				}
 
-				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Ensure the configmap is kept and tracked by anotherappliedmanifestwork
 			gomega.Eventually(func() error {

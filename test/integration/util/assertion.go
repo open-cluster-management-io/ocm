@@ -42,27 +42,28 @@ func AssertWorkCondition(namespace, name string, workClient workclientset.Interf
 }
 
 func AssertWorkGeneration(namespace, name string, workClient workclientset.Interface, expectedType string, eventuallyTimeout, eventuallyInterval int) {
-	gomega.Eventually(func() bool {
+	gomega.Eventually(func() error {
 		work, err := workClient.WorkV1().ManifestWorks(namespace).Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
-			return false
+			return err
 		}
 
 		// check manifest status conditions
 		condition := meta.FindStatusCondition(work.Status.Conditions, expectedType)
 		if condition == nil {
-			return false
+			return fmt.Errorf("condition is nil")
 		}
 
 		if condition.ObservedGeneration != work.Generation {
-			return false
+			return fmt.Errorf("generation not equal: observedGeneration: %v, generation: %v",
+				condition.ObservedGeneration, work.Generation)
 		}
 
-		return true
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
-// check if work is deleted
+// AssertWorkDeleted check if work is deleted
 func AssertWorkDeleted(namespace, name, hubhash string, manifests []workapiv1.Manifest, workClient workclientset.Interface, kubeClient kubernetes.Interface, eventuallyTimeout, eventuallyInterval int) {
 	// wait for deletion of manifest work
 	gomega.Eventually(func() error {
@@ -101,24 +102,24 @@ func AssertAppliedManifestWorkDeleted(name string, workClient workclientset.Inte
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 }
 
-// check if finalizer is added
+// AssertFinalizerAdded check if finalizer is added
 func AssertFinalizerAdded(namespace, name string, workClient workclientset.Interface, eventuallyTimeout, eventuallyInterval int) {
-	gomega.Eventually(func() bool {
+	gomega.Eventually(func() error {
 		work, err := workClient.WorkV1().ManifestWorks(namespace).Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
-			return false
+			return err
 		}
 
 		for _, finalizer := range work.Finalizers {
 			if finalizer == "cluster.open-cluster-management.io/manifest-work-cleanup" {
-				return true
+				return nil
 			}
 		}
-		return false
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		return fmt.Errorf("not found")
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
-// check if all manifests are applied
+// AssertExistenceOfConfigMaps check if all manifests are applied
 func AssertExistenceOfConfigMaps(manifests []workapiv1.Manifest, kubeClient kubernetes.Interface, eventuallyTimeout, eventuallyInterval int) {
 	gomega.Eventually(func() error {
 		for _, manifest := range manifests {
@@ -137,7 +138,7 @@ func AssertExistenceOfConfigMaps(manifests []workapiv1.Manifest, kubeClient kube
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
-// check if configmap does not exist
+// AssertNonexistenceOfConfigMaps check if configmap does not exist
 func AssertNonexistenceOfConfigMaps(manifests []workapiv1.Manifest, kubeClient kubernetes.Interface,
 	eventuallyTimeout, eventuallyInterval int) {
 	gomega.Eventually(func() bool {
@@ -149,27 +150,27 @@ func AssertNonexistenceOfConfigMaps(manifests []workapiv1.Manifest, kubeClient k
 		}
 
 		return false
-	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.BeFalse())
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }
 
-// check the existence of resource with GVR, namespace and name
+// AssertExistenceOfResources check the existence of resource with GVR, namespace and name
 func AssertExistenceOfResources(gvrs []schema.GroupVersionResource, namespaces, names []string, dynamicClient dynamic.Interface, eventuallyTimeout, eventuallyInterval int) {
 	gomega.Expect(gvrs).To(gomega.HaveLen(len(namespaces)))
 	gomega.Expect(gvrs).To(gomega.HaveLen(len(names)))
 
-	gomega.Eventually(func() bool {
+	gomega.Eventually(func() error {
 		for i := range gvrs {
 			_, err := GetResource(namespaces[i], names[i], gvrs[i], dynamicClient)
 			if err != nil {
-				return false
+				return err
 			}
 		}
 
-		return true
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
-// check if resource with GVR, namespace and name does not exists
+// AssertNonexistenceOfResources check if resource with GVR, namespace and name does not exists
 func AssertNonexistenceOfResources(gvrs []schema.GroupVersionResource, namespaces, names []string, dynamicClient dynamic.Interface, eventuallyTimeout, eventuallyInterval int) {
 	gomega.Expect(gvrs).To(gomega.HaveLen(len(namespaces)))
 	gomega.Expect(gvrs).To(gomega.HaveLen(len(names)))
@@ -186,7 +187,7 @@ func AssertNonexistenceOfResources(gvrs []schema.GroupVersionResource, namespace
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }
 
-// check if applied resources in work status are updated correctly
+// AssertAppliedResources check if applied resources in work status are updated correctly
 func AssertAppliedResources(hubHash, workName string, gvrs []schema.GroupVersionResource, namespaces, names []string, workClient workclientset.Interface, eventuallyTimeout, eventuallyInterval int) {
 	gomega.Expect(gvrs).To(gomega.HaveLen(len(namespaces)))
 	gomega.Expect(gvrs).To(gomega.HaveLen(len(names)))
@@ -219,11 +220,12 @@ func AssertAppliedResources(hubHash, workName string, gvrs []schema.GroupVersion
 		}
 	})
 
-	gomega.Eventually(func() bool {
+	gomega.Eventually(func() error {
 		appliedManifestWorkName := fmt.Sprintf("%s-%s", hubHash, workName)
-		appliedManifestWork, err := workClient.WorkV1().AppliedManifestWorks().Get(context.Background(), appliedManifestWorkName, metav1.GetOptions{})
+		appliedManifestWork, err := workClient.WorkV1().AppliedManifestWorks().Get(
+			context.Background(), appliedManifestWorkName, metav1.GetOptions{})
 		if err != nil {
-			return false
+			return err
 		}
 
 		// remove uid from each AppliedManifestResourceMeta
@@ -240,6 +242,10 @@ func AssertAppliedResources(hubHash, workName string, gvrs []schema.GroupVersion
 			})
 		}
 
-		return reflect.DeepEqual(actualAppliedResources, appliedResources)
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		if !reflect.DeepEqual(actualAppliedResources, appliedResources) {
+			return fmt.Errorf("applied resources not equal, expect: %v, actual: %v",
+				appliedResources, actualAppliedResources)
+		}
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }

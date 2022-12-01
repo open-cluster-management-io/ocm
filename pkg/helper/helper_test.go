@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/google/go-cmp/cmp"
 	"reflect"
 	"testing"
 	"time"
@@ -16,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
@@ -165,7 +165,7 @@ func TestUpdateStatusCondition(t *testing.T) {
 					actual.LastTransitionTime = metav1.Time{}
 				}
 				if !equality.Semantic.DeepEqual(expected, actual) {
-					t.Errorf(diff.ObjectDiff(expected, actual))
+					t.Errorf(cmp.Diff(expected, actual))
 				}
 			}
 		})
@@ -265,7 +265,7 @@ func TestMergeManifestConditions(t *testing.T) {
 				}
 
 				if !equality.Semantic.DeepEqual(actualCondition, expectedCondition) {
-					t.Errorf(diff.ObjectDiff(actualCondition, expectedCondition))
+					t.Errorf(cmp.Diff(actualCondition, expectedCondition))
 				}
 			}
 		})
@@ -329,7 +329,7 @@ func TestMergeStatusConditions(t *testing.T) {
 					actual.LastTransitionTime = metav1.Time{}
 				}
 				if !equality.Semantic.DeepEqual(actual, expect) {
-					t.Errorf(diff.ObjectDiff(actual, expect))
+					t.Errorf(cmp.Diff(actual, expect))
 				}
 			}
 		})
@@ -405,9 +405,26 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 			owner:                                metav1.OwnerReference{Name: "n1", UID: "a"},
 		},
 		{
-			name: "skip with multiple owners",
+			name: "delete with multiple owners",
 			existingResources: []runtime.Object{
-				newSecret("ns1", "n1", false, "ns1-n1", metav1.OwnerReference{Name: "n1", UID: "a"}, metav1.OwnerReference{Name: "n2", UID: "b"}),
+				newSecret("ns1", "n1", false, "ns1-n1",
+					metav1.OwnerReference{Name: "n1", UID: "a"}, metav1.OwnerReference{Name: "n2", UID: "b"}),
+			},
+			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "ns2-n2"},
+			},
+			expectedResourcesPendingFinalization: []workapiv1.AppliedManifestResourceMeta{
+				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"}},
+			owner: metav1.OwnerReference{Name: "n1", UID: "a"},
+		},
+		{
+			name: "skip with multiple applied manifest work owners",
+			existingResources: []runtime.Object{
+				newSecret("ns1", "n1", false, "ns1-n1",
+					metav1.OwnerReference{Name: "n1", UID: "a"},
+					metav1.OwnerReference{Name: "n2", UID: "b",
+						APIVersion: "work.open-cluster-management.io/v1", Kind: "AppliedManifestWork"}),
 			},
 			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
@@ -432,7 +449,7 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 			}
 
 			if !equality.Semantic.DeepEqual(actual, c.expectedResourcesPendingFinalization) {
-				t.Errorf(diff.ObjectDiff(actual, c.expectedResourcesPendingFinalization))
+				t.Errorf(cmp.Diff(actual, c.expectedResourcesPendingFinalization))
 			}
 		})
 	}

@@ -235,8 +235,8 @@ func DeleteAppliedResources(
 			continue
 		}
 
-		// If there are still any other existing owners (not only ManifestWorks), update ownerrefs only.
-		if len(existingOwner) > 1 {
+		// If there are still any other existing appliedManifestWorks owners, update ownerrefs only.
+		if existOtherAppliedManifestWorkOwners(owner, existingOwner) {
 			err := ApplyOwnerReferences(ctx, dynamicClient, gvr, u, *ownerCopy)
 			if err != nil {
 				errs = append(errs, fmt.Errorf(
@@ -287,6 +287,23 @@ func DeleteAppliedResources(
 	}
 
 	return resourcesPendingFinalization, errs
+}
+
+// existOtherAppliedManifestWorkOwners check existingOwners for other appliedManifestWork owners other than myOwner
+func existOtherAppliedManifestWorkOwners(myOwner metav1.OwnerReference, existingOwners []metav1.OwnerReference) bool {
+	for _, owner := range existingOwners {
+		if owner.APIVersion != "work.open-cluster-management.io/v1" {
+			continue
+		}
+		if owner.Kind != "AppliedManifestWork" {
+			continue
+		}
+		if myOwner.UID == owner.UID {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 // GuessObjectGroupVersionKind returns GVK for the passed runtime object.
