@@ -86,7 +86,7 @@ const (
 
 	// AnnotationDeletionOrphan is an annotation for the manifest which will not be cleaned up
 	// after the addon manifestWork is deleted.
-	AnnotationDeletionOrphan = "addon-cluster-management.io/deletion-orphan"
+	AnnotationDeletionOrphan = "addon.cluster-management.io/deletion-orphan"
 )
 
 // DeployWorkNamePrefix returns the prefix of the work name for the addon

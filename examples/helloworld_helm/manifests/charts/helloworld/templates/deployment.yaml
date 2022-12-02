@@ -11,7 +11,7 @@ metadata:
     addonInstallNamespace: {{ .Values.addonInstallNamespace }}
   annotations:
     kubeVersion: {{ .Capabilities.KubeVersion }}
-    "addon-cluster-management.io/deletion-orphan": ""
+    "addon.cluster-management.io/deletion-orphan": ""
 spec:
   replicas: 1
   selector:
