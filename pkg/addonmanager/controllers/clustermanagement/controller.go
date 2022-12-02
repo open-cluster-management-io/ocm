@@ -174,24 +174,22 @@ func mergeConfigReferences(
 	clusterManagementAddon *addonapiv1alpha1.ClusterManagementAddOn,
 	addon *addonapiv1alpha1.ManagedClusterAddOn,
 ) error {
-	registeredConfigs := agent.GetAgentAddonOptions().SupportedConfigGVRs
-	if len(registeredConfigs) == 0 {
-		// the config resources are not registed by framework
+	// make sure the supported configs in ClusterManagementAddon are registered and no duplicated
+	cmaConfigSet, err := validateCMAConfigs(clusterManagementAddon.Spec.SupportedConfigs, agent.GetAgentAddonOptions().SupportedConfigGVRs)
+	if err != nil {
+		return err
+	}
+
+	if len(cmaConfigSet) == 0 {
+		if len(addon.Spec.Configs) != 0 {
+			return fmt.Errorf("the supported config resources are required in ClusterManagementAddon")
+		}
+
+		// the supported configs are not specified and no config refers in the managed cluster addon
 		// for compatibility, try to merge old addon configuration
 		// TODO  this will be removed after next few releases
 		mergeAddOnConfiguration(modified, clusterManagementAddon, addon)
 		return nil
-	}
-
-	cmaConfigs := clusterManagementAddon.Spec.SupportedConfigs
-	if len(cmaConfigs) == 0 {
-		return fmt.Errorf("the supported config resources are required in ClusterManagementAddon")
-	}
-
-	// make sure the supported configs in ClusterManagementAddon are registered and no duplicated
-	cmaConfigSet, err := validateCMAConfigs(cmaConfigs, registeredConfigs)
-	if err != nil {
-		return err
 	}
 
 	// merge the ClusterManagementAddOn default configs and ManagedClusterAddOn configs

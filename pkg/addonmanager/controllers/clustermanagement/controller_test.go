@@ -468,11 +468,75 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: addontesting.AssertNoActions,
 		},
 		{
-			name:                   "no configs in ClusterManagementAddOn",
-			syncKey:                "cluster1/test",
-			managedClusteraddon:    []runtime.Object{addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test"))},
-			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "", "")},
-			cluster:                []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			name:    "no configs in ClusterManagementAddOn",
+			syncKey: "cluster1/test",
+			managedClusteraddon: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test"))
+					addon.Status.RelatedObjects = []addonapiv1alpha1.ObjectReference{
+						{
+							Name:     "test",
+							Group:    "addon.open-cluster-management.io",
+							Resource: "clustermanagementaddons",
+						},
+					}
+					return addon
+				}(),
+			},
+			clusterManagementAddon: []runtime.Object{
+				func() *addonapiv1alpha1.ClusterManagementAddOn {
+					return &addonapiv1alpha1.ClusterManagementAddOn{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test",
+						},
+					}
+				}(),
+			},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{
+				name:       "test",
+				configGVRs: []schema.GroupVersionResource{{Group: "configs.test", Resource: "testconfigs"}},
+			},
+			validateAddonActions: addontesting.AssertNoActions,
+		},
+		{
+			name:    "no configs in ClusterManagementAddOn, but ManagedClusterAddOn has config refers",
+			syncKey: "cluster1/test",
+			managedClusteraddon: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test"))
+					addon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "configs.test",
+								Resource: "testconfigs",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "test1",
+							},
+						},
+					}
+					addon.Status.RelatedObjects = []addonapiv1alpha1.ObjectReference{
+						{
+							Name:     "test",
+							Group:    "addon.open-cluster-management.io",
+							Resource: "clustermanagementaddons",
+						},
+					}
+					return addon
+				}(),
+			},
+			clusterManagementAddon: []runtime.Object{
+				func() *addonapiv1alpha1.ClusterManagementAddOn {
+					return &addonapiv1alpha1.ClusterManagementAddOn{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test",
+						},
+					}
+				}(),
+			},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			testaddon: &testAgent{
 				name:       "test",
 				configGVRs: []schema.GroupVersionResource{{Group: "configs.test", Resource: "testconfigs"}},
