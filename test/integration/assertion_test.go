@@ -3,6 +3,9 @@ package integration
 import (
 	"context"
 	"fmt"
+	"sort"
+	"time"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -15,8 +18,6 @@ import (
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	"open-cluster-management.io/placement/test/integration/util"
-	"sort"
-	"time"
 )
 
 func assertPlacementDecisionCreated(placement *clusterapiv1beta1.Placement) {
@@ -291,8 +292,16 @@ func assertCreatingClusters(clusterSetName string, num int, labels ...string) []
 			cluster.Labels[labels[i-1]] = labels[i]
 		}
 		cluster, err := clusterClient.ClusterV1().ManagedClusters().Create(context.Background(), cluster, metav1.CreateOptions{})
-		names = append(names, cluster.Name)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		cluster.Status.Conditions = []metav1.Condition{}
+		for i := 1; i < len(labels); i += 2 {
+			cluster.Status.ClusterClaims = append(cluster.Status.ClusterClaims, clusterapiv1.ManagedClusterClaim{Name: labels[i-1], Value: labels[i]})
+		}
+		_, err = clusterClient.ClusterV1().ManagedClusters().UpdateStatus(context.Background(), cluster, metav1.UpdateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		names = append(names, cluster.Name)
 	}
 
 	sort.SliceStable(names, func(i, j int) bool {

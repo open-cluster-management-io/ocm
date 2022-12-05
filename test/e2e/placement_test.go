@@ -298,6 +298,19 @@ var _ = ginkgo.Describe("Placement", func() {
 		err = clusterClient.ClusterV1beta1().Placements(namespace).Delete(context.TODO(), placementName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
+
+	//update this case when version upgrade
+	ginkgo.It("Should support v1beta1 placement", func() {
+		ginkgo.By("Create v1beta1 placement with v1beta1 client")
+		placement := &clusterapiv1beta1.Placement{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      "test",
+			},
+		}
+		_, err = clusterClient.ClusterV1beta1().Placements(namespace).Create(context.Background(), placement, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	})
 })
 
 func noc(n int) *int32 {

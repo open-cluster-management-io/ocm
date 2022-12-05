@@ -3,6 +3,8 @@ package integration
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -14,7 +16,6 @@ import (
 	controllers "open-cluster-management.io/placement/pkg/controllers"
 	"open-cluster-management.io/placement/pkg/controllers/scheduling"
 	"open-cluster-management.io/placement/test/integration/util"
-	"time"
 )
 
 var _ = ginkgo.Describe("TaintToleration", func() {
@@ -58,13 +59,105 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 	})
 
 	ginkgo.Context("TaintToleration", func() {
-		ginkgo.It("Should schedule successfully with taint/toleration and requeue when expire TolerationSeconds", func() {
+		ginkgo.It("Should schedule successfully when taint/toleration matches", func() {
+			//Cluster settings
+			assertBindingClusterSet(clusterSet1Name, namespace)
+			clusterNames := assertCreatingClusters(clusterSet1Name, 3)
+
+			assertUpdatingClusterWithClusterTaint(clusterNames[0], &clusterapiv1.Taint{
+				Key:    "key1",
+				Value:  "value1",
+				Effect: clusterapiv1.TaintEffectNoSelect,
+			})
+			assertUpdatingClusterWithClusterTaint(clusterNames[1], &clusterapiv1.Taint{
+				Key:    "key2",
+				Value:  "value2",
+				Effect: clusterapiv1.TaintEffectNoSelect,
+			})
+			assertUpdatingClusterWithClusterTaint(clusterNames[2], &clusterapiv1.Taint{
+				Key:    "key2",
+				Value:  "value3",
+				Effect: clusterapiv1.TaintEffectNoSelect,
+			})
+
+			//Checking the result of the placement
+			assertCreatingPlacementWithDecision(placementName, namespace, noc(3), 2, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{
+				{
+					Key:      "key1",
+					Operator: clusterapiv1beta1.TolerationOpExists,
+				},
+				{
+					Key:      "key2",
+					Operator: clusterapiv1beta1.TolerationOpEqual,
+					Value:    "value2",
+				},
+			})
+			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[0], clusterNames[1]})
+		})
+
+		ginkgo.It("Should schedule when taint/toleration effect matches", func() {
+			//Cluster settings
+			assertBindingClusterSet(clusterSet1Name, namespace)
+			clusterNames := assertCreatingClusters(clusterSet1Name, 4)
+
+			assertUpdatingClusterWithClusterTaint(clusterNames[0], &clusterapiv1.Taint{
+				Key:    "key1",
+				Value:  "value1",
+				Effect: clusterapiv1.TaintEffectNoSelect,
+			})
+			assertUpdatingClusterWithClusterTaint(clusterNames[1], &clusterapiv1.Taint{
+				Key:    "key2",
+				Value:  "value2",
+				Effect: clusterapiv1.TaintEffectNoSelectIfNew,
+			})
+			assertUpdatingClusterWithClusterTaint(clusterNames[2], &clusterapiv1.Taint{
+				Key:    "key3",
+				Value:  "value3",
+				Effect: clusterapiv1.TaintEffectPreferNoSelect,
+			})
+
+			//Taint/toleration matches, effect not match
+			assertCreatingPlacementWithDecision(placementName, namespace, noc(4), 2, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{
+				{
+					Key:      "key1",
+					Operator: clusterapiv1beta1.TolerationOpExists,
+					Effect:   clusterapiv1.TaintEffectPreferNoSelect,
+				},
+				{
+					Key:      "key2",
+					Operator: clusterapiv1beta1.TolerationOpExists,
+					Effect:   clusterapiv1.TaintEffectNoSelect,
+				},
+				{
+					Key:      "key3",
+					Operator: clusterapiv1beta1.TolerationOpExists,
+					Effect:   clusterapiv1.TaintEffectNoSelect,
+				},
+				{
+					Key:      "key4",
+					Operator: clusterapiv1beta1.TolerationOpExists,
+					Effect:   clusterapiv1.TaintEffectNoSelect,
+				},
+			})
+			//Checking the result of the placement
+			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[2], clusterNames[3]})
+
+			//Taint effect is NoSelectIfNew, tolerations doesn't match, cluster is in decision
+			assertUpdatingClusterWithClusterTaint(clusterNames[3], &clusterapiv1.Taint{
+				Key:    "key4",
+				Value:  "value4",
+				Effect: clusterapiv1.TaintEffectNoSelectIfNew,
+			})
+			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[2], clusterNames[3]})
+		})
+
+		ginkgo.It("Should reschedule when expire TolerationSeconds", func() {
 			addedTime := metav1.Now()
 			addedTime_60 := addedTime.Add(-60 * time.Second)
 			tolerationSeconds_10 := int64(10)
 			tolerationSeconds_20 := int64(20)
 
-			// cluster settings
+			//Cluster settings
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			clusterNames := assertCreatingClusters(clusterSet1Name, 4)
 
