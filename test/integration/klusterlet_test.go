@@ -3,9 +3,10 @@ package integration
 import (
 	"context"
 	"fmt"
-	ocmfeature "open-cluster-management.io/api/feature"
 	"strings"
 	"time"
+
+	ocmfeature "open-cluster-management.io/api/feature"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -344,7 +345,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 		})
 
 		ginkgo.It("should have correct work deployment until HubConnectionDegraded is False when clusterName is empty", func() {
-			klusterlet.Spec.ClusterName = ""
+			klusterlet.Spec.ClusterName = "" // The clusterName is empty, the controller get clusterName from hubKubeConfigSecret.
 			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -402,6 +403,57 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				}
 				return false
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		})
+
+		ginkgo.It("Should change work deployment replicas to 0 when hubConfigSecret is missing", func() {
+			klusterlet.Spec.ClusterName = "testcluster"
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// replicas of work deployment should be 0 if hubConfigSecret is missing
+			err = kubeClient.CoreV1().Secrets(klusterletNamespace).Delete(context.Background(), helpers.HubKubeConfig, metav1.DeleteOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			gomega.Eventually(func() error {
+				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if deployment.Spec.Replicas == nil {
+					return err
+				}
+				if *deployment.Spec.Replicas != 0 {
+					return fmt.Errorf("replicas of work deployment should be 0")
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			// recreate the hubConfigSecret, replicas of work deployment should not be 0
+			hubKubeConfigSecret = &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      helpers.HubKubeConfig,
+					Namespace: klusterletNamespace,
+				},
+				Data: map[string][]byte{
+					"kubeconfig": []byte("update dummy"),
+				},
+			}
+			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(), hubKubeConfigSecret, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			gomega.Eventually(func() error {
+				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if deployment.Spec.Replicas == nil {
+					return err
+				}
+				if *deployment.Spec.Replicas == 0 {
+					return fmt.Errorf("replicas of work deployment should not be 0")
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 		})
 
 		ginkgo.It("Deployment should be updated when klusterlet is changed", func() {
