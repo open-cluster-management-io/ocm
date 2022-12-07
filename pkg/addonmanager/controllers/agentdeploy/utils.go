@@ -242,10 +242,10 @@ func (b *addonWorksBuilder) BuildDeployWorks(addonWorkNamespace string,
 	var owner *metav1.OwnerReference
 	installMode, _ := constants.GetHostedModeInfo(addon.GetAnnotations())
 
-	// only set addon as the owner of works in default mode. should not set owner in hosted mode.
-	if installMode == constants.InstallModeDefault {
-		owner = metav1.NewControllerRef(addon, addonapiv1alpha1.GroupVersion.WithKind("ManagedClusterAddOn"))
-	}
+	// This owner is only added to the manifestWork deployed in managed cluster ns.
+	// the manifestWork in managed cluster ns is cleaned up via the addon ownerRef, so need to add the owner.
+	// the manifestWork in hosting cluster ns is cleaned up by its controller since it and its addon cross ns.
+	owner = metav1.NewControllerRef(addon, addonapiv1alpha1.GroupVersion.WithKind("ManagedClusterAddOn"))
 
 	var deletionOrphaningRules []workapiv1.OrphaningRule
 	for _, object := range objects {
@@ -427,7 +427,10 @@ func newAddonWorkObjectMeta(namePrefix, addonName, addonNamespace, workNamespace
 				constants.AddonLabel: addonName,
 			},
 		}
-		if owner != nil {
+		// This owner is only added to the manifestWork deployed in managed cluster ns.
+		// the manifestWork in managed cluster ns is cleaned up via the addon ownerRef, so need to add the owner.
+		// the manifestWork in hosting cluster ns is cleaned up by its controller since it and its addon cross ns.
+		if addonNamespace == workNamespace && owner != nil {
 			objectMeta.OwnerReferences = []metav1.OwnerReference{*owner}
 		}
 		// if the addon namespace is not equal with the manifestwork namespace(cluster name), add the addon namespace label

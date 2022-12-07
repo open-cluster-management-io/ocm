@@ -175,5 +175,26 @@ var _ = ginkgo.Describe("install/uninstall helloworld hosted addons in Hosted mo
 				context.Background(), helloWorldHostedAddonName, metav1.GetOptions{})
 			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+		// all mainfestWorks in hosted/hosting cluster ns should be deleted
+		gomega.Eventually(func() error {
+			workName := fmt.Sprintf("%s-%v", constants.DeployWorkNamePrefix(helloWorldHostedAddonName), 0)
+			_, err = hubWorkClient.WorkV1().ManifestWorks(hostedManagedClusterName).Get(
+				context.Background(), workName, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return fmt.Errorf("the manifsetWork is not deleted. err:%v", err)
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		gomega.Eventually(func() error {
+			workName := fmt.Sprintf("%s-%v",
+				constants.DeployHostingWorkNamePrefix(hostedManagedClusterName, helloWorldHostedAddonName), 0)
+			_, err = hubWorkClient.WorkV1().ManifestWorks(hostingClusterName).Get(
+				context.Background(), workName, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return fmt.Errorf("the manifsetWork is not deleted. err:%v", err)
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 })

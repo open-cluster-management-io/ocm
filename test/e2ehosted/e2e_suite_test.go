@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+
 	"os"
 	"testing"
 
@@ -17,6 +18,7 @@ import (
 
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	workclient "open-cluster-management.io/api/client/work/clientset/versioned"
 )
 
 func TestE2E(t *testing.T) {
@@ -29,6 +31,7 @@ var (
 	hubKubeClient      kubernetes.Interface
 	hubAddOnClient     addonclient.Interface
 	hubClusterClient   clusterclient.Interface
+	hubWorkClient      workclient.Interface
 
 	hostedKlusterletName              string // name of the hosted mode klusterlet
 	hostedManagedKubeconfigSecretName string // name of the secret for the managed cluster in hosted mode
@@ -80,6 +83,11 @@ var _ = ginkgo.BeforeSuite(func() {
 		}
 
 		hubClusterClient, err = clusterclient.NewForConfig(clusterCfg)
+		if err != nil {
+			return err
+		}
+
+		hubWorkClient, err = workclient.NewForConfig(clusterCfg)
 		if err != nil {
 			return err
 		}
