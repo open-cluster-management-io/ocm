@@ -129,13 +129,16 @@ func TestSync(t *testing.T) {
 				}
 			}
 
+			syncCtx := testinghelpers.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName)
+
 			ctrl := &leaseController{
 				kubeClient:    leaseClient,
 				clusterClient: clusterClient,
 				clusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				leaseLister:   leaseInformerFactory.Coordination().V1().Leases().Lister(),
+				eventRecorder: syncCtx.Recorder(),
 			}
-			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, ""))
+			syncErr := ctrl.sync(context.TODO(), syncCtx)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

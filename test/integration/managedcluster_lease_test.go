@@ -42,7 +42,7 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 		cancel := util.RunAgent("cluster-leasetest", agentOptions, spokeCfg)
 		defer cancel()
 
-		bootstrapManagedCluster(managedClusterName, hubKubeconfigSecret)
+		bootstrapManagedCluster(managedClusterName, hubKubeconfigSecret, util.TestLeaseDurationSeconds)
 		// after two grace period, make sure the managed cluster is available
 		gracePeriod := 2 * 5 * util.TestLeaseDurationSeconds
 		assertAvailableCondition(managedClusterName, metav1.ConditionTrue, gracePeriod)
@@ -59,7 +59,7 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 		}
 		stop := util.RunAgent("cluster-availabletest", agentOptions, spokeCfg)
 
-		bootstrapManagedCluster(managedClusterName, hubKubeconfigSecret)
+		bootstrapManagedCluster(managedClusterName, hubKubeconfigSecret, util.TestLeaseDurationSeconds)
 		assertAvailableCondition(managedClusterName, metav1.ConditionTrue, 0)
 
 		// stop the current managed cluster
@@ -96,7 +96,7 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 		cancel := util.RunAgent("cluster-leasetest", agentOptions, spokeCfg)
 		defer cancel()
 
-		bootstrapManagedCluster(managedClusterName, hubKubeconfigSecret)
+		bootstrapManagedCluster(managedClusterName, hubKubeconfigSecret, util.TestLeaseDurationSeconds)
 		assertAvailableCondition(managedClusterName, metav1.ConditionTrue, 0)
 
 		// remove the cluster
@@ -133,12 +133,38 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 		gracePeriod := 2 * 5 * util.TestLeaseDurationSeconds
 		assertAvailableCondition(managedClusterName, metav1.ConditionTrue, gracePeriod)
 	})
+
+	ginkgo.It("should use a short lease duration", func() {
+		// run registration agent
+		agentOptions := spoke.SpokeAgentOptions{
+			ClusterName:              managedClusterName,
+			BootstrapKubeconfig:      bootstrapKubeConfigFile,
+			HubKubeconfigSecret:      hubKubeconfigSecret,
+			HubKubeconfigDir:         hubKubeconfigDir,
+			ClusterHealthCheckPeriod: 1 * time.Minute,
+		}
+		stop := util.RunAgent("cluster-leasetest", agentOptions, spokeCfg)
+
+		bootstrapManagedCluster(managedClusterName, hubKubeconfigSecret, 60)
+		assertAvailableCondition(managedClusterName, metav1.ConditionTrue, 0)
+
+		// update the lease duration with a short duration (1s)
+		err := updateManagedClusterLeaseDuration(managedClusterName, util.TestLeaseDurationSeconds)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		// stop the agent
+		stop()
+
+		// after two short grace period, make sure the managed cluster is unknown
+		gracePeriod := 2 * 5 * util.TestLeaseDurationSeconds
+		assertAvailableCondition(managedClusterName, metav1.ConditionUnknown, gracePeriod)
+	})
 })
 
-func bootstrapManagedCluster(managedClusterName, hubKubeconfigSecret string) {
+func bootstrapManagedCluster(managedClusterName, hubKubeconfigSecret string, leaseDuration int32) {
 	// simulate hub cluster admin to accept the managed cluster and approve the csr
 	gomega.Eventually(func() error {
-		return util.AcceptManagedCluster(clusterClient, managedClusterName)
+		return util.AcceptManagedClusterWithLeaseDuration(clusterClient, managedClusterName, leaseDuration)
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 	gomega.Eventually(func() error {
@@ -168,4 +194,16 @@ func assertAvailableCondition(managedClusterName string, status metav1.Condition
 		}
 		return nil
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
+
+func updateManagedClusterLeaseDuration(clusterName string, leaseDuration int32) error {
+	cluster, err := clusterClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	cluster.Spec.LeaseDurationSeconds = leaseDuration
+
+	_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), cluster, metav1.UpdateOptions{})
+	return err
 }

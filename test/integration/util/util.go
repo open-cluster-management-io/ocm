@@ -504,13 +504,17 @@ func GetManagedCluster(clusterClient clusterclientset.Interface, spokeClusterNam
 }
 
 func AcceptManagedCluster(clusterClient clusterclientset.Interface, spokeClusterName string) error {
+	return AcceptManagedClusterWithLeaseDuration(clusterClient, spokeClusterName, 60)
+}
+
+func AcceptManagedClusterWithLeaseDuration(clusterClient clusterclientset.Interface, spokeClusterName string, leaseDuration int32) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		spokeCluster, err := GetManagedCluster(clusterClient, spokeClusterName)
 		if err != nil {
 			return err
 		}
 		spokeCluster.Spec.HubAcceptsClient = true
-		spokeCluster.Spec.LeaseDurationSeconds = TestLeaseDurationSeconds
+		spokeCluster.Spec.LeaseDurationSeconds = leaseDuration
 		_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), spokeCluster, metav1.UpdateOptions{})
 		return err
 	})

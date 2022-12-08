@@ -115,7 +115,6 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		clusterClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		kubeInfomers.Coordination().V1().Leases(),
-		ResyncInterval, //TODO: this interval time should be allowed to change from outside
 		controllerContext.EventRecorder,
 	)
 
