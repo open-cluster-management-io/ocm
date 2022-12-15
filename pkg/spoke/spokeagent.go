@@ -362,6 +362,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			o.ClusterName,
 			addOnClient,
 			addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
+			hubKubeClient.CoordinationV1(),
 			managementKubeClient.CoordinationV1(),
 			spokeKubeClient.CoordinationV1(),
 			AddOnLeaseControllerSyncInterval, //TODO: this interval time should be allowed to change from outside

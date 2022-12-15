@@ -6,7 +6,9 @@ rules:
 # Allow spoke registration agent to get/update coordination.k8s.io/lease
 - apiGroups: ["coordination.k8s.io"]
   resources: ["leases"]
-  resourceNames: ["managed-cluster-lease"]
+  # TODO for backward compatible, we do not limit the resource name
+  # remove this after we no longer support lower versions kubernetes (less than 1.14)
+  #resourceNames: ["managed-cluster-lease"]
   verbs: ["get", "update"]
 # Allow agent to get/list/watch managed cluster addons
 - apiGroups: ["addon.open-cluster-management.io"]

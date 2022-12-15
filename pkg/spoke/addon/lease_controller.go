@@ -37,6 +37,7 @@ type managedClusterAddOnLeaseController struct {
 	clock                 clock.Clock
 	addOnClient           addonclient.Interface
 	addOnLister           addonlisterv1alpha1.ManagedClusterAddOnLister
+	hubLeaseClient        coordv1client.CoordinationV1Interface
 	managementLeaseClient coordv1client.CoordinationV1Interface
 	spokeLeaseClient      coordv1client.CoordinationV1Interface
 }
@@ -45,6 +46,7 @@ type managedClusterAddOnLeaseController struct {
 func NewManagedClusterAddOnLeaseController(clusterName string,
 	addOnClient addonclient.Interface,
 	addOnInformer addoninformerv1alpha1.ManagedClusterAddOnInformer,
+	hubLeaseClient coordv1client.CoordinationV1Interface,
 	managementLeaseClient coordv1client.CoordinationV1Interface,
 	spokeLeaseClient coordv1client.CoordinationV1Interface,
 	resyncInterval time.Duration,
@@ -54,6 +56,7 @@ func NewManagedClusterAddOnLeaseController(clusterName string,
 		clock:                 clock.RealClock{},
 		addOnClient:           addOnClient,
 		addOnLister:           addOnInformer.Lister(),
+		hubLeaseClient:        hubLeaseClient,
 		managementLeaseClient: managementLeaseClient,
 		spokeLeaseClient:      spokeLeaseClient,
 	}
@@ -126,6 +129,31 @@ func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
 	var condition metav1.Condition
 	switch {
 	case errors.IsNotFound(err):
+		// for backward compatible, for lower versions kubernetes (less than 1.14), addons update their leases on hub
+		// cluster, so if we cannot find addon lease on managed/management cluster, we will try to use addon hub lease.
+		// TODO remove this after we no longer support lower versions kubernetes (less than 1.14)
+		observedLease, err = c.hubLeaseClient.Leases(addOn.Namespace).Get(ctx, addOn.Name, metav1.GetOptions{})
+		if err == nil {
+			if now.Before(observedLease.Spec.RenewTime.Add(gracePeriod)) {
+				// the lease is constantly updated, update its addon status to available
+				condition = metav1.Condition{
+					Type:    addonv1alpha1.ManagedClusterAddOnConditionAvailable,
+					Status:  metav1.ConditionTrue,
+					Reason:  "ManagedClusterAddOnLeaseUpdated",
+					Message: fmt.Sprintf("%s add-on is available.", addOn.Name),
+				}
+				break
+			}
+
+			// the lease is not constantly updated, update its addon status to unavailable
+			condition = metav1.Condition{
+				Type:    addonv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Status:  metav1.ConditionFalse,
+				Reason:  "ManagedClusterAddOnLeaseUpdateStopped",
+				Message: fmt.Sprintf("%s add-on is not available.", addOn.Name),
+			}
+			break
+		}
 		condition = metav1.Condition{
 			Type:    addonv1alpha1.ManagedClusterAddOnConditionAvailable,
 			Status:  metav1.ConditionUnknown,
