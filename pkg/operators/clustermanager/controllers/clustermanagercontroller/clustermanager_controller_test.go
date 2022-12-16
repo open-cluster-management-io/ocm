@@ -376,7 +376,7 @@ func TestDeleteCRD(t *testing.T) {
 	clusterManager.ObjectMeta.SetDeletionTimestamp(&now)
 	crd := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: crdNames[0],
+			Name: "clustermanagementaddons.addon.open-cluster-management.io",
 		},
 	}
 
@@ -391,7 +391,7 @@ func TestDeleteCRD(t *testing.T) {
 			return true, crd, nil
 		}
 		return true, &apiextensionsv1.CustomResourceDefinition{}, errors.NewNotFound(
-			apiextensionsv1.Resource("customresourcedefinitions"), crdNames[0])
+			apiextensionsv1.Resource("customresourcedefinitions"), "clustermanagementaddons.addon.open-cluster-management.io")
 
 	})
 	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")

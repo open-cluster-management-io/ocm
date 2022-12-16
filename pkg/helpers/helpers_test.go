@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/version"
-	fakedynamic "k8s.io/client-go/dynamic/fake"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
@@ -455,14 +454,6 @@ func TestApplyDirectly(t *testing.T) {
 			expectErr:      false,
 		},
 		{
-			name: "Apply v1beta1 CRD",
-			applyFiles: map[string]runtime.Object{
-				"crd": newUnstructured("apiextensions.k8s.io/v1beta1", "CustomResourceDefinition", "", "", map[string]interface{}{}),
-			},
-			applyFileNames: []string{"crd"},
-			expectErr:      false,
-		},
-		{
 			name: "Apply CRD with nil apiExtensionClient",
 			applyFiles: map[string]runtime.Object{
 				"crd": newUnstructured("apiextensions.k8s.io/v1", "CustomResourceDefinition", "", "", map[string]interface{}{}),
@@ -494,9 +485,6 @@ func TestApplyDirectly(t *testing.T) {
 				return json.Marshal(c.applyFiles[name])
 			}
 
-			scheme := runtime.NewScheme()
-			dynamicClient := fakedynamic.NewSimpleDynamicClient(scheme)
-
 			cache := resourceapply.NewResourceCache()
 			var results []resourceapply.ApplyResult
 			switch {
@@ -504,7 +492,6 @@ func TestApplyDirectly(t *testing.T) {
 				results = ApplyDirectly(
 					context.TODO(),
 					fakeKubeClient, nil, nil,
-					dynamicClient,
 					eventstesting.NewTestingEventRecorder(t),
 					cache,
 					fakeApplyFunc,
@@ -514,7 +501,6 @@ func TestApplyDirectly(t *testing.T) {
 				results = ApplyDirectly(
 					context.TODO(),
 					fakeKubeClient, nil, fakeResgistrationClient,
-					dynamicClient,
 					eventstesting.NewTestingEventRecorder(t),
 					cache,
 					fakeApplyFunc,
@@ -524,7 +510,6 @@ func TestApplyDirectly(t *testing.T) {
 				results = ApplyDirectly(
 					context.TODO(),
 					fakeKubeClient, fakeExtensionClient, nil,
-					dynamicClient,
 					eventstesting.NewTestingEventRecorder(t),
 					cache,
 					fakeApplyFunc,
@@ -534,7 +519,6 @@ func TestApplyDirectly(t *testing.T) {
 				results = ApplyDirectly(
 					context.TODO(),
 					fakeKubeClient, fakeExtensionClient, fakeResgistrationClient,
-					dynamicClient,
 					eventstesting.NewTestingEventRecorder(t),
 					cache,
 					fakeApplyFunc,

@@ -10,6 +10,7 @@ import (
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -59,7 +60,6 @@ func (r *managementReconcile) reconcile(ctx context.Context, klusterlet *operato
 		r.kubeClient,
 		nil,
 		nil,
-		nil,
 		r.recorder,
 		r.cache,
 		func(name string) ([]byte, error) {
@@ -88,6 +88,41 @@ func (r *managementReconcile) reconcile(ctx context.Context, klusterlet *operato
 			Message: applyErrors.Error(),
 		})
 		return klusterlet, reconcileStop, applyErrors
+	}
+
+	return klusterlet, reconcileContinue, nil
+}
+
+func (r *managementReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+	// Remove secrets
+	secrets := []string{config.HubKubeConfigSecret}
+	if config.InstallMode == operatorapiv1.InstallModeHosted {
+		// In Hosted mod, also need to remove the external-managed-kubeconfig-registration and external-managed-kubeconfig-work
+		secrets = append(secrets, []string{config.ExternalManagedKubeConfigRegistrationSecret, config.ExternalManagedKubeConfigWorkSecret}...)
+	}
+	for _, secret := range secrets {
+		err := r.kubeClient.CoreV1().Secrets(config.AgentNamespace).Delete(ctx, secret, metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			return klusterlet, reconcileStop, err
+		}
+		r.recorder.Eventf("SecretDeleted", "secret %s is deleted", secret)
+	}
+
+	// remove static file on the management cluster
+	err := removeStaticResources(ctx, r.kubeClient, nil, managementStaticResourceFiles, config)
+	if err != nil {
+		return klusterlet, reconcileStop, err
+	}
+
+	// The agent namespace on the management cluster should be removed **at the end**. Otherwise if any failure occurred,
+	// the managed-external-kubeconfig secret would be removed and the next reconcile will fail due to can not build the
+	// managed cluster clients.
+	if config.InstallMode == operatorapiv1.InstallModeHosted {
+		// remove the agent namespace on the management cluster
+		err = r.kubeClient.CoreV1().Namespaces().Delete(ctx, config.AgentNamespace, metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			return klusterlet, reconcileStop, err
+		}
 	}
 
 	return klusterlet, reconcileContinue, nil

@@ -21,15 +21,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	admissionclient "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
@@ -426,48 +423,14 @@ func ApplyDirectly(
 	client kubernetes.Interface,
 	apiExtensionClient apiextensionsclient.Interface,
 	apiRegistrationClient apiregistrationclient.APIServicesGetter,
-	dynamicClient dynamic.Interface,
 	recorder events.Recorder,
 	cache resourceapply.ResourceCache,
 	manifests resourceapply.AssetFunc,
 	files ...string) []resourceapply.ApplyResult {
 	ret := []resourceapply.ApplyResult{}
 
-	noCRDV1beta1Files := []string{}
-	for _, file := range files {
-		result := resourceapply.ApplyResult{File: file}
-		objBytes, err := manifests(file)
-		if err != nil {
-			result.Error = fmt.Errorf("missing %q: %v", file, err)
-			ret = append(ret, result)
-			continue
-		}
-
-		// apply v1beta1 crd if the object is crd v1beta1, we need to do this by using dynamic client
-		// since the v1beta1 schema has been removed in kube 1.23.
-		// TODO remove this logic after we do not support spoke with version lowner than 1.16
-		requiredObj, _, err := scheme.Codecs.UniversalDecoder().Decode(objBytes, nil, &unstructured.Unstructured{})
-		if err != nil {
-			result.Error = fmt.Errorf("cannot unmarshal %q: %v", file, err)
-			ret = append(ret, result)
-			continue
-		}
-		unstructuredObj := requiredObj.(*unstructured.Unstructured)
-		if unstructuredObj.GetKind() != "CustomResourceDefinition" {
-			noCRDV1beta1Files = append(noCRDV1beta1Files, file)
-			continue
-		}
-		if unstructuredObj.GetAPIVersion() != "apiextensions.k8s.io/v1beta1" {
-			noCRDV1beta1Files = append(noCRDV1beta1Files, file)
-			continue
-		}
-
-		result.Result, result.Changed, result.Error = applyCRDv1beta1(ctx, dynamicClient, recorder, unstructuredObj)
-		ret = append(ret, result)
-	}
-
 	genericApplyFiles := []string{}
-	for _, file := range noCRDV1beta1Files {
+	for _, file := range files {
 		result := resourceapply.ApplyResult{File: file}
 		objBytes, err := manifests(file)
 		if err != nil {
@@ -521,36 +484,6 @@ func ApplyDirectly(
 
 	ret = append(ret, applyResults...)
 	return ret
-}
-
-func applyCRDv1beta1(ctx context.Context, client dynamic.Interface, recorder events.Recorder, required *unstructured.Unstructured) (runtime.Object, bool, error) {
-	gvr := schema.GroupVersionResource{
-		Group:    "apiextensions.k8s.io",
-		Version:  "v1beta1",
-		Resource: "customresourcedefinitions",
-	}
-
-	existing, err := client.Resource(gvr).Get(ctx, required.GetName(), metav1.GetOptions{})
-
-	if errors.IsNotFound(err) {
-		actual, createdErr := client.Resource(gvr).Create(ctx, required, metav1.CreateOptions{})
-		return actual, true, createdErr
-	}
-
-	if err != nil {
-		return nil, false, err
-	}
-
-	requiredSpec, _, _ := unstructured.NestedMap(required.UnstructuredContent(), "spec")
-	existingSpec, _, _ := unstructured.NestedMap(existing.UnstructuredContent(), "spec")
-
-	if equality.Semantic.DeepEqual(requiredSpec, existingSpec) {
-		return existing, false, nil
-	}
-
-	required.SetResourceVersion(existing.GetResourceVersion())
-	actual, err := client.Resource(gvr).Update(ctx, required, metav1.UpdateOptions{})
-	return actual, true, err
 }
 
 // NumOfUnavailablePod is to check if a deployment is in degraded state.

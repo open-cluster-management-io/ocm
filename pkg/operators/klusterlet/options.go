@@ -8,7 +8,6 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 
@@ -37,10 +36,6 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 		return err
 	}
 	apiExtensionClient, err := apiextensionsclient.NewForConfig(controllerContext.KubeConfig)
-	if err != nil {
-		return err
-	}
-	dynamicClient, err := dynamic.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
@@ -78,7 +73,6 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 	klusterletController := klusterletcontroller.NewKlusterletController(
 		kubeClient,
 		apiExtensionClient,
-		dynamicClient,
 		operatorClient.OperatorV1().Klusterlets(),
 		operatorInformer.Operator().V1().Klusterlets(),
 		kubeInformer.Core().V1().Secrets(),
@@ -92,7 +86,6 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 	klusterletCleanupController := klusterletcontroller.NewKlusterletCleanupController(
 		kubeClient,
 		apiExtensionClient,
-		dynamicClient,
 		operatorClient.OperatorV1().Klusterlets(),
 		operatorInformer.Operator().V1().Klusterlets(),
 		kubeInformer.Core().V1().Secrets(),

@@ -35,7 +35,7 @@ func TestSyncDelete(t *testing.T) {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 
-	deleteActions := []clienttesting.DeleteActionImpl{}
+	var deleteActions []clienttesting.DeleteActionImpl
 	kubeActions := controller.kubeClient.Actions()
 	for _, action := range kubeActions {
 		if action.GetVerb() == "delete" {
@@ -50,7 +50,7 @@ func TestSyncDelete(t *testing.T) {
 		t.Errorf("Expected 27 delete actions, but got %d", len(deleteActions))
 	}
 
-	updateWorkActions := []clienttesting.UpdateActionImpl{}
+	var updateWorkActions []clienttesting.UpdateActionImpl
 	workActions := controller.workClient.Actions()
 	for _, action := range workActions {
 		if action.GetVerb() == "update" {
@@ -93,7 +93,7 @@ func TestSyncDeleteHosted(t *testing.T) {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 
-	deleteActionsManagement := []clienttesting.DeleteActionImpl{}
+	var deleteActionsManagement []clienttesting.DeleteActionImpl
 	kubeActions := controller.kubeClient.Actions()
 	for _, action := range kubeActions {
 		if action.GetVerb() == "delete" {
@@ -109,7 +109,7 @@ func TestSyncDeleteHosted(t *testing.T) {
 		t.Errorf("Expected 17 delete actions, but got %d", len(deleteActionsManagement))
 	}
 
-	deleteActionsManaged := []clienttesting.DeleteActionImpl{}
+	var deleteActionsManaged []clienttesting.DeleteActionImpl
 	for _, action := range controller.managedKubeClient.Actions() {
 		if action.GetVerb() == "delete" {
 			deleteAction := action.(clienttesting.DeleteActionImpl)
@@ -123,7 +123,7 @@ func TestSyncDeleteHosted(t *testing.T) {
 		t.Errorf("Expected 13 delete actions, but got %d", len(deleteActionsManaged))
 	}
 
-	updateWorkActions := []clienttesting.UpdateActionImpl{}
+	var updateWorkActions []clienttesting.UpdateActionImpl
 	workActions := controller.managedWorkClient.Actions()
 	for _, action := range workActions {
 		if action.GetVerb() == "update" {
@@ -149,8 +149,7 @@ func TestSyncDeleteHostedDeleteAgentNamespace(t *testing.T) {
 	})
 	now := metav1.Now()
 	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
-	controller := newTestControllerHosted(t, klusterlet, nil).
-		setBuildManagedClusterClientsHostedModeFunc(buildManagedClusterClientsFromSecret)
+	controller := newTestControllerHosted(t, klusterlet, nil).setDefaultManagedClusterClientsBuilder()
 	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
 
 	err := controller.cleanupController.sync(context.TODO(), syncContext)
@@ -167,8 +166,7 @@ func TestSyncDeleteHostedDeleteWaitKubeconfig(t *testing.T) {
 	klusterlet := newKlusterletHosted("klusterlet", "testns", "cluster1")
 	now := metav1.Now()
 	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
-	controller := newTestControllerHosted(t, klusterlet, nil).
-		setBuildManagedClusterClientsHostedModeFunc(buildManagedClusterClientsFromSecret)
+	controller := newTestControllerHosted(t, klusterlet, nil).setDefaultManagedClusterClientsBuilder()
 	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
 
 	err := controller.cleanupController.sync(context.TODO(), syncContext)

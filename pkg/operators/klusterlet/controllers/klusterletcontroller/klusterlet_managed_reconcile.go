@@ -6,10 +6,12 @@ package klusterletcontroller
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -18,6 +20,7 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/registration-operator/manifests"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
+	"strings"
 )
 
 var (
@@ -91,7 +94,6 @@ func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 		r.managedClusterClients.kubeClient,
 		r.managedClusterClients.apiExtensionClient,
 		nil,
-		r.managedClusterClients.dynamicClient,
 		r.recorder,
 		r.cache,
 		func(name string) ([]byte, error) {
@@ -123,4 +125,83 @@ func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 	}
 
 	return klusterlet, reconcileContinue, nil
+}
+
+func (r *managedReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+	// nothing should be done when deploy mode is hosted and hosted finalizer is not added.
+	if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeHosted && !hasFinalizer(klusterlet, klusterletHostedFinalizer) {
+		return klusterlet, reconcileContinue, nil
+	}
+
+	if err := r.cleanUpAppliedManifestWorks(ctx, klusterlet, config); err != nil {
+		return klusterlet, reconcileStop, err
+	}
+
+	if err := removeStaticResources(ctx, r.managedClusterClients.kubeClient, r.managedClusterClients.apiExtensionClient,
+		managedStaticResourceFiles, config); err != nil {
+		return klusterlet, reconcileStop, err
+	}
+
+	if cnt, err := r.kubeVersion.Compare("v1.12.0"); err == nil && cnt < 0 {
+		err = removeStaticResources(ctx, r.managedClusterClients.kubeClient, r.managedClusterClients.apiExtensionClient,
+			kube111StaticResourceFiles, config)
+		if err != nil {
+			return klusterlet, reconcileStop, err
+		}
+	}
+
+	// remove the klusterlet namespace and klusterlet addon namespace on the managed cluster
+	// For now, whether in Default or Hosted mode, the addons could be deployed on the managed cluster.
+	namespaces := []string{config.KlusterletNamespace, fmt.Sprintf("%s-addon", config.KlusterletNamespace)}
+	for _, namespace := range namespaces {
+		if err := r.managedClusterClients.kubeClient.CoreV1().Namespaces().Delete(
+			ctx, namespace, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+			return klusterlet, reconcileStop, err
+		}
+	}
+
+	return klusterlet, reconcileContinue, nil
+}
+
+// cleanUpAppliedManifestWorks removes finalizer from the AppliedManifestWorks whose name starts with
+// the hash of the given hub host.
+func (r *managedReconcile) cleanUpAppliedManifestWorks(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, config klusterletConfig) error {
+	appliedManifestWorks, err := r.managedClusterClients.appliedManifestWorkClient.List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("unable to list AppliedManifestWorks: %w", err)
+	}
+
+	if len(appliedManifestWorks.Items) == 0 {
+		return nil
+	}
+
+	bootstrapKubeConfigSecret, err := r.kubeClient.CoreV1().Secrets(config.AgentNamespace).Get(ctx, config.BootStrapKubeConfigSecret, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	restConfig, err := helpers.LoadClientConfigFromSecret(bootstrapKubeConfigSecret)
+	if err != nil {
+		return fmt.Errorf("unable to load kubeconfig from secret %q %q: %w", config.AgentNamespace, config.BootStrapKubeConfigSecret, err)
+	}
+
+	var errs []error
+	prefix := fmt.Sprintf("%s-", fmt.Sprintf("%x", sha256.Sum256([]byte(restConfig.Host))))
+	for _, appliedManifestWork := range appliedManifestWorks.Items {
+		// ignore AppliedManifestWork for other klusterlet
+		// TODO we should not need to filter AppliedManifestWork using hubhost in the next release.
+		if string(klusterlet.UID) != appliedManifestWork.Spec.AgentID || !strings.HasPrefix(appliedManifestWork.Name, prefix) {
+			continue
+		}
+
+		// remove finalizer if exists
+		if mutated := removeFinalizer(&appliedManifestWork, appliedManifestWorkFinalizer); !mutated {
+			continue
+		}
+
+		_, err := r.managedClusterClients.appliedManifestWorkClient.Update(ctx, &appliedManifestWork, metav1.UpdateOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			errs = append(errs, fmt.Errorf("unable to remove finalizer from AppliedManifestWork %q: %w", appliedManifestWork.Name, err))
+		}
+	}
+	return utilerrors.NewAggregate(errs)
 }

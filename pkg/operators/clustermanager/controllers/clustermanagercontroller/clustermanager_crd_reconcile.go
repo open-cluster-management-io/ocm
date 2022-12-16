@@ -10,19 +10,19 @@ import (
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/registration-operator/manifests"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
 	"open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/migrationcontroller"
+	"open-cluster-management.io/registration-operator/pkg/operators/crdmanager"
 	"reflect"
 	migrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/typed/migration/v1alpha1"
-	"time"
 )
 
 var (
@@ -79,15 +79,12 @@ func (c *crdReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 		return cm, reconcileStop, err
 	}
 
-	var appliedErrs []error
-	resourceResults := helpers.ApplyDirectly(
-		ctx,
-		nil,
-		c.hubAPIExtensionClient,
-		nil,
-		nil,
-		c.recorder,
-		c.cache,
+	crdManager := crdmanager.NewManager[*apiextensionsv1.CustomResourceDefinition](
+		c.hubAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions(),
+		crdmanager.EqualV1,
+	)
+
+	if err := crdManager.Apply(ctx,
 		func(name string) ([]byte, error) {
 			template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
 			if err != nil {
@@ -97,60 +94,48 @@ func (c *crdReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 			helpers.SetRelatedResourcesStatusesWithObj(&cm.Status.RelatedResources, objData)
 			return objData, nil
 		},
-		hubCRDResourceFiles...,
-	)
-	for _, result := range resourceResults {
-		if result.Error != nil {
-			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
-		}
-	}
-
-	if len(appliedErrs) > 0 {
+		hubCRDResourceFiles...); err != nil {
 		meta.SetStatusCondition(&cm.Status.Conditions, metav1.Condition{
 			Type:    clusterManagerApplied,
 			Status:  metav1.ConditionFalse,
 			Reason:  "CRDApplyFaild",
-			Message: fmt.Sprintf("Failed to apply crd: %v", utilerrors.NewAggregate(appliedErrs)),
+			Message: fmt.Sprintf("Failed to apply crd: %v", err),
 		})
-		return cm, reconcileStop, utilerrors.NewAggregate(appliedErrs)
+		return cm, reconcileStop, err
 	}
 
 	return cm, reconcileContinue, nil
 }
 
 func (c *crdReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterManager, config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
-	if c.skipRemoveCRDs {
-		return cm, reconcileContinue, nil
-	}
-	// Remove crd
+	crdManager := crdmanager.NewManager[*apiextensionsv1.CustomResourceDefinition](
+		c.hubAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions(),
+		crdmanager.EqualV1,
+	)
+
+	// Remove crds in order at first
 	for _, name := range crdNames {
-		err := c.removeCRD(ctx, name)
-		if err != nil {
-			// TODO add condition
+		if err := crdManager.CleanOne(ctx, name, c.skipRemoveCRDs); err != nil {
 			return cm, reconcileStop, err
 		}
 		c.recorder.Eventf("CRDDeleted", "crd %s is deleted", name)
 	}
+	if c.skipRemoveCRDs {
+		return cm, reconcileContinue, nil
+	}
 
-	for _, file := range hubCRDResourceFiles {
-		err := helpers.CleanUpStaticObject(
-			ctx,
-			nil,
-			c.hubAPIExtensionClient,
-			nil,
-			func(name string) ([]byte, error) {
-				template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
-				if err != nil {
-					return nil, err
-				}
-				return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
-			},
-			file,
-		)
-		if err != nil {
-			// TODO add condition
-			return cm, reconcileContinue, err
-		}
+	if err := crdManager.Clean(ctx, c.skipRemoveCRDs,
+		func(name string) ([]byte, error) {
+			template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
+			if err != nil {
+				return nil, err
+			}
+			objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
+			helpers.SetRelatedResourcesStatusesWithObj(&cm.Status.RelatedResources, objData)
+			return objData, nil
+		},
+		hubCRDResourceFiles...); err != nil {
+		return cm, reconcileStop, err
 	}
 
 	return cm, reconcileContinue, nil
@@ -199,27 +184,4 @@ func (c *crdReconcile) updateStoredVersion(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-// removeCRD removes crd, and check if crd resource is removed. Since the related cr is still being deleted,
-// it will check the crd existence after deletion, and only return nil when crd is not found.
-func (c *crdReconcile) removeCRD(ctx context.Context, name string) error {
-	err := c.hubAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Delete(
-		ctx, name, metav1.DeleteOptions{})
-	switch {
-	case errors.IsNotFound(err):
-		return nil
-	case err != nil:
-		return err
-	}
-
-	_, err = c.hubAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
-	switch {
-	case errors.IsNotFound(err):
-		return nil
-	case err != nil:
-		return err
-	}
-
-	return helpers.NewRequeueError(fmt.Sprintf("crd %s is still deleting", name), 3*time.Second)
 }

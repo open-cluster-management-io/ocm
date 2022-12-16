@@ -56,7 +56,6 @@ func (c *webhookReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 		c.hubKubeClient,
 		nil,
 		nil,
-		nil,
 		c.recorder,
 		c.cache,
 		func(name string) ([]byte, error) {

@@ -536,11 +536,14 @@ func (t *Tester) CheckClusterManagerStatus() error {
 		return fmt.Errorf("ClusterManager not found")
 	}
 	cm := cms.Items[0]
-	if meta.IsStatusConditionTrue(cm.Status.Conditions, "HubRegistrationDegraded") {
+	if !meta.IsStatusConditionFalse(cm.Status.Conditions, "HubRegistrationDegraded") {
 		return fmt.Errorf("HubRegistration is degraded")
 	}
-	if meta.IsStatusConditionTrue(cm.Status.Conditions, "HubPlacementDegraded") {
+	if !meta.IsStatusConditionFalse(cm.Status.Conditions, "HubPlacementDegraded") {
 		return fmt.Errorf("HubPlacement is degraded")
+	}
+	if !meta.IsStatusConditionFalse(cm.Status.Conditions, "Progressing") {
+		return fmt.Errorf("ClusterManager is still progressing")
 	}
 	return nil
 }

@@ -244,6 +244,11 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 
 	// Update status
 	var conds []metav1.Condition = []metav1.Condition{featureGateCondition}
+
+	if cond := meta.FindStatusCondition(clusterManager.Status.Conditions, clusterManagerProgressing); cond != nil {
+		conds = append(conds, *cond)
+	}
+
 	if len(errs) == 0 {
 		conds = append(conds, metav1.Condition{
 			Type:    clusterManagerApplied,
@@ -251,12 +256,26 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 			Reason:  "ClusterManagerApplied",
 			Message: "Components of cluster manager are applied",
 		})
-	} else if cond := meta.FindStatusCondition(clusterManager.Status.Conditions, clusterManagerApplied); cond != nil {
-		conds = append(conds, *cond)
-	}
+	} else {
+		if cond := meta.FindStatusCondition(clusterManager.Status.Conditions, clusterManagerApplied); cond != nil {
+			conds = append(conds, *cond)
+		}
 
-	if cond := meta.FindStatusCondition(clusterManager.Status.Conditions, clusterManagerProgressing); cond != nil {
-		conds = append(conds, *cond)
+		// When appliedCondition is false, we should not update related resources and resource generations
+		_, updated, updatedErr := helpers.UpdateClusterManagerStatus(
+			ctx, n.clusterManagerClient, clusterManager.Name,
+			helpers.UpdateClusterManagerConditionFn(conds...),
+			func(oldStatus *operatorapiv1.ClusterManagerStatus) error {
+				oldStatus.ObservedGeneration = clusterManager.Generation
+				return nil
+			},
+		)
+
+		if updated {
+			return updatedErr
+		}
+
+		return utilerrors.NewAggregate(errs)
 	}
 
 	_, _, updatedErr := helpers.UpdateClusterManagerStatus(

@@ -81,7 +81,6 @@ func (c *hubReoncile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterMa
 		c.hubKubeClient,
 		nil,
 		nil,
-		nil,
 		c.recorder,
 		c.cache,
 		func(name string) ([]byte, error) {

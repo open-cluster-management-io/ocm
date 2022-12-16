@@ -10,6 +10,7 @@ import (
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -151,6 +152,22 @@ func (r *runtimeReconcile) getClusterNameFromHubKubeConfigSecret(ctx context.Con
 		return "", fmt.Errorf("the cluster name in the secret is empty")
 	}
 	return string(clusterName), nil
+}
+
+func (r *runtimeReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+	deployments := []string{
+		fmt.Sprintf("%s-registration-agent", config.KlusterletName),
+		fmt.Sprintf("%s-work-agent", config.KlusterletName),
+	}
+	for _, deployment := range deployments {
+		err := r.kubeClient.AppsV1().Deployments(config.AgentNamespace).Delete(ctx, deployment, metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			return klusterlet, reconcileStop, err
+		}
+		r.recorder.Eventf("DeploymentDeleted", "deployment %s is deleted", deployment)
+	}
+
+	return klusterlet, reconcileContinue, nil
 }
 
 // registrationServiceAccountName splices the name of registration service account

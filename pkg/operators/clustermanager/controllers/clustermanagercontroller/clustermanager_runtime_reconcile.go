@@ -68,7 +68,7 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 	var appliedErrs []error
 	resourceResults := helpers.ApplyDirectly(
 		ctx,
-		c.kubeClient, nil, nil, nil,
+		c.kubeClient, nil, nil,
 		c.recorder,
 		c.cache,
 		func(name string) ([]byte, error) {
