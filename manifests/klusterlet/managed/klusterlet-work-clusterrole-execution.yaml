@@ -26,3 +26,8 @@ rules:
 - apiGroups: ["monitoring.coreos.com"]
   resources: ["servicemonitors"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Allow agent to manage oauth clients
+# TODO refactor permission control of work agent to remove this
+- apiGroups: ["oauth.openshift.io"]
+  resources: ["oauthclients"]
+  verbs: ["get", "list", "watch", "create", "patch","update", "delete"]
