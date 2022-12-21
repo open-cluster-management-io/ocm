@@ -20,7 +20,7 @@ type AddOnPlacementScore struct {
 	Status AddOnPlacementScoreStatus `json:"status,omitempty"`
 }
 
-//AddOnPlacementScoreStatus represents the current status of AddOnPlacementScore.
+// AddOnPlacementScoreStatus represents the current status of AddOnPlacementScore.
 type AddOnPlacementScoreStatus struct {
 	// Conditions contain the different condition statuses for this AddOnPlacementScore.
 	// +patchMergeKey=type
@@ -45,7 +45,7 @@ type AddOnPlacementScoreStatus struct {
 	ValidUntil *metav1.Time `json:"validUntil"`
 }
 
-//AddOnPlacementScoreItem represents the score name and value.
+// AddOnPlacementScoreItem represents the score name and value.
 type AddOnPlacementScoreItem struct {
 	// Name is the name of the score
 	// +kubebuilder:validation:Required

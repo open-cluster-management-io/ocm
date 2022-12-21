@@ -146,7 +146,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testHostedAddonImpl.name,
 				Annotations: map[string]string{
-					constants.HostingClusterNameAnnotationKey: hostingClusterName,
+					addonapiv1alpha1.HostingClusterNameAnnotationKey: hostingClusterName,
 				},
 			},
 			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{

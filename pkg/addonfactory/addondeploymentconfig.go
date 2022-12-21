@@ -74,10 +74,12 @@ func GetAddOnDeloymentConfigValues(
 
 // ToAddOnDeloymentConfigValues transform the AddOnDeploymentConfig object into Values object that is a plain value map
 // for example: the spec of one AddOnDeploymentConfig is:
-// {
-//	customizedVariables: [{name: "Image", value: "img"}, {name: "ImagePullPolicy", value: "Always"}],
-//  nodePlacement: {nodeSelector: {"host": "ssd"}, tolerations: {"key": "test"}},
-// }
+//
+//	{
+//		customizedVariables: [{name: "Image", value: "img"}, {name: "ImagePullPolicy", value: "Always"}],
+//	 nodePlacement: {nodeSelector: {"host": "ssd"}, tolerations: {"key": "test"}},
+//	}
+//
 // after transformed, the key set of Values object will be: {"Image", "ImagePullPolicy", "NodeSelector", "Tolerations"}
 func ToAddOnDeloymentConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
 	values, err := ToAddOnCustomizedVariableValues(config)
@@ -96,9 +98,11 @@ func ToAddOnDeloymentConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig)
 // ToAddOnNodePlacementValues only transform the AddOnDeploymentConfig NodePlacement part into Values object that has
 // a specific for helm chart values
 // for example: the spec of one AddOnDeploymentConfig is:
-// {
-//  nodePlacement: {nodeSelector: {"host": "ssd"}, tolerations: {"key":"test"}},
-// }
+//
+//	{
+//	 nodePlacement: {nodeSelector: {"host": "ssd"}, tolerations: {"key":"test"}},
+//	}
+//
 // after transformed, the Values will be:
 // map[global:map[nodeSelector:map[host:ssd]] tolerations:[map[key:test]]]
 func ToAddOnNodePlacementValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
@@ -130,9 +134,11 @@ func ToAddOnNodePlacementValues(config addonapiv1alpha1.AddOnDeploymentConfig) (
 
 // ToAddOnCustomizedVariables only transform the CustomizedVariables in the spec of AddOnDeploymentConfig into Values object.
 // for example: the spec of one AddOnDeploymentConfig is:
-// {
-//  customizedVariables: [{name: "a", value: "x"}, {name: "b", value: "y"}],
-// }
+//
+//	{
+//	 customizedVariables: [{name: "a", value: "x"}, {name: "b", value: "y"}],
+//	}
+//
 // after transformed, the Values will be:
 // map[a:x b:y]
 func ToAddOnCustomizedVariableValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {

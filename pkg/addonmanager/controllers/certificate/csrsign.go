@@ -3,6 +3,8 @@ package certificate
 import (
 	"context"
 	"fmt"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"strings"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -14,7 +16,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	certificateslisters "k8s.io/client-go/listers/certificates/v1"
 	"k8s.io/klog/v2"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
@@ -61,7 +62,7 @@ func NewCSRSignController(
 				if len(accessor.GetLabels()) == 0 {
 					return false
 				}
-				addonName := accessor.GetLabels()[constants.AddonLabel]
+				addonName := accessor.GetLabels()[addonapiv1alpha1.AddonLabelKey]
 				if _, ok := agentAddons[addonName]; !ok {
 					return false
 				}
@@ -96,7 +97,7 @@ func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContex
 		return nil
 	}
 
-	addonName := csr.Labels[constants.AddonLabel]
+	addonName := csr.Labels[addonapiv1alpha1.AddonLabelKey]
 	agentAddon, ok := c.agentAddons[addonName]
 	if !ok {
 		return nil
@@ -106,7 +107,7 @@ func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContex
 	if registrationOption == nil {
 		return nil
 	}
-	clusterName, ok := csr.Labels[constants.ClusterLabel]
+	clusterName, ok := csr.Labels[clusterv1.ClusterNameLabelKey]
 	if !ok {
 		return nil
 	}

@@ -15,6 +15,8 @@ import (
 	fakeclusterv1alpha1 "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1alpha1/fake"
 	clusterv1beta1 "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta1"
 	fakeclusterv1beta1 "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta1/fake"
+	clusterv1beta2 "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta2"
+	fakeclusterv1beta2 "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta2/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -80,4 +82,9 @@ func (c *Clientset) ClusterV1alpha1() clusterv1alpha1.ClusterV1alpha1Interface {
 // ClusterV1beta1 retrieves the ClusterV1beta1Client
 func (c *Clientset) ClusterV1beta1() clusterv1beta1.ClusterV1beta1Interface {
 	return &fakeclusterv1beta1.FakeClusterV1beta1{Fake: &c.Fake}
+}
+
+// ClusterV1beta2 retrieves the ClusterV1beta2Client
+func (c *Clientset) ClusterV1beta2() clusterv1beta2.ClusterV1beta2Interface {
+	return &fakeclusterv1beta2.FakeClusterV1beta2{Fake: &c.Fake}
 }

@@ -19,7 +19,6 @@ import (
 	v1beta1certificateslisters "k8s.io/client-go/listers/certificates/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -102,7 +101,7 @@ func NewCSRApprovingController(
 				if len(accessor.GetLabels()) == 0 {
 					return false
 				}
-				addonName := accessor.GetLabels()[constants.AddonLabel]
+				addonName := accessor.GetLabels()[addonv1alpha1.AddonLabelKey]
 				if _, ok := agentAddons[addonName]; !ok {
 					return false
 				}
@@ -128,7 +127,7 @@ func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncC
 		return nil
 	}
 
-	addonName := csr.GetLabels()[constants.AddonLabel]
+	addonName := csr.GetLabels()[addonv1alpha1.AddonLabelKey]
 	agentAddon, ok := c.agentAddons[addonName]
 	if !ok {
 		return nil
@@ -138,7 +137,7 @@ func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncC
 	if registrationOption == nil {
 		return nil
 	}
-	clusterName, ok := csr.GetLabels()[constants.ClusterLabel]
+	clusterName, ok := csr.GetLabels()[clusterv1.ClusterNameLabelKey]
 	if !ok {
 		return nil
 	}

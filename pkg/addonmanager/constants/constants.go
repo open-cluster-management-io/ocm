@@ -1,19 +1,11 @@
 package constants
 
-import "fmt"
+import (
+	"fmt"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+)
 
 const (
-	// AddonLabel is the label for addon
-	AddonLabel = "open-cluster-management.io/addon-name"
-	// AddonNamespaceLabel is the label for addon namespace
-	AddonNamespaceLabel = "open-cluster-management.io/addon-namespace"
-
-	// ClusterLabel is the label for cluster
-	ClusterLabel = "open-cluster-management.io/cluster-name"
-
-	// PreDeleteHookLabel is the label for a hook object
-	PreDeleteHookLabel = "open-cluster-management.io/addon-pre-delete"
-
 	// PreDeleteHookFinalizer is the finalizer for an addon which has deployed hook objects
 	PreDeleteHookFinalizer = "cluster.open-cluster-management.io/addon-pre-delete"
 
@@ -45,13 +37,6 @@ const (
 	InstallModeHosted          = "Hosted"
 	InstallModeDefault         = "Default"
 
-	// HostingClusterNameAnnotationKey is the annotation key for indicating the hosting cluster name
-	HostingClusterNameAnnotationKey = "addon.open-cluster-management.io/hosting-cluster-name"
-
-	// HostedManifestLocationLabelKey is the label key for indicating where the manifest should be deployed in Hosted
-	// mode
-	HostedManifestLocationLabelKey = "addon.open-cluster-management.io/hosted-manifest-location"
-
 	// HostedManifestLocationManagedLabelValue indicates the manifest will be deployed on the managed cluster in Hosted
 	// mode, it is the default value of a manifest in Hosted mode
 	HostedManifestLocationManagedLabelValue = "managed"
@@ -79,14 +64,6 @@ const (
 	// HostingClusterValidityReasonInvalid is the reason of condition HostingClusterValidity indicating the hosting
 	// cluster is invalid
 	HostingClusterValidityReasonInvalid = "HostingClusterInvalid"
-
-	// DisableAddonAutomaticInstallationAnnotationKey is the annotation key for disabling the functionality of
-	// installing addon automatically
-	DisableAddonAutomaticInstallationAnnotationKey = "addon.open-cluster-management.io/disable-automatic-installation"
-
-	// AnnotationDeletionOrphan is an annotation for the manifest which will not be cleaned up
-	// after the addon manifestWork is deleted.
-	AnnotationDeletionOrphan = "addon.open-cluster-management.io/deletion-orphan"
 )
 
 // DeployWorkNamePrefix returns the prefix of the work name for the addon
@@ -111,7 +88,7 @@ func PreDeleteHookHostingWorkName(addonNamespace, addonName string) string {
 
 // GetHostedModeInfo returns addon installation mode and hosting cluster name.
 func GetHostedModeInfo(annotations map[string]string) (string, string) {
-	hostingClusterName, ok := annotations[HostingClusterNameAnnotationKey]
+	hostingClusterName, ok := annotations[addonv1alpha1.HostingClusterNameAnnotationKey]
 	if !ok {
 		return InstallModeDefault, ""
 	}
@@ -121,7 +98,7 @@ func GetHostedModeInfo(annotations map[string]string) (string, string) {
 
 // GetHostedManifestLocation returns the location of the manifest in Hosted mode, if it is invalid will return error
 func GetHostedManifestLocation(labels map[string]string) (string, bool, error) {
-	manifestLocation, ok := labels[HostedManifestLocationLabelKey]
+	manifestLocation, ok := labels[addonv1alpha1.HostedManifestLocationLabelKey]
 	if !ok {
 		return "", false, nil
 	}

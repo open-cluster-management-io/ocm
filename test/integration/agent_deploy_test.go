@@ -413,7 +413,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		mchObj := &unstructured.Unstructured{}
 		err = mchObj.UnmarshalJSON([]byte(mchJson))
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		mchObj.SetAnnotations(map[string]string{constants.AnnotationDeletionOrphan: ""})
+		mchObj.SetAnnotations(map[string]string{addonapiv1alpha1.DeletionOrphanAnnotationKey: ""})
 		testAddonImpl.manifests[managedClusterName] = []runtime.Object{deployObj, mchObj}
 
 		addon := &addonapiv1alpha1.ManagedClusterAddOn{

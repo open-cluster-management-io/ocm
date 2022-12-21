@@ -39,25 +39,26 @@ type configChecker struct {
 //
 // Example Code:
 // config_checker_server.go
-// type configCheckerServer struct {
-// 	checkers []heathz.HealthChecker
-// }
 //
-// func NewConfigCheckerServer(checkers []healthz.HealthChecker) *configCheckerServer {
-// 	return &configCheckerServer{checkers: checkers}
-// }
+//	type configCheckerServer struct {
+//		checkers []heathz.HealthChecker
+//	}
 //
-// func (s *configCheckerServer) ServerHttp(rw http.ResponseWriter, r *http.Request) {
-// 	for _, c := range s.chekers {
-// 		if c.Name() == r.URL {
-// 			if err := c.Check(); err != nil {
-// 				rw.WriteHeader(500)
-// 			} else {
-// 				rw.WriteHeader(200)
-// 			}
-// 		}
-// 	}
-// }
+//	func NewConfigCheckerServer(checkers []healthz.HealthChecker) *configCheckerServer {
+//		return &configCheckerServer{checkers: checkers}
+//	}
+//
+//	func (s *configCheckerServer) ServerHttp(rw http.ResponseWriter, r *http.Request) {
+//		for _, c := range s.chekers {
+//			if c.Name() == r.URL {
+//				if err := c.Check(); err != nil {
+//					rw.WriteHeader(500)
+//				} else {
+//					rw.WriteHeader(200)
+//				}
+//			}
+//		}
+//	}
 //
 // main.go
 // ...

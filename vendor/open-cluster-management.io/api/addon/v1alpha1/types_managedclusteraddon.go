@@ -216,3 +216,36 @@ type ManagedClusterAddOnList struct {
 
 	Items []ManagedClusterAddOn `json:"items"`
 }
+
+const (
+	// Label and annotation keys set on ManagedClusterAddon.
+
+	// AddonLabelKey is the label key to set addon name. It is to set on the resources on the hub relating
+	// to an addon
+	AddonLabelKey = "open-cluster-management.io/addon-name"
+
+	// DisableAddonAutomaticInstallationAnnotationKey is the annotation key for disabling the functionality of
+	// installing addon automatically. it should be set on ManagedClusterAddon resource only.
+	DisableAddonAutomaticInstallationAnnotationKey = "addon.open-cluster-management.io/disable-automatic-installation"
+
+	// AddonNamespaceLabelKey is the label key to set namespace of ManagedClusterAddon.
+	AddonNamespaceLabelKey = "open-cluster-management.io/addon-namespace"
+
+	// Label and annotation keys set on manifests of addon agent.
+
+	// AddonPreDeleteHookLabelKey is the label key to identify that a resource manifest is used as pre-delete hook for an addon
+	// and should be created and deleted before the specified ManagedClusterAddon is deleted.
+	AddonPreDeleteHookLabelKey = "open-cluster-management.io/addon-pre-delete"
+
+	// HostingClusterNameAnnotationKey is the annotation key for indicating the hosting cluster name, it should be set
+	// on ManagedClusterAddon resource only.
+	HostingClusterNameAnnotationKey = "addon.open-cluster-management.io/hosting-cluster-name"
+
+	// DeletionOrphanAnnotationKey is an annotation for the manifest of addin indicating that it will not be cleaned up
+	// after the addon is deleted.
+	DeletionOrphanAnnotationKey = "addon.open-cluster-management.io/deletion-orphan"
+
+	// HostedManifestLocationLabelKey is the label key for indicating the cluster that the manifest should be deployed in Hosted
+	// mode.
+	HostedManifestLocationLabelKey = "addon.open-cluster-management.io/hosted-manifest-location"
+)

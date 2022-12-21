@@ -200,8 +200,8 @@ func TestHostingReconcile(t *testing.T) {
 					addontesting.NewHostingUnstructured("v1", "Deployment", "default", "test1"),
 				)
 				work.SetLabels(map[string]string{
-					constants.AddonLabel:          "test",
-					constants.AddonNamespaceLabel: "cluster1",
+					addonapiv1alpha1.AddonLabelKey:          "test",
+					addonapiv1alpha1.AddonNamespaceLabelKey: "cluster1",
 				})
 				work.Status.Conditions = []metav1.Condition{
 					{
@@ -251,8 +251,8 @@ func TestHostingReconcile(t *testing.T) {
 					addontesting.NewHostingUnstructured("v1", "Deployment", "default", "test"),
 				)
 				work.SetLabels(map[string]string{
-					constants.AddonLabel:          "test",
-					constants.AddonNamespaceLabel: "cluster1",
+					addonapiv1alpha1.AddonLabelKey:          "test",
+					addonapiv1alpha1.AddonNamespaceLabelKey: "cluster1",
 				})
 				work.Status.Conditions = []metav1.Condition{
 					{
@@ -349,8 +349,8 @@ func TestHostingReconcile(t *testing.T) {
 					addontesting.NewHostingUnstructured("v1", "Deployment", "default", "test"),
 				)
 				work.Labels = map[string]string{
-					constants.AddonLabel:          "test",
-					constants.AddonNamespaceLabel: "cluster1",
+					addonapiv1alpha1.AddonLabelKey:          "test",
+					addonapiv1alpha1.AddonNamespaceLabelKey: "cluster1",
 				}
 				work.Status.Conditions = []metav1.Condition{
 					{

@@ -67,7 +67,7 @@ func newManifestWork(addonNamespace, addonName, clusterName string, manifests []
 			Name:      manifestWorkNameFunc(addonNamespace, addonName),
 			Namespace: clusterName,
 			Labels: map[string]string{
-				constants.AddonLabel: addonName,
+				addonapiv1alpha1.AddonLabelKey: addonName,
 			},
 		},
 		Spec: workapiv1.ManifestWorkSpec{
@@ -79,7 +79,7 @@ func newManifestWork(addonNamespace, addonName, clusterName string, manifests []
 
 	// if the addon namespace is not equal with the manifestwork namespace(cluster name), add the addon namespace label
 	if addonNamespace != clusterName {
-		work.Labels[constants.AddonNamespaceLabel] = addonNamespace
+		work.Labels[addonapiv1alpha1.AddonNamespaceLabelKey] = addonNamespace
 	}
 	return work
 }
@@ -104,7 +104,7 @@ func (b *addonWorksBuilder) isPreDeleteHookObject(obj runtime.Object) (bool, *wo
 		return false, nil
 	}
 	labels := accessor.GetLabels()
-	if _, ok := labels[constants.PreDeleteHookLabel]; !ok {
+	if _, ok := labels[addonapiv1alpha1.AddonPreDeleteHookLabelKey]; !ok {
 		return false, nil
 	}
 
@@ -339,7 +339,7 @@ func (b *addonWorksBuilder) BuildHookWork(addonWorkNamespace string,
 	}
 	hookWork.Spec.ManifestConfigs = hookManifestConfigs
 	if addon.Namespace != addonWorkNamespace {
-		hookWork.Labels[constants.AddonNamespaceLabel] = addon.Namespace
+		hookWork.Labels[addonapiv1alpha1.AddonNamespaceLabelKey] = addon.Namespace
 	}
 	return hookWork, nil
 }
@@ -424,7 +424,7 @@ func newAddonWorkObjectMeta(namePrefix, addonName, addonNamespace, workNamespace
 			Name:      fmt.Sprintf("%s-%d", namePrefix, index),
 			Namespace: workNamespace,
 			Labels: map[string]string{
-				constants.AddonLabel: addonName,
+				addonapiv1alpha1.AddonLabelKey: addonName,
 			},
 		}
 		// This owner is only added to the manifestWork deployed in managed cluster ns.
@@ -435,7 +435,7 @@ func newAddonWorkObjectMeta(namePrefix, addonName, addonNamespace, workNamespace
 		}
 		// if the addon namespace is not equal with the manifestwork namespace(cluster name), add the addon namespace label
 		if addonNamespace != workNamespace {
-			objectMeta.Labels[constants.AddonNamespaceLabel] = addonNamespace
+			objectMeta.Labels[addonapiv1alpha1.AddonNamespaceLabelKey] = addonNamespace
 		}
 		return objectMeta
 	}
@@ -471,7 +471,7 @@ func getDeletionOrphaningRule(obj runtime.Object) (*workapiv1.OrphaningRule, err
 		return nil, err
 	}
 	annotations := accessor.GetAnnotations()
-	if _, ok := annotations[constants.AnnotationDeletionOrphan]; !ok {
+	if _, ok := annotations[addonapiv1alpha1.DeletionOrphanAnnotationKey]; !ok {
 		return nil, nil
 	}
 

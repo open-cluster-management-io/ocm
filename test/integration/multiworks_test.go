@@ -153,7 +153,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 
 		gomega.Eventually(func() error {
 			works, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).List(context.Background(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s", constants.AddonLabel, testMultiWorksAddonImpl.name),
+				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1alpha1.AddonLabelKey, testMultiWorksAddonImpl.name),
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			if len(works.Items) != 2 {
@@ -194,7 +194,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 
 		gomega.Eventually(func() error {
 			works, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).List(context.Background(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s", constants.AddonLabel, testMultiWorksAddonImpl.name),
+				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1alpha1.AddonLabelKey, testMultiWorksAddonImpl.name),
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			if len(works.Items) != 2 {
@@ -231,7 +231,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 
 		gomega.Eventually(func() error {
 			works, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).List(context.Background(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s", constants.AddonLabel, testMultiWorksAddonImpl.name),
+				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1alpha1.AddonLabelKey, testMultiWorksAddonImpl.name),
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			if len(works.Items) != 2 {
@@ -343,7 +343,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 
 		gomega.Eventually(func() error {
 			works, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).List(context.Background(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s", constants.AddonLabel, testMultiWorksAddonImpl.name),
+				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1alpha1.AddonLabelKey, testMultiWorksAddonImpl.name),
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			if len(works.Items) != 2 {

@@ -44,6 +44,7 @@ func (AppliedManifestWorkList) SwaggerDoc() map[string]string {
 var map_AppliedManifestWorkSpec = map[string]string{
 	"":                 "AppliedManifestWorkSpec represents the desired configuration of AppliedManifestWork",
 	"hubHash":          "HubHash represents the hash of the first hub kube apiserver to identify which hub this AppliedManifestWork links to.",
+	"agentID":          "AgentID represents the ID of the work agent who is to handle this AppliedManifestWork.",
 	"manifestWorkName": "ManifestWorkName represents the name of the related manifestwork on the hub.",
 }
 

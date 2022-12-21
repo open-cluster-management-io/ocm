@@ -62,12 +62,12 @@ func (c TargetRotation) EnsureTargetCertKeyPair(signingCertKeyPair *crypto.CA, c
 // Return empty if a valid cert/key pair is in place and no need to rotate it yet.
 //
 // We create a new target cert/key pair if
-//   1) no cert/key pair exits
-//   2) or the cert expired (then we are also pretty late)
-//   3) or we are over the renewal percentage of the validity
-//   4) or the CA bundle doesn't contain a CA cert that matches exiting secret's common name.
-//   5) or the CA bundle doesn't contain the parent CA cert of the exiting secret.
-//   6) or the previously signed SANs in the CA bundle doesn't match expectation
+//  1. no cert/key pair exits
+//  2. or the cert expired (then we are also pretty late)
+//  3. or we are over the renewal percentage of the validity
+//  4. or the CA bundle doesn't contain a CA cert that matches exiting secret's common name.
+//  5. or the CA bundle doesn't contain the parent CA cert of the exiting secret.
+//  6. or the previously signed SANs in the CA bundle doesn't match expectation
 func needNewTargetCertKeyPair(secret *corev1.Secret, caBundleCerts []*x509.Certificate, hostnames []string) string {
 	certData := secret.Data["tls.crt"]
 	if len(certData) == 0 {

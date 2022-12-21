@@ -123,7 +123,7 @@ func TestDefaultReconcile(t *testing.T) {
 					addontesting.NewUnstructured("v1", "Deployment", "default", "test1"),
 				)
 				work.SetLabels(map[string]string{
-					constants.AddonLabel: "test",
+					addonapiv1alpha1.AddonLabelKey: "test",
 				})
 				work.Status.Conditions = []metav1.Condition{
 					{
@@ -166,7 +166,7 @@ func TestDefaultReconcile(t *testing.T) {
 					addontesting.NewUnstructured("v1", "Deployment", "default", "test"),
 				)
 				work.SetLabels(map[string]string{
-					constants.AddonLabel: "test",
+					addonapiv1alpha1.AddonLabelKey: "test",
 				})
 				work.Status.Conditions = []metav1.Condition{
 					{

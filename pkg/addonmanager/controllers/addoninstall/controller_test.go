@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
@@ -99,7 +98,7 @@ func TestReconcile(t *testing.T) {
 			addon: []runtime.Object{},
 			cluster: []runtime.Object{addontesting.SetManagedClusterAnnotation(
 				addontesting.NewManagedCluster("cluster1"),
-				map[string]string{constants.DisableAddonAutomaticInstallationAnnotationKey: "true"})},
+				map[string]string{addonapiv1alpha1.DisableAddonAutomaticInstallationAnnotationKey: "true"})},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 0 {
 					t.Errorf("Should not install addon when cluster has disable automatic installation annotation")

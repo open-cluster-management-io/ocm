@@ -12,14 +12,6 @@ type Interface interface {
 	AddOnPlacementScores() AddOnPlacementScoreInformer
 	// ClusterClaims returns a ClusterClaimInformer.
 	ClusterClaims() ClusterClaimInformer
-	// ManagedClusterSets returns a ManagedClusterSetInformer.
-	ManagedClusterSets() ManagedClusterSetInformer
-	// ManagedClusterSetBindings returns a ManagedClusterSetBindingInformer.
-	ManagedClusterSetBindings() ManagedClusterSetBindingInformer
-	// Placements returns a PlacementInformer.
-	Placements() PlacementInformer
-	// PlacementDecisions returns a PlacementDecisionInformer.
-	PlacementDecisions() PlacementDecisionInformer
 }
 
 type version struct {
@@ -41,24 +33,4 @@ func (v *version) AddOnPlacementScores() AddOnPlacementScoreInformer {
 // ClusterClaims returns a ClusterClaimInformer.
 func (v *version) ClusterClaims() ClusterClaimInformer {
 	return &clusterClaimInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
-// ManagedClusterSets returns a ManagedClusterSetInformer.
-func (v *version) ManagedClusterSets() ManagedClusterSetInformer {
-	return &managedClusterSetInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
-// ManagedClusterSetBindings returns a ManagedClusterSetBindingInformer.
-func (v *version) ManagedClusterSetBindings() ManagedClusterSetBindingInformer {
-	return &managedClusterSetBindingInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
-// Placements returns a PlacementInformer.
-func (v *version) Placements() PlacementInformer {
-	return &placementInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
-// PlacementDecisions returns a PlacementDecisionInformer.
-func (v *version) PlacementDecisions() PlacementDecisionInformer {
-	return &placementDecisionInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

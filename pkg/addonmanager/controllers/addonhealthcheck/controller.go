@@ -64,7 +64,7 @@ func NewAddonHealthCheckController(
 		WithFilteredEventsInformersQueueKeysFunc(
 			func(obj runtime.Object) []string {
 				accessor, _ := meta.Accessor(obj)
-				return []string{fmt.Sprintf("%s/%s", accessor.GetNamespace(), accessor.GetLabels()[constants.AddonLabel])}
+				return []string{fmt.Sprintf("%s/%s", accessor.GetNamespace(), accessor.GetLabels()[addonapiv1alpha1.AddonLabelKey])}
 			},
 			func(obj interface{}) bool {
 				accessor, _ := meta.Accessor(obj)
@@ -72,7 +72,7 @@ func NewAddonHealthCheckController(
 					return false
 				}
 
-				addonName, ok := accessor.GetLabels()[constants.AddonLabel]
+				addonName, ok := accessor.GetLabels()[addonapiv1alpha1.AddonLabelKey]
 				if !ok {
 					return false
 				}
@@ -159,7 +159,7 @@ func (c *addonHealthCheckController) probeAddonStatus(ctx context.Context, addon
 		return nil
 	}
 
-	requirement, _ := labels.NewRequirement(constants.AddonLabel, selection.Equals, []string{addon.Name})
+	requirement, _ := labels.NewRequirement(addonapiv1alpha1.AddonLabelKey, selection.Equals, []string{addon.Name})
 	selector := labels.NewSelector().Add(*requirement)
 
 	addonWorks, err := c.workLister.ManifestWorks(addon.Namespace).List(selector)

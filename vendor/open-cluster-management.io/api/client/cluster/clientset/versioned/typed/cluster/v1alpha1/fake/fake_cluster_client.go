@@ -20,22 +20,6 @@ func (c *FakeClusterV1alpha1) ClusterClaims() v1alpha1.ClusterClaimInterface {
 	return &FakeClusterClaims{c}
 }
 
-func (c *FakeClusterV1alpha1) ManagedClusterSets() v1alpha1.ManagedClusterSetInterface {
-	return &FakeManagedClusterSets{c}
-}
-
-func (c *FakeClusterV1alpha1) ManagedClusterSetBindings(namespace string) v1alpha1.ManagedClusterSetBindingInterface {
-	return &FakeManagedClusterSetBindings{c, namespace}
-}
-
-func (c *FakeClusterV1alpha1) Placements(namespace string) v1alpha1.PlacementInterface {
-	return &FakePlacements{c, namespace}
-}
-
-func (c *FakeClusterV1alpha1) PlacementDecisions(namespace string) v1alpha1.PlacementDecisionInterface {
-	return &FakePlacementDecisions{c, namespace}
-}
-
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeClusterV1alpha1) RESTClient() rest.Interface {

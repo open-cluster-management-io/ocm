@@ -126,7 +126,8 @@ func (f *Factory) WithFilteredEventsInformersQueueKeysFunc(queueKeyFn ObjectQueu
 // This is useful when you want to refresh every N minutes or you fear that your informers can be stucked.
 // If this is not called, no periodical resync will happen.
 // Note: The controller context passed to Sync() function in this case does not contain the object metadata or object itself.
-//       This can be used to detect periodical resyncs, but normal Sync() have to be cautious about `nil` objects.
+//
+//	This can be used to detect periodical resyncs, but normal Sync() have to be cautious about `nil` objects.
 func (f *Factory) ResyncEvery(interval time.Duration) *Factory {
 	f.resyncInterval = interval
 	return f

@@ -26,7 +26,7 @@ type PlacementDecision struct {
 	Status PlacementDecisionStatus `json:"status,omitempty"`
 }
 
-//The placementDecsion label name holding the placement name
+// The placementDecsion label name holding the placement name
 const (
 	PlacementLabel string = "cluster.open-cluster-management.io/placement"
 )

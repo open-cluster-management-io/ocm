@@ -92,10 +92,10 @@ func NewAddonDeployController(
 				// in hosted mode, need get the addon namespace from the AddonNamespaceLabel, because
 				// the namespaces of manifestWork and addon may be different.
 				// in default mode, the addon and manifestWork are in the cluster namespace.
-				if addonNamespace, ok := accessor.GetLabels()[constants.AddonNamespaceLabel]; ok {
-					return []string{fmt.Sprintf("%s/%s", addonNamespace, accessor.GetLabels()[constants.AddonLabel])}
+				if addonNamespace, ok := accessor.GetLabels()[addonapiv1alpha1.AddonNamespaceLabelKey]; ok {
+					return []string{fmt.Sprintf("%s/%s", addonNamespace, accessor.GetLabels()[addonapiv1alpha1.AddonLabelKey])}
 				}
-				return []string{fmt.Sprintf("%s/%s", accessor.GetNamespace(), accessor.GetLabels()[constants.AddonLabel])}
+				return []string{fmt.Sprintf("%s/%s", accessor.GetNamespace(), accessor.GetLabels()[addonapiv1alpha1.AddonLabelKey])}
 			},
 			func(obj interface{}) bool {
 				accessor, _ := meta.Accessor(obj)
@@ -104,7 +104,7 @@ func NewAddonDeployController(
 				}
 
 				// only watch the addon deploy/hook manifestWorks here.
-				addonName, ok := accessor.GetLabels()[constants.AddonLabel]
+				addonName, ok := accessor.GetLabels()[addonapiv1alpha1.AddonLabelKey]
 				if !ok {
 					return false
 				}

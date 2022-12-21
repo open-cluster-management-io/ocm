@@ -150,8 +150,8 @@ func TestHostingHookReconcile(t *testing.T) {
 						addontesting.NewHostedHookJob("test", "default"),
 					)
 					work.Labels = map[string]string{
-						constants.AddonLabel:          "test",
-						constants.AddonNamespaceLabel: "cluster1",
+						addonapiv1alpha1.AddonLabelKey:          "test",
+						addonapiv1alpha1.AddonNamespaceLabelKey: "cluster1",
 					}
 					work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 						{
@@ -247,8 +247,8 @@ func TestHostingHookReconcile(t *testing.T) {
 						addontesting.NewHostedHookJob("test", "default"),
 					)
 					work.Labels = map[string]string{
-						constants.AddonLabel:          "test",
-						constants.AddonNamespaceLabel: "cluster1",
+						addonapiv1alpha1.AddonLabelKey:          "test",
+						addonapiv1alpha1.AddonNamespaceLabelKey: "cluster1",
 					}
 					work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 						{

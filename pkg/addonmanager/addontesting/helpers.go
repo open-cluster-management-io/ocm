@@ -61,21 +61,21 @@ func NewHostingUnstructured(apiVersion, kind, namespace, name string) *unstructu
 	}
 
 	u.SetLabels(map[string]string{
-		constants.HostedManifestLocationLabelKey: constants.HostedManifestLocationHostingLabelValue,
+		addonapiv1alpha1.HostedManifestLocationLabelKey: constants.HostedManifestLocationHostingLabelValue,
 	})
 	return u
 }
 
 func NewHookJob(name, namespace string) *unstructured.Unstructured {
 	job := NewUnstructured("batch/v1", "Job", namespace, name)
-	job.SetLabels(map[string]string{constants.PreDeleteHookLabel: ""})
+	job.SetLabels(map[string]string{addonapiv1alpha1.AddonPreDeleteHookLabelKey: ""})
 	return job
 }
 
 func NewHostedHookJob(name, namespace string) *unstructured.Unstructured {
 	job := NewUnstructured("batch/v1", "Job", namespace, name)
-	job.SetLabels(map[string]string{constants.PreDeleteHookLabel: "",
-		constants.HostedManifestLocationLabelKey: constants.HostedManifestLocationHostingLabelValue,
+	job.SetLabels(map[string]string{addonapiv1alpha1.AddonPreDeleteHookLabelKey: "",
+		addonapiv1alpha1.HostedManifestLocationLabelKey: constants.HostedManifestLocationHostingLabelValue,
 	})
 	return job
 }
@@ -97,7 +97,7 @@ func NewHostedModeAddon(name, namespace string, hostingCluster string,
 			Name:            name,
 			Namespace:       namespace,
 			OwnerReferences: owners,
-			Annotations:     map[string]string{constants.HostingClusterNameAnnotationKey: hostingCluster},
+			Annotations:     map[string]string{addonapiv1alpha1.HostingClusterNameAnnotationKey: hostingCluster},
 		},
 	}
 }

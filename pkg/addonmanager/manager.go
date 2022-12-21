@@ -3,6 +3,7 @@ package addonmanager
 import (
 	"context"
 	"fmt"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,7 +13,6 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addonconfig"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addonhealthcheck"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addoninstall"
@@ -114,7 +114,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 			selector := &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
-						Key:      constants.AddonLabel,
+						Key:      addonv1alpha1.AddonLabelKey,
 						Operator: metav1.LabelSelectorOpIn,
 						Values:   addonNames,
 					},
@@ -129,7 +129,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 			selector := &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
-						Key:      constants.AddonLabel,
+						Key:      addonv1alpha1.AddonLabelKey,
 						Operator: metav1.LabelSelectorOpIn,
 						Values:   addonNames,
 					},

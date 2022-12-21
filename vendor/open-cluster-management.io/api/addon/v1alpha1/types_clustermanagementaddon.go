@@ -48,6 +48,9 @@ type ClusterManagementAddOnSpec struct {
 	// An empty list means the add-on does not require configurations.
 	// The default is an empty list
 	// +optional
+	// +listType=map
+	// +listMapKey=group
+	// +listMapKey=resource
 	SupportedConfigs []ConfigMeta `json:"supportedConfigs,omitempty"`
 }
 
@@ -93,6 +96,8 @@ type ConfigCoordinates struct {
 // ConfigGroupResource represents the GroupResource of the add-on configuration
 type ConfigGroupResource struct {
 	// group of the add-on configuration.
+	// +optional
+	// +kubebuilder:default=""
 	Group string `json:"group"`
 
 	// resource of the add-on configuration.

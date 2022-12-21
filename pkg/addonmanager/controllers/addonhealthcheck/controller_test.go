@@ -193,7 +193,7 @@ func TestReconcileWithWork(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: addon.Namespace,
 			Name:      fmt.Sprintf("%s-0", constants.DeployWorkNamePrefix(addon.Name)),
-			Labels:    map[string]string{constants.AddonLabel: addOn.Name},
+			Labels:    map[string]string{addonapiv1alpha1.AddonLabelKey: addOn.Name},
 		},
 	}
 	if err := workInformers.Work().V1().ManifestWorks().Informer().GetStore().Add(work0); err != nil {
@@ -203,7 +203,7 @@ func TestReconcileWithWork(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: addon.Namespace,
 			Name:      fmt.Sprintf("%s-1", constants.DeployWorkNamePrefix(addon.Name)),
-			Labels:    map[string]string{constants.AddonLabel: addOn.Name},
+			Labels:    map[string]string{addonapiv1alpha1.AddonLabelKey: addOn.Name},
 		},
 	}
 	if err := workInformers.Work().V1().ManifestWorks().Informer().GetStore().Add(work1); err != nil {
@@ -337,7 +337,7 @@ func TestReconcileWithProbe(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: addon.Namespace,
 			Name:      fmt.Sprintf("%s-0", constants.DeployWorkNamePrefix(addon.Name)),
-			Labels:    map[string]string{constants.AddonLabel: addon.Name},
+			Labels:    map[string]string{addonapiv1alpha1.AddonLabelKey: addon.Name},
 		},
 		Status: workapiv1.ManifestWorkStatus{
 			Conditions: []metav1.Condition{
@@ -352,7 +352,7 @@ func TestReconcileWithProbe(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: addon.Namespace,
 			Name:      fmt.Sprintf("%s-1", constants.DeployWorkNamePrefix(addon.Name)),
-			Labels:    map[string]string{constants.AddonLabel: addon.Name},
+			Labels:    map[string]string{addonapiv1alpha1.AddonLabelKey: addon.Name},
 		},
 		Status: workapiv1.ManifestWorkStatus{
 			Conditions: []metav1.Condition{

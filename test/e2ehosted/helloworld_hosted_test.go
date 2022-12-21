@@ -58,7 +58,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld hosted addons in Hosted mo
 								Namespace: hostedManagedClusterName,
 								Name:      helloWorldHostedAddonName,
 								Annotations: map[string]string{
-									constants.HostingClusterNameAnnotationKey: hostingClusterName,
+									addonapiv1alpha1.HostingClusterNameAnnotationKey: hostingClusterName,
 								},
 							},
 							Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
