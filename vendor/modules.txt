@@ -1174,6 +1174,8 @@ open-cluster-management.io/api/cluster/v1
 open-cluster-management.io/api/cluster/v1alpha1
 open-cluster-management.io/api/cluster/v1beta1
 open-cluster-management.io/api/cluster/v1beta2
+open-cluster-management.io/api/utils/work/v1/workapplier
+open-cluster-management.io/api/utils/work/v1/workbuilder
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.32
@@ -1185,7 +1187,6 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
 sigs.k8s.io/controller-runtime/pkg/client
 sigs.k8s.io/controller-runtime/pkg/client/apiutil
 sigs.k8s.io/controller-runtime/pkg/client/config
-sigs.k8s.io/controller-runtime/pkg/client/fake
 sigs.k8s.io/controller-runtime/pkg/conversion
 sigs.k8s.io/controller-runtime/pkg/envtest
 sigs.k8s.io/controller-runtime/pkg/internal/flock

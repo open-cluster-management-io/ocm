@@ -14,7 +14,6 @@ import (
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type WorkApplier struct {
@@ -40,45 +39,6 @@ func NewWorkApplierWithTypedClient(workClient workv1client.Interface,
 		},
 		patchWork: func(ctx context.Context, namespace, name string, pt types.PatchType, data []byte) (*workapiv1.ManifestWork, error) {
 			return workClient.WorkV1().ManifestWorks(namespace).Patch(ctx, name, pt, data, metav1.PatchOptions{})
-		},
-	}
-}
-
-func NewWorkApplierWithRuntimeClient(workClient client.Client) *WorkApplier {
-	return &WorkApplier{
-		cache: newWorkCache(),
-		getWork: func(ctx context.Context, namespace, name string) (*workapiv1.ManifestWork, error) {
-			work := &workapiv1.ManifestWork{}
-			err := workClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, work)
-			return work, err
-		},
-		deleteWork: func(ctx context.Context, namespace, name string) error {
-			work := &workapiv1.ManifestWork{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      name,
-					Namespace: namespace,
-				},
-			}
-			return workClient.Delete(ctx, work)
-		},
-		patchWork: func(ctx context.Context, namespace, name string, pt types.PatchType, data []byte) (*workapiv1.ManifestWork, error) {
-			work := &workapiv1.ManifestWork{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      name,
-					Namespace: namespace,
-				},
-			}
-			if err := workClient.Patch(ctx, work, client.RawPatch(pt, data)); err != nil {
-				return nil, err
-			}
-			if err := workClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, work); err != nil {
-				return nil, err
-			}
-			return work, nil
-		},
-		createWork: func(ctx context.Context, work *workapiv1.ManifestWork) (*workapiv1.ManifestWork, error) {
-			err := workClient.Create(ctx, work)
-			return work, err
 		},
 	}
 }

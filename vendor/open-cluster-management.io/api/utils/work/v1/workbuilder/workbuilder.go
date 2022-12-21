@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/errors"
-	"open-cluster-management.io/addon-framework/pkg/common/workapplier"
+	"open-cluster-management.io/api/utils/work/v1/workapplier"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 

@@ -16,8 +16,6 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
-	"open-cluster-management.io/addon-framework/pkg/common/workapplier"
-	"open-cluster-management.io/addon-framework/pkg/common/workbuilder"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -28,6 +26,8 @@ import (
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/api/utils/work/v1/workapplier"
+	"open-cluster-management.io/api/utils/work/v1/workbuilder"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
