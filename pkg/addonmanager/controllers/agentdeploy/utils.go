@@ -103,8 +103,14 @@ func (b *addonWorksBuilder) isPreDeleteHookObject(obj runtime.Object) (bool, *wo
 	if err != nil {
 		return false, nil
 	}
+
 	labels := accessor.GetLabels()
-	if _, ok := labels[addonapiv1alpha1.AddonPreDeleteHookLabelKey]; !ok {
+	annotations := accessor.GetAnnotations()
+
+	// TODO: deprecate PreDeleteHookLabel in the future release.
+	_, hasPreDeleteLabel := labels[addonapiv1alpha1.AddonPreDeleteHookLabelKey]
+	_, hasPreDeleteAnnotation := annotations[addonapiv1alpha1.AddonPreDeleteHookAnnotationKey]
+	if !hasPreDeleteLabel && !hasPreDeleteAnnotation {
 		return false, nil
 	}
 
@@ -165,7 +171,7 @@ func (m *hostingManifest) deployable(hostedModeEnabled bool, installMode string,
 		return false, nil
 	}
 
-	location, exist, err := constants.GetHostedManifestLocation(accessor.GetLabels())
+	location, exist, err := constants.GetHostedManifestLocation(accessor.GetLabels(), accessor.GetAnnotations())
 	if err != nil {
 		return false, err
 	}
@@ -173,7 +179,7 @@ func (m *hostingManifest) deployable(hostedModeEnabled bool, installMode string,
 		return false, nil
 	}
 
-	if exist && location == constants.HostedManifestLocationHostingLabelValue {
+	if exist && location == addonapiv1alpha1.HostedManifestLocationHostingValue {
 		klog.V(4).Infof("will deploy the manifest %s/%s on the hosting cluster in Hosted mode",
 			accessor.GetNamespace(), accessor.GetName())
 		return true, nil
@@ -205,7 +211,7 @@ func (m *managedManifest) deployable(hostedModeEnabled bool, installMode string,
 		return false, nil
 	}
 
-	location, exist, err := constants.GetHostedManifestLocation(accessor.GetLabels())
+	location, exist, err := constants.GetHostedManifestLocation(accessor.GetLabels(), accessor.GetAnnotations())
 	if err != nil {
 		return false, err
 	}
@@ -214,7 +220,7 @@ func (m *managedManifest) deployable(hostedModeEnabled bool, installMode string,
 		return true, nil
 	}
 
-	if !exist || location == constants.HostedManifestLocationManagedLabelValue {
+	if !exist || location == addonapiv1alpha1.HostedManifestLocationManagedValue {
 		klog.V(4).Infof("will deploy the manifest %s/%s on the managed cluster in Hosted mode",
 			accessor.GetNamespace(), accessor.GetName())
 		return true, nil

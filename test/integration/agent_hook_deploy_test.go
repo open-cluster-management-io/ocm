@@ -29,9 +29,9 @@ const (
     "metadata": {
         "name": "test",
         "namespace": "default",
-        "labels": {
-            "open-cluster-management.io/addon-pre-delete":""
-        }
+		"annotations": {
+			"addon.open-cluster-management.io/addon-pre-delete":""
+		}
     },
     "spec": {
         "manualSelector": true,

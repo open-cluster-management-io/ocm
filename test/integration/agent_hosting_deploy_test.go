@@ -31,7 +31,7 @@ const (
 		"metadata": {
 			"name": "nginx-deployment",
 			"namespace": "default",
-			"labels": {
+			"annotations": {
 				"addon.open-cluster-management.io/hosted-manifest-location": "hosting"
 			}
 		},

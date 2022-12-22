@@ -3,7 +3,7 @@ kind: RoleBinding
 metadata:
   name: helloworldhosted-agent
   namespace: {{ .AddonInstallNamespace }}
-  labels:
+  annotations:
     addon.open-cluster-management.io/hosted-manifest-location: hosting
 roleRef:
   apiGroup: rbac.authorization.k8s.io

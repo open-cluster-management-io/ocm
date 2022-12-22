@@ -3,7 +3,7 @@ kind: Role
 metadata:
   name: helloworldhosted-agent
   namespace: {{ .AddonInstallNamespace }}
-  labels:
+  annotations:
     addon.open-cluster-management.io/hosted-manifest-location: hosting
 rules:
 # leader election needs to operate configmaps

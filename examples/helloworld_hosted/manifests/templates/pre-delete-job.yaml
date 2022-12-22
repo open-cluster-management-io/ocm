@@ -3,8 +3,8 @@ apiVersion: batch/v1
 metadata:
   name: helloworldhosted-cleanup-configmap
   namespace: {{ .AddonInstallNamespace }}
-  labels:
-    open-cluster-management.io/addon-pre-delete: ""
+  annotations:
+    addon.open-cluster-management.io/addon-pre-delete: ""
     addon.open-cluster-management.io/hosted-manifest-location: hosting
 spec:
   manualSelector: true

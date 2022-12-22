@@ -3,9 +3,10 @@ apiVersion: apps/v1
 metadata:
   name: helloworldhosted-agent
   namespace: {{ .AddonInstallNamespace }}
+  annotations:
+    addon.open-cluster-management.io/hosted-manifest-location: hosting
   labels:
     app: helloworldhosted-agent
-    addon.open-cluster-management.io/hosted-manifest-location: hosting
 spec:
   replicas: 1
   selector:

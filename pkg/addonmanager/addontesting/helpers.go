@@ -59,24 +59,22 @@ func NewHostingUnstructured(apiVersion, kind, namespace, name string) *unstructu
 			},
 		},
 	}
-
-	u.SetLabels(map[string]string{
-		addonapiv1alpha1.HostedManifestLocationLabelKey: constants.HostedManifestLocationHostingLabelValue,
+	u.SetAnnotations(map[string]string{
+		addonapiv1alpha1.HostedManifestLocationAnnotationKey: addonapiv1alpha1.HostedManifestLocationHostingValue,
 	})
 	return u
 }
 
 func NewHookJob(name, namespace string) *unstructured.Unstructured {
 	job := NewUnstructured("batch/v1", "Job", namespace, name)
-	job.SetLabels(map[string]string{addonapiv1alpha1.AddonPreDeleteHookLabelKey: ""})
+	job.SetAnnotations(map[string]string{addonapiv1alpha1.AddonPreDeleteHookAnnotationKey: ""})
 	return job
 }
 
 func NewHostedHookJob(name, namespace string) *unstructured.Unstructured {
 	job := NewUnstructured("batch/v1", "Job", namespace, name)
-	job.SetLabels(map[string]string{addonapiv1alpha1.AddonPreDeleteHookLabelKey: "",
-		addonapiv1alpha1.HostedManifestLocationLabelKey: constants.HostedManifestLocationHostingLabelValue,
-	})
+	job.SetAnnotations(map[string]string{addonapiv1alpha1.AddonPreDeleteHookAnnotationKey: "",
+		addonapiv1alpha1.HostedManifestLocationAnnotationKey: addonapiv1alpha1.HostedManifestLocationHostingValue})
 	return job
 }
 

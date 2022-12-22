@@ -17,7 +17,7 @@ const (
 	AddonManifestApplied = "ManifestApplied"
 
 	// AddonManifestAppliedReasonWorkApplyFailed is the reason of condition AddonManifestApplied indicating
-	// the failuer of apply manifestwork of the manifests
+	// the failure of apply manifestwork of the manifests
 	AddonManifestAppliedReasonWorkApplyFailed = "ManifestWorkApplyFailed"
 
 	// AddonManifestAppliedReasonManifestsApplied is the reason of condition AddonManifestApplied indicating
@@ -36,15 +36,6 @@ const (
 	InstallModeBuiltinValueKey = "InstallMode"
 	InstallModeHosted          = "Hosted"
 	InstallModeDefault         = "Default"
-
-	// HostedManifestLocationManagedLabelValue indicates the manifest will be deployed on the managed cluster in Hosted
-	// mode, it is the default value of a manifest in Hosted mode
-	HostedManifestLocationManagedLabelValue = "managed"
-	// HostedManifestLocationHostingLabelValue indicates the manifest will be deployed on the hosting cluster in Hosted
-	// mode
-	HostedManifestLocationHostingLabelValue = "hosting"
-	// HostedManifestLocationNoneLabelValue indicates the manifest will not be deployed in Hosted mode
-	HostedManifestLocationNoneLabelValue = "none"
 
 	// HostingManifestFinalizer is the finalizer for an addon which has deployed manifests on the external
 	// hosting cluster in Hosted mode
@@ -97,17 +88,21 @@ func GetHostedModeInfo(annotations map[string]string) (string, string) {
 }
 
 // GetHostedManifestLocation returns the location of the manifest in Hosted mode, if it is invalid will return error
-func GetHostedManifestLocation(labels map[string]string) (string, bool, error) {
-	manifestLocation, ok := labels[addonv1alpha1.HostedManifestLocationLabelKey]
-	if !ok {
-		return "", false, nil
+func GetHostedManifestLocation(labels, annotations map[string]string) (string, bool, error) {
+	manifestLocation := annotations[addonv1alpha1.HostedManifestLocationAnnotationKey]
+
+	// TODO: deprecate HostedManifestLocationLabelKey in the future release
+	if manifestLocation == "" {
+		manifestLocation = labels[addonv1alpha1.HostedManifestLocationLabelKey]
 	}
 
 	switch manifestLocation {
-	case HostedManifestLocationManagedLabelValue,
-		HostedManifestLocationHostingLabelValue,
-		HostedManifestLocationNoneLabelValue:
+	case addonv1alpha1.HostedManifestLocationManagedValue,
+		addonv1alpha1.HostedManifestLocationHostingValue,
+		addonv1alpha1.HostedManifestLocationNoneValue:
 		return manifestLocation, true, nil
+	case "":
+		return "", false, nil
 	default:
 		return "", true, fmt.Errorf("not supported manifest location: %s", manifestLocation)
 	}

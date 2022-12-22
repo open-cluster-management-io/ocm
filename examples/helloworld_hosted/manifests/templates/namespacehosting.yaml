@@ -3,6 +3,8 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: {{ .AddonInstallNamespace }}
+  annotations:
+    addon.open-cluster-management.io/hosted-manifest-location: hosting
   labels:
     addon.open-cluster-management.io/namespace: "true"
-    addon.open-cluster-management.io/hosted-manifest-location: hosting
+

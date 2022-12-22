@@ -30,9 +30,9 @@ const (
     "metadata": {
         "name": "test",
         "namespace": "default",
-        "labels": {
-            "addon.open-cluster-management.io/hosted-manifest-location":"hosting",
-            "open-cluster-management.io/addon-pre-delete":""
+		"annotations": {
+            "addon.open-cluster-management.io/addon-pre-delete": "",
+			"addon.open-cluster-management.io/hosted-manifest-location": "hosting"
         }
     },
     "spec": {
