@@ -23,8 +23,9 @@ import (
 
 const byWorkNameAndAgentID = "UnManagedAppliedManifestWork-byWorkNameAndAgentID"
 
-// ManifestWorkFinalizeController handles cleanup of manifestwork resources before deletion is allowed.
+// UnManagedAppliedWorkController deletes unmanaged applied works.
 type UnManagedAppliedWorkController struct {
+	manifestWorkLister         worklister.ManifestWorkNamespaceLister
 	appliedManifestWorkClient  workv1client.AppliedManifestWorkInterface
 	appliedManifestWorkLister  worklister.AppliedManifestWorkLister
 	appliedManifestWorkIndexer cache.Indexer
@@ -34,12 +35,15 @@ type UnManagedAppliedWorkController struct {
 
 func NewUnManagedAppliedWorkController(
 	recorder events.Recorder,
+	manifestWorkInformer workinformer.ManifestWorkInformer,
+	manifestWorkLister worklister.ManifestWorkNamespaceLister,
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
 	appliedManifestWorkInformer workinformer.AppliedManifestWorkInformer,
 	hubHash, agentID string,
 ) factory.Controller {
 
 	controller := &UnManagedAppliedWorkController{
+		manifestWorkLister:         manifestWorkLister,
 		appliedManifestWorkClient:  appliedManifestWorkClient,
 		appliedManifestWorkLister:  appliedManifestWorkInformer.Lister(),
 		appliedManifestWorkIndexer: appliedManifestWorkInformer.Informer().GetIndexer(),
@@ -55,6 +59,10 @@ func NewUnManagedAppliedWorkController(
 	}
 
 	return factory.New().
+		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
+			accessor, _ := meta.Accessor(obj)
+			return fmt.Sprintf("%s-%s", hubHash, accessor.GetName())
+		}, manifestWorkInformer.Informer()).
 		WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
 			accessor, _ := meta.Accessor(obj)
 			return accessor.GetName()
@@ -69,6 +77,26 @@ func (m *UnManagedAppliedWorkController) sync(ctx context.Context, controllerCon
 	appliedManifestWork, err := m.appliedManifestWorkLister.Get(appliedManifestWorkName)
 	if errors.IsNotFound(err) {
 		// work not found, could have been deleted, do nothing.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	// We delete the old applied work until the work of this applied work is applied.
+	// This will avoid to delete the old applied work prematurely, if an applied work is an
+	// owner of its applied resource, if we delete the old applied work prematurely, this will
+	// casue to delete the applied resource.
+	manifestWork, err := m.manifestWorkLister.Get(appliedManifestWork.Spec.ManifestWorkName)
+	if errors.IsNotFound(err) {
+		// work not found, could have been deleted, do nothing.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !meta.IsStatusConditionTrue(manifestWork.Status.Conditions, workapiv1.WorkApplied) {
+		// the work is not applied, do nothing.
 		return nil
 	}
 

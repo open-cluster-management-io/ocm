@@ -161,6 +161,8 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 	)
 	unmanagedAppliedManifestWorkController := finalizercontroller.NewUnManagedAppliedWorkController(
 		controllerContext.EventRecorder,
+		workInformerFactory.Work().V1().ManifestWorks(),
+		workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks(o.SpokeClusterName),
 		spokeWorkClient.WorkV1().AppliedManifestWorks(),
 		spokeWorkInformerFactory.Work().V1().AppliedManifestWorks(),
 		hubhash, agentID,

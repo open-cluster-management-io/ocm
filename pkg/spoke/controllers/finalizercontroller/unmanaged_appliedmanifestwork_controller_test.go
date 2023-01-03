@@ -21,6 +21,7 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 		workName                           string
 		hubHash                            string
 		agentID                            string
+		works                              []runtime.Object
 		appliedWorks                       []runtime.Object
 		validateAppliedManifestWorkActions func(t *testing.T, actions []clienttesting.Action)
 	}{
@@ -29,6 +30,22 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 			workName: "test",
 			hubHash:  "hubhash1",
 			agentID:  "test-agent",
+			works: []runtime.Object{
+				&workapiv1.ManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test",
+						Namespace: "test",
+					},
+					Status: workapiv1.ManifestWorkStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   workapiv1.WorkApplied,
+								Status: metav1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
 			appliedWorks: []runtime.Object{
 				&workapiv1.AppliedManifestWork{
 					ObjectMeta: metav1.ObjectMeta{
@@ -60,10 +77,63 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 			},
 		},
 		{
+			name:     "no action if the work is not applied",
+			workName: "test",
+			hubHash:  "hubhash1",
+			agentID:  "test-agent",
+			works: []runtime.Object{
+				&workapiv1.ManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test",
+						Namespace: "test",
+					},
+				},
+			},
+			appliedWorks: []runtime.Object{
+				&workapiv1.AppliedManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "hubhash-test",
+					},
+					Spec: workapiv1.AppliedManifestWorkSpec{
+						ManifestWorkName: "test",
+						HubHash:          "hubhash",
+						AgentID:          "test-agent",
+					},
+				},
+				&workapiv1.AppliedManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "hubhash1-test",
+					},
+					Spec: workapiv1.AppliedManifestWorkSpec{
+						ManifestWorkName: "test",
+						HubHash:          "hubhash1",
+						AgentID:          "test-agent",
+					},
+				},
+			},
+			validateAppliedManifestWorkActions: noAction,
+		},
+		{
 			name:     "no action for different AgentID",
 			workName: "test",
 			hubHash:  "hubhash1",
 			agentID:  "test-agent",
+			works: []runtime.Object{
+				&workapiv1.ManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test",
+						Namespace: "test",
+					},
+					Status: workapiv1.ManifestWorkStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   workapiv1.WorkApplied,
+								Status: metav1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
 			appliedWorks: []runtime.Object{
 				&workapiv1.AppliedManifestWork{
 					ObjectMeta: metav1.ObjectMeta{
@@ -93,6 +163,22 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 			workName: "test",
 			hubHash:  "hubhash1",
 			agentID:  "test-agent",
+			works: []runtime.Object{
+				&workapiv1.ManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test",
+						Namespace: "test",
+					},
+					Status: workapiv1.ManifestWorkStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   workapiv1.WorkApplied,
+								Status: metav1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
 			appliedWorks: []runtime.Object{
 				&workapiv1.AppliedManifestWork{
 					ObjectMeta: metav1.ObjectMeta{
@@ -129,6 +215,11 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			for _, work := range c.works {
+				if err := informerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(work); err != nil {
+					t.Fatal(err)
+				}
+			}
 			for _, appliedWork := range c.appliedWorks {
 				if err := informerFactory.Work().V1().AppliedManifestWorks().Informer().GetStore().Add(appliedWork); err != nil {
 					t.Fatal(err)
@@ -136,6 +227,7 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 			}
 
 			controller := &UnManagedAppliedWorkController{
+				manifestWorkLister:         informerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks("test"),
 				appliedManifestWorkClient:  fakeClient.WorkV1().AppliedManifestWorks(),
 				appliedManifestWorkLister:  informerFactory.Work().V1().AppliedManifestWorks().Lister(),
 				appliedManifestWorkIndexer: informerFactory.Work().V1().AppliedManifestWorks().Informer().GetIndexer(),

@@ -3,7 +3,6 @@ package integration
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -65,7 +64,7 @@ var _ = ginkgo.Describe("Unmanaged ApplieManifestWork", func() {
 		newCfg, err := newHub.Start()
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		newHubTempDir, err = ioutil.TempDir("", "unmanaged_work_test")
+		newHubTempDir, err = os.MkdirTemp("", "unmanaged_work_test")
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		newHubKubeConfigFile = path.Join(newHubTempDir, "kubeconfig")

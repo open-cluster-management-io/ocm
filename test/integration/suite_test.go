@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -60,7 +59,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	gomega.Expect(cfg).ToNot(gomega.BeNil())
 
 	// create kubeconfig file for hub in a tmp dir
-	tempDir, err = ioutil.TempDir("", "test")
+	tempDir, err = os.MkdirTemp("", "test")
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(tempDir).ToNot(gomega.BeEmpty())
 	hubKubeconfigFileName = path.Join(tempDir, "kubeconfig")
