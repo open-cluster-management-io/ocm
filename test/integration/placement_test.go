@@ -101,6 +101,12 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertNumberOfDecisions(placementName, namespace, 5)
 		})
 
+		ginkgo.It("Should create empty placementdecision when no cluster selected", func() {
+			placement := assertCreatingPlacement(placementName, namespace, nil, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
+			assertPlacementDecisionCreated(placement)
+			assertNumberOfDecisions(placementName, namespace, 0)
+		})
+
 		ginkgo.It("Should create multiple placementdecisions once scheduled", func() {
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			assertCreatingClusters(clusterSet1Name, 101)
@@ -273,6 +279,7 @@ var _ = ginkgo.Describe("Placement", func() {
 					Value:    "value1",
 				},
 			})
+			assertNumberOfDecisions(placementName, namespace, 0)
 			assertPlacementConditionMisconfigured(placementName, namespace, true)
 
 			assertUpdatingPlacement(placementName, namespace, noc(1), clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})

@@ -18,8 +18,9 @@ import (
 )
 
 const (
-	clusterSetLabel = "cluster.open-cluster-management.io/clusterset"
-	placementLabel  = "cluster.open-cluster-management.io/placement"
+	clusterSetLabel          = "cluster.open-cluster-management.io/clusterset"
+	placementLabel           = "cluster.open-cluster-management.io/placement"
+	maxNumOfClusterDecisions = 100
 )
 
 var _ = ginkgo.Describe("Placement", func() {
@@ -84,11 +85,15 @@ var _ = ginkgo.Describe("Placement", func() {
 
 	assertNumberOfDecisions := func(placementName string, desiredNOD int) {
 		ginkgo.By("Check the number of decisions in placementdecisions")
+		desiredNOPD := desiredNOD/maxNumOfClusterDecisions + 1
 		gomega.Eventually(func() bool {
 			pdl, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
 				LabelSelector: placementLabel + "=" + placementName,
 			})
 			if err != nil {
+				return false
+			}
+			if len(pdl.Items) != desiredNOPD {
 				return false
 			}
 			actualNOD := 0
@@ -279,20 +284,9 @@ var _ = ginkgo.Describe("Placement", func() {
 			return err
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
+		ginkgo.By("Create empty placement decision")
 		assertNumberOfDecisions(placementName, 0)
 		assertPlacementStatus(placementName, 0, false)
-
-		ginkgo.By("Check if placementdecisions are deleted as well")
-		gomega.Eventually(func() bool {
-			placementDecisions, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.TODO(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s", placementLabel, placementName),
-			})
-			if err != nil {
-				return false
-			}
-
-			return len(placementDecisions.Items) == 0
-		}, eventuallyTimeout*5, eventuallyInterval*5).Should(gomega.BeTrue())
 
 		ginkgo.By("Delete placement")
 		err = clusterClient.ClusterV1beta1().Placements(namespace).Delete(context.TODO(), placementName, metav1.DeleteOptions{})

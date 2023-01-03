@@ -238,14 +238,6 @@ func (c *schedulingController) syncPlacement(ctx context.Context, syncCtx factor
 		status,
 	)
 
-	// update status and return error if schedule() returns error
-	if status.IsError() {
-		if err := c.updateStatus(ctx, placement, int32(len(scheduleResult.Decisions())), misconfiguredCondition, satisfiedCondition); err != nil {
-			return err
-		}
-		return status.AsError()
-	}
-
 	// requeue placement if requeueAfter is defined in scheduleResult
 	if syncCtx != nil && scheduleResult.RequeueAfter() != nil {
 		key, _ := cache.MetaNamespaceKeyFunc(placement)
@@ -254,13 +246,16 @@ func (c *schedulingController) syncPlacement(ctx context.Context, syncCtx factor
 		syncCtx.Queue().AddAfter(key, *t)
 	}
 
-	err = c.bind(ctx, placement, scheduleResult.Decisions(), scheduleResult.PrioritizerScores(), status)
-	if err != nil {
+	if err := c.bind(ctx, placement, scheduleResult.Decisions(), scheduleResult.PrioritizerScores(), status); err != nil {
 		return err
 	}
 
 	// update placement status if necessary to signal no bindings
-	return c.updateStatus(ctx, placement, int32(len(scheduleResult.Decisions())), misconfiguredCondition, satisfiedCondition)
+	if err := c.updateStatus(ctx, placement, int32(len(scheduleResult.Decisions())), misconfiguredCondition, satisfiedCondition); err != nil {
+		return err
+	}
+
+	return status.AsError()
 }
 
 // getManagedClusterSetBindings returns all bindings found in the placement namespace.
@@ -463,6 +458,11 @@ func (c *schedulingController) bind(
 			remainingDecisions = nil
 		}
 		decisionSlices = append(decisionSlices, decisionSlice)
+	}
+	// if decisionSlices is empty, append one empty slice.
+	// so that can create a PlacementDecision with empty decisions in status.
+	if len(decisionSlices) == 0 {
+		decisionSlices = append(decisionSlices, []clusterapiv1beta1.ClusterDecision{})
 	}
 
 	// bind cluster decision slices to placementdecisions.

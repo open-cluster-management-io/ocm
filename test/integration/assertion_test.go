@@ -79,10 +79,8 @@ func assertPlacementDeleted(placementName, namespace string) {
 
 func assertNumberOfDecisions(placementName, namespace string, desiredNOD int) {
 	ginkgo.By("Check the number of decisions in placementdecisions")
-	desiredNOPD := desiredNOD / maxNumOfClusterDecisions
-	if desiredNOD%maxNumOfClusterDecisions != 0 {
-		desiredNOPD++
-	}
+	// at least one decision for each placement
+	desiredNOPD := desiredNOD/maxNumOfClusterDecisions + 1
 	gomega.Eventually(func() bool {
 		pdl, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
 			LabelSelector: placementLabel + "=" + placementName,

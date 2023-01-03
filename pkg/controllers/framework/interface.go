@@ -93,7 +93,7 @@ func NewStatus(plugin string, code Code, reasons ...string) *Status {
 		reasons: reasons,
 		plugin:  plugin,
 	}
-	if code == Error {
+	if s.IsError() {
 		s.err = errors.New(s.Message())
 	}
 	return s
