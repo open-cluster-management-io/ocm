@@ -83,10 +83,9 @@ func (m *UnManagedAppliedWorkController) sync(ctx context.Context, controllerCon
 		return err
 	}
 
-	// We delete the old applied work until the work of this applied work is applied.
-	// This will avoid to delete the old applied work prematurely, if an applied work is an
-	// owner of its applied resource, if we delete the old applied work prematurely, this will
-	// casue to delete the applied resource.
+	// We delete the old AppliedManifestWork only when the related ManifestWork is applied with the new
+	// AppliedManifestWork as the new owner. This can avoid deleting the old AppliedManifestWork prematurely
+	// before the new AppliedManifestWork takes the ownership of the applied resources.
 	manifestWork, err := m.manifestWorkLister.Get(appliedManifestWork.Spec.ManifestWorkName)
 	if errors.IsNotFound(err) {
 		// work not found, could have been deleted, do nothing.
