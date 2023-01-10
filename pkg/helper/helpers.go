@@ -20,13 +20,17 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
+	clusterv1beta1client "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta1"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
+	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
@@ -523,4 +527,34 @@ func BuildResourceMeta(
 
 	resourceMeta.Resource = mapping.Resource.Resource
 	return resourceMeta, mapping.Resource, err
+}
+
+type PlacementDecisionGetter struct {
+	Client clusterv1beta1client.ClusterV1beta1Client
+}
+
+func (pdl PlacementDecisionGetter) List(selector labels.Selector, namespace string) ([]*clusterv1beta1.PlacementDecision, error) {
+	opts := metav1.ListOptions{
+		LabelSelector: selector.String(),
+	}
+
+	decisionList, err := pdl.Client.PlacementDecisions(namespace).List(context.Background(), opts)
+	if err != nil {
+		return nil, err
+	}
+	var decisions []*clusterv1beta1.PlacementDecision
+	for i := range decisionList.Items {
+		decisions = append(decisions, &decisionList.Items[i])
+	}
+	return decisions, nil
+}
+
+func GetPlacement(client clusterv1beta1client.ClusterV1beta1Client, ctx context.Context, opts metav1.GetOptions, name string, ns string) (*clusterv1beta1.Placement, error) {
+	return client.Placements(ns).Get(ctx, name, opts)
+}
+
+func GetClusters(client clusterv1beta1client.ClusterV1beta1Client, placement *clusterv1beta1.Placement, existingClusters sets.String) (sets.String, sets.String, error) {
+	pdtracker := clusterv1beta1.NewPlacementDecisionClustersTracker(placement, PlacementDecisionGetter{Client: client}, existingClusters)
+
+	return pdtracker.Get()
 }
