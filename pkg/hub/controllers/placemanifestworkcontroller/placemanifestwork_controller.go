@@ -2,57 +2,93 @@ package placemanifestworkcontroller
 
 import (
 	"context"
-	"time"
-
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	clusterinformerv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
 	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
-	workv1alpha1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1alpha1"
+	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	workinformerv1 "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	workinformerv1alpha1 "open-cluster-management.io/api/client/work/informers/externalversions/work/v1alpha1"
 	worklisterv1 "open-cluster-management.io/api/client/work/listers/work/v1"
 	worklisterv1alpha1 "open-cluster-management.io/api/client/work/listers/work/v1alpha1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 )
 
-var (
-	ResyncInterval = 15 * time.Second
+const (
+	// PlaceManifestWorkControllerNameLabelKey is the label key on manifestwork to ref to the placemanifestwork
+	// that owns this manifestwork
+	// TODO move this to the api repo
+	PlaceManifestWorkControllerNameLabelKey = "work.open-cluster-management.io/placemanifestwork"
 )
 
 type PlaceManifestWorkController struct {
-	placeManifestWorkClient workv1alpha1client.PlaceManifestWorkInterface
-	placeManifestWorkLister worklisterv1alpha1.PlaceManifestWorkNamespaceLister
-	placementLister         clusterlister.PlacementLister
-	placeDecisionLister     clusterlister.PlacementDecisionLister
-	manifestWorkLister      worklisterv1.ManifestWorkLister
+	workClient               workclientset.Interface
+	placeManifestWorkLister  worklisterv1alpha1.PlaceManifestWorkLister
+	placeManifestWorkIndexer cache.Indexer
+	placementLister          clusterlister.PlacementLister
+	placeDecisionLister      clusterlister.PlacementDecisionLister
+	manifestWorkLister       worklisterv1.ManifestWorkLister
 }
 
 func NewPlaceManifestWorkController(
-	ctx context.Context,
 	recorder events.Recorder,
-	placeManifestWorkClient workv1alpha1client.PlaceManifestWorkInterface,
-	placeManifestWorkLister worklisterv1alpha1.PlaceManifestWorkNamespaceLister,
+	workClient workclientset.Interface,
 	placeManifestWorkInformer workinformerv1alpha1.PlaceManifestWorkInformer,
-	manifestWorkLister worklisterv1.ManifestWorkLister,
-	placementLister clusterlister.PlacementLister,
-	placeDecisionLister clusterlister.PlacementDecisionLister) factory.Controller {
+	manifestWorkInformer workinformerv1.ManifestWorkInformer,
+	placementInformer clusterinformerv1beta1.PlacementInformer,
+	placeDecisionInformer clusterinformerv1beta1.PlacementDecisionInformer) factory.Controller {
 
 	controller := &PlaceManifestWorkController{
-		placeManifestWorkClient: placeManifestWorkClient,
-		placeManifestWorkLister: placeManifestWorkLister,
-		placementLister:         placementLister,
-		placeDecisionLister:     placeDecisionLister,
-		manifestWorkLister:      manifestWorkLister,
+		workClient:               workClient,
+		placeManifestWorkLister:  placeManifestWorkInformer.Lister(),
+		placeManifestWorkIndexer: placeManifestWorkInformer.Informer().GetIndexer(),
+		placementLister:          placementInformer.Lister(),
+		placeDecisionLister:      placeDecisionInformer.Lister(),
+		manifestWorkLister:       manifestWorkInformer.Lister(),
+	}
+
+	err := placeManifestWorkInformer.Informer().AddIndexers(
+		cache.Indexers{
+			placeManifestWorkByPlacement: indexPlacementManifestWorkByPlacement,
+		})
+	if err != nil {
+		utilruntime.HandleError(err)
 	}
 
 	return factory.New().
 		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
-			accessor, _ := meta.Accessor(obj)
-			return accessor.GetName()
+			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+			if err != nil {
+				utilruntime.HandleError(err)
+				return ""
+			}
+			return key
 		}, placeManifestWorkInformer.Informer()).
-		WithSync(controller.sync).ResyncEvery(ResyncInterval).ToController("PlaceManifestWorkController", recorder)
+		WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
+			accessor, _ := meta.Accessor(obj)
+			key, ok := accessor.GetLabels()[PlaceManifestWorkControllerNameLabelKey]
+			if !ok {
+				return ""
+			}
+			return key
+		}, func(obj interface{}) bool {
+			accessor, err := meta.Accessor(obj)
+			if err != nil {
+				return false
+			}
+			if _, ok := accessor.GetLabels()[PlaceManifestWorkControllerNameLabelKey]; ok {
+				return true
+			}
+			return false
+		}, manifestWorkInformer.Informer()).
+		WithInformersQueueKeysFunc(controller.placementDecisionQueueKeysFunc, placeDecisionInformer.Informer()).
+		WithInformersQueueKeysFunc(controller.placementQueueKeysFunc, placementInformer.Informer()).
+		WithSync(controller.sync).ToController("PlaceManifestWorkController", recorder)
 }
 
 // sync is the main reconcile loop for placeManifest work. It is triggered every 15sec

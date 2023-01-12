@@ -16,7 +16,7 @@ func NewWorkloadAgent() *cobra.Command {
 		NewControllerCommandConfig("work-agent", version.Get(), o.RunWorkloadAgent)
 	cmd := cmdConfig.NewCommand()
 	cmd.Use = "agent"
-	cmd.Short = "Start the Cluster Registration Agent"
+	cmd.Short = "Start the Work Agent"
 
 	o.AddFlags(cmd)
 

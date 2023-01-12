@@ -13,6 +13,7 @@ import (
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 
+	"open-cluster-management.io/work/pkg/cmd/hub"
 	"open-cluster-management.io/work/pkg/cmd/spoke"
 	"open-cluster-management.io/work/pkg/cmd/webhook"
 	"open-cluster-management.io/work/pkg/cmd/webhook/admission"
@@ -55,5 +56,6 @@ func newWorkCommand() *cobra.Command {
 	cmd.AddCommand(spoke.NewWorkloadAgent())
 	cmd.AddCommand(admission.NewAdmissionHook())
 	cmd.AddCommand(webhook.NewWebhook())
+	cmd.AddCommand(hub.NewHubManager())
 	return cmd
 }

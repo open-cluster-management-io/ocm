@@ -123,7 +123,6 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 	).NewExecutorValidator(ctx, features.DefaultSpokeMutableFeatureGate.Enabled(ocmfeature.ExecutorValidatingCaches))
 
 	manifestWorkController := manifestcontroller.NewManifestWorkController(
-		ctx,
 		controllerContext.EventRecorder,
 		spokeDynamicClient,
 		spokeKubeClient,

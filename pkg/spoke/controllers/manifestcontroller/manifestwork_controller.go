@@ -65,7 +65,6 @@ type applyResult struct {
 
 // NewManifestWorkController returns a ManifestWorkController
 func NewManifestWorkController(
-	ctx context.Context,
 	recorder events.Recorder,
 	spokeDynamicClient dynamic.Interface,
 	spokeKubeClient kubernetes.Interface,

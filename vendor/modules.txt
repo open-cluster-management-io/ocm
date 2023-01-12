@@ -1220,9 +1220,23 @@ k8s.io/utils/strings/slices
 k8s.io/utils/trace
 # open-cluster-management.io/api v0.9.1-0.20221116150238-55691c2c5f04
 ## explicit; go 1.19
+open-cluster-management.io/api/client/cluster/clientset/versioned
 open-cluster-management.io/api/client/cluster/clientset/versioned/scheme
+open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1
+open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1alpha1
 open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta1
+open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta2
+open-cluster-management.io/api/client/cluster/informers/externalversions
+open-cluster-management.io/api/client/cluster/informers/externalversions/cluster
+open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1
+open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1alpha1
+open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1
+open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta2
+open-cluster-management.io/api/client/cluster/informers/externalversions/internalinterfaces
+open-cluster-management.io/api/client/cluster/listers/cluster/v1
+open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1
 open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1
+open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2
 open-cluster-management.io/api/client/work/clientset/versioned
 open-cluster-management.io/api/client/work/clientset/versioned/fake
 open-cluster-management.io/api/client/work/clientset/versioned/scheme
