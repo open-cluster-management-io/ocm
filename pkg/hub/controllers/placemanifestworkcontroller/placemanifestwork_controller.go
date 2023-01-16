@@ -2,19 +2,25 @@ package placemanifestworkcontroller
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	clusterinformerv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
-	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workinformerv1 "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	workinformerv1alpha1 "open-cluster-management.io/api/client/work/informers/externalversions/work/v1alpha1"
-	worklisterv1 "open-cluster-management.io/api/client/work/listers/work/v1"
 	worklisterv1alpha1 "open-cluster-management.io/api/client/work/listers/work/v1alpha1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 )
@@ -24,16 +30,32 @@ const (
 	// that owns this manifestwork
 	// TODO move this to the api repo
 	PlaceManifestWorkControllerNameLabelKey = "work.open-cluster-management.io/placemanifestwork"
+
+	// PlaceManifestWorkFinalizer is the name of the finalizer added to placeManifestWork. It is used to ensure
+	// related manifestworks is deleted
+	PlaceManifestWorkFinalizer = "work.open-cluster-management.io/manifest-work-cleanup"
 )
 
 type PlaceManifestWorkController struct {
 	workClient               workclientset.Interface
 	placeManifestWorkLister  worklisterv1alpha1.PlaceManifestWorkLister
 	placeManifestWorkIndexer cache.Indexer
-	placementLister          clusterlister.PlacementLister
-	placeDecisionLister      clusterlister.PlacementDecisionLister
-	manifestWorkLister       worklisterv1.ManifestWorkLister
+
+	reconcilers []placeManifestWorkReconcile
 }
+
+// placeManifestWorkReconcile is a interface for reconcile logic. It returns an updated placeManifestWork and whether further
+// reconcile needs to proceed.
+type placeManifestWorkReconcile interface {
+	reconcile(ctx context.Context, pw *workapiv1alpha1.PlaceManifestWork) (*workapiv1alpha1.PlaceManifestWork, reconcileState, error)
+}
+
+type reconcileState int64
+
+const (
+	reconcileStop reconcileState = iota
+	reconcileContinue
+)
 
 func NewPlaceManifestWorkController(
 	recorder events.Recorder,
@@ -47,9 +69,13 @@ func NewPlaceManifestWorkController(
 		workClient:               workClient,
 		placeManifestWorkLister:  placeManifestWorkInformer.Lister(),
 		placeManifestWorkIndexer: placeManifestWorkInformer.Informer().GetIndexer(),
-		placementLister:          placementInformer.Lister(),
-		placeDecisionLister:      placeDecisionInformer.Lister(),
-		manifestWorkLister:       manifestWorkInformer.Lister(),
+
+		reconcilers: []placeManifestWorkReconcile{
+			&finalizeReconciler{workClient: workClient, manifestWorkLister: manifestWorkInformer.Lister()},
+			&addFinalizerReconciler{workClient: workClient},
+			&deployReconciler{workClient: workClient, manifestWorkLister: manifestWorkInformer.Lister(), placementLister: placementInformer.Lister(), placeDecisionLister: placeDecisionInformer.Lister()},
+			&statusReconciler{workClient: workClient, manifestWorkLister: manifestWorkInformer.Lister(), placeDecisionLister: placeDecisionInformer.Lister()},
+		},
 	}
 
 	err := placeManifestWorkInformer.Informer().AddIndexers(
@@ -93,15 +119,74 @@ func NewPlaceManifestWorkController(
 
 // sync is the main reconcile loop for placeManifest work. It is triggered every 15sec
 func (m *PlaceManifestWorkController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	placeManifestWorkName := controllerContext.QueueKey()
-	klog.V(4).Infof("Reconciling placeManifestWork %q", placeManifestWorkName)
-	// TODO: add watcher for manifest and placement
-	// TODO: add annotation to determine the placeManifestwork owner
-	// TODO: add the finalizer for PlaceManifestWork
-	return nil
+	key := controllerContext.QueueKey()
+	klog.V(4).Infof("Reconciling placeManifestWork %q", key)
+
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		// ignore placement whose key is not in format: namespace/name
+		utilruntime.HandleError(err)
+		return nil
+	}
+
+	placementManifestWork, err := m.placeManifestWorkLister.PlaceManifestWorks(namespace).Get(name)
+	switch {
+	case errors.IsNotFound(err):
+		return nil
+	case err != nil:
+		return err
+	}
+
+	oldPlacementManifestWork := placementManifestWork
+	placementManifestWork = placementManifestWork.DeepCopy()
+
+	var state reconcileState
+	var errs []error
+	for _, reconciler := range m.reconcilers {
+		placementManifestWork, state, err = reconciler.reconcile(ctx, placementManifestWork)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		if state == reconcileStop {
+			break
+		}
+	}
+
+	// Patch status
+	if err := m.patchPlaceManifestStatus(ctx, oldPlacementManifestWork, placementManifestWork); err != nil {
+		errs = append(errs, err)
+	}
+
+	return utilerrors.NewAggregate(errs)
 }
 
-func (m *PlaceManifestWorkController) finalizePlaceManifestWork(placeManifestWork workapiv1alpha1.PlaceManifestWork) error {
-	// TODO: Delete all ManifestWork owned by the given placeManifestWork
-	return nil
+func (m *PlaceManifestWorkController) patchPlaceManifestStatus(ctx context.Context, old, new *workapiv1alpha1.PlaceManifestWork) error {
+	if apiequality.Semantic.DeepEqual(old.Status, new.Status) {
+		return nil
+	}
+
+	oldData, err := json.Marshal(workapiv1alpha1.PlaceManifestWork{
+		Status: old.Status,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to Marshal old data for placeManifestWork status %s: %w", old.Name, err)
+	}
+	newData, err := json.Marshal(workapiv1alpha1.PlaceManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:             old.UID,
+			ResourceVersion: old.ResourceVersion,
+		}, // to ensure they appear in the patch as preconditions
+		Status: new.Status,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to Marshal new data for work status %s: %w", old.Name, err)
+	}
+
+	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
+	if err != nil {
+		return fmt.Errorf("failed to create patch for work %s: %w", old.Name, err)
+	}
+
+	_, err = m.workClient.WorkV1alpha1().PlaceManifestWorks(old.Namespace).Patch(ctx, old.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	return err
 }

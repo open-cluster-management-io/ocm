@@ -229,3 +229,8 @@ type ManagedClusterList struct {
 	// Items is a list of managed clusters.
 	Items []ManagedCluster `json:"items"`
 }
+
+const (
+	// ClusterNameLabelKey is the key of a label to set ManagedCluster name.
+	ClusterNameLabelKey = "open-cluster-management.io/cluster-name"
+)
