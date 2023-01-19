@@ -167,6 +167,9 @@ func (r *managedReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.
 // the hash of the given hub host.
 func (r *managedReconcile) cleanUpAppliedManifestWorks(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, config klusterletConfig) error {
 	appliedManifestWorks, err := r.managedClusterClients.appliedManifestWorkClient.List(ctx, metav1.ListOptions{})
+	if errors.IsNotFound(err) {
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("unable to list AppliedManifestWorks: %w", err)
 	}
