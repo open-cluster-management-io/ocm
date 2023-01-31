@@ -3,8 +3,8 @@ package utils
 import (
 	"crypto/sha256"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"sync"
 
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -119,7 +119,7 @@ func (cc *configChecker) Check(_ *http.Request) error {
 func load(configfiles []string) ([32]byte, error) {
 	var allContent []byte
 	for _, c := range configfiles {
-		content, err := ioutil.ReadFile(c)
+		content, err := os.ReadFile(c)
 		if err != nil {
 			return [32]byte{}, fmt.Errorf("read %s failed, %v", c, err)
 		}

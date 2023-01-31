@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -20,13 +19,13 @@ var fileAName, fileBName string
 var _ = Describe("Config Checker With Reload", func() {
 	BeforeEach(func() {
 		// create file in tmp directory
-		fileA, err := ioutil.TempFile("", "fileA")
+		fileA, err := os.CreateTemp("", "fileA")
 		Expect(err).To(BeNil())
 
 		_, err = fileA.WriteString("fileA")
 		Expect(err).To(BeNil())
 
-		fileB, err := ioutil.TempFile("", "fileB")
+		fileB, err := os.CreateTemp("", "fileB")
 		Expect(err).To(BeNil())
 
 		_, err = fileB.WriteString("fileB")
@@ -61,7 +60,7 @@ var _ = Describe("Config Checker With Reload", func() {
 	Context("Modify file A", func() {
 		It("should return err at first check, nil at second check", func() {
 			// modify file A
-			Expect(ioutil.WriteFile(fileAName, []byte("fileA modified"), 0755)).To(BeNil())
+			Expect(os.WriteFile(fileAName, []byte("fileA modified"), 0755)).To(BeNil())
 			// check
 			Expect(cc.Check(nil)).ToNot(BeNil())
 			// check again err should be nil
@@ -72,7 +71,7 @@ var _ = Describe("Config Checker With Reload", func() {
 	Context("Modify file B", func() {
 		It("should return err at first check, nil at second check", func() {
 			// modify file B
-			Expect(ioutil.WriteFile(fileBName, []byte("fileB modified"), 0755)).To(BeNil())
+			Expect(os.WriteFile(fileBName, []byte("fileB modified"), 0755)).To(BeNil())
 			// check
 			Expect(cc.Check(nil)).ToNot(BeNil())
 			// check again err should be nil
