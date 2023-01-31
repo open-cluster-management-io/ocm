@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"strings"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -24,10 +25,6 @@ import (
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/registration/pkg/helpers"
 	"open-cluster-management.io/registration/pkg/hub/user"
-)
-
-const (
-	spokeClusterNameLabel = "open-cluster-management.io/cluster-name"
 )
 
 // csrApprovingController auto approve the renewal CertificateSigningRequests for an accepted spoke cluster on the hub.
@@ -134,7 +131,7 @@ func authorize(ctx context.Context, kubeClient kubernetes.Interface, csr csrInfo
 // 2. if organization field and commonName field in csr request is valid.
 // 3. if user name in csr is the same as commonName field in csr request.
 func isSpokeClusterClientCertRenewal(csr csrInfo) bool {
-	spokeClusterName, existed := csr.labels[spokeClusterNameLabel]
+	spokeClusterName, existed := csr.labels[clusterv1.ClusterNameLabelKey]
 	if !existed {
 		return false
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"os"
 	"path"
 	"time"
@@ -266,7 +267,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		hubKubeClient,
 		10*time.Minute,
 		informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
-			listOptions.LabelSelector = fmt.Sprintf("%s=%s", clientcert.ClusterNameLabel, o.ClusterName)
+			listOptions.LabelSelector = fmt.Sprintf("%s=%s", clusterv1.ClusterNameLabelKey, o.ClusterName)
 		}),
 	)
 	addOnInformerFactory := addoninformers.NewSharedInformerFactoryWithOptions(

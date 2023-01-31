@@ -10,23 +10,31 @@ import (
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
 	workv1 "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
+	workv1alpha1 "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1alpha1"
 )
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	WorkV1() workv1.WorkV1Interface
+	WorkV1alpha1() workv1alpha1.WorkV1alpha1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	workV1 *workv1.WorkV1Client
+	workV1       *workv1.WorkV1Client
+	workV1alpha1 *workv1alpha1.WorkV1alpha1Client
 }
 
 // WorkV1 retrieves the WorkV1Client
 func (c *Clientset) WorkV1() workv1.WorkV1Interface {
 	return c.workV1
+}
+
+// WorkV1alpha1 retrieves the WorkV1alpha1Client
+func (c *Clientset) WorkV1alpha1() workv1alpha1.WorkV1alpha1Interface {
+	return c.workV1alpha1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -44,6 +52,10 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 // where httpClient was generated with rest.HTTPClientFor(c).
 func NewForConfig(c *rest.Config) (*Clientset, error) {
 	configShallowCopy := *c
+
+	if configShallowCopy.UserAgent == "" {
+		configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
+	}
 
 	// share the transport between all clients
 	httpClient, err := rest.HTTPClientFor(&configShallowCopy)
@@ -73,6 +85,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
+	cs.workV1alpha1, err = workv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
@@ -95,6 +111,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.workV1 = workv1.New(c)
+	cs.workV1alpha1 = workv1alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

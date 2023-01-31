@@ -3,6 +3,8 @@ package addon
 import (
 	"context"
 	"fmt"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -223,8 +225,8 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 			GenerateName: fmt.Sprintf("addon-%s-%s-", c.clusterName, config.addOnName),
 			Labels: map[string]string{
 				// the labels are only hints. Anyone could set/modify them.
-				clientcert.ClusterNameLabel: c.clusterName,
-				clientcert.AddonNameLabel:   config.addOnName,
+				clusterv1.ClusterNameLabelKey: c.clusterName,
+				addonv1alpha1.AddonLabelKey:   config.addOnName,
 			},
 		},
 		Subject:         config.x509Subject(c.clusterName, c.agentName),
@@ -324,12 +326,12 @@ func indexByAddonFunc(obj interface{}) ([]string, error) {
 		return nil, err
 	}
 
-	cluster, ok := accessor.GetLabels()[clientcert.ClusterNameLabel]
+	cluster, ok := accessor.GetLabels()[clusterv1.ClusterNameLabelKey]
 	if !ok {
 		return []string{}, nil
 	}
 
-	addon, ok := accessor.GetLabels()[clientcert.AddonNameLabel]
+	addon, ok := accessor.GetLabels()[addonv1alpha1.AddonLabelKey]
 	if !ok {
 		return []string{}, nil
 	}
@@ -345,11 +347,11 @@ func createCSREventFilterFunc(clusterName, addOnName, signerName string) factory
 		}
 		labels := accessor.GetLabels()
 		// only enqueue csr from a specific managed cluster
-		if labels[clientcert.ClusterNameLabel] != clusterName {
+		if labels[clusterv1.ClusterNameLabelKey] != clusterName {
 			return false
 		}
 		// only enqueue csr created for a specific addon
-		if labels[clientcert.AddonNameLabel] != addOnName {
+		if labels[addonv1alpha1.AddonLabelKey] != addOnName {
 			return false
 		}
 

@@ -26,7 +26,6 @@ import (
 
 const leaseDurationTimes = 5
 const leaseName = "managed-cluster-lease"
-const clusterNameLabel = "open-cluster-management.io/cluster-name"
 
 var (
 	// LeaseDurationSeconds is lease update time interval
@@ -60,7 +59,7 @@ func NewClusterLeaseController(
 		WithFilteredEventsInformersQueueKeyFunc(
 			func(obj runtime.Object) string {
 				accessor, _ := meta.Accessor(obj)
-				return accessor.GetLabels()[clusterNameLabel]
+				return accessor.GetLabels()[clusterv1.ClusterNameLabelKey]
 			},
 			func(obj interface{}) bool {
 				metaObj, ok := obj.(metav1.ObjectMetaAccessor)
@@ -71,7 +70,7 @@ func NewClusterLeaseController(
 				// only handle the managed cluster lease
 				// TODO instead of this by adding label filter in the SharedInformerFactory
 				// see https://github.com/open-cluster-management-io/registration/issues/225
-				if _, ok := metaObj.GetObjectMeta().GetLabels()[clusterNameLabel]; !ok {
+				if _, ok := metaObj.GetObjectMeta().GetLabels()[clusterv1.ClusterNameLabelKey]; !ok {
 					return false
 				}
 
@@ -117,7 +116,7 @@ func (c *leaseController) sync(ctx context.Context, syncCtx factory.SyncContext)
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      leaseName,
 				Namespace: cluster.Name,
-				Labels:    map[string]string{clusterNameLabel: cluster.Name},
+				Labels:    map[string]string{clusterv1.ClusterNameLabelKey: cluster.Name},
 			},
 			Spec: coordv1.LeaseSpec{
 				HolderIdentity: pointer.StringPtr(leaseName),

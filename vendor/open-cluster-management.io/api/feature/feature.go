@@ -45,6 +45,12 @@ const (
 	// will check if the request user has the execute-as permission with the default executor
 	// "system:serviceaccount::klusterlet-work-sa"
 	NilExecutorValidating featuregate.Feature = "NilExecutorValidating"
+
+	// ExecutorValidatingCaches will start a new controller in the wokrk agent to cache subject access review
+	// validating results for executors.
+	// When using the ManifestWork Executor feature, enabling this can reduce the number of subject access review
+	// requests sent by the work agent to the managed cluster api server.
+	ExecutorValidatingCaches featuregate.Feature = "ExecutorValidatingCaches"
 )
 
 // DefaultSpokeRegistrationFeatureGates consists of all known ocm-registration
@@ -68,4 +74,10 @@ var DefaultHubRegistrationFeatureGates = map[featuregate.Feature]featuregate.Fea
 // To add a new feature, define a key for it above and add it here.
 var DefaultHubWorkFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	NilExecutorValidating: {Default: false, PreRelease: featuregate.Alpha},
+}
+
+// DefaultSpokeWorkFeatureGates consists of all known ocm work feature keys for work agent.
+// To add a new feature, define a key for it above and add it here.
+var DefaultSpokeWorkFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	ExecutorValidatingCaches: {Default: false, PreRelease: featuregate.Alpha},
 }

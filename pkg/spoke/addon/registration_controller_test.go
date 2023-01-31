@@ -2,6 +2,7 @@ package addon
 
 import (
 	"context"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"testing"
 	"time"
 
@@ -16,7 +17,6 @@ import (
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
-	"open-cluster-management.io/registration/pkg/clientcert"
 	testinghelpers "open-cluster-management.io/registration/pkg/helpers/testing"
 )
 
@@ -48,8 +48,8 @@ func TestFilterCSREvents(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						// the labels are only hints. Anyone could set/modify them.
-						clientcert.ClusterNameLabel: clusterName,
-						clientcert.AddonNameLabel:   addonName,
+						clusterv1.ClusterNameLabelKey: clusterName,
+						addonv1alpha1.AddonLabelKey:   addonName,
 					},
 				},
 				Spec: certificates.CertificateSigningRequestSpec{

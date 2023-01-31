@@ -22,7 +22,7 @@ require (
 	k8s.io/component-base v0.24.3
 	k8s.io/klog/v2 v2.70.1
 	k8s.io/utils v0.0.0-20220713171938-56c0de1e6f5e
-	open-cluster-management.io/api v0.8.1-0.20221008072653-71a179ef201c
+	open-cluster-management.io/api v0.9.1-0.20221212072517-d2016d321f33
 	sigs.k8s.io/controller-runtime v0.12.3
 )
 
@@ -59,7 +59,7 @@ require (
 	github.com/google/gnostic v0.5.7-v3refs // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
-	github.com/google/uuid v1.1.2 // indirect
+	github.com/google/uuid v1.2.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect

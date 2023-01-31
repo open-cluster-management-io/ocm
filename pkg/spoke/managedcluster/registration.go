@@ -3,6 +3,8 @@ package managedcluster
 import (
 	"crypto/x509/pkix"
 	"fmt"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"strings"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -66,7 +68,7 @@ func NewClientCertForHubController(
 			GenerateName: fmt.Sprintf("%s-", clusterName),
 			Labels: map[string]string{
 				// the label is only an hint for cluster name. Anyone could set/modify it.
-				clientcert.ClusterNameLabel: clusterName,
+				clusterv1.ClusterNameLabelKey: clusterName,
 			},
 		},
 		Subject: &pkix.Name{
@@ -84,12 +86,12 @@ func NewClientCertForHubController(
 			}
 			labels := accessor.GetLabels()
 			// only enqueue csr from a specific managed cluster
-			if labels[clientcert.ClusterNameLabel] != clusterName {
+			if labels[clusterv1.ClusterNameLabelKey] != clusterName {
 				return false
 			}
 
 			// should not contain addon key
-			_, ok := labels[clientcert.AddonNameLabel]
+			_, ok := labels[addonv1alpha1.AddonLabelKey]
 			if ok {
 				return false
 			}
@@ -171,13 +173,13 @@ func indexByClusterFunc(obj interface{}) ([]string, error) {
 		return nil, err
 	}
 
-	cluster, ok := accessor.GetLabels()[clientcert.ClusterNameLabel]
+	cluster, ok := accessor.GetLabels()[clusterv1.ClusterNameLabelKey]
 	if !ok {
 		return []string{}, nil
 	}
 
 	// should not contain addon key
-	if _, ok := accessor.GetLabels()[clientcert.AddonNameLabel]; ok {
+	if _, ok := accessor.GetLabels()[addonv1alpha1.AddonLabelKey]; ok {
 		return []string{}, nil
 	}
 

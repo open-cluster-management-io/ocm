@@ -35,9 +35,6 @@ const (
 	ClusterNameFile = "cluster-name"
 	AgentNameFile   = "agent-name"
 
-	ClusterNameLabel = "open-cluster-management.io/cluster-name"
-	AddonNameLabel   = "open-cluster-management.io/addon-name"
-
 	// ClusterCertificateRotatedCondition is a condition type that client certificate is rotated
 	ClusterCertificateRotatedCondition = "ClusterCertificateRotated"
 

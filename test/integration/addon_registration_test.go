@@ -413,7 +413,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 
 		ginkgo.By("CSR should not exceed 10")
 		csrs, err := kubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s,%s=%s", clientcert.ClusterNameLabel, managedClusterName, clientcert.AddonNameLabel, addOnName),
+			LabelSelector: fmt.Sprintf("%s=%s,%s=%s", clusterv1.ClusterNameLabelKey, managedClusterName, addonv1alpha1.AddonLabelKey, addOnName),
 		})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(len(csrs.Items) >= 10).ShouldNot(gomega.BeFalse())
