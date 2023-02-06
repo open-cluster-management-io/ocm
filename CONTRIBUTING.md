@@ -65,7 +65,7 @@ After your PR is ready to commit, please run following commands to check your co
 - run the end-to-end test, prepare a kind cluster and run the following command. Make sure [imagebuilder](https://github.com/openshift/imagebuilder) is installed.
 
   ```shell
-  go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.1
+  go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
   
   export KUBECONFIG={the kubeconfig of your kind cluster that will run the e2e test}
 
