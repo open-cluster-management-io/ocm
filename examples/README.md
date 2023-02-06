@@ -24,7 +24,7 @@ export KUBECONFIG=</path/to/hub_cluster/kubeconfig>
 Build the docker image to run the sample AddOn.
 ```sh
 # get imagebuilder first
-go get github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.1
+go get github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
 export PATH=$PATH:$(go env GOPATH)/bin
 # build image
 make images
