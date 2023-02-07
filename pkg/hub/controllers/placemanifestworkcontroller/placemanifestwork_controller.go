@@ -22,6 +22,7 @@ import (
 	workinformerv1 "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	workinformerv1alpha1 "open-cluster-management.io/api/client/work/informers/externalversions/work/v1alpha1"
 	worklisterv1alpha1 "open-cluster-management.io/api/client/work/listers/work/v1alpha1"
+	"open-cluster-management.io/api/utils/work/v1/workapplier"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 )
 
@@ -71,10 +72,12 @@ func NewPlaceManifestWorkController(
 		placeManifestWorkIndexer: placeManifestWorkInformer.Informer().GetIndexer(),
 
 		reconcilers: []placeManifestWorkReconcile{
-			&finalizeReconciler{workClient: workClient, manifestWorkLister: manifestWorkInformer.Lister()},
+			&finalizeReconciler{workApplier: workapplier.NewWorkApplierWithTypedClient(workClient, manifestWorkInformer.Lister()),
+				workClient: workClient, manifestWorkLister: manifestWorkInformer.Lister()},
 			&addFinalizerReconciler{workClient: workClient},
-			&deployReconciler{workClient: workClient, manifestWorkLister: manifestWorkInformer.Lister(), placementLister: placementInformer.Lister(), placeDecisionLister: placeDecisionInformer.Lister()},
-			&statusReconciler{workClient: workClient, manifestWorkLister: manifestWorkInformer.Lister(), placeDecisionLister: placeDecisionInformer.Lister()},
+			&deployReconciler{workApplier: workapplier.NewWorkApplierWithTypedClient(workClient, manifestWorkInformer.Lister()),
+				manifestWorkLister: manifestWorkInformer.Lister(), placementLister: placementInformer.Lister(), placeDecisionLister: placeDecisionInformer.Lister()},
+			&statusReconciler{manifestWorkLister: manifestWorkInformer.Lister()},
 		},
 	}
 

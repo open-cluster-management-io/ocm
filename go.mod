@@ -14,6 +14,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/pflag v1.0.5
+	golang.org/x/exp v0.0.0-20230131160201-f062dba9d201
 	k8s.io/api v0.24.3
 	k8s.io/apiextensions-apiserver v0.24.3
 	k8s.io/apimachinery v0.24.3
@@ -22,7 +23,7 @@ require (
 	k8s.io/component-base v0.24.3
 	k8s.io/klog/v2 v2.70.1
 	k8s.io/utils v0.0.0-20220725171434-9bab9ef40391
-	open-cluster-management.io/api v0.9.1-0.20230113024003-6529d52caeeb
+	open-cluster-management.io/api v0.9.1-0.20230119012002-efddffc71682
 	sigs.k8s.io/controller-runtime v0.12.3
 )
 
