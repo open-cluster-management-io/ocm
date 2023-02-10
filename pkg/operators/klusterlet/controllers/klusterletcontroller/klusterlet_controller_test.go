@@ -357,6 +357,8 @@ func assertRegistrationDeployment(t *testing.T, actions []clienttesting.Action, 
 		expectedArgs = append(expectedArgs, fmt.Sprintf("--spoke-external-server-urls=%s", serverURL))
 	}
 
+	expectedArgs = append(expectedArgs, "--terminate-on-files=/spoke/hub-kubeconfig/kubeconfig")
+
 	if *deployment.Spec.Replicas == 1 {
 		expectedArgs = append(expectedArgs, "--disable-leader-election")
 	}
@@ -393,7 +395,9 @@ func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, cl
 
 	if mode == operatorapiv1.InstallModeHosted {
 		expectArgs = append(expectArgs, "--spoke-kubeconfig=/spoke/config/kubeconfig")
+		expectArgs = append(expectArgs, "--terminate-on-files=/spoke/config/kubeconfig")
 	}
+	expectArgs = append(expectArgs, "--terminate-on-files=/spoke/hub-kubeconfig/kubeconfig")
 
 	if *deployment.Spec.Replicas == 1 {
 		expectArgs = append(expectArgs, "--disable-leader-election")

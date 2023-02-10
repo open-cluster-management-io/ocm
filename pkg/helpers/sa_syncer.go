@@ -1,8 +1,9 @@
 package helpers
 
 import (
+	"bytes"
 	"context"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
 )
 
@@ -80,7 +82,7 @@ func SyncKubeConfigSecret(ctx context.Context, secretName, secretNamespace, kube
 		return err
 	}
 
-	if tokenValid(secret) {
+	if tokenValid(secret) && clusterInfoNotChanged(secret, templateKubeconfig) {
 		return nil
 	}
 
@@ -112,6 +114,46 @@ func tokenValid(secret *corev1.Secret) bool {
 	return true
 }
 
+func clusterInfoNotChanged(secret *corev1.Secret, templateKubeconfig *rest.Config) bool {
+	// check if the templateKubeconfig is changed
+	templateCluster, err := assembleClusterConfig(templateKubeconfig)
+	if err != nil {
+		klog.Infof("Assemble template cluster config error: %s", err)
+		return false
+	}
+
+	saKubeconfig, kubeconfigFound := secret.Data["kubeconfig"]
+	if !kubeconfigFound {
+		return false
+	}
+	kubeconfig, err := clientcmd.Load(saKubeconfig)
+	if err != nil {
+		klog.Infof("Load kubeconfig error: %s", err)
+		return false
+	}
+	cluster, ok := kubeconfig.Clusters["cluster"]
+	if !ok {
+		klog.Infof("Cluster not found")
+		return false
+	}
+
+	if cluster.Server != templateCluster.Server {
+		klog.Infof("Cluster host changed from %s to %s", cluster.Server, templateCluster.Server)
+		return false
+	}
+	if bytes.Compare(cluster.CertificateAuthorityData, templateCluster.CertificateAuthorityData) != 0 {
+		klog.Infof("Cluster certificate authority data changed")
+		return false
+	}
+	if cluster.InsecureSkipTLSVerify != templateCluster.InsecureSkipTLSVerify {
+		klog.Infof("Cluster insecureSkipTLSVerify changed from %v to %v",
+			cluster.InsecureSkipTLSVerify, templateCluster.InsecureSkipTLSVerify)
+		return false
+	}
+
+	return true
+}
+
 // applyKubeconfigSecret would render saToken to a secret.
 func applyKubeconfigSecret(ctx context.Context, templateKubeconfig *rest.Config, secretName, secretNamespace, kubeconfigPath string, secretClient coreclientv1.SecretsGetter, tokenGetter TokenGetterFunc, recorder events.Recorder) error {
 
@@ -120,26 +162,9 @@ func applyKubeconfigSecret(ctx context.Context, templateKubeconfig *rest.Config,
 		return err
 	}
 
-	var c *clientcmdapi.Cluster
-	if len(templateKubeconfig.CAData) != 0 {
-		c = &clientcmdapi.Cluster{
-			Server:                   templateKubeconfig.Host,
-			CertificateAuthorityData: templateKubeconfig.CAData,
-		}
-	} else if len(templateKubeconfig.CAFile) != 0 {
-		caData, err := ioutil.ReadFile(templateKubeconfig.CAFile)
-		if err != nil {
-			return err
-		}
-		c = &clientcmdapi.Cluster{
-			Server:                   templateKubeconfig.Host,
-			CertificateAuthorityData: caData,
-		}
-	} else {
-		c = &clientcmdapi.Cluster{
-			Server:                templateKubeconfig.Host,
-			InsecureSkipTLSVerify: true,
-		}
+	c, err := assembleClusterConfig(templateKubeconfig)
+	if err != nil {
+		return err
 	}
 
 	kubeconfigContent, err := clientcmd.Write(clientcmdapi.Config{
@@ -182,4 +207,29 @@ func applyKubeconfigSecret(ctx context.Context, templateKubeconfig *rest.Config,
 
 	_, _, err = resourceapply.ApplySecret(ctx, secretClient, recorder, secret)
 	return err
+}
+
+func assembleClusterConfig(templateKubeconfig *rest.Config) (*clientcmdapi.Cluster, error) {
+	var c *clientcmdapi.Cluster
+	if len(templateKubeconfig.CAData) != 0 {
+		c = &clientcmdapi.Cluster{
+			Server:                   templateKubeconfig.Host,
+			CertificateAuthorityData: templateKubeconfig.CAData,
+		}
+	} else if len(templateKubeconfig.CAFile) != 0 {
+		caData, err := os.ReadFile(templateKubeconfig.CAFile)
+		if err != nil {
+			return nil, err
+		}
+		c = &clientcmdapi.Cluster{
+			Server:                   templateKubeconfig.Host,
+			CertificateAuthorityData: caData,
+		}
+	} else {
+		c = &clientcmdapi.Cluster{
+			Server:                templateKubeconfig.Host,
+			InsecureSkipTLSVerify: true,
+		}
+	}
+	return c, nil
 }
