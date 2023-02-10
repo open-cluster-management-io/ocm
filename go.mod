@@ -57,7 +57,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
-	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
+	github.com/emicklei/go-restful v2.16.0+incompatible // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
