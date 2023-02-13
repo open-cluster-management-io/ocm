@@ -16,11 +16,11 @@ import (
 	utilflag "k8s.io/component-base/cli/flag"
 	logs "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
-	"open-cluster-management.io/addon-framework/examples/cmdfactory"
 	"open-cluster-management.io/addon-framework/examples/helloworld"
 	"open-cluster-management.io/addon-framework/examples/helloworld_agent"
 	"open-cluster-management.io/addon-framework/examples/helloworld_helm"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
+	cmdfactory "open-cluster-management.io/addon-framework/pkg/cmd/factory"
 	"open-cluster-management.io/addon-framework/pkg/version"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 
