@@ -12,6 +12,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/onsi/gomega"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
 	coordv1 "k8s.io/api/coordination/v1"
@@ -38,6 +39,7 @@ import (
 type Tester struct {
 	kubeconfigPath                   string
 	KubeClient                       kubernetes.Interface
+	HubAPIExtensionClient            apiextensionsclient.Interface
 	ClusterCfg                       *rest.Config
 	OperatorClient                   operatorclient.Interface
 	ClusterClient                    clusterclient.Interface
@@ -93,6 +95,11 @@ func (t *Tester) Init() error {
 	}
 	if t.KubeClient, err = kubernetes.NewForConfig(t.ClusterCfg); err != nil {
 		klog.Errorf("failed to get KubeClient. %v", err)
+		return err
+	}
+
+	if t.HubAPIExtensionClient, err = apiextensionsclient.NewForConfig(t.ClusterCfg); err != nil {
+		klog.Errorf("failed to get HubApiExtensionClient. %v", err)
 		return err
 	}
 	if t.OperatorClient, err = operatorclient.NewForConfig(t.ClusterCfg); err != nil {

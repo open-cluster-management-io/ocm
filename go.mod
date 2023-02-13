@@ -19,7 +19,7 @@ require (
 	k8s.io/component-base v0.24.3
 	k8s.io/klog/v2 v2.70.0
 	k8s.io/kube-aggregator v0.24.3
-	open-cluster-management.io/api v0.9.1-0.20221116150238-55691c2c5f04
+	open-cluster-management.io/api v0.10.1-0.20230208112741-9a2b4f0edd3d
 	sigs.k8s.io/controller-runtime v0.12.3
 	sigs.k8s.io/kube-storage-version-migrator v0.0.5
 )
@@ -70,7 +70,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
-	github.com/google/uuid v1.1.2 // indirect
+	github.com/google/uuid v1.2.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect

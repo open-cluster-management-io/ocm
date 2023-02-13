@@ -7,6 +7,8 @@ package clustermanagercontroller
 import (
 	"context"
 	"fmt"
+	"reflect"
+
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -21,7 +23,6 @@ import (
 	"open-cluster-management.io/registration-operator/pkg/helpers"
 	"open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/migrationcontroller"
 	"open-cluster-management.io/registration-operator/pkg/operators/crdmanager"
-	"reflect"
 	migrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/typed/migration/v1alpha1"
 )
 
@@ -51,10 +52,8 @@ var (
 
 	// removed CRD StoredVersions
 	removedCRDStoredVersions = map[string]string{
-		"placements.cluster.open-cluster-management.io":                "v1alpha1",
-		"placementdecisions.cluster.open-cluster-management.io":        "v1alpha1",
-		"managedclustersets.cluster.open-cluster-management.io":        "v1alpha1",
-		"managedclustersetbindings.cluster.open-cluster-management.io": "v1alpha1",
+		"managedclustersets.cluster.open-cluster-management.io":        "v1beta1",
+		"managedclustersetbindings.cluster.open-cluster-management.io": "v1beta1",
 	}
 )
 
@@ -163,7 +162,7 @@ func (c *crdReconcile) updateStoredVersion(ctx context.Context) error {
 			continue
 		}
 
-		// remove v1alpha1 from its status
+		// remove old versions from its status
 		oldStoredVersions := crd.Status.StoredVersions
 		newStoredVersions := make([]string, 0, len(oldStoredVersions))
 		for _, stored := range oldStoredVersions {

@@ -44,7 +44,10 @@ var (
 	// migrationRequestFiles = []string{
 	//		"cluster-manager/cluster-manager-managedclustersets-migration.yaml",
 	// }
-	migrationRequestFiles = []string{}
+	migrationRequestFiles = []string{
+		"cluster-manager/cluster-manager-managedclustersets-migration.yaml",
+		"cluster-manager/cluster-manager-managedclustersetbindings-migration.yaml",
+	}
 )
 
 const (

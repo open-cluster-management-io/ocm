@@ -26,7 +26,7 @@ spec:
       deprecated: true
       deprecationWarning: "cluster.open-cluster-management.io/v1beta1 ManagedClusterSet is deprecated; use cluster.open-cluster-management.io/v1beta2 ManagedClusterSet"
       served: true
-      storage: true
+      storage: false
       subresources:
         status: {}
       "schema":
@@ -149,7 +149,7 @@ spec:
           type: date
       name: v1beta2
       served: true
-      storage: false
+      storage: true
       subresources:
         status: {}
       "schema":

@@ -61,15 +61,11 @@ func TestApplyStorageVersionMigrations(t *testing.T) {
 		{
 			name: "created",
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertActions(t, actions, "get", "create", "get", "create", "get", "create", "get", "create")
+				assertActions(t, actions, "get", "create", "get", "create")
 				actual := actions[1].(clienttesting.CreateActionImpl).Object
 				assertStorageVersionMigration(t, "managedclustersets.cluster.open-cluster-management.io", actual)
 				actual = actions[3].(clienttesting.CreateActionImpl).Object
 				assertStorageVersionMigration(t, "managedclustersetbindings.cluster.open-cluster-management.io", actual)
-				actual = actions[5].(clienttesting.CreateActionImpl).Object
-				assertStorageVersionMigration(t, "placements.cluster.open-cluster-management.io", actual)
-				actual = actions[7].(clienttesting.CreateActionImpl).Object
-				assertStorageVersionMigration(t, "placementdecisions.cluster.open-cluster-management.io", actual)
 			},
 		},
 		{
@@ -87,15 +83,11 @@ func TestApplyStorageVersionMigrations(t *testing.T) {
 				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertActions(t, actions, "get", "create", "get", "update", "get", "create", "get", "update")
+				assertActions(t, actions, "get", "create", "get", "update")
 				actual := actions[1].(clienttesting.CreateActionImpl).Object
 				assertStorageVersionMigration(t, "managedclustersets.cluster.open-cluster-management.io", actual)
 				actual = actions[3].(clienttesting.UpdateActionImpl).Object
 				assertStorageVersionMigration(t, "managedclustersetbindings.cluster.open-cluster-management.io", actual)
-				actual = actions[5].(clienttesting.CreateActionImpl).Object
-				assertStorageVersionMigration(t, "placements.cluster.open-cluster-management.io", actual)
-				actual = actions[7].(clienttesting.UpdateActionImpl).Object
-				assertStorageVersionMigration(t, "placementdecisions.cluster.open-cluster-management.io", actual)
 			},
 		},
 	}
