@@ -163,7 +163,7 @@ spec:
                             description: Resource is the resource name of the Kubernetes resource.
                             type: string
                       updateStrategy:
-                        description: UpdateStrategy defines the strategy to update this manifest. UpdateStrategy is Update if it is not set, optional
+                        description: UpdateStrategy defines the strategy to update this manifest. UpdateStrategy is Update if it is not set.
                         type: object
                         required:
                           - type

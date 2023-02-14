@@ -88,7 +88,7 @@ spec:
                         maxLength: 316
                         pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
       served: true
-      storage: true
+      storage: false
       subresources:
         status: {}
     - name: v1beta2
@@ -162,7 +162,7 @@ spec:
                         maxLength: 316
                         pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
       served: true
-      storage: false
+      storage: true
       subresources:
         status: {}
 status:

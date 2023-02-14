@@ -1,13 +1,13 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: placementmanifestworks.work.open-cluster-management.io
+  name: placemanifestworks.work.open-cluster-management.io
 spec:
   group: work.open-cluster-management.io
   names:
     kind: PlaceManifestWork
     listKind: PlaceManifestWorkList
-    plural: placementmanifestworks
+    plural: placemanifestworks
     shortNames:
       - pmw
       - pmws
@@ -187,7 +187,7 @@ spec:
                                 description: Resource is the resource name of the Kubernetes resource.
                                 type: string
                           updateStrategy:
-                            description: UpdateStrategy defines the strategy to update this manifest. UpdateStrategy is Update if it is not set, optional
+                            description: UpdateStrategy defines the strategy to update this manifest. UpdateStrategy is Update if it is not set.
                             type: object
                             required:
                               - type
