@@ -3,7 +3,6 @@ package managedcluster
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
@@ -16,9 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
-
-// well-known anonymous user
-const anonymous = "system:anonymous"
 
 var (
 	// CreatingControllerSyncInterval is exposed so that integration tests can crank up the controller sync speed.
@@ -54,7 +50,8 @@ func NewManagedClusterCreatingController(
 
 func (c *managedClusterCreatingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	existingCluster, err := c.hubClusterClient.ClusterV1().ManagedClusters().Get(ctx, c.clusterName, metav1.GetOptions{})
-	if err != nil && skipUnauthorizedError(err) == nil && strings.Contains(err.Error(), anonymous) {
+	// ManagedCluster is only allowed created during bootstrap. After bootstrap secret expired, an unauthorized error will be got, output log at the debug level
+	if err != nil && skipUnauthorizedError(err) == nil {
 		klog.V(4).Infof("unable to get the managed cluster %q from hub: %v", c.clusterName, err)
 		return nil
 	}
