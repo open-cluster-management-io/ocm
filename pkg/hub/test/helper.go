@@ -3,11 +3,14 @@ package test
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
-	workapiv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
+	"open-cluster-management.io/work/pkg/spoke/spoketesting"
 )
 
 func CreateTestPlaceManifestWork(name string, ns string, placementName string) *workapiv1alpha1.PlaceManifestWork {
+	obj := spoketesting.NewUnstructured("v1", "kind", "test-ns", "test-name")
+	mw, _ := spoketesting.NewManifestWork(0, obj)
+
 	pmw := &workapiv1alpha1.PlaceManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
@@ -16,11 +19,7 @@ func CreateTestPlaceManifestWork(name string, ns string, placementName string) *
 			UID:             "0b1441ec-717f-4877-a165-27e5b59245f5",
 		},
 		Spec: workapiv1alpha1.PlaceManifestWorkSpec{
-			ManifestWorkTemplate: workapiv1.ManifestWorkSpec{
-				Workload: workapiv1.ManifestsTemplate{
-					Manifests: []workapiv1.Manifest{},
-				},
-			},
+			ManifestWorkTemplate: mw.Spec,
 			PlacementRef: workapiv1alpha1.LocalPlacementReference{
 				Name: placementName,
 			},

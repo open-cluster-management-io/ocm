@@ -59,7 +59,7 @@ func (r *ManifestWorkWebhook) validateRequest(newWork, oldWork *workv1.ManifestW
 		return apierrors.NewBadRequest("manifests should not be empty")
 	}
 
-	if err := validateManifests(newWork); err != nil {
+	if err := ValidateManifests(newWork.Spec.Workload.Manifests); err != nil {
 		return apierrors.NewBadRequest(err.Error())
 	}
 
@@ -75,9 +75,13 @@ func (r *ManifestWorkWebhook) validateRequest(newWork, oldWork *workv1.ManifestW
 	return validateExecutor(r.kubeClient, newWork, req.UserInfo)
 }
 
-func validateManifests(work *workv1.ManifestWork) error {
+func ValidateManifests(manifests []workv1.Manifest) error {
+	if len(manifests) == 0 {
+		return apierrors.NewBadRequest("Workload manifests should not be empty")
+	}
+
 	totalSize := 0
-	for _, manifest := range work.Spec.Workload.Manifests {
+	for _, manifest := range manifests {
 		totalSize = totalSize + manifest.Size()
 	}
 
@@ -85,7 +89,7 @@ func validateManifests(work *workv1.ManifestWork) error {
 		return apierrors.NewBadRequest(fmt.Sprintf("the size of manifests is %v bytes which exceeds the 50k limit", totalSize))
 	}
 
-	for _, manifest := range work.Spec.Workload.Manifests {
+	for _, manifest := range manifests {
 		err := validateManifest(manifest.Raw)
 		if err != nil {
 			return err
