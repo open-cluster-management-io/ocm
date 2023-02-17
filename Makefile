@@ -29,11 +29,11 @@ KUSTOMIZE_ARCHIVE_NAME?=kustomize_$(KUSTOMIZE_VERSION)_$(GOHOSTOS)_$(GOHOSTARCH)
 kustomize_dir:=$(dir $(KUSTOMIZE))
 
 # Image URL to use all building/pushing image targets;
-GO_BUILD_PACKAGES :=./examples/cmd/...
-IMAGE ?= addon-examples
+IMAGE := addon-manager
+EXAMPLE_IMAGE ?= addon-examples
 IMAGE_REGISTRY ?= quay.io/open-cluster-management
 IMAGE_TAG ?= latest
-export EXAMPLE_IMAGE_NAME ?= $(IMAGE_REGISTRY)/$(IMAGE):$(IMAGE_TAG)
+export EXAMPLE_IMAGE_NAME ?= $(IMAGE_REGISTRY)/$(EXAMPLE_IMAGE):$(IMAGE_TAG)
 
 GIT_HOST ?= open-cluster-management.io
 BASE_DIR := $(shell basename $(PWD))
@@ -48,7 +48,8 @@ GO_TEST_PACKAGES :=./pkg/...
 # $2 - Dockerfile path
 # $3 - context directory for image build
 # It will generate target "image-$(1)" for building the image and binding it as a prerequisite to target "images".
-$(call build-image,$(IMAGE),$(IMAGE_REGISTRY)/$(IMAGE),./Dockerfile,.)
+$(call build-image,$(IMAGE),$(IMAGE_REGISTRY)/$(IMAGE),./build/Dockerfile,.)
+$(call build-image,$(EXAMPLE_IMAGE),$(IMAGE_REGISTRY)/$(EXAMPLE_IMAGE),./build/Dockerfile.example,.)
 
 verify-gocilint:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.46.2

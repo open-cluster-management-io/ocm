@@ -62,7 +62,7 @@ func (w *WorkApplier) Apply(ctx context.Context, work *workapiv1.ManifestWork) (
 		return existingWork, nil
 	}
 
-	if manifestWorkSpecEqual(work.Spec, existingWork.Spec) {
+	if ManifestWorkSpecEqual(work.Spec, existingWork.Spec) {
 		return existingWork, nil
 	}
 
@@ -124,7 +124,7 @@ func manifestsEqual(new, old []workapiv1.Manifest) bool {
 	return true
 }
 
-func manifestWorkSpecEqual(new, old workapiv1.ManifestWorkSpec) bool {
+func ManifestWorkSpecEqual(new, old workapiv1.ManifestWorkSpec) bool {
 	if !manifestsEqual(new.Workload.Manifests, old.Workload.Manifests) {
 		return false
 	}

@@ -118,10 +118,24 @@ type ManagedClusterAddOnStatus struct {
 	// +optional
 	AddOnConfiguration ConfigCoordinates `json:"addOnConfiguration,omitempty"`
 
+	// SupportedConfigs is a list of configuration types that are allowed to override the add-on configurations defined
+	// in ClusterManagementAddOn spec.
+	// The default is an empty list, which means the add-on configurations can not be overridden.
+	// +optional
+	// +listType=map
+	// +listMapKey=group
+	// +listMapKey=resource
+	SupportedConfigs []ConfigGroupResource `json:"supportedConfigs,omitempty"`
+
 	// configReferences is a list of current add-on configuration references.
 	// This will be overridden by the clustermanagementaddon configuration references.
 	// +optional
 	ConfigReferences []ConfigReference `json:"configReferences,omitempty"`
+
+	// namespace is the namespace on the managedcluster to put registration secret or lease for the addon. It is
+	// required when registrtion is set or healthcheck mode is Lease.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 
 	// registrations is the conifigurations for the addon agent to register to hub. It should be set by each addon controller
 	// on hub to define how the addon agent on managedcluster is registered. With the registration defined,

@@ -17,6 +17,7 @@ import (
 
 	certificatesv1 "k8s.io/api/certificates/v1"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
+	"open-cluster-management.io/addon-framework/pkg/manager"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
@@ -63,6 +64,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		CRDDirectoryPaths: []string{
 			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "work", "v1", "0000_00_work.open-cluster-management.io_manifestworks.crd.yaml"),
 			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "cluster", "v1"),
+			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "cluster", "v1beta1"),
 			filepath.Join(".", "vendor", "open-cluster-management.io", "api", "addon", "v1alpha1"),
 		},
 	}
@@ -133,6 +135,8 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		err = addonManager.AddAgent(testMultiWorksAddonImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		err = addonManager.Start(mgrContext)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		err = manager.RunManager(mgrContext, cfg)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	}()
 

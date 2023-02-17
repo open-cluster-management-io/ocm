@@ -42,7 +42,12 @@ func main() {
 	}
 
 	ctx := context.Background()
-	go addonMgr.Start(ctx)
+	go func() {
+		err := addonMgr.Start(ctx)
+		if err != nil {
+			klog.Fatal(err)
+		}
+	}()
 
 	<-ctx.Done()
 }
