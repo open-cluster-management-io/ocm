@@ -1,0 +1,22 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: open-cluster-management:work-hub-controller
+rules:
+# Allow get/list/watch configmaps
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+# Allow create subjectaccessreviews
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["create"]
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["manifestworks"]
+  verbs: ["get", "list", "watch","create", "update", "delete", "deletecollection", "patch"]
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["placemanifestworks"]
+  verbs: ["get", "list", "watch", "update"]
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["placemanifestworks/status"]
+  verbs: ["patch", "update"]

@@ -56,7 +56,7 @@ var _ = ginkgo.Describe("Unmanaged ApplieManifestWork", func() {
 		newHub = &envtest.Environment{
 			ErrorIfCRDPathMissing: true,
 			CRDDirectoryPaths: []string{
-				filepath.Join(".", "deploy", "webhook"),
+				filepath.Join(".", "deploy", "hub"),
 				filepath.Join(".", "deploy", "spoke"),
 			},
 		}

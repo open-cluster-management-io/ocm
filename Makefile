@@ -67,7 +67,7 @@ e2e-hub-kubeconfig-secret: cluster-ip
 	$(RM) ./e2e-hub-kubeconfig
 
 create-cluster-ns:
-	$(KUSTOMIZE) build deploy/hub | $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) apply -f -
+	$(KUSTOMIZE) build deploy/cluster_namespae | $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) apply -f -
 
 deploy-work-agent: ensure-kustomize create-cluster-ns hub-kubeconfig-secret
 	cp deploy/spoke/kustomization.yaml deploy/spoke/kustomization.yaml.tmp
@@ -78,36 +78,36 @@ deploy-work-agent: ensure-kustomize create-cluster-ns hub-kubeconfig-secret
 	$(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) apply -f deploy/spoke/role_extension-apiserver.yaml 
 	$(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) apply -f deploy/spoke/role_binding_extension-apiserver.yaml
 
-deploy-webhook: ensure-kustomize
-	cp deploy/webhook/kustomization.yaml deploy/webhook/kustomization.yaml.tmp
-	cp deploy/webhook/webhook.yaml deploy/webhook/webhook.yaml.tmp
+deploy-hub: ensure-kustomize
+	cp deploy/hub/kustomization.yaml deploy/hub/kustomization.yaml.tmp
+	cp deploy/hub/webhook.yaml deploy/hub/webhook.yaml.tmp
 	bash -x hack/inject-ca.sh
-	cd deploy/webhook && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/work:latest=$(IMAGE_NAME)
+	cd deploy/hub && ../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/work:latest=$(IMAGE_NAME)
 	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
-	$(KUSTOMIZE) build deploy/webhook | $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) apply -f -
-	mv deploy/webhook/kustomization.yaml.tmp deploy/webhook/kustomization.yaml
-	mv deploy/webhook/webhook.yaml.tmp deploy/webhook/webhook.yaml
+	$(KUSTOMIZE) build deploy/hub | $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) apply -f -
+	mv deploy/hub/kustomization.yaml.tmp deploy/hub/kustomization.yaml
+	mv deploy/hub/webhook.yaml.tmp deploy/hub/webhook.yaml
 
 clean-work-agent:
 	$(KUBECTL) config use-context $(SPOKE_KUBECONFIG_CONTEXT) --kubeconfig $(SPOKE_KUBECONFIG)
 	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) delete --ignore-not-found -f -
 
-clean-webhook:
+clean-hub:
 	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
-	$(KUSTOMIZE) build deploy/webhook | $(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) delete --ignore-not-found -f -
+	$(KUSTOMIZE) build deploy/hub | $(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) delete --ignore-not-found -f -
 
 remove-cluster-ns:
 	$(KUBECTL) config use-context $(HUB_KUBECONFIG_CONTEXT) --kubeconfig $(HUB_KUBECONFIG)
-	$(KUSTOMIZE) build deploy/hub | $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) delete --ignore-not-found -f -
+	$(KUSTOMIZE) build deploy/cluster_namespae | $(KUBECTL) --kubeconfig $(HUB_KUBECONFIG) delete --ignore-not-found -f -
 
-deploy: deploy-webhook deploy-work-agent
+deploy: deploy-hub deploy-work-agent
 
-undeploy: remove-cluster-ns clean-work-agent clean-webhook
+undeploy: remove-cluster-ns clean-work-agent clean-hub
 
 build-e2e:
 	go test -c ./test/e2e -mod=vendor
 
-test-e2e: build-e2e deploy-webhook e2e-hub-kubeconfig-secret
+test-e2e: build-e2e deploy-hub e2e-hub-kubeconfig-secret
 	./e2e.test -test.v -ginkgo.v
 
 clean-e2e:

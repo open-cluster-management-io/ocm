@@ -6,8 +6,8 @@ sh -x $BASE_DIR/generate-cert.sh
 
 CA=`cat $BASE_DIR/cert/tls.crt |base64 -w 0`
 
-sed -i "s/CA_PLACE_HOLDER/${CA}/g" $BASE_DIR/../deploy/webhook/webhook.yaml
+sed -i "s/CA_PLACE_HOLDER/${CA}/g" $BASE_DIR/../deploy/hub/webhook.yaml
 
-rm -rf $BASE_DIR/../deploy/webhook/cert
+rm -rf $BASE_DIR/../deploy/hub/cert
 
-mv -f $BASE_DIR/cert $BASE_DIR/../deploy/webhook/cert
+mv -f $BASE_DIR/cert $BASE_DIR/../deploy/hub/cert

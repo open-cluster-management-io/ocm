@@ -14,7 +14,7 @@ spec:
       labels:
         app: work-webhook
     spec:
-      serviceAccountName: work-webhook-sa
+      serviceAccountName: work-hub-sa
       containers:
       - name: work-webhook
         image: quay.io/open-cluster-management/work:latest
