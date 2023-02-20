@@ -133,7 +133,7 @@ var map_ManifestConfigOption = map[string]string{
 	"":                   "ManifestConfigOption represents the configurations of a manifest defined in workload field.",
 	"resourceIdentifier": "ResourceIdentifier represents the group, resource, name and namespace of a resoure. iff this refers to a resource not created by this manifest work, the related rules will not be executed.",
 	"feedbackRules":      "FeedbackRules defines what resource status field should be returned. If it is not set or empty, no feedback rules will be honored.",
-	"updateStrategy":     "UpdateStrategy defines the strategy to update this manifest. UpdateStrategy is Update if it is not set, optional",
+	"updateStrategy":     "UpdateStrategy defines the strategy to update this manifest. UpdateStrategy is Update if it is not set.",
 }
 
 func (ManifestConfigOption) SwaggerDoc() map[string]string {

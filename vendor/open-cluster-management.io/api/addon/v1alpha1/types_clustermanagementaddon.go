@@ -52,6 +52,12 @@ type ClusterManagementAddOnSpec struct {
 	// +listMapKey=group
 	// +listMapKey=resource
 	SupportedConfigs []ConfigMeta `json:"supportedConfigs,omitempty"`
+
+	// InstallStrategy represents that related ManagedClusterAddOns should be installed
+	// on certain clusters.
+	// +optional
+	// +kubebuilder:default={type: Manual}
+	InstallStrategy *InstallStrategy `json:"installStrategy,omitempty"`
 }
 
 // AddOnMeta represents a collection of metadata information for the add-on.
@@ -119,6 +125,56 @@ type ConfigReferent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength:=1
 	Name string `json:"name"`
+}
+
+// InstallStrategy represents that related ManagedClusterAddOns should be installed
+// on certain clusters.
+type InstallStrategy struct {
+	// Type is the type of the install strategy, it can be:
+	// - Manual: no automatic install
+	// - Placements: install to clusters selected by placements.
+	// +kubebuilder:validation:Enum=Manual;Placements
+	// +kubebuilder:default:=Manual
+	// +optional
+	Type string `json:"type"`
+	// Placements is a list of placement references honored when install strategy type is
+	// Placements. All clusters selected by these placements will install the addon
+	// If one cluster belongs to multiple placements, it will only apply the strategy defined
+	// later in the order. That is to say, The latter strategy overrides the previous one.
+	// +optional
+	// +listType=map
+	// +listMapKey=namespace
+	// +listMapKey=name
+	Placements []PlacementStrategy `json:"placements,omitempty"`
+}
+
+const (
+	// AddonInstallStrategyManual is the addon install strategy representing no automatic addon installation
+	AddonInstallStrategyManual string = "Manual"
+	// AddonInstallStrategyManualPlacements is the addon install strategy representing the addon installation
+	// is based on placement decisions.
+	AddonInstallStrategyManualPlacements string = "Placements"
+)
+
+type PlacementRef struct {
+	// Namespace is the namespace of the placement
+	// +required
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength:=1
+	Namespace string `json:"namespace"`
+	// Name is the name of the placement
+	// +required
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength:=1
+	Name string `json:"name"`
+}
+
+type PlacementStrategy struct {
+	PlacementRef `json:",inline"`
+	// Configs is the configuration of managedClusterAddon during installation.
+	// User can override the configuration by updating the managedClusterAddon directly.
+	// +optional
+	Configs []AddOnConfig `json:"configs,omitempty"`
 }
 
 // ClusterManagementAddOnStatus represents the current status of cluster management add-on.
