@@ -107,8 +107,8 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		).
 		WithGetValuesFuncs(
 			helloworld_helm.GetDefaultValues,
-			addonfactory.GetAddOnDeloymentConfigValues(
-				addonfactory.NewAddOnDeloymentConfigGetter(addonClient),
+			addonfactory.GetAddOnDeploymentConfigValues(
+				addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
 				addonfactory.ToAddOnNodePlacementValues,
 			),
 			helloworld_helm.GetImageValues(kubeClient),

@@ -17,15 +17,15 @@ var (
 	tolerations  = []corev1.Toleration{{Key: "foo", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoExecute}}
 )
 
-func TestGetAddOnDeloymentConfigValues(t *testing.T) {
+func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 	cases := []struct {
 		name           string
-		toValuesFuncs  []AddOnDeloymentConfigToValuesFunc
+		toValuesFuncs  []AddOnDeploymentConfigToValuesFunc
 		addOnObjs      []runtime.Object
 		expectedValues Values
 	}{
 		{
-			name: "no addon deloyment configs",
+			name: "no addon Deployment configs",
 			addOnObjs: []runtime.Object{
 				func() *addonapiv1alpha1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
@@ -48,7 +48,7 @@ func TestGetAddOnDeloymentConfigValues(t *testing.T) {
 		},
 		{
 			name:          "mutiple addon deployment configs",
-			toValuesFuncs: []AddOnDeloymentConfigToValuesFunc{ToAddOnDeloymentConfigValues},
+			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnDeploymentConfigValues},
 			addOnObjs: []runtime.Object{
 				func() *addonapiv1alpha1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
@@ -110,7 +110,7 @@ func TestGetAddOnDeloymentConfigValues(t *testing.T) {
 		},
 		{
 			name:          "to addon node placement",
-			toValuesFuncs: []AddOnDeloymentConfigToValuesFunc{ToAddOnNodePlacementValues},
+			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnNodePlacementValues},
 			addOnObjs: []runtime.Object{
 				func() *addonapiv1alpha1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
@@ -150,7 +150,7 @@ func TestGetAddOnDeloymentConfigValues(t *testing.T) {
 		},
 		{
 			name:          "multiple toValuesFuncs",
-			toValuesFuncs: []AddOnDeloymentConfigToValuesFunc{ToAddOnNodePlacementValues, ToAddOnCustomizedVariableValues},
+			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnNodePlacementValues, ToAddOnCustomizedVariableValues},
 			addOnObjs: []runtime.Object{
 				func() *addonapiv1alpha1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
@@ -201,14 +201,14 @@ func TestGetAddOnDeloymentConfigValues(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			fakeAddonClient := fakeaddon.NewSimpleClientset(c.addOnObjs...)
 
-			getter := NewAddOnDeloymentConfigGetter(fakeAddonClient)
+			getter := NewAddOnDeploymentConfigGetter(fakeAddonClient)
 
 			addOn, ok := c.addOnObjs[0].(*addonapiv1alpha1.ManagedClusterAddOn)
 			if !ok {
 				t.Errorf("expected addon object, but failed")
 			}
 
-			values, err := GetAddOnDeloymentConfigValues(getter, c.toValuesFuncs...)(nil, addOn)
+			values, err := GetAddOnDeploymentConfigValues(getter, c.toValuesFuncs...)(nil, addOn)
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
 			}

@@ -97,9 +97,9 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		WithConfigGVRs(addonfactory.AddOnDeploymentConfigGVR).
 		WithGetValuesFuncs(
 			helloworld.GetDefaultValues,
-			addonfactory.GetAddOnDeloymentConfigValues(
-				addonfactory.NewAddOnDeloymentConfigGetter(addonClient),
-				addonfactory.ToAddOnDeloymentConfigValues,
+			addonfactory.GetAddOnDeploymentConfigValues(
+				addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
+				addonfactory.ToAddOnDeploymentConfigValues,
 			),
 		).
 		WithAgentRegistrationOption(registrationOption).

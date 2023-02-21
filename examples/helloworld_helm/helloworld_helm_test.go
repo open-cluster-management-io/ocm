@@ -165,8 +165,8 @@ func TestManifestAddonAgent(t *testing.T) {
 			WithConfigGVRs(addonfactory.AddOnDeploymentConfigGVR).
 			WithGetValuesFuncs(
 				GetDefaultValues,
-				addonfactory.GetAddOnDeloymentConfigValues(
-					addonfactory.NewAddOnDeloymentConfigGetter(fakeAddonClient),
+				addonfactory.GetAddOnDeploymentConfigValues(
+					addonfactory.NewAddOnDeploymentConfigGetter(fakeAddonClient),
 					addonfactory.ToAddOnNodePlacementValues,
 				),
 				GetImageValues(fakeKubeClient),

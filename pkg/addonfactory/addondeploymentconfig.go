@@ -18,32 +18,36 @@ var AddOnDeploymentConfigGVR = schema.GroupVersionResource{
 }
 
 // AddOnDeloymentConfigToValuesFunc transform the AddOnDeploymentConfig object into Values object
-// The transformation logic depends on the defintion of the addon template
+// The transformation logic depends on the definition of the addon template
+// Deprecated: use AddOnDeploymentConfigToValuesFunc instead.
 type AddOnDeloymentConfigToValuesFunc func(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error)
 
 // AddOnDeloymentConfigGetter has a method to return a AddOnDeploymentConfig object
+// Deprecated: use AddOnDeploymentConfigGetter instead.
 type AddOnDeloymentConfigGetter interface {
 	Get(ctx context.Context, namespace, name string) (*addonapiv1alpha1.AddOnDeploymentConfig, error)
 }
 
-type defaultAddOnDeloymentConfigGetter struct {
+type defaultAddOnDeploymentConfigGetter struct {
 	addonClient addonv1alpha1client.Interface
 }
 
-func (g *defaultAddOnDeloymentConfigGetter) Get(
+func (g *defaultAddOnDeploymentConfigGetter) Get(
 	ctx context.Context, namespace, name string) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
 	return g.addonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
 // NewAddOnDeloymentConfigGetter returns a AddOnDeloymentConfigGetter with addon client
+// Deprecated: use NewAddOnDeploymentConfigGetter instead.
 func NewAddOnDeloymentConfigGetter(addonClient addonv1alpha1client.Interface) AddOnDeloymentConfigGetter {
-	return &defaultAddOnDeloymentConfigGetter{addonClient: addonClient}
+	return &defaultAddOnDeploymentConfigGetter{addonClient: addonClient}
 }
 
-// GetAddOnDeloymentConfigValues uses AddOnDeloymentConfigGetter to get the AddOnDeloymentConfig object, then
-// uses AddOnDeloymentConfigToValuesFunc to transform the AddOnDeloymentConfig object to Values object
-// If there are mutiple AddOnDeloymentConfig objects in the AddOn ConfigReferences, the big index object will
+// GetAddOnDeloymentConfigValues uses AddOnDeloymentConfigGetter to get the AddOnDeploymentConfig object, then
+// uses AddOnDeloymentConfigToValuesFunc to transform the AddOnDeploymentConfig object to Values object
+// If there are multiple AddOnDeploymentConfig objects in the AddOn ConfigReferences, the big index object will
 // override the one from small index
+// Deprecated: use GetAddOnDeploymentConfigValues instead.
 func GetAddOnDeloymentConfigValues(
 	getter AddOnDeloymentConfigGetter, toValuesFuncs ...AddOnDeloymentConfigToValuesFunc) GetValuesFunc {
 	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
@@ -54,13 +58,13 @@ func GetAddOnDeloymentConfigValues(
 				continue
 			}
 
-			addOnDeloymentConfig, err := getter.Get(context.Background(), config.Namespace, config.Name)
+			addOnDeploymentConfig, err := getter.Get(context.Background(), config.Namespace, config.Name)
 			if err != nil {
 				return nil, err
 			}
 
 			for _, toValuesFunc := range toValuesFuncs {
-				values, err := toValuesFunc(*addOnDeloymentConfig)
+				values, err := toValuesFunc(*addOnDeploymentConfig)
 				if err != nil {
 					return nil, err
 				}
@@ -81,6 +85,7 @@ func GetAddOnDeloymentConfigValues(
 //	}
 //
 // after transformed, the key set of Values object will be: {"Image", "ImagePullPolicy", "NodeSelector", "Tolerations"}
+// Deprecated: use ToAddOnDeploymentConfigValues instead.
 func ToAddOnDeloymentConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
 	values, err := ToAddOnCustomizedVariableValues(config)
 	if err != nil {
@@ -132,7 +137,7 @@ func ToAddOnNodePlacementValues(config addonapiv1alpha1.AddOnDeploymentConfig) (
 	return values, nil
 }
 
-// ToAddOnCustomizedVariables only transform the CustomizedVariables in the spec of AddOnDeploymentConfig into Values object.
+// ToAddOnCustomizedVariableValues only transform the CustomizedVariables in the spec of AddOnDeploymentConfig into Values object.
 // for example: the spec of one AddOnDeploymentConfig is:
 //
 //	{
@@ -145,6 +150,75 @@ func ToAddOnCustomizedVariableValues(config addonapiv1alpha1.AddOnDeploymentConf
 	values := Values{}
 	for _, variable := range config.Spec.CustomizedVariables {
 		values[variable.Name] = variable.Value
+	}
+
+	return values, nil
+}
+
+// AddOnDeploymentConfigToValuesFunc transform the AddOnDeploymentConfig object into Values object
+// The transformation logic depends on the definition of the addon template
+type AddOnDeploymentConfigToValuesFunc func(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error)
+
+// AddOnDeploymentConfigGetter has a method to return a AddOnDeploymentConfig object
+type AddOnDeploymentConfigGetter interface {
+	Get(ctx context.Context, namespace, name string) (*addonapiv1alpha1.AddOnDeploymentConfig, error)
+}
+
+// NewAddOnDeploymentConfigGetter returns a AddOnDeploymentConfigGetter with addon client
+func NewAddOnDeploymentConfigGetter(addonClient addonv1alpha1client.Interface) AddOnDeploymentConfigGetter {
+	return &defaultAddOnDeploymentConfigGetter{addonClient: addonClient}
+}
+
+// GetAddOnDeploymentConfigValues uses AddOnDeploymentConfigGetter to get the AddOnDeploymentConfig object, then
+// uses AddOnDeploymentConfigToValuesFunc to transform the AddOnDeploymentConfig object to Values object
+// If there are multiple AddOnDeploymentConfig objects in the AddOn ConfigReferences, the big index object will
+// override the one from small index
+func GetAddOnDeploymentConfigValues(
+	getter AddOnDeploymentConfigGetter, toValuesFuncs ...AddOnDeploymentConfigToValuesFunc) GetValuesFunc {
+	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+		var lastValues = Values{}
+		for _, config := range addon.Status.ConfigReferences {
+			if config.ConfigGroupResource.Group != AddOnDeploymentConfigGVR.Group ||
+				config.ConfigGroupResource.Resource != AddOnDeploymentConfigGVR.Resource {
+				continue
+			}
+
+			addOnDeploymentConfig, err := getter.Get(context.Background(), config.Namespace, config.Name)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, toValuesFunc := range toValuesFuncs {
+				values, err := toValuesFunc(*addOnDeploymentConfig)
+				if err != nil {
+					return nil, err
+				}
+				lastValues = MergeValues(lastValues, values)
+			}
+		}
+
+		return lastValues, nil
+	}
+}
+
+// ToAddOnDeploymentConfigValues transform the AddOnDeploymentConfig object into Values object that is a plain value map
+// for example: the spec of one AddOnDeploymentConfig is:
+//
+//	{
+//		customizedVariables: [{name: "Image", value: "img"}, {name: "ImagePullPolicy", value: "Always"}],
+//	 nodePlacement: {nodeSelector: {"host": "ssd"}, tolerations: {"key": "test"}},
+//	}
+//
+// after transformed, the key set of Values object will be: {"Image", "ImagePullPolicy", "NodeSelector", "Tolerations"}
+func ToAddOnDeploymentConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
+	values, err := ToAddOnCustomizedVariableValues(config)
+	if err != nil {
+		return nil, err
+	}
+
+	if config.Spec.NodePlacement != nil {
+		values["NodeSelector"] = config.Spec.NodePlacement.NodeSelector
+		values["Tolerations"] = config.Spec.NodePlacement.Tolerations
 	}
 
 	return values, nil

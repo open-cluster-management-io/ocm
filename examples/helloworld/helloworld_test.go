@@ -152,9 +152,9 @@ func TestManifestAddonAgent(t *testing.T) {
 			WithConfigGVRs(addonfactory.AddOnDeploymentConfigGVR).
 			WithGetValuesFuncs(
 				GetDefaultValues,
-				addonfactory.GetAddOnDeloymentConfigValues(
-					addonfactory.NewAddOnDeloymentConfigGetter(fakeAddonClient),
-					addonfactory.ToAddOnDeloymentConfigValues,
+				addonfactory.GetAddOnDeploymentConfigValues(
+					addonfactory.NewAddOnDeploymentConfigGetter(fakeAddonClient),
+					addonfactory.ToAddOnDeploymentConfigValues,
 				),
 				addonfactory.GetValuesFromAddonAnnotation,
 			).
