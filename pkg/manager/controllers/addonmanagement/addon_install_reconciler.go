@@ -2,6 +2,7 @@ package addonmanagement
 
 import (
 	"context"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -33,7 +34,7 @@ func (d *managedClusterAddonInstallReconciler) reconcile(
 		return cma, reconcileContinue, err
 	}
 
-	existingDeployed := sets.NewString()
+	existingDeployed := sets.Set[string]{}
 	for _, addonObject := range addons {
 		addon := addonObject.(*addonv1alpha1.ManagedClusterAddOn)
 		existingDeployed.Insert(addon.Namespace)
@@ -74,9 +75,9 @@ func (d *managedClusterAddonInstallReconciler) reconcile(
 	return cma, reconcileContinue, utilerrors.NewAggregate(errs)
 }
 
-func (d *managedClusterAddonInstallReconciler) getAllDecisions(addonName string, placements []addonv1alpha1.PlacementStrategy) (sets.String, error) {
+func (d *managedClusterAddonInstallReconciler) getAllDecisions(addonName string, placements []addonv1alpha1.PlacementStrategy) (sets.Set[string], error) {
 	var errs []error
-	required := sets.NewString()
+	required := sets.Set[string]{}
 	for _, strategy := range placements {
 		_, err := d.placementLister.Placements(strategy.PlacementRef.Namespace).Get(strategy.PlacementRef.Name)
 		if errors.IsNotFound(err) {

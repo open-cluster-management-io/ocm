@@ -82,7 +82,7 @@ func (c *addonConfigController) buildConfigInformers(
 	for gvr := range configGVRs {
 		genericInformer := configInformerFactory.ForResource(gvr)
 		indexInformer := genericInformer.Informer()
-		indexInformer.AddEventHandler(
+		_, err := indexInformer.AddEventHandler(
 			cache.ResourceEventHandlerFuncs{
 				AddFunc: c.enqueueAddOnsByConfig(gvr),
 				UpdateFunc: func(oldObj, newObj interface{}) {
@@ -91,6 +91,9 @@ func (c *addonConfigController) buildConfigInformers(
 				DeleteFunc: c.enqueueAddOnsByConfig(gvr),
 			},
 		)
+		if err != nil {
+			utilruntime.HandleError(err)
+		}
 		configInformers = append(configInformers, indexInformer)
 		c.configListers[toListerKey(gvr.Group, gvr.Resource)] = dynamiclister.New(indexInformer.GetIndexer(), gvr)
 	}

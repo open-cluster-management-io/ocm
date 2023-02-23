@@ -161,7 +161,7 @@ func TestDefaultHookReconcile(t *testing.T) {
 											Name: "JobComplete",
 											Value: workapiv1.FieldValue{
 												Type:   workapiv1.String,
-												String: pointer.StringPtr("True"),
+												String: pointer.String("True"),
 											},
 										},
 									},
@@ -240,7 +240,7 @@ func TestDefaultHookReconcile(t *testing.T) {
 											Name: "JobComplete",
 											Value: workapiv1.FieldValue{
 												Type:   workapiv1.String,
-												String: pointer.StringPtr("True"),
+												String: pointer.String("True"),
 											},
 										},
 									},

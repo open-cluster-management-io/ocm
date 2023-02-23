@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -31,7 +32,7 @@ type Factory struct {
 // Informer represents any structure that allow to register event handlers and informs if caches are synced.
 // Any SharedInformer will comply.
 type Informer interface {
-	AddEventHandler(handler cache.ResourceEventHandler)
+	AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error)
 	HasSynced() bool
 }
 
@@ -167,7 +168,10 @@ func (f *Factory) ToController(name string) Controller {
 		for d := range f.informerQueueKeys[i].informers {
 			informer := f.informerQueueKeys[i].informers[d]
 			queueKeyFn := f.informerQueueKeys[i].queueKeyFn
-			informer.AddEventHandler(c.syncContext.(syncContext).eventHandler(queueKeyFn, f.informerQueueKeys[i].filter))
+			_, err := informer.AddEventHandler(c.syncContext.(syncContext).eventHandler(queueKeyFn, f.informerQueueKeys[i].filter))
+			if err != nil {
+				utilruntime.HandleError(err)
+			}
 			c.cachesToSync = append(c.cachesToSync, informer.HasSynced)
 		}
 	}
@@ -175,7 +179,10 @@ func (f *Factory) ToController(name string) Controller {
 	for i := range f.informers {
 		for d := range f.informers[i].informers {
 			informer := f.informers[i].informers[d]
-			informer.AddEventHandler(c.syncContext.(syncContext).eventHandler(DefaultQueueKeysFunc, f.informers[i].filter))
+			_, err := informer.AddEventHandler(c.syncContext.(syncContext).eventHandler(DefaultQueueKeysFunc, f.informers[i].filter))
+			if err != nil {
+				utilruntime.HandleError(err)
+			}
 			c.cachesToSync = append(c.cachesToSync, informer.HasSynced)
 		}
 	}
