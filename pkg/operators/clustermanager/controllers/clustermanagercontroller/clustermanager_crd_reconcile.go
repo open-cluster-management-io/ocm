@@ -51,10 +51,7 @@ var (
 	}
 
 	// removed CRD StoredVersions
-	removedCRDStoredVersions = map[string]string{
-		"managedclustersets.cluster.open-cluster-management.io":        "v1beta1",
-		"managedclustersetbindings.cluster.open-cluster-management.io": "v1beta1",
-	}
+	removedCRDStoredVersions = map[string]string{}
 )
 
 type crdReconcile struct {

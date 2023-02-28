@@ -12,11 +12,6 @@ import (
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
-const (
-	clustersetCrdName        = "managedclustersets.cluster.open-cluster-management.io"
-	clustersetBindingCrdName = "managedclustersetbindings.cluster.open-cluster-management.io"
-)
-
 var _ = ginkgo.Describe("Create v1beta2 managedclusterset", func() {
 	ginkgo.It("Create a v1beta2 labelselector based ManagedClusterSet and get/update/delete with v1beta2 client", func() {
 		ginkgo.By("Create a v1beta2 ManagedClusterSet")
@@ -117,35 +112,5 @@ var _ = ginkgo.Describe("Create v1beta2 managedclusterset", func() {
 		ginkgo.By("Delete v1beta2 ManagedClusterSet using v1beta1 client")
 		err := t.ClusterClient.ClusterV1beta1().ManagedClusterSets().Delete(context.Background(), managedClusterSetName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	})
-	ginkgo.It("Check if the v1beta1 storageversion is removed from clusterset crd", func() {
-		gomega.Eventually(func() error {
-			clustersetCrd, err := t.HubAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), clustersetCrdName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			if len(clustersetCrd.Status.StoredVersions) != 1 {
-				return fmt.Errorf("clustersetCrd.Status.StoredVersions should be v1beta2, but got:%v", clustersetCrd.Status.StoredVersions)
-			}
-			if clustersetCrd.Status.StoredVersions[0] != "v1beta2" {
-				return fmt.Errorf("clustersetCrd.Status.StoredVersions should be v1beta2, but got:%v", clustersetCrd.Status.StoredVersions)
-			}
-			return nil
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
-	})
-	ginkgo.It("Check if the v1beta1 storageversion is removed from clustersetbinding crd", func() {
-		gomega.Eventually(func() error {
-			clustersetBindingCrd, err := t.HubAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), clustersetBindingCrdName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			if len(clustersetBindingCrd.Status.StoredVersions) != 1 {
-				return fmt.Errorf("clustersetBindingCrd.Status.StoredVersions should be v1beta2, but got:%v", clustersetBindingCrd.Status.StoredVersions)
-			}
-			if clustersetBindingCrd.Status.StoredVersions[0] != "v1beta2" {
-				return fmt.Errorf("clustersetBindingCrd.Status.StoredVersions should be v1beta2, but got:%v", clustersetBindingCrd.Status.StoredVersions)
-			}
-			return nil
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
 	})
 })
