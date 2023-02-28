@@ -63,8 +63,10 @@ func NewAddonDeployController(
 	}
 
 	c := &addonDeployController{
-		workApplier:               workapplier.NewWorkApplierWithTypedClient(workClient, workInformers.Lister()),
-		workBuilder:               workbuilder.NewWorkBuilder(),
+		workApplier: workapplier.NewWorkApplierWithTypedClient(workClient, workInformers.Lister()),
+		// the default manifest limit in a work is 500k
+		// TODO: make the limit configurable
+		workBuilder:               workbuilder.NewWorkBuilder().WithManifestsLimit(500 * 1024),
 		addonClient:               addonClient,
 		managedClusterLister:      clusterInformers.Lister(),
 		managedClusterAddonLister: addonInformers.Lister(),

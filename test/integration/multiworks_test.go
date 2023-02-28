@@ -125,15 +125,15 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 		deploymentObj := &unstructured.Unstructured{}
 		err := deploymentObj.UnmarshalJSON([]byte(deploymentJson))
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		deploymentObj.SetAnnotations(map[string]string{"data": newFakeData(15 * 1024)})
+		deploymentObj.SetAnnotations(map[string]string{"data": newFakeData(150 * 1024)})
 		mycrdObj := &unstructured.Unstructured{}
 		err = mycrdObj.UnmarshalJSON([]byte(mycrdJson))
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		mycrdObj.SetAnnotations(map[string]string{"data": newFakeData(20 * 1024)})
+		mycrdObj.SetAnnotations(map[string]string{"data": newFakeData(200 * 1024)})
 		mycrObj := &unstructured.Unstructured{}
 		err = mycrObj.UnmarshalJSON([]byte(mycrJson))
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		mycrObj.SetAnnotations(map[string]string{"data": newFakeData(5 * 1024)})
+		mycrObj.SetAnnotations(map[string]string{"data": newFakeData(50 * 1024)})
 		testMultiWorksAddonImpl.manifests[managedClusterName] = []runtime.Object{deploymentObj, mycrdObj, mycrObj}
 		testMultiWorksAddonImpl.prober = &agent.HealthProber{
 			Type: agent.HealthProberTypeWork,
@@ -182,7 +182,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 		configmapObj := &unstructured.Unstructured{}
 		err = configmapObj.UnmarshalJSON([]byte(configmapJson))
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		configmapObj.SetAnnotations(map[string]string{"data": newFakeData(8 * 1024)})
+		configmapObj.SetAnnotations(map[string]string{"data": newFakeData(80 * 1024)})
 		testMultiWorksAddonImpl.manifests[managedClusterName] = []runtime.Object{deploymentObj, mycrdObj, mycrObj, configmapObj}
 
 		// update addon to trigger reconcile
@@ -311,20 +311,20 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 		err := deploymentObj0.UnmarshalJSON([]byte(deploymentJson))
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		deploymentObj0.SetName("nginx-deployment-0")
-		deploymentObj0.SetAnnotations(map[string]string{"data": newFakeData(15 * 1024)})
+		deploymentObj0.SetAnnotations(map[string]string{"data": newFakeData(150 * 1024)})
 		deploymentObj1 := &unstructured.Unstructured{}
 		err = deploymentObj1.UnmarshalJSON([]byte(deploymentJson))
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		deploymentObj1.SetName("nginx-deployment-1")
-		deploymentObj1.SetAnnotations(map[string]string{"data": newFakeData(15 * 1024)})
+		deploymentObj1.SetAnnotations(map[string]string{"data": newFakeData(150 * 1024)})
 		mycrdObj := &unstructured.Unstructured{}
 		err = mycrdObj.UnmarshalJSON([]byte(mycrdJson))
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		mycrdObj.SetAnnotations(map[string]string{"data": newFakeData(20 * 1024)})
+		mycrdObj.SetAnnotations(map[string]string{"data": newFakeData(200 * 1024)})
 		mycrObj := &unstructured.Unstructured{}
 		err = mycrObj.UnmarshalJSON([]byte(mycrJson))
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		mycrObj.SetAnnotations(map[string]string{"data": newFakeData(5 * 1024)})
+		mycrObj.SetAnnotations(map[string]string{"data": newFakeData(50 * 1024)})
 		testMultiWorksAddonImpl.manifests[managedClusterName] = []runtime.Object{deploymentObj0, deploymentObj1, mycrdObj, mycrObj}
 
 		testMultiWorksAddonImpl.prober = utils.NewDeploymentProber(types.NamespacedName{Name: "nginx-deployment-0", Namespace: "default"},
