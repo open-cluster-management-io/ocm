@@ -64,27 +64,27 @@ var _ = ginkgo.Describe("ManifestWork admission webhook", func() {
 			manifests := []workapiv1.Manifest{
 				{
 					RawExtension: runtime.RawExtension{
-						Object: newSecretBySize("default", "test1", 10*1024),
+						Object: newSecretBySize("default", "test1", 100*1024),
 					},
 				},
 				{
 					RawExtension: runtime.RawExtension{
-						Object: newSecretBySize("default", "test2", 10*1024),
+						Object: newSecretBySize("default", "test2", 100*1024),
 					},
 				},
 				{
 					RawExtension: runtime.RawExtension{
-						Object: newSecretBySize("default", "test3", 10*1024),
+						Object: newSecretBySize("default", "test3", 100*1024),
 					},
 				},
 				{
 					RawExtension: runtime.RawExtension{
-						Object: newSecretBySize("default", "test4", 10*1024),
+						Object: newSecretBySize("default", "test4", 100*1024),
 					},
 				},
 				{
 					RawExtension: runtime.RawExtension{
-						Object: newSecretBySize("default", "test5", 10*1024),
+						Object: newSecretBySize("default", "test5", 100*1024),
 					},
 				},
 			}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"open-cluster-management.io/work/pkg/webhook/common"
 	"reflect"
 
 	ocmfeature "open-cluster-management.io/api/feature"
@@ -14,7 +15,6 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -22,9 +22,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 )
-
-// ManifestLimit is the max size of manifests data which is 50k bytes.
-const ManifestLimit = 50 * 1024
 
 // ManifestWorkAdmissionHook will validate the creating/updating manifestwork request.
 type ManifestWorkAdmissionHook struct {
@@ -102,7 +99,7 @@ func (a *ManifestWorkAdmissionHook) validateManifestWorkObj(request *admissionv1
 		return fmt.Errorf("manifests should not be empty")
 	}
 
-	if err := a.validateManifests(work); err != nil {
+	if err := common.ManifestValidator.ValidateManifests(work.Spec.Workload.Manifests); err != nil {
 		return err
 	}
 
@@ -123,46 +120,6 @@ func (a *ManifestWorkAdmissionHook) validateManifestWorkObj(request *admissionv1
 	}
 
 	return a.validateExecutor(work, request.UserInfo)
-}
-
-func (a *ManifestWorkAdmissionHook) validateManifests(work *workv1.ManifestWork) error {
-	totalSize := 0
-	for _, manifest := range work.Spec.Workload.Manifests {
-		totalSize = totalSize + manifest.Size()
-	}
-
-	if totalSize > ManifestLimit {
-		return fmt.Errorf("the size of manifests is %v bytes which exceeds the 50k limit", totalSize)
-	}
-
-	for _, manifest := range work.Spec.Workload.Manifests {
-		err := a.validateManifest(manifest.Raw)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (a *ManifestWorkAdmissionHook) validateManifest(manifest []byte) error {
-	// If the manifest cannot be decoded, return err
-	unstructuredObj := &unstructured.Unstructured{}
-	err := unstructuredObj.UnmarshalJSON(manifest)
-	if err != nil {
-		return err
-	}
-
-	// The object must have name specified, generateName is not allowed in manifestwork
-	if unstructuredObj.GetName() == "" {
-		return fmt.Errorf("name must be set in manifest")
-	}
-
-	if unstructuredObj.GetGenerateName() != "" {
-		return fmt.Errorf("generateName must not be set in manifest")
-	}
-
-	return nil
 }
 
 func (a *ManifestWorkAdmissionHook) validateExecutor(work *workv1.ManifestWork, userInfo authenticationv1.UserInfo) error {

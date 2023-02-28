@@ -2,11 +2,11 @@ package v1alpha1
 
 import (
 	"context"
+	"open-cluster-management.io/work/pkg/webhook/common"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	workv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
-	webhookv1 "open-cluster-management.io/work/pkg/webhook/v1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -56,5 +56,5 @@ func (r *PlaceManifestWorkWebhook) validateRequest(newPlaceWork *workv1alpha1.Pl
 }
 
 func validatePlaceManifests(placeWork *workv1alpha1.PlaceManifestWork) error {
-	return webhookv1.ValidateManifests(placeWork.Spec.ManifestWorkTemplate.Workload.Manifests)
+	return common.ManifestValidator.ValidateManifests(placeWork.Spec.ManifestWorkTemplate.Workload.Manifests)
 }

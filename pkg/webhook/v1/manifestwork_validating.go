@@ -3,13 +3,13 @@ package v1
 import (
 	"context"
 	"fmt"
+	"open-cluster-management.io/work/pkg/webhook/common"
 	"reflect"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
@@ -19,9 +19,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
-
-// ManifestLimit is the max size of manifests data which is 50k bytes.
-const ManifestLimit = 50 * 1024
 
 var _ webhook.CustomValidator = &ManifestWorkWebhook{}
 
@@ -59,7 +56,7 @@ func (r *ManifestWorkWebhook) validateRequest(newWork, oldWork *workv1.ManifestW
 		return apierrors.NewBadRequest("manifests should not be empty")
 	}
 
-	if err := ValidateManifests(newWork.Spec.Workload.Manifests); err != nil {
+	if err := common.ManifestValidator.ValidateManifests(newWork.Spec.Workload.Manifests); err != nil {
 		return apierrors.NewBadRequest(err.Error())
 	}
 
@@ -73,50 +70,6 @@ func (r *ManifestWorkWebhook) validateRequest(newWork, oldWork *workv1.ManifestW
 		return nil
 	}
 	return validateExecutor(r.kubeClient, newWork, req.UserInfo)
-}
-
-func ValidateManifests(manifests []workv1.Manifest) error {
-	if len(manifests) == 0 {
-		return apierrors.NewBadRequest("Workload manifests should not be empty")
-	}
-
-	totalSize := 0
-	for _, manifest := range manifests {
-		totalSize = totalSize + manifest.Size()
-	}
-
-	if totalSize > ManifestLimit {
-		return apierrors.NewBadRequest(fmt.Sprintf("the size of manifests is %v bytes which exceeds the 50k limit", totalSize))
-	}
-
-	for _, manifest := range manifests {
-		err := validateManifest(manifest.Raw)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func validateManifest(manifest []byte) error {
-	// If the manifest cannot be decoded, return err
-	unstructuredObj := &unstructured.Unstructured{}
-	err := unstructuredObj.UnmarshalJSON(manifest)
-	if err != nil {
-		return err
-	}
-
-	// The object must have name specified, generateName is not allowed in manifestwork
-	if unstructuredObj.GetName() == "" {
-		return fmt.Errorf("name must be set in manifest")
-	}
-
-	if unstructuredObj.GetGenerateName() != "" {
-		return fmt.Errorf("generateName must not be set in manifest")
-	}
-
-	return nil
 }
 
 func validateExecutor(kubeClient kubernetes.Interface, work *workv1.ManifestWork, userInfo authenticationv1.UserInfo) error {

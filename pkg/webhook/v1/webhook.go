@@ -19,7 +19,7 @@ func (r *ManifestWorkWebhook) Init(mgr ctrl.Manager) error {
 	return err
 }
 
-// SetExternalKubeClientSet is function to enable the webhook injecting to kube admssion
+// SetExternalKubeClientSet is function to enable the webhook injecting to kube admission
 func (r *ManifestWorkWebhook) SetExternalKubeClientSet(client kubernetes.Interface) {
 	r.kubeClient = client
 }

@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"k8s.io/klog/v2"
+	"open-cluster-management.io/work/pkg/webhook/common"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -51,6 +52,8 @@ func (c *Options) RunWebhookServer() error {
 		klog.Errorf("unable to add readyz check handler: %v", err)
 		return err
 	}
+
+	common.ManifestValidator.WithLimit(c.ManifestLimit)
 
 	if err = (&webhookv1.ManifestWorkWebhook{}).Init(mgr); err != nil {
 		klog.Error(err, "unable to create ManagedCluster webhook")
