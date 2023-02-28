@@ -6,8 +6,8 @@ package klusterletcontroller
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
+
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -18,9 +18,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/kubernetes"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
 	"open-cluster-management.io/registration-operator/manifests"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
-	"strings"
 )
 
 var (
@@ -178,21 +178,10 @@ func (r *managedReconcile) cleanUpAppliedManifestWorks(ctx context.Context, klus
 		return nil
 	}
 
-	bootstrapKubeConfigSecret, err := r.kubeClient.CoreV1().Secrets(config.AgentNamespace).Get(ctx, config.BootStrapKubeConfigSecret, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	restConfig, err := helpers.LoadClientConfigFromSecret(bootstrapKubeConfigSecret)
-	if err != nil {
-		return fmt.Errorf("unable to load kubeconfig from secret %q %q: %w", config.AgentNamespace, config.BootStrapKubeConfigSecret, err)
-	}
-
 	var errs []error
-	prefix := fmt.Sprintf("%s-", fmt.Sprintf("%x", sha256.Sum256([]byte(restConfig.Host))))
 	for _, appliedManifestWork := range appliedManifestWorks.Items {
 		// ignore AppliedManifestWork for other klusterlet
-		// TODO we should not need to filter AppliedManifestWork using hubhost in the next release.
-		if string(klusterlet.UID) != appliedManifestWork.Spec.AgentID || !strings.HasPrefix(appliedManifestWork.Name, prefix) {
+		if string(klusterlet.UID) != appliedManifestWork.Spec.AgentID {
 			continue
 		}
 

@@ -60,9 +60,9 @@ func TestSyncDelete(t *testing.T) {
 		}
 	}
 
-	// update 1 appliedminifestwork to remove appliedManifestWorkFinalizer
-	if len(updateWorkActions) != 1 {
-		t.Errorf("Expected 1 update action, but got %d", len(updateWorkActions))
+	// update 2 appliedminifestwork to remove appliedManifestWorkFinalizer, using agentID to filter, ignore hub host
+	if len(updateWorkActions) != 2 {
+		t.Errorf("Expected 2 update action, but got %d", len(updateWorkActions))
 	}
 }
 
@@ -133,9 +133,9 @@ func TestSyncDeleteHosted(t *testing.T) {
 		}
 	}
 
-	// update 1 appliedminifestwork to remove appliedManifestWorkFinalizer
-	if len(updateWorkActions) != 1 {
-		t.Errorf("Expected 1 update action, but got %d", len(updateWorkActions))
+	// update 2 appliedminifestwork to remove appliedManifestWorkFinalizer, using agentID to filter, ignore hub host
+	if len(updateWorkActions) != 2 {
+		t.Errorf("Expected 2 update action, but got %d", len(updateWorkActions))
 	}
 }
 
