@@ -12,8 +12,8 @@ type FakeWorkV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeWorkV1alpha1) PlaceManifestWorks(namespace string) v1alpha1.PlaceManifestWorkInterface {
-	return &FakePlaceManifestWorks{c, namespace}
+func (c *FakeWorkV1alpha1) ManifestWorkReplicaSets(namespace string) v1alpha1.ManifestWorkReplicaSetInterface {
+	return &FakeManifestWorkReplicaSets{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

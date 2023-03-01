@@ -112,6 +112,10 @@ func (in *AppliedManifestWorkStatus) DeepCopyInto(out *AppliedManifestWorkStatus
 		*out = make([]AppliedManifestResourceMeta, len(*in))
 		copy(*out, *in)
 	}
+	if in.EvictionStartTime != nil {
+		in, out := &in.EvictionStartTime, &out.EvictionStartTime
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 

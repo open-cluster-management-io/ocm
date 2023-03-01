@@ -44,6 +44,11 @@ type ClusterManagerSpec struct {
 	// +kubebuilder:default=quay.io/open-cluster-management/placement
 	PlacementImagePullSpec string `json:"placementImagePullSpec,omitempty"`
 
+	// AddOnManagerImagePullSpec represents the desired image configuration of addon manager controller/webhook installed on hub.
+	// +optional
+	// +kubebuilder:default=quay.io/open-cluster-management/addon-manager
+	AddOnManagerImagePullSpec string `json:"addOnManagerImagePullSpec,omitempty"`
+
 	// NodePlacement enables explicit control over the scheduling of the deployed pods.
 	// +optional
 	NodePlacement NodePlacement `json:"nodePlacement,omitempty"`
@@ -61,6 +66,11 @@ type ClusterManagerSpec struct {
 	// WorkConfiguration contains the configuration of work
 	// +optional
 	WorkConfiguration *WorkConfiguration `json:"workConfiguration,omitempty"`
+
+	// AddOnManagerConfiguration contains the configuration of addon manager
+	// +optional
+	// +kubebuilder:default={mode: Disable}
+	AddOnManagerConfiguration *AddOnManagerConfiguration `json:"addOnManagerConfiguration,omitempty"`
 }
 
 type RegistrationConfiguration struct {
@@ -86,6 +96,34 @@ type WorkConfiguration struct {
 	// +optional
 	FeatureGates []FeatureGate `json:"featureGates,omitempty"`
 }
+
+type AddOnManagerConfiguration struct {
+	// Mode is either Enable, Disable, "" where "" is Disable by default.
+	// In Enable mode, the component will be installed.
+	// In Disable mode, the component will not be installed.
+	// +kubebuilder:default:=Disable
+	// +kubebuilder:validation:Enum:=Enable;Disable
+	// +optional
+	Mode ComponentModeType `json:"mode,omitempty"`
+
+	// FeatureGates represents the list of feature gates for addon manager
+	// If it is set empty, default feature gates will be used.
+	// If it is set, featuregate/Foo is an example of one item in FeatureGates:
+	//   1. If featuregate/Foo does not exist, registration-operator will discard it
+	//   2. If featuregate/Foo exists and is false by default. It is now possible to set featuregate/Foo=[false|true]
+	//   3. If featuregate/Foo exists and is true by default. If a cluster-admin upgrading from 1 to 2 wants to continue having featuregate/Foo=false,
+	//  	he can set featuregate/Foo=false before upgrading. Let's say the cluster-admin wants featuregate/Foo=false.
+	// +optional
+	FeatureGates []FeatureGate `json:"featureGates,omitempty"`
+}
+
+type ComponentModeType string
+
+const (
+	// Valid ComponentModeType value is Enable, Disable.
+	ComponentModeTypeEnable  ComponentModeType = "Enable"
+	ComponentModeTypeDisable ComponentModeType = "Disable"
+)
 
 type FeatureGate struct {
 	// Feature is the key of feature gate. e.g. featuregate/Foo.
