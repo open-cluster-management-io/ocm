@@ -44,8 +44,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Work().V1().ManifestWorks().Informer()}, nil
 
 		// Group=work.open-cluster-management.io, Version=v1alpha1
-	case v1alpha1.SchemeGroupVersion.WithResource("placemanifestworks"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Work().V1alpha1().PlaceManifestWorks().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("manifestworkreplicasets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Work().V1alpha1().ManifestWorkReplicaSets().Informer()}, nil
 
 	}
 

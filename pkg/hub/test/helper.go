@@ -7,25 +7,24 @@ import (
 	"open-cluster-management.io/work/pkg/spoke/spoketesting"
 )
 
-func CreateTestPlaceManifestWork(name string, ns string, placementName string) *workapiv1alpha1.PlaceManifestWork {
+func CreateTestManifestWorkReplicaSet(name string, ns string, placementName string) *workapiv1alpha1.ManifestWorkReplicaSet {
 	obj := spoketesting.NewUnstructured("v1", "kind", "test-ns", "test-name")
 	mw, _ := spoketesting.NewManifestWork(0, obj)
+	placementRef := workapiv1alpha1.LocalPlacementReference{Name: placementName}
 
-	pmw := &workapiv1alpha1.PlaceManifestWork{
+	mwrs := &workapiv1alpha1.ManifestWorkReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
 			Namespace:       ns,
 			ResourceVersion: "316679655",
 			UID:             "0b1441ec-717f-4877-a165-27e5b59245f5",
 		},
-		Spec: workapiv1alpha1.PlaceManifestWorkSpec{
+		Spec: workapiv1alpha1.ManifestWorkReplicaSetSpec{
 			ManifestWorkTemplate: mw.Spec,
-			PlacementRef: workapiv1alpha1.LocalPlacementReference{
-				Name: placementName,
-			},
+			PlacementRefs:        []workapiv1alpha1.LocalPlacementReference{placementRef},
 		},
 	}
-	return pmw
+	return mwrs
 }
 
 // Return placement with predicate of label cluster name

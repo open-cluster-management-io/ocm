@@ -6,11 +6,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-type PlaceManifestWorkWebhook struct {
+type ManifestWorkReplicaSetWebhook struct {
 	kubeClient kubernetes.Interface
 }
 
-func (r *PlaceManifestWorkWebhook) Init(mgr ctrl.Manager) error {
+func (r *ManifestWorkReplicaSetWebhook) Init(mgr ctrl.Manager) error {
 	err := r.SetupWebhookWithManager(mgr)
 	if err != nil {
 		return err
@@ -20,13 +20,13 @@ func (r *PlaceManifestWorkWebhook) Init(mgr ctrl.Manager) error {
 }
 
 // SetExternalKubeClientSet is function to enable the webhook injecting to kube admssion
-func (r *PlaceManifestWorkWebhook) SetExternalKubeClientSet(client kubernetes.Interface) {
+func (r *ManifestWorkReplicaSetWebhook) SetExternalKubeClientSet(client kubernetes.Interface) {
 	r.kubeClient = client
 }
 
-func (r *PlaceManifestWorkWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func (r *ManifestWorkReplicaSetWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		WithValidator(r).
-		For(&v1alpha1.PlaceManifestWork{}).
+		For(&v1alpha1.ManifestWorkReplicaSet{}).
 		Complete()
 }

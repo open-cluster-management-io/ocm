@@ -1,4 +1,4 @@
-package placemanifestworkcontroller
+package manifestworkreplicasetcontroller
 
 import (
 	"k8s.io/client-go/tools/cache"
@@ -13,14 +13,14 @@ import (
 )
 
 func TestPlaceMWControllerIndex(t *testing.T) {
-	pmwTest := helpertest.CreateTestPlaceManifestWork("pmw-test", "default", "place-test")
-	pmwTest.Status.PlacedManifestWorkSummary.Total = 1
-	mw, _ := CreateManifestWork(pmwTest, "cls1")
-	fWorkClient := fakeworkclient.NewSimpleClientset(pmwTest, mw)
+	mwrSetTest := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	mwrSetTest.Status.Summary.Total = 1
+	mw, _ := CreateManifestWork(mwrSetTest, "cls1")
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSetTest, mw)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
 
-	err := workInformerFactory.Work().V1alpha1().PlaceManifestWorks().Informer().AddIndexers(
-		cache.Indexers{placeManifestWorkByPlacement: indexPlacementManifestWorkByPlacement})
+	err := workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().AddIndexers(
+		cache.Indexers{manifestWorkReplicaSetByPlacement: indexManifestWorkReplicaSetByPlacement})
 
 	if err != nil {
 		t.Fatal(err)
@@ -29,7 +29,7 @@ func TestPlaceMWControllerIndex(t *testing.T) {
 	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw); err != nil {
 		t.Fatal(err)
 	}
-	if err := workInformerFactory.Work().V1alpha1().PlaceManifestWorks().Informer().GetStore().Add(pmwTest); err != nil {
+	if err := workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetStore().Add(mwrSetTest); err != nil {
 		t.Fatal(err)
 	}
 
@@ -49,12 +49,12 @@ func TestPlaceMWControllerIndex(t *testing.T) {
 	placementLister := clusterInformerFactory.Cluster().V1beta1().Placements().Lister()
 	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
 
-	pmwController := &PlaceManifestWorkController{
-		workClient:               fWorkClient,
-		placeManifestWorkLister:  workInformerFactory.Work().V1alpha1().PlaceManifestWorks().Lister(),
-		placeManifestWorkIndexer: workInformerFactory.Work().V1alpha1().PlaceManifestWorks().Informer().GetIndexer(),
+	pmwController := &ManifestWorkReplicaSetController{
+		workClient:                    fWorkClient,
+		manifestWorkReplicaSetLister:  workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Lister(),
+		manifestWorkReplicaSetIndexer: workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetIndexer(),
 
-		reconcilers: []placeManifestWorkReconcile{
+		reconcilers: []ManifestWorkReplicaSetReconcile{
 			&finalizeReconciler{workApplier: workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 				workClient: fWorkClient, manifestWorkLister: mwLister},
 			&addFinalizerReconciler{workClient: fWorkClient},
@@ -65,18 +65,18 @@ func TestPlaceMWControllerIndex(t *testing.T) {
 	}
 
 	// Check index key creation
-	placementKey, err := indexPlacementManifestWorkByPlacement(pmwTest)
+	placementKey, err := indexManifestWorkReplicaSetByPlacement(mwrSetTest)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(placementKey) == 0 {
 		t.Fatal("Key not created", placementKey)
 	}
-	if placementKey[0] != pmwTest.Namespace+"/"+pmwTest.Spec.PlacementRef.Name {
+	if placementKey[0] != mwrSetTest.Namespace+"/"+mwrSetTest.Spec.PlacementRefs[0].Name {
 		t.Fatal("placement Key not match ", placementKey[0])
 	}
 
-	expectedKey := pmwTest.Namespace + "/" + pmwTest.Name
+	expectedKey := mwrSetTest.Namespace + "/" + mwrSetTest.Name
 	placeNotExist, placeDecisinNotExist := helpertest.CreateTestPlacement("place-notExist", "ns-notExist")
 	// Check placement Queue Keys
 	keys := pmwController.placementQueueKeysFunc(placement)
@@ -108,8 +108,8 @@ func TestPlaceMWControllerIndex(t *testing.T) {
 
 	// Check manifestWork Queue Keys
 	key := pmwController.manifestWorkQueueKeyFunc(mw)
-	if key != pmwTest.Name {
-		t.Fatal("Expected manifestwork key not match", key, " - ", pmwTest.Name)
+	if key != mwrSetTest.Name {
+		t.Fatal("Expected manifestwork key not match", key, " - ", mwrSetTest.Name)
 	}
 	// Check manifestWork Queue Keys not exist
 	mw.Labels = map[string]string{"testLabel": "label1"}

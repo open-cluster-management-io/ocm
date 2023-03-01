@@ -1,4 +1,4 @@
-package placemanifestworkcontroller
+package manifestworkreplicasetcontroller
 
 import (
 	"context"
@@ -13,17 +13,17 @@ import (
 	"time"
 )
 
-func TestPlaceMWControllerPatchStatus(t *testing.T) {
-	pmwTest := helpertest.CreateTestPlaceManifestWork("pmw-test", "default", "place-test")
-	pmwTest.Status.PlacedManifestWorkSummary.Total = 1
-	mw, _ := CreateManifestWork(pmwTest, "cls1")
-	fWorkClient := fakeworkclient.NewSimpleClientset(pmwTest, mw)
+func TestManifestWorkReplicaSetControllerPatchStatus(t *testing.T) {
+	mwrSetTest := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	mwrSetTest.Status.Summary.Total = 1
+	mw, _ := CreateManifestWork(mwrSetTest, "cls1")
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSetTest, mw)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
 
 	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw); err != nil {
 		t.Fatal(err)
 	}
-	if err := workInformerFactory.Work().V1alpha1().PlaceManifestWorks().Informer().GetStore().Add(pmwTest); err != nil {
+	if err := workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetStore().Add(mwrSetTest); err != nil {
 		t.Fatal(err)
 	}
 
@@ -43,12 +43,12 @@ func TestPlaceMWControllerPatchStatus(t *testing.T) {
 	placementLister := clusterInformerFactory.Cluster().V1beta1().Placements().Lister()
 	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
 
-	pmwController := &PlaceManifestWorkController{
-		workClient:               fWorkClient,
-		placeManifestWorkLister:  workInformerFactory.Work().V1alpha1().PlaceManifestWorks().Lister(),
-		placeManifestWorkIndexer: workInformerFactory.Work().V1alpha1().PlaceManifestWorks().Informer().GetIndexer(),
+	pmwController := &ManifestWorkReplicaSetController{
+		workClient:                    fWorkClient,
+		manifestWorkReplicaSetLister:  workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Lister(),
+		manifestWorkReplicaSetIndexer: workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetIndexer(),
 
-		reconcilers: []placeManifestWorkReconcile{
+		reconcilers: []ManifestWorkReplicaSetReconcile{
 			&finalizeReconciler{workApplier: workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
 				workClient: fWorkClient, manifestWorkLister: mwLister},
 			&addFinalizerReconciler{workClient: fWorkClient},
@@ -58,11 +58,11 @@ func TestPlaceMWControllerPatchStatus(t *testing.T) {
 		},
 	}
 
-	// create new pmwTestNew with status
-	pmwTestNew := helpertest.CreateTestPlaceManifestWork("pmw-test-new", "default", "place-test-new")
-	pmwTestNew.Status.PlacedManifestWorkSummary.Total = pmwTest.Status.PlacedManifestWorkSummary.Total + 3
+	// create new mwrSetTestNew with status
+	mwrSetTestNew := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test-new", "default", "place-test-new")
+	mwrSetTestNew.Status.Summary.Total = mwrSetTest.Status.Summary.Total + 3
 
-	err := pmwController.patchPlaceManifestStatus(context.TODO(), pmwTest, pmwTestNew)
+	err := pmwController.patchPlaceManifestStatus(context.TODO(), mwrSetTest, mwrSetTestNew)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestPlaceMWControllerPatchStatus(t *testing.T) {
 		t.Fatal("fWorkClient Should have patch action ")
 	}
 	// Check placeMW patch name
-	if pmwTest.Name != actions[0].(clienttesting.PatchAction).GetName() {
+	if mwrSetTest.Name != actions[0].(clienttesting.PatchAction).GetName() {
 		t.Fatal("PlaceMW patch action not match ", actions[0])
 	}
 }

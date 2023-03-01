@@ -12,7 +12,7 @@ import (
 	"open-cluster-management.io/work/test/integration/util"
 )
 
-var _ = ginkgo.Describe("PlaceManifestWork", func() {
+var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 	var namespaceName string
 
 	ginkgo.BeforeEach(func() {
@@ -29,27 +29,29 @@ var _ = ginkgo.Describe("PlaceManifestWork", func() {
 	})
 
 	// A sanity check ensuring crd is created correctly which should be refactored later
-	ginkgo.Context("Create a placeManifestWork", func() {
+	ginkgo.Context("Create a manifestWorkReplicaSet", func() {
 		ginkgo.It("should create successfully", func() {
 			manifests := []workapiv1.Manifest{
 				util.ToManifest(util.NewConfigmap("defaut", "cm1", map[string]string{"a": "b"}, nil)),
 			}
+			placementRef := workapiv1alpha1.LocalPlacementReference{Name: "placement-test"}
 
-			placeManifestWork := &workapiv1alpha1.PlaceManifestWork{
+			manifestWorkReplicaSet := &workapiv1alpha1.ManifestWorkReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-work",
 					Namespace: namespaceName,
 				},
-				Spec: workapiv1alpha1.PlaceManifestWorkSpec{
+				Spec: workapiv1alpha1.ManifestWorkReplicaSetSpec{
 					ManifestWorkTemplate: workapiv1.ManifestWorkSpec{
 						Workload: workapiv1.ManifestsTemplate{
 							Manifests: manifests,
 						},
 					},
+					PlacementRefs: []workapiv1alpha1.LocalPlacementReference{placementRef},
 				},
 			}
 
-			_, err := hubWorkClient.WorkV1alpha1().PlaceManifestWorks(namespaceName).Create(context.TODO(), placeManifestWork, metav1.CreateOptions{})
+			_, err := hubWorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespaceName).Create(context.TODO(), manifestWorkReplicaSet, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 	})

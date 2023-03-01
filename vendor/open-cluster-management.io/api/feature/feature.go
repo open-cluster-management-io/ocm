@@ -51,6 +51,11 @@ const (
 	// When using the ManifestWork Executor feature, enabling this can reduce the number of subject access review
 	// requests sent by the work agent to the managed cluster api server.
 	ExecutorValidatingCaches featuregate.Feature = "ExecutorValidatingCaches"
+
+	// ManagedClusterAutoApproval will approve a managed cluster registraion request automatically.
+	// A registraion request to be automatically approved must be initiated by specific users, these users are
+	// specifed with "--cluster-auto-approval-users" flag in the registration hub controller.
+	ManagedClusterAutoApproval featuregate.Feature = "ManagedClusterAutoApproval"
 )
 
 // DefaultSpokeRegistrationFeatureGates consists of all known ocm-registration
@@ -68,6 +73,7 @@ var DefaultSpokeRegistrationFeatureGates = map[featuregate.Feature]featuregate.F
 var DefaultHubRegistrationFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	DefaultClusterSet:          {Default: false, PreRelease: featuregate.Alpha},
 	V1beta1CSRAPICompatibility: {Default: false, PreRelease: featuregate.Alpha},
+	ManagedClusterAutoApproval: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 // DefaultHubWorkFeatureGates consists of all known acm work wehbook feature keys.

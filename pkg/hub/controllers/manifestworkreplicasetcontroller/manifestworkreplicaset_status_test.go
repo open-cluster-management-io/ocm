@@ -1,4 +1,4 @@
-package placemanifestworkcontroller
+package manifestworkreplicasetcontroller
 
 import (
 	"context"
@@ -15,18 +15,18 @@ import (
 
 func TestStatusReconcileAsExpected(t *testing.T) {
 	clusters := []string{"cls1", "cls2", "cls3", "cls4"}
-	pmwTest := helpertest.CreateTestPlaceManifestWork("pmw-test", "default", "place-test")
-	pmwTest.Status.PlacedManifestWorkSummary.Total = len(clusters)
+	mwrSetTest := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	mwrSetTest.Status.Summary.Total = len(clusters)
 
-	fWorkClient := fakeworkclient.NewSimpleClientset(pmwTest)
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSetTest)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
 
-	if err := workInformerFactory.Work().V1alpha1().PlaceManifestWorks().Informer().GetStore().Add(pmwTest); err != nil {
+	if err := workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetStore().Add(mwrSetTest); err != nil {
 		t.Fatal(err)
 	}
 
 	for _, cls := range clusters {
-		mw, _ := CreateManifestWork(pmwTest, cls)
+		mw, _ := CreateManifestWork(mwrSetTest, cls)
 		cond := getCondition(string(workv1.ManifestApplied), "", "", metav1.ConditionTrue)
 		apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 
@@ -38,17 +38,17 @@ func TestStatusReconcileAsExpected(t *testing.T) {
 	}
 
 	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
-	pmwStatusController := statusReconciler{
+	mwrSetStatusController := statusReconciler{
 		manifestWorkLister: mwLister,
 	}
 
-	pmwTest, _, err := pmwStatusController.reconcile(context.TODO(), pmwTest)
+	mwrSetTest, _, err := mwrSetStatusController.reconcile(context.TODO(), mwrSetTest)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Check for the expected PlacedManifestWorkSummary
-	pmwSummery := workapiv1alpha1.PlacedManifestWorkSummary{
+	// Check for the expected Summary
+	mwrSetSummary := workapiv1alpha1.ManifestWorkReplicaSetSummary{
 		Total:       len(clusters),
 		Applied:     len(clusters),
 		Available:   len(clusters),
@@ -56,15 +56,15 @@ func TestStatusReconcileAsExpected(t *testing.T) {
 		Progressing: 0,
 	}
 
-	if pmwTest.Status.PlacedManifestWorkSummary != pmwSummery {
-		t.Fatal("PlacedManifestWorkSummary not as expected ", pmwTest.Status.PlacedManifestWorkSummary, pmwSummery)
+	if mwrSetTest.Status.Summary != mwrSetSummary {
+		t.Fatal("Summary not as expected ", mwrSetTest.Status.Summary, mwrSetSummary)
 	}
 
 	// Check the ManifestworkApplied conditions
-	appliedCondition := apimeta.FindStatusCondition(pmwTest.Status.Conditions, string(workapiv1alpha1.ManifestworkApplied))
+	appliedCondition := apimeta.FindStatusCondition(mwrSetTest.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionManifestworkApplied)
 
 	if appliedCondition == nil {
-		t.Fatal("Applied condition not found ", pmwTest.Status.Conditions)
+		t.Fatal("Applied condition not found ", mwrSetTest.Status.Conditions)
 	}
 
 	// Check ManifestworkApplied condition status true
@@ -73,25 +73,25 @@ func TestStatusReconcileAsExpected(t *testing.T) {
 	}
 
 	// Check ManifestworkApplied condition reason
-	if appliedCondition.Reason != workapiv1alpha1.AsExpected {
+	if appliedCondition.Reason != workapiv1alpha1.ReasonAsExpected {
 		t.Fatal("Applied condition Reason not match AsExpected ", appliedCondition)
 	}
 }
 
 func TestStatusReconcileAsProcessing(t *testing.T) {
 	clusters := []string{"cls1", "cls2", "cls3", "cls4"}
-	pmwTest := helpertest.CreateTestPlaceManifestWork("pmw-test", "default", "place-test")
-	pmwTest.Status.PlacedManifestWorkSummary.Total = len(clusters)
+	mwrSetTest := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	mwrSetTest.Status.Summary.Total = len(clusters)
 
-	fWorkClient := fakeworkclient.NewSimpleClientset(pmwTest)
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSetTest)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
 
-	if err := workInformerFactory.Work().V1alpha1().PlaceManifestWorks().Informer().GetStore().Add(pmwTest); err != nil {
+	if err := workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetStore().Add(mwrSetTest); err != nil {
 		t.Fatal(err)
 	}
 
 	for id, cls := range clusters {
-		mw, _ := CreateManifestWork(pmwTest, cls)
+		mw, _ := CreateManifestWork(mwrSetTest, cls)
 		cond := getCondition(string(workv1.ManifestApplied), "", "", metav1.ConditionTrue)
 		apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 
@@ -109,17 +109,17 @@ func TestStatusReconcileAsProcessing(t *testing.T) {
 	}
 
 	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
-	pmwStatusController := statusReconciler{
+	mwrSetStatusController := statusReconciler{
 		manifestWorkLister: mwLister,
 	}
 
-	pmwTest, _, err := pmwStatusController.reconcile(context.TODO(), pmwTest)
+	mwrSetTest, _, err := mwrSetStatusController.reconcile(context.TODO(), mwrSetTest)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Check for the expected PlacedManifestWorkSummary
-	pmwSummery := workapiv1alpha1.PlacedManifestWorkSummary{
+	// Check for the expected Summary
+	mwrSetSummary := workapiv1alpha1.ManifestWorkReplicaSetSummary{
 		Total:       len(clusters),
 		Applied:     len(clusters),
 		Available:   len(clusters) / 2,
@@ -127,15 +127,15 @@ func TestStatusReconcileAsProcessing(t *testing.T) {
 		Progressing: len(clusters) / 2,
 	}
 
-	if pmwTest.Status.PlacedManifestWorkSummary != pmwSummery {
-		t.Fatal("PlacedManifestWorkSummary not as expected ", pmwTest.Status.PlacedManifestWorkSummary, pmwSummery)
+	if mwrSetTest.Status.Summary != mwrSetSummary {
+		t.Fatal("Summary not as expected ", mwrSetTest.Status.Summary, mwrSetSummary)
 	}
 
 	// Check the ManifestworkApplied conditions
-	appliedCondition := apimeta.FindStatusCondition(pmwTest.Status.Conditions, string(workapiv1alpha1.ManifestworkApplied))
+	appliedCondition := apimeta.FindStatusCondition(mwrSetTest.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionManifestworkApplied)
 
 	if appliedCondition == nil {
-		t.Fatal("Applied condition not found ", pmwTest.Status.Conditions)
+		t.Fatal("Applied condition not found ", mwrSetTest.Status.Conditions)
 	}
 
 	// Check ManifestworkApplied condition status false
@@ -144,26 +144,26 @@ func TestStatusReconcileAsProcessing(t *testing.T) {
 	}
 
 	// Check ManifestworkApplied condition reason
-	if appliedCondition.Reason != workapiv1alpha1.Processing {
+	if appliedCondition.Reason != workapiv1alpha1.ReasonProcessing {
 		t.Fatal("Applied condition Reason not match Processing ", appliedCondition)
 	}
 }
 
 func TestStatusReconcileNotAsExpected(t *testing.T) {
 	clusters := []string{"cls1", "cls2", "cls3", "cls4"}
-	pmwTest := helpertest.CreateTestPlaceManifestWork("pmw-test", "default", "place-test")
-	pmwTest.Status.PlacedManifestWorkSummary.Total = len(clusters)
+	mwrSetTest := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	mwrSetTest.Status.Summary.Total = len(clusters)
 
-	fWorkClient := fakeworkclient.NewSimpleClientset(pmwTest)
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSetTest)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
 
-	if err := workInformerFactory.Work().V1alpha1().PlaceManifestWorks().Informer().GetStore().Add(pmwTest); err != nil {
+	if err := workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetStore().Add(mwrSetTest); err != nil {
 		t.Fatal(err)
 	}
 
 	avaCount, processingCount, degradCount := 0, 0, 0
 	for id, cls := range clusters {
-		mw, _ := CreateManifestWork(pmwTest, cls)
+		mw, _ := CreateManifestWork(mwrSetTest, cls)
 		cond := getCondition(string(workv1.ManifestApplied), "", "", metav1.ConditionTrue)
 		apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 
@@ -187,17 +187,17 @@ func TestStatusReconcileNotAsExpected(t *testing.T) {
 	}
 
 	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
-	pmwStatusController := statusReconciler{
+	mwrSetStatusController := statusReconciler{
 		manifestWorkLister: mwLister,
 	}
 
-	pmwTest, _, err := pmwStatusController.reconcile(context.TODO(), pmwTest)
+	mwrSetTest, _, err := mwrSetStatusController.reconcile(context.TODO(), mwrSetTest)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Check for the expected PlacedManifestWorkSummary
-	pmwSummery := workapiv1alpha1.PlacedManifestWorkSummary{
+	// Check for the expected Summary
+	mwrSetSummary := workapiv1alpha1.ManifestWorkReplicaSetSummary{
 		Total:       len(clusters),
 		Applied:     len(clusters),
 		Available:   avaCount,
@@ -205,15 +205,15 @@ func TestStatusReconcileNotAsExpected(t *testing.T) {
 		Progressing: processingCount,
 	}
 
-	if pmwTest.Status.PlacedManifestWorkSummary != pmwSummery {
-		t.Fatal("PlacedManifestWorkSummary not as expected ", pmwTest.Status.PlacedManifestWorkSummary, pmwSummery)
+	if mwrSetTest.Status.Summary != mwrSetSummary {
+		t.Fatal("Summary not as expected ", mwrSetTest.Status.Summary, mwrSetSummary)
 	}
 
 	// Check the ManifestworkApplied conditions
-	appliedCondition := apimeta.FindStatusCondition(pmwTest.Status.Conditions, string(workapiv1alpha1.ManifestworkApplied))
+	appliedCondition := apimeta.FindStatusCondition(mwrSetTest.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionManifestworkApplied)
 
 	if appliedCondition == nil {
-		t.Fatal("Applied condition not found ", pmwTest.Status.Conditions)
+		t.Fatal("Applied condition not found ", mwrSetTest.Status.Conditions)
 	}
 
 	// Check ManifestworkApplied condition status false
@@ -222,7 +222,7 @@ func TestStatusReconcileNotAsExpected(t *testing.T) {
 	}
 
 	// Check ManifestworkApplied condition reason
-	if appliedCondition.Reason != workapiv1alpha1.NotAsExpected {
+	if appliedCondition.Reason != workapiv1alpha1.ReasonNotAsExpected {
 		t.Fatal("Applied condition Reason not match NotAsExpected ", appliedCondition)
 	}
 }

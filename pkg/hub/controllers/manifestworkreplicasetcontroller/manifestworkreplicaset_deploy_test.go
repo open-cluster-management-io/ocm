@@ -1,4 +1,4 @@
-package placemanifestworkcontroller
+package manifestworkreplicasetcontroller
 
 import (
 	"context"
@@ -16,15 +16,15 @@ import (
 )
 
 func TestDeployReconcileAsExpected(t *testing.T) {
-	pmwTest := helpertest.CreateTestPlaceManifestWork("pmw-test", "default", "place-test")
-	mw, _ := CreateManifestWork(pmwTest, "cls1")
-	fWorkClient := fakeworkclient.NewSimpleClientset(pmwTest, mw)
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	mw, _ := CreateManifestWork(mwrSet, "cls1")
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet, mw)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
 
 	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw); err != nil {
 		t.Fatal(err)
 	}
-	if err := workInformerFactory.Work().V1alpha1().PlaceManifestWorks().Informer().GetStore().Add(pmwTest); err != nil {
+	if err := workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetStore().Add(mwrSet); err != nil {
 		t.Fatal(err)
 	}
 	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
@@ -51,13 +51,13 @@ func TestDeployReconcileAsExpected(t *testing.T) {
 		placementLister:     placementLister,
 	}
 
-	pmwTest, _, err := pmwDeployController.reconcile(context.TODO(), pmwTest)
+	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Check for the expected PlacedManifestWorkSummary
-	pmwSummery := workapiv1alpha1.PlacedManifestWorkSummary{
+	// Check for the expected manifestWorkReplicaSetSummary
+	mwrSetSummary := workapiv1alpha1.ManifestWorkReplicaSetSummary{
 		Total:       int(placement.Status.NumberOfSelectedClusters),
 		Applied:     0,
 		Available:   0,
@@ -65,15 +65,15 @@ func TestDeployReconcileAsExpected(t *testing.T) {
 		Progressing: 0,
 	}
 
-	if pmwTest.Status.PlacedManifestWorkSummary != pmwSummery {
-		t.Fatal("PlacedManifestWorkSummary not as expected ", pmwTest.Status.PlacedManifestWorkSummary, pmwSummery)
+	if mwrSet.Status.Summary != mwrSetSummary {
+		t.Fatal("Summary not as expected ", mwrSet.Status.Summary, mwrSetSummary)
 	}
 
 	// Check the PlacedManifestWork conditions
-	placeCondition := apimeta.FindStatusCondition(pmwTest.Status.Conditions, string(workapiv1alpha1.PlacementDecisionVerified))
+	placeCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, string(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified))
 
 	if placeCondition == nil {
-		t.Fatal("Placement condition not found ", pmwTest.Status.Conditions)
+		t.Fatal("Placement condition not found ", mwrSet.Status.Conditions)
 	}
 
 	// Check placement condition status true
@@ -82,14 +82,14 @@ func TestDeployReconcileAsExpected(t *testing.T) {
 	}
 
 	// Check placement condition reason
-	if placeCondition.Reason != workapiv1alpha1.AsExpected {
+	if placeCondition.Reason != workapiv1alpha1.ReasonAsExpected {
 		t.Fatal("Placement condition Reason not match AsExpected ", placeCondition)
 	}
 }
 
 func TestDeployReconcileAsPlacementDecisionEmpty(t *testing.T) {
-	pmwTest := helpertest.CreateTestPlaceManifestWork("pmw-test", "default", "place-test")
-	fWorkClient := fakeworkclient.NewSimpleClientset(pmwTest)
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Minute)
 	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
 
@@ -115,13 +115,13 @@ func TestDeployReconcileAsPlacementDecisionEmpty(t *testing.T) {
 		placementLister:     placementLister,
 	}
 
-	pmwTest, _, err := pmwDeployController.reconcile(context.TODO(), pmwTest)
+	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Check for the expected PlacedManifestWorkSummary
-	pmwSummery := workapiv1alpha1.PlacedManifestWorkSummary{
+	// Check for the expected Summary
+	mwrSetSummary := workapiv1alpha1.ManifestWorkReplicaSetSummary{
 		Total:       int(placement.Status.NumberOfSelectedClusters),
 		Applied:     0,
 		Available:   0,
@@ -129,15 +129,15 @@ func TestDeployReconcileAsPlacementDecisionEmpty(t *testing.T) {
 		Progressing: 0,
 	}
 
-	if pmwTest.Status.PlacedManifestWorkSummary != pmwSummery {
-		t.Fatal("PlacedManifestWorkSummary not as expected ", pmwTest.Status.PlacedManifestWorkSummary, pmwSummery)
+	if mwrSet.Status.Summary != mwrSetSummary {
+		t.Fatal("Summary not as expected ", mwrSet.Status.Summary, mwrSetSummary)
 	}
 
 	// Check the PlacedManifestWork conditions
-	placeCondition := apimeta.FindStatusCondition(pmwTest.Status.Conditions, string(workapiv1alpha1.PlacementDecisionVerified))
+	placeCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, string(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified))
 
 	if placeCondition == nil {
-		t.Fatal("Placement condition not found ", pmwTest.Status.Conditions)
+		t.Fatal("Placement condition not found ", mwrSet.Status.Conditions)
 	}
 
 	// Check placement condition status is false
@@ -146,14 +146,14 @@ func TestDeployReconcileAsPlacementDecisionEmpty(t *testing.T) {
 	}
 
 	// Check placement condition reason is PlacementDecisionEmpty
-	if placeCondition.Reason != workapiv1alpha1.PlacementDecisionEmpty {
+	if placeCondition.Reason != workapiv1alpha1.ReasonPlacementDecisionEmpty {
 		t.Fatal("Placement condition Reason not match PlacementDecisionEmpty ", placeCondition)
 	}
 }
 
 func TestDeployReconcileAsPlacementNotExist(t *testing.T) {
-	pmwTest := helpertest.CreateTestPlaceManifestWork("pmw-test", "default", "place-notexist")
-	fWorkClient := fakeworkclient.NewSimpleClientset(pmwTest)
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-notexist")
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Minute)
 	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
 
@@ -175,16 +175,16 @@ func TestDeployReconcileAsPlacementNotExist(t *testing.T) {
 		placementLister:     placementLister,
 	}
 
-	pmwTest, _, err := pmwDeployController.reconcile(context.TODO(), pmwTest)
+	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
 	if err == nil {
 		t.Fatal("Expected Not Found Error ", err)
 	}
 
 	// Check the PlacedManifestWork conditions
-	placeCondition := apimeta.FindStatusCondition(pmwTest.Status.Conditions, string(workapiv1alpha1.PlacementDecisionVerified))
+	placeCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, string(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified))
 
 	if placeCondition == nil {
-		t.Fatal("Placement condition not found ", pmwTest.Status.Conditions)
+		t.Fatal("Placement condition not found ", mwrSet.Status.Conditions)
 	}
 
 	// Check placement condition status is false
@@ -193,7 +193,7 @@ func TestDeployReconcileAsPlacementNotExist(t *testing.T) {
 	}
 
 	// Check placement condition reason is PlacementDecisionNotFound
-	if placeCondition.Reason != workapiv1alpha1.PlacementDecisionNotFound {
+	if placeCondition.Reason != workapiv1alpha1.ReasonPlacementDecisionNotFound {
 		t.Fatal("Placement condition Reason not match PlacementDecisionEmpty ", placeCondition)
 	}
 }

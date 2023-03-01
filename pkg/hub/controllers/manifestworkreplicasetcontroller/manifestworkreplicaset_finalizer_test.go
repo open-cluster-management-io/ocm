@@ -1,4 +1,4 @@
-package placemanifestworkcontroller
+package manifestworkreplicasetcontroller
 
 import (
 	"context"
@@ -14,9 +14,9 @@ import (
 
 // Test finalize reconcile
 func TestFinalizeReconcile(t *testing.T) {
-	pmwTest := helpertest.CreateTestPlaceManifestWork("pmw-test", "default", "place-test")
-	mw, _ := CreateManifestWork(pmwTest, "cluster1")
-	fakeClient := fakeclient.NewSimpleClientset(pmwTest, mw)
+	mwrSetTest := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	mw, _ := CreateManifestWork(mwrSetTest, "cluster1")
+	fakeClient := fakeclient.NewSimpleClientset(mwrSetTest, mw)
 	manifestWorkInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fakeClient, 1*time.Second)
 	mwLister := manifestWorkInformerFactory.Work().V1().ManifestWorks().Lister()
 
@@ -26,18 +26,18 @@ func TestFinalizeReconcile(t *testing.T) {
 		workApplier:        workapplier.NewWorkApplierWithTypedClient(fakeClient, mwLister),
 	}
 
-	// Set placeManifestWork delete time AND Set finalizer
+	// Set manifestWorkReplicaSet delete time AND Set finalizer
 	timeNow := metav1.Now()
-	pmwTest.DeletionTimestamp = &timeNow
-	pmwTest.Finalizers = append(pmwTest.Finalizers, PlaceManifestWorkFinalizer)
+	mwrSetTest.DeletionTimestamp = &timeNow
+	mwrSetTest.Finalizers = append(mwrSetTest.Finalizers, ManifestWorkReplicaSetFinalizer)
 
-	pmwTest, _, err := finalizerController.reconcile(context.TODO(), pmwTest)
+	mwrSetTest, _, err := finalizerController.reconcile(context.TODO(), mwrSetTest)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Check pmwTest finalizer removed
-	if slices.Contains(pmwTest.Finalizers, PlaceManifestWorkFinalizer) {
-		t.Fatal("Finalizer not deleted", pmwTest.Finalizers)
+	// Check mwrSetTest finalizer removed
+	if slices.Contains(mwrSetTest.Finalizers, ManifestWorkReplicaSetFinalizer) {
+		t.Fatal("Finalizer not deleted", mwrSetTest.Finalizers)
 	}
 }

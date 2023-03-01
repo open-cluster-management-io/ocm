@@ -1,4 +1,4 @@
-package placemanifestworkcontroller
+package manifestworkreplicasetcontroller
 
 import (
 	"context"
@@ -27,28 +27,28 @@ import (
 )
 
 const (
-	// PlaceManifestWorkControllerNameLabelKey is the label key on manifestwork to ref to the placemanifestwork
+	// ManifestWorkReplicaSetControllerNameLabelKey is the label key on manifestwork to ref to the ManifestWorkReplicaSet
 	// that owns this manifestwork
 	// TODO move this to the api repo
-	PlaceManifestWorkControllerNameLabelKey = "work.open-cluster-management.io/placemanifestwork"
+	ManifestWorkReplicaSetControllerNameLabelKey = "work.open-cluster-management.io/manifestworkreplicaset"
 
-	// PlaceManifestWorkFinalizer is the name of the finalizer added to placeManifestWork. It is used to ensure
+	// ManifestWorkReplicaSetFinalizer is the name of the finalizer added to ManifestWorkReplicaSet. It is used to ensure
 	// related manifestworks is deleted
-	PlaceManifestWorkFinalizer = "work.open-cluster-management.io/manifest-work-cleanup"
+	ManifestWorkReplicaSetFinalizer = "work.open-cluster-management.io/manifest-work-cleanup"
 )
 
-type PlaceManifestWorkController struct {
-	workClient               workclientset.Interface
-	placeManifestWorkLister  worklisterv1alpha1.PlaceManifestWorkLister
-	placeManifestWorkIndexer cache.Indexer
+type ManifestWorkReplicaSetController struct {
+	workClient                    workclientset.Interface
+	manifestWorkReplicaSetLister  worklisterv1alpha1.ManifestWorkReplicaSetLister
+	manifestWorkReplicaSetIndexer cache.Indexer
 
-	reconcilers []placeManifestWorkReconcile
+	reconcilers []ManifestWorkReplicaSetReconcile
 }
 
-// placeManifestWorkReconcile is a interface for reconcile logic. It returns an updated placeManifestWork and whether further
+// manifestWorkReplicaSetReconcile is a interface for reconcile logic. It returns an updated manifestWorkReplicaSet and whether further
 // reconcile needs to proceed.
-type placeManifestWorkReconcile interface {
-	reconcile(ctx context.Context, pw *workapiv1alpha1.PlaceManifestWork) (*workapiv1alpha1.PlaceManifestWork, reconcileState, error)
+type ManifestWorkReplicaSetReconcile interface {
+	reconcile(ctx context.Context, pw *workapiv1alpha1.ManifestWorkReplicaSet) (*workapiv1alpha1.ManifestWorkReplicaSet, reconcileState, error)
 }
 
 type reconcileState int64
@@ -58,20 +58,20 @@ const (
 	reconcileContinue
 )
 
-func NewPlaceManifestWorkController(
+func NewManifestWorkReplicaSetController(
 	recorder events.Recorder,
 	workClient workclientset.Interface,
-	placeManifestWorkInformer workinformerv1alpha1.PlaceManifestWorkInformer,
+	manifestWorkReplicaSetInformer workinformerv1alpha1.ManifestWorkReplicaSetInformer,
 	manifestWorkInformer workinformerv1.ManifestWorkInformer,
 	placementInformer clusterinformerv1beta1.PlacementInformer,
 	placeDecisionInformer clusterinformerv1beta1.PlacementDecisionInformer) factory.Controller {
 
-	controller := &PlaceManifestWorkController{
-		workClient:               workClient,
-		placeManifestWorkLister:  placeManifestWorkInformer.Lister(),
-		placeManifestWorkIndexer: placeManifestWorkInformer.Informer().GetIndexer(),
+	controller := &ManifestWorkReplicaSetController{
+		workClient:                    workClient,
+		manifestWorkReplicaSetLister:  manifestWorkReplicaSetInformer.Lister(),
+		manifestWorkReplicaSetIndexer: manifestWorkReplicaSetInformer.Informer().GetIndexer(),
 
-		reconcilers: []placeManifestWorkReconcile{
+		reconcilers: []ManifestWorkReplicaSetReconcile{
 			&finalizeReconciler{workApplier: workapplier.NewWorkApplierWithTypedClient(workClient, manifestWorkInformer.Lister()),
 				workClient: workClient, manifestWorkLister: manifestWorkInformer.Lister()},
 			&addFinalizerReconciler{workClient: workClient},
@@ -81,9 +81,9 @@ func NewPlaceManifestWorkController(
 		},
 	}
 
-	err := placeManifestWorkInformer.Informer().AddIndexers(
+	err := manifestWorkReplicaSetInformer.Informer().AddIndexers(
 		cache.Indexers{
-			placeManifestWorkByPlacement: indexPlacementManifestWorkByPlacement,
+			manifestWorkReplicaSetByPlacement: indexManifestWorkReplicaSetByPlacement,
 		})
 	if err != nil {
 		utilruntime.HandleError(err)
@@ -97,10 +97,10 @@ func NewPlaceManifestWorkController(
 				return ""
 			}
 			return key
-		}, placeManifestWorkInformer.Informer()).
+		}, manifestWorkReplicaSetInformer.Informer()).
 		WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
 			accessor, _ := meta.Accessor(obj)
-			key, ok := accessor.GetLabels()[PlaceManifestWorkControllerNameLabelKey]
+			key, ok := accessor.GetLabels()[ManifestWorkReplicaSetControllerNameLabelKey]
 			if !ok {
 				return ""
 			}
@@ -110,20 +110,20 @@ func NewPlaceManifestWorkController(
 			if err != nil {
 				return false
 			}
-			if _, ok := accessor.GetLabels()[PlaceManifestWorkControllerNameLabelKey]; ok {
+			if _, ok := accessor.GetLabels()[ManifestWorkReplicaSetControllerNameLabelKey]; ok {
 				return true
 			}
 			return false
 		}, manifestWorkInformer.Informer()).
 		WithInformersQueueKeysFunc(controller.placementDecisionQueueKeysFunc, placeDecisionInformer.Informer()).
 		WithInformersQueueKeysFunc(controller.placementQueueKeysFunc, placementInformer.Informer()).
-		WithSync(controller.sync).ToController("PlaceManifestWorkController", recorder)
+		WithSync(controller.sync).ToController("ManifestWorkReplicaSetController", recorder)
 }
 
 // sync is the main reconcile loop for placeManifest work. It is triggered every 15sec
-func (m *PlaceManifestWorkController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
+func (m *ManifestWorkReplicaSetController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	key := controllerContext.QueueKey()
-	klog.V(4).Infof("Reconciling placeManifestWork %q", key)
+	klog.V(4).Infof("Reconciling ManifestWorkReplicaSet %q", key)
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
@@ -132,7 +132,7 @@ func (m *PlaceManifestWorkController) sync(ctx context.Context, controllerContex
 		return nil
 	}
 
-	placementManifestWork, err := m.placeManifestWorkLister.PlaceManifestWorks(namespace).Get(name)
+	manifestWorkReplicaSet, err := m.manifestWorkReplicaSetLister.ManifestWorkReplicaSets(namespace).Get(name)
 	switch {
 	case errors.IsNotFound(err):
 		return nil
@@ -140,13 +140,13 @@ func (m *PlaceManifestWorkController) sync(ctx context.Context, controllerContex
 		return err
 	}
 
-	oldPlacementManifestWork := placementManifestWork
-	placementManifestWork = placementManifestWork.DeepCopy()
+	oldManifestWorkReplicaSet := manifestWorkReplicaSet
+	manifestWorkReplicaSet = manifestWorkReplicaSet.DeepCopy()
 
 	var state reconcileState
 	var errs []error
 	for _, reconciler := range m.reconcilers {
-		placementManifestWork, state, err = reconciler.reconcile(ctx, placementManifestWork)
+		manifestWorkReplicaSet, state, err = reconciler.reconcile(ctx, manifestWorkReplicaSet)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -156,25 +156,25 @@ func (m *PlaceManifestWorkController) sync(ctx context.Context, controllerContex
 	}
 
 	// Patch status
-	if err := m.patchPlaceManifestStatus(ctx, oldPlacementManifestWork, placementManifestWork); err != nil {
+	if err := m.patchPlaceManifestStatus(ctx, oldManifestWorkReplicaSet, manifestWorkReplicaSet); err != nil {
 		errs = append(errs, err)
 	}
 
 	return utilerrors.NewAggregate(errs)
 }
 
-func (m *PlaceManifestWorkController) patchPlaceManifestStatus(ctx context.Context, old, new *workapiv1alpha1.PlaceManifestWork) error {
+func (m *ManifestWorkReplicaSetController) patchPlaceManifestStatus(ctx context.Context, old, new *workapiv1alpha1.ManifestWorkReplicaSet) error {
 	if apiequality.Semantic.DeepEqual(old.Status, new.Status) {
 		return nil
 	}
 
-	oldData, err := json.Marshal(workapiv1alpha1.PlaceManifestWork{
+	oldData, err := json.Marshal(workapiv1alpha1.ManifestWorkReplicaSet{
 		Status: old.Status,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to Marshal old data for placeManifestWork status %s: %w", old.Name, err)
+		return fmt.Errorf("failed to Marshal old data for ManifestWorkReplicaSet status %s: %w", old.Name, err)
 	}
-	newData, err := json.Marshal(workapiv1alpha1.PlaceManifestWork{
+	newData, err := json.Marshal(workapiv1alpha1.ManifestWorkReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             old.UID,
 			ResourceVersion: old.ResourceVersion,
@@ -190,6 +190,6 @@ func (m *PlaceManifestWorkController) patchPlaceManifestStatus(ctx context.Conte
 		return fmt.Errorf("failed to create patch for work %s: %w", old.Name, err)
 	}
 
-	_, err = m.workClient.WorkV1alpha1().PlaceManifestWorks(old.Namespace).Patch(ctx, old.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	_, err = m.workClient.WorkV1alpha1().ManifestWorkReplicaSets(old.Namespace).Patch(ctx, old.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	return err
 }

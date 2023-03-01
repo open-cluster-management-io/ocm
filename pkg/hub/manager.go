@@ -10,7 +10,7 @@ import (
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
-	"open-cluster-management.io/work/pkg/hub/controllers/placemanifestworkcontroller"
+	"open-cluster-management.io/work/pkg/hub/controllers/manifestworkreplicasetcontroller"
 )
 
 // RunWorkHubManager starts the controllers on hub.
@@ -28,14 +28,14 @@ func RunWorkHubManager(ctx context.Context, controllerContext *controllercmd.Con
 	clusterInformerFactory := clusterinformers.NewSharedInformerFactory(hubClusterClient, 30*time.Minute)
 	workInformerFactory := workinformers.NewSharedInformerFactory(hubWorkClient, 30*time.Minute)
 
-	// we need a separated filtered manifestwork informers so we only watch the manifestworks that placemanifestwork cares.
+	// we need a separated filtered manifestwork informers so we only watch the manifestworks that manifestworkreplicaset cares.
 	// This could reduce a lot of memory consumptions
 	manifestWorkInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(hubWorkClient, 30*time.Minute, workinformers.WithTweakListOptions(
 		func(listOptions *metav1.ListOptions) {
 			selector := &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
-						Key:      placemanifestworkcontroller.PlaceManifestWorkControllerNameLabelKey,
+						Key:      manifestworkreplicasetcontroller.ManifestWorkReplicaSetControllerNameLabelKey,
 						Operator: metav1.LabelSelectorOpExists,
 					},
 				},
@@ -44,10 +44,10 @@ func RunWorkHubManager(ctx context.Context, controllerContext *controllercmd.Con
 		},
 	))
 
-	placeManifestWorkController := placemanifestworkcontroller.NewPlaceManifestWorkController(
+	manifestWorkReplicaSetController := manifestworkreplicasetcontroller.NewManifestWorkReplicaSetController(
 		controllerContext.EventRecorder,
 		hubWorkClient,
-		workInformerFactory.Work().V1alpha1().PlaceManifestWorks(),
+		workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets(),
 		manifestWorkInformerFactory.Work().V1().ManifestWorks(),
 		clusterInformerFactory.Cluster().V1beta1().Placements(),
 		clusterInformerFactory.Cluster().V1beta1().PlacementDecisions(),
@@ -56,7 +56,7 @@ func RunWorkHubManager(ctx context.Context, controllerContext *controllercmd.Con
 	go clusterInformerFactory.Start(ctx.Done())
 	go workInformerFactory.Start(ctx.Done())
 	go manifestWorkInformerFactory.Start(ctx.Done())
-	go placeManifestWorkController.Run(ctx, 5)
+	go manifestWorkReplicaSetController.Run(ctx, 5)
 
 	<-ctx.Done()
 	return nil

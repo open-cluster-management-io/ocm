@@ -11,34 +11,33 @@ import (
 	"testing"
 )
 
-var placeManifestWorkSchema = metav1.GroupVersionResource{
+var manifestWorkReplicaSetSchema = metav1.GroupVersionResource{
 	Group:    "work.open-cluster-management.io",
 	Version:  "v1alpha1",
-	Resource: "placemanifestworks",
+	Resource: "manifestworkreplicasets",
 }
 
 func TestWebHookValidateRequest(t *testing.T) {
 	request := admission.Request{
 		AdmissionRequest: admissionv1.AdmissionRequest{
-			Resource:  placeManifestWorkSchema,
+			Resource:  manifestWorkReplicaSetSchema,
 			Operation: admissionv1.Connect,
 		},
 	}
 	ctx := admission.NewContextWithRequest(context.Background(), request)
-	webHook := PlaceManifestWorkWebhook{}
-	pmw := &workv1alpha1.PlaceManifestWork{
+	webHook := ManifestWorkReplicaSetWebhook{}
+	placementRef := workv1alpha1.LocalPlacementReference{Name: "place"}
+	mwrSet := &workv1alpha1.ManifestWorkReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "name",
 			Namespace: "ns",
 		},
-		Spec: workv1alpha1.PlaceManifestWorkSpec{
-			PlacementRef: workv1alpha1.LocalPlacementReference{
-				Name: "place",
-			},
+		Spec: workv1alpha1.ManifestWorkReplicaSetSpec{
+			PlacementRefs: []workv1alpha1.LocalPlacementReference{placementRef},
 		},
 	}
 
-	err := webHook.validateRequest(pmw, nil, ctx)
+	err := webHook.validateRequest(mwrSet, nil, ctx)
 	if err == nil {
 		t.Fatal("Expecting error for empty ManifestWorkTemplate")
 	}
@@ -46,41 +45,41 @@ func TestWebHookValidateRequest(t *testing.T) {
 		t.Fatal("Expecting bad request error type")
 	}
 
-	pmw = helpertest.CreateTestPlaceManifestWork("pmw-test", "default", "place-test")
-	err = webHook.validateRequest(pmw, nil, ctx)
+	mwrSet = helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	err = webHook.validateRequest(mwrSet, nil, ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestWebHookCreateRequest(t *testing.T) {
-	webHook := PlaceManifestWorkWebhook{}
-	pmw := &workv1alpha1.PlaceManifestWork{}
-	err := webHook.ValidateCreate(context.Background(), pmw)
+	webHook := ManifestWorkReplicaSetWebhook{}
+	mwrSet := &workv1alpha1.ManifestWorkReplicaSet{}
+	err := webHook.ValidateCreate(context.Background(), mwrSet)
 	if err == nil {
-		t.Fatal("Expecting error for empty pmw")
+		t.Fatal("Expecting error for empty mwrSet")
 	}
 	if !apierrors.IsBadRequest(err) {
 		t.Fatal("Expecting bad request error type")
 	}
 	request := admission.Request{
 		AdmissionRequest: admissionv1.AdmissionRequest{
-			Resource:  placeManifestWorkSchema,
+			Resource:  manifestWorkReplicaSetSchema,
 			Operation: admissionv1.Create,
 		},
 	}
 	ctx := admission.NewContextWithRequest(context.Background(), request)
-	pmw = helpertest.CreateTestPlaceManifestWork("pmw-test", "default", "place-test")
-	err = webHook.ValidateCreate(ctx, pmw)
+	mwrSet = helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	err = webHook.ValidateCreate(ctx, mwrSet)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestWebHookUpdateRequest(t *testing.T) {
-	webHook := PlaceManifestWorkWebhook{}
-	pmw := helpertest.CreateTestPlaceManifestWork("pmw-test", "default", "place-test")
-	err := webHook.ValidateUpdate(context.Background(), nil, pmw)
+	webHook := ManifestWorkReplicaSetWebhook{}
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	err := webHook.ValidateUpdate(context.Background(), nil, mwrSet)
 	if err == nil {
 		t.Fatal("Expecting error for nil oldPlaceMW")
 	}
@@ -88,7 +87,7 @@ func TestWebHookUpdateRequest(t *testing.T) {
 		t.Fatal("Expecting bad request error type")
 	}
 
-	err = webHook.ValidateUpdate(context.Background(), pmw, nil)
+	err = webHook.ValidateUpdate(context.Background(), mwrSet, nil)
 	if err == nil {
 		t.Fatal("Expecting error for nil newPlaceMW")
 	}
@@ -98,12 +97,12 @@ func TestWebHookUpdateRequest(t *testing.T) {
 
 	request := admission.Request{
 		AdmissionRequest: admissionv1.AdmissionRequest{
-			Resource:  placeManifestWorkSchema,
+			Resource:  manifestWorkReplicaSetSchema,
 			Operation: admissionv1.Update,
 		},
 	}
 	ctx := admission.NewContextWithRequest(context.Background(), request)
-	err = webHook.ValidateUpdate(ctx, pmw, pmw)
+	err = webHook.ValidateUpdate(ctx, mwrSet, mwrSet)
 	if err != nil {
 		t.Fatal(err)
 	}
