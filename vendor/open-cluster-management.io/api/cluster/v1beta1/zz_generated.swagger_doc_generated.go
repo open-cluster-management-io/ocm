@@ -22,7 +22,7 @@ func (ManagedClusterSelector) SwaggerDoc() map[string]string {
 }
 
 var map_ManagedClusterSet = map[string]string{
-	"":       "ManagedClusterSet defines a group of ManagedClusters that user's workload can run on. A workload can be defined to deployed on a ManagedClusterSet, which mean:\n  1. The workload can run on any ManagedCluster in the ManagedClusterSet\n  2. The workload cannot run on any ManagedCluster outside the ManagedClusterSet\n  3. The service exposed by the workload can be shared in any ManagedCluster in the ManagedClusterSet\n\nIn order to assign a ManagedCluster to a certian ManagedClusterSet, add a label with name `cluster.open-cluster-management.io/clusterset` on the ManagedCluster to refers to the ManagedClusterSet. User is not allow to add/remove this label on a ManagedCluster unless they have a RBAC rule to CREATE on a virtual subresource of managedclustersets/join. In order to update this label, user must have the permission on both the old and new ManagedClusterSet.",
+	"":       "ManagedClusterSet defines a group of ManagedClusters that user's workload can run on. A workload can be defined to deployed on a ManagedClusterSet, which mean:\n 1. The workload can run on any ManagedCluster in the ManagedClusterSet\n 2. The workload cannot run on any ManagedCluster outside the ManagedClusterSet\n 3. The service exposed by the workload can be shared in any ManagedCluster in the ManagedClusterSet\n\nIn order to assign a ManagedCluster to a certian ManagedClusterSet, add a label with name `cluster.open-cluster-management.io/clusterset` on the ManagedCluster to refers to the ManagedClusterSet. User is not allow to add/remove this label on a ManagedCluster unless they have a RBAC rule to CREATE on a virtual subresource of managedclustersets/join. In order to update this label, user must have the permission on both the old and new ManagedClusterSet.",
 	"spec":   "Spec defines the attributes of the ManagedClusterSet",
 	"status": "Status represents the current status of the ManagedClusterSet",
 }
@@ -136,7 +136,7 @@ func (ClusterSelector) SwaggerDoc() map[string]string {
 }
 
 var map_Placement = map[string]string{
-	"":       "Placement defines a rule to select a set of ManagedClusters from the ManagedClusterSets bound to the placement namespace.\n\nHere is how the placement policy combines with other selection methods to determine a matching list of ManagedClusters: 1) Kubernetes clusters are registered with hub as cluster-scoped ManagedClusters; 2) ManagedClusters are organized into cluster-scoped ManagedClusterSets; 3) ManagedClusterSets are bound to workload namespaces; 4) Namespace-scoped Placements specify a slice of ManagedClusterSets which select a working set\n   of potential ManagedClusters;\n5) Then Placements subselect from that working set using label/claim selection.\n\nNo ManagedCluster will be selected if no ManagedClusterSet is bound to the placement namespace. User is able to bind a ManagedClusterSet to a namespace by creating a ManagedClusterSetBinding in that namespace if they have a RBAC rule to CREATE on the virtual subresource of `managedclustersets/bind`.\n\nA slice of PlacementDecisions with label cluster.open-cluster-management.io/placement={placement name} will be created to represent the ManagedClusters selected by this placement.\n\nIf a ManagedCluster is selected and added into the PlacementDecisions, other components may apply workload on it; once it is removed from the PlacementDecisions, the workload applied on this ManagedCluster should be evicted accordingly.",
+	"":       "Placement defines a rule to select a set of ManagedClusters from the ManagedClusterSets bound to the placement namespace.\n\nHere is how the placement policy combines with other selection methods to determine a matching list of ManagedClusters:\n 1. Kubernetes clusters are registered with hub as cluster-scoped ManagedClusters;\n 2. ManagedClusters are organized into cluster-scoped ManagedClusterSets;\n 3. ManagedClusterSets are bound to workload namespaces;\n 4. Namespace-scoped Placements specify a slice of ManagedClusterSets which select a working set\n    of potential ManagedClusters;\n 5. Then Placements subselect from that working set using label/claim selection.\n\nNo ManagedCluster will be selected if no ManagedClusterSet is bound to the placement namespace. User is able to bind a ManagedClusterSet to a namespace by creating a ManagedClusterSetBinding in that namespace if they have a RBAC rule to CREATE on the virtual subresource of `managedclustersets/bind`.\n\nA slice of PlacementDecisions with label cluster.open-cluster-management.io/placement={placement name} will be created to represent the ManagedClusters selected by this placement.\n\nIf a ManagedCluster is selected and added into the PlacementDecisions, other components may apply workload on it; once it is removed from the PlacementDecisions, the workload applied on this ManagedCluster should be evicted accordingly.",
 	"spec":   "Spec defines the attributes of Placement.",
 	"status": "Status represents the current status of the Placement",
 }
@@ -161,6 +161,7 @@ var map_PlacementSpec = map[string]string{
 	"numberOfClusters":  "NumberOfClusters represents the desired number of ManagedClusters to be selected which meet the placement requirements. 1) If not specified, all ManagedClusters which meet the placement requirements (including ClusterSets,\n   and Predicates) will be selected;\n2) Otherwise if the nubmer of ManagedClusters meet the placement requirements is larger than\n   NumberOfClusters, a random subset with desired number of ManagedClusters will be selected;\n3) If the nubmer of ManagedClusters meet the placement requirements is equal to NumberOfClusters,\n   all of them will be selected;\n4) If the nubmer of ManagedClusters meet the placement requirements is less than NumberOfClusters,\n   all of them will be selected, and the status of condition `PlacementConditionSatisfied` will be\n   set to false;",
 	"predicates":        "Predicates represent a slice of predicates to select ManagedClusters. The predicates are ORed.",
 	"prioritizerPolicy": "PrioritizerPolicy defines the policy of the prioritizers. If this field is unset, then default prioritizer mode and configurations are used. Referring to PrioritizerPolicy to see more description about Mode and Configurations.",
+	"spreadPolicy":      "SpreadPolicy defines how placement decisions should be distributed among a set of ManagedClusters.",
 	"tolerations":       "Tolerations are applied to placements, and allow (but do not require) the managed clusters with certain taints to be selected by placements with matching tolerations.",
 }
 
@@ -199,12 +200,33 @@ func (PrioritizerPolicy) SwaggerDoc() map[string]string {
 var map_ScoreCoordinate = map[string]string{
 	"":        "ScoreCoordinate represents the configuration of the score type and score source",
 	"type":    "Type defines the type of the prioritizer score. Type is either \"BuiltIn\", \"AddOn\" or \"\", where \"\" is \"BuiltIn\" by default. When the type is \"BuiltIn\", need to specify a BuiltIn prioritizer name in BuiltIn. When the type is \"AddOn\", need to configure the score source in AddOn.",
-	"builtIn": "BuiltIn defines the name of a BuiltIn prioritizer. Below are the valid BuiltIn prioritizer names. 1) Balance: balance the decisions among the clusters. 2) Steady: ensure the existing decision is stabilized. 3) ResourceAllocatableCPU & ResourceAllocatableMemory: sort clusters based on the allocatable.",
+	"builtIn": "BuiltIn defines the name of a BuiltIn prioritizer. Below are the valid BuiltIn prioritizer names. 1) Balance: balance the decisions among the clusters. 2) Steady: ensure the existing decision is stabilized. 3) ResourceAllocatableCPU & ResourceAllocatableMemory: sort clusters based on the allocatable. 4) Spread: spread the workload evenly to topologies.",
 	"addOn":   "When type is \"AddOn\", AddOn defines the resource name and score name.",
 }
 
 func (ScoreCoordinate) SwaggerDoc() map[string]string {
 	return map_ScoreCoordinate
+}
+
+var map_SpreadConstraintsTerm = map[string]string{
+	"":                  "SpreadConstraintsTerm defines a terminology to spread placement decisions.",
+	"topologyKey":       "TopologyKey is either a label key or a cluster claim name of ManagedClusters.",
+	"topologyKeyType":   "TopologyKeyType indicates the type of TopologyKey. It could be Label or Claim.",
+	"maxSkew":           "MaxSkew represents the degree to which the workload may be unevenly distributed. Skew is the maximum difference between the number of selected ManagedClusters in a topology and the global minimum. The global minimum is the minimum number of selected ManagedClusters for the topologies within the same TopologyKey. The minimum possible value of MaxSkew is 1, and the default value is 1.",
+	"whenUnsatisfiable": "WhenUnsatisfiable represents the action of the scheduler when MaxSkew cannot be satisfied. It could be DoNotSchedule or ScheduleAnyway. The default value is ScheduleAnyway. DoNotSchedule instructs the scheduler not to schedule more ManagedClusters when MaxSkew is not satisfied. ScheduleAnyway instructs the scheduler to keep scheduling even if MaxSkew is not satisfied.",
+}
+
+func (SpreadConstraintsTerm) SwaggerDoc() map[string]string {
+	return map_SpreadConstraintsTerm
+}
+
+var map_SpreadPolicy = map[string]string{
+	"":                  "SpreadPolicy defines how the placement decision should be spread among the ManagedClusters.",
+	"spreadConstraints": "SpreadConstraints defines how the placement decision should be distributed among a set of ManagedClusters. The importance of the SpreadConstraintsTerms follows the natural order of their index in the slice. The scheduler first consider SpreadConstraintsTerms with smaller index then those with larger index to distribute the placement decision.",
+}
+
+func (SpreadPolicy) SwaggerDoc() map[string]string {
+	return map_SpreadPolicy
 }
 
 var map_Toleration = map[string]string{
