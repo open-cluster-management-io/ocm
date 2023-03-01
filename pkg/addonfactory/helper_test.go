@@ -35,7 +35,7 @@ func TestGetValuesFromAddonAnnotation(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			values, err := GetValuesFromAddonAnnotation(NewFakeManagedCluster("test"),
+			values, err := GetValuesFromAddonAnnotation(NewFakeManagedCluster("test", "1.10.1"),
 				NewFakeManagedClusterAddon("test", "test", "test", c.annotationValues))
 			if !c.expectedErr && err != nil {
 				t.Errorf("expected no error, bug got err %v", err)

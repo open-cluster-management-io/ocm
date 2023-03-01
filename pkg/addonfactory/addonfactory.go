@@ -34,6 +34,7 @@ type AgentAddonFactory struct {
 	agentAddonOptions agent.AgentAddonOptions
 	// trimCRDDescription flag is used to trim the description of CRDs in manifestWork. disabled by default.
 	trimCRDDescription bool
+	hostingCluster     *clusterv1.ManagedCluster
 }
 
 // NewAgentAddonFactory builds an addonAgentFactory instance with addon name and fs.
@@ -112,6 +113,13 @@ func (f *AgentAddonFactory) WithTrimCRDDescription() *AgentAddonFactory {
 // WithConfigGVRs defines the addon supported configuration GroupVersionResource
 func (f *AgentAddonFactory) WithConfigGVRs(gvrs ...schema.GroupVersionResource) *AgentAddonFactory {
 	f.agentAddonOptions.SupportedConfigGVRs = append(f.agentAddonOptions.SupportedConfigGVRs, gvrs...)
+	return f
+}
+
+// WithHostingCluster defines the hosting cluster used in hosted mode. An AgentAddon may use this to provide
+// additional metadata.
+func (f *AgentAddonFactory) WithHostingCluster(cluster *clusterv1.ManagedCluster) *AgentAddonFactory {
+	f.hostingCluster = cluster
 	return f
 }
 

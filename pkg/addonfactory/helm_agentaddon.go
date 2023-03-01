@@ -35,8 +35,9 @@ type helmBuiltinValues struct {
 // the values in helm chart should begin with a lowercase letter, so we need convert it to Values by JsonStructToValues.
 // the default values can be overrided by getValuesFuncs
 type helmDefaultValues struct {
-	HubKubeConfigSecret     string `json:"hubKubeConfigSecret,omitempty"`
-	ManagedKubeConfigSecret string `json:"managedKubeConfigSecret,omitempty"`
+	HubKubeConfigSecret        string                 `json:"hubKubeConfigSecret,omitempty"`
+	ManagedKubeConfigSecret    string                 `json:"managedKubeConfigSecret,omitempty"`
+	HostingClusterCapabilities chartutil.Capabilities `json:"hostingClusterCapabilities,omitempty"`
 }
 
 type HelmAgentAddon struct {
@@ -45,6 +46,7 @@ type HelmAgentAddon struct {
 	getValuesFuncs     []GetValuesFunc
 	agentAddonOptions  agent.AgentAddonOptions
 	trimCRDDescription bool
+	hostingCluster     *clusterv1.ManagedCluster
 }
 
 func newHelmAgentAddon(factory *AgentAddonFactory, chart *chart.Chart) *HelmAgentAddon {
@@ -54,6 +56,7 @@ func newHelmAgentAddon(factory *AgentAddonFactory, chart *chart.Chart) *HelmAgen
 		getValuesFuncs:     factory.getValuesFuncs,
 		agentAddonOptions:  factory.agentAddonOptions,
 		trimCRDDescription: factory.trimCRDDescription,
+		hostingCluster:     factory.hostingCluster,
 	}
 }
 
@@ -214,6 +217,10 @@ func (a *HelmAgentAddon) getDefaultValues(
 	}
 
 	defaultValues.ManagedKubeConfigSecret = fmt.Sprintf("%s-managed-kubeconfig", addon.Name)
+
+	if a.hostingCluster != nil {
+		defaultValues.HostingClusterCapabilities = *a.capabilities(a.hostingCluster, addon)
+	}
 
 	helmDefaultValues, err := JsonStructToValues(defaultValues)
 	if err != nil {

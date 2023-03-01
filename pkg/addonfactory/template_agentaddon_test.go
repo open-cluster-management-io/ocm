@@ -149,7 +149,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 				c.expectedManagedKubeConfigSecret = fmt.Sprintf("%s-managed-kubeconfig", c.addonName)
 			}
 
-			cluster := NewFakeManagedCluster(c.clusterName)
+			cluster := NewFakeManagedCluster(c.clusterName, "1.10.1")
 			clusterAddon := NewFakeManagedClusterAddon(c.addonName, c.clusterName, c.installNamespace,
 				c.annotationConfig)
 

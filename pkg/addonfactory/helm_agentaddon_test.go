@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -64,6 +65,7 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 		name                            string
 		scheme                          *runtime.Scheme
 		clusterName                     string
+		hostingCluster                  *clusterv1.ManagedCluster
 		addonName                       string
 		installNamespace                string
 		annotationValues                string
@@ -74,6 +76,7 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 		expectedObjCnt                  int
 		expectedHubKubeConfigSecret     string
 		expectedManagedKubeConfigSecret string
+		expectedNamespace               bool
 	}{
 		{
 			name:                     "template render ok with annotation values",
@@ -131,6 +134,18 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 			expectedHubKubeConfigSecret:     "external-hub-kubeconfig",
 			expectedManagedKubeConfigSecret: "external-managed-kubeconfig",
 		},
+		{
+			name:                     "template render ok with newer hosting cluster",
+			scheme:                   testScheme,
+			clusterName:              "cluster1",
+			hostingCluster:           NewFakeManagedCluster("hosting-cluster", "1.25.0"),
+			addonName:                "helloworld",
+			installNamespace:         "myNs",
+			expectedInstallNamespace: "myNs",
+			expectedImage:            "quay.io/testimage:test",
+			expectedObjCnt:           5,
+			expectedNamespace:        true,
+		},
 	}
 
 	for _, c := range cases {
@@ -148,7 +163,7 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 				c.expectedManagedKubeConfigSecret = fmt.Sprintf("%s-managed-kubeconfig", c.addonName)
 			}
 
-			cluster := NewFakeManagedCluster(c.clusterName)
+			cluster := NewFakeManagedCluster(c.clusterName, "1.10.1")
 			clusterAddon := NewFakeManagedClusterAddon(c.addonName, c.clusterName, c.installNamespace, c.annotationValues)
 
 			agentAddon, err := NewAgentAddonFactory(c.addonName, chartFS, "testmanifests/chart").
@@ -156,6 +171,7 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 				WithScheme(c.scheme).
 				WithTrimCRDDescription().
 				WithAgentRegistrationOption(&agent.RegistrationOption{}).
+				WithHostingCluster(c.hostingCluster).
 				BuildHelmAgentAddon()
 			if err != nil {
 				t.Errorf("expected no error, got err %v", err)
@@ -213,8 +229,15 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 					if !validateTrimCRDv1beta1(object) {
 						t.Errorf("the crd is not compredded")
 					}
+				case *corev1.Namespace:
+					if c.expectedNamespace {
+						if object.Name != "newer-k8s" {
+							t.Errorf("expected a namespace named newer-k8s and got: %s", object.Name)
+						}
+					} else {
+						t.Errorf("did not expect a namespace and got: %s", object.Name)
+					}
 				}
-
 			}
 		})
 	}
