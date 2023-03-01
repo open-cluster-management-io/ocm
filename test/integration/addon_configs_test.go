@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -77,10 +78,12 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		err = hubKubeClient.CoreV1().Namespaces().Delete(context.Background(), configDefaultNamespace, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(), testAddOnConfigsImpl.name, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		delete(testAddOnConfigsImpl.registrations, managedClusterName)
 	})
 
-	ginkgo.It("Should use use default config", func() {
+	ginkgo.It("Should use default config", func() {
 		addon := &addonapiv1alpha1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      testAddOnConfigsImpl.name,
@@ -107,6 +110,72 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 
 			if configReference.ConfigReferent.Name != configDefaultName {
 				return fmt.Errorf("Expected default config is used, actual: %v", actual.Status.ConfigReferences)
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	})
+
+	ginkgo.It("Should override default config by install strategy", func() {
+		cma, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), testAddOnConfigsImpl.name, metav1.GetOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		cma.Spec.InstallStrategy = &addonapiv1alpha1.InstallStrategy{
+			Type: addonapiv1alpha1.AddonInstallStrategyManualPlacements,
+			Placements: []addonapiv1alpha1.PlacementStrategy{
+				{
+					PlacementRef: addonapiv1alpha1.PlacementRef{Name: "test-placement", Namespace: configDefaultNamespace},
+					Configs: []addonapiv1alpha1.AddOnConfig{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    addOnDeploymentConfigGVR.Group,
+								Resource: addOnDeploymentConfigGVR.Resource,
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: configDefaultNamespace,
+								Name:      "another-config",
+							},
+						},
+					},
+				},
+			},
+		}
+		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Update(context.Background(), cma, metav1.UpdateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		placement := &clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: configDefaultNamespace}}
+		_, err = hubClusterClient.ClusterV1beta1().Placements(configDefaultNamespace).Create(context.Background(), placement, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		decision := &clusterv1beta1.PlacementDecision{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-placement",
+				Namespace: configDefaultNamespace,
+				Labels:    map[string]string{clusterv1beta1.PlacementLabel: "test-placement"},
+			},
+		}
+		decision, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(configDefaultNamespace).Create(context.Background(), decision, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		decision.Status.Decisions = []clusterv1beta1.ClusterDecision{
+			{ClusterName: managedClusterName},
+		}
+		_, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(configDefaultNamespace).UpdateStatus(context.Background(), decision, metav1.UpdateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		gomega.Eventually(func() error {
+			actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddOnConfigsImpl.name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			if len(actual.Status.ConfigReferences) != 1 {
+				return fmt.Errorf("Expected 1 config reference, actual: %v", actual.Status.ConfigReferences)
+			}
+
+			configReference := actual.Status.ConfigReferences[0]
+
+			if configReference.ConfigReferent.Name != "another-config" {
+				return fmt.Errorf("Expected config is overridden, actual: %v", actual.Status.ConfigReferences)
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())

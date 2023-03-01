@@ -47,7 +47,7 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 		delete(testAddonImpl.registrations, managedClusterName)
 	})
 
-	ginkgo.It("Should update config coordinate successfully", func() {
+	ginkgo.It("Should update config related object successfully", func() {
 		addon := &addonapiv1alpha1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
@@ -64,12 +64,7 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
 			},
-			Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
-				AddOnConfiguration: addonapiv1alpha1.ConfigCoordinates{
-					CRDName: "testcrd",
-					CRName:  "testcr",
-				},
-			},
+			Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{},
 		}
 		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(), clusterManagementAddon, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -78,13 +73,6 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 			actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
-			}
-			//nolint:staticcheck
-			//lint:ignore SA1019 Ignore the deprecation warnings
-			if !apiequality.Semantic.DeepEqual(clusterManagementAddon.Spec.AddOnConfiguration, actual.Status.AddOnConfiguration) {
-				//nolint:staticcheck
-				//lint:ignore SA1019 Ignore the deprecation warnings
-				return fmt.Errorf("Expected config coordinate is not correct, actual: %v", actual.Status.AddOnConfiguration)
 			}
 			relatedObjects := []addonapiv1alpha1.ObjectReference{
 				{
@@ -95,6 +83,9 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 			}
 			if !apiequality.Semantic.DeepEqual(relatedObjects, actual.Status.RelatedObjects) {
 				return fmt.Errorf("Expected related object is not correct, actual: %v", actual.Status.RelatedObjects)
+			}
+			if actual.Status.Namespace != "test" {
+				return fmt.Errorf("Expected namespace in status is not correct, actual %s", actual.Status.Namespace)
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())

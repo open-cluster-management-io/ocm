@@ -122,6 +122,7 @@ jobs:
       - name: Load image on the nodes of the cluster
         run: |
           kind load docker-image --name=cluster1 quay.io/open-cluster-management/addon-examples:latest
+          kind load docker-image --name=cluster1 quay.io/open-cluster-management/addon-manager:latest
       - name: Run e2e test
         run: |
           make test-e2e

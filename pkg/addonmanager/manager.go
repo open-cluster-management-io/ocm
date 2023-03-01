@@ -18,7 +18,6 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addoninstall"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/agentdeploy"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/certificate"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/clustermanagement"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/registration"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
@@ -156,14 +155,6 @@ func (a *addonManager) Start(ctx context.Context) error {
 		a.addonAgents,
 	)
 
-	clusterManagementController := clustermanagement.NewClusterManagementController(
-		addonClient,
-		clusterInformers.Cluster().V1().ManagedClusters(),
-		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
-		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
-		a.addonAgents,
-	)
-
 	addonInstallController := addoninstall.NewAddonInstallController(
 		addonClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
@@ -231,7 +222,6 @@ func (a *addonManager) Start(ctx context.Context) error {
 
 	go deployController.Run(ctx, 1)
 	go registrationController.Run(ctx, 1)
-	go clusterManagementController.Run(ctx, 1)
 	go addonInstallController.Run(ctx, 1)
 	go addonHealthCheckController.Run(ctx, 1)
 	if addonConfigController != nil {

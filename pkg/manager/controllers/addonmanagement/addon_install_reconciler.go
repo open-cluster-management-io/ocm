@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"open-cluster-management.io/addon-framework/pkg/index"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
@@ -29,7 +30,7 @@ func (d *managedClusterAddonInstallReconciler) reconcile(
 		return cma, reconcileContinue, nil
 	}
 
-	addons, err := d.managedClusterAddonIndexer.ByIndex(managedClusterAddonByName, cma.Name)
+	addons, err := d.managedClusterAddonIndexer.ByIndex(index.ManagedClusterAddonByName, cma.Name)
 	if err != nil {
 		return cma, reconcileContinue, err
 	}

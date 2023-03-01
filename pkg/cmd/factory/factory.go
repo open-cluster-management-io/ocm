@@ -264,6 +264,12 @@ func toServerConfig() (*genericapiserver.Config, error) {
 
 	servingOptions := genericapiserveroptions.NewSecureServingOptions()
 	servingOptions.BindPort = 8443
+	temporaryCertDir, err := os.MkdirTemp("", "serving-cert")
+	if err != nil {
+		return nil, err
+	}
+	servingOptions.ServerCert.CertDirectory = temporaryCertDir
+	servingOptions.ServerCert.PairName = "tls"
 	if err := servingOptions.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, err
 	}

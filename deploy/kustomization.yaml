@@ -1,0 +1,14 @@
+namespace: open-cluster-management-hub
+
+resources:
+  - resources/cluster_role_binding.yaml
+  - resources/cluster_role.yaml
+  - resources/manager_deployment.yaml
+  - resources/service_account.yaml
+
+images:
+  - name: quay.io/open-cluster-management/addon-manager:latest
+    newName: quay.io/open-cluster-management/addon-manager
+    newTag: latest
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization

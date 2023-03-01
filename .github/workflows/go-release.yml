@@ -8,12 +8,12 @@ env:
   # Common versions
   GO_VERSION: '1.19'
   GO_REQUIRED_MIN_VERSION: ''
-  GOPATH: '/home/runner/work/work/work/go'
+  GOPATH: '/home/runner/work/addon-framework/addon-framework/go'
   GITHUB_REF: ${{ github.ref }}
 
 defaults:
   run:
-    working-directory: go/src/open-cluster-management.io/work
+    working-directory: go/src/open-cluster-management.io/addon-framework
 
 jobs:
   release:

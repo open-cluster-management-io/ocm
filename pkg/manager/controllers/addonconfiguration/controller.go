@@ -1,4 +1,4 @@
-package addonmanagement
+package addonconfiguration
 
 import (
 	"context"
@@ -16,16 +16,19 @@ import (
 	clusterinformersv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
 )
 
-type addonManagementController struct {
+// addonConfigurationController is a controller to update configuration of mca with the following order
+// 1. use configuration in mca spec if it is set
+// 2. use configuration in install strategy
+// 3. use configuration in the default configuration in cma
+type addonConfigurationController struct {
 	addonClient                   addonv1alpha1client.Interface
 	clusterManagementAddonLister  addonlisterv1alpha1.ClusterManagementAddOnLister
 	clusterManagementAddonIndexer cache.Indexer
 
-	reconcilers []addonManagementReconcile
+	reconcilers []addonConfigurationReconcile
 }
 
-// addonManagementReconcile is a interface for reconcile logic. It creates ManagedClusterAddon based on install strategy
-type addonManagementReconcile interface {
+type addonConfigurationReconcile interface {
 	reconcile(ctx context.Context, cma *addonv1alpha1.ClusterManagementAddOn) (*addonv1alpha1.ClusterManagementAddOn, reconcileState, error)
 }
 
@@ -36,24 +39,24 @@ const (
 	reconcileContinue
 )
 
-func NewAddonManagementController(
+func NewAddonConfigurationController(
 	addonClient addonv1alpha1client.Interface,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	placementInformer clusterinformersv1beta1.PlacementInformer,
 	placementDecisionInformer clusterinformersv1beta1.PlacementDecisionInformer,
 ) factory.Controller {
-	c := &addonManagementController{
+	c := &addonConfigurationController{
 		addonClient:                   addonClient,
 		clusterManagementAddonLister:  clusterManagementAddonInformers.Lister(),
 		clusterManagementAddonIndexer: clusterManagementAddonInformers.Informer().GetIndexer(),
 
-		reconcilers: []addonManagementReconcile{
-			&managedClusterAddonInstallReconciler{
+		reconcilers: []addonConfigurationReconcile{
+			&managedClusterAddonConfigurationReconciler{
 				addonClient:                addonClient,
+				managedClusterAddonIndexer: addonInformers.Informer().GetIndexer(),
 				placementDecisionLister:    placementDecisionInformer.Lister(),
 				placementLister:            placementInformer.Lister(),
-				managedClusterAddonIndexer: addonInformers.Informer().GetIndexer(),
 			},
 		},
 	}
@@ -66,10 +69,10 @@ func NewAddonManagementController(
 		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
 		WithInformersQueueKeysFunc(index.ClusterManagementAddonByPlacementDecisionQueueKey(clusterManagementAddonInformers), placementDecisionInformer.Informer()).
 		WithInformersQueueKeysFunc(index.ClusterManagementAddonByPlacementQueueKey(clusterManagementAddonInformers), placementInformer.Informer()).
-		WithSync(c.sync).ToController("addon-management-controller")
+		WithSync(c.sync).ToController("addon-configuration-controller")
 }
 
-func (c *addonManagementController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
+func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
 	_, addonName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		// ignore addon whose key is invalid

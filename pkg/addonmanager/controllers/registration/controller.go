@@ -119,6 +119,16 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 		Message: "Registration of the addon agent is configured",
 	})
 
+	// sync supported configs
+	var supportedConfigs []addonapiv1alpha1.ConfigGroupResource
+	for _, config := range agentAddon.GetAgentAddonOptions().SupportedConfigGVRs {
+		supportedConfigs = append(supportedConfigs, addonapiv1alpha1.ConfigGroupResource{
+			Group:    config.Group,
+			Resource: config.Resource,
+		})
+	}
+	managedClusterAddonCopy.Status.SupportedConfigs = supportedConfigs
+
 	return c.patchAddonStatus(ctx, managedClusterAddonCopy, managedClusterAddon)
 }
 
@@ -129,8 +139,9 @@ func (c *addonConfigurationController) patchAddonStatus(ctx context.Context, new
 
 	oldData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
 		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-			Registrations: old.Status.Registrations,
-			Conditions:    old.Status.Conditions,
+			Registrations:    old.Status.Registrations,
+			SupportedConfigs: old.Status.SupportedConfigs,
+			Conditions:       old.Status.Conditions,
 		},
 	})
 	if err != nil {
@@ -143,8 +154,9 @@ func (c *addonConfigurationController) patchAddonStatus(ctx context.Context, new
 			ResourceVersion: new.ResourceVersion,
 		},
 		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-			Registrations: new.Status.Registrations,
-			Conditions:    new.Status.Conditions,
+			Registrations:    new.Status.Registrations,
+			SupportedConfigs: new.Status.SupportedConfigs,
+			Conditions:       new.Status.Conditions,
 		},
 	})
 	if err != nil {

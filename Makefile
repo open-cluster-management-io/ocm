@@ -8,6 +8,7 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
 	targets/openshift/deps.mk \
 	targets/openshift/images.mk \
+	targets/openshift/kustomize.mk \
 	lib/tmp.mk \
 )
 
@@ -22,17 +23,15 @@ export HOSTED_MANAGED_KLUSTERLET_NAME ?= managed
 export HOSTED_MANAGED_KUBECONFIG_SECRET_NAME ?= e2e-hosted-managed-kubeconfig
 
 KUBECTL?=kubectl
+KUSTOMIZE_VERSION:=4.5.5
 PWD=$(shell pwd)
-KUSTOMIZE?=$(PWD)/$(PERMANENT_TMP_GOPATH)/bin/kustomize
-KUSTOMIZE_VERSION?=v4.5.5
-KUSTOMIZE_ARCHIVE_NAME?=kustomize_$(KUSTOMIZE_VERSION)_$(GOHOSTOS)_$(GOHOSTARCH).tar.gz
-kustomize_dir:=$(dir $(KUSTOMIZE))
 
 # Image URL to use all building/pushing image targets;
-IMAGE := addon-manager
+MANAGER_IMAGE := addon-manager
 EXAMPLE_IMAGE ?= addon-examples
 IMAGE_REGISTRY ?= quay.io/open-cluster-management
 IMAGE_TAG ?= latest
+export MANAGER_IMAGE_NAME ?= $(IMAGE_REGISTRY)/$(MANAGER_IMAGE):$(IMAGE_TAG)
 export EXAMPLE_IMAGE_NAME ?= $(IMAGE_REGISTRY)/$(EXAMPLE_IMAGE):$(IMAGE_TAG)
 
 GIT_HOST ?= open-cluster-management.io
@@ -48,7 +47,7 @@ GO_TEST_PACKAGES :=./pkg/...
 # $2 - Dockerfile path
 # $3 - context directory for image build
 # It will generate target "image-$(1)" for building the image and binding it as a prerequisite to target "images".
-$(call build-image,$(IMAGE),$(IMAGE_REGISTRY)/$(IMAGE),./build/Dockerfile,.)
+$(call build-image,$(MANAGER_IMAGE),$(IMAGE_REGISTRY)/$(MANAGER_IMAGE),./build/Dockerfile,.)
 $(call build-image,$(EXAMPLE_IMAGE),$(IMAGE_REGISTRY)/$(EXAMPLE_IMAGE),./build/Dockerfile.example,.)
 
 verify-gocilint:
@@ -63,27 +62,33 @@ deploy-ocm:
 deploy-hosted-ocm:
 	examples/deploy/hosted-ocm/install.sh
 
+deploy-addon-manager: ensure-kustomize
+	cp deploy/kustomization.yaml deploy/kustomization.yaml.tmp
+	cd deploy && ../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-manager=$(MANAGER_IMAGE_NAME)
+	$(KUSTOMIZE) build deploy | $(KUBECTL) apply -f -
+	mv deploy/kustomization.yaml.tmp deploy/kustomization.yaml
+
 deploy-busybox: ensure-kustomize
 	cp examples/deploy/addon/busybox/kustomization.yaml examples/deploy/addon/busybox/kustomization.yaml.tmp
-	cd examples/deploy/addon/busybox && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-examples=$(EXAMPLE_IMAGE_NAME)
+	cd examples/deploy/addon/busybox && ../../../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-examples=$(EXAMPLE_IMAGE_NAME)
 	$(KUSTOMIZE) build examples/deploy/addon/busybox | $(KUBECTL) apply -f -
 	mv examples/deploy/addon/busybox/kustomization.yaml.tmp examples/deploy/addon/busybox/kustomization.yaml
 
 deploy-helloworld: ensure-kustomize
 	cp examples/deploy/addon/helloworld/kustomization.yaml examples/deploy/addon/helloworld/kustomization.yaml.tmp
-	cd examples/deploy/addon/helloworld && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-examples=$(EXAMPLE_IMAGE_NAME)
+	cd examples/deploy/addon/helloworld && ../../../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-examples=$(EXAMPLE_IMAGE_NAME)
 	$(KUSTOMIZE) build examples/deploy/addon/helloworld | $(KUBECTL) apply -f -
 	mv examples/deploy/addon/helloworld/kustomization.yaml.tmp examples/deploy/addon/helloworld/kustomization.yaml
 
 deploy-helloworld-helm: ensure-kustomize
 	cp examples/deploy/addon/helloworld-helm/kustomization.yaml examples/deploy/addon/helloworld-helm/kustomization.yaml.tmp
-	cd examples/deploy/addon/helloworld-helm && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-examples=$(EXAMPLE_IMAGE_NAME)
+	cd examples/deploy/addon/helloworld-helm && ../../../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-examples=$(EXAMPLE_IMAGE_NAME)
 	$(KUSTOMIZE) build examples/deploy/addon/helloworld-helm | $(KUBECTL) apply -f -
 	mv examples/deploy/addon/helloworld-helm/kustomization.yaml.tmp examples/deploy/addon/helloworld-helm/kustomization.yaml
 
 deploy-helloworld-hosted: ensure-kustomize
 	cp examples/deploy/addon/helloworld-hosted/kustomization.yaml examples/deploy/addon/helloworld-hosted/kustomization.yaml.tmp
-	cd examples/deploy/addon/helloworld-hosted && $(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-examples=$(EXAMPLE_IMAGE_NAME)
+	cd examples/deploy/addon/helloworld-hosted && ../../../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-examples=$(EXAMPLE_IMAGE_NAME)
 	$(KUSTOMIZE) build examples/deploy/addon/helloworld-hosted | $(KUBECTL) apply -f -
 	mv examples/deploy/addon/helloworld-hosted/kustomization.yaml.tmp examples/deploy/addon/helloworld-hosted/kustomization.yaml
 
@@ -108,25 +113,13 @@ undeploy-helloworld-hosted: ensure-kustomize
 build-e2e:
 	go test -c ./test/e2e
 
-test-e2e: build-e2e deploy-ocm deploy-helloworld deploy-helloworld-helm
+test-e2e: build-e2e deploy-ocm deploy-addon-manager deploy-helloworld deploy-helloworld-helm
 	./e2e.test -test.v -ginkgo.v
 
 build-hosted-e2e:
 	go test -c ./test/e2ehosted
 
-test-hosted-e2e: build-hosted-e2e deploy-hosted-ocm deploy-helloworld-hosted
+test-hosted-e2e: build-hosted-e2e deploy-hosted-ocm deploy-addon-manager deploy-helloworld-hosted
 	./e2ehosted.test -test.v -ginkgo.v
-
-# Ensure kustomize
-ensure-kustomize:
-ifeq "" "$(wildcard $(KUSTOMIZE))"
-	$(info Installing kustomize into '$(KUSTOMIZE)')
-	mkdir -p '$(kustomize_dir)'
-	curl -s -f -L https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F$(KUSTOMIZE_VERSION)/$(KUSTOMIZE_ARCHIVE_NAME) -o '$(kustomize_dir)$(KUSTOMIZE_ARCHIVE_NAME)'
-	tar -C '$(kustomize_dir)' -zvxf '$(kustomize_dir)$(KUSTOMIZE_ARCHIVE_NAME)'
-	chmod +x '$(KUSTOMIZE)';
-else
-	$(info Using existing kustomize from "$(KUSTOMIZE)")
-endif
 
 include ./test/integration-test.mk

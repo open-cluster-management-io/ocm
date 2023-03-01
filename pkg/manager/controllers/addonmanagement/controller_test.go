@@ -7,6 +7,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
+	"open-cluster-management.io/addon-framework/pkg/index"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
@@ -224,7 +225,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 
 			err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
 				cache.Indexers{
-					managedClusterAddonByName: indexManagedClusterAddonByName,
+					index.ManagedClusterAddonByName: index.IndexManagedClusterAddonByName,
 				})
 			if err != nil {
 				t.Fatal(err)
