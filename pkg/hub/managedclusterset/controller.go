@@ -51,7 +51,8 @@ func NewManagedClusterSetController(
 		eventRecorder:    recorder.WithComponentSuffix("managed-cluster-set-controller"),
 		queue:            syncCtx.Queue(),
 	}
-	clusterInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+
+	_, err := clusterInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			cluster, ok := obj.(*v1.ManagedCluster)
 			if !ok {
@@ -97,6 +98,11 @@ func NewManagedClusterSetController(
 			}
 		},
 	})
+
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
+
 	return factory.New().
 		WithSyncContext(syncCtx).
 		WithInformersQueueKeyFunc(func(obj runtime.Object) string {

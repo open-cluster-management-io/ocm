@@ -64,7 +64,7 @@ func NewManagedClusterSetBindingController(
 		queue:                     syncCtx.Queue(),
 	}
 
-	clusterSetInformer.Informer().AddEventHandler(
+	_, err = clusterSetInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: c.enqueueBindingsByClusterSet,
 			UpdateFunc: func(oldObj, newObj interface{}) {
@@ -73,6 +73,9 @@ func NewManagedClusterSetBindingController(
 			DeleteFunc: c.enqueueBindingsByClusterSet,
 		},
 	)
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
 
 	return factory.New().
 		WithSyncContext(syncCtx).

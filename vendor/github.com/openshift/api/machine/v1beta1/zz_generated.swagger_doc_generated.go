@@ -149,6 +149,34 @@ func (TagSpecification) SwaggerDoc() map[string]string {
 	return map_TagSpecification
 }
 
+var map_AzureBootDiagnostics = map[string]string{
+	"":                   "AzureBootDiagnostics configures the boot diagnostics settings for the virtual machine. This allows you to configure capturing serial output from the virtual machine on boot. This is useful for debugging software based launch issues.",
+	"storageAccountType": "StorageAccountType determines if the storage account for storing the diagnostics data should be provisioned by Azure (AzureManaged) or by the customer (CustomerManaged).",
+	"customerManaged":    "CustomerManaged provides reference to the customer manager storage account.",
+}
+
+func (AzureBootDiagnostics) SwaggerDoc() map[string]string {
+	return map_AzureBootDiagnostics
+}
+
+var map_AzureCustomerManagedBootDiagnostics = map[string]string{
+	"":                  "AzureCustomerManagedBootDiagnostics provides reference to a customer managed storage account.",
+	"storageAccountURI": "StorageAccountURI is the URI of the customer managed storage account. The URI typically will be `https://<mystorageaccountname>.blob.core.windows.net/` but may differ if you are using Azure DNS zone endpoints. You can find the correct endpoint by looking for the Blob Primary Endpoint in the endpoints tab in the Azure console.",
+}
+
+func (AzureCustomerManagedBootDiagnostics) SwaggerDoc() map[string]string {
+	return map_AzureCustomerManagedBootDiagnostics
+}
+
+var map_AzureDiagnostics = map[string]string{
+	"":     "AzureDiagnostics is used to configure the diagnostic settings of the virtual machine.",
+	"boot": "AzureBootDiagnostics configures the boot diagnostics settings for the virtual machine. This allows you to configure capturing serial output from the virtual machine on boot. This is useful for debugging software based launch issues.",
+}
+
+func (AzureDiagnostics) SwaggerDoc() map[string]string {
+	return map_AzureDiagnostics
+}
+
 var map_AzureMachineProviderSpec = map[string]string{
 	"":                          "AzureMachineProviderSpec is the type that will be embedded in a Machine.Spec.ProviderSpec field for an Azure virtual machine. It is used by the Azure machine actuator to create a single Machine. Required parameters such as location that are not specified by this configuration, will be defaulted by the actuator. Compatibility level 2: Stable within a major release for a minimum of 9 months or 3 minor releases (whichever is longer).",
 	"userDataSecret":            "UserDataSecret contains a local reference to a secret that contains the UserData to apply to the instance",
@@ -177,6 +205,7 @@ var map_AzureMachineProviderSpec = map[string]string{
 	"ultraSSDCapability":        "UltraSSDCapability enables or disables Azure UltraSSD capability for a virtual machine. This can be used to allow/disallow binding of Azure UltraSSD to the Machine both as Data Disks or via Persistent Volumes. This Azure feature is subject to a specific scope and certain limitations. More informations on this can be found in the official Azure documentation for Ultra Disks: (https://docs.microsoft.com/en-us/azure/virtual-machines/disks-enable-ultra-ssd?tabs=azure-portal#ga-scope-and-limitations).\n\nWhen omitted, if at least one Data Disk of type UltraSSD is specified, the platform will automatically enable the capability. If a Perisistent Volume backed by an UltraSSD is bound to a Pod on the Machine, when this field is ommitted, the platform will *not* automatically enable the capability (unless already enabled by the presence of an UltraSSD as Data Disk). This may manifest in the Pod being stuck in `ContainerCreating` phase. This defaulting behaviour may be subject to change in future.\n\nWhen set to \"Enabled\", if the capability is available for the Machine based on the scope and limitations described above, the capability will be set on the Machine. This will thus allow UltraSSD both as Data Disks and Persistent Volumes. If set to \"Enabled\" when the capability can't be available due to scope and limitations, the Machine will go into \"Failed\" state.\n\nWhen set to \"Disabled\", UltraSSDs will not be allowed either as Data Disks nor as Persistent Volumes. In this case if any UltraSSDs are specified as Data Disks on a Machine, the Machine will go into a \"Failed\" state. If instead any UltraSSDs are backing the volumes (via Persistent Volumes) of any Pods scheduled on a Node which is backed by the Machine, the Pod may get stuck in `ContainerCreating` phase.",
 	"acceleratedNetworking":     "AcceleratedNetworking enables or disables Azure accelerated networking feature. Set to false by default. If true, then this will depend on whether the requested VMSize is supported. If set to true with an unsupported VMSize, Azure will return an error.",
 	"availabilitySet":           "AvailabilitySet specifies the availability set to use for this instance. Availability set should be precreated, before using this field.",
+	"diagnostics":               "Diagnostics configures the diagnostics settings for the virtual machine. This allows you to configure boot diagnostics such as capturing serial output from the virtual machine on boot. This is useful for debugging software based launch issues.",
 }
 
 func (AzureMachineProviderSpec) SwaggerDoc() map[string]string {
@@ -338,26 +367,27 @@ func (GCPKMSKeyReference) SwaggerDoc() map[string]string {
 }
 
 var map_GCPMachineProviderSpec = map[string]string{
-	"":                   "GCPMachineProviderSpec is the type that will be embedded in a Machine.Spec.ProviderSpec field for an GCP virtual machine. It is used by the GCP machine actuator to create a single Machine. Compatibility level 2: Stable within a major release for a minimum of 9 months or 3 minor releases (whichever is longer).",
-	"userDataSecret":     "UserDataSecret contains a local reference to a secret that contains the UserData to apply to the instance",
-	"credentialsSecret":  "CredentialsSecret is a reference to the secret with GCP credentials.",
-	"canIPForward":       "CanIPForward Allows this instance to send and receive packets with non-matching destination or source IPs. This is required if you plan to use this instance to forward routes.",
-	"deletionProtection": "DeletionProtection whether the resource should be protected against deletion.",
-	"disks":              "Disks is a list of disks to be attached to the VM.",
-	"labels":             "Labels list of labels to apply to the VM.",
-	"gcpMetadata":        "Metadata key/value pairs to apply to the VM.",
-	"networkInterfaces":  "NetworkInterfaces is a list of network interfaces to be attached to the VM.",
-	"serviceAccounts":    "ServiceAccounts is a list of GCP service accounts to be used by the VM.",
-	"tags":               "Tags list of tags to apply to the VM.",
-	"targetPools":        "TargetPools are used for network TCP/UDP load balancing. A target pool references member instances, an associated legacy HttpHealthCheck resource, and, optionally, a backup target pool",
-	"machineType":        "MachineType is the machine type to use for the VM.",
-	"region":             "Region is the region in which the GCP machine provider will create the VM.",
-	"zone":               "Zone is the zone in which the GCP machine provider will create the VM.",
-	"projectID":          "ProjectID is the project in which the GCP machine provider will create the VM.",
-	"gpus":               "GPUs is a list of GPUs to be attached to the VM.",
-	"preemptible":        "Preemptible indicates if created instance is preemptible.",
-	"onHostMaintenance":  "OnHostMaintenance determines the behavior when a maintenance event occurs that might cause the instance to reboot. This is required to be set to \"Terminate\" if you want to provision machine with attached GPUs. Otherwise, allowed values are \"Migrate\" and \"Terminate\". If omitted, the platform chooses a default, which is subject to change over time, currently that default is \"Migrate\".",
-	"restartPolicy":      "RestartPolicy determines the behavior when an instance crashes or the underlying infrastructure provider stops the instance as part of a maintenance event (default \"Always\"). Cannot be \"Always\" with preemptible instances. Otherwise, allowed values are \"Always\" and \"Never\". If omitted, the platform chooses a default, which is subject to change over time, currently that default is \"Always\". RestartPolicy represents AutomaticRestart in GCP compute api",
+	"":                       "GCPMachineProviderSpec is the type that will be embedded in a Machine.Spec.ProviderSpec field for an GCP virtual machine. It is used by the GCP machine actuator to create a single Machine. Compatibility level 2: Stable within a major release for a minimum of 9 months or 3 minor releases (whichever is longer).",
+	"userDataSecret":         "UserDataSecret contains a local reference to a secret that contains the UserData to apply to the instance",
+	"credentialsSecret":      "CredentialsSecret is a reference to the secret with GCP credentials.",
+	"canIPForward":           "CanIPForward Allows this instance to send and receive packets with non-matching destination or source IPs. This is required if you plan to use this instance to forward routes.",
+	"deletionProtection":     "DeletionProtection whether the resource should be protected against deletion.",
+	"disks":                  "Disks is a list of disks to be attached to the VM.",
+	"labels":                 "Labels list of labels to apply to the VM.",
+	"gcpMetadata":            "Metadata key/value pairs to apply to the VM.",
+	"networkInterfaces":      "NetworkInterfaces is a list of network interfaces to be attached to the VM.",
+	"serviceAccounts":        "ServiceAccounts is a list of GCP service accounts to be used by the VM.",
+	"tags":                   "Tags list of tags to apply to the VM.",
+	"targetPools":            "TargetPools are used for network TCP/UDP load balancing. A target pool references member instances, an associated legacy HttpHealthCheck resource, and, optionally, a backup target pool",
+	"machineType":            "MachineType is the machine type to use for the VM.",
+	"region":                 "Region is the region in which the GCP machine provider will create the VM.",
+	"zone":                   "Zone is the zone in which the GCP machine provider will create the VM.",
+	"projectID":              "ProjectID is the project in which the GCP machine provider will create the VM.",
+	"gpus":                   "GPUs is a list of GPUs to be attached to the VM.",
+	"preemptible":            "Preemptible indicates if created instance is preemptible.",
+	"onHostMaintenance":      "OnHostMaintenance determines the behavior when a maintenance event occurs that might cause the instance to reboot. This is required to be set to \"Terminate\" if you want to provision machine with attached GPUs. Otherwise, allowed values are \"Migrate\" and \"Terminate\". If omitted, the platform chooses a default, which is subject to change over time, currently that default is \"Migrate\".",
+	"restartPolicy":          "RestartPolicy determines the behavior when an instance crashes or the underlying infrastructure provider stops the instance as part of a maintenance event (default \"Always\"). Cannot be \"Always\" with preemptible instances. Otherwise, allowed values are \"Always\" and \"Never\". If omitted, the platform chooses a default, which is subject to change over time, currently that default is \"Always\". RestartPolicy represents AutomaticRestart in GCP compute api",
+	"shieldedInstanceConfig": "ShieldedInstanceConfig is the Shielded VM configuration for the VM",
 }
 
 func (GCPMachineProviderSpec) SwaggerDoc() map[string]string {
@@ -405,6 +435,17 @@ var map_GCPServiceAccount = map[string]string{
 
 func (GCPServiceAccount) SwaggerDoc() map[string]string {
 	return map_GCPServiceAccount
+}
+
+var map_GCPShieldedInstanceConfig = map[string]string{
+	"":                                 "GCPShieldedInstanceConfig describes the shielded VM configuration of the instance on GCP. Shielded VM configuration allow users to enable and disable Secure Boot, vTPM, and Integrity Monitoring.",
+	"secureBoot":                       "SecureBoot Defines whether the instance should have secure boot enabled. Secure Boot verify the digital signature of all boot components, and halting the boot process if signature verification fails. If omitted, the platform chooses a default, which is subject to change over time, currently that default is Disabled.",
+	"virtualizedTrustedPlatformModule": "VirtualizedTrustedPlatformModule enable virtualized trusted platform module measurements to create a known good boot integrity policy baseline. The integrity policy baseline is used for comparison with measurements from subsequent VM boots to determine if anything has changed. This is required to be set to \"Enabled\" if IntegrityMonitoring is enabled. If omitted, the platform chooses a default, which is subject to change over time, currently that default is Enabled.",
+	"integrityMonitoring":              "IntegrityMonitoring determines whether the instance should have integrity monitoring that verify the runtime boot integrity. Compares the most recent boot measurements to the integrity policy baseline and return a pair of pass/fail results depending on whether they match or not. If omitted, the platform chooses a default, which is subject to change over time, currently that default is Enabled.",
+}
+
+func (GCPShieldedInstanceConfig) SwaggerDoc() map[string]string {
+	return map_GCPShieldedInstanceConfig
 }
 
 var map_LastOperation = map[string]string{
@@ -655,9 +696,9 @@ var map_VSphereMachineProviderSpec = map[string]string{
 	"numCPUs":           "NumCPUs is the number of virtual processors in a virtual machine. Defaults to the analogue property value in the template from which this machine is cloned.",
 	"numCoresPerSocket": "NumCPUs is the number of cores among which to distribute CPUs in this virtual machine. Defaults to the analogue property value in the template from which this machine is cloned.",
 	"memoryMiB":         "MemoryMiB is the size of a virtual machine's memory, in MiB. Defaults to the analogue property value in the template from which this machine is cloned.",
-	"diskGiB":           "DiskGiB is the size of a virtual machine's disk, in GiB. Defaults to the analogue property value in the template from which this machine is cloned.",
+	"diskGiB":           "DiskGiB is the size of a virtual machine's disk, in GiB. Defaults to the analogue property value in the template from which this machine is cloned. This parameter will be ignored if 'LinkedClone' CloneMode is set.",
 	"snapshot":          "Snapshot is the name of the snapshot from which the VM was cloned",
-	"cloneMode":         "CloneMode specifies the type of clone operation. The LinkedClone mode is only support for templates that have at least one snapshot. If the template has no snapshots, then CloneMode defaults to FullClone. When LinkedClone mode is enabled the DiskGiB field is ignored as it is not possible to expand disks of linked clones. Defaults to LinkedClone, but fails gracefully to FullClone if the source of the clone operation has no snapshots.",
+	"cloneMode":         "CloneMode specifies the type of clone operation. The LinkedClone mode is only support for templates that have at least one snapshot. If the template has no snapshots, then CloneMode defaults to FullClone. When LinkedClone mode is enabled the DiskGiB field is ignored as it is not possible to expand disks of linked clones. Defaults to FullClone. When using LinkedClone, if no snapshots exist for the source template, falls back to FullClone.",
 }
 
 func (VSphereMachineProviderSpec) SwaggerDoc() map[string]string {

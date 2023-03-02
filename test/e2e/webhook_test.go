@@ -3,7 +3,6 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -13,15 +12,16 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 
+	authv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/util/wait"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -979,27 +979,18 @@ func buildClusterClient(saNamespace, saName string, clusterPolicyRules, policyRu
 		}
 	}
 
-	var tokenSecret *corev1.Secret
-	err = wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
-		secrets, err := hubClient.CoreV1().Secrets(saNamespace).List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		for _, secret := range secrets.Items {
-			if strings.HasPrefix(secret.Name, fmt.Sprintf("%s-token-", saName)) {
-				tokenSecret = &secret
-				return true, nil
-			}
-		}
-
-		return false, nil
-	})
+	tokenRequest, err := hubClient.CoreV1().ServiceAccounts(saNamespace).CreateToken(
+		context.TODO(),
+		saName,
+		&authv1.TokenRequest{
+			Spec: authv1.TokenRequestSpec{
+				ExpirationSeconds: pointer.Int64(8640 * 3600),
+			},
+		},
+		metav1.CreateOptions{},
+	)
 	if err != nil {
 		return nil, err
-	}
-	if tokenSecret == nil {
-		return nil, fmt.Errorf("the %s token secret cannot be found in %s namespace", sa, saNamespace)
 	}
 
 	unauthorizedClusterClient, err := clusterv1client.NewForConfig(&restclient.Config{
@@ -1007,7 +998,7 @@ func buildClusterClient(saNamespace, saName string, clusterPolicyRules, policyRu
 		TLSClientConfig: restclient.TLSClientConfig{
 			CAData: clusterCfg.CAData,
 		},
-		BearerToken: string(tokenSecret.Data["token"]),
+		BearerToken: tokenRequest.Status.Token,
 	})
 	return unauthorizedClusterClient, err
 }

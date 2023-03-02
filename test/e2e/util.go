@@ -5,7 +5,7 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"reflect"
 	"time"
 
@@ -578,7 +578,7 @@ func assetToUnstructured(name string) (*unstructured.Unstructured, error) {
 		return nil, err
 	}
 
-	reader := json.YAMLFramer.NewFrameReader(ioutil.NopCloser(bytes.NewReader(raw)))
+	reader := json.YAMLFramer.NewFrameReader(io.NopCloser(bytes.NewReader(raw)))
 	d := streaming.NewDecoder(reader, yamlDecoder)
 	obj, _, err := d.Decode(nil, nil)
 	if err != nil {
