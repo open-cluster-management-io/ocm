@@ -15,6 +15,18 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 )
 
+const (
+	// Label on the CSIDriver to declare the driver's effective pod security profile
+	csiInlineVolProfileLabel = "security.openshift.io/csi-ephemeral-volume-profile"
+)
+
+var (
+	// Exempt labels are not overwritten if the value has changed
+	exemptCSIDriverLabels = []string{
+		csiInlineVolProfileLabel,
+	}
+)
+
 // ApplyStorageClass merges objectmeta, tries to write everything else
 func ApplyStorageClass(ctx context.Context, client storageclientv1.StorageClassesGetter, recorder events.Recorder, required *storagev1.StorageClass) (*storagev1.StorageClass, bool,
 	error) {
@@ -111,8 +123,10 @@ func ApplyCSIDriver(ctx context.Context, client storageclientv1.CSIDriversGetter
 	if required.Annotations == nil {
 		required.Annotations = map[string]string{}
 	}
-	err := SetSpecHashAnnotation(&required.ObjectMeta, required.Spec)
-	if err != nil {
+	if err := SetSpecHashAnnotation(&required.ObjectMeta, required.Spec); err != nil {
+		return nil, false, err
+	}
+	if err := validateRequiredCSIDriverLabels(required); err != nil {
 		return nil, false, err
 	}
 
@@ -126,6 +140,15 @@ func ApplyCSIDriver(ctx context.Context, client storageclientv1.CSIDriversGetter
 	}
 	if err != nil {
 		return nil, false, err
+	}
+
+	// Exempt labels are not overwritten if the value has changed. They get set
+	// once during creation, but the admin may choose to set a different value.
+	// If the label is removed, it reverts back to the default value.
+	for _, exemptLabel := range exemptCSIDriverLabels {
+		if existingValue, ok := existing.Labels[exemptLabel]; ok {
+			required.Labels[exemptLabel] = existingValue
+		}
 	}
 
 	metadataModified := resourcemerge.BoolPtr(false)
@@ -171,6 +194,25 @@ func ApplyCSIDriver(ctx context.Context, client storageclientv1.CSIDriversGetter
 	}
 	reportCreateEvent(recorder, existingCopy, err)
 	return actual, true, err
+}
+
+func validateRequiredCSIDriverLabels(required *storagev1.CSIDriver) error {
+	supportsEphemeralVolumes := false
+	for _, mode := range required.Spec.VolumeLifecycleModes {
+		if mode == storagev1.VolumeLifecycleEphemeral {
+			supportsEphemeralVolumes = true
+			break
+		}
+	}
+	// All OCP managed CSI drivers that support the Ephemeral volume
+	// lifecycle mode must provide a profile label the be matched against
+	// the pod security policy for the namespace of the pod.
+	// Valid values are: restricted, baseline, privileged.
+	_, labelFound := required.Labels[csiInlineVolProfileLabel]
+	if supportsEphemeralVolumes && !labelFound {
+		return fmt.Errorf("CSIDriver %s supports Ephemeral volume lifecycle but is missing required label %s", required.Name, csiInlineVolProfileLabel)
+	}
+	return nil
 }
 
 func DeleteStorageClass(ctx context.Context, client storageclientv1.StorageClassesGetter, recorder events.Recorder, required *storagev1.StorageClass) (*storagev1.StorageClass, bool,

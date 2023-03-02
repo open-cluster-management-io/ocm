@@ -109,15 +109,21 @@ func newControllerInner(controller *CacheController,
 	cacheControllerName := "ManifestWorkExecutorCache"
 	syncCtx := factory.NewSyncContext(cacheControllerName, recorder)
 
-	rbInformer.Informer().AddEventHandler(&roleBindingEventHandler{
+	_, err = rbInformer.Informer().AddEventHandler(&roleBindingEventHandler{
 		enqueueUpsertFunc: controller.bindingResourceUpsertEnqueueFn(syncCtx),
 		enqueueDeleteFunc: controller.bindingResourceDeleteEnqueueFn(syncCtx),
 	})
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
 
-	crbInformer.Informer().AddEventHandler(&clusterRoleBindingEventHandler{
+	_, err = crbInformer.Informer().AddEventHandler(&clusterRoleBindingEventHandler{
 		enqueueUpsertFunc: controller.bindingResourceUpsertEnqueueFn(syncCtx),
 		enqueueDeleteFunc: controller.bindingResourceDeleteEnqueueFn(syncCtx),
 	})
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
 
 	return factory.New().
 		WithSyncContext(syncCtx).

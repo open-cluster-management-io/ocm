@@ -16,7 +16,6 @@ import (
 	"open-cluster-management.io/work/pkg/cmd/hub"
 	"open-cluster-management.io/work/pkg/cmd/spoke"
 	"open-cluster-management.io/work/pkg/cmd/webhook"
-	"open-cluster-management.io/work/pkg/cmd/webhook/admission"
 	"open-cluster-management.io/work/pkg/version"
 )
 
@@ -54,7 +53,6 @@ func newWorkCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(spoke.NewWorkloadAgent())
-	cmd.AddCommand(admission.NewAdmissionHook())
 	cmd.AddCommand(webhook.NewWebhook())
 	cmd.AddCommand(hub.NewHubManager())
 	return cmd
