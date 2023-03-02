@@ -32,6 +32,10 @@ REGISTRATION_IMAGE?=$(IMAGE_REGISTRY)/registration:$(REGISTRATION_TAG)
 PLACEMENT_TAG?=latest
 PLACEMENT_IMAGE?=$(IMAGE_REGISTRY)/placement:$(PLACEMENT_TAG)
 
+# ADDON_MANAGER_IMAGE can be set in the env to override calculated value
+ADDON_MANAGER_TAG?=latest
+ADDON_MANAGER_IMAGE?=$(IMAGE_REGISTRY)/addon-manager:$(ADDON_MANAGER_TAG)
+
 OPERATOR_SDK?=$(PERMANENT_TMP_GOPATH)/bin/operator-sdk
 OPERATOR_SDK_VERSION?=v1.1.0
 operatorsdk_gen_dir:=$(dir $(OPERATOR_SDK))
@@ -119,10 +123,10 @@ deploy-hub-operator: ensure-kustomize
 	mv deploy/cluster-manager/config/kustomization.yaml.tmp deploy/cluster-manager/config/kustomization.yaml
 
 apply-hub-cr:
-	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/placement,$(PLACEMENT_IMAGE)," deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers.cr.yaml | $(KUBECTL) apply -f -
+	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/placement,$(PLACEMENT_IMAGE)," -e "s,quay.io/open-cluster-management/addon-manager,$(ADDON_MANAGER_IMAGE)," deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers.cr.yaml | $(KUBECTL) apply -f -
 
 apply-hub-cr-hosted: external-hub-secret
-	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/placement,$(PLACEMENT_IMAGE)," deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers_hosted.cr.yaml | $(KUBECTL) apply -f -
+	$(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/placement,$(PLACEMENT_IMAGE)," -e "s,quay.io/open-cluster-management/addon-manager,$(ADDON_MANAGER_IMAGE)," deploy/cluster-manager/config/samples/operator_open-cluster-management_clustermanagers_hosted.cr.yaml | $(KUBECTL) apply -f -
 
 clean-hub: clean-hub-cr clean-hub-operator
 

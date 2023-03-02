@@ -93,23 +93,5 @@ func (c *webhookReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterM
 	// Remove All webhook files
 	webhookResources := hubRegistrationWebhookResourceFiles
 	webhookResources = append(webhookResources, hubWorkWebhookResourceFiles...)
-	for _, file := range webhookResources {
-		err := helpers.CleanUpStaticObject(
-			ctx,
-			c.hubKubeClient, nil, nil,
-			func(name string) ([]byte, error) {
-				template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
-				if err != nil {
-					return nil, err
-				}
-				return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
-			},
-			file,
-		)
-		if err != nil {
-			return cm, reconcileContinue, err
-		}
-	}
-
-	return cm, reconcileContinue, nil
+	return cleanResources(ctx, c.kubeClient, cm, config, webhookResources...)
 }

@@ -250,6 +250,8 @@ func CleanUpStaticObject(
 	switch t := object.(type) {
 	case *corev1.Namespace:
 		err = client.CoreV1().Namespaces().Delete(ctx, t.Name, metav1.DeleteOptions{})
+	case *appsv1.Deployment:
+		err = client.AppsV1().Deployments(t.Namespace).Delete(ctx, t.Name, metav1.DeleteOptions{})
 	case *corev1.Endpoints:
 		err = client.CoreV1().Endpoints(t.Namespace).Delete(ctx, t.Name, metav1.DeleteOptions{})
 	case *corev1.Service:
@@ -706,6 +708,20 @@ func SetRelatedResourcesStatuses(
 	}
 }
 
+func RemoveRelatedResourcesStatuses(
+	relatedResourcesStatuses *[]operatorapiv1.RelatedResourceMeta,
+	rmRelatedResourcesStatus operatorapiv1.RelatedResourceMeta) {
+	if relatedResourcesStatuses == nil {
+		return
+	}
+
+	existingRelatedResource := FindRelatedResourcesStatus(*relatedResourcesStatuses, rmRelatedResourcesStatus)
+	if existingRelatedResource != nil {
+		RemoveRelatedResourcesStatus(relatedResourcesStatuses, rmRelatedResourcesStatus)
+		return
+	}
+}
+
 func FindRelatedResourcesStatus(
 	relatedResourcesStatuses []operatorapiv1.RelatedResourceMeta,
 	relatedResource operatorapiv1.RelatedResourceMeta) *operatorapiv1.RelatedResourceMeta {
@@ -717,6 +733,18 @@ func FindRelatedResourcesStatus(
 	return nil
 }
 
+func RemoveRelatedResourcesStatus(
+	relatedResourcesStatuses *[]operatorapiv1.RelatedResourceMeta,
+	relatedResource operatorapiv1.RelatedResourceMeta) {
+	var result []operatorapiv1.RelatedResourceMeta
+	for _, v := range *relatedResourcesStatuses {
+		if v != relatedResource {
+			result = append(result, v)
+		}
+	}
+	*relatedResourcesStatuses = result
+}
+
 func SetRelatedResourcesStatusesWithObj(
 	relatedResourcesStatuses *[]operatorapiv1.RelatedResourceMeta, objData []byte) {
 	res, err := GenerateRelatedResource(objData)
@@ -725,6 +753,16 @@ func SetRelatedResourcesStatusesWithObj(
 		return
 	}
 	SetRelatedResourcesStatuses(relatedResourcesStatuses, res)
+}
+
+func RemoveRelatedResourcesStatusesWithObj(
+	relatedResourcesStatuses *[]operatorapiv1.RelatedResourceMeta, objData []byte) {
+	res, err := GenerateRelatedResource(objData)
+	if err != nil {
+		klog.Errorf("failed to generate relatedResource %v, and skip to set into status. %v", objData, err)
+		return
+	}
+	RemoveRelatedResourcesStatuses(relatedResourcesStatuses, res)
 }
 
 func UpdateClusterManagerRelatedResourcesFn(relatedResources ...operatorapiv1.RelatedResourceMeta) UpdateClusterManagerStatusFunc {

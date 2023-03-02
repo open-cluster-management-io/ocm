@@ -31,6 +31,41 @@ spec:
                 mode: Default
             description: Spec represents a desired deployment configuration of controllers that govern registration and work distribution for attached Klusterlets.
             properties:
+              addOnManagerConfiguration:
+                default:
+                  mode: Disable
+                description: AddOnManagerConfiguration contains the configuration of addon manager
+                properties:
+                  featureGates:
+                    description: "FeatureGates represents the list of feature gates for addon manager If it is set empty, default feature gates will be used. If it is set, featuregate/Foo is an example of one item in FeatureGates:   1. If featuregate/Foo does not exist, registration-operator will discard it   2. If featuregate/Foo exists and is false by default. It is now possible to set featuregate/Foo=[false|true]   3. If featuregate/Foo exists and is true by default. If a cluster-admin upgrading from 1 to 2 wants to continue having featuregate/Foo=false,  \the can set featuregate/Foo=false before upgrading. Let's say the cluster-admin wants featuregate/Foo=false."
+                    items:
+                      properties:
+                        feature:
+                          description: Feature is the key of feature gate. e.g. featuregate/Foo.
+                          type: string
+                        mode:
+                          default: Disable
+                          description: Mode is either Enable, Disable, "" where "" is Disable by default. In Enable mode, a valid feature gate `featuregate/Foo` will be set to "--featuregate/Foo=true". In Disable mode, a valid feature gate `featuregate/Foo` will be set to "--featuregate/Foo=false".
+                          enum:
+                          - Enable
+                          - Disable
+                          type: string
+                      required:
+                      - feature
+                      type: object
+                    type: array
+                  mode:
+                    default: Disable
+                    description: Mode is either Enable, Disable, "" where "" is Disable by default. In Enable mode, the component will be installed. In Disable mode, the component will not be installed.
+                    enum:
+                    - Enable
+                    - Disable
+                    type: string
+                type: object
+              addOnManagerImagePullSpec:
+                default: quay.io/open-cluster-management/addon-manager
+                description: AddOnManagerImagePullSpec represents the desired image configuration of addon manager controller/webhook installed on hub.
+                type: string
               deployOption:
                 default:
                   mode: Default

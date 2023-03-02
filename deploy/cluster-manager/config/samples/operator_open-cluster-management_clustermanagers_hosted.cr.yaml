@@ -6,6 +6,7 @@ spec:
   registrationImagePullSpec: quay.io/open-cluster-management/registration
   workImagePullSpec: quay.io/open-cluster-management/work
   placementImagePullSpec: quay.io/open-cluster-management/placement
+  addOnManagerImagePullSpec: quay.io/open-cluster-management/addon-manager
   deployOption:
     mode: Hosted
     hosted:

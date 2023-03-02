@@ -1198,6 +1198,232 @@ func TestGetRelatedResource(t *testing.T) {
 	}
 }
 
+func TestSetRelatedResourcesStatusesWithObj(t *testing.T) {
+	cases := []struct {
+		name                    string
+		manifestFile            string
+		config                  manifests.HubConfig
+		relatedResources        []operatorapiv1.RelatedResourceMeta
+		expectedRelatedResource []operatorapiv1.RelatedResourceMeta
+	}{
+		{
+			name:         "append obj to nil relatedResources",
+			manifestFile: "cluster-manager/hub/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml",
+			config: manifests.HubConfig{
+				ClusterManagerName: "test",
+				Replica:            1,
+			},
+			relatedResources: nil,
+			expectedRelatedResource: []operatorapiv1.RelatedResourceMeta{
+				{
+					Group:     "apiextensions.k8s.io",
+					Version:   "v1",
+					Resource:  "customresourcedefinitions",
+					Namespace: "",
+					Name:      "clustermanagementaddons.addon.open-cluster-management.io",
+				},
+			},
+		},
+		{
+			name:         "append obj to empty relatedResources",
+			manifestFile: "cluster-manager/hub/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml",
+			config: manifests.HubConfig{
+				ClusterManagerName: "test",
+				Replica:            1,
+			},
+			relatedResources: []operatorapiv1.RelatedResourceMeta{},
+			expectedRelatedResource: []operatorapiv1.RelatedResourceMeta{
+				{
+					Group:     "apiextensions.k8s.io",
+					Version:   "v1",
+					Resource:  "customresourcedefinitions",
+					Namespace: "",
+					Name:      "clustermanagementaddons.addon.open-cluster-management.io",
+				},
+			},
+		},
+		{
+			name:         "append obj to relatedResources",
+			manifestFile: "cluster-manager/hub/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml",
+			config: manifests.HubConfig{
+				ClusterManagerName: "test",
+				Replica:            1,
+			},
+			relatedResources: []operatorapiv1.RelatedResourceMeta{
+				{
+					Group:     "apps",
+					Version:   "v1",
+					Resource:  "deployments",
+					Namespace: "test-namespace",
+					Name:      "test-registration-controller",
+				},
+			},
+			expectedRelatedResource: []operatorapiv1.RelatedResourceMeta{
+				{
+					Group:     "apps",
+					Version:   "v1",
+					Resource:  "deployments",
+					Namespace: "test-namespace",
+					Name:      "test-registration-controller",
+				},
+				{
+					Group:     "apiextensions.k8s.io",
+					Version:   "v1",
+					Resource:  "customresourcedefinitions",
+					Namespace: "",
+					Name:      "clustermanagementaddons.addon.open-cluster-management.io",
+				},
+			},
+		},
+		{
+			name:         "append duplicate obj to relatedResources",
+			manifestFile: "cluster-manager/hub/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml",
+			config: manifests.HubConfig{
+				ClusterManagerName: "test",
+				Replica:            1,
+			},
+			relatedResources: []operatorapiv1.RelatedResourceMeta{
+				{
+					Group:     "apiextensions.k8s.io",
+					Version:   "v1",
+					Resource:  "customresourcedefinitions",
+					Namespace: "",
+					Name:      "clustermanagementaddons.addon.open-cluster-management.io",
+				},
+			},
+			expectedRelatedResource: []operatorapiv1.RelatedResourceMeta{
+				{
+					Group:     "apiextensions.k8s.io",
+					Version:   "v1",
+					Resource:  "customresourcedefinitions",
+					Namespace: "",
+					Name:      "clustermanagementaddons.addon.open-cluster-management.io",
+				},
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			template, err := manifests.ClusterManagerManifestFiles.ReadFile(c.manifestFile)
+			if err != nil {
+				t.Errorf("failed to read file %v", err)
+			}
+			objData := assets.MustCreateAssetFromTemplate(c.manifestFile, template, c.config).Data
+
+			SetRelatedResourcesStatusesWithObj(&c.relatedResources, objData)
+			if !reflect.DeepEqual(c.relatedResources, c.expectedRelatedResource) {
+				t.Errorf("Expect to get %v, but got %v", c.expectedRelatedResource, c.relatedResources)
+			}
+		})
+
+	}
+}
+
+func TestRemoveRelatedResourcesStatusesWithObj(t *testing.T) {
+	cases := []struct {
+		name                    string
+		manifestFile            string
+		config                  manifests.HubConfig
+		relatedResources        []operatorapiv1.RelatedResourceMeta
+		expectedRelatedResource []operatorapiv1.RelatedResourceMeta
+	}{
+		{
+			name:         "remove obj from nil relatedResources",
+			manifestFile: "cluster-manager/hub/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml",
+			config: manifests.HubConfig{
+				ClusterManagerName: "test",
+				Replica:            1,
+			},
+			relatedResources:        nil,
+			expectedRelatedResource: nil,
+		},
+		{
+			name:         "remove obj from empty relatedResources",
+			manifestFile: "cluster-manager/hub/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml",
+			config: manifests.HubConfig{
+				ClusterManagerName: "test",
+				Replica:            1,
+			},
+			relatedResources:        []operatorapiv1.RelatedResourceMeta{},
+			expectedRelatedResource: []operatorapiv1.RelatedResourceMeta{},
+		},
+		{
+			name:         "remove obj from relatedResources",
+			manifestFile: "cluster-manager/hub/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml",
+			config: manifests.HubConfig{
+				ClusterManagerName: "test",
+				Replica:            1,
+			},
+			relatedResources: []operatorapiv1.RelatedResourceMeta{
+				{
+					Group:     "apps",
+					Version:   "v1",
+					Resource:  "deployments",
+					Namespace: "test-namespace",
+					Name:      "test-registration-controller",
+				},
+				{
+					Group:     "apiextensions.k8s.io",
+					Version:   "v1",
+					Resource:  "customresourcedefinitions",
+					Namespace: "",
+					Name:      "clustermanagementaddons.addon.open-cluster-management.io",
+				},
+			},
+			expectedRelatedResource: []operatorapiv1.RelatedResourceMeta{
+				{
+					Group:     "apps",
+					Version:   "v1",
+					Resource:  "deployments",
+					Namespace: "test-namespace",
+					Name:      "test-registration-controller",
+				},
+			},
+		},
+		{
+			name:         "remove not exist obj from relatedResources",
+			manifestFile: "cluster-manager/hub/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml",
+			config: manifests.HubConfig{
+				ClusterManagerName: "test",
+				Replica:            1,
+			},
+			relatedResources: []operatorapiv1.RelatedResourceMeta{
+				{
+					Group:     "apps",
+					Version:   "v1",
+					Resource:  "deployments",
+					Namespace: "test-namespace",
+					Name:      "test-registration-controller",
+				},
+			},
+			expectedRelatedResource: []operatorapiv1.RelatedResourceMeta{
+				{
+					Group:     "apps",
+					Version:   "v1",
+					Resource:  "deployments",
+					Namespace: "test-namespace",
+					Name:      "test-registration-controller",
+				},
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			template, err := manifests.ClusterManagerManifestFiles.ReadFile(c.manifestFile)
+			if err != nil {
+				t.Errorf("failed to read file %v", err)
+			}
+			objData := assets.MustCreateAssetFromTemplate(c.manifestFile, template, c.config).Data
+
+			RemoveRelatedResourcesStatusesWithObj(&c.relatedResources, objData)
+			if !reflect.DeepEqual(c.relatedResources, c.expectedRelatedResource) {
+				t.Errorf("Expect to get %v, but got %v", c.expectedRelatedResource, c.relatedResources)
+			}
+		})
+
+	}
+}
+
 func TestUpdateRelatedResources(t *testing.T) {
 	gvrDeployment := appsv1.SchemeGroupVersion.WithResource("deployments")
 	gvrSecret := corev1.SchemeGroupVersion.WithResource("secrets")

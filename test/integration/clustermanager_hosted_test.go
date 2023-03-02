@@ -8,12 +8,14 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	v1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
 	"open-cluster-management.io/registration-operator/test/integration/util"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/cert"
@@ -41,6 +43,15 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 	var hubPlacementDeployment = fmt.Sprintf("%s-placement-controller", clusterManagerName)
 	var hubRegistrationWebhookDeployment = fmt.Sprintf("%s-registration-webhook", clusterManagerName)
 	var hubWorkWebhookDeployment = fmt.Sprintf("%s-work-webhook", clusterManagerName)
+	var hubAddOnManagerDeployment = fmt.Sprintf("%s-addon-manager-controller", clusterManagerName)
+	var hubRegistrationClusterRole = fmt.Sprintf("open-cluster-management:%s-registration:controller", clusterManagerName)
+	var hubRegistrationWebhookClusterRole = fmt.Sprintf("open-cluster-management:%s-registration:webhook", clusterManagerName)
+	var hubWorkWebhookClusterRole = fmt.Sprintf("open-cluster-management:%s-registration:webhook", clusterManagerName)
+	var hubAddOnManagerClusterRole = fmt.Sprintf("open-cluster-management:%s-addon-manager:controller", clusterManagerName)
+	var hubRegistrationSA = fmt.Sprintf("%s-registration-controller-sa", clusterManagerName)
+	var hubRegistrationWebhookSA = fmt.Sprintf("%s-registration-webhook-sa", clusterManagerName)
+	var hubWorkWebhookSA = fmt.Sprintf("%s-work-webhook-sa", clusterManagerName)
+	var hubAddOnManagerSA = fmt.Sprintf("%s-addon-manager-controller-sa", clusterManagerName)
 
 	ginkgo.BeforeEach(func() {
 		hostedCtx, hostedCancel = context.WithCancel(context.Background())
@@ -92,9 +103,6 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
 			// Check clusterrole/clusterrolebinding
-			hubRegistrationClusterRole := fmt.Sprintf("open-cluster-management:%s-registration:controller", clusterManagerName)
-			hubRegistrationWebhookClusterRole := fmt.Sprintf("open-cluster-management:%s-registration:webhook", clusterManagerName)
-			hubWorkWebhookClusterRole := fmt.Sprintf("open-cluster-management:%s-registration:webhook", clusterManagerName)
 			gomega.Eventually(func() error {
 				if _, err := hostedKubeClient.RbacV1().ClusterRoles().Get(hostedCtx, hubRegistrationClusterRole, metav1.GetOptions{}); err != nil {
 					return err
@@ -133,9 +141,6 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
 			// Check service account
-			hubRegistrationSA := fmt.Sprintf("%s-registration-controller-sa", clusterManagerName)
-			hubRegistrationWebhookSA := fmt.Sprintf("%s-registration-webhook-sa", clusterManagerName)
-			hubWorkWebhookSA := fmt.Sprintf("%s-work-webhook-sa", clusterManagerName)
 			gomega.Eventually(func() error {
 				if _, err := hostedKubeClient.CoreV1().ServiceAccounts(hubNamespaceHosted).Get(hostedCtx, hubRegistrationSA, metav1.GetOptions{}); err != nil {
 					return err
@@ -259,6 +264,135 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
 			util.AssertClusterManagerCondition(clusterManagerName, hostedOperatorClient, "Applied", "ClusterManagerApplied", metav1.ConditionTrue)
+		})
+
+		ginkgo.It("should have expected resource created/deleted successfully when feature gates AddOnManager enabled/disabled", func() {
+			// Check addon manager default mode
+			clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			gomega.Eventually(func() bool {
+				if clusterManager.Spec.AddOnManagerConfiguration.Mode == operatorapiv1.ComponentModeTypeDisable {
+					return true
+				}
+				return false
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Check addon manager enabled mode
+			clusterManager.Spec.AddOnManagerConfiguration.Mode = operatorapiv1.ComponentModeTypeEnable
+			_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			gomega.Eventually(func() bool {
+				if clusterManager.Spec.AddOnManagerConfiguration.Mode == operatorapiv1.ComponentModeTypeEnable {
+					return true
+				}
+				return false
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Check clusterrole/clusterrolebinding
+			gomega.Eventually(func() error {
+				if _, err := hostedKubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubAddOnManagerClusterRole, metav1.GetOptions{}); err != nil {
+					return err
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			gomega.Eventually(func() error {
+				if _, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), hubAddOnManagerClusterRole, metav1.GetOptions{}); err != nil {
+					return err
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			// Check service account
+			gomega.Eventually(func() error {
+				if _, err := hostedKubeClient.CoreV1().ServiceAccounts(hubNamespaceHosted).Get(context.Background(), hubAddOnManagerSA, metav1.GetOptions{}); err != nil {
+					return err
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			// Check deployment
+			gomega.Eventually(func() error {
+				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(context.Background(), hubAddOnManagerDeployment, metav1.GetOptions{}); err != nil {
+					return err
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			// Check if relatedResources are correct
+			gomega.Eventually(func() error {
+				actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if len(actual.Status.RelatedResources) != 38 {
+					return fmt.Errorf("should get 38 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			// Check addon manager disable mode
+			clusterManager, err = hostedOperatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			clusterManager.Spec.AddOnManagerConfiguration.Mode = operatorapiv1.ComponentModeTypeDisable
+			clusterManager, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			gomega.Eventually(func() bool {
+				if clusterManager.Spec.AddOnManagerConfiguration.Mode == operatorapiv1.ComponentModeTypeDisable {
+					return true
+				}
+				return false
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Check clusterrole/clusterrolebinding
+			gomega.Eventually(func() bool {
+				_, err := hostedKubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubAddOnManagerClusterRole, metav1.GetOptions{})
+				if err == nil {
+					return false
+				}
+				return errors.IsNotFound(err)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			gomega.Eventually(func() bool {
+				_, err := hostedKubeClient.RbacV1().ClusterRoleBindings().Get(context.Background(), hubAddOnManagerClusterRole, metav1.GetOptions{})
+				if err == nil {
+					return false
+				}
+				return errors.IsNotFound(err)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Check service account
+			gomega.Eventually(func() bool {
+				_, err := hostedKubeClient.CoreV1().ServiceAccounts(hubNamespaceHosted).Get(context.Background(), hubAddOnManagerSA, metav1.GetOptions{})
+				if err == nil {
+					return false
+				}
+				return errors.IsNotFound(err)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Check deployment
+			gomega.Eventually(func() bool {
+				_, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(context.Background(), hubAddOnManagerDeployment, metav1.GetOptions{})
+				if err == nil {
+					return false
+				}
+				return errors.IsNotFound(err)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			// Check if relatedResources are correct
+			gomega.Eventually(func() error {
+				actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if len(actual.Status.RelatedResources) != 34 {
+					return fmt.Errorf("should get 34 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
 		})
 
 		ginkgo.It("Deployment should be updated when clustermanager is changed", func() {

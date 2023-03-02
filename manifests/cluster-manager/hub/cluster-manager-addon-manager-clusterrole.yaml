@@ -1,0 +1,35 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: open-cluster-management:{{ .ClusterManagerName }}-addon-manager:controller
+rules:
+# Allow controller to get/list/watch/create/delete configmaps/events
+- apiGroups: [""]
+  resources: ["configmaps", "events"]
+  verbs: ["get", "list", "watch", "create", "update", "delete", "deletecollection", "patch"]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["get", "create"]
+# Allow controller to manage managedclusters/placements/placementdecisions
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclusters", "placements", "placementdecisions"]
+  verbs: ["get", "list", "watch"]
+# Allow controller to manage managedclusteraddons/clustermanagementaddons
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["managedclusteraddons/finalizers"]
+  verbs: ["update"]
+- apiGroups: [ "addon.open-cluster-management.io" ]
+  resources: [ "clustermanagementaddons/finalizers" ]
+  verbs: [ "update" ]
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["clustermanagementaddons"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["managedclusteraddons"]
+  verbs: ["get", "list", "watch", "create", "update", "delete"]
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["managedclusteraddons/status"]
+  verbs: ["update", "patch"]

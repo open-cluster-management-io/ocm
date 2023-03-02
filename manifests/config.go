@@ -14,6 +14,8 @@ type HubConfig struct {
 	WorkWebhook                    Webhook
 	RegistrationFeatureGates       []string
 	WorkFeatureGates               []string
+	AddOnManagerImage              string
+	AddOnManagerComponentMode      string
 }
 
 type Webhook struct {

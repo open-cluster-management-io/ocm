@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
+	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -138,6 +139,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		RegistrationImage:       clusterManager.Spec.RegistrationImagePullSpec,
 		WorkImage:               clusterManager.Spec.WorkImagePullSpec,
 		PlacementImage:          clusterManager.Spec.PlacementImagePullSpec,
+		AddOnManagerImage:       clusterManager.Spec.AddOnManagerImagePullSpec,
 		Replica:                 helpers.DetermineReplica(ctx, n.operatorKubeClient, clusterManager.Spec.DeployOption.Mode, nil),
 		HostedMode:              clusterManager.Spec.DeployOption.Mode == operatorapiv1.InstallModeHosted,
 		RegistrationWebhook: manifests.Webhook{
@@ -146,6 +148,10 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		WorkWebhook: manifests.Webhook{
 			Port: defaultWebhookPort,
 		},
+	}
+
+	if clusterManager.Spec.AddOnManagerConfiguration != nil {
+		config.AddOnManagerComponentMode = string(clusterManager.Spec.AddOnManagerConfiguration.Mode)
 	}
 
 	var featureGateCondition metav1.Condition
@@ -368,4 +374,28 @@ func convertWebhookConfiguration(webhookConfiguration operatorapiv1.WebhookConfi
 		Port:       webhookConfiguration.Port,
 		IsIPFormat: isIPFormat(webhookConfiguration.Address),
 	}
+}
+
+// clean specified resources
+func cleanResources(ctx context.Context, kubeClient kubernetes.Interface, cm *operatorapiv1.ClusterManager, config manifests.HubConfig, resources ...string) (*operatorapiv1.ClusterManager, reconcileState, error) {
+	for _, file := range resources {
+		err := helpers.CleanUpStaticObject(
+			ctx,
+			kubeClient, nil, nil,
+			func(name string) ([]byte, error) {
+				template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
+				if err != nil {
+					return nil, err
+				}
+				objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
+				helpers.RemoveRelatedResourcesStatusesWithObj(&cm.Status.RelatedResources, objData)
+				return objData, nil
+			},
+			file,
+		)
+		if err != nil {
+			return cm, reconcileContinue, err
+		}
+	}
+	return cm, reconcileContinue, nil
 }

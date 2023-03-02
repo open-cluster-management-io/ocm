@@ -56,6 +56,9 @@ func newClusterManager(name string) *operatorapiv1.ClusterManager {
 			DeployOption: operatorapiv1.ClusterManagerDeployOption{
 				Mode: operatorapiv1.InstallModeDefault,
 			},
+			AddOnManagerConfiguration: &operatorapiv1.AddOnManagerConfiguration{
+				Mode: operatorapiv1.ComponentModeTypeEnable,
+			},
 		},
 	}
 }
@@ -180,6 +183,29 @@ func setDeployment(clusterManagerName, clusterManagerNamespace string) []runtime
 				ObservedGeneration: 1,
 			},
 		},
+		&appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       clusterManagerName + "-addon-manager-controller",
+				Namespace:  clusterManagerNamespace,
+				Generation: 1,
+			},
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "addon-manager-controller",
+							},
+						},
+					},
+				},
+				Replicas: &replicas,
+			},
+			Status: appsv1.DeploymentStatus{
+				ReadyReplicas:      replicas,
+				ObservedGeneration: 1,
+			},
+		},
 	}
 }
 
@@ -221,6 +247,9 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.Cl
 		if strings.Contains(o.Name, "placement") && hubCore.Spec.PlacementImagePullSpec != o.Spec.Template.Spec.Containers[0].Image {
 			t.Errorf("Placement image does not match to the expected.")
 		}
+		if strings.Contains(o.Name, "addon-manager") && hubCore.Spec.AddOnManagerImagePullSpec != o.Spec.Template.Spec.Containers[0].Image {
+			t.Errorf("AddOnManager image does not match to the expected.")
+		}
 	}
 }
 
@@ -250,7 +279,7 @@ func TestSyncDeploy(t *testing.T) {
 
 	// Check if resources are created as expected
 	// We expect creat the namespace twice respectively in the management cluster and the hub cluster.
-	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 21)
+	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 24)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager)
 	}
@@ -290,7 +319,7 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 
 	// Check if resources are created as expected
 	// We expect creat the namespace twice respectively in the management cluster and the hub cluster.
-	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 20)
+	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 24)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager)
 	}
@@ -332,7 +361,7 @@ func TestSyncDelete(t *testing.T) {
 			deleteKubeActions = append(deleteKubeActions, deleteKubeAction)
 		}
 	}
-	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 21) // delete namespace both from the hub cluster and the mangement cluster
+	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 24) // delete namespace both from the hub cluster and the mangement cluster
 
 	deleteCRDActions := []clienttesting.DeleteActionImpl{}
 	crdActions := tc.apiExtensionClient.Actions()

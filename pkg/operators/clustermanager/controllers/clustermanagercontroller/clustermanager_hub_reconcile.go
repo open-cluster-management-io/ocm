@@ -43,6 +43,13 @@ var (
 		"cluster-manager/hub/cluster-manager-placement-serviceaccount.yaml",
 	}
 
+	hubAddOnManagerRbacResourceFiles = []string{
+		// addon-manager
+		"cluster-manager/hub/cluster-manager-addon-manager-clusterrole.yaml",
+		"cluster-manager/hub/cluster-manager-addon-manager-clusterrolebinding.yaml",
+		"cluster-manager/hub/cluster-manager-addon-manager-serviceaccount.yaml",
+	}
+
 	// The hubHostedWebhookServiceFiles should only be deployed on the hub cluster when the deploy mode is hosted.
 	hubDefaultWebhookServiceFiles = []string{
 		"cluster-manager/hub/cluster-manager-registration-webhook-service.yaml",
@@ -65,6 +72,14 @@ type hubReoncile struct {
 }
 
 func (c *hubReoncile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager, config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
+	// If AddOnManager is not enabled, remove related resources
+	if operatorapiv1.ComponentModeType(config.AddOnManagerComponentMode) != operatorapiv1.ComponentModeTypeEnable {
+		_, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, hubAddOnManagerRbacResourceFiles...)
+		if err != nil {
+			return cm, reconcileStop, err
+		}
+	}
+
 	hubResources := getHubResources(cm.Spec.DeployOption.Mode, config)
 	var appliedErrs []error
 
@@ -106,33 +121,15 @@ func (c *hubReoncile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterMa
 
 func (c *hubReoncile) clean(ctx context.Context, cm *operatorapiv1.ClusterManager, config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
 	hubResources := getHubResources(cm.Spec.DeployOption.Mode, config)
-	for _, file := range hubResources {
-		err := helpers.CleanUpStaticObject(
-			ctx,
-			c.hubKubeClient,
-			nil,
-			nil,
-			func(name string) ([]byte, error) {
-				template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
-				if err != nil {
-					return nil, err
-				}
-				return assets.MustCreateAssetFromTemplate(name, template, config).Data, nil
-			},
-			file,
-		)
-		if err != nil {
-			// TODO update condition
-			return cm, reconcileContinue, err
-		}
-	}
-
-	return cm, reconcileContinue, nil
+	return cleanResources(ctx, c.hubKubeClient, cm, config, hubResources...)
 }
 
 func getHubResources(mode operatorapiv1.InstallMode, config manifests.HubConfig) []string {
 	hubResources := []string{namespaceResource}
 	hubResources = append(hubResources, hubRbacResourceFiles...)
+	if operatorapiv1.ComponentModeType(config.AddOnManagerComponentMode) == operatorapiv1.ComponentModeTypeEnable {
+		hubResources = append(hubResources, hubAddOnManagerRbacResourceFiles...)
+	}
 	// the hubHostedWebhookServiceFiles are only used in hosted mode
 	if mode == operatorapiv1.InstallModeHosted {
 		hubResources = append(hubResources, hubHostedWebhookServiceFiles...)
