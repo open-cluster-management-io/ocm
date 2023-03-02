@@ -2,7 +2,6 @@ package helpers
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"reflect"
 
@@ -422,7 +421,6 @@ func ApplyDirectly(
 	ctx context.Context,
 	client kubernetes.Interface,
 	apiExtensionClient apiextensionsclient.Interface,
-	apiRegistrationClient apiregistrationclient.APIServicesGetter,
 	recorder events.Recorder,
 	cache resourceapply.ResourceCache,
 	manifests resourceapply.AssetFunc,
@@ -455,15 +453,6 @@ func ApplyDirectly(
 		case *admissionv1.MutatingWebhookConfiguration:
 			result.Result, result.Changed, result.Error = ApplyMutatingWebhookConfiguration(
 				client.AdmissionregistrationV1(), t)
-		case *apiregistrationv1.APIService:
-			if apiRegistrationClient == nil {
-				result.Error = fmt.Errorf("apiRegistrationClient is nil")
-			} else {
-				t.ObjectMeta.Annotations = make(map[string]string)
-				checksum := fmt.Sprintf("%x", sha256.Sum256(t.Spec.CABundle))
-				t.ObjectMeta.Annotations["caBundle-checksum"] = string(checksum[:]) // to trigger the update when caBundle changed
-				result.Result, result.Changed, result.Error = resourceapply.ApplyAPIService(ctx, apiRegistrationClient, recorder, t)
-			}
 		case *corev1.Endpoints:
 			result.Result, result.Changed, result.Error = ApplyEndpoints(context.TODO(), client.CoreV1(), t)
 		default:

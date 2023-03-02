@@ -7,6 +7,7 @@ package clustermanagercontroller
 import (
 	"context"
 	"fmt"
+
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -14,7 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes"
-	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/registration-operator/manifests"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
@@ -56,20 +56,12 @@ var (
 	// hubHostedWebhookEndpointFiles only apply when the deploy mode is hosted and address is IPFormat.
 	hubHostedWebhookEndpointRegistration = "cluster-manager/hub/cluster-manager-registration-webhook-endpoint-hosted.yaml"
 	hubHostedWebhookEndpointWork         = "cluster-manager/hub/cluster-manager-work-webhook-endpoint-hosted.yaml"
-
-	// The apiservice resources should be deleted
-	hubApiserviceFiles = []string{
-		"cluster-manager/hub/cluster-manager-work-webhook-apiservice.yaml",
-		"cluster-manager/hub/cluster-manager-registration-webhook-apiservice.yaml",
-	}
 )
 
 type hubReoncile struct {
-	hubKubeClient            kubernetes.Interface
-	hubAPIRegistrationClient apiregistrationclient.APIServicesGetter
-
-	cache    resourceapply.ResourceCache
-	recorder events.Recorder
+	hubKubeClient kubernetes.Interface
+	cache         resourceapply.ResourceCache
+	recorder      events.Recorder
 }
 
 func (c *hubReoncile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager, config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
@@ -79,7 +71,6 @@ func (c *hubReoncile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterMa
 	resourceResults := helpers.ApplyDirectly(
 		ctx,
 		c.hubKubeClient,
-		nil,
 		nil,
 		c.recorder,
 		c.cache,
@@ -115,15 +106,12 @@ func (c *hubReoncile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterMa
 
 func (c *hubReoncile) clean(ctx context.Context, cm *operatorapiv1.ClusterManager, config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
 	hubResources := getHubResources(cm.Spec.DeployOption.Mode, config)
-	// TODO apiservice is added only to ensure they are removed when cleanup. this code should be removed later
-	hubResources = append(hubResources, hubApiserviceFiles...)
-
 	for _, file := range hubResources {
 		err := helpers.CleanUpStaticObject(
 			ctx,
 			c.hubKubeClient,
 			nil,
-			c.hubAPIRegistrationClient,
+			nil,
 			func(name string) ([]byte, error) {
 				template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
 				if err != nil {

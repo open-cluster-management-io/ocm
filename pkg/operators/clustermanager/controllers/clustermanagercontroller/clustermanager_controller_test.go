@@ -23,8 +23,6 @@ import (
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
-	fakeapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
-	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 	fakeoperatorlient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
@@ -44,7 +42,6 @@ type testController struct {
 	managementKubeClient     *fakekube.Clientset
 	hubKubeClient            *fakekube.Clientset
 	apiExtensionClient       *fakeapiextensions.Clientset
-	apiRegistrationClient    *fakeapiregistration.Clientset
 	operatorClient           *fakeoperatorlient.Clientset
 }
 
@@ -190,20 +187,18 @@ func setup(t *testing.T, tc *testController, cd []runtime.Object, crds ...runtim
 	fakeHubKubeClient := fakekube.NewSimpleClientset()
 	fakeManagementKubeClient := fakekube.NewSimpleClientset(cd...)
 	fakeAPIExtensionClient := fakeapiextensions.NewSimpleClientset(crds...)
-	fakeAPIRegistrationClient := fakeapiregistration.NewSimpleClientset()
 	fakeMigrationClient := fakemigrationclient.NewSimpleClientset()
 
 	// set clients in test controller
 	tc.apiExtensionClient = fakeAPIExtensionClient
-	tc.apiRegistrationClient = fakeAPIRegistrationClient
 	tc.hubKubeClient = fakeHubKubeClient
 	tc.managementKubeClient = fakeManagementKubeClient
 
 	// set clients in clustermanager controller
 	tc.clusterManagerController.recorder = eventstesting.NewTestingEventRecorder(t)
 	tc.clusterManagerController.operatorKubeClient = fakeManagementKubeClient
-	tc.clusterManagerController.generateHubClusterClients = func(hubKubeConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, apiregistrationclient.APIServicesGetter, migrationclient.StorageVersionMigrationsGetter, error) {
-		return fakeHubKubeClient, fakeAPIExtensionClient, fakeAPIRegistrationClient.ApiregistrationV1(), fakeMigrationClient.MigrationV1alpha1(), nil
+	tc.clusterManagerController.generateHubClusterClients = func(hubKubeConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, migrationclient.StorageVersionMigrationsGetter, error) {
+		return fakeHubKubeClient, fakeAPIExtensionClient, fakeMigrationClient.MigrationV1alpha1(), nil
 	}
 	tc.clusterManagerController.ensureSAKubeconfigs = func(ctx context.Context, clusterManagerName, clusterManagerNamespace string, hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error {
 		return nil
@@ -349,17 +344,6 @@ func TestSyncDelete(t *testing.T) {
 	}
 	// Check if resources are created as expected
 	testinghelper.AssertEqualNumber(t, len(deleteCRDActions), 13)
-
-	deleteAPIServiceActions := []clienttesting.DeleteActionImpl{}
-	apiServiceActions := tc.apiRegistrationClient.Actions()
-	for _, action := range apiServiceActions {
-		if action.GetVerb() == "delete" {
-			deleteAPIServiceAction := action.(clienttesting.DeleteActionImpl)
-			deleteAPIServiceActions = append(deleteAPIServiceActions, deleteAPIServiceAction)
-		}
-	}
-	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(deleteAPIServiceActions), 2)
 
 	for _, action := range deleteKubeActions {
 		switch action.Resource.Resource {

@@ -7,6 +7,7 @@ package klusterletcontroller
 import (
 	"context"
 	"fmt"
+
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -58,7 +59,6 @@ func (r *managementReconcile) reconcile(ctx context.Context, klusterlet *operato
 	resourceResults := helpers.ApplyDirectly(
 		ctx,
 		r.kubeClient,
-		nil,
 		nil,
 		r.recorder,
 		r.cache,

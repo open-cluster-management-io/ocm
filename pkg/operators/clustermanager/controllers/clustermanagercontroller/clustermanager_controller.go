@@ -3,6 +3,7 @@ package clustermanagercontroller
 import (
 	"context"
 	"encoding/base64"
+
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	errorhelpers "errors"
@@ -14,7 +15,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -55,7 +55,7 @@ type clusterManagerController struct {
 	cache                resourceapply.ResourceCache
 	// For testcases which don't need these functions, we could set fake funcs
 	ensureSAKubeconfigs       func(ctx context.Context, clusterManagerName, clusterManagerNamespace string, hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error
-	generateHubClusterClients func(hubConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, apiregistrationclient.APIServicesGetter, migrationclient.StorageVersionMigrationsGetter, error)
+	generateHubClusterClients func(hubConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, migrationclient.StorageVersionMigrationsGetter, error)
 	skipRemoveCRDs            bool
 }
 
@@ -185,7 +185,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	if err != nil {
 		return err
 	}
-	hubClient, hubApiExtensionClient, hubApiRegistrationClient, hubMigrationClient, err := n.generateHubClusterClients(hubKubeConfig)
+	hubClient, hubApiExtensionClient, hubMigrationClient, err := n.generateHubClusterClients(hubKubeConfig)
 	if err != nil {
 		return err
 	}
@@ -194,7 +194,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	var errs []error
 	reconcilers := []clusterManagerReconcile{
 		&crdReconcile{cache: n.cache, recorder: n.recorder, hubAPIExtensionClient: hubApiExtensionClient, hubMigrationClient: hubMigrationClient, skipRemoveCRDs: n.skipRemoveCRDs},
-		&hubReoncile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient, hubAPIRegistrationClient: hubApiRegistrationClient},
+		&hubReoncile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient},
 		&runtimeReconcile{cache: n.cache, recorder: n.recorder, hubKubeConfig: hubKubeConfig, hubKubeClient: hubClient, kubeClient: managementClient, ensureSAKubeconfigs: n.ensureSAKubeconfigs},
 		&webhookReconcile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient, kubeClient: managementClient},
 	}
@@ -313,24 +313,21 @@ func removeClusterManagerFinalizer(ctx context.Context, clusterManagerClient ope
 	return nil
 }
 
-func generateHubClients(hubKubeConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, apiregistrationclient.APIServicesGetter, migrationclient.StorageVersionMigrationsGetter, error) {
+func generateHubClients(hubKubeConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, migrationclient.StorageVersionMigrationsGetter, error) {
 	hubClient, err := kubernetes.NewForConfig(hubKubeConfig)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
 	hubApiExtensionClient, err := apiextensionsclient.NewForConfig(hubKubeConfig)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
-	hubApiRegistrationClient, err := apiregistrationclient.NewForConfig(hubKubeConfig)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
+
 	hubMigrationClient, err := migrationclient.NewForConfig(hubKubeConfig)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
-	return hubClient, hubApiExtensionClient, hubApiRegistrationClient, hubMigrationClient, nil
+	return hubClient, hubApiExtensionClient, hubMigrationClient, nil
 }
 
 // ensureSAKubeconfigs is used to create a kubeconfig with a token from a ServiceAccount.

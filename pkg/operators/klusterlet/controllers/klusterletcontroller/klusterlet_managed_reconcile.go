@@ -93,7 +93,6 @@ func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 		ctx,
 		r.managedClusterClients.kubeClient,
 		r.managedClusterClients.apiExtensionClient,
-		nil,
 		r.recorder,
 		r.cache,
 		func(name string) ([]byte, error) {

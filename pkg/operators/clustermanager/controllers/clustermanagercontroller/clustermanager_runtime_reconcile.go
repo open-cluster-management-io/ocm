@@ -7,6 +7,8 @@ package clustermanagercontroller
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -18,7 +20,6 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/registration-operator/manifests"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
-	"strings"
 )
 
 var (
@@ -68,7 +69,7 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 	var appliedErrs []error
 	resourceResults := helpers.ApplyDirectly(
 		ctx,
-		c.kubeClient, nil, nil,
+		c.kubeClient, nil,
 		c.recorder,
 		c.cache,
 		func(name string) ([]byte, error) {

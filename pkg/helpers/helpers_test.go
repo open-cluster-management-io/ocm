@@ -405,45 +405,21 @@ func TestApplyMutatingWebhookConfiguration(t *testing.T) {
 
 func TestApplyDirectly(t *testing.T) {
 	testcase := []struct {
-		name                    string
-		applyFiles              map[string]runtime.Object
-		applyFileNames          []string
-		nilapiExtensionClient   bool
-		nilapiRegistratonClient bool
-		expectErr               bool
+		name                  string
+		applyFiles            map[string]runtime.Object
+		applyFileNames        []string
+		nilapiExtensionClient bool
+		expectErr             bool
 	}{
 		{
-			name: "Apply webhooks & apiservice & secret",
+			name: "Apply webhooks & secret",
 			applyFiles: map[string]runtime.Object{
 				"validatingwebhooks": newUnstructured("admissionregistration.k8s.io/v1", "ValidatingWebhookConfiguration", "", "", map[string]interface{}{"webhooks": []interface{}{}}),
 				"mutatingwebhooks":   newUnstructured("admissionregistration.k8s.io/v1", "MutatingWebhookConfiguration", "", "", map[string]interface{}{"webhooks": []interface{}{}}),
-				"apiservice":         newUnstructured("apiregistration.k8s.io/v1", "APIService", "", "", map[string]interface{}{"spec": map[string]interface{}{"service": map[string]string{"name": "svc1", "namespace": "svc1"}}}),
 				"secret":             newUnstructured("v1", "Secret", "ns1", "n1", map[string]interface{}{"data": map[string]interface{}{"key1": []byte("key1")}}),
 			},
-			applyFileNames: []string{"validatingwebhooks", "mutatingwebhooks", "apiservice", "secret"},
+			applyFileNames: []string{"validatingwebhooks", "mutatingwebhooks", "secret"},
 			expectErr:      false,
-		},
-		{
-			name: "Apply webhooks & apiservice & secret with nil apiRegistrationClient",
-			applyFiles: map[string]runtime.Object{
-				"validatingwebhooks": newUnstructured("admissionregistration.k8s.io/v1", "ValidatingWebhookConfiguration", "", "", map[string]interface{}{"webhooks": []interface{}{}}),
-				"mutatingwebhooks":   newUnstructured("admissionregistration.k8s.io/v1", "MutatingWebhookConfiguration", "", "", map[string]interface{}{"webhooks": []interface{}{}}),
-				"apiservice":         newUnstructured("apiregistration.k8s.io/v1", "APIService", "", "", map[string]interface{}{"spec": map[string]interface{}{"service": map[string]string{"name": "svc1", "namespace": "svc1"}}}),
-				"secret":             newUnstructured("v1", "Secret", "ns1", "n1", map[string]interface{}{"data": map[string]interface{}{"key1": []byte("key1")}}),
-			},
-			applyFileNames:          []string{"validatingwebhooks", "mutatingwebhooks", "apiservice", "secret"},
-			nilapiRegistratonClient: true,
-			expectErr:               true,
-		},
-		{
-			name: "Apply generic resources with nil apiExtensionclient & nil apiRegistrationClient",
-			applyFiles: map[string]runtime.Object{
-				"secret": newUnstructured("v1", "Secret", "ns1", "n1", map[string]interface{}{"data": map[string]interface{}{"key1": []byte("key1")}}),
-			},
-			nilapiExtensionClient:   true,
-			nilapiRegistratonClient: true,
-			applyFileNames:          []string{"secret"},
-			expectErr:               false,
 		},
 		{
 			name: "Apply CRD",
@@ -476,7 +452,6 @@ func TestApplyDirectly(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			fakeKubeClient := fakekube.NewSimpleClientset()
 			fakeExtensionClient := fakeapiextensions.NewSimpleClientset()
-			fakeResgistrationClient := fakeapiregistration.NewSimpleClientset().ApiregistrationV1()
 			fakeApplyFunc := func(name string) ([]byte, error) {
 				if c.applyFiles[name] == nil {
 					return nil, fmt.Errorf("Failed to find file")
@@ -488,28 +463,10 @@ func TestApplyDirectly(t *testing.T) {
 			cache := resourceapply.NewResourceCache()
 			var results []resourceapply.ApplyResult
 			switch {
-			case c.nilapiExtensionClient && c.nilapiRegistratonClient:
-				results = ApplyDirectly(
-					context.TODO(),
-					fakeKubeClient, nil, nil,
-					eventstesting.NewTestingEventRecorder(t),
-					cache,
-					fakeApplyFunc,
-					c.applyFileNames...,
-				)
 			case c.nilapiExtensionClient:
 				results = ApplyDirectly(
 					context.TODO(),
-					fakeKubeClient, nil, fakeResgistrationClient,
-					eventstesting.NewTestingEventRecorder(t),
-					cache,
-					fakeApplyFunc,
-					c.applyFileNames...,
-				)
-			case c.nilapiRegistratonClient:
-				results = ApplyDirectly(
-					context.TODO(),
-					fakeKubeClient, fakeExtensionClient, nil,
+					fakeKubeClient, nil,
 					eventstesting.NewTestingEventRecorder(t),
 					cache,
 					fakeApplyFunc,
@@ -518,7 +475,7 @@ func TestApplyDirectly(t *testing.T) {
 			default:
 				results = ApplyDirectly(
 					context.TODO(),
-					fakeKubeClient, fakeExtensionClient, fakeResgistrationClient,
+					fakeKubeClient, fakeExtensionClient,
 					eventstesting.NewTestingEventRecorder(t),
 					cache,
 					fakeApplyFunc,
@@ -547,17 +504,15 @@ func TestDeleteStaticObject(t *testing.T) {
 	applyFiles := map[string]runtime.Object{
 		"validatingwebhooks": newUnstructured("admissionregistration.k8s.io/v1", "ValidatingWebhookConfiguration", "", "", map[string]interface{}{"webhooks": []interface{}{}}),
 		"mutatingwebhooks":   newUnstructured("admissionregistration.k8s.io/v1", "MutatingWebhookConfiguration", "", "", map[string]interface{}{"webhooks": []interface{}{}}),
-		"apiservice":         newUnstructured("apiregistration.k8s.io/v1", "APIService", "", "", map[string]interface{}{"spec": map[string]interface{}{"service": map[string]string{"name": "svc1", "namespace": "svc1"}}}),
 		"secret":             newUnstructured("v1", "Secret", "ns1", "n1", map[string]interface{}{"data": map[string]interface{}{"key1": []byte("key1")}}),
 		"crd":                newUnstructured("apiextensions.k8s.io/v1beta1", "CustomResourceDefinition", "", "", map[string]interface{}{}),
 		"kind1":              newUnstructured("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": []byte("key1")}}),
 	}
 	testcase := []struct {
-		name                     string
-		applyFileName            string
-		expectErr                bool
-		nilapiExtensionClient    bool
-		nilapiRegistrationClient bool
+		name                  string
+		applyFileName         string
+		expectErr             bool
+		nilapiExtensionClient bool
 	}{
 		{
 			name:          "Delete validating webhooks",
@@ -568,17 +523,6 @@ func TestDeleteStaticObject(t *testing.T) {
 			name:          "Delete mutating webhooks",
 			applyFileName: "mutatingwebhooks",
 			expectErr:     false,
-		},
-		{
-			name:          "Delete apiservice",
-			applyFileName: "apiservice",
-			expectErr:     false,
-		},
-		{
-			name:                     "Delete apiservice with nil apiRegistrationClient",
-			applyFileName:            "apiservice",
-			nilapiRegistrationClient: true,
-			expectErr:                true,
 		},
 		{
 			name:          "Delete secret",
@@ -618,24 +562,10 @@ func TestDeleteStaticObject(t *testing.T) {
 
 			var err error
 			switch {
-			case c.nilapiExtensionClient && c.nilapiRegistrationClient:
-				err = CleanUpStaticObject(
-					context.TODO(),
-					fakeKubeClient, nil, nil,
-					fakeAssetFunc,
-					c.applyFileName,
-				)
 			case c.nilapiExtensionClient:
 				err = CleanUpStaticObject(
 					context.TODO(),
 					fakeKubeClient, nil, fakeResgistrationClient,
-					fakeAssetFunc,
-					c.applyFileName,
-				)
-			case c.nilapiRegistrationClient:
-				err = CleanUpStaticObject(
-					context.TODO(),
-					fakeKubeClient, fakeExtensionClient, nil,
 					fakeAssetFunc,
 					c.applyFileName,
 				)
