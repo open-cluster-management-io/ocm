@@ -47,8 +47,8 @@ GO_TEST_PACKAGES :=./pkg/...
 # $2 - Dockerfile path
 # $3 - context directory for image build
 # It will generate target "image-$(1)" for building the image and binding it as a prerequisite to target "images".
-$(call build-image,$(MANAGER_IMAGE),$(IMAGE_REGISTRY)/$(MANAGER_IMAGE),./build/Dockerfile,.)
-$(call build-image,$(EXAMPLE_IMAGE),$(IMAGE_REGISTRY)/$(EXAMPLE_IMAGE),./build/Dockerfile.example,.)
+$(call build-image,$(MANAGER_IMAGE),$(IMAGE_REGISTRY)/$(MANAGER_IMAGE):$(IMAGE_TAG),./build/Dockerfile,.)
+$(call build-image,$(EXAMPLE_IMAGE),$(IMAGE_REGISTRY)/$(EXAMPLE_IMAGE):$(IMAGE_TAG),./build/Dockerfile.example,.)
 
 verify-gocilint:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.46.2

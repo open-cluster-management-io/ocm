@@ -41,11 +41,11 @@ jobs:
         run: |
           IMAGE_TAG=latest-${{ matrix.arch }} \
           IMAGE_BUILD_EXTRA_FLAGS="--build-arg OS=linux --build-arg ARCH=${{ matrix.arch }}" \
-            make images
+            make image-addon-manager
       - name: push
         run: |
           echo ${{ secrets.DOCKER_PASSWORD }} | docker login quay.io --username ${{ secrets.DOCKER_USER }} --password-stdin
-          docker push quay.io/open-cluster-management/addon-mananger:latest-${{ matrix.arch }}
+          docker push quay.io/open-cluster-management/addon-manager:latest-${{ matrix.arch }}
   image-manifest:
     name: image manifest
     runs-on: ubuntu-latest
@@ -55,19 +55,19 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/addon-manager
+          path: go/src/open-cluster-management.io/addon-framework
       - name: create
         run: |
           echo ${{ secrets.DOCKER_PASSWORD }} | docker login quay.io --username ${{ secrets.DOCKER_USER }} --password-stdin
-          docker manifest create quay.io/open-cluster-management/addon-mananger:latest \
-            quay.io/open-cluster-management/addon-mananger:latest-amd64 \
-            quay.io/open-cluster-management/addon-mananger:latest-arm64
+          docker manifest create quay.io/open-cluster-management/addon-manager:latest \
+            quay.io/open-cluster-management/addon-manager:latest-amd64 \
+            quay.io/open-cluster-management/addon-manager:latest-arm64
       - name: annotate
         run: |
-          docker manifest annotate quay.io/open-cluster-management/addon-mananger:latest \
-            quay.io/open-cluster-management/addon-mananger:latest-amd64 --arch amd64
-          docker manifest annotate quay.io/open-cluster-management/addon-mananger:latest \
-            quay.io/open-cluster-management/addon-mananger:latest-arm64 --arch arm64
+          docker manifest annotate quay.io/open-cluster-management/addon-manager:latest \
+            quay.io/open-cluster-management/addon-manager:latest-amd64 --arch amd64
+          docker manifest annotate quay.io/open-cluster-management/addon-manager:latest \
+            quay.io/open-cluster-management/addon-manager:latest-arm64 --arch arm64
       - name: push
         run: |
-          docker manifest push quay.io/open-cluster-management/addon-mananger:latest
+          docker manifest push quay.io/open-cluster-management/addon-manager:latest
