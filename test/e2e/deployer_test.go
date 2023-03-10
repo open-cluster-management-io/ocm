@@ -59,7 +59,6 @@ type workAgentDeployer interface {
 type defaultWorkAgentDeployer struct {
 	componentNamespace       string
 	clusterName              string
-	nameSuffix               string
 	image                    string
 	spokeKubeClient          kubernetes.Interface
 	spokeDynamicClient       dynamic.Interface
@@ -72,7 +71,6 @@ type defaultWorkAgentDeployer struct {
 
 func newDefaultWorkAgentDeployer(
 	clusterName string,
-	nameSuffix string,
 	image string,
 	spokeKubeClient kubernetes.Interface,
 	spokeDynamicClient dynamic.Interface,
@@ -81,7 +79,6 @@ func newDefaultWorkAgentDeployer(
 	return &defaultWorkAgentDeployer{
 		componentNamespace:       defaultComponentNamespace,
 		clusterName:              clusterName,
-		nameSuffix:               nameSuffix,
 		image:                    image,
 		spokeKubeClient:          spokeKubeClient,
 		spokeDynamicClient:       spokeDynamicClient,

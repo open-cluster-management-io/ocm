@@ -190,6 +190,25 @@ To clean the environment
 make undeploy
 ```
 
+### Run e2e test cases as sanity check on an existing environment
+
+In order to verify the `ManifestWork` API on an existing environment with work webhook/agent installed and well configured, you are able to run the e2e test cases as sanity check by following the steps below.
+
+Build the binary of the e2e test cases
+```
+make build-e2e
+```
+
+And then run the e2e test cases on a certian managed cluster e.g. cluster1.
+```
+./e2e.test --ginkgo.v --ginkgo.label-filter=sanity-check -hub-kubeconfig=/path/to/file -cluster-name=cluster1 -managed-kubeconfig=/path/to/file
+```
+
+By setting the deployment name of the work valiating webhook on the hub cluster, the test cases will not start running until the webhook is ready.
+```
+./e2e.test --ginkgo.v --ginkgo.label-filter=sanity-check -hub-kubeconfig=/path/to/file -cluster-name=cluster1 -managed-kubeconfig=/path/to/file -webhook-deployment-name=work-webhook
+```
+
 ## Community, discussion, contribution, and support
 
 Check the [CONTRIBUTING Doc](CONTRIBUTING.md) for how to contribute to the repo.

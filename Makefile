@@ -108,7 +108,7 @@ build-e2e:
 	go test -c ./test/e2e -mod=vendor
 
 test-e2e: build-e2e deploy-hub e2e-hub-kubeconfig-secret
-	./e2e.test -test.v -ginkgo.v
+	./e2e.test -test.v -ginkgo.v -deploy-agent=true -nil-executor-validating=true -webhook-deployment-name=work-webhook
 
 clean-e2e:
 	$(RM) ./e2e.test
