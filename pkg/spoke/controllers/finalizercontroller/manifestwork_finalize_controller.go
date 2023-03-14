@@ -68,13 +68,11 @@ func (m *ManifestWorkFinalizeController) sync(ctx context.Context, controllerCon
 
 	manifestWork, err := m.manifestWorkLister.Get(manifestWorkName)
 
-	// Delete appliedmanifestwork if relating manfiestwork is not found or being deleted
+	// Delete appliedmanifestwork if relating manfiestwork is being deleted
 	switch {
 	case errors.IsNotFound(err):
-		err := m.deleteAppliedManifestWork(ctx, appliedManifestWorkName)
-		if err != nil {
-			return err
-		}
+		// the appliedmanifestwork will be evicted if the relating manfiestwork is not found
+		return nil
 	case err != nil:
 		return err
 	case !manifestWork.DeletionTimestamp.IsZero():

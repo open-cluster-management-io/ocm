@@ -46,6 +46,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		o.HubKubeconfigFile = hubKubeconfigFileName
 		o.SpokeClusterName = utilrand.String(5)
 		o.StatusSyncInterval = 3 * time.Second
+		o.AppliedManifestWorkEvictionGracePeriod = 5 * time.Second
 
 		ns := &corev1.Namespace{}
 		ns.Name = o.SpokeClusterName
@@ -396,11 +397,23 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 				return errors.IsNotFound(err)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
-			// Once manifest work is deleted, all CRs/CRD should have already been deleted too
-			for i := range gvrs {
-				_, err := util.GetResource(namespaces[i], names[i], gvrs[i], spokeDynamicClient)
-				gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
-			}
+			// Once manifest work is not found, its relating appliedmanifestwork will be evicted, and finally,
+			// all CRs/CRD should been deleted too
+			gomega.Eventually(func() error {
+				for i := range gvrs {
+					_, err := util.GetResource(namespaces[i], names[i], gvrs[i], spokeDynamicClient)
+					if errors.IsNotFound(err) {
+						continue
+					}
+					if err != nil {
+						return err
+					}
+
+					return fmt.Errorf("the resource %s/%s still exists", namespaces[i], names[i])
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 		})
 	})
 
@@ -673,6 +686,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 				},
 				Spec: workapiv1.AppliedManifestWorkSpec{
 					HubHash:          hubHash,
+					AgentID:          hubHash,
 					ManifestWorkName: "fakework",
 				},
 			}

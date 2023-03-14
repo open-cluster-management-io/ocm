@@ -28,21 +28,23 @@ import (
 
 // WorkloadAgentOptions defines the flags for workload agent
 type WorkloadAgentOptions struct {
-	HubKubeconfigFile   string
-	SpokeKubeconfigFile string
-	SpokeClusterName    string
-	QPS                 float32
-	Burst               int
-	StatusSyncInterval  time.Duration
-	AgentID             string
+	HubKubeconfigFile                      string
+	SpokeKubeconfigFile                    string
+	SpokeClusterName                       string
+	AgentID                                string
+	Burst                                  int
+	StatusSyncInterval                     time.Duration
+	AppliedManifestWorkEvictionGracePeriod time.Duration
+	QPS                                    float32
 }
 
 // NewWorkloadAgentOptions returns the flags with default value set
 func NewWorkloadAgentOptions() *WorkloadAgentOptions {
 	return &WorkloadAgentOptions{
-		QPS:                50,
-		Burst:              100,
-		StatusSyncInterval: 10 * time.Second,
+		QPS:                                    50,
+		Burst:                                  100,
+		StatusSyncInterval:                     10 * time.Second,
+		AppliedManifestWorkEvictionGracePeriod: 10 * time.Minute,
 	}
 }
 
@@ -59,6 +61,7 @@ func (o *WorkloadAgentOptions) AddFlags(cmd *cobra.Command) {
 	flags.Float32Var(&o.QPS, "spoke-kube-api-qps", o.QPS, "QPS to use while talking with apiserver on spoke cluster.")
 	flags.IntVar(&o.Burst, "spoke-kube-api-burst", o.Burst, "Burst to use while talking with apiserver on spoke cluster.")
 	flags.DurationVar(&o.StatusSyncInterval, "status-sync-interval", o.StatusSyncInterval, "Interval to sync resource status to hub.")
+	flags.DurationVar(&o.AppliedManifestWorkEvictionGracePeriod, "appliedmanifestwork-eviction-grace-period", o.AppliedManifestWorkEvictionGracePeriod, "Grace period for appliedmanifestwork eviction")
 }
 
 // RunWorkloadAgent starts the controllers on agent to process work from hub.
@@ -164,6 +167,7 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 		workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks(o.SpokeClusterName),
 		spokeWorkClient.WorkV1().AppliedManifestWorks(),
 		spokeWorkInformerFactory.Work().V1().AppliedManifestWorks(),
+		o.AppliedManifestWorkEvictionGracePeriod,
 		hubhash, agentID,
 	)
 	appliedManifestWorkController := appliedmanifestcontroller.NewAppliedManifestWorkController(

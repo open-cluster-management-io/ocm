@@ -185,19 +185,13 @@ func TestSyncManifestWorkController(t *testing.T) {
 					Name: fmt.Sprintf("%s-work", hubHash),
 				},
 			},
-			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("Expect 2 actions on appliedmanifestwork, but have %d", len(actions))
-				}
-
-				spoketesting.AssertAction(t, actions[0], "delete")
-			},
+			validateAppliedManifestWorkActions: noAction,
 			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 0 {
 					t.Errorf("Suppose nothing done for manifestwork")
 				}
 			},
-			expectedQueueLen: 1,
+			expectedQueueLen: 0,
 		},
 	}
 

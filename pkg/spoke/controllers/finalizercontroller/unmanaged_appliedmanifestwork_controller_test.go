@@ -8,7 +8,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
+
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -18,31 +19,60 @@ import (
 func TestSyncUnamanagedAppliedWork(t *testing.T) {
 	cases := []struct {
 		name                               string
-		workName                           string
+		appliedManifestWorkName            string
 		hubHash                            string
 		agentID                            string
+		evictionGracePeriod                time.Duration
 		works                              []runtime.Object
 		appliedWorks                       []runtime.Object
+		expectedQueueLen                   int
 		validateAppliedManifestWorkActions func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
-			name:     "delete applied work if unmanaged",
-			workName: "test",
-			hubHash:  "hubhash1",
-			agentID:  "test-agent",
+			name:                               "appliedmanifestwork is not found",
+			appliedManifestWorkName:            "hubhash-test",
+			hubHash:                            "hubhash",
+			agentID:                            "test-agent",
+			works:                              []runtime.Object{},
+			appliedWorks:                       []runtime.Object{},
+			validateAppliedManifestWorkActions: noAction,
+		},
+		{
+			name:                    "evict appliedmanifestwork when its relating manifestwork is missing on the hub",
+			appliedManifestWorkName: "hubhash-test",
+			hubHash:                 "hubhash",
+			agentID:                 "test-agent",
+			works:                   []runtime.Object{},
+			appliedWorks: []runtime.Object{
+				&workapiv1.AppliedManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "hubhash-test",
+					},
+					Spec: workapiv1.AppliedManifestWorkSpec{
+						ManifestWorkName: "test",
+						HubHash:          "hubhash",
+						AgentID:          "test-agent",
+					},
+				},
+			},
+			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 1 {
+					t.Errorf("Expect 1 actions on appliedmanifestwork, but have %d", len(actions))
+				}
+
+				spoketesting.AssertAction(t, actions[0], "patch")
+			},
+		},
+		{
+			name:                    "evict appliedmanifestwork after the hub switched",
+			appliedManifestWorkName: "hubhash-test",
+			hubHash:                 "hubhash-new",
+			agentID:                 "test-agent",
 			works: []runtime.Object{
 				&workapiv1.ManifestWork{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test",
 						Namespace: "test",
-					},
-					Status: workapiv1.ManifestWorkStatus{
-						Conditions: []metav1.Condition{
-							{
-								Type:   workapiv1.WorkApplied,
-								Status: metav1.ConditionTrue,
-							},
-						},
 					},
 				},
 			},
@@ -57,14 +87,43 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 						AgentID:          "test-agent",
 					},
 				},
+			},
+			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 1 {
+					t.Errorf("Expect 1 actions on appliedmanifestwork, but have %d", len(actions))
+				}
+
+				spoketesting.AssertAction(t, actions[0], "patch")
+			},
+		},
+		{
+			name:                    "delete appliedmanifestwork after eviction grace period ",
+			appliedManifestWorkName: "hubhash-test",
+			hubHash:                 "hubhash-new",
+			agentID:                 "test-agent",
+			evictionGracePeriod:     10 * time.Minute,
+			works: []runtime.Object{
+				&workapiv1.ManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test",
+						Namespace: "test",
+					},
+				},
+			},
+			appliedWorks: []runtime.Object{
 				&workapiv1.AppliedManifestWork{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "hubhash1-test",
+						Name: "hubhash-test",
 					},
 					Spec: workapiv1.AppliedManifestWorkSpec{
 						ManifestWorkName: "test",
-						HubHash:          "hubhash1",
+						HubHash:          "hubhash",
 						AgentID:          "test-agent",
+					},
+					Status: workapiv1.AppliedManifestWorkStatus{
+						EvictionStartTime: &metav1.Time{
+							Time: time.Now().Add(-10 * time.Minute),
+						},
 					},
 				},
 			},
@@ -77,10 +136,10 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 			},
 		},
 		{
-			name:     "no action if the work is not applied",
-			workName: "test",
-			hubHash:  "hubhash1",
-			agentID:  "test-agent",
+			name:                    "stop to evicte appliedmanifestwork when its relating manifestwork is recreated on the hub",
+			appliedManifestWorkName: "hubhash-test",
+			hubHash:                 "hubhash",
+			agentID:                 "test-agent",
 			works: []runtime.Object{
 				&workapiv1.ManifestWork{
 					ObjectMeta: metav1.ObjectMeta{
@@ -99,41 +158,28 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 						HubHash:          "hubhash",
 						AgentID:          "test-agent",
 					},
-				},
-				&workapiv1.AppliedManifestWork{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "hubhash1-test",
-					},
-					Spec: workapiv1.AppliedManifestWorkSpec{
-						ManifestWorkName: "test",
-						HubHash:          "hubhash1",
-						AgentID:          "test-agent",
-					},
-				},
-			},
-			validateAppliedManifestWorkActions: noAction,
-		},
-		{
-			name:     "no action for different AgentID",
-			workName: "test",
-			hubHash:  "hubhash1",
-			agentID:  "test-agent",
-			works: []runtime.Object{
-				&workapiv1.ManifestWork{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test",
-						Namespace: "test",
-					},
-					Status: workapiv1.ManifestWorkStatus{
-						Conditions: []metav1.Condition{
-							{
-								Type:   workapiv1.WorkApplied,
-								Status: metav1.ConditionTrue,
-							},
+					Status: workapiv1.AppliedManifestWorkStatus{
+						EvictionStartTime: &metav1.Time{
+							Time: time.Now(),
 						},
 					},
 				},
 			},
+			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 1 {
+					t.Errorf("Expect 1 actions on appliedmanifestwork, but have %d", len(actions))
+				}
+
+				spoketesting.AssertAction(t, actions[0], "patch")
+			},
+		},
+		{
+			name:                    "requeue eviction appliedmanifestwork",
+			appliedManifestWorkName: "hubhash-test",
+			hubHash:                 "hubhash",
+			agentID:                 "test-agent",
+			evictionGracePeriod:     10 * time.Minute,
+			works:                   []runtime.Object{},
 			appliedWorks: []runtime.Object{
 				&workapiv1.AppliedManifestWork{
 					ObjectMeta: metav1.ObjectMeta{
@@ -142,65 +188,16 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 					Spec: workapiv1.AppliedManifestWorkSpec{
 						ManifestWorkName: "test",
 						HubHash:          "hubhash",
-						AgentID:          "test-agent1",
-					},
-				},
-				&workapiv1.AppliedManifestWork{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "hubhash1-test",
-					},
-					Spec: workapiv1.AppliedManifestWorkSpec{
-						ManifestWorkName: "test",
-						HubHash:          "hubhash1",
 						AgentID:          "test-agent",
 					},
-				},
-			},
-			validateAppliedManifestWorkActions: noAction,
-		},
-		{
-			name:     "no action for different work",
-			workName: "test",
-			hubHash:  "hubhash1",
-			agentID:  "test-agent",
-			works: []runtime.Object{
-				&workapiv1.ManifestWork{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test",
-						Namespace: "test",
-					},
-					Status: workapiv1.ManifestWorkStatus{
-						Conditions: []metav1.Condition{
-							{
-								Type:   workapiv1.WorkApplied,
-								Status: metav1.ConditionTrue,
-							},
+					Status: workapiv1.AppliedManifestWorkStatus{
+						EvictionStartTime: &metav1.Time{
+							Time: time.Now().Add(-5 * time.Minute),
 						},
 					},
 				},
 			},
-			appliedWorks: []runtime.Object{
-				&workapiv1.AppliedManifestWork{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "hubhash-test1",
-					},
-					Spec: workapiv1.AppliedManifestWorkSpec{
-						ManifestWorkName: "test1",
-						HubHash:          "hubhash",
-						AgentID:          "test-agent",
-					},
-				},
-				&workapiv1.AppliedManifestWork{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "hubhash1-test",
-					},
-					Spec: workapiv1.AppliedManifestWorkSpec{
-						ManifestWorkName: "test",
-						HubHash:          "hubhash1",
-						AgentID:          "test-agent",
-					},
-				},
-			},
+			expectedQueueLen:                   1,
 			validateAppliedManifestWorkActions: noAction,
 		},
 	}
@@ -209,12 +206,6 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			fakeClient := fakeworkclient.NewSimpleClientset(c.appliedWorks...)
 			informerFactory := workinformers.NewSharedInformerFactory(fakeClient, 5*time.Minute)
-			err := informerFactory.Work().V1().AppliedManifestWorks().Informer().AddIndexers(cache.Indexers{
-				byWorkNameAndAgentID: indexByWorkNameAndAgentID,
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
 			for _, work := range c.works {
 				if err := informerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(work); err != nil {
 					t.Fatal(err)
@@ -226,23 +217,28 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 				}
 			}
 
-			controller := &UnManagedAppliedWorkController{
-				manifestWorkLister:         informerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks("test"),
-				appliedManifestWorkClient:  fakeClient.WorkV1().AppliedManifestWorks(),
-				appliedManifestWorkLister:  informerFactory.Work().V1().AppliedManifestWorks().Lister(),
-				appliedManifestWorkIndexer: informerFactory.Work().V1().AppliedManifestWorks().Informer().GetIndexer(),
-				hubHash:                    c.hubHash,
-				agentID:                    c.agentID,
+			controller := &unmanagedAppliedWorkController{
+				manifestWorkLister:        informerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks("test"),
+				appliedManifestWorkClient: fakeClient.WorkV1().AppliedManifestWorks(),
+				appliedManifestWorkLister: informerFactory.Work().V1().AppliedManifestWorks().Lister(),
+				hubHash:                   c.hubHash,
+				agentID:                   c.agentID,
+				evictionGracePeriod:       c.evictionGracePeriod,
+				rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(0, c.evictionGracePeriod),
 			}
 
-			controllerContext := spoketesting.NewFakeSyncContext(t, c.hubHash+"-"+c.workName)
-			err = controller.sync(context.TODO(), controllerContext)
-			if err != nil {
+			controllerContext := spoketesting.NewFakeSyncContext(t, c.appliedManifestWorkName)
+			if err := controller.sync(context.TODO(), controllerContext); err != nil {
 				t.Errorf("Expect no sync error, but got %v", err)
 			}
 
 			appliedWorkAction := fakeClient.Actions()
 			c.validateAppliedManifestWorkActions(t, appliedWorkAction)
+
+			queueLen := controllerContext.Queue().Len()
+			if queueLen != c.expectedQueueLen {
+				t.Errorf("expected %d, but %d", c.expectedQueueLen, queueLen)
+			}
 		})
 	}
 }
