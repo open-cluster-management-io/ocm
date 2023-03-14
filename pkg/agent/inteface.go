@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -178,7 +179,7 @@ type ProbeField struct {
 type HealthProberType string
 
 const (
-	// HealthProberTypeLease indicates the healthiness status will be refreshed, which is
+	// HealthProberTypeNone indicates the healthiness status will be refreshed, which is
 	// leaving the healthiness of ManagedClusterAddon to an empty string.
 	HealthProberTypeNone HealthProberType = "None"
 	// HealthProberTypeLease indicates the healthiness of the addon is connected with the
@@ -219,6 +220,31 @@ func DefaultGroups(clusterName, addonName string) []string {
 		fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", clusterName, addonName),
 		fmt.Sprintf("system:open-cluster-management:addon:%s", addonName),
 		"system:authenticated",
+	}
+}
+
+// CustomSignerConfigurations returns a func that can generate RegistrationConfig
+// for CustomSigner type registration addon
+func CustomSignerConfigurations(addonName, agentName string,
+	customSignerConfig *addonapiv1alpha1.CustomSignerRegistrationConfig,
+) func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
+	return func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
+		if customSignerConfig == nil {
+			utilruntime.HandleError(fmt.Errorf("custome signer is nil"))
+		}
+		config := addonapiv1alpha1.RegistrationConfig{
+			SignerName: customSignerConfig.SignerName,
+			// TODO: confirm the subject
+			Subject: addonapiv1alpha1.Subject{
+				User:   DefaultUser(cluster.Name, addonName, agentName),
+				Groups: DefaultGroups(cluster.Name, addonName),
+			},
+		}
+		if customSignerConfig.Subject != nil {
+			config.Subject = *customSignerConfig.Subject
+		}
+
+		return []addonapiv1alpha1.RegistrationConfig{config}
 	}
 }
 

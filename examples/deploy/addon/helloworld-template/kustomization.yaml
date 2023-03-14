@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: hub
+
+resources:
+- resources/addon_deployment_config.yaml
+- resources/addon_template.yaml
+- resources/cluster_management_addon.yaml
+- resources/managed_cluster_addon.yaml
+- resources/cluster_role.yaml
+
+
+images:
+- name: quay.io/open-cluster-management/addon-examples
+  newName: quay.io/open-cluster-management/addon-examples
+  newTag: latest

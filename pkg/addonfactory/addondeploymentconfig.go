@@ -304,3 +304,27 @@ func overrideImageDirectly(source, mirror, imageName string) string {
 	trimSegment := strings.TrimPrefix(imageName, source)
 	return fmt.Sprintf("%s%s", mirror, trimSegment)
 }
+
+// ToAddOnNodePlacementPrivateValues only transform the AddOnDeploymentConfig NodePlacement part into Values object
+// with a specific key, this value would be used by the addon template controller
+func ToAddOnNodePlacementPrivateValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
+	if config.Spec.NodePlacement == nil {
+		return nil, nil
+	}
+
+	return Values{
+		NodePlacementPrivateValueKey: config.Spec.NodePlacement,
+	}, nil
+}
+
+// ToAddOnRegistriesPrivateValues only transform the AddOnDeploymentConfig Registries part into Values object
+// with a specific key, this value would be used by the addon template controller
+func ToAddOnRegistriesPrivateValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
+	if config.Spec.Registries == nil {
+		return nil, nil
+	}
+
+	return Values{
+		RegistriesPrivateValueKey: config.Spec.Registries,
+	}, nil
+}

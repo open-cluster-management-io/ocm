@@ -5,6 +5,10 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -15,16 +19,30 @@ import (
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
 
+	"open-cluster-management.io/addon-framework/pkg/addonfactory"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addonconfig"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/managementaddonconfig"
 	"open-cluster-management.io/addon-framework/pkg/index"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonconfiguration"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonmanagement"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonowner"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonprogressing"
+	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addontemplate"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/managementaddoninstallprogression"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
+var builtInConfigGVRs = map[schema.GroupVersionResource]bool{
+	addonfactory.AddOnDeploymentConfigGVR: true,
+	addontemplate.AddOnTemplateGVR:        true,
+}
+
 func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
+	hubKubeClient, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		return err
+	}
+
 	hubClusterClient, err := clusterclientset.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
@@ -36,6 +54,11 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 	}
 
 	workClient, err := workv1client.NewForConfig(kubeConfig)
+	if err != nil {
+		return err
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
 	}
@@ -71,6 +94,23 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 	if err != nil {
 		return err
 	}
+
+	dynamicInformers := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, 10*time.Minute)
+
+	addonConfigController := addonconfig.NewAddonConfigController(
+		addonClient,
+		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
+		dynamicInformers,
+		builtInConfigGVRs,
+		utils.ManagedByAddonManager,
+	)
+	managementAddonConfigController := managementaddonconfig.NewManagementAddonConfigController(
+		addonClient,
+		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
+		dynamicInformers,
+		builtInConfigGVRs,
+		utils.ManagedByAddonManager,
+	)
 
 	addonManagementController := addonmanagement.NewAddonManagementController(
 		addonClient,
@@ -112,15 +152,26 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 		utils.ManagedByAddonManager,
 	)
 
+	addonTemplateController := addontemplate.NewAddonTemplateController(
+		kubeConfig,
+		hubKubeClient,
+		addonClient,
+		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
+	)
+
+	go addonConfigController.Run(ctx, 2)
+	go managementAddonConfigController.Run(ctx, 2)
 	go addonManagementController.Run(ctx, 2)
 	go addonConfigurationController.Run(ctx, 2)
 	go addonOwnerController.Run(ctx, 2)
 	go addonProgressingController.Run(ctx, 2)
 	go mgmtAddonInstallProgressionController.Run(ctx, 2)
+	go addonTemplateController.Run(ctx, 2)
 
 	go clusterInformerFactory.Start(ctx.Done())
 	go addonInformerFactory.Start(ctx.Done())
 	go workInformers.Start(ctx.Done())
+	go dynamicInformers.Start(ctx.Done())
 
 	<-ctx.Done()
 	return nil

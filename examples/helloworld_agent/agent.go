@@ -60,6 +60,7 @@ func (o *AgentOptions) AddFlags(cmd *cobra.Command) {
 		"Location of kubeconfig file to connect to the managed cluster.")
 	flags.StringVar(&o.SpokeClusterName, "cluster-name", o.SpokeClusterName, "Name of spoke cluster.")
 	flags.StringVar(&o.AddonNamespace, "addon-namespace", o.AddonNamespace, "Installation namespace of addon.")
+	flags.StringVar(&o.AddonName, "addon-name", o.AddonName, "name of the addon.")
 }
 
 // RunAgent starts the controllers on agent to process work from hub.

@@ -60,7 +60,7 @@ func New() *Factory {
 	return &Factory{}
 }
 
-// Sync is used to set the controller synchronization function. This function is the core of the controller and is
+// WithSync is used to set the controller synchronization function. This function is the core of the controller and is
 // usually hold the main controller logic.
 func (f *Factory) WithSync(syncFn SyncFunc) *Factory {
 	f.sync = syncFn
@@ -142,7 +142,7 @@ func (f *Factory) WithSyncContext(ctx SyncContext) *Factory {
 	return f
 }
 
-// Controller produce a runnable controller.
+// ToController produce a runnable controller.
 func (f *Factory) ToController(name string) Controller {
 	if f.sync == nil {
 		panic(fmt.Errorf("WithSync() must be used before calling ToController() in %q", name))
@@ -187,8 +187,8 @@ func (f *Factory) ToController(name string) Controller {
 		}
 	}
 
-	for i := range f.bareInformers {
-		c.cachesToSync = append(c.cachesToSync, f.bareInformers[i].HasSynced)
+	for _, bareInformer := range f.bareInformers {
+		c.cachesToSync = append(c.cachesToSync, bareInformer.HasSynced)
 	}
 
 	return c

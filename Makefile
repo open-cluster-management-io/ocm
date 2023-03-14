@@ -92,6 +92,15 @@ deploy-helloworld-hosted: ensure-kustomize
 	$(KUSTOMIZE) build examples/deploy/addon/helloworld-hosted | $(KUBECTL) apply -f -
 	mv examples/deploy/addon/helloworld-hosted/kustomization.yaml.tmp examples/deploy/addon/helloworld-hosted/kustomization.yaml
 
+deploy-helloworld-template: ensure-kustomize
+	$(KUBECTL) create namespace $(MANAGED_CLUSTER_NAME) --dry-run=client -o yaml | $(KUBECTL) apply -f -
+# remove the following line when the registration-operator is supported to install the addon template CRD
+	$(KUBECTL) apply -f ./vendor/open-cluster-management.io/api/addon/v1alpha1/0000_03_addon.open-cluster-management.io_addontemplates.crd.yaml
+	cp examples/deploy/addon/helloworld-template/kustomization.yaml examples/deploy/addon/helloworld-template/kustomization.yaml.tmp
+	cd examples/deploy/addon/helloworld-template && ../../../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-examples=$(EXAMPLE_IMAGE_NAME)
+	$(KUSTOMIZE) build examples/deploy/addon/helloworld-template | $(KUBECTL) apply -f -
+	mv examples/deploy/addon/helloworld-template/kustomization.yaml.tmp examples/deploy/addon/helloworld-template/kustomization.yaml
+
 undeploy-addon:
 	$(KUBECTL) delete -f examples/deploy/addon/helloworld-hosted/resources/helloworld_hosted_clustermanagementaddon.yaml --ignore-not-found
 	$(KUBECTL) delete -f examples/deploy/addon/helloworld-helm/resources/helloworld_helm_clustermanagementaddon.yaml --ignore-not-found
@@ -113,7 +122,7 @@ undeploy-helloworld-hosted: ensure-kustomize
 build-e2e:
 	go test -c ./test/e2e
 
-test-e2e: build-e2e deploy-ocm deploy-addon-manager deploy-helloworld deploy-helloworld-helm
+test-e2e: build-e2e deploy-ocm deploy-addon-manager deploy-helloworld deploy-helloworld-helm deploy-helloworld-template
 	./e2e.test -test.v -ginkgo.v
 
 build-hosted-e2e:
@@ -121,5 +130,16 @@ build-hosted-e2e:
 
 test-hosted-e2e: build-hosted-e2e deploy-hosted-ocm deploy-addon-manager deploy-helloworld-hosted
 	./e2ehosted.test -test.v -ginkgo.v
+
+RUNTIME ?= podman
+build-images: build-image-manager build-image-examples
+build-image-manager:
+	$(RUNTIME) build \
+		-f ./build/Dockerfile \
+		-t $(MANAGER_IMAGE_NAME) .
+build-image-examples:
+	$(RUNTIME) build \
+		-f ./build/Dockerfile.example \
+		-t $(EXAMPLE_IMAGE_NAME) .
 
 include ./test/integration-test.mk

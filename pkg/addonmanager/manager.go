@@ -5,12 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/client-go/tools/cache"
-
-	"open-cluster-management.io/addon-framework/pkg/index"
-	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonconfiguration"
-	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonowner"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -18,6 +12,7 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
@@ -34,6 +29,9 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/registration"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
+	"open-cluster-management.io/addon-framework/pkg/index"
+	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonconfiguration"
+	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonowner"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
@@ -185,12 +183,14 @@ func (a *addonManager) Start(ctx context.Context) error {
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 			dynamicInformers,
 			a.addonConfigs,
+			utils.ManagedBySelf(a.addonAgents),
 		)
 		managementAddonConfigController = managementaddonconfig.NewManagementAddonConfigController(
 			addonClient,
 			addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 			dynamicInformers,
 			a.addonConfigs,
+			utils.ManagedBySelf(a.addonAgents),
 		)
 
 		// start addonConfiguration controller, note this is to handle the case when the general addon-manager

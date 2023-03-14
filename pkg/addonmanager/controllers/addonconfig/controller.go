@@ -37,11 +37,12 @@ type enqueueFunc func(obj interface{})
 
 // addonConfigController reconciles all interested addon config types (GroupVersionResource) on the hub.
 type addonConfigController struct {
-	addonClient   addonv1alpha1client.Interface
-	addonLister   addonlisterv1alpha1.ManagedClusterAddOnLister
-	addonIndexer  cache.Indexer
-	configListers map[schema.GroupResource]dynamiclister.Lister
-	queue         workqueue.RateLimitingInterface
+	addonClient     addonv1alpha1client.Interface
+	addonLister     addonlisterv1alpha1.ManagedClusterAddOnLister
+	addonIndexer    cache.Indexer
+	configListers   map[schema.GroupResource]dynamiclister.Lister
+	queue           workqueue.RateLimitingInterface
+	addonFilterFunc factory.EventFilterFunc
 }
 
 func NewAddonConfigController(
@@ -49,15 +50,17 @@ func NewAddonConfigController(
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	configInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	configGVRs map[schema.GroupVersionResource]bool,
+	addonFilterFunc factory.EventFilterFunc,
 ) factory.Controller {
 	syncCtx := factory.NewSyncContext(controllerName)
 
 	c := &addonConfigController{
-		addonClient:   addonClient,
-		addonLister:   addonInformers.Lister(),
-		addonIndexer:  addonInformers.Informer().GetIndexer(),
-		configListers: map[schema.GroupResource]dynamiclister.Lister{},
-		queue:         syncCtx.Queue(),
+		addonClient:     addonClient,
+		addonLister:     addonInformers.Lister(),
+		addonIndexer:    addonInformers.Informer().GetIndexer(),
+		configListers:   map[schema.GroupResource]dynamiclister.Lister{},
+		queue:           syncCtx.Queue(),
+		addonFilterFunc: addonFilterFunc,
 	}
 
 	configInformers := c.buildConfigInformers(configInformerFactory, configGVRs)
@@ -161,8 +164,11 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return err
 	}
 
-	addonCopy := addon.DeepCopy()
+	if !c.addonFilterFunc(addon) {
+		return nil
+	}
 
+	addonCopy := addon.DeepCopy()
 	if err := c.updateConfigSpecHashAndGenerations(addonCopy); err != nil {
 		return err
 	}

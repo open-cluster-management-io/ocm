@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -351,4 +352,87 @@ func ApplyRoleBinding(ctx context.Context, client rbacclientv1.RoleBindingsGette
 
 	actual, err := client.RoleBindings(requiredCopy.Namespace).Update(ctx, existingCopy, metav1.UpdateOptions{})
 	return actual, true, err
+}
+
+// TemplateAddonHubPermission returns a func that can grant permission for addon agent
+// that is deployed by addon template.
+// the returned func will create a rolebinding to bind the clusterRole/role which is
+// specified by the user, so the is required to make sure the existence of the
+// clusterRole/role
+func TemplateAddonHubPermission(hubKubeClient kubernetes.Interface,
+	kcrc *addonapiv1alpha1.KubeClientRegistrationConfig) agent.PermissionConfigFunc {
+	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+		if kcrc == nil {
+			return nil
+		}
+
+		if kcrc.HubPermissions == nil {
+			return nil
+		}
+
+		for _, pc := range kcrc.HubPermissions {
+			switch pc.Type {
+			case addonapiv1alpha1.HubPermissionsBindingCurrentCluster:
+				owner := metav1.OwnerReference{
+					APIVersion: addon.APIVersion,
+					Kind:       addon.Kind,
+					Name:       addon.Name,
+					UID:        addon.UID,
+				}
+				err := createPermissionBinding(hubKubeClient,
+					cluster.Name, addon.Name, cluster.Name, pc.RoleRef, owner)
+				if err != nil {
+					return err
+				}
+			case addonapiv1alpha1.HubPermissionsBindingSingleNamespace:
+				if pc.SingleNamespace == nil {
+					return fmt.Errorf("single namespace is nil")
+				}
+				owner := metav1.OwnerReference{
+					APIVersion: cluster.APIVersion,
+					Kind:       cluster.Kind,
+					Name:       cluster.Name,
+					UID:        cluster.UID,
+				}
+				err := createPermissionBinding(hubKubeClient,
+					cluster.Name, addon.Name, pc.SingleNamespace.Namespace, pc.RoleRef, owner)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		return nil
+	}
+}
+
+func createPermissionBinding(hubKubeClient kubernetes.Interface,
+	clusterName, addonName, namespace string, roleRef rbacv1.RoleRef, owner metav1.OwnerReference) error {
+	// TODO: confirm the group
+	groups := agent.DefaultGroups(clusterName, addonName)
+	binding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("open-cluster-management:%s:%s:agent",
+				addonName, strings.ToLower(roleRef.Kind)),
+			Namespace:       namespace,
+			OwnerReferences: []metav1.OwnerReference{owner},
+		},
+		RoleRef: roleRef,
+		Subjects: []rbacv1.Subject{
+			{Kind: "Group", APIGroup: "rbac.authorization.k8s.io", Name: groups[0]},
+		},
+	}
+
+	// TODO: check the existence of the role, cluster role
+	_, err := hubKubeClient.RbacV1().RoleBindings(namespace).Get(context.TODO(), binding.Name, metav1.GetOptions{})
+	switch {
+	case apierrors.IsNotFound(err):
+		_, createErr := hubKubeClient.RbacV1().RoleBindings(namespace).Create(context.TODO(), binding, metav1.CreateOptions{})
+		if createErr != nil {
+			return createErr
+		}
+	case err != nil:
+		return err
+	}
+	return nil
 }

@@ -43,6 +43,7 @@ type clusterManagementAddonConfigController struct {
 	clusterManagementAddonIndexer cache.Indexer
 	configListers                 map[schema.GroupResource]dynamiclister.Lister
 	queue                         workqueue.RateLimitingInterface
+	addonFilterFunc               factory.EventFilterFunc
 }
 
 func NewManagementAddonConfigController(
@@ -50,6 +51,7 @@ func NewManagementAddonConfigController(
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	configInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	configGVRs map[schema.GroupVersionResource]bool,
+	addonFilterFunc factory.EventFilterFunc,
 ) factory.Controller {
 	syncCtx := factory.NewSyncContext(controllerName)
 
@@ -59,6 +61,7 @@ func NewManagementAddonConfigController(
 		clusterManagementAddonIndexer: clusterManagementAddonInformers.Informer().GetIndexer(),
 		configListers:                 map[schema.GroupResource]dynamiclister.Lister{},
 		queue:                         syncCtx.Queue(),
+		addonFilterFunc:               addonFilterFunc,
 	}
 
 	configInformers := c.buildConfigInformers(configInformerFactory, configGVRs)
@@ -172,8 +175,11 @@ func (c *clusterManagementAddonConfigController) sync(ctx context.Context, syncC
 		return err
 	}
 
-	cmaCopy := cma.DeepCopy()
+	if !c.addonFilterFunc(cma) {
+		return nil
+	}
 
+	cmaCopy := cma.DeepCopy()
 	if err := c.updateConfigSpecHash(cmaCopy); err != nil {
 		return err
 	}
@@ -291,6 +297,8 @@ func getIndex(configGroupResource addonapiv1alpha1.ConfigGroupResource, configSp
 	return fmt.Sprintf("%s/%s/%s", configGroupResource.Group, configGroupResource.Resource, configSpecHash.Name)
 }
 
+// GetSpecHash returns the sha256 hash of the spec field of the given object
+// TODO: move this to a common place
 func GetSpecHash(obj *unstructured.Unstructured) (string, error) {
 	spec, ok := obj.Object["spec"]
 	if !ok {

@@ -18,6 +18,12 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
+func newCSRWithSigner(signer, commonName, clusterName string, orgs ...string) *certificatesv1.CertificateSigningRequest {
+	csr := newCSR(commonName, clusterName, orgs...)
+	csr.Spec.SignerName = signer
+	return csr
+}
+
 func newCSR(commonName string, clusterName string, orgs ...string) *certificatesv1.CertificateSigningRequest {
 	clientKey, _ := keyutil.MakeEllipticPrivateKeyPEM()
 	privateKey, _ := keyutil.ParsePrivateKeyPEM(clientKey)
@@ -147,28 +153,37 @@ func TestUnionApprover(t *testing.T) {
 
 	cases := []struct {
 		name        string
-		approveFunc []agent.CSRApproveFunc
+		signer      string
+		approveFunc map[string]agent.CSRApproveFunc
 		approved    bool
 	}{
 		{
 			name:        "approve all",
-			approveFunc: []agent.CSRApproveFunc{approveAll, approveAll},
+			signer:      "a",
+			approveFunc: map[string]agent.CSRApproveFunc{"a": approveAll, "b": approveAll},
 			approved:    true,
 		},
 		{
 			name:        "approve none",
-			approveFunc: []agent.CSRApproveFunc{approveAll, approveNone},
+			signer:      "b",
+			approveFunc: map[string]agent.CSRApproveFunc{"a": approveAll, "b": approveNone},
+			approved:    false,
+		},
+		{
+			name:        "not match signer",
+			signer:      "c",
+			approveFunc: map[string]agent.CSRApproveFunc{"a": approveAll, "b": approveAll},
 			approved:    false,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			approver := UnionCSRApprover(c.approveFunc...)
+			approver := UnionCSRApprover(c.approveFunc)
 			approved := approver(
 				newCluster("cluster1"),
 				newAddon("addon1", "cluster1"),
-				newCSR(agent.DefaultUser("cluster1", "addon1", "test"), "cluster1", "group1"),
+				newCSRWithSigner(c.signer, agent.DefaultUser("cluster1", "addon1", "test"), "cluster1", "group1"),
 			)
 			if approved != c.approved {
 				t.Errorf("Expected approve is %t, but got %t", c.approved, approved)
