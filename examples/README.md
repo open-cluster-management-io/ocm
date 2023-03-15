@@ -60,6 +60,59 @@ kubectl apply -f examples/deploy/addon-cr/helloworld_helm_addon_cr.yaml
 
 We can check the helloworld_helm AddOn agent is deployed in the `installNamespace` on the managed cluster. 
 
+## Configure the example add-ons
+
+The helloworld add-on supports configuring the nodeSelector and tolerations for its agent with `AddOnDeploymentConfig` and the helloworld_helm add-on supports configuring image and imagePullPolicy for its agent with `ConfigMap` and also supports configuring node selector and tolerations for its agent.
+
+## Congfig the helloworld add-on
+
+The helloworld add-on supported configuration types can be listed from the `supportedConfigs` field in its `ClusterManagementAddOn`
+```sh
+kubectl get clustermanagementaddons helloworld -ojsonpath='{.spec.supportedConfigs}'
+```
+
+To configure the helloworld add-on agent
+
+1. Create a `AddOnDeploymentConfig` with nodeSelector and tolerations, there is an example in `examples/deploy/addon-config/addondeploymentconfig.yaml`
+
+2. Apply the `AddOnDeploymentConfig` to a namespace, for example, to our managed cluster namespace
+```sh
+kubectl -n cluster1 apply -f examples/deploy/addon-config/addondeploymentconfig.yaml
+```
+
+3. Reference this configuration to helloworld add-on, for example
+```sh
+kubectl -n cluster1 patch managedclusteraddons helloworld --type='json' -p='[{\"op\":\"add\", \"path\":\"/spec/configs\", \"value\":[{\"group\":\"addon.open-cluster-management.io\",\"resource\":\"addondeploymentconfigs\",\"namespace\":\"cluster1\",\"name\":\"deploy-config\"}]}]'
+```
+
+Then the helloworld add-on agent will be configured with this configuration.
+
+## Congfig the helloworld_helm add-on
+
+The helloworld_helm add-on supported configuration types can be listed from the `supportedConfigs` field in its `ClusterManagementAddOn`
+```sh
+kubectl get clustermanagementaddons helloworldhelm -ojsonpath='{.spec.supportedConfigs}'
+```
+
+To configure the helloworld_helm add-on agent
+
+1. Create a `AddOnDeploymentConfig` with nodeSelector and tolerations, there is an example in `examples/deploy/addon-config/addondeploymentconfig.yaml`
+
+2. Create a `ConfigMap` with image and imagePullPolicy, there is an example in `examples/deploy/addon-config/configmap.yaml`
+
+2. Apply these two configurations to a namespace, for example, to our managed cluster namespace
+```sh
+kubectl -n cluster1 apply -f examples/deploy/addon-config/addondeploymentconfig.yaml
+kubectl -n cluster1 apply -f examples/deploy/addon-config/configmap.yaml
+```
+
+3. Reference these two configurations to helloworld_helm add-on, for example
+```sh
+kubectl -n cluster1 patch managedclusteraddons helloworldhelm --type='json' -p='[{\"op\":\"add\", \"path\":\"/spec/configs\", \"value\":[{\"group\":\"addon.open-cluster-management.io\",\"resource\":\"addondeploymentconfigs\",\"namespace\":\"cluster1\",\"name\":\"deploy-config\"},{\"resource\":\"configmaps\",\"namespace\":\"cluster1\",\"name\":\"image-config\"}]}]'
+```
+
+Then the helloworld_helm add-on agent will be configured with these two configurations.
+
 ## Clean up
 Undeploy managedClusterAddons firstly.
 ```sh
@@ -78,10 +131,3 @@ kubectl --kubeconfig </path/to/hub_cluster/kubeconfig> delete managedclusteraddo
 ```
 
 Follow instructions from [registration-operator](https://github.com/open-cluster-management-io/registration-operator) to uninstall OCM if necessary;
-
-<!--
-## XXX References
-
-If you have any further question about xxx, please refer to
-[XXX help documentation](docs/xxx_help.md) for further information.
--->
