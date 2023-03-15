@@ -3,20 +3,23 @@ kind: ClusterRole
 metadata:
   name: open-cluster-management:work-hub-controller
 rules:
-# Allow get/list/watch configmaps
-- apiGroups: [""]
-  resources: ["configmaps"]
-  verbs: ["get", "list", "watch"]
+- apiGroups: [ "" ]
+  resources: [ "configmaps" ]
+  verbs: [ "get", "list", "watch" ]
 # Allow create subjectaccessreviews
 - apiGroups: ["authorization.k8s.io"]
   resources: ["subjectaccessreviews"]
   verbs: ["create"]
 - apiGroups: ["work.open-cluster-management.io"]
   resources: ["manifestworks"]
-  verbs: ["get", "list", "watch","create", "update", "delete", "deletecollection", "patch"]
+  verbs: ["get", "list", "watch","create", "update", "delete", "deletecollection", "patch", "execute-as"]
 - apiGroups: ["work.open-cluster-management.io"]
   resources: ["manifestworkreplicasets"]
   verbs: ["get", "list", "watch", "update"]
 - apiGroups: ["work.open-cluster-management.io"]
   resources: ["manifestworkreplicasets/status"]
   verbs: ["patch", "update"]
+- apiGroups: [ "cluster.open-cluster-management.io" ]
+  resources: [ "placements", "placementdecisions" ]
+  verbs: [ "get", "list", "watch"]
+

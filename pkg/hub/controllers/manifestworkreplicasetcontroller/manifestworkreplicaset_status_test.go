@@ -27,10 +27,10 @@ func TestStatusReconcileAsExpected(t *testing.T) {
 
 	for _, cls := range clusters {
 		mw, _ := CreateManifestWork(mwrSetTest, cls)
-		cond := getCondition(string(workv1.ManifestApplied), "", "", metav1.ConditionTrue)
+		cond := getCondition(workv1.WorkApplied, "", "", metav1.ConditionTrue)
 		apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 
-		cond = getCondition(string(workv1.ManifestAvailable), "", "", metav1.ConditionTrue)
+		cond = getCondition(workv1.WorkAvailable, "", "", metav1.ConditionTrue)
 		apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 		if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw); err != nil {
 			t.Fatal(err)
@@ -92,14 +92,14 @@ func TestStatusReconcileAsProcessing(t *testing.T) {
 
 	for id, cls := range clusters {
 		mw, _ := CreateManifestWork(mwrSetTest, cls)
-		cond := getCondition(string(workv1.ManifestApplied), "", "", metav1.ConditionTrue)
+		cond := getCondition(workv1.WorkApplied, "", "", metav1.ConditionTrue)
 		apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 
 		if id%2 == 0 {
-			cond = getCondition(string(workv1.ManifestAvailable), "", "", metav1.ConditionTrue)
+			cond = getCondition(workv1.WorkAvailable, "", "", metav1.ConditionTrue)
 			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 		} else {
-			cond = getCondition(string(workv1.ManifestProgressing), "", "", metav1.ConditionTrue)
+			cond = getCondition(workv1.WorkProgressing, "", "", metav1.ConditionTrue)
 			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 		}
 
@@ -164,19 +164,19 @@ func TestStatusReconcileNotAsExpected(t *testing.T) {
 	avaCount, processingCount, degradCount := 0, 0, 0
 	for id, cls := range clusters {
 		mw, _ := CreateManifestWork(mwrSetTest, cls)
-		cond := getCondition(string(workv1.ManifestApplied), "", "", metav1.ConditionTrue)
+		cond := getCondition(workv1.WorkApplied, "", "", metav1.ConditionTrue)
 		apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 
 		if id%2 == 0 {
-			cond = getCondition(string(workv1.ManifestAvailable), "", "", metav1.ConditionTrue)
+			cond = getCondition(workv1.WorkAvailable, "", "", metav1.ConditionTrue)
 			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 			avaCount++
 		} else if id%3 == 0 {
-			cond = getCondition(string(workv1.ManifestDegraded), "", "", metav1.ConditionTrue)
+			cond = getCondition(workv1.WorkDegraded, "", "", metav1.ConditionTrue)
 			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 			processingCount++
 		} else {
-			cond = getCondition(string(workv1.ManifestProgressing), "", "", metav1.ConditionTrue)
+			cond = getCondition(workv1.WorkProgressing, "", "", metav1.ConditionTrue)
 			apimeta.SetStatusCondition(&mw.Status.Conditions, cond)
 			degradCount++
 		}

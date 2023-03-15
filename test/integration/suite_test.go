@@ -1,6 +1,10 @@
 package integration
 
 import (
+	"context"
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
+	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	"open-cluster-management.io/work/pkg/hub"
 	"os"
 	"path"
 	"path/filepath"
@@ -34,7 +38,10 @@ var testEnv *envtest.Environment
 var spokeKubeClient kubernetes.Interface
 var spokeWorkClient workclientset.Interface
 var hubWorkClient workclientset.Interface
+var hubClusterClient clusterclientset.Interface
 var hubHash string
+var envCtx context.Context
+var envCancel context.CancelFunc
 
 func TestIntegration(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
@@ -53,7 +60,7 @@ var _ = ginkgo.BeforeSuite(func() {
 			filepath.Join(".", "deploy", "hub"),
 		},
 	}
-
+	envCtx, envCancel = context.WithCancel(context.TODO())
 	cfg, err := testEnv.Start()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(cfg).ToNot(gomega.BeNil())
@@ -78,10 +85,24 @@ var _ = ginkgo.BeforeSuite(func() {
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	spokeWorkClient, err = workclientset.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	hubClusterClient, err = clusterclientset.NewForConfig(cfg)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	// start hub controller
+	go func() {
+		err := hub.RunWorkHubManager(envCtx, &controllercmd.ControllerContext{
+			KubeConfig:    cfg,
+			EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
+		})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	}()
 })
 
 var _ = ginkgo.AfterSuite(func() {
 	ginkgo.By("tearing down the test environment")
+
+	envCancel()
 
 	err := testEnv.Stop()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())

@@ -3,8 +3,6 @@ package manifestworkreplicasetcontroller
 import (
 	"context"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	worklisterv1 "open-cluster-management.io/api/client/work/listers/work/v1"
@@ -32,7 +30,7 @@ func (f *finalizeReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alp
 			break
 		}
 	}
-	// if there is no finalizer, we do not need to reconcile anymore and we do not need to
+	// if there is no finalizer, we do not need to reconcile anymore.
 	if !found {
 		return mwrSet, reconcileStop, nil
 	}
@@ -53,13 +51,7 @@ func (f *finalizeReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alp
 }
 
 func (m *finalizeReconciler) finalizeManifestWorkReplicaSet(ctx context.Context, manifestWorkReplicaSet *workapiv1alpha1.ManifestWorkReplicaSet) error {
-	req, err := labels.NewRequirement(ManifestWorkReplicaSetControllerNameLabelKey, selection.In, []string{manifestWorkReplicaSet.Name})
-	if err != nil {
-		return err
-	}
-
-	selector := labels.NewSelector().Add(*req)
-	manifestWorks, err := m.manifestWorkLister.List(selector)
+	manifestWorks, err := listManifestWorksByManifestWorkReplicaSet(manifestWorkReplicaSet, m.manifestWorkLister)
 	if err != nil {
 		return err
 	}

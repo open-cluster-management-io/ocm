@@ -6,8 +6,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
@@ -41,13 +39,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 		placements = append(placements, placement)
 	}
 
-	req, err := labels.NewRequirement(ManifestWorkReplicaSetControllerNameLabelKey, selection.In, []string{mwrSet.Name})
-	if err != nil {
-		return mwrSet, reconcileContinue, err
-	}
-
-	selector := labels.NewSelector().Add(*req)
-	manifestWorks, err := d.manifestWorkLister.List(selector)
+	manifestWorks, err := listManifestWorksByManifestWorkReplicaSet(mwrSet, d.manifestWorkLister)
 	if err != nil {
 		return mwrSet, reconcileContinue, err
 	}
@@ -168,7 +160,7 @@ func CreateManifestWork(mwrSet *workapiv1alpha1.ManifestWorkReplicaSet, clusterN
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mwrSet.Name,
 			Namespace: clusterNS,
-			Labels:    map[string]string{ManifestWorkReplicaSetControllerNameLabelKey: mwrSet.Name},
+			Labels:    map[string]string{ManifestWorkReplicaSetControllerNameLabelKey: manifestWorkReplicaSetKey(mwrSet)},
 		},
 		Spec: mwrSet.Spec.ManifestWorkTemplate}, nil
 }

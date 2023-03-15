@@ -62,7 +62,7 @@ func (m *ManifestWorkReplicaSetController) placementDecisionQueueKeysFunc(obj ru
 	return keys
 }
 
-// we will generate manifestwork with a lab
+// we will generate manifestwork with a label
 func (m *ManifestWorkReplicaSetController) manifestWorkQueueKeyFunc(obj runtime.Object) string {
 	accessor, _ := meta.Accessor(obj)
 	key, ok := accessor.GetLabels()[ManifestWorkReplicaSetControllerNameLabelKey]
@@ -86,4 +86,10 @@ func indexManifestWorkReplicaSetByPlacement(obj interface{}) ([]string, error) {
 	}
 
 	return keys, nil
+}
+
+// manifestWorkReplicaSetKey return the value of the key of manifestworkreplicaset, and comply with
+// label value format.
+func manifestWorkReplicaSetKey(mwrs *workapiv1alpha1.ManifestWorkReplicaSet) string {
+	return fmt.Sprintf("%s.%s", mwrs.Namespace, mwrs.Name)
 }

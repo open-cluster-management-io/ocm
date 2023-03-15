@@ -11,7 +11,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -21,9 +23,12 @@ import (
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workinformerv1 "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	workinformerv1alpha1 "open-cluster-management.io/api/client/work/informers/externalversions/work/v1alpha1"
+	worklisterv1 "open-cluster-management.io/api/client/work/listers/work/v1"
 	worklisterv1alpha1 "open-cluster-management.io/api/client/work/listers/work/v1alpha1"
 	"open-cluster-management.io/api/utils/work/v1/workapplier"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
+	"strings"
 )
 
 const (
@@ -100,11 +105,15 @@ func NewManifestWorkReplicaSetController(
 		}, manifestWorkReplicaSetInformer.Informer()).
 		WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
 			accessor, _ := meta.Accessor(obj)
-			key, ok := accessor.GetLabels()[ManifestWorkReplicaSetControllerNameLabelKey]
+			labelValue, ok := accessor.GetLabels()[ManifestWorkReplicaSetControllerNameLabelKey]
 			if !ok {
 				return ""
 			}
-			return key
+			keys := strings.Split(labelValue, ".")
+			if len(keys) != 2 {
+				return ""
+			}
+			return fmt.Sprintf("%s/%s", keys[0], keys[1])
 		}, func(obj interface{}) bool {
 			accessor, err := meta.Accessor(obj)
 			if err != nil {
@@ -192,4 +201,14 @@ func (m *ManifestWorkReplicaSetController) patchPlaceManifestStatus(ctx context.
 
 	_, err = m.workClient.WorkV1alpha1().ManifestWorkReplicaSets(old.Namespace).Patch(ctx, old.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	return err
+}
+
+func listManifestWorksByManifestWorkReplicaSet(mwrs *workapiv1alpha1.ManifestWorkReplicaSet, manifestWorkLister worklisterv1.ManifestWorkLister) ([]*workapiv1.ManifestWork, error) {
+	req, err := labels.NewRequirement(ManifestWorkReplicaSetControllerNameLabelKey, selection.Equals, []string{manifestWorkReplicaSetKey(mwrs)})
+	if err != nil {
+		return nil, err
+	}
+
+	selector := labels.NewSelector().Add(*req)
+	return manifestWorkLister.List(selector)
 }

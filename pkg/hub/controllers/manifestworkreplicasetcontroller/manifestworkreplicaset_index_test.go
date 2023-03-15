@@ -108,7 +108,7 @@ func TestPlaceMWControllerIndex(t *testing.T) {
 
 	// Check manifestWork Queue Keys
 	key := pmwController.manifestWorkQueueKeyFunc(mw)
-	if key != mwrSetTest.Name {
+	if key != mwrSetTest.Namespace+"."+mwrSetTest.Name {
 		t.Fatal("Expected manifestwork key not match", key, " - ", mwrSetTest.Name)
 	}
 	// Check manifestWork Queue Keys not exist

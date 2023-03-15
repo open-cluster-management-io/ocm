@@ -3,9 +3,6 @@ package manifestworkreplicasetcontroller
 import (
 	"context"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	worklisterv1 "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
@@ -29,13 +26,7 @@ func (d *statusReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 		return mwrSet, reconcileContinue, nil
 	}
 
-	req, err := labels.NewRequirement(ManifestWorkReplicaSetControllerNameLabelKey, selection.In, []string{mwrSet.Name})
-	if err != nil {
-		return mwrSet, reconcileContinue, err
-	}
-
-	selector := labels.NewSelector().Add(*req)
-	manifestWorks, err := d.manifestWorkLister.List(selector)
+	manifestWorks, err := listManifestWorksByManifestWorkReplicaSet(mwrSet, d.manifestWorkLister)
 	if err != nil {
 		return mwrSet, reconcileContinue, err
 	}
@@ -47,23 +38,19 @@ func (d *statusReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 		}
 
 		// applied condition
-		condition := apimeta.FindStatusCondition(mw.Status.Conditions, string(workapiv1.ManifestApplied))
-		if condition != nil && condition.Status == metav1.ConditionTrue {
+		if apimeta.IsStatusConditionTrue(mw.Status.Conditions, workapiv1.WorkApplied) {
 			appliedCount++
 		}
 		// Progressing condition
-		condition = apimeta.FindStatusCondition(mw.Status.Conditions, string(workapiv1.ManifestProgressing))
-		if condition != nil && condition.Status == metav1.ConditionTrue {
+		if apimeta.IsStatusConditionTrue(mw.Status.Conditions, workapiv1.WorkProgressing) {
 			processingCount++
 		}
 		// Available condition
-		condition = apimeta.FindStatusCondition(mw.Status.Conditions, string(workapiv1.ManifestAvailable))
-		if condition != nil && condition.Status == metav1.ConditionTrue {
+		if apimeta.IsStatusConditionTrue(mw.Status.Conditions, workapiv1.WorkAvailable) {
 			availableCount++
 		}
 		// Degraded condition
-		condition = apimeta.FindStatusCondition(mw.Status.Conditions, string(workapiv1.ManifestDegraded))
-		if condition != nil && condition.Status == metav1.ConditionTrue {
+		if apimeta.IsStatusConditionTrue(mw.Status.Conditions, workapiv1.WorkDegraded) {
 			degradCount++
 		}
 	}

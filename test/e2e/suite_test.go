@@ -21,6 +21,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -57,6 +58,7 @@ var (
 	spokeDynamicClient dynamic.Interface
 	hubWorkClient      workclientset.Interface
 	spokeWorkClient    workclientset.Interface
+	hubClusterClient   clusterclientset.Interface
 	agentDeployer      workAgentDeployer
 )
 
@@ -89,6 +91,9 @@ var _ = ginkgo.BeforeSuite(func() {
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	hubWorkClient, err = workclientset.NewForConfig(hubRestConfig)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	hubClusterClient, err = clusterclientset.NewForConfig(hubRestConfig)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	// pick up managedKubeconfig from argument first,
