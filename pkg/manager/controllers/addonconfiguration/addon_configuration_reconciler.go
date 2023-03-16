@@ -42,7 +42,7 @@ func (d *managedClusterAddonConfigurationReconciler) buildConfigurationGraph(cma
 		graph.addAddonNode(addon)
 	}
 
-	if cma.Spec.InstallStrategy == nil || cma.Spec.InstallStrategy.Type == addonv1alpha1.AddonInstallStrategyManual {
+	if cma.Spec.InstallStrategy.Type == "" || cma.Spec.InstallStrategy.Type == addonv1alpha1.AddonInstallStrategyManual {
 		return graph, nil
 	}
 

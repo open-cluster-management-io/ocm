@@ -1,10 +1,11 @@
 package addonconfiguration
 
 import (
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"reflect"
 	"testing"
+
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
 type placementStrategy struct {

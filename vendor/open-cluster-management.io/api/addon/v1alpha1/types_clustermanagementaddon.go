@@ -57,7 +57,7 @@ type ClusterManagementAddOnSpec struct {
 	// on certain clusters.
 	// +optional
 	// +kubebuilder:default={type: Manual}
-	InstallStrategy *InstallStrategy `json:"installStrategy,omitempty"`
+	InstallStrategy InstallStrategy `json:"installStrategy,omitempty"`
 }
 
 // AddOnMeta represents a collection of metadata information for the add-on.

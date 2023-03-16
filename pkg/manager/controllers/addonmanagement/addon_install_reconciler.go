@@ -27,7 +27,7 @@ type managedClusterAddonInstallReconciler struct {
 
 func (d *managedClusterAddonInstallReconciler) reconcile(
 	ctx context.Context, cma *addonv1alpha1.ClusterManagementAddOn) (*addonv1alpha1.ClusterManagementAddOn, reconcileState, error) {
-	if cma.Spec.InstallStrategy == nil || cma.Spec.InstallStrategy.Type == addonv1alpha1.AddonInstallStrategyManual {
+	if cma.Spec.InstallStrategy.Type == "" || cma.Spec.InstallStrategy.Type == addonv1alpha1.AddonInstallStrategyManual {
 		return cma, reconcileContinue, nil
 	}
 

@@ -26,7 +26,7 @@ func IndexClusterManagementAddonByPlacement(obj interface{}) ([]string, error) {
 	}
 
 	var keys []string
-	if cma.Spec.InstallStrategy == nil || cma.Spec.InstallStrategy.Type == addonv1alpha1.AddonInstallStrategyManual {
+	if cma.Spec.InstallStrategy.Type == "" || cma.Spec.InstallStrategy.Type == addonv1alpha1.AddonInstallStrategyManual {
 		return keys, nil
 	}
 

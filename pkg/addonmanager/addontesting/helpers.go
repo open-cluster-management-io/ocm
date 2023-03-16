@@ -129,6 +129,9 @@ func NewClusterManagementAddon(name, crd, cr string) *addonapiv1alpha1.ClusterMa
 				CRDName: crd,
 				CRName:  cr,
 			},
+			InstallStrategy: addonapiv1alpha1.InstallStrategy{
+				Type: addonapiv1alpha1.AddonInstallStrategyManual,
+			},
 		},
 	}
 }

@@ -28,7 +28,7 @@ import (
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:path=placemanifestworks,shortName=pmw;pmws,scope=Namespaced
+// +kubebuilder:resource:path=manifestworkreplicasets,shortName=mwrs,scope=Namespaced
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Placement",type="string",JSONPath=".status.conditions[?(@.type==\"PlacementVerified\")].reason",description="Reason"
@@ -36,33 +36,36 @@ import (
 // +kubebuilder:printcolumn:name="ManifestWorks",type="string",JSONPath=".status.conditions[?(@.type==\"ManifestworkApplied\")].reason",description="Reason"
 // +kubebuilder:printcolumn:name="Applied",type="string",JSONPath=".status.conditions[?(@.type==\"ManifestworkApplied\")].status",description="Applied"
 
-// PlaceManifestWork is the Schema for the PlaceManifestWorks API. This custom resource is able to apply
+// ManifestWorkReplicaSet is the Schema for the ManifestWorkReplicaSet API. This custom resource is able to apply
 // ManifestWork using Placement for 0..n ManagedCluster(in their namespaces). It will also remove the ManifestWork custom resources
 // when deleted. Lastly the specific ManifestWork custom resources created per ManagedCluster namespace will be adjusted based on PlacementDecision
 // changes.
-type PlaceManifestWork struct {
+type ManifestWorkReplicaSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec reperesents the desired ManifestWork payload and Placement reference to be reconciled
-	Spec PlaceManifestWorkSpec `json:"spec,omitempty"`
+	Spec ManifestWorkReplicaSetSpec `json:"spec,omitempty"`
 
 	// Status represent the current status of Placing ManifestWork resources
-	Status PlaceManifestWorkStatus `json:"status,omitempty"`
+	Status ManifestWorkReplicaSetStatus `json:"status,omitempty"`
 }
 
-// PlaceManifestWorkSpec defines the desired state of PlaceManifestWork
-type PlaceManifestWorkSpec struct {
+// ManifestWorkReplicaSetSpec defines the desired state of ManifestWorkReplicaSet
+type ManifestWorkReplicaSetSpec struct {
 	// ManifestWorkTemplate is the ManifestWorkSpec that will be used to generate a per-cluster ManifestWork
 	ManifestWorkTemplate work.ManifestWorkSpec `json:"manifestWorkTemplate"`
 
-	// PacementRef is the name of the Placement resource, from which a PlacementDecision will be found and used
-	// to distribute the ManifestWork
-	PlacementRef LocalPlacementReference `json:"placementRef,omitempty"`
+	// PacementRefs is a list of the names of the Placement resource, from which a PlacementDecision will be found and used
+	// to distribute the ManifestWork.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +required
+	PlacementRefs []LocalPlacementReference `json:"placementRefs"`
 }
 
-// PlaceManifestWorkStatus defines the observed state of PlaceManifestWork
-type PlaceManifestWorkStatus struct {
+// ManifestWorkReplicaSetStatus defines the observed state of ManifestWorkReplicaSet
+type ManifestWorkReplicaSetStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
@@ -73,19 +76,22 @@ type PlaceManifestWorkStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// Summary totals of resulting ManifestWorks
-	PlacedManifestWorkSummary PlacedManifestWorkSummary `json:"summary"`
+	Summary ManifestWorkReplicaSetSummary `json:"summary"`
 }
 
 // localPlacementReference is the name of a Placement resource in current namespace
 type LocalPlacementReference struct {
 	// Name of the Placement resource in the current namespace
+	// +required
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 }
 
-// PlaceManifestWorkSummary provides reference counts of all ManifestWorks that are associated with a
-// given PlaceManifestWork resource, for their respective states
-type PlacedManifestWorkSummary struct {
-	// Total number of ManifestWorks managed by the PlaceManifestWork
+// ManifestWorkReplicaSetSummary provides reference counts of all ManifestWorks that are associated with a
+// given ManifestWorkReplicaSet resource, for their respective states
+type ManifestWorkReplicaSetSummary struct {
+	// Total number of ManifestWorks managed by the ManifestWorkReplicaSet
 	Total int `json:"total"`
 	// TODO: Progressing is the number of ManifestWorks with condition Progressing: true
 	Progressing int `json:"progressing"`
@@ -100,30 +106,37 @@ type PlacedManifestWorkSummary struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
 //
-// PlaceManifestWorkList contains a list of PlaceManifestWork
-type PlaceManifestWorkList struct {
+// ManifestWorkReplicaSetList contains a list of ManifestWorkReplicaSet
+type ManifestWorkReplicaSetList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []PlaceManifestWork `json:"items"`
+	Items           []ManifestWorkReplicaSet `json:"items"`
 }
 
-type PlaceWorkConditionType string
-
 const (
-	PlacementDecisionNotFound = "PlacementDecisionNotFound"
-	PlacementDecisionEmpty    = "PlacementDecisionEmpty"
+	// ReasonPlacementDecisionNotFound is a reason for ManifestWorkReplicaSetConditionPlacementVerified condition type
+	// representing placement decision is not found for the ManifestWorkSet
+	ReasonPlacementDecisionNotFound = "PlacementDecisionNotFound"
+	// ReasonPlacementDecisionEmpty is a reason for ManifestWorkReplicaSetConditionPlacementVerified condition type
+	// representing the placement decision is empty for the ManifestWorkSet
+	ReasonPlacementDecisionEmpty = "PlacementDecisionEmpty"
+	// ReasonAsExpected is a reason for ManifestWorkReplicaSetConditionManifestworkApplied condition type representing
+	// the ManifestWorkSet is applied correctly.
+	ReasonAsExpected = "AsExpected"
+	// ReasonProcessing is a reason for ManifestWorkReplicaSetConditionManifestworkApplied condition type representing
+	// the ManifestWorkSet is under processing
+	ReasonProcessing = "Processing"
+	// ReasonNotAsExpected is a reason for ManifestWorkReplicaSetConditionManifestworkApplied condition type representing
+	// the ManifestWorkSet is not applied correctly.
+	ReasonNotAsExpected = "NotAsExpected"
 
-	AsExpected    = "AsExpected"
-	Processing    = "Processing"
-	NotAsExpected = "NotAsExpected"
-
-	// PlacementDecisionVerified indicates if Placement is valid
+	// ManifestWorkSetConditionPlacementVerified indicates if Placement is valid
 	//
 	// Reason: AsExpected, PlacementDecisionNotFound, PlacementDecisionEmpty or NotAsExpected
-	PlacementDecisionVerified PlaceWorkConditionType = "PlacementVerified"
+	ManifestWorkReplicaSetConditionPlacementVerified string = "PlacementVerified"
 
-	// ManifestWorkApplied confirms that a ManifestWork has been created in each cluster defined by PlacementDecision
+	// ManifestWorkSetConditionManifestworkApplied confirms that a ManifestWork has been created in each cluster defined by PlacementDecision
 	//
 	// Reason: AsExpected, NotAsExpected or Processing
-	ManifestworkApplied PlaceWorkConditionType = "ManifestworkApplied"
+	ManifestWorkReplicaSetConditionManifestworkApplied string = "ManifestworkApplied"
 )

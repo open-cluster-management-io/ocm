@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -27,7 +28,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 				Name: fmt.Sprintf("test-%s", suffix),
 			},
 			Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
-				InstallStrategy: &addonapiv1alpha1.InstallStrategy{
+				InstallStrategy: addonapiv1alpha1.InstallStrategy{
 					Type: addonapiv1alpha1.AddonInstallStrategyManual,
 				},
 			},
@@ -99,7 +100,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			clusterManagementAddon, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), cma.Name, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			clusterManagementAddon.Spec.InstallStrategy = &addonapiv1alpha1.InstallStrategy{
+			clusterManagementAddon.Spec.InstallStrategy = addonapiv1alpha1.InstallStrategy{
 				Type: addonapiv1alpha1.AddonInstallStrategyManualPlacements,
 				Placements: []addonapiv1alpha1.PlacementStrategy{
 					{

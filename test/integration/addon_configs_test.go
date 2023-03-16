@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
 	"github.com/onsi/ginkgo"
@@ -119,7 +120,7 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 		cma, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), testAddOnConfigsImpl.name, metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		cma.Spec.InstallStrategy = &addonapiv1alpha1.InstallStrategy{
+		cma.Spec.InstallStrategy = addonapiv1alpha1.InstallStrategy{
 			Type: addonapiv1alpha1.AddonInstallStrategyManualPlacements,
 			Placements: []addonapiv1alpha1.PlacementStrategy{
 				{
@@ -353,6 +354,9 @@ func createClusterManagementAddOn(name, defaultConfigNamespace, defaultConfigNam
 								Namespace: defaultConfigNamespace,
 							},
 						},
+					},
+					InstallStrategy: addonapiv1alpha1.InstallStrategy{
+						Type: addonapiv1alpha1.AddonInstallStrategyManual,
 					},
 				},
 			},

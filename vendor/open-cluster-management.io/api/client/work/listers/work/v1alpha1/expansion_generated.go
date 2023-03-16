@@ -2,10 +2,10 @@
 
 package v1alpha1
 
-// PlaceManifestWorkListerExpansion allows custom methods to be added to
-// PlaceManifestWorkLister.
-type PlaceManifestWorkListerExpansion interface{}
+// ManifestWorkReplicaSetListerExpansion allows custom methods to be added to
+// ManifestWorkReplicaSetLister.
+type ManifestWorkReplicaSetListerExpansion interface{}
 
-// PlaceManifestWorkNamespaceListerExpansion allows custom methods to be added to
-// PlaceManifestWorkNamespaceLister.
-type PlaceManifestWorkNamespaceListerExpansion interface{}
+// ManifestWorkReplicaSetNamespaceListerExpansion allows custom methods to be added to
+// ManifestWorkReplicaSetNamespaceLister.
+type ManifestWorkReplicaSetNamespaceListerExpansion interface{}

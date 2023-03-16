@@ -3,6 +3,10 @@ package addonconfiguration
 import (
 	"context"
 	"encoding/json"
+	"sort"
+	"testing"
+	"time"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -16,9 +20,6 @@ import (
 	fakecluster "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
-	"sort"
-	"testing"
-	"time"
 )
 
 func TestAddonConfigReconcile(t *testing.T) {
@@ -50,7 +51,9 @@ func TestAddonConfigReconcile(t *testing.T) {
 			},
 			clusterManagementAddon: newClusterManagementAddon("test",
 				[]addonv1alpha1.ConfigMeta{{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"}, DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}}},
-				nil),
+				addonv1alpha1.InstallStrategy{
+					Type: addonv1alpha1.AddonInstallStrategyManual,
+				}),
 			placements:         []runtime.Object{},
 			placementDecisions: []runtime.Object{},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -85,7 +88,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 			},
 			clusterManagementAddon: newClusterManagementAddon("test",
 				[]addonv1alpha1.ConfigMeta{{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"}, DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}}},
-				&addonv1alpha1.InstallStrategy{
+				addonv1alpha1.InstallStrategy{
 					Type: addonv1alpha1.AddonInstallStrategyManualPlacements,
 					Placements: []addonv1alpha1.PlacementStrategy{
 						{
@@ -138,7 +141,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 			},
 			clusterManagementAddon: newClusterManagementAddon("test",
 				[]addonv1alpha1.ConfigMeta{{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"}, DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}}},
-				&addonv1alpha1.InstallStrategy{
+				addonv1alpha1.InstallStrategy{
 					Type: addonv1alpha1.AddonInstallStrategyManualPlacements,
 					Placements: []addonv1alpha1.PlacementStrategy{
 						{
@@ -190,7 +193,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 			},
 			clusterManagementAddon: newClusterManagementAddon("test",
 				[]addonv1alpha1.ConfigMeta{{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"}, DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}}},
-				&addonv1alpha1.InstallStrategy{
+				addonv1alpha1.InstallStrategy{
 					Type: addonv1alpha1.AddonInstallStrategyManualPlacements,
 					Placements: []addonv1alpha1.PlacementStrategy{
 						{
@@ -237,7 +240,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 			},
 			clusterManagementAddon: newClusterManagementAddon("test",
 				[]addonv1alpha1.ConfigMeta{{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"}, DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}}},
-				&addonv1alpha1.InstallStrategy{
+				addonv1alpha1.InstallStrategy{
 					Type: addonv1alpha1.AddonInstallStrategyManualPlacements,
 					Placements: []addonv1alpha1.PlacementStrategy{
 						{
@@ -321,7 +324,7 @@ func (a byPatchName) Less(i, j int) bool {
 	return patchi.Namespace < patchj.Namespace
 }
 
-func newClusterManagementAddon(name string, defaultConfigs []addonv1alpha1.ConfigMeta, installStrategy *addonv1alpha1.InstallStrategy) *addonv1alpha1.ClusterManagementAddOn {
+func newClusterManagementAddon(name string, defaultConfigs []addonv1alpha1.ConfigMeta, installStrategy addonv1alpha1.InstallStrategy) *addonv1alpha1.ClusterManagementAddOn {
 	cma := addontesting.NewClusterManagementAddon(name, "", "")
 	cma.Spec.SupportedConfigs = defaultConfigs
 	cma.Spec.InstallStrategy = installStrategy

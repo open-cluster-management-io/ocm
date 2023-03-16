@@ -204,11 +204,7 @@ func (in *ClusterManagementAddOnSpec) DeepCopyInto(out *ClusterManagementAddOnSp
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.InstallStrategy != nil {
-		in, out := &in.InstallStrategy, &out.InstallStrategy
-		*out = new(InstallStrategy)
-		(*in).DeepCopyInto(*out)
-	}
+	in.InstallStrategy.DeepCopyInto(&out.InstallStrategy)
 	return
 }
 

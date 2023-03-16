@@ -64,7 +64,11 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
 			},
-			Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{},
+			Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
+				InstallStrategy: addonapiv1alpha1.InstallStrategy{
+					Type: addonapiv1alpha1.AddonInstallStrategyManual,
+				},
+			},
 		}
 		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(), clusterManagementAddon, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())

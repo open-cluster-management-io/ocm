@@ -2,4 +2,4 @@
 
 package v1alpha1
 
-type PlaceManifestWorkExpansion interface{}
+type ManifestWorkReplicaSetExpansion interface{}
