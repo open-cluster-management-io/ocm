@@ -201,6 +201,18 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				gomega.Expect(u.deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
 			})
 
+			ginkgo.It("Should respond bad request when cluster name is invalid", func() {
+				clusterName := fmt.Sprintf("webhook.spoke-%s", rand.String(6))
+				ginkgo.By(fmt.Sprintf("create a managed cluster %q with an invalid name", clusterName))
+
+				managedCluster := newManagedCluster(clusterName, false, validURL)
+
+				_, err := clusterClient.ClusterV1().ManagedClusters().Create(context.TODO(), managedCluster, metav1.CreateOptions{})
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(errors.IsBadRequest(err)).Should(gomega.BeTrue())
+				gomega.Expect(u.deleteManageClusterAndRelatedNamespace(clusterName)).ToNot(gomega.HaveOccurred())
+			})
+
 			ginkgo.It("Should forbid the request when creating an accepted managed cluster by unauthorized user", func() {
 				sa := fmt.Sprintf("webhook-sa-%s", rand.String(6))
 				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))

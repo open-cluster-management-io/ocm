@@ -3,11 +3,13 @@ package v1
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
@@ -107,7 +109,10 @@ func (r *ManagedClusterWebhook) ValidateDelete(_ context.Context, obj runtime.Ob
 // validateManagedClusterObj validates the fileds of ManagedCluster object
 func (r *ManagedClusterWebhook) validateManagedClusterObj(cluster v1.ManagedCluster) error {
 	errs := []error{}
-
+	// The cluster name must be the same format of namespace name.
+	if errMsgs := apimachineryvalidation.ValidateNamespaceName(cluster.Name, false); len(errMsgs) > 0 {
+		errs = append(errs, fmt.Errorf("metadata.name format is not correct: %s", strings.Join(errMsgs, ",")))
+	}
 	// there are no spoke client configs, finish the validation process
 	if len(cluster.Spec.ManagedClusterClientConfigs) == 0 {
 		return nil

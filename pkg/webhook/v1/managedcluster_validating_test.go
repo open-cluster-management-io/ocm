@@ -119,6 +119,20 @@ func TestValidateCreate(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:          "validate cluster name",
+			expectedError: true,
+			cluster: &v1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "01.set",
+				},
+				Spec: v1.ManagedClusterSpec{
+					ManagedClusterClientConfigs: []v1.ClientConfig{
+						{URL: "https://127.0.0.1:8001"},
+					},
+				},
+			},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
