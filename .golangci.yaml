@@ -1,7 +1,7 @@
 # Copyright Contributors to the Open Cluster Management project
 
 run:
-  # default concurrency is a available CPU number
+  # default concurrency is an available CPU number
   concurrency: 10
   # timeout for analysis, e.g. 30s, 5m, default is 1m
   deadline: 5m
@@ -36,7 +36,7 @@ linters:
     - gocritic
     - gofmt
     - goimports
-    # - gosec
+    - gosec
     - gosimple
     - govet
     - ineffassign

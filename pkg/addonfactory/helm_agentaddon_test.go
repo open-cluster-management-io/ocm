@@ -360,6 +360,12 @@ func hasDescriptionV1(p *apiextensionsv1.JSONSchemaProps) bool {
 func validateTrimCRDv1beta1(crd *apiextensionsv1beta1.CustomResourceDefinition) bool {
 	versions := crd.Spec.Versions
 	for i := range versions {
+		if versions[i].Schema == nil {
+			return true
+		}
+		if versions[i].Schema.OpenAPIV3Schema == nil {
+			return true
+		}
 		properties := versions[i].Schema.OpenAPIV3Schema.Properties
 		for _, p := range properties {
 			if hasDescriptionV1beta1(&p) {

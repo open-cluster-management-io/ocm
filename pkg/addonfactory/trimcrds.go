@@ -28,7 +28,9 @@ func trimCRDDescription(objects []runtime.Object) []runtime.Object {
 func trimCRDv1Description(crd *apiextensionsv1.CustomResourceDefinition) {
 	versions := crd.Spec.Versions
 	for i := range versions {
-		removeDescriptionV1(versions[i].Schema.OpenAPIV3Schema)
+		if versions[i].Schema != nil {
+			removeDescriptionV1(versions[i].Schema.OpenAPIV3Schema)
+		}
 	}
 }
 
@@ -70,7 +72,8 @@ func removeDescriptionV1(p *apiextensionsv1.JSONSchemaProps) {
 
 	if len(p.Properties) != 0 {
 		newProperties := map[string]apiextensionsv1.JSONSchemaProps{}
-		for k, v := range p.Properties {
+		for k := range p.Properties {
+			v := p.Properties[k]
 			removeDescriptionV1(&v)
 			newProperties[k] = v
 		}
@@ -79,7 +82,8 @@ func removeDescriptionV1(p *apiextensionsv1.JSONSchemaProps) {
 
 	if len(p.PatternProperties) != 0 {
 		newProperties := map[string]apiextensionsv1.JSONSchemaProps{}
-		for k, v := range p.PatternProperties {
+		for k := range p.PatternProperties {
+			v := p.PatternProperties[k]
 			removeDescriptionV1(&v)
 			newProperties[k] = v
 		}
@@ -92,7 +96,8 @@ func removeDescriptionV1(p *apiextensionsv1.JSONSchemaProps) {
 
 	if len(p.Dependencies) != 0 {
 		newDependencies := map[string]apiextensionsv1.JSONSchemaPropsOrStringArray{}
-		for k, v := range p.Dependencies {
+		for k := range p.Dependencies {
+			v := p.Dependencies[k]
 			removeDescriptionV1(v.Schema)
 			newDependencies[k] = v
 		}
@@ -105,7 +110,8 @@ func removeDescriptionV1(p *apiextensionsv1.JSONSchemaProps) {
 
 	if len(p.Definitions) != 0 {
 		newDefinitions := map[string]apiextensionsv1.JSONSchemaProps{}
-		for k, v := range p.Definitions {
+		for k := range p.Definitions {
+			v := p.Definitions[k]
 			removeDescriptionV1(&v)
 			newDefinitions[k] = v
 		}
@@ -121,7 +127,9 @@ func removeDescriptionV1(p *apiextensionsv1.JSONSchemaProps) {
 func trimCRDv1beta1Description(crd *apiextensionsv1beta1.CustomResourceDefinition) {
 	versions := crd.Spec.Versions
 	for i := range versions {
-		removeDescriptionV1beta1(versions[i].Schema.OpenAPIV3Schema)
+		if versions[i].Schema != nil {
+			removeDescriptionV1beta1(versions[i].Schema.OpenAPIV3Schema)
+		}
 	}
 }
 
@@ -163,7 +171,8 @@ func removeDescriptionV1beta1(p *apiextensionsv1beta1.JSONSchemaProps) {
 
 	if len(p.Properties) != 0 {
 		newProperties := map[string]apiextensionsv1beta1.JSONSchemaProps{}
-		for k, v := range p.Properties {
+		for k := range p.Properties {
+			v := p.Properties[k]
 			removeDescriptionV1beta1(&v)
 			newProperties[k] = v
 		}
@@ -172,7 +181,8 @@ func removeDescriptionV1beta1(p *apiextensionsv1beta1.JSONSchemaProps) {
 
 	if len(p.PatternProperties) != 0 {
 		newProperties := map[string]apiextensionsv1beta1.JSONSchemaProps{}
-		for k, v := range p.PatternProperties {
+		for k := range p.PatternProperties {
+			v := p.PatternProperties[k]
 			removeDescriptionV1beta1(&v)
 			newProperties[k] = v
 		}
@@ -198,7 +208,8 @@ func removeDescriptionV1beta1(p *apiextensionsv1beta1.JSONSchemaProps) {
 
 	if len(p.Definitions) != 0 {
 		newDefinitions := map[string]apiextensionsv1beta1.JSONSchemaProps{}
-		for k, v := range p.Definitions {
+		for k := range p.Definitions {
+			v := p.Definitions[k]
 			removeDescriptionV1beta1(&v)
 			newDefinitions[k] = v
 		}
