@@ -18,9 +18,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
-	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	"open-cluster-management.io/addon-framework/pkg/agent"
 )
 
 var serialNumberLimit = new(big.Int).Lsh(big.NewInt(1), 128)
@@ -38,7 +39,7 @@ func DefaultSignerWithExpiry(caKey, caData []byte, duration time.Duration) agent
 		blockTlsKey, _ := pem.Decode(caKey)
 
 		// For now only PKCS#1 is supported which assures the private key algorithm is RSA.
-		// TODO: Compatiblity w/ PKCS#8 key e.g. EC algorithm
+		// TODO: Compatibility w/ PKCS#8 key e.g. EC algorithm
 		key, err := x509.ParsePKCS1PrivateKey(blockTlsKey.Bytes)
 		if err != nil {
 			klog.Errorf("Failed to parse key: %v", err)

@@ -11,9 +11,14 @@ import (
 	"k8s.io/client-go/kubernetes"
 	rbacclientv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/utils/pointer"
-	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	"open-cluster-management.io/addon-framework/pkg/agent"
+)
+
+const (
+	RoleRefKindUser = "User"
 )
 
 // RBACPermissionBuilder builds a agent.PermissionConfigFunc that applies Kubernetes RBAC policies.
@@ -230,7 +235,9 @@ func ApplyClusterRole(ctx context.Context, client rbacclientv1.ClusterRolesGette
 
 // ApplyClusterRoleBinding merges objectmeta, requires subjects and role refs
 // TODO on non-matching roleref, delete and recreate
-func ApplyClusterRoleBinding(ctx context.Context, client rbacclientv1.ClusterRoleBindingsGetter, required *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, bool, error) {
+func ApplyClusterRoleBinding(ctx context.Context,
+	client rbacclientv1.ClusterRoleBindingsGetter,
+	required *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, bool, error) {
 	existing, err := client.ClusterRoleBindings().Get(ctx, required.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		requiredCopy := required.DeepCopy()
@@ -248,14 +255,14 @@ func ApplyClusterRoleBinding(ctx context.Context, client rbacclientv1.ClusterRol
 	// Enforce apiGroup fields in roleRefs
 	existingCopy.RoleRef.APIGroup = rbacv1.GroupName
 	for i := range existingCopy.Subjects {
-		if existingCopy.Subjects[i].Kind == "User" {
+		if existingCopy.Subjects[i].Kind == RoleRefKindUser {
 			existingCopy.Subjects[i].APIGroup = rbacv1.GroupName
 		}
 	}
 
 	requiredCopy.RoleRef.APIGroup = rbacv1.GroupName
 	for i := range requiredCopy.Subjects {
-		if requiredCopy.Subjects[i].Kind == "User" {
+		if requiredCopy.Subjects[i].Kind == RoleRefKindUser {
 			requiredCopy.Subjects[i].APIGroup = rbacv1.GroupName
 		}
 	}
@@ -320,14 +327,14 @@ func ApplyRoleBinding(ctx context.Context, client rbacclientv1.RoleBindingsGette
 	// Enforce apiGroup fields in roleRefs and subjects
 	existingCopy.RoleRef.APIGroup = rbacv1.GroupName
 	for i := range existingCopy.Subjects {
-		if existingCopy.Subjects[i].Kind == "User" {
+		if existingCopy.Subjects[i].Kind == RoleRefKindUser {
 			existingCopy.Subjects[i].APIGroup = rbacv1.GroupName
 		}
 	}
 
 	requiredCopy.RoleRef.APIGroup = rbacv1.GroupName
 	for i := range requiredCopy.Subjects {
-		if requiredCopy.Subjects[i].Kind == "User" {
+		if requiredCopy.Subjects[i].Kind == RoleRefKindUser {
 			requiredCopy.Subjects[i].APIGroup = rbacv1.GroupName
 		}
 	}

@@ -7,16 +7,16 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/certs"
+	"github.com/openshift/library-go/pkg/crypto"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"open-cluster-management.io/addon-framework/pkg/utils"
-
-	"github.com/openshift/library-go/pkg/crypto"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/util/cert"
+
+	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 // TargetRotation rotates a key and cert signed by a CA. It creates a new one when 80%
@@ -31,7 +31,8 @@ type TargetRotation struct {
 	Client    corev1client.SecretsGetter
 }
 
-func (c TargetRotation) EnsureTargetCertKeyPair(signingCertKeyPair *crypto.CA, caBundleCerts []*x509.Certificate, fns ...crypto.CertificateExtensionFunc) error {
+func (c TargetRotation) EnsureTargetCertKeyPair(signingCertKeyPair *crypto.CA, caBundleCerts []*x509.Certificate,
+	fns ...crypto.CertificateExtensionFunc) error {
 	originalTargetCertKeyPairSecret, err := c.Lister.Secrets(c.Namespace).Get(c.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
@@ -48,7 +49,8 @@ func (c TargetRotation) EnsureTargetCertKeyPair(signingCertKeyPair *crypto.CA, c
 		return nil
 	}
 
-	if err := c.setTargetCertKeyPairSecret(targetCertKeyPairSecret, c.Validity, signingCertKeyPair, fns...); err != nil {
+	if err := c.setTargetCertKeyPairSecret(
+		targetCertKeyPairSecret, c.Validity, signingCertKeyPair, fns...); err != nil {
 		return err
 	}
 
@@ -106,13 +108,15 @@ func needNewTargetCertKeyPair(secret *corev1.Secret, caBundleCerts []*x509.Certi
 		containsIssuer = true
 	}
 	if !containsIssuer {
-		return fmt.Sprintf("issuer %q not in ca bundle:\n%s", cert.Issuer.CommonName, certs.CertificateBundleToString(caBundleCerts))
+		return fmt.Sprintf("issuer %q not in ca bundle:\n%s",
+			cert.Issuer.CommonName, certs.CertificateBundleToString(caBundleCerts))
 	}
 
 	expectedIPs, expectedHosts := crypto.IPAddressesDNSNames(hostnames)
 	currentNames := sets.NewString(cert.DNSNames...)
 	if !sets.NewString(expectedHosts...).Equal(currentNames) {
-		return fmt.Sprintf("issued hostnames mismatch in ca bundle: (current) %v, (expected) %v", currentNames, expectedHosts)
+		return fmt.Sprintf("issued hostnames mismatch in ca bundle: (current) %v, (expected) %v",
+			currentNames, expectedHosts)
 	}
 	currentIPs := sets.NewString()
 	for _, ip := range cert.IPAddresses {
@@ -123,14 +127,16 @@ func needNewTargetCertKeyPair(secret *corev1.Secret, caBundleCerts []*x509.Certi
 		expectedStrIPs.Insert(ip.String())
 	}
 	if !expectedStrIPs.Equal(currentIPs) {
-		return fmt.Sprintf("issued ip addresses mismatch in ca bundle: (current) %v, (expected) %v", currentIPs, expectedIPs)
+		return fmt.Sprintf("issued ip addresses mismatch in ca bundle: (current) %v, (expected) %v",
+			currentIPs, expectedIPs)
 	}
 
 	return ""
 }
 
 // setTargetCertKeyPairSecret creates a new cert/key pair and sets them in the secret.
-func (c TargetRotation) setTargetCertKeyPairSecret(targetCertKeyPairSecret *corev1.Secret, validity time.Duration, signer *crypto.CA, fns ...crypto.CertificateExtensionFunc) error {
+func (c TargetRotation) setTargetCertKeyPairSecret(targetCertKeyPairSecret *corev1.Secret, validity time.Duration,
+	signer *crypto.CA, fns ...crypto.CertificateExtensionFunc) error {
 	if targetCertKeyPairSecret.Data == nil {
 		targetCertKeyPairSecret.Data = map[string][]byte{}
 	}
@@ -158,7 +164,8 @@ func (c TargetRotation) setTargetCertKeyPairSecret(targetCertKeyPairSecret *core
 	return nil
 }
 
-func (c TargetRotation) NewCertificate(signer *crypto.CA, validity time.Duration, fns ...crypto.CertificateExtensionFunc) (*crypto.TLSCertificateConfig, error) {
+func (c TargetRotation) NewCertificate(signer *crypto.CA, validity time.Duration,
+	fns ...crypto.CertificateExtensionFunc) (*crypto.TLSCertificateConfig, error) {
 	if len(c.HostNames) == 0 {
 		return nil, fmt.Errorf("no hostnames set")
 	}

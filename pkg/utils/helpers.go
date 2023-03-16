@@ -9,8 +9,6 @@ import (
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -19,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/klog/v2"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 )
 
@@ -161,7 +160,7 @@ func ApplySecret(ctx context.Context, client coreclientv1.SecretsGetter, require
 		actual, err = client.Secrets(required.Namespace).Update(ctx, existingCopy, metav1.UpdateOptions{})
 
 		if err == nil {
-			return actual, true, err
+			return actual, true, nil
 		}
 		if !strings.Contains(err.Error(), "field is immutable") {
 			return actual, true, err
@@ -279,6 +278,7 @@ func PatchAddonCondition(ctx context.Context, addonClient addonv1alpha1client.In
 	}
 
 	klog.V(2).Infof("Patching addon %s/%s condition with %s", new.Namespace, new.Name, string(patchBytes))
-	_, err = addonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Patch(ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	_, err = addonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Patch(
+		ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	return err
 }

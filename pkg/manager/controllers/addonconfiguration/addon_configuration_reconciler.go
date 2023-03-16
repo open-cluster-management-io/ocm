@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -13,11 +14,12 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"open-cluster-management.io/addon-framework/pkg/index"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+
+	"open-cluster-management.io/addon-framework/pkg/index"
 )
 
 type managedClusterAddonConfigurationReconciler struct {
@@ -108,7 +110,8 @@ func (d *managedClusterAddonConfigurationReconciler) reconcile(
 	return cma, reconcileContinue, utilerrors.NewAggregate(errs)
 }
 
-func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(mca *addonv1alpha1.ManagedClusterAddOn, desiredConfigMap addonConfigMap) *addonv1alpha1.ManagedClusterAddOn {
+func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
+	mca *addonv1alpha1.ManagedClusterAddOn, desiredConfigMap addonConfigMap) *addonv1alpha1.ManagedClusterAddOn {
 	mcaCopy := mca.DeepCopy()
 
 	var mergedConfigs []addonv1alpha1.ConfigReference
@@ -178,6 +181,7 @@ func (d *managedClusterAddonConfigurationReconciler) patchAddonStatus(ctx contex
 	}
 
 	klog.Infof("Patching addon %s/%s status with %s", new.Namespace, new.Name, string(patchBytes))
-	_, err = d.addonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Patch(ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	_, err = d.addonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Patch(
+		ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	return err
 }

@@ -2,17 +2,19 @@ package manager
 
 import (
 	"context"
+	"time"
+
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"open-cluster-management.io/addon-framework/pkg/index"
-	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonconfiguration"
-	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonmanagement"
-	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonstatus"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
-	"time"
+
+	"open-cluster-management.io/addon-framework/pkg/index"
+	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonconfiguration"
+	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonmanagement"
+	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonstatus"
 )
 
 func RunManager(ctx context.Context, kubeConfig *rest.Config) error {

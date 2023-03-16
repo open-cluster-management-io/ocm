@@ -32,11 +32,11 @@ type addonNode struct {
 type addonConfigMap map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference
 
 func (d addonConfigMap) copy() addonConfigMap {
-	ouput := addonConfigMap{}
+	output := addonConfigMap{}
 	for k, v := range d {
-		ouput[k] = v
+		output[k] = v
 	}
-	return ouput
+	return output
 }
 
 func newGraph(supportedConfigs []addonv1alpha1.ConfigMeta) *configurationGraph {

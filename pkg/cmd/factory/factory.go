@@ -3,6 +3,12 @@ package factory
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"net"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,11 +30,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
-	"math/rand"
-	"net"
-	"os"
-	"strings"
-	"time"
 )
 
 // ControllerFlags provides the "normal" controller flags

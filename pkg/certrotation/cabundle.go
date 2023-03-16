@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/openshift/library-go/pkg/crypto"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -13,9 +14,8 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/util/cert"
-	"open-cluster-management.io/addon-framework/pkg/utils"
 
-	"github.com/openshift/library-go/pkg/crypto"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 // CABundleRotation maintains a CA bundle config map, but adding new CA certs and removing expired old ones.
@@ -27,8 +27,8 @@ type CABundleRotation struct {
 }
 
 func (c CABundleRotation) EnsureConfigMapCABundle(signingCertKeyPair *crypto.CA) ([]*x509.Certificate, error) {
-	// by this point we have current signing cert/key pair.  We now need to make sure that the ca-bundle configmap has this cert and
-	// doesn't have any expired certs
+	// by this point we have current signing cert/key pair.  We now need to make sure that the
+	// ca-bundle configmap has this cert and doesn't have any expired certs
 	originalCABundleConfigMap, err := c.Lister.ConfigMaps(c.Namespace).Get(c.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
@@ -41,7 +41,9 @@ func (c CABundleRotation) EnsureConfigMapCABundle(signingCertKeyPair *crypto.CA)
 	if _, err = manageCABundleConfigMap(caBundleConfigMap, signingCertKeyPair.Config.Certs[0]); err != nil {
 		return nil, err
 	}
-	if originalCABundleConfigMap == nil || originalCABundleConfigMap.Data == nil || !equality.Semantic.DeepEqual(originalCABundleConfigMap.Data, caBundleConfigMap.Data) {
+	if originalCABundleConfigMap == nil ||
+		originalCABundleConfigMap.Data == nil ||
+		!equality.Semantic.DeepEqual(originalCABundleConfigMap.Data, caBundleConfigMap.Data) {
 		actualCABundleConfigMap, _, err := utils.ApplyConfigMap(context.TODO(), c.Client, caBundleConfigMap)
 		if err != nil {
 			return nil, err
@@ -51,7 +53,8 @@ func (c CABundleRotation) EnsureConfigMapCABundle(signingCertKeyPair *crypto.CA)
 
 	caBundle := caBundleConfigMap.Data["ca-bundle.crt"]
 	if len(caBundle) == 0 {
-		return nil, fmt.Errorf("configmap/%s -n%s missing ca-bundle.crt", caBundleConfigMap.Name, caBundleConfigMap.Namespace)
+		return nil, fmt.Errorf("configmap/%s -n%s missing ca-bundle.crt",
+			caBundleConfigMap.Name, caBundleConfigMap.Namespace)
 	}
 	certificates, err := cert.ParseCertsPEM([]byte(caBundle))
 	if err != nil {
@@ -61,9 +64,10 @@ func (c CABundleRotation) EnsureConfigMapCABundle(signingCertKeyPair *crypto.CA)
 	return certificates, nil
 }
 
-// manageCABundleConfigMap adds the new certificate to the list of cabundles, eliminates duplicates, and prunes the list of expired
-// certs to trust as signers
-func manageCABundleConfigMap(caBundleConfigMap *corev1.ConfigMap, currentSigner *x509.Certificate) ([]*x509.Certificate, error) {
+// manageCABundleConfigMap adds the new certificate to the list of cabundles, eliminates duplicates,
+// and prunes the list of expired certs to trust as signers
+func manageCABundleConfigMap(
+	caBundleConfigMap *corev1.ConfigMap, currentSigner *x509.Certificate) ([]*x509.Certificate, error) {
 	if caBundleConfigMap.Data == nil {
 		caBundleConfigMap.Data = map[string]string{}
 	}

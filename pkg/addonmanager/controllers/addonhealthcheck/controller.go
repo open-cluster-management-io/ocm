@@ -13,10 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
-	"open-cluster-management.io/addon-framework/pkg/agent"
-	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
-	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
@@ -24,6 +20,11 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
+	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 // addonHealthCheckController reconciles instances of ManagedClusterAddon on the hub.
@@ -115,7 +116,8 @@ func (c *addonHealthCheckController) sync(ctx context.Context, syncCtx factory.S
 	return c.syncAddonHealthChecker(ctx, managedClusterAddon, agentAddon)
 }
 
-func (c *addonHealthCheckController) syncAddonHealthChecker(ctx context.Context, addon *addonapiv1alpha1.ManagedClusterAddOn, agentAddon agent.AgentAddon) error {
+func (c *addonHealthCheckController) syncAddonHealthChecker(ctx context.Context,
+	addon *addonapiv1alpha1.ManagedClusterAddOn, agentAddon agent.AgentAddon) error {
 	// for in-place edit
 	addon = addon.DeepCopy()
 	// reconcile health check mode
@@ -126,12 +128,10 @@ func (c *addonHealthCheckController) syncAddonHealthChecker(ctx context.Context,
 	}
 
 	switch agentAddon.GetAgentAddonOptions().HealthProber.Type {
-	case agent.HealthProberTypeWork:
-		fallthrough
-	case agent.HealthProberTypeNone:
+	case agent.HealthProberTypeWork, agent.HealthProberTypeNone:
 		expectedHealthCheckMode = addonapiv1alpha1.HealthCheckModeCustomized
 	case agent.HealthProberTypeLease:
-		fallthrough
+		expectedHealthCheckMode = addonapiv1alpha1.HealthCheckModeLease
 	default:
 		expectedHealthCheckMode = addonapiv1alpha1.HealthCheckModeLease
 	}

@@ -2,6 +2,7 @@ package constants
 
 import (
 	"fmt"
+
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 

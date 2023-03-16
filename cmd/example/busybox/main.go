@@ -7,6 +7,7 @@ import (
 
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
+
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 )

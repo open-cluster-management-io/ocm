@@ -2,6 +2,7 @@ package hub
 
 import (
 	"github.com/spf13/cobra"
+
 	"open-cluster-management.io/addon-framework/pkg/cmd/factory"
 	"open-cluster-management.io/addon-framework/pkg/manager"
 	"open-cluster-management.io/addon-framework/pkg/version"

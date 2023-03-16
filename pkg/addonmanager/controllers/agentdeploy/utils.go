@@ -8,11 +8,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
-	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"open-cluster-management.io/api/utils/work/v1/workbuilder"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
+	"open-cluster-management.io/addon-framework/pkg/agent"
 )
 
 func addonHasFinalizer(addon *addonapiv1alpha1.ManagedClusterAddOn, finalizer string) bool {
@@ -424,7 +425,8 @@ func hookWorkIsCompleted(hookWork *workapiv1.ManifestWork) bool {
 	return true
 }
 
-func newAddonWorkObjectMeta(namePrefix, addonName, addonNamespace, workNamespace string, owner *metav1.OwnerReference) workbuilder.GenerateManifestWorkObjectMeta {
+func newAddonWorkObjectMeta(namePrefix, addonName, addonNamespace, workNamespace string,
+	owner *metav1.OwnerReference) workbuilder.GenerateManifestWorkObjectMeta {
 	return func(index int) metav1.ObjectMeta {
 		objectMeta := metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%d", namePrefix, index),

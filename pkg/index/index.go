@@ -2,6 +2,7 @@ package index
 
 import (
 	"fmt"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -47,7 +48,8 @@ func IndexManagedClusterAddonByName(obj interface{}) ([]string, error) {
 	return []string{mca.Name}, nil
 }
 
-func ClusterManagementAddonByPlacementQueueKey(clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer) func(obj runtime.Object) []string {
+func ClusterManagementAddonByPlacementQueueKey(
+	cmai addoninformerv1alpha1.ClusterManagementAddOnInformer) func(obj runtime.Object) []string {
 	return func(obj runtime.Object) []string {
 		key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 		if err != nil {
@@ -55,7 +57,7 @@ func ClusterManagementAddonByPlacementQueueKey(clusterManagementAddonInformers a
 			return []string{}
 		}
 
-		objs, err := clusterManagementAddonInformers.Informer().GetIndexer().ByIndex(ClusterManagementAddonByPlacement, key)
+		objs, err := cmai.Informer().GetIndexer().ByIndex(ClusterManagementAddonByPlacement, key)
 		if err != nil {
 			utilruntime.HandleError(err)
 			return []string{}
@@ -72,7 +74,8 @@ func ClusterManagementAddonByPlacementQueueKey(clusterManagementAddonInformers a
 	}
 }
 
-func ClusterManagementAddonByPlacementDecisionQueueKey(clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer) func(obj runtime.Object) []string {
+func ClusterManagementAddonByPlacementDecisionQueueKey(
+	cmai addoninformerv1alpha1.ClusterManagementAddOnInformer) func(obj runtime.Object) []string {
 	return func(obj runtime.Object) []string {
 		accessor, _ := meta.Accessor(obj)
 		placementName, ok := accessor.GetLabels()[clusterv1beta1.PlacementLabel]
@@ -80,7 +83,8 @@ func ClusterManagementAddonByPlacementDecisionQueueKey(clusterManagementAddonInf
 			return []string{}
 		}
 
-		objs, err := clusterManagementAddonInformers.Informer().GetIndexer().ByIndex(ClusterManagementAddonByPlacement, fmt.Sprintf("%s/%s", accessor.GetNamespace(), placementName))
+		objs, err := cmai.Informer().GetIndexer().ByIndex(ClusterManagementAddonByPlacement,
+			fmt.Sprintf("%s/%s", accessor.GetNamespace(), placementName))
 		if err != nil {
 			utilruntime.HandleError(err)
 			return []string{}

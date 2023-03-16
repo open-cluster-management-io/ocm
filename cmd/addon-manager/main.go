@@ -4,16 +4,15 @@ import (
 	goflag "flag"
 	"fmt"
 	"math/rand"
-	"open-cluster-management.io/addon-framework/pkg/cmd/hub"
 	"os"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 
+	"open-cluster-management.io/addon-framework/pkg/cmd/hub"
 	"open-cluster-management.io/addon-framework/pkg/version"
 )
 
