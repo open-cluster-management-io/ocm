@@ -11,6 +11,7 @@ import (
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
 	"open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/certrotationcontroller"
 	"open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/clustermanagercontroller"
+	"open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/crdstatuccontroller"
 	"open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/migrationcontroller"
 	clustermanagerstatuscontroller "open-cluster-management.io/registration-operator/pkg/operators/clustermanager/controllers/statuscontroller"
 )
@@ -66,6 +67,13 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 	crdMigrationController := migrationcontroller.NewCRDMigrationController(
 		controllerContext.KubeConfig,
 		kubeClient,
+		operatorClient.OperatorV1().ClusterManagers(),
+		operatorInformer.Operator().V1().ClusterManagers(),
+		controllerContext.EventRecorder)
+
+	crdStatusController := crdstatuccontroller.NewCRDStatusController(
+		controllerContext.KubeConfig,
+		kubeClient,
 		operatorInformer.Operator().V1().ClusterManagers(),
 		controllerContext.EventRecorder)
 
@@ -75,7 +83,7 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 	go statusController.Run(ctx, 1)
 	go certRotationController.Run(ctx, 1)
 	go crdMigrationController.Run(ctx, 1)
-
+	go crdStatusController.Run(ctx, 1)
 	<-ctx.Done()
 	return nil
 }

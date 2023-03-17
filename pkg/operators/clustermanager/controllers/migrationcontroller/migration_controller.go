@@ -3,7 +3,6 @@ package migrationcontroller
 import (
 	"context"
 	"fmt"
-	"time"
 
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -24,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	"open-cluster-management.io/registration-operator/manifests"
@@ -51,26 +51,35 @@ var (
 )
 
 const (
-	clusterManagerApplied   = "Applied"
+	clusterManagerApplied = "Applied"
+	MigrationSucceeded    = "MigrationSucceeded"
+
 	migrationRequestCRDName = "storageversionmigrations.migration.k8s.io"
 )
 
 type crdMigrationController struct {
-	kubeconfig           *rest.Config
-	kubeClient           kubernetes.Interface
-	clusterManagerLister operatorlister.ClusterManagerLister
+	kubeconfig                *rest.Config
+	kubeClient                kubernetes.Interface
+	clusterManagerClient      operatorv1client.ClusterManagerInterface
+	clusterManagerLister      operatorlister.ClusterManagerLister
+	recorder                  events.Recorder
+	generateHubClusterClients func(hubConfig *rest.Config) (apiextensionsclient.Interface, migrationv1alpha1client.StorageVersionMigrationsGetter, error)
 }
 
 // NewClusterManagerController construct cluster manager hub controller
 func NewCRDMigrationController(
 	kubeconfig *rest.Config,
 	kubeClient kubernetes.Interface,
+	clusterManagerClient operatorv1client.ClusterManagerInterface,
 	clusterManagerInformer operatorinformer.ClusterManagerInformer,
 	recorder events.Recorder) factory.Controller {
 	controller := &crdMigrationController{
-		kubeconfig:           kubeconfig,
-		kubeClient:           kubeClient,
-		clusterManagerLister: clusterManagerInformer.Lister(),
+		kubeconfig:                kubeconfig,
+		kubeClient:                kubeClient,
+		clusterManagerClient:      clusterManagerClient,
+		clusterManagerLister:      clusterManagerInformer.Lister(),
+		recorder:                  recorder,
+		generateHubClusterClients: generateHubClients,
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -103,22 +112,9 @@ func (c *crdMigrationController) sync(ctx context.Context, controllerContext fac
 	if err != nil {
 		return err
 	}
-	apiExtensionClient, err := apiextensionsclient.NewForConfig(hubKubeconfig)
+	apiExtensionClient, migrationClient, err := c.generateHubClusterClients(hubKubeconfig)
 	if err != nil {
 		return err
-	}
-	migrationClient, err := migrationv1alpha1client.NewForConfig(hubKubeconfig)
-	if err != nil {
-		return err
-	}
-
-	// apply storage version migrations if it is supported
-	supported, err := supportStorageVersionMigration(ctx, apiExtensionClient)
-	if err != nil {
-		return err
-	}
-	if !supported {
-		return nil
 	}
 
 	// ClusterManager is deleting, we remove its related resources on hub
@@ -126,13 +122,57 @@ func (c *crdMigrationController) sync(ctx context.Context, controllerContext fac
 		return removeStorageVersionMigrations(ctx, migrationClient)
 	}
 
+	// apply storage version migrations if it is supported
+	supported, err := supportStorageVersionMigration(ctx, apiExtensionClient)
+	if err != nil {
+		return err
+	}
+
+	if !supported {
+		migrationCond := metav1.Condition{
+			Type:    MigrationSucceeded,
+			Status:  metav1.ConditionFalse,
+			Reason:  "StorageVersionMigrationFailed",
+			Message: fmt.Sprintf("Do not support StorageVersionMigration"),
+		}
+		_, _, err = helpers.UpdateClusterManagerStatus(ctx, c.clusterManagerClient, clusterManagerName,
+			helpers.UpdateClusterManagerConditionFn(migrationCond),
+		)
+		return err
+	}
+
 	// do not apply storage version migrations until other resources are applied
 	if applied := meta.IsStatusConditionTrue(clusterManager.Status.Conditions, clusterManagerApplied); !applied {
-		controllerContext.Queue().AddAfter(clusterManagerName, 5*time.Second)
+		controllerContext.Queue().AddRateLimited(clusterManagerName)
 		return nil
 	}
 
-	return applyStorageVersionMigrations(ctx, migrationClient, controllerContext.Recorder())
+	err = applyStorageVersionMigrations(ctx, migrationClient, c.recorder)
+	if err != nil {
+		klog.Errorf("Failed to apply StorageVersionMigrations. %v", err)
+		return err
+	}
+
+	migrationCond, err := syncStorageVersionMigrationsCondition(ctx, migrationClient)
+	if err != nil {
+		klog.Errorf("Failed to sync StorageVersionMigrations condition. %v", err)
+		return err
+	}
+
+	_, _, err = helpers.UpdateClusterManagerStatus(ctx, c.clusterManagerClient, clusterManagerName,
+		helpers.UpdateClusterManagerConditionFn(migrationCond),
+	)
+	if err != nil {
+		return err
+	}
+
+	//If migration not succeed, wait for all StorageVersionMigrations succeed.
+	if migrationCond.Status != metav1.ConditionTrue {
+		klog.V(4).Infof("Wait all StorageVersionMigrations succeed. migrationCond: %v. error: %v", migrationCond, err)
+		controllerContext.Queue().AddRateLimited(clusterManagerName)
+	}
+
+	return nil
 }
 
 // supportStorageVersionMigration returns ture if StorageVersionMigration CRD exists; otherwise returns false.
@@ -174,8 +214,7 @@ func removeStorageVersionMigrations(
 func applyStorageVersionMigrations(ctx context.Context, migrationClient migrationv1alpha1client.StorageVersionMigrationsGetter, recorder events.Recorder) error {
 	errs := []error{}
 	for _, file := range migrationRequestFiles {
-		_, _, err := applyStorageVersionMigration(
-			migrationClient,
+		required, err := parseStorageVersionMigrationFile(
 			func(name string) ([]byte, error) {
 				template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
 				if err != nil {
@@ -183,14 +222,77 @@ func applyStorageVersionMigrations(ctx context.Context, migrationClient migratio
 				}
 				return assets.MustCreateAssetFromTemplate(name, template, struct{}{}).Data, nil
 			},
-			recorder,
 			file)
 		if err != nil {
 			errs = append(errs, err)
+			continue
+		}
+
+		_, _, err = applyStorageVersionMigration(migrationClient, required, recorder)
+		if err != nil {
+			errs = append(errs, err)
+			continue
 		}
 	}
 
 	return operatorhelpers.NewMultiLineAggregate(errs)
+}
+
+// syncStorageVersionMigrationsCondition sync the migration condition based on all the StorageVersionMigrations status
+// 1. migrationSucceeded is true only when all the StorageVersionMigrations resources succeed.
+// 2. migrationSucceeded is false when any of the StorageVersionMigrations resources failed or running
+func syncStorageVersionMigrationsCondition(ctx context.Context, migrationClient migrationv1alpha1client.StorageVersionMigrationsGetter) (metav1.Condition, error) {
+	for _, file := range migrationRequestFiles {
+		required, err := parseStorageVersionMigrationFile(
+			func(name string) ([]byte, error) {
+				template, err := manifests.ClusterManagerManifestFiles.ReadFile(name)
+				if err != nil {
+					return nil, err
+				}
+				return assets.MustCreateAssetFromTemplate(name, template, struct{}{}).Data, nil
+			},
+			file)
+		if err != nil {
+			return metav1.Condition{}, err
+		}
+		existing, err := migrationClient.StorageVersionMigrations().Get(ctx, required.Name, metav1.GetOptions{})
+		if err != nil {
+			return metav1.Condition{}, err
+		}
+		migrationStatusCondition := getStorageVersionMigrationStatusCondition(existing)
+		if migrationStatusCondition == nil {
+			return metav1.Condition{
+				Type:    MigrationSucceeded,
+				Status:  metav1.ConditionFalse,
+				Reason:  "StorageVersionMigrationProcessing",
+				Message: fmt.Sprintf("Wait StorageVersionMigration %v succeed.", existing.Name),
+			}, nil
+		}
+		switch migrationStatusCondition.Type {
+		case migrationv1alpha1.MigrationSucceeded:
+			continue
+		case migrationv1alpha1.MigrationFailed:
+			return metav1.Condition{
+				Type:    MigrationSucceeded,
+				Status:  metav1.ConditionFalse,
+				Reason:  fmt.Sprintf("StorageVersionMigration Failed. %v", migrationStatusCondition.Reason),
+				Message: fmt.Sprintf("Failed to wait StorageVersionMigration %v succeed. %v", existing.Name, migrationStatusCondition.Message),
+			}, nil
+		case migrationv1alpha1.MigrationRunning:
+			return metav1.Condition{
+				Type:    MigrationSucceeded,
+				Status:  metav1.ConditionFalse,
+				Reason:  fmt.Sprintf("StorageVersionMigration Running. %v", migrationStatusCondition.Reason),
+				Message: fmt.Sprintf("Wait StorageVersionMigration %v succeed. %v", existing.Name, migrationStatusCondition.Message),
+			}, nil
+		}
+	}
+	return metav1.Condition{
+		Type:    MigrationSucceeded,
+		Status:  metav1.ConditionTrue,
+		Reason:  "StorageVersionMigrationSucceed",
+		Message: fmt.Sprintf("All StorageVersionMigrations Succeed"),
+	}, nil
 }
 
 func removeStorageVersionMigration(
@@ -198,20 +300,10 @@ func removeStorageVersionMigration(
 	migrationClient migrationv1alpha1client.StorageVersionMigrationsGetter,
 	manifests resourceapply.AssetFunc,
 	file string) error {
-	objectRaw, err := manifests(file)
+	required, err := parseStorageVersionMigrationFile(manifests, file)
 	if err != nil {
 		return err
 	}
-	object, _, err := genericCodec.Decode(objectRaw, nil, nil)
-	if err != nil {
-		return err
-	}
-
-	required, ok := object.(*migrationv1alpha1.StorageVersionMigration)
-	if !ok {
-		return fmt.Errorf("invalid StorageVersionMigration in file %q: %v", file, object)
-	}
-
 	err = migrationClient.StorageVersionMigrations().Delete(ctx, required.Name, metav1.DeleteOptions{})
 	if errors.IsNotFound(err) {
 		return nil
@@ -219,25 +311,35 @@ func removeStorageVersionMigration(
 	return err
 }
 
-func applyStorageVersionMigration(
-	client migrationv1alpha1client.StorageVersionMigrationsGetter,
+func parseStorageVersionMigrationFile(
 	manifests resourceapply.AssetFunc,
-	recorder events.Recorder,
-	file string) (*migrationv1alpha1.StorageVersionMigration, bool, error) {
+	file string,
+) (*migrationv1alpha1.StorageVersionMigration, error) {
 	objBytes, err := manifests(file)
 	if err != nil {
-		return nil, false, fmt.Errorf("missing %q: %v", file, err)
+		return nil, fmt.Errorf("missing %q: %v", file, err)
 	}
-	requiredObj, _, err := genericCodec.Decode(objBytes, nil, nil)
+	svmObj, _, err := genericCodec.Decode(objBytes, nil, nil)
 	if err != nil {
-		return nil, false, fmt.Errorf("cannot decode %q: %v", file, err)
+		return nil, fmt.Errorf("cannot decode %q: %v", file, err)
 	}
 
-	required, ok := requiredObj.(*migrationv1alpha1.StorageVersionMigration)
+	svm, ok := svmObj.(*migrationv1alpha1.StorageVersionMigration)
 	if !ok {
-		return nil, false, fmt.Errorf("invalid StorageVersionMigration in file %q: %v", file, requiredObj)
+		return nil, fmt.Errorf("invalid StorageVersionMigration in file %q: %v", file, svmObj)
 	}
 
+	return svm, nil
+}
+
+func applyStorageVersionMigration(
+	client migrationv1alpha1client.StorageVersionMigrationsGetter,
+	required *migrationv1alpha1.StorageVersionMigration,
+	recorder events.Recorder,
+) (*migrationv1alpha1.StorageVersionMigration, bool, error) {
+	if required == nil {
+		return nil, false, fmt.Errorf("required StorageVersionMigration is nil")
+	}
 	existing, err := client.StorageVersionMigrations().Get(context.TODO(), required.Name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		actual, err := client.StorageVersionMigrations().Create(context.TODO(), required, metav1.CreateOptions{})
@@ -273,24 +375,39 @@ func applyStorageVersionMigration(
 	return actual, true, nil
 }
 
-func IsStorageVersionMigrationSucceeded(client migrationv1alpha1client.StorageVersionMigrationsGetter, name string) (bool, error) {
-	svmcr, err := client.StorageVersionMigrations().Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return false, err
-	}
-
+func getStorageVersionMigrationStatusCondition(svmcr *migrationv1alpha1.StorageVersionMigration) *migrationv1alpha1.MigrationCondition {
+	var runningCon *migrationv1alpha1.MigrationCondition
 	for _, c := range svmcr.Status.Conditions {
 		switch c.Type {
 		case migrationv1alpha1.MigrationSucceeded:
 			if c.Status == corev1.ConditionTrue {
-				return true, nil
+				return &c
 			}
+			continue
 		case migrationv1alpha1.MigrationFailed:
 			if c.Status == corev1.ConditionTrue {
-				return false, nil
+				return &c
 			}
+			continue
+		case migrationv1alpha1.MigrationRunning:
+			if c.Status == corev1.ConditionTrue {
+				runningCon = &c
+			}
+			continue
 		}
 	}
+	return runningCon
+}
 
-	return false, nil
+func generateHubClients(hubKubeConfig *rest.Config) (apiextensionsclient.Interface, migrationv1alpha1client.StorageVersionMigrationsGetter, error) {
+	hubApiExtensionClient, err := apiextensionsclient.NewForConfig(hubKubeConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	hubMigrationClient, err := migrationv1alpha1client.NewForConfig(hubKubeConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	return hubApiExtensionClient, hubMigrationClient, nil
 }
