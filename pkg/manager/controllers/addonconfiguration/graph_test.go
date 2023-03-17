@@ -4,8 +4,9 @@ import (
 	"reflect"
 	"testing"
 
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 )
 
 type placementStrategy struct {
@@ -29,7 +30,8 @@ func TestConfigurationGraph(t *testing.T) {
 			name: "default config only",
 			defaultConfigs: []addonv1alpha1.ConfigMeta{
 				{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"}},
-				{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"}, DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}},
+				{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+					DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}},
 			},
 			addons: []*addonv1alpha1.ManagedClusterAddOn{
 				addontesting.NewAddon("test", "cluster1"),
@@ -59,8 +61,10 @@ func TestConfigurationGraph(t *testing.T) {
 		{
 			name: "with placement strategy",
 			defaultConfigs: []addonv1alpha1.ConfigMeta{
-				{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"}, DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}},
-				{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"}, DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}},
+				{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+					DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}},
+				{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+					DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}},
 			},
 			addons: []*addonv1alpha1.ManagedClusterAddOn{
 				addontesting.NewAddon("test", "cluster1"),
@@ -69,11 +73,14 @@ func TestConfigurationGraph(t *testing.T) {
 			},
 			placementStrategies: []placementStrategy{
 				{configs: []addonv1alpha1.AddOnConfig{
-					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"}, ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"}},
+					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"}},
 				}, clusters: []string{"cluster1"}},
 				{configs: []addonv1alpha1.AddOnConfig{
-					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"}, ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"}},
-					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"}, ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"}},
+					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"}},
+					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"}},
 				}, clusters: []string{"cluster2"}},
 			},
 			expected: []*addonNode{
@@ -121,23 +128,29 @@ func TestConfigurationGraph(t *testing.T) {
 		{
 			name: "mca override",
 			defaultConfigs: []addonv1alpha1.ConfigMeta{
-				{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"}, DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}},
-				{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"}, DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}},
+				{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+					DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}},
+				{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+					DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}},
 			},
 			addons: []*addonv1alpha1.ManagedClusterAddOn{
 				newManagedClusterAddon("test", "cluster1", []addonv1alpha1.AddOnConfig{
-					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"}, ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"}},
+					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"}},
 				}, nil),
 				addontesting.NewAddon("test", "cluster2"),
 				addontesting.NewAddon("test", "cluster3"),
 			},
 			placementStrategies: []placementStrategy{
 				{configs: []addonv1alpha1.AddOnConfig{
-					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"}, ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"}},
+					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"}},
 				}, clusters: []string{"cluster1"}},
 				{configs: []addonv1alpha1.AddOnConfig{
-					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"}, ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"}},
-					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"}, ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"}},
+					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"}},
+					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"}},
 				}, clusters: []string{"cluster2"}},
 			},
 			expected: []*addonNode{
@@ -153,7 +166,8 @@ func TestConfigurationGraph(t *testing.T) {
 						},
 					},
 					mca: newManagedClusterAddon("test", "cluster1", []addonv1alpha1.AddOnConfig{
-						{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"}, ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"}},
+						{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"}},
 					}, nil),
 				},
 				{
@@ -196,8 +210,28 @@ func TestConfigurationGraph(t *testing.T) {
 				graph.addPlacementNode(strategy.configs, strategy.clusters)
 			}
 
-			if !reflect.DeepEqual(graph.addonToUpdate(), c.expected) {
-				t.Errorf("output is not correct, expected %v, got %v", c.expected, graph.addonToUpdate())
+			actual := graph.addonToUpdate()
+			if len(actual) != len(c.expected) {
+				t.Errorf("output length is not correct, expected %v, got %v", len(c.expected), len(actual))
+			}
+
+			for _, ev := range c.expected {
+				compared := false
+				for _, v := range actual {
+					if v == nil || ev == nil {
+						t.Errorf("addonNode should not be nil")
+					}
+					if ev.mca != nil && v.mca != nil && ev.mca.Namespace == v.mca.Namespace {
+						if !reflect.DeepEqual(v, ev) {
+							t.Errorf("output is not correct, cluster %s, expected %v, got %v", v.mca.Namespace, ev, v)
+						}
+						compared = true
+					}
+				}
+
+				if !compared {
+					t.Errorf("not found addonNode %v", ev.mca)
+				}
 			}
 		})
 	}
