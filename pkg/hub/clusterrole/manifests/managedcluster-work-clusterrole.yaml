@@ -1,0 +1,17 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: open-cluster-management:managedcluster:work
+rules:
+# Allow work agent to send event to hub
+- apiGroups: ["", "events.k8s.io"]
+  resources: ["events"]
+  verbs: ["create", "patch", "update"]
+# Allow work agent to get/list/watch/update manifestworks
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["manifestworks"]
+  verbs: ["get", "list", "watch", "update"]
+# Allow work agent to update the status of manifestwork
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["manifestworks/status"]
+  verbs: ["patch", "update"]
