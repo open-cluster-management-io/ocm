@@ -56,6 +56,10 @@ const (
 	// A registraion request to be automatically approved must be initiated by specific users, these users are
 	// specifed with "--cluster-auto-approval-users" flag in the registration hub controller.
 	ManagedClusterAutoApproval featuregate.Feature = "ManagedClusterAutoApproval"
+
+	// ManifestWorkReplicaSet will start new controller in the Hub that can be used to deploy manifestWorks to group
+	// of clusters selected by a placement. For more info check ManifestWorkReplicaSet APIs
+	ManifestWorkReplicaSet featuregate.Feature = "ManifestWorkReplicaSet"
 )
 
 // DefaultSpokeRegistrationFeatureGates consists of all known ocm-registration
@@ -79,7 +83,8 @@ var DefaultHubRegistrationFeatureGates = map[featuregate.Feature]featuregate.Fea
 // DefaultHubWorkFeatureGates consists of all known acm work wehbook feature keys.
 // To add a new feature, define a key for it above and add it here.
 var DefaultHubWorkFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	NilExecutorValidating: {Default: false, PreRelease: featuregate.Alpha},
+	NilExecutorValidating:  {Default: false, PreRelease: featuregate.Alpha},
+	ManifestWorkReplicaSet: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 // DefaultSpokeWorkFeatureGates consists of all known ocm work feature keys for work agent.
