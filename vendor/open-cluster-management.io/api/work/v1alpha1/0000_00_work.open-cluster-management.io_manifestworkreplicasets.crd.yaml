@@ -1,17 +1,16 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: placemanifestworks.work.open-cluster-management.io
+  name: manifestworkreplicasets.work.open-cluster-management.io
 spec:
   group: work.open-cluster-management.io
   names:
-    kind: PlaceManifestWork
-    listKind: PlaceManifestWorkList
-    plural: placemanifestworks
+    kind: ManifestWorkReplicaSet
+    listKind: ManifestWorkReplicaSetList
+    plural: manifestworkreplicasets
     shortNames:
-      - pmw
-      - pmws
-    singular: placemanifestwork
+      - mwrs
+    singular: manifestworkreplicaset
   scope: Namespaced
   preserveUnknownFields: false
   versions:
@@ -35,7 +34,7 @@ spec:
       name: v1alpha1
       schema:
         openAPIV3Schema:
-          description: PlaceManifestWork is the Schema for the PlaceManifestWorks API. This custom resource is able to apply ManifestWork using Placement for 0..n ManagedCluster(in their namespaces). It will also remove the ManifestWork custom resources when deleted. Lastly the specific ManifestWork custom resources created per ManagedCluster namespace will be adjusted based on PlacementDecision changes.
+          description: ManifestWorkReplicaSet is the Schema for the ManifestWorkReplicaSet API. This custom resource is able to apply ManifestWork using Placement for 0..n ManagedCluster(in their namespaces). It will also remove the ManifestWork custom resources when deleted. Lastly the specific ManifestWork custom resources created per ManagedCluster namespace will be adjusted based on PlacementDecision changes.
           type: object
           properties:
             apiVersion:
@@ -49,6 +48,8 @@ spec:
             spec:
               description: Spec reperesents the desired ManifestWork payload and Placement reference to be reconciled
               type: object
+              required:
+                - placementRefs
               properties:
                 manifestWorkTemplate:
                   description: ManifestWorkTemplate is the ManifestWorkSpec that will be used to generate a per-cluster ManifestWork
@@ -224,13 +225,20 @@ spec:
                             type: object
                             x-kubernetes-preserve-unknown-fields: true
                             x-kubernetes-embedded-resource: true
-                placementRef:
-                  description: PacementRef is the name of the Placement resource, from which a PlacementDecision will be found and used to distribute the ManifestWork
-                  type: object
-                  properties:
-                    name:
-                      description: Name of the Placement resource in the current namespace
-                      type: string
+                placementRefs:
+                  description: PacementRefs is a list of the names of the Placement resource, from which a PlacementDecision will be found and used to distribute the ManifestWork.
+                  type: array
+                  minItems: 1
+                  items:
+                    description: localPlacementReference is the name of a Placement resource in current namespace
+                    type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        description: Name of the Placement resource in the current namespace
+                        type: string
+                        minLength: 1
             status:
               description: Status represent the current status of Placing ManifestWork resources
               type: object
@@ -296,7 +304,7 @@ spec:
                       description: 'TODO: Progressing is the number of ManifestWorks with condition Progressing: true'
                       type: integer
                     total:
-                      description: Total number of ManifestWorks managed by the PlaceManifestWork
+                      description: Total number of ManifestWorks managed by the ManifestWorkReplicaSet
                       type: integer
       served: true
       storage: true

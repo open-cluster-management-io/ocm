@@ -94,6 +94,7 @@ var map_ClusterManagementAddOnSpec = map[string]string{
 	"addOnMeta":          "addOnMeta is a reference to the metadata information for the add-on.",
 	"addOnConfiguration": "Deprecated: Use supportedConfigs filed instead addOnConfiguration is a reference to configuration information for the add-on. In scenario where a multiple add-ons share the same add-on CRD, multiple ClusterManagementAddOn resources need to be created and reference the same AddOnConfiguration.",
 	"supportedConfigs":   "supportedConfigs is a list of configuration types supported by add-on. An empty list means the add-on does not require configurations. The default is an empty list",
+	"installStrategy":    "InstallStrategy represents that related ManagedClusterAddOns should be installed on certain clusters.",
 }
 
 func (ClusterManagementAddOnSpec) SwaggerDoc() map[string]string {
@@ -148,6 +149,33 @@ func (ConfigReferent) SwaggerDoc() map[string]string {
 	return map_ConfigReferent
 }
 
+var map_InstallStrategy = map[string]string{
+	"":           "InstallStrategy represents that related ManagedClusterAddOns should be installed on certain clusters.",
+	"type":       "Type is the type of the install strategy, it can be: - Manual: no automatic install - Placements: install to clusters selected by placements.",
+	"placements": "Placements is a list of placement references honored when install strategy type is Placements. All clusters selected by these placements will install the addon If one cluster belongs to multiple placements, it will only apply the strategy defined later in the order. That is to say, The latter strategy overrides the previous one.",
+}
+
+func (InstallStrategy) SwaggerDoc() map[string]string {
+	return map_InstallStrategy
+}
+
+var map_PlacementRef = map[string]string{
+	"namespace": "Namespace is the namespace of the placement",
+	"name":      "Name is the name of the placement",
+}
+
+func (PlacementRef) SwaggerDoc() map[string]string {
+	return map_PlacementRef
+}
+
+var map_PlacementStrategy = map[string]string{
+	"configs": "Configs is the configuration of managedClusterAddon during installation. User can override the configuration by updating the managedClusterAddon directly.",
+}
+
+func (PlacementStrategy) SwaggerDoc() map[string]string {
+	return map_PlacementStrategy
+}
+
 var map_ConfigReference = map[string]string{
 	"":                       "ConfigReference is a reference to the current add-on configuration. This resource is used to locate the configuration resource for the current add-on.",
 	"lastObservedGeneration": "lastObservedGeneration is the observed generation of the add-on configuration.",
@@ -199,7 +227,9 @@ var map_ManagedClusterAddOnStatus = map[string]string{
 	"relatedObjects":     "relatedObjects is a list of objects that are \"interesting\" or related to this operator. Common uses are: 1. the detailed resource driving the operator 2. operator namespaces 3. operand namespaces 4. related ClusterManagementAddon resource",
 	"addOnMeta":          "addOnMeta is a reference to the metadata information for the add-on. This should be same as the addOnMeta for the corresponding ClusterManagementAddOn resource.",
 	"addOnConfiguration": "Deprecated: Use configReference instead addOnConfiguration is a reference to configuration information for the add-on. This resource is use to locate the configuration resource for the add-on.",
+	"supportedConfigs":   "SupportedConfigs is a list of configuration types that are allowed to override the add-on configurations defined in ClusterManagementAddOn spec. The default is an empty list, which means the add-on configurations can not be overridden.",
 	"configReferences":   "configReferences is a list of current add-on configuration references. This will be overridden by the clustermanagementaddon configuration references.",
+	"namespace":          "namespace is the namespace on the managedcluster to put registration secret or lease for the addon. It is required when registrtion is set or healthcheck mode is Lease.",
 	"registrations":      "registrations is the conifigurations for the addon agent to register to hub. It should be set by each addon controller on hub to define how the addon agent on managedcluster is registered. With the registration defined, The addon agent can access to kube apiserver with kube style API or other endpoints on hub cluster with client certificate authentication. A csr will be created per registration configuration. If more than one registrationConfig is defined, a csr will be created for each registration configuration. It is not allowed that multiple registrationConfigs have the same signer name. After the csr is approved on the hub cluster, the klusterlet agent will create a secret in the installNamespace for the registrationConfig. If the signerName is \"kubernetes.io/kube-apiserver-client\", the secret name will be \"{addon name}-hub-kubeconfig\" whose contents includes key/cert and kubeconfig. Otherwise, the secret name will be \"{addon name}-{signer name}-client-cert\" whose contents includes key/cert.",
 	"healthCheck":        "healthCheck indicates how to check the healthiness status of the current addon. It should be set by each addon implementation, by default, the lease mode will be used.",
 }

@@ -184,6 +184,9 @@ spec:
                       enum:
                         - Lease
                         - Customized
+                namespace:
+                  description: namespace is the namespace on the managedcluster to put registration secret or lease for the addon. It is required when registrtion is set or healthcheck mode is Lease.
+                  type: string
                 registrations:
                   description: registrations is the conifigurations for the addon agent to register to hub. It should be set by each addon controller on hub to define how the addon agent on managedcluster is registered. With the registration defined, The addon agent can access to kube apiserver with kube style API or other endpoints on hub cluster with client certificate authentication. A csr will be created per registration configuration. If more than one registrationConfig is defined, a csr will be created for each registration configuration. It is not allowed that multiple registrationConfigs have the same signer name. After the csr is approved on the hub cluster, the klusterlet agent will create a secret in the installNamespace for the registrationConfig. If the signerName is "kubernetes.io/kube-apiserver-client", the secret name will be "{addon name}-hub-kubeconfig" whose contents includes key/cert and kubeconfig. Otherwise, the secret name will be "{addon name}-{signer name}-client-cert" whose contents includes key/cert.
                   type: array
@@ -236,6 +239,27 @@ spec:
                       resource:
                         description: resource of the referent.
                         type: string
+                supportedConfigs:
+                  description: SupportedConfigs is a list of configuration types that are allowed to override the add-on configurations defined in ClusterManagementAddOn spec. The default is an empty list, which means the add-on configurations can not be overridden.
+                  type: array
+                  items:
+                    description: ConfigGroupResource represents the GroupResource of the add-on configuration
+                    type: object
+                    required:
+                      - resource
+                    properties:
+                      group:
+                        description: group of the add-on configuration.
+                        type: string
+                        default: ""
+                      resource:
+                        description: resource of the add-on configuration.
+                        type: string
+                        minLength: 1
+                  x-kubernetes-list-map-keys:
+                    - group
+                    - resource
+                  x-kubernetes-list-type: map
       served: true
       storage: true
       subresources:

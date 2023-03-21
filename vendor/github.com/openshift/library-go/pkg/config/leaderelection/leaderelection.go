@@ -22,15 +22,17 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 )
 
-// ToLeaderElectionWithConfigmapLease returns a "configmapsleases" based leader
+// ToLeaderElectionWithLease returns a "leases" based leader
 // election config that you just need to fill in the Callback for.
-// It is compatible with a "configmaps" based leader election and
-// paves the way toward using "leases" based leader election.
+// NOTE: we had switched from "configmaps" to "configmapsleases"
+// to give an opportunity for the operators to migrate in a
+// backward compatible way. The final step in the migration is
+// switch to using Leases.
 // See https://github.com/kubernetes/kubernetes/issues/107454 for
 // details on how to migrate to "leases" leader election.
+//
 // Don't forget the callbacks!
-// TODO: In the next version we should switch to using "leases"
-func ToLeaderElectionWithConfigmapLease(clientConfig *rest.Config, config configv1.LeaderElection, component, identity string) (leaderelection.LeaderElectionConfig, error) {
+func ToLeaderElectionWithLease(clientConfig *rest.Config, config configv1.LeaderElection, component, identity string) (leaderelection.LeaderElectionConfig, error) {
 	kubeClient, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
 		return leaderelection.LeaderElectionConfig{}, err
@@ -57,7 +59,7 @@ func ToLeaderElectionWithConfigmapLease(clientConfig *rest.Config, config config
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
 	eventRecorder := eventBroadcaster.NewRecorder(clientgoscheme.Scheme, corev1.EventSource{Component: component})
 	rl, err := resourcelock.New(
-		resourcelock.ConfigMapsLeasesResourceLock,
+		resourcelock.LeasesResourceLock,
 		config.Namespace,
 		config.Name,
 		kubeClient.CoreV1(),
