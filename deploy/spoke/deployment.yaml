@@ -1,0 +1,42 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: work-agent
+  labels:
+    app: work-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: work-agent
+  template:
+    metadata:
+      labels:
+        app: work-agent
+    spec:
+      serviceAccountName: work-agent-sa
+      containers:
+      - name: work-agent
+        image: quay.io/open-cluster-management/work:latest
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/work"
+          - "agent"
+          - "--spoke-cluster-name=cluster1"
+          - "--hub-kubeconfig=/spoke/hub-kubeconfig/kubeconfig"
+          - "--disable-leader-election"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
+        volumeMounts:
+        - name: hub-kubeconfig-secret
+          mountPath: "/spoke/hub-kubeconfig"
+          readOnly: true
+      volumes:
+      - name: hub-kubeconfig-secret
+        secret:
+          secretName: hub-kubeconfig-secret

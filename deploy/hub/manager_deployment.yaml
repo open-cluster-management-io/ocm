@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: work-hub-controller
+  labels:
+    app: work-hub-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: work-hub-controller
+  template:
+    metadata:
+      labels:
+        app: work-hub-controller
+    spec:
+      serviceAccountName: work-hub-sa
+      containers:
+      - name: work-hub-controller
+        image: quay.io/open-cluster-management/work:latest
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/work"
+          - "manager"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
