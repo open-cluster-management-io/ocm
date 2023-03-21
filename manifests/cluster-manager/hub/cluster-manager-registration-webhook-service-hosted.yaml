@@ -1,0 +1,23 @@
+{{if .RegistrationWebhook.IsIPFormat}}
+kind: Service
+apiVersion: v1
+metadata:
+  name: cluster-manager-registration-webhook
+  namespace: {{ .ClusterManagerNamespace }}
+spec:
+  type: ClusterIP
+  ports:
+  - protocol: TCP
+    port: {{.RegistrationWebhook.Port}}
+    targetPort: {{.RegistrationWebhook.Port}}
+    name: tls
+{{else}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: cluster-manager-registration-webhook
+  namespace: {{ .ClusterManagerNamespace }}
+spec:
+  type: ExternalName
+  externalName: {{.RegistrationWebhook.Address}}
+{{end}}

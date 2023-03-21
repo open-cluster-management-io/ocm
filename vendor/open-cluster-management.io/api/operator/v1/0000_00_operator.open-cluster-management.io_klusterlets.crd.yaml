@@ -1,0 +1,268 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: klusterlets.operator.open-cluster-management.io
+spec:
+  group: operator.open-cluster-management.io
+  names:
+    kind: Klusterlet
+    listKind: KlusterletList
+    plural: klusterlets
+    singular: klusterlet
+  scope: Cluster
+  preserveUnknownFields: false
+  versions:
+    - name: v1
+      schema:
+        openAPIV3Schema:
+          description: Klusterlet represents controllers to install the resources for a managed cluster. When configured, the Klusterlet requires a secret named bootstrap-hub-kubeconfig in the agent namespace to allow API requests to the hub for the registration protocol. In Hosted mode, the Klusterlet requires an additional secret named external-managed-kubeconfig in the agent namespace to allow API requests to the managed cluster for resources installation.
+          type: object
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: Spec represents the desired deployment configuration of Klusterlet agent.
+              type: object
+              properties:
+                clusterName:
+                  description: ClusterName is the name of the managed cluster to be created on hub. The Klusterlet agent generates a random name if it is not set, or discovers the appropriate cluster name on OpenShift.
+                  type: string
+                deployOption:
+                  description: DeployOption contains the options of deploying a klusterlet
+                  type: object
+                  properties:
+                    mode:
+                      description: 'Mode can be Default or Hosted. It is Default mode if not specified In Default mode, all klusterlet related resources are deployed on the managed cluster. In Hosted mode, only crd and configurations are installed on the spoke/managed cluster. Controllers run in another cluster (defined as management-cluster) and connect to the mangaged cluster with the kubeconfig in secret of "external-managed-kubeconfig"(a kubeconfig of managed-cluster with cluster-admin permission). Note: Do not modify the Mode field once it''s applied.'
+                      type: string
+                externalServerURLs:
+                  description: ExternalServerURLs represents the a list of apiserver urls and ca bundles that is accessible externally If it is set empty, managed cluster has no externally accessible url that hub cluster can visit.
+                  type: array
+                  items:
+                    description: ServerURL represents the apiserver url and ca bundle that is accessible externally
+                    type: object
+                    properties:
+                      caBundle:
+                        description: CABundle is the ca bundle to connect to apiserver of the managed cluster. System certs are used if it is not set.
+                        type: string
+                        format: byte
+                      url:
+                        description: URL is the url of apiserver endpoint of the managed cluster.
+                        type: string
+                hubApiServerHostAlias:
+                  description: HubApiServerHostAlias contains the host alias for hub api server. registration-agent and work-agent will use it to communicate with hub api server.
+                  type: object
+                  required:
+                    - hostname
+                    - ip
+                  properties:
+                    hostname:
+                      description: Hostname for the above IP address.
+                      type: string
+                      pattern: ^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$
+                    ip:
+                      description: IP address of the host file entry.
+                      type: string
+                      pattern: ^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$
+                namespace:
+                  description: Namespace is the namespace to deploy the agent on the managed cluster. The namespace must have a prefix of "open-cluster-management-", and if it is not set, the namespace of "open-cluster-management-agent" is used to deploy agent. In addition, the add-ons are deployed to the namespace of "{Namespace}-addon". In the Hosted mode, this namespace still exists on the managed cluster to contain necessary resources, like service accounts, roles and rolebindings, while the agent is deployed to the namespace with the same name as klusterlet on the management cluster.
+                  type: string
+                  maxLength: 63
+                  pattern: ^open-cluster-management-[-a-z0-9]*[a-z0-9]$
+                nodePlacement:
+                  description: NodePlacement enables explicit control over the scheduling of the deployed pods.
+                  type: object
+                  properties:
+                    nodeSelector:
+                      description: NodeSelector defines which Nodes the Pods are scheduled on. The default is an empty list.
+                      type: object
+                      additionalProperties:
+                        type: string
+                    tolerations:
+                      description: Tolerations is attached by pods to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>. The default is an empty list.
+                      type: array
+                      items:
+                        description: The pod this Toleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.
+                        type: object
+                        properties:
+                          effect:
+                            description: Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
+                            type: string
+                          key:
+                            description: Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys.
+                            type: string
+                          operator:
+                            description: Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.
+                            type: string
+                          tolerationSeconds:
+                            description: TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system.
+                            type: integer
+                            format: int64
+                          value:
+                            description: Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string.
+                            type: string
+                registrationConfiguration:
+                  description: RegistrationConfiguration contains the configuration of registration
+                  type: object
+                  properties:
+                    featureGates:
+                      description: "FeatureGates represents the list of feature gates for registration If it is set empty, default feature gates will be used. If it is set, featuregate/Foo is an example of one item in FeatureGates:   1. If featuregate/Foo does not exist, registration-operator will discard it   2. If featuregate/Foo exists and is false by default. It is now possible to set featuregate/Foo=[false|true]   3. If featuregate/Foo exists and is true by default. If a cluster-admin upgrading from 1 to 2 wants to continue having featuregate/Foo=false,  \the can set featuregate/Foo=false before upgrading. Let's say the cluster-admin wants featuregate/Foo=false."
+                      type: array
+                      items:
+                        type: object
+                        required:
+                          - feature
+                        properties:
+                          feature:
+                            description: Feature is the key of feature gate. e.g. featuregate/Foo.
+                            type: string
+                          mode:
+                            description: Mode is either Enable, Disable, "" where "" is Disable by default. In Enable mode, a valid feature gate `featuregate/Foo` will be set to "--featuregate/Foo=true". In Disable mode, a valid feature gate `featuregate/Foo` will be set to "--featuregate/Foo=false".
+                            type: string
+                            default: Disable
+                            enum:
+                              - Enable
+                              - Disable
+                registrationImagePullSpec:
+                  description: RegistrationImagePullSpec represents the desired image configuration of registration agent. quay.io/open-cluster-management.io/registration:latest will be used if unspecified.
+                  type: string
+                workConfiguration:
+                  description: WorkConfiguration contains the configuration of work
+                  type: object
+                  properties:
+                    featureGates:
+                      description: "FeatureGates represents the list of feature gates for work If it is set empty, default feature gates will be used. If it is set, featuregate/Foo is an example of one item in FeatureGates:   1. If featuregate/Foo does not exist, registration-operator will discard it   2. If featuregate/Foo exists and is false by default. It is now possible to set featuregate/Foo=[false|true]   3. If featuregate/Foo exists and is true by default. If a cluster-admin upgrading from 1 to 2 wants to continue having featuregate/Foo=false,  \the can set featuregate/Foo=false before upgrading. Let's say the cluster-admin wants featuregate/Foo=false."
+                      type: array
+                      items:
+                        type: object
+                        required:
+                          - feature
+                        properties:
+                          feature:
+                            description: Feature is the key of feature gate. e.g. featuregate/Foo.
+                            type: string
+                          mode:
+                            description: Mode is either Enable, Disable, "" where "" is Disable by default. In Enable mode, a valid feature gate `featuregate/Foo` will be set to "--featuregate/Foo=true". In Disable mode, a valid feature gate `featuregate/Foo` will be set to "--featuregate/Foo=false".
+                            type: string
+                            default: Disable
+                            enum:
+                              - Enable
+                              - Disable
+                workImagePullSpec:
+                  description: WorkImagePullSpec represents the desired image configuration of work agent. quay.io/open-cluster-management.io/work:latest will be used if unspecified.
+                  type: string
+            status:
+              description: Status represents the current status of Klusterlet agent.
+              type: object
+              properties:
+                conditions:
+                  description: 'Conditions contain the different condition statuses for this Klusterlet. Valid condition types are: Applied: Components have been applied in the managed cluster. Available: Components in the managed cluster are available and ready to serve. Progressing: Components in the managed cluster are in a transitioning state. Degraded: Components in the managed cluster do not match the desired configuration and only provide degraded service.'
+                  type: array
+                  items:
+                    description: "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, type FooStatus struct{     // Represents the observations of a foo's current state.     // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\"     // +patchMergeKey=type     // +patchStrategy=merge     // +listType=map     // +listMapKey=type     Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n     // other fields }"
+                    type: object
+                    required:
+                      - lastTransitionTime
+                      - message
+                      - reason
+                      - status
+                      - type
+                    properties:
+                      lastTransitionTime:
+                        description: lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                        type: string
+                        format: date-time
+                      message:
+                        description: message is a human readable message indicating details about the transition. This may be an empty string.
+                        type: string
+                        maxLength: 32768
+                      observedGeneration:
+                        description: observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.
+                        type: integer
+                        format: int64
+                        minimum: 0
+                      reason:
+                        description: reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty.
+                        type: string
+                        maxLength: 1024
+                        minLength: 1
+                        pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      status:
+                        description: status of the condition, one of True, False, Unknown.
+                        type: string
+                        enum:
+                          - "True"
+                          - "False"
+                          - Unknown
+                      type:
+                        description: type of condition in CamelCase or in foo.example.com/CamelCase. --- Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be useful (see .node.status.conditions), the ability to deconflict is important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                        type: string
+                        maxLength: 316
+                        pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                generations:
+                  description: Generations are used to determine when an item needs to be reconciled or has changed in a way that needs a reaction.
+                  type: array
+                  items:
+                    description: GenerationStatus keeps track of the generation for a given resource so that decisions about forced updates can be made. The definition matches the GenerationStatus defined in github.com/openshift/api/v1
+                    type: object
+                    properties:
+                      group:
+                        description: group is the group of the resource that you're tracking
+                        type: string
+                      lastGeneration:
+                        description: lastGeneration is the last generation of the resource that controller applies
+                        type: integer
+                        format: int64
+                      name:
+                        description: name is the name of the resource that you're tracking
+                        type: string
+                      namespace:
+                        description: namespace is where the resource that you're tracking is
+                        type: string
+                      resource:
+                        description: resource is the resource type of the resource that you're tracking
+                        type: string
+                      version:
+                        description: version is the version of the resource that you're tracking
+                        type: string
+                observedGeneration:
+                  description: ObservedGeneration is the last generation change you've dealt with
+                  type: integer
+                  format: int64
+                relatedResources:
+                  description: RelatedResources are used to track the resources that are related to this Klusterlet.
+                  type: array
+                  items:
+                    description: RelatedResourceMeta represents the resource that is managed by an operator
+                    type: object
+                    properties:
+                      group:
+                        description: group is the group of the resource that you're tracking
+                        type: string
+                      name:
+                        description: name is the name of the resource that you're tracking
+                        type: string
+                      namespace:
+                        description: namespace is where the thing you're tracking is
+                        type: string
+                      resource:
+                        description: resource is the resource type of the resource that you're tracking
+                        type: string
+                      version:
+                        description: version is the version of the thing you're tracking
+                        type: string
+      served: true
+      storage: true
+      subresources:
+        status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

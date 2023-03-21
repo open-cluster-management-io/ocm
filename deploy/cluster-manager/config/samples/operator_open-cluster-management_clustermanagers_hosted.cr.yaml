@@ -1,0 +1,18 @@
+apiVersion: operator.open-cluster-management.io/v1
+kind: ClusterManager
+metadata:
+  name: cluster-manager
+spec:
+  registrationImagePullSpec: quay.io/open-cluster-management/registration
+  workImagePullSpec: quay.io/open-cluster-management/work
+  placementImagePullSpec: quay.io/open-cluster-management/placement
+  addOnManagerImagePullSpec: quay.io/open-cluster-management/addon-manager
+  deployOption:
+    mode: Hosted
+    hosted:
+      registrationWebhookConfiguration:
+        address: management-control-plane
+        port: 30443
+      workWebhookConfiguration:
+        address: management-control-plane
+        port: 31443

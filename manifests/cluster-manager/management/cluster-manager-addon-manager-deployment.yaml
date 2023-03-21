@@ -1,0 +1,84 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ .ClusterManagerName }}-addon-manager-controller
+  namespace: {{ .ClusterManagerNamespace }}
+  labels:
+    app: clustermanager-controller
+spec:
+  replicas: {{ .Replica }}
+  selector:
+    matchLabels:
+      app: clustermanager-addon-manager-controller
+  template:
+    metadata:
+      labels:
+        app: clustermanager-addon-manager-controller
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 70
+            podAffinityTerm:
+              topologyKey: failure-domain.beta.kubernetes.io/zone
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - clustermanager-addon-manager-controller
+          - weight: 30
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - clustermanager-addon-manager-controller
+      {{ if not .HostedMode }}
+      serviceAccountName: {{ .ClusterManagerName }}-addon-manager-controller-sa
+      {{ end }}
+      containers:
+      - name: addon-manager-controller
+        image: {{ .AddOnManagerImage }}
+        args:
+          - "/addon-manager"
+          - "manager"
+          {{ if .HostedMode }}
+          - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
+          {{ end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+        resources:
+          requests:
+            cpu: 2m
+            memory: 16Mi
+      {{ if .HostedMode }}
+        volumeMounts:
+        - mountPath: /var/run/secrets/hub
+          name: kubeconfig
+          readOnly: true    
+      volumes:
+      - name: kubeconfig
+        secret:
+          secretName: {{ .ClusterManagerName }}-addon-manager-controller-sa-kubeconfig
+      {{ end }}
