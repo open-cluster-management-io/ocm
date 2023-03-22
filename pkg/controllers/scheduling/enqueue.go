@@ -2,6 +2,7 @@ package scheduling
 
 import (
 	"fmt"
+
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
@@ -42,14 +43,20 @@ func newEnqueuer(
 	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer,
 	placementInformer clusterinformerv1beta1.PlacementInformer,
 	clusterSetBindingInformer clusterinformerv1beta2.ManagedClusterSetBindingInformer) *enqueuer {
-	placementInformer.Informer().AddIndexers(cache.Indexers{
+	err := placementInformer.Informer().AddIndexers(cache.Indexers{
 		placementsByScore:             indexPlacementsByScore,
 		placementsByClusterSetBinding: indexPlacementByClusterSetBinding,
 	})
+	if err != nil {
+		runtime.HandleError(err)
+	}
 
-	clusterSetBindingInformer.Informer().AddIndexers(cache.Indexers{
+	err = clusterSetBindingInformer.Informer().AddIndexers(cache.Indexers{
 		clustersetBindingsByClusterSet: indexClusterSetBindingByClusterSet,
 	})
+	if err != nil {
+		runtime.HandleError(err)
+	}
 
 	return &enqueuer{
 		queue:                    queue,
