@@ -3,6 +3,7 @@ package leaderelection
 import (
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"strings"
 	"time"
@@ -116,6 +117,16 @@ func LeaderElectionDefaulting(config configv1.LeaderElection, defaultNamespace, 
 	if ret.RetryPeriod.Duration == 0 {
 		ret.RetryPeriod.Duration = 26 * time.Second
 	}
+
+	retryTimes := int(math.Floor(float64(ret.RenewDeadline.Duration / ret.RetryPeriod.Duration)))
+	klog.Infof("The leader election gives %v retries and allows for %v of clock skew. The kube-apiserver downtime tolerance is %vs. Worst non-graceful lease acquisition is %v. Worst graceful lease acquisition is %v.",
+		retryTimes,
+		ret.LeaseDuration.Duration-ret.RenewDeadline.Duration,
+		(retryTimes-1)*(int(ret.RetryPeriod.Duration.Seconds())),
+		ret.LeaseDuration.Duration+ret.RetryPeriod.Duration,
+		ret.RetryPeriod,
+	)
+
 	if len(ret.Namespace) == 0 {
 		if len(defaultNamespace) > 0 {
 			ret.Namespace = defaultNamespace

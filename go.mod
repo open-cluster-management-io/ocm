@@ -8,7 +8,7 @@ require (
 	github.com/onsi/gomega v1.27.4
 	github.com/openshift/api v0.0.0-20230223193310-d964c7a58d75
 	github.com/openshift/build-machinery-go v0.0.0-20230306181456-d321ffa04533
-	github.com/openshift/library-go v0.0.0-20230308200407-f3277c772011
+	github.com/openshift/library-go v0.0.0-20230321160537-6ac65c5454f9
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
