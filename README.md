@@ -152,6 +152,30 @@ Undeploy placement controller from the cluster.
 make undeploy-hub
 ```
 
+### Run e2e test cases as sanity check on an existing environment
+
+In order to verify the `Placement` API on an existing environment with placement controller installed and well configured, you are able to run the e2e test cases as sanity check by following the steps below.
+
+Build the binary of the e2e test cases
+```
+make build-e2e
+```
+
+And then run the e2e test cases against an existing environment.
+```
+./e2e.test --ginkgo.v --ginkgo.label-filter=sanity-check -hub-kubeconfig=/path/to/file
+```
+
+In an environment that has already had the `global` clusterset created, you can skip the creation of the `global` clusterset during testing.
+```
+./e2e.test --ginkgo.v --ginkgo.label-filter=sanity-check -hub-kubeconfig=/path/to/file -create-global-clusterset=false
+```
+
+Since the e2e test cases create fake ManagedClusters (without agent installed) during testing, in a full featured OCM environment (with registration controller running on the hub), a taint `cluster.open-cluster-management.io/unreachable` will be added to those fake ManagedClusters automatically. You have to tolerate this taint when running e2e test cases in such an environment.
+```
+./e2e.test --ginkgo.v --ginkgo.label-filter=sanity-check -hub-kubeconfig=/path/to/file -tolerate-unreachable-taint
+```
+
 <!--
 ## XXX References
 
