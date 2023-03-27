@@ -360,6 +360,8 @@ type KlusterletSpec struct {
 	// ClusterName is the name of the managed cluster to be created on hub.
 	// The Klusterlet agent generates a random name if it is not set, or discovers the appropriate cluster name on OpenShift.
 	// +optional
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
 	ClusterName string `json:"clusterName,omitempty"`
 
 	// ExternalServerURLs represents the a list of apiserver urls and ca bundles that is accessible externally

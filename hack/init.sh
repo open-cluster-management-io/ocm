@@ -18,8 +18,8 @@ PATCHED_DIR="./_output/"
 
 SPOKE_CRD_FILES="./vendor/open-cluster-management.io/api/work/v1/0000_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml
 ./vendor/open-cluster-management.io/api/cluster/v1alpha1/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml
-./vendor/open-cluster-management.io/api/work/v1/0001_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml
-./vendor/open-cluster-management.io/api/cluster/v1alpha1/0001_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml
+./vendor/open-cluster-management.io/api/crdsv1beta1/0001_01_work.open-cluster-management.io_appliedmanifestworks.crd.yaml
+./vendor/open-cluster-management.io/api/crdsv1beta1/0001_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml
 "
 
 CLUSTER_MANAGER_CRD_FILE="./vendor/open-cluster-management.io/api/operator/v1/0000_01_operator.open-cluster-management.io_clustermanagers.crd.yaml"

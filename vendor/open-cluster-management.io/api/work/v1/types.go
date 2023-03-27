@@ -26,6 +26,12 @@ type ManifestWork struct {
 	Status ManifestWorkStatus `json:"status,omitempty"`
 }
 
+const (
+	// ManifestConfigSpecHashAnnotationKey is the annotation key to identify the configurations
+	// used by the manifestwork.
+	ManifestConfigSpecHashAnnotationKey = "open-cluster-management.io/config-spec-hash"
+)
+
 // ManifestWorkSpec represents a desired configuration of manifests to be deployed on the managed cluster.
 type ManifestWorkSpec struct {
 	// Workload represents the manifest workload to be deployed on a managed cluster.
