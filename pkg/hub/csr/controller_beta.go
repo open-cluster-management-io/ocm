@@ -21,20 +21,18 @@ import (
 
 // v1beta1CSRApprovingController auto approve the renewal CertificateSigningRequests for an accepted spoke cluster on the hub.
 type v1beta1CSRApprovingController struct {
-	kubeClient    kubernetes.Interface
-	csrLister     certificatesv1beta1lister.CertificateSigningRequestLister
-	eventRecorder events.Recorder
+	csrLister   certificatesv1beta1lister.CertificateSigningRequestLister
+	reconcilers []Reconciler
 }
 
 func NewV1beta1CSRApprovingController(
-	kubeClient kubernetes.Interface,
 	v1beta1CSRInformer certificatesv1beta1informers.CertificateSigningRequestInformer,
+	reconcilers []Reconciler,
 	recorder events.Recorder) factory.Controller {
 
 	c := &v1beta1CSRApprovingController{
-		kubeClient:    kubeClient,
-		csrLister:     v1beta1CSRInformer.Lister(),
-		eventRecorder: recorder.WithComponentSuffix("csr-approving-controller"),
+		csrLister:   v1beta1CSRInformer.Lister(),
+		reconcilers: reconcilers,
 	}
 
 	return factory.New().WithInformersQueueKeyFunc(func(obj runtime.Object) string {
@@ -63,34 +61,29 @@ func (c *v1beta1CSRApprovingController) sync(ctx context.Context, syncCtx factor
 	}
 
 	csrInfo := newCSRInfo(csr)
-	// Check whether current csr is a renewal spoke cluster csr.
-	isRenewal := isSpokeClusterClientCertRenewal(csrInfo)
-	if !isRenewal {
-		klog.V(4).Infof("CSR %q was not recognized", csr.Name)
-		return nil
+	for _, r := range c.reconcilers {
+		state, err := r.Reconcile(ctx, csrInfo, approveCSRV1beta1Func(ctx, csr))
+		if err != nil {
+			return err
+		}
+		if state == reconcileStop {
+			break
+		}
 	}
 
-	allowed, err := authorize(ctx, c.kubeClient, csrInfo)
-	if err != nil {
-		return err
-	}
-	if !allowed {
-		//TODO find a way to avoid looking at this CSR again.
-		klog.V(4).Infof("Managed cluster csr %q cannont be auto approved due to subject access review was not approved", csr.Name)
-		return nil
-	}
-
-	// Auto approve the spoke cluster csr
-	csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
-		Type:    certificatesv1beta1.CertificateApproved,
-		Status:  corev1.ConditionTrue,
-		Reason:  "AutoApprovedByHubCSRApprovingController",
-		Message: "Auto approving Managed cluster agent certificate after SubjectAccessReview.",
-	})
-	_, err = c.kubeClient.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(ctx, csr, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
-	c.eventRecorder.Eventf("ManagedClusterCSRAutoApproved", "spoke cluster csr %q is auto approved by hub csr controller", csr.Name)
 	return nil
+}
+
+func approveCSRV1beta1Func(ctx context.Context, csr *certificatesv1beta1.CertificateSigningRequest) approveCSRFunc {
+	return func(kubeClient kubernetes.Interface) error {
+		// Auto approve the spoke cluster csr
+		csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
+			Type:    certificatesv1beta1.CertificateApproved,
+			Status:  corev1.ConditionTrue,
+			Reason:  "AutoApprovedByHubCSRApprovingController",
+			Message: "Auto approving Managed cluster agent certificate after SubjectAccessReview.",
+		})
+		_, err := kubeClient.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(ctx, csr, metav1.UpdateOptions{})
+		return err
+	}
 }

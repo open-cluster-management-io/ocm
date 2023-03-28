@@ -7,14 +7,14 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
-	"open-cluster-management.io/registration/pkg/features"
 	"open-cluster-management.io/registration/pkg/hub"
 	"open-cluster-management.io/registration/pkg/version"
 )
 
 func NewController() *cobra.Command {
+	manager := hub.NewHubManagerOptions()
 	cmdConfig := controllercmd.
-		NewControllerCommandConfig("registration-controller", version.Get(), hub.RunControllerManager)
+		NewControllerCommandConfig("registration-controller", version.Get(), manager.RunControllerManager)
 	cmd := cmdConfig.NewCommand()
 	cmd.Use = "controller"
 	cmd.Short = "Start the Cluster Registration Controller"
@@ -35,7 +35,7 @@ func NewController() *cobra.Command {
 		"The duration the clients should wait between attempting acquisition and renewal "+
 		"of a leadership. This is only applicable if leader election is enabled.")
 
-	features.DefaultHubMutableFeatureGate.AddFlag(flags)
+	manager.AddFlags(cmd.Flags())
 
 	return cmd
 }

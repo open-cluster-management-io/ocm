@@ -28,6 +28,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/pkg/errors"
+	"github.com/spf13/pflag"
 
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -37,8 +38,26 @@ import (
 
 var ResyncInterval = 5 * time.Minute
 
+// HubManagerOptions holds configuration for hub manager controller
+type HubManagerOptions struct {
+	ClusterAutoApprovalUsers []string
+}
+
+// NewHubManagerOptions returns a HubManagerOptions
+func NewHubManagerOptions() *HubManagerOptions {
+	return &HubManagerOptions{}
+}
+
+// AddFlags registers flags for manager
+func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
+	features.DefaultHubMutableFeatureGate.AddFlag(fs)
+	fs.StringArrayVar(&m.ClusterAutoApprovalUsers, "--cluster-auto-approval-users", m.ClusterAutoApprovalUsers,
+		"A list of reachable spoke cluster api server URLs for hub cluster.")
+
+}
+
 // RunControllerManager starts the controllers on hub to manage spoke cluster registration.
-func RunControllerManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	// If qps in kubconfig is not set, increase the qps and burst to enhance the ability of kube client to handle
 	// requests in concurrent
 	// TODO: Use ClientConnectionOverrides flags to change qps/burst when library-go exposes them in the future
@@ -86,6 +105,17 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		controllerContext.EventRecorder,
 	)
 
+	csrReconciles := []csr.Reconciler{csr.NewCSRRenewalReconciler(kubeClient, controllerContext.EventRecorder)}
+	if features.DefaultHubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
+		csrReconciles = append(csrReconciles, csr.NewCSRBootstrapReconciler(
+			kubeClient,
+			clusterClient,
+			clusterInformers.Cluster().V1().ManagedClusters().Lister(),
+			m.ClusterAutoApprovalUsers,
+			controllerContext.EventRecorder,
+		))
+	}
+
 	var csrController factory.Controller
 	if features.DefaultHubMutableFeatureGate.Enabled(ocmfeature.V1beta1CSRAPICompatibility) {
 		v1CSRSupported, v1beta1CSRSupported, err := helpers.IsCSRSupported(kubeClient)
@@ -95,8 +125,8 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 
 		if !v1CSRSupported && v1beta1CSRSupported {
 			csrController = csr.NewV1beta1CSRApprovingController(
-				kubeClient,
 				kubeInfomers.Certificates().V1beta1().CertificateSigningRequests(),
+				csrReconciles,
 				controllerContext.EventRecorder,
 			)
 			klog.Info("Using v1beta1 CSR api to manage spoke client certificate")
@@ -104,8 +134,8 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	}
 	if csrController == nil {
 		csrController = csr.NewCSRApprovingController(
-			kubeClient,
 			kubeInfomers.Certificates().V1().CertificateSigningRequests(),
+			csrReconciles,
 			controllerContext.EventRecorder,
 		)
 	}
