@@ -1,6 +1,7 @@
 package agentdeploy
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -293,10 +294,16 @@ func (b *addonWorksBuilder) BuildDeployWorks(addonWorkNamespace string,
 		}
 	}
 
+	annotations, err := configsToAnnotations(addon.Status.ConfigReferences)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	return b.workBuilder.Build(deployObjects,
 		newAddonWorkObjectMeta(b.processor.manifestWorkNamePrefix(addon.Namespace, addon.Name), addon.Name, addon.Namespace, addonWorkNamespace, owner),
 		workbuilder.ExistingManifestWorksOption(existingWorks),
 		workbuilder.ManifestConfigOption(manifestOptions),
+		workbuilder.ManifestAnnotations(annotations),
 		workbuilder.DeletionOption(deletionOption))
 }
 
@@ -493,4 +500,45 @@ func getDeletionOrphaningRule(obj runtime.Object) (*workapiv1.OrphaningRule, err
 		Namespace: accessor.GetNamespace(),
 	}
 	return rule, nil
+}
+
+// convert config reference to annotations.
+func configsToAnnotations(configReference []addonapiv1alpha1.ConfigReference) (map[string]string, error) {
+	if len(configReference) == 0 {
+		return nil, nil
+	}
+
+	// annotations is a map stores the config name and config spec hash.
+	//
+	// config name follows the format of <resource>.<group>/<namespace>/<name>, for example,
+	// addondeploymentconfigs.addon.open-cluster-management.io/open-cluster-management/default.
+	// for a cluster scoped resource, the namespace would be empty, for example,
+	// addonhubconfigs.addon.open-cluster-management.io//default.
+	annotations := make(map[string]string, len(configReference))
+	for _, v := range configReference {
+		if v.DesiredConfig == nil {
+			continue
+		}
+		resourceStr := v.Resource
+		if len(v.Group) > 0 {
+			resourceStr += fmt.Sprintf(".%s", v.Group)
+		}
+		resourceStr += fmt.Sprintf("/%s/%s", v.DesiredConfig.Namespace, v.DesiredConfig.Name)
+
+		annotations[resourceStr] = v.DesiredConfig.SpecHash
+	}
+
+	// converts the annotations map into a JSON byte string.
+	jsonBytes, err := json.Marshal(annotations)
+	if err != nil {
+		return nil, err
+	}
+
+	// return a map with key as "open-cluster-management.io/config-spec-hash" and value is the JSON byte string.
+	// For example:
+	// open-cluster-management.io/config-spec-hash: '{"addonhubconfigs.addon.open-cluster-management.io//default":"613d134a2ec072a8a6451af913979f496d657ef5",
+	// "addondeploymentconfigs.addon.open-cluster-management.io/open-cluster-management/default":"cca7df9188fb920dcfab374940452393e2037619"}'
+	return map[string]string{
+		workapiv1.ManifestConfigSpecHashAnnotationKey: string(jsonBytes),
+	}, nil
 }

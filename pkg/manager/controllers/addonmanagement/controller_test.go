@@ -57,7 +57,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 			clusterManagementAddon: func() *addonv1alpha1.ClusterManagementAddOn {
 				addon := addontesting.NewClusterManagementAddon("test", "", "")
 				addon.Spec.InstallStrategy = addonv1alpha1.InstallStrategy{
-					Type: addonv1alpha1.AddonInstallStrategyManualPlacements,
+					Type: addonv1alpha1.AddonInstallStrategyPlacements,
 					Placements: []addonv1alpha1.PlacementStrategy{
 						{
 							PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
@@ -76,7 +76,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 			clusterManagementAddon: func() *addonv1alpha1.ClusterManagementAddOn {
 				addon := addontesting.NewClusterManagementAddon("test", "", "")
 				addon.Spec.InstallStrategy = addonv1alpha1.InstallStrategy{
-					Type: addonv1alpha1.AddonInstallStrategyManualPlacements,
+					Type: addonv1alpha1.AddonInstallStrategyPlacements,
 					Placements: []addonv1alpha1.PlacementStrategy{
 						{
 							PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
@@ -97,7 +97,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 			clusterManagementAddon: func() *addonv1alpha1.ClusterManagementAddOn {
 				addon := addontesting.NewClusterManagementAddon("test", "", "")
 				addon.Spec.InstallStrategy = addonv1alpha1.InstallStrategy{
-					Type: addonv1alpha1.AddonInstallStrategyManualPlacements,
+					Type: addonv1alpha1.AddonInstallStrategyPlacements,
 					Placements: []addonv1alpha1.PlacementStrategy{
 						{
 							PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
@@ -134,7 +134,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 			clusterManagementAddon: func() *addonv1alpha1.ClusterManagementAddOn {
 				addon := addontesting.NewClusterManagementAddon("test", "", "")
 				addon.Spec.InstallStrategy = addonv1alpha1.InstallStrategy{
-					Type: addonv1alpha1.AddonInstallStrategyManualPlacements,
+					Type: addonv1alpha1.AddonInstallStrategyPlacements,
 					Placements: []addonv1alpha1.PlacementStrategy{
 						{
 							PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
@@ -171,7 +171,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 			clusterManagementAddon: func() *addonv1alpha1.ClusterManagementAddOn {
 				addon := addontesting.NewClusterManagementAddon("test", "", "")
 				addon.Spec.InstallStrategy = addonv1alpha1.InstallStrategy{
-					Type: addonv1alpha1.AddonInstallStrategyManualPlacements,
+					Type: addonv1alpha1.AddonInstallStrategyPlacements,
 					Placements: []addonv1alpha1.PlacementStrategy{
 						{
 							PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},

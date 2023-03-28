@@ -89,7 +89,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 			clusterManagementAddon: newClusterManagementAddon("test",
 				[]addonv1alpha1.ConfigMeta{{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"}, DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}}},
 				addonv1alpha1.InstallStrategy{
-					Type: addonv1alpha1.AddonInstallStrategyManualPlacements,
+					Type: addonv1alpha1.AddonInstallStrategyPlacements,
 					Placements: []addonv1alpha1.PlacementStrategy{
 						{
 							PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
@@ -142,7 +142,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 			clusterManagementAddon: newClusterManagementAddon("test",
 				[]addonv1alpha1.ConfigMeta{{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"}, DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}}},
 				addonv1alpha1.InstallStrategy{
-					Type: addonv1alpha1.AddonInstallStrategyManualPlacements,
+					Type: addonv1alpha1.AddonInstallStrategyPlacements,
 					Placements: []addonv1alpha1.PlacementStrategy{
 						{
 							PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
@@ -194,7 +194,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 			clusterManagementAddon: newClusterManagementAddon("test",
 				[]addonv1alpha1.ConfigMeta{{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"}, DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}}},
 				addonv1alpha1.InstallStrategy{
-					Type: addonv1alpha1.AddonInstallStrategyManualPlacements,
+					Type: addonv1alpha1.AddonInstallStrategyPlacements,
 					Placements: []addonv1alpha1.PlacementStrategy{
 						{
 							PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
@@ -241,7 +241,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 			clusterManagementAddon: newClusterManagementAddon("test",
 				[]addonv1alpha1.ConfigMeta{{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"}, DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}}},
 				addonv1alpha1.InstallStrategy{
-					Type: addonv1alpha1.AddonInstallStrategyManualPlacements,
+					Type: addonv1alpha1.AddonInstallStrategyPlacements,
 					Placements: []addonv1alpha1.PlacementStrategy{
 						{
 							PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},

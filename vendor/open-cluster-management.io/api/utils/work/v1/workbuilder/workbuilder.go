@@ -54,6 +54,7 @@ type internalWorkBuilder struct {
 	executorOption                 *workapiv1.ManifestWorkExecutor
 	existingManifestWorks          []workapiv1.ManifestWork
 	manifestConfigOption           []workapiv1.ManifestConfigOption
+	annotations                    map[string]string
 }
 type WorkBuilderOption func(*internalWorkBuilder) *internalWorkBuilder
 
@@ -81,6 +82,13 @@ func ManifestConfigOption(option []workapiv1.ManifestConfigOption) WorkBuilderOp
 func ManifestWorkExecutorOption(executor *workapiv1.ManifestWorkExecutor) WorkBuilderOption {
 	return func(builder *internalWorkBuilder) *internalWorkBuilder {
 		builder.executorOption = executor
+		return builder
+	}
+}
+
+func ManifestAnnotations(annotations map[string]string) WorkBuilderOption {
+	return func(builder *internalWorkBuilder) *internalWorkBuilder {
+		builder.annotations = annotations
 		return builder
 	}
 }
@@ -259,6 +267,7 @@ func (f *internalWorkBuilder) initManifestWork(index int) *workapiv1.ManifestWor
 		ObjectMeta: f.generateManifestWorkObjectMeta(index),
 	}
 	f.setManifestWorkOptions(work)
+	f.setAnnotations(work)
 	return work
 }
 
@@ -267,6 +276,10 @@ func (f *internalWorkBuilder) setManifestWorkOptions(work *workapiv1.ManifestWor
 	work.Spec.DeleteOption = f.deletionOption
 	work.Spec.ManifestConfigs = f.manifestConfigOption
 	work.Spec.Executor = f.executorOption
+}
+
+func (f *internalWorkBuilder) setAnnotations(work *workapiv1.ManifestWork) {
+	work.SetAnnotations(f.annotations)
 }
 
 func (f *internalWorkBuilder) bufferOfManifestWork(work *workapiv1.ManifestWork) int {

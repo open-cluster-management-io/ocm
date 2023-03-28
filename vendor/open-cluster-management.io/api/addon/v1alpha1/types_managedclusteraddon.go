@@ -180,13 +180,23 @@ type ConfigReference struct {
 	// This field is synced from ClusterManagementAddOn configGroupResource field.
 	ConfigGroupResource `json:",inline"`
 
+	// Deprecated: Use DesiredConfig instead
 	// This field is synced from ClusterManagementAddOn defaultConfig and ManagedClusterAddOn config fields.
 	// If both of them are defined, the ManagedClusterAddOn configs will overwrite the ClusterManagementAddOn
 	// defaultConfigs.
 	ConfigReferent `json:",inline"`
 
+	// Deprecated: Use LastAppliedConfig instead
 	// lastObservedGeneration is the observed generation of the add-on configuration.
 	LastObservedGeneration int64 `json:"lastObservedGeneration"`
+
+	// desiredConfig record the desired config spec hash.
+	// +optional
+	DesiredConfig *ConfigSpecHash `json:"desiredConfig"`
+
+	// lastAppliedConfig record the config spec hash when the corresponding ManifestWork is applied successfully.
+	// +optional
+	LastAppliedConfig *ConfigSpecHash `json:"lastAppliedConfig"`
 }
 
 // HealthCheckMode indicates the mode for the addon to check its healthiness status
@@ -305,8 +315,12 @@ const (
 	// the managed cluster.
 	ManagedClusterAddOnConditionDegraded string = "Degraded"
 
+	// Deprecated: Use ManagedClusterAddOnConditionProgressing instead
 	// ManagedClusterAddOnConditionConfigured represents that the addon agent is configured with its configuration
 	ManagedClusterAddOnConditionConfigured string = "Configured"
+
+	// ManagedClusterAddOnConditionProgressing represents that the addon agent is applying configurations.
+	ManagedClusterAddOnConditionProgressing string = "Progressing"
 
 	// ManagedClusterAddOnManifestApplied is a condition type representing whether the manifest of an addon is
 	// applied correctly.

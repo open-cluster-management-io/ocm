@@ -102,7 +102,9 @@ func (ClusterManagementAddOnSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterManagementAddOnStatus = map[string]string{
-	"": "ClusterManagementAddOnStatus represents the current status of cluster management add-on.",
+	"":                        "ClusterManagementAddOnStatus represents the current status of cluster management add-on.",
+	"defaultconfigReferences": "defaultconfigReferences is a list of current add-on default configuration references.",
+	"installProgressions":     "installProgression is a list of current add-on configuration references per placement.",
 }
 
 func (ClusterManagementAddOnStatus) SwaggerDoc() map[string]string {
@@ -149,6 +151,44 @@ func (ConfigReferent) SwaggerDoc() map[string]string {
 	return map_ConfigReferent
 }
 
+var map_ConfigSpecHash = map[string]string{
+	"":         "ConfigSpecHash represents the namespace,name and spec hash for an add-on configuration.",
+	"specHash": "spec hash for an add-on configuration.",
+}
+
+func (ConfigSpecHash) SwaggerDoc() map[string]string {
+	return map_ConfigSpecHash
+}
+
+var map_DefaultConfigReference = map[string]string{
+	"":              "DefaultConfigReference is a reference to the current add-on configuration. This resource is used to record the configuration resource for the current add-on.",
+	"desiredConfig": "desiredConfig record the desired config spec hash.",
+}
+
+func (DefaultConfigReference) SwaggerDoc() map[string]string {
+	return map_DefaultConfigReference
+}
+
+var map_InstallConfigReference = map[string]string{
+	"":                    "InstallConfigReference is a reference to the current add-on configuration. This resource is used to record the configuration resource for the current add-on.",
+	"desiredConfig":       "desiredConfig record the desired config name and spec hash.",
+	"lastKnownGoodConfig": "lastKnownGoodConfig records the last known good config spec hash. For fresh install or rollout with type UpdateAll or RollingUpdate, the lastKnownGoodConfig is the same as lastAppliedConfig. For rollout with type RollingUpdateWithCanary, the lastKnownGoodConfig is the last successfully applied config spec hash of the canary placement.",
+	"lastAppliedConfig":   "lastAppliedConfig records the config spec hash when the all the corresponding ManagedClusterAddOn are applied successfully.",
+}
+
+func (InstallConfigReference) SwaggerDoc() map[string]string {
+	return map_InstallConfigReference
+}
+
+var map_InstallProgression = map[string]string{
+	"configReferences": "configReferences is a list of current add-on configuration references.",
+	"conditions":       "conditions describe the state of the managed and monitored components for the operator.",
+}
+
+func (InstallProgression) SwaggerDoc() map[string]string {
+	return map_InstallProgression
+}
+
 var map_InstallStrategy = map[string]string{
 	"":           "InstallStrategy represents that related ManagedClusterAddOns should be installed on certain clusters.",
 	"type":       "Type is the type of the install strategy, it can be: - Manual: no automatic install - Placements: install to clusters selected by placements.",
@@ -169,16 +209,48 @@ func (PlacementRef) SwaggerDoc() map[string]string {
 }
 
 var map_PlacementStrategy = map[string]string{
-	"configs": "Configs is the configuration of managedClusterAddon during installation. User can override the configuration by updating the managedClusterAddon directly.",
+	"configs":         "Configs is the configuration of managedClusterAddon during installation. User can override the configuration by updating the managedClusterAddon directly.",
+	"rolloutStrategy": "The rollout strategy to apply addon configurations change. The rollout strategy only watches the addon configurations defined in ClusterManagementAddOn.",
 }
 
 func (PlacementStrategy) SwaggerDoc() map[string]string {
 	return map_PlacementStrategy
 }
 
+var map_RollingUpdate = map[string]string{
+	"":               "RollingUpdate represents the behavior to rolling update add-on configurations on the selected clusters.",
+	"maxConcurrency": "The maximum concurrently updating number of clusters. Value can be an absolute number (ex: 5) or a percentage of desired addons (ex: 10%). Absolute number is calculated from percentage by rounding up. Defaults to 25%. Example: when this is set to 30%, once the addon configs change, the addon on 30% of the selected clusters will adopt the new configs. When the addons with new configs are healthy, the addon on the remaining clusters will be further updated.",
+}
+
+func (RollingUpdate) SwaggerDoc() map[string]string {
+	return map_RollingUpdate
+}
+
+var map_RollingUpdateWithCanary = map[string]string{
+	"":          "RollingUpdateWithCanary represents the canary placement and behavior to rolling update add-on configurations on the selected clusters.",
+	"placement": "Canary placement reference.",
+}
+
+func (RollingUpdateWithCanary) SwaggerDoc() map[string]string {
+	return map_RollingUpdateWithCanary
+}
+
+var map_RolloutStrategy = map[string]string{
+	"":                        "RolloutStrategy represents the rollout strategy of the add-on configuration.",
+	"type":                    "Type is the type of the rollout strategy, it supports UpdateAll, RollingUpdate and RollingUpdateWithCanary: - UpdateAll: when configs change, apply the new configs to all the selected clusters at once.\n  This is the default strategy.\n- RollingUpdate: when configs change, apply the new configs to all the selected clusters with\n  the concurrence rate defined in MaxConcurrency.\n- RollingUpdateWithCanary: when configs change, wait and check if add-ons on the canary placement\n  selected clusters have applied the new configs and are healthy, then apply the new configs to\n  all the selected clusters with the concurrence rate defined in MaxConcurrency.\n\n  The field lastKnownGoodConfig in the status record the last successfully applied\n  spec hash of canary placement. If the config spec hash changes after the canary is passed and\n  before the rollout is done, the current rollout will continue, then roll out to the latest change.\n\n  For example, the addon configs have spec hash A. The canary is passed and the lastKnownGoodConfig\n  would be A, and all the selected clusters are rolling out to A.\n  Then the config spec hash changes to B. At this time, the clusters will continue rolling out to A.\n  When the rollout is done and canary passed B, the lastKnownGoodConfig would be B and\n  all the clusters will start rolling out to B.\n\n  The canary placement does not have to be a subset of the install placement, and it is more like a\n  reference for finding and checking canary clusters before upgrading all. To trigger the rollout\n  on the canary clusters, you can define another rollout strategy with the type RollingUpdate, or even\n  manually upgrade the addons on those clusters.",
+	"rollingUpdate":           "Rolling update with placement config params. Present only if the type is RollingUpdate.",
+	"rollingUpdateWithCanary": "Rolling update with placement config params. Present only if the type is RollingUpdateWithCanary.",
+}
+
+func (RolloutStrategy) SwaggerDoc() map[string]string {
+	return map_RolloutStrategy
+}
+
 var map_ConfigReference = map[string]string{
 	"":                       "ConfigReference is a reference to the current add-on configuration. This resource is used to locate the configuration resource for the current add-on.",
-	"lastObservedGeneration": "lastObservedGeneration is the observed generation of the add-on configuration.",
+	"lastObservedGeneration": "Deprecated: Use LastAppliedConfig instead lastObservedGeneration is the observed generation of the add-on configuration.",
+	"desiredConfig":          "desiredConfig record the desired config spec hash.",
+	"lastAppliedConfig":      "lastAppliedConfig record the config spec hash when the corresponding ManifestWork is applied successfully.",
 }
 
 func (ConfigReference) SwaggerDoc() map[string]string {

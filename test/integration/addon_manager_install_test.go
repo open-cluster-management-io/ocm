@@ -101,10 +101,13 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			clusterManagementAddon.Spec.InstallStrategy = addonapiv1alpha1.InstallStrategy{
-				Type: addonapiv1alpha1.AddonInstallStrategyManualPlacements,
+				Type: addonapiv1alpha1.AddonInstallStrategyPlacements,
 				Placements: []addonapiv1alpha1.PlacementStrategy{
 					{
 						PlacementRef: addonapiv1alpha1.PlacementRef{Name: "test-placement", Namespace: placementNamespace},
+						RolloutStrategy: addonapiv1alpha1.RolloutStrategy{
+							Type: addonapiv1alpha1.AddonRolloutStrategyUpdateAll,
+						},
 					},
 				},
 			}
