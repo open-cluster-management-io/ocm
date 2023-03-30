@@ -44,6 +44,7 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 	var hubRegistrationWebhookDeployment = fmt.Sprintf("%s-registration-webhook", clusterManagerName)
 	var hubWorkWebhookDeployment = fmt.Sprintf("%s-work-webhook", clusterManagerName)
 	var hubAddOnManagerDeployment = fmt.Sprintf("%s-addon-manager-controller", clusterManagerName)
+	var hubWorkControllerDeployment = fmt.Sprintf("%s-work-controller", clusterManagerName)
 	var hubRegistrationClusterRole = fmt.Sprintf("open-cluster-management:%s-registration:controller", clusterManagerName)
 	var hubRegistrationWebhookClusterRole = fmt.Sprintf("open-cluster-management:%s-registration:webhook", clusterManagerName)
 	var hubWorkWebhookClusterRole = fmt.Sprintf("open-cluster-management:%s-registration:webhook", clusterManagerName)
@@ -51,6 +52,7 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 	var hubRegistrationSA = fmt.Sprintf("%s-registration-controller-sa", clusterManagerName)
 	var hubRegistrationWebhookSA = fmt.Sprintf("%s-registration-webhook-sa", clusterManagerName)
 	var hubWorkWebhookSA = fmt.Sprintf("%s-work-webhook-sa", clusterManagerName)
+	var hubWorkControllerSA = fmt.Sprintf("%s-work-controller-sa", clusterManagerName)
 	var hubAddOnManagerSA = fmt.Sprintf("%s-addon-manager-controller-sa", clusterManagerName)
 
 	ginkgo.BeforeEach(func() {
@@ -159,6 +161,12 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			gomega.Eventually(func() error {
+				if _, err := hostedKubeClient.CoreV1().ServiceAccounts(hubNamespaceHosted).Get(hostedCtx, hubWorkControllerSA, metav1.GetOptions{}); err != nil {
+					return err
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
 			// Check deployment
 			gomega.Eventually(func() error {
@@ -180,6 +188,13 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 
 			gomega.Eventually(func() error {
 				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubWorkWebhookDeployment, metav1.GetOptions{}); err != nil {
+					return err
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			gomega.Eventually(func() error {
+				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubWorkControllerDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -243,9 +258,16 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 			workValidtingWebhook := "manifestworkvalidators.admission.work.open-cluster-management.io"
 			//Should not apply the webhook config if the replica and observed is not set
 			_, err = hostedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(hostedCtx, workValidtingWebhook, metav1.GetOptions{})
+			gomega.Expect(err).To(gomega.HaveOccurred())
+
+			mwrSetValidtingWebhook := "manifestworkreplicasetvalidators.admission.work.open-cluster-management.io"
+			//Should not apply the webhook config if the replica and observed is not set
+			_, err = hostedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(hostedCtx, mwrSetValidtingWebhook, metav1.GetOptions{})
+			gomega.Expect(err).To(gomega.HaveOccurred())
 
 			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubRegistrationWebhookDeployment)
 			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubWorkWebhookDeployment)
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubWorkControllerDeployment)
 
 			gomega.Eventually(func() error {
 				if _, err := hostedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(hostedCtx, registrationValidtingWebhook, metav1.GetOptions{}); err != nil {
@@ -258,6 +280,13 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 
 			gomega.Eventually(func() error {
 				if _, err := hostedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(hostedCtx, workValidtingWebhook, metav1.GetOptions{}); err != nil {
+					return err
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			gomega.Eventually(func() error {
+				if _, err := hostedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(hostedCtx, mwrSetValidtingWebhook, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -326,8 +355,8 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 38 {
-					return fmt.Errorf("should get 38 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 44 {
+					return fmt.Errorf("should get 44 relatedResources, actual got %v, %v", len(actual.Status.RelatedResources), actual.Status.RelatedResources)
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -387,8 +416,8 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 34 {
-					return fmt.Errorf("should get 34 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 40 {
+					return fmt.Errorf("should get 40 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -443,6 +472,7 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubPlacementDeployment)
 			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubRegistrationWebhookDeployment)
 			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubWorkWebhookDeployment)
+			updateDeploymentStatus(hostedKubeClient, hubNamespaceHosted, hubWorkControllerDeployment)
 
 			// Check if generations are correct
 			gomega.Eventually(func() error {
@@ -464,8 +494,8 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 34 {
-					return fmt.Errorf("should get 34 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 40 {
+					return fmt.Errorf("should get 40 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())

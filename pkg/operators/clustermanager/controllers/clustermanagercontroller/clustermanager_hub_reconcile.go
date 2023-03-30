@@ -41,6 +41,10 @@ var (
 		"cluster-manager/hub/cluster-manager-placement-clusterrole.yaml",
 		"cluster-manager/hub/cluster-manager-placement-clusterrolebinding.yaml",
 		"cluster-manager/hub/cluster-manager-placement-serviceaccount.yaml",
+		// manifestworkreplicaset
+		"cluster-manager/hub/cluster-manager-manifestworkreplicaset-clusterrole.yaml",
+		"cluster-manager/hub/cluster-manager-manifestworkreplicaset-clusterrolebinding.yaml",
+		"cluster-manager/hub/cluster-manager-manifestworkreplicaset-serviceaccount.yaml",
 	}
 
 	hubAddOnManagerRbacResourceFiles = []string{

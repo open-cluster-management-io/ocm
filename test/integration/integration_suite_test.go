@@ -142,6 +142,10 @@ var _ = ginkgo.BeforeSuite(func() {
 						Feature: "NilExecutorValidating",
 						Mode:    "Enable",
 					},
+					{
+						Feature: "ManifestWorkReplicaSet",
+						Mode:    "Enable",
+					},
 				},
 			},
 		},

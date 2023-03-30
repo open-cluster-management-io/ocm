@@ -53,6 +53,7 @@ type Tester struct {
 	hubRegistrationDeployment        string
 	hubRegistrationWebhookDeployment string
 	hubWorkWebhookDeployment         string
+	hubWorkControllerDeployment      string
 	hubPlacementDeployment           string
 	operatorNamespace                string
 	klusterletOperator               string
@@ -71,6 +72,7 @@ func NewTester(kubeconfigPath string) *Tester {
 		hubRegistrationDeployment:        "cluster-manager-registration-controller",
 		hubRegistrationWebhookDeployment: "cluster-manager-registration-webhook",
 		hubWorkWebhookDeployment:         "cluster-manager-work-webhook",
+		hubWorkControllerDeployment:      "cluster-manager-work-controller",
 		hubPlacementDeployment:           "cluster-manager-placement-controller",
 		operatorNamespace:                "open-cluster-management",
 		klusterletOperator:               "klusterlet",
@@ -523,6 +525,20 @@ func (t *Tester) CheckHubReady() error {
 		readyReplicas := workWebhookDeployment.Status.ReadyReplicas
 		if readyReplicas != replicas {
 			return fmt.Errorf("deployment %s should have %d but got %d ready replicas", t.hubWorkWebhookDeployment, replicas, readyReplicas)
+		}
+		return nil
+	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeNil())
+
+	gomega.Eventually(func() error {
+		workHubControllerDeployment, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
+			Get(context.TODO(), t.hubWorkControllerDeployment, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		replicas := *workHubControllerDeployment.Spec.Replicas
+		readyReplicas := workHubControllerDeployment.Status.ReadyReplicas
+		if readyReplicas != replicas {
+			return fmt.Errorf("deployment %s should have %d but got %d ready replicas", t.hubWorkControllerDeployment, replicas, readyReplicas)
 		}
 		return nil
 	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeNil())

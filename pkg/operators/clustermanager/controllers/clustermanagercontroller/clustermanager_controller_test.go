@@ -206,6 +206,29 @@ func setDeployment(clusterManagerName, clusterManagerNamespace string) []runtime
 				ObservedGeneration: 1,
 			},
 		},
+		&appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       clusterManagerName + "-work-controller",
+				Namespace:  clusterManagerNamespace,
+				Generation: 1,
+			},
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: clusterManagerName + "-work-controller",
+							},
+						},
+					},
+				},
+				Replicas: &replicas,
+			},
+			Status: appsv1.DeploymentStatus{
+				ReadyReplicas:      replicas,
+				ObservedGeneration: 1,
+			},
+		},
 	}
 }
 
@@ -278,8 +301,8 @@ func TestSyncDeploy(t *testing.T) {
 	}
 
 	// Check if resources are created as expected
-	// We expect creat the namespace twice respectively in the management cluster and the hub cluster.
-	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 24)
+	// We expect create the namespace twice respectively in the management cluster and the hub cluster.
+	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 28)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager)
 	}
@@ -293,7 +316,7 @@ func TestSyncDeploy(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(createCRDObjects), 10)
+	testinghelper.AssertEqualNumber(t, len(createCRDObjects), 11)
 }
 
 func TestSyncDeployNoWebhook(t *testing.T) {
@@ -318,8 +341,8 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 	}
 
 	// Check if resources are created as expected
-	// We expect creat the namespace twice respectively in the management cluster and the hub cluster.
-	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 24)
+	// We expect create the namespace twice respectively in the management cluster and the hub cluster.
+	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 28)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager)
 	}
@@ -333,7 +356,7 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(createCRDObjects), 10)
+	testinghelper.AssertEqualNumber(t, len(createCRDObjects), 11)
 }
 
 // TestSyncDelete test cleanup hub deploy
@@ -361,7 +384,7 @@ func TestSyncDelete(t *testing.T) {
 			deleteKubeActions = append(deleteKubeActions, deleteKubeAction)
 		}
 	}
-	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 24) // delete namespace both from the hub cluster and the mangement cluster
+	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 28) // delete namespace both from the hub cluster and the mangement cluster
 
 	deleteCRDActions := []clienttesting.DeleteActionImpl{}
 	crdActions := tc.apiExtensionClient.Actions()
@@ -372,7 +395,7 @@ func TestSyncDelete(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(deleteCRDActions), 13)
+	testinghelper.AssertEqualNumber(t, len(deleteCRDActions), 15)
 
 	for _, action := range deleteKubeActions {
 		switch action.Resource.Resource {

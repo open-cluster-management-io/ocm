@@ -31,6 +31,7 @@ var (
 	}
 	hubWorkWebhookResourceFiles = []string{
 		"cluster-manager/hub/cluster-manager-work-webhook-validatingconfiguration.yaml",
+		"cluster-manager/hub/cluster-manager-manifestworkreplicaset-webhook-validatingconfiguration.yaml",
 	}
 )
 

@@ -25,3 +25,4 @@ _output/
 .external-hub-kubeconfig
 .external-managed-kubeconfig
 .idea
+.project

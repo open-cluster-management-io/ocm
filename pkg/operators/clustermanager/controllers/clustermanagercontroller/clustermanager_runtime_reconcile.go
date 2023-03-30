@@ -29,6 +29,7 @@ var (
 		"cluster-manager/management/cluster-manager-registration-webhook-deployment.yaml",
 		"cluster-manager/management/cluster-manager-work-webhook-deployment.yaml",
 		"cluster-manager/management/cluster-manager-placement-deployment.yaml",
+		"cluster-manager/management/cluster-manager-manifestworkreplicaset-deployment.yaml",
 	}
 
 	addOnManagerDeploymentFiles = []string{
@@ -176,5 +177,6 @@ func getSAs(clusterManagerName string) []string {
 		clusterManagerName + "-registration-webhook-sa",
 		clusterManagerName + "-work-webhook-sa",
 		clusterManagerName + "-placement-controller-sa",
+		clusterManagerName + "-work-controller-sa",
 	}
 }

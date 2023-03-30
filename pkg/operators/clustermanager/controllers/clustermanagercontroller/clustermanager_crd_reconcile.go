@@ -30,6 +30,7 @@ var (
 		"managedclusteraddons.addon.open-cluster-management.io",
 		"manifestworks.work.open-cluster-management.io",
 		"managedclusters.cluster.open-cluster-management.io",
+		"manifestworkreplicasets.work.open-cluster-management.io",
 	}
 
 	// crdResourceFiles should be deployed in the hub cluster
@@ -38,6 +39,7 @@ var (
 		"cluster-manager/hub/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml",
 		"cluster-manager/hub/0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml",
 		"cluster-manager/hub/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml",
+		"cluster-manager/hub/0000_00_work.open-cluster-management.io_manifestworkreplicasets.crd.yaml",
 		"cluster-manager/hub/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml",
 		"cluster-manager/hub/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml",
 		"cluster-manager/hub/0000_02_clusters.open-cluster-management.io_placements.crd.yaml",
