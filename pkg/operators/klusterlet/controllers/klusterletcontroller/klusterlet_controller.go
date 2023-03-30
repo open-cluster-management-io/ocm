@@ -3,44 +3,45 @@ package klusterletcontroller
 import (
 	"context"
 	"fmt"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"strings"
 
+	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/version"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
 	coreinformer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
 	"open-cluster-management.io/registration-operator/pkg/helpers"
 )
 
 const (
 
 	// klusterletHostedFinalizer is used to clean up resources on the managed/hosted cluster in Hosted mode
-	klusterletHostedFinalizer    = "operator.open-cluster-management.io/klusterlet-hosted-cleanup"
-	klusterletFinalizer          = "operator.open-cluster-management.io/klusterlet-cleanup"
-	imagePullSecret              = "open-cluster-management-image-pull-credentials"
-	klusterletApplied            = "Applied"
-	klusterletReadyToApply       = "ReadyToApply"
-	hubConnectionDegraded        = "HubConnectionDegraded"
-	hubKubeConfigSecretMissing   = "HubKubeConfigSecretMissing"
-	appliedManifestWorkFinalizer = "cluster.open-cluster-management.io/applied-manifest-work-cleanup"
+	klusterletHostedFinalizer             = "operator.open-cluster-management.io/klusterlet-hosted-cleanup"
+	klusterletFinalizer                   = "operator.open-cluster-management.io/klusterlet-cleanup"
+	imagePullSecret                       = "open-cluster-management-image-pull-credentials"
+	klusterletApplied                     = "Applied"
+	klusterletReadyToApply                = "ReadyToApply"
+	hubConnectionDegraded                 = "HubConnectionDegraded"
+	hubKubeConfigSecretMissing            = "HubKubeConfigSecretMissing"
+	appliedManifestWorkFinalizer          = "cluster.open-cluster-management.io/applied-manifest-work-cleanup"
+	managedResourcesEvictionTimestampAnno = "operator.open-cluster-management.io/managed-resources-eviction-timestamp"
 )
 
 type klusterletController struct {

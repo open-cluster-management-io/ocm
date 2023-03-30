@@ -2,7 +2,13 @@ package klusterletcontroller
 
 import (
 	"context"
+	"reflect"
+	"strings"
+	"time"
+
 	"github.com/openshift/library-go/pkg/assets"
+	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/events"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -14,16 +20,13 @@ import (
 	coreinformer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	"open-cluster-management.io/registration-operator/manifests"
-	"reflect"
-
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
+	"open-cluster-management.io/registration-operator/manifests"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
 )
 
@@ -132,7 +135,6 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 			withMode(config.InstallMode).
 			withKubeConfigSecret(config.AgentNamespace, config.ExternalManagedKubeConfigSecret).
 			build(ctx)
-
 		// stop when hosted kubeconfig is not found. the klustelet controller will monitor the secret and retrigger
 		// reconcilation of cleanup controller when secret is created again.
 		if errors.IsNotFound(err) {
@@ -142,20 +144,35 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 			return err
 		}
 
-		reconcilers = append(reconcilers,
-			&crdReconcile{
-				managedClusterClients: managedClusterClients,
-				kubeVersion:           n.kubeVersion,
-				recorder:              controllerContext.Recorder(),
-			},
-			&managedReconcile{
-				managedClusterClients: managedClusterClients,
-				kubeClient:            n.kubeClient,
-				kubeVersion:           n.kubeVersion,
-				opratorNamespace:      n.operatorNamespace,
-				recorder:              controllerContext.Recorder(),
-			},
-		)
+		// check the managed cluster connectivity
+		cleanupManagedClusterResources, err := n.checkConnectivity(ctx, managedClusterClients.appliedManifestWorkClient, klusterlet)
+		if err != nil {
+			errs := []error{err}
+			// compare the annotation to check whether the eviction timestamp has changed
+			if err := n.updateKlusterletAnnotation(ctx, klusterlet.Name, klusterlet.Annotations); err != nil {
+				errs = append(errs, err)
+			}
+			return utilerrors.NewAggregate(errs)
+		}
+
+		// after trying to connect to the managed cluster times out for a period of time, we will stop removing
+		// resources on managed clusters, but just clean the resources on the hosting cluster and finish the cleanup
+		if cleanupManagedClusterResources {
+			reconcilers = append(reconcilers,
+				&crdReconcile{
+					managedClusterClients: managedClusterClients,
+					kubeVersion:           n.kubeVersion,
+					recorder:              controllerContext.Recorder(),
+				},
+				&managedReconcile{
+					managedClusterClients: managedClusterClients,
+					kubeClient:            n.kubeClient,
+					kubeVersion:           n.kubeVersion,
+					opratorNamespace:      n.operatorNamespace,
+					recorder:              controllerContext.Recorder(),
+				},
+			)
+		}
 	}
 	// managementReconcile should be added as the last one, since we finally need to remove agent namespace.
 	reconcilers = append(reconcilers, &managementReconcile{
@@ -180,12 +197,86 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 		return utilerrors.NewAggregate(errs)
 	}
 
-	return n.removeKlusterletFinalizers(ctx, klusterlet)
+	return n.removeKlusterletFinalizers(ctx, klusterlet.Name)
 }
 
-func (n *klusterletCleanupController) removeKlusterletFinalizers(ctx context.Context, deploy *operatorapiv1.Klusterlet) error {
+func (r *klusterletCleanupController) checkConnectivity(ctx context.Context,
+	amwClient workv1client.AppliedManifestWorkInterface,
+	klusterlet *operatorapiv1.Klusterlet) (cleanupManagedClusterResources bool, err error) {
+	_, err = amwClient.List(ctx, metav1.ListOptions{})
+	if err == nil {
+		return true, nil
+	}
+
+	// if the managed cluster is destroyed, the returned err is TCP timeout or TCP no such host,
+	// the k8s.io/apimachinery/pkg/api/errors.IsTimeout,IsServerTimeout can not match this error
+	if isTCPTimeOutError(err) || isTCPNoSuchHostError(err) {
+		klog.Infof("Check the connectivity, err: %v", err)
+		if klusterlet.Annotations == nil {
+			klusterlet.Annotations = make(map[string]string, 0)
+		}
+
+		evictionTimeStr, ok := klusterlet.Annotations[managedResourcesEvictionTimestampAnno]
+		if !ok {
+			klusterlet.Annotations[managedResourcesEvictionTimestampAnno] = time.Now().Format(time.RFC3339)
+			return true, err
+		}
+		evictionTime, perr := time.Parse(time.RFC3339, evictionTimeStr)
+		if perr != nil {
+			klog.Infof("Parse eviction time %v error %s", evictionTimeStr, perr)
+			klusterlet.Annotations[managedResourcesEvictionTimestampAnno] = time.Now().Format(time.RFC3339)
+			return true, err
+		}
+
+		if evictionTime.Add(5 * time.Minute).Before(time.Now()) {
+			klog.Infof("Try to connect managed cluster timed out for 5 minutes, ignore the resources")
+			// ignore the resources on the managed cluster, return false here
+			return false, nil
+		}
+
+		return true, err
+	}
+
+	// It may be temporarily unreachable, but now it is reachable, delete the timestamp
+	delete(klusterlet.Annotations, managedResourcesEvictionTimestampAnno)
+	return true, err
+}
+
+func isTCPTimeOutError(err error) bool {
+	return err != nil &&
+		strings.Contains(err.Error(), "dial tcp") &&
+		strings.Contains(err.Error(), "i/o timeout")
+}
+
+func isTCPNoSuchHostError(err error) bool {
+	return err != nil &&
+		strings.Contains(err.Error(), "dial tcp: lookup") &&
+		strings.Contains(err.Error(), "no such host")
+}
+
+func (n *klusterletCleanupController) updateKlusterletAnnotation(
+	ctx context.Context, klusterletName string, annotations map[string]string) error {
 	// reload klusterlet
-	deploy, err := n.klusterletClient.Get(ctx, deploy.Name, metav1.GetOptions{})
+	klusterlet, err := n.klusterletClient.Get(ctx, klusterletName, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	if !reflect.DeepEqual(klusterlet.Annotations, annotations) {
+		klusterlet.Annotations = annotations
+		_, err := n.klusterletClient.Update(ctx, klusterlet, metav1.UpdateOptions{})
+		return err
+	}
+
+	return nil
+}
+
+func (n *klusterletCleanupController) removeKlusterletFinalizers(ctx context.Context, klusterletName string) error {
+	// reload klusterlet
+	klusterlet, err := n.klusterletClient.Get(ctx, klusterletName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		return nil
 	}
@@ -193,15 +284,15 @@ func (n *klusterletCleanupController) removeKlusterletFinalizers(ctx context.Con
 		return err
 	}
 	var copiedFinalizers []string
-	for i := range deploy.Finalizers {
-		if deploy.Finalizers[i] == klusterletFinalizer || deploy.Finalizers[i] == klusterletHostedFinalizer {
+	for i := range klusterlet.Finalizers {
+		if klusterlet.Finalizers[i] == klusterletFinalizer || klusterlet.Finalizers[i] == klusterletHostedFinalizer {
 			continue
 		}
-		copiedFinalizers = append(copiedFinalizers, deploy.Finalizers[i])
+		copiedFinalizers = append(copiedFinalizers, klusterlet.Finalizers[i])
 	}
-	if len(deploy.Finalizers) != len(copiedFinalizers) {
-		deploy.Finalizers = copiedFinalizers
-		_, err := n.klusterletClient.Update(ctx, deploy, metav1.UpdateOptions{})
+	if len(klusterlet.Finalizers) != len(copiedFinalizers) {
+		klusterlet.Finalizers = copiedFinalizers
+		_, err := n.klusterletClient.Update(ctx, klusterlet, metav1.UpdateOptions{})
 		return err
 	}
 

@@ -7,7 +7,6 @@ package klusterletcontroller
 import (
 	"context"
 	"fmt"
-
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
