@@ -20,7 +20,7 @@ require (
 	k8s.io/klog/v2 v2.90.1
 	k8s.io/kube-aggregator v0.26.3
 	k8s.io/utils v0.0.0-20230313181309-38a27ef9d749
-	open-cluster-management.io/api v0.10.1-0.20230327022939-01b4ef0a6c5e
+	open-cluster-management.io/api v0.10.1-0.20230330015317-a9fa4082f060
 	sigs.k8s.io/controller-runtime v0.14.5
 	sigs.k8s.io/kube-storage-version-migrator v0.0.5
 )

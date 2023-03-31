@@ -3,6 +3,7 @@ package clustermanagercontroller
 import (
 	"context"
 	"encoding/base64"
+	ocmfeature "open-cluster-management.io/api/feature"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
@@ -150,17 +151,30 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		},
 	}
 
-	if clusterManager.Spec.AddOnManagerConfiguration != nil {
-		config.AddOnManagerComponentMode = string(clusterManager.Spec.AddOnManagerConfiguration.Mode)
-	}
-
-	var featureGateCondition metav1.Condition
+	var registrationFeatureMsgs, workFeatureMsgs, addonFeatureMsgs string
 	// If there are some invalid feature gates of registration or work, will output
 	// condition `ValidFeatureGates` False in ClusterManager.
-	config.RegistrationFeatureGates, config.WorkFeatureGates, featureGateCondition = helpers.CheckFeatureGates(
-		helpers.OperatorTypeClusterManager,
-		clusterManager.Spec.RegistrationConfiguration,
-		clusterManager.Spec.WorkConfiguration)
+	registrationFeatureGates := helpers.DefaultHubRegistrationFeatureGates
+	if clusterManager.Spec.RegistrationConfiguration != nil {
+		registrationFeatureGates = clusterManager.Spec.RegistrationConfiguration.FeatureGates
+	}
+	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration", registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates)
+
+	workFeatureGates := []operatorapiv1.FeatureGate{}
+	if clusterManager.Spec.WorkConfiguration != nil {
+		workFeatureGates = clusterManager.Spec.WorkConfiguration.FeatureGates
+	}
+	config.WorkFeatureGates, workFeatureMsgs = helpers.ConvertToFeatureGateFlags("Work", workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates)
+
+	addonFeatureGates := []operatorapiv1.FeatureGate{}
+	if clusterManager.Spec.AddOnManagerConfiguration != nil {
+		addonFeatureGates = clusterManager.Spec.AddOnManagerConfiguration.FeatureGates
+	}
+	_, addonFeatureMsgs = helpers.ConvertToFeatureGateFlags("Addon", addonFeatureGates, ocmfeature.DefaultHubAddonManagerFeatureGates)
+	featureGateCondition := helpers.BuildFeatureCondition(registrationFeatureMsgs, workFeatureMsgs, addonFeatureMsgs)
+
+	// Check if addon management is enabled by the feature gate
+	config.AddOnManagerEnabled = helpers.FeatureGateEnabled(addonFeatureGates, ocmfeature.DefaultHubAddonManagerFeatureGates, ocmfeature.AddonManagement)
 
 	// If we are deploying in the hosted mode, it requires us to create webhook in a different way with the default mode.
 	// In the hosted mode, the webhook servers is running in the management cluster but the users are accessing the hub cluster.

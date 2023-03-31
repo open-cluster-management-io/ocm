@@ -3,6 +3,8 @@ package klusterletcontroller
 import (
 	"context"
 	"fmt"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	ocmfeature "open-cluster-management.io/api/feature"
 	"strings"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -14,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/version"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
 	coreinformer "k8s.io/client-go/informers/core/v1"
@@ -211,16 +212,24 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		return nil
 	}
 
-	var featureGateCondition metav1.Condition
 	// If there are some invalid feature gates of registration or work, will output condition `ValidFeatureGates`
 	// False in Klusterlet.
 	// TODO: For the work feature gates, when splitting permissions in the future, if the ExecutorValidatingCaches
 	//       function is enabled, additional permissions for get, list, and watch RBAC resources required by this
 	//       function need to be applied
-	config.RegistrationFeatureGates, config.WorkFeatureGates, featureGateCondition = helpers.CheckFeatureGates(
-		helpers.OperatorTypeKlusterlet,
-		klusterlet.Spec.RegistrationConfiguration,
-		klusterlet.Spec.WorkConfiguration)
+	var registrationFeatureMsgs, workFeatureMsgs string
+	registrationFeatureGates := helpers.DefaultSpokeRegistrationFeatureGates
+	if klusterlet.Spec.RegistrationConfiguration != nil {
+		registrationFeatureGates = klusterlet.Spec.RegistrationConfiguration.FeatureGates
+	}
+	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration", registrationFeatureGates, ocmfeature.DefaultSpokeRegistrationFeatureGates)
+
+	workFeatureGates := []operatorapiv1.FeatureGate{}
+	if klusterlet.Spec.WorkConfiguration != nil {
+		workFeatureGates = klusterlet.Spec.WorkConfiguration.FeatureGates
+	}
+	config.WorkFeatureGates, workFeatureMsgs = helpers.ConvertToFeatureGateFlags("Work", workFeatureGates, ocmfeature.DefaultSpokeWorkFeatureGates)
+	featureGateCondition := helpers.BuildFeatureCondition(registrationFeatureMsgs, workFeatureMsgs)
 
 	reconcilers := []klusterletReconcile{
 		&crdReconcile{

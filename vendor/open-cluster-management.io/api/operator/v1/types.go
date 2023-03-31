@@ -69,7 +69,6 @@ type ClusterManagerSpec struct {
 
 	// AddOnManagerConfiguration contains the configuration of addon manager
 	// +optional
-	// +kubebuilder:default={mode: Disable}
 	AddOnManagerConfiguration *AddOnManagerConfiguration `json:"addOnManagerConfiguration,omitempty"`
 }
 
@@ -98,14 +97,6 @@ type WorkConfiguration struct {
 }
 
 type AddOnManagerConfiguration struct {
-	// Mode is either Enable, Disable, "" where "" is Disable by default.
-	// In Enable mode, the component will be installed.
-	// In Disable mode, the component will not be installed.
-	// +kubebuilder:default:=Disable
-	// +kubebuilder:validation:Enum:=Enable;Disable
-	// +optional
-	Mode ComponentModeType `json:"mode,omitempty"`
-
 	// FeatureGates represents the list of feature gates for addon manager
 	// If it is set empty, default feature gates will be used.
 	// If it is set, featuregate/Foo is an example of one item in FeatureGates:
@@ -116,14 +107,6 @@ type AddOnManagerConfiguration struct {
 	// +optional
 	FeatureGates []FeatureGate `json:"featureGates,omitempty"`
 }
-
-type ComponentModeType string
-
-const (
-	// Valid ComponentModeType value is Enable, Disable.
-	ComponentModeTypeEnable  ComponentModeType = "Enable"
-	ComponentModeTypeDisable ComponentModeType = "Disable"
-)
 
 type FeatureGate struct {
 	// Feature is the key of feature gate. e.g. featuregate/Foo.

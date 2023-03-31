@@ -50,7 +50,7 @@ type runtimeReconcile struct {
 
 func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager, config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
 	// If AddOnManager is not enabled, remove related resources
-	if operatorapiv1.ComponentModeType(config.AddOnManagerComponentMode) != operatorapiv1.ComponentModeTypeEnable {
+	if !config.AddOnManagerEnabled {
 		_, _, err := cleanResources(ctx, c.kubeClient, cm, config, addOnManagerDeploymentFiles...)
 		if err != nil {
 			return cm, reconcileStop, err
@@ -104,7 +104,7 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 
 	var progressingDeployments []string
 	deployResources := deploymentFiles
-	if operatorapiv1.ComponentModeType(config.AddOnManagerComponentMode) == operatorapiv1.ComponentModeTypeEnable {
+	if config.AddOnManagerEnabled {
 		deployResources = append(deployResources, addOnManagerDeploymentFiles...)
 	}
 	for _, file := range deployResources {

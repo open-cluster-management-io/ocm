@@ -297,27 +297,19 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 
 		ginkgo.It("should have expected resource created/deleted successfully when feature gates AddOnManager enabled/disabled", func() {
 			// Check addon manager default mode
-			clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-			gomega.Eventually(func() bool {
-				if clusterManager.Spec.AddOnManagerConfiguration.Mode == operatorapiv1.ComponentModeTypeDisable {
-					return true
+			gomega.Eventually(func() error {
+				clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
 				}
-				return false
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
-			// Check addon manager enabled mode
-			clusterManager.Spec.AddOnManagerConfiguration.Mode = operatorapiv1.ComponentModeTypeEnable
-			_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-			gomega.Eventually(func() bool {
-				if clusterManager.Spec.AddOnManagerConfiguration.Mode == operatorapiv1.ComponentModeTypeEnable {
-					return true
+				// Check addon manager enabled mode
+				clusterManager.Spec.AddOnManagerConfiguration.FeatureGates = []operatorapiv1.FeatureGate{
+					{Feature: "AddonManagement", Mode: operatorapiv1.FeatureGateModeTypeEnable},
 				}
-				return false
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+				_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
 			// Check clusterrole/clusterrolebinding
 			gomega.Eventually(func() error {
@@ -362,19 +354,16 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Check addon manager disable mode
-			clusterManager, err = hostedOperatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-			clusterManager.Spec.AddOnManagerConfiguration.Mode = operatorapiv1.ComponentModeTypeDisable
-			clusterManager, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-			gomega.Eventually(func() bool {
-				if clusterManager.Spec.AddOnManagerConfiguration.Mode == operatorapiv1.ComponentModeTypeDisable {
-					return true
+			gomega.Eventually(func() error {
+				clusterManager, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
 				}
-				return false
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+				clusterManager.Spec.AddOnManagerConfiguration.FeatureGates = []operatorapiv1.FeatureGate{}
+				clusterManager, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
 			// Check clusterrole/clusterrolebinding
 			gomega.Eventually(func() bool {

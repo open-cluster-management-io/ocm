@@ -78,9 +78,6 @@ func newClusterManager(name string) *operatorapiv1.ClusterManager {
 			DeployOption: operatorapiv1.ClusterManagerDeployOption{
 				Mode: operatorapiv1.InstallModeDefault,
 			},
-			AddOnManagerConfiguration: &operatorapiv1.AddOnManagerConfiguration{
-				Mode: operatorapiv1.ComponentModeTypeEnable,
-			},
 		},
 	}
 }

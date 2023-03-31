@@ -41,8 +41,6 @@ spec:
               that govern registration and work distribution for attached Klusterlets.
             properties:
               addOnManagerConfiguration:
-                default:
-                  mode: Disable
                 description: AddOnManagerConfiguration contains the configuration
                   of addon manager
                 properties:
@@ -77,15 +75,6 @@ spec:
                       - feature
                       type: object
                     type: array
-                  mode:
-                    default: Disable
-                    description: Mode is either Enable, Disable, "" where "" is Disable
-                      by default. In Enable mode, the component will be installed.
-                      In Disable mode, the component will not be installed.
-                    enum:
-                    - Enable
-                    - Disable
-                    type: string
                 type: object
               addOnManagerImagePullSpec:
                 default: quay.io/open-cluster-management/addon-manager

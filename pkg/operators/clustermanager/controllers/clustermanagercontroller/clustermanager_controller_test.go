@@ -57,7 +57,9 @@ func newClusterManager(name string) *operatorapiv1.ClusterManager {
 				Mode: operatorapiv1.InstallModeDefault,
 			},
 			AddOnManagerConfiguration: &operatorapiv1.AddOnManagerConfiguration{
-				Mode: operatorapiv1.ComponentModeTypeEnable,
+				FeatureGates: []operatorapiv1.FeatureGate{
+					{Feature: "AddonManagement", Mode: operatorapiv1.FeatureGateModeTypeEnable},
+				},
 			},
 		},
 	}
