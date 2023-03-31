@@ -211,7 +211,8 @@ func (r *klusterletCleanupController) checkConnectivity(ctx context.Context,
 	// if the managed cluster is destroyed, the returned err is TCP timeout or TCP no such host,
 	// the k8s.io/apimachinery/pkg/api/errors.IsTimeout,IsServerTimeout can not match this error
 	if isTCPTimeOutError(err) || isTCPNoSuchHostError(err) {
-		klog.Infof("Check the connectivity, err: %v", err)
+		klog.V(4).Infof("Check the connectivity for klusterlet %s, annotation: %s, err: %v",
+			klusterlet.Name, klusterlet.Annotations, err)
 		if klusterlet.Annotations == nil {
 			klusterlet.Annotations = make(map[string]string, 0)
 		}
@@ -223,13 +224,14 @@ func (r *klusterletCleanupController) checkConnectivity(ctx context.Context,
 		}
 		evictionTime, perr := time.Parse(time.RFC3339, evictionTimeStr)
 		if perr != nil {
-			klog.Infof("Parse eviction time %v error %s", evictionTimeStr, perr)
+			klog.Infof("Parse eviction time %v for klusterlet %s error %s", evictionTimeStr, klusterlet.Name, perr)
 			klusterlet.Annotations[managedResourcesEvictionTimestampAnno] = time.Now().Format(time.RFC3339)
 			return true, err
 		}
 
 		if evictionTime.Add(5 * time.Minute).Before(time.Now()) {
-			klog.Infof("Try to connect managed cluster timed out for 5 minutes, ignore the resources")
+			klog.Infof("Try to connect managed cluster timed out for 5 minutes, klusterlet %s, ignore the resources",
+				klusterlet.Name)
 			// ignore the resources on the managed cluster, return false here
 			return false, nil
 		}
