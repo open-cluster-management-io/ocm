@@ -38,7 +38,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 				addontesting.NewAddon("test", "cluster1"),
 				addontesting.NewAddon("test", "cluster2"),
 			},
-			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", ""),
+			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", "").Build(),
 			placements:             []runtime.Object{},
 			placementDecisions:     []runtime.Object{},
 			validateAddonActions:   addontesting.AssertNoActions,
@@ -325,7 +325,7 @@ func (a byPatchName) Less(i, j int) bool {
 }
 
 func newClusterManagementAddon(name string, defaultConfigs []addonv1alpha1.ConfigMeta, installStrategy addonv1alpha1.InstallStrategy) *addonv1alpha1.ClusterManagementAddOn {
-	cma := addontesting.NewClusterManagementAddon(name, "", "")
+	cma := addontesting.NewClusterManagementAddon(name, "", "").Build()
 	cma.Spec.SupportedConfigs = defaultConfigs
 	cma.Spec.InstallStrategy = installStrategy
 	return cma

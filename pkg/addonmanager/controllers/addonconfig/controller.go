@@ -39,7 +39,7 @@ type addonConfigController struct {
 	addonClient   addonv1alpha1client.Interface
 	addonLister   addonlisterv1alpha1.ManagedClusterAddOnLister
 	addonIndexer  cache.Indexer
-	configListers map[string]dynamiclister.Lister
+	configListers map[schema.GroupResource]dynamiclister.Lister
 	queue         workqueue.RateLimitingInterface
 }
 
@@ -55,7 +55,7 @@ func NewAddonConfigController(
 		addonClient:   addonClient,
 		addonLister:   addonInformers.Lister(),
 		addonIndexer:  addonInformers.Informer().GetIndexer(),
-		configListers: map[string]dynamiclister.Lister{},
+		configListers: map[schema.GroupResource]dynamiclister.Lister{},
 		queue:         syncCtx.Queue(),
 	}
 
@@ -96,20 +96,20 @@ func (c *addonConfigController) buildConfigInformers(
 			utilruntime.HandleError(err)
 		}
 		configInformers = append(configInformers, indexInformer)
-		c.configListers[toListerKey(gvr.Group, gvr.Resource)] = dynamiclister.New(indexInformer.GetIndexer(), gvr)
+		c.configListers[schema.GroupResource{Group: gvr.Group, Resource: gvr.Resource}] = dynamiclister.New(indexInformer.GetIndexer(), gvr)
 	}
 	return configInformers
 }
 
 func (c *addonConfigController) enqueueAddOnsByConfig(gvr schema.GroupVersionResource) enqueueFunc {
 	return func(obj interface{}) {
-		name, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+		namespaceName, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("error to get accessor of object: %v", obj))
 			return
 		}
 
-		objs, err := c.addonIndexer.ByIndex(byAddOnConfig, fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Resource, name))
+		objs, err := c.addonIndexer.ByIndex(byAddOnConfig, fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Resource, namespaceName))
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("error to get addons: %v", err))
 			return
@@ -119,9 +119,7 @@ func (c *addonConfigController) enqueueAddOnsByConfig(gvr schema.GroupVersionRes
 			if obj == nil {
 				continue
 			}
-
-			addon := obj.(*addonapiv1alpha1.ManagedClusterAddOn)
-			key, _ := cache.MetaNamespaceKeyFunc(addon)
+			key, _ := cache.MetaNamespaceKeyFunc(obj)
 			c.queue.Add(key)
 		}
 	}
@@ -183,7 +181,7 @@ func (c *addonConfigController) updateConfigGenerations(addon *addonapiv1alpha1.
 	}
 
 	for index, configReference := range addon.Status.ConfigReferences {
-		lister, ok := c.configListers[toListerKey(configReference.Group, configReference.Resource)]
+		lister, ok := c.configListers[schema.GroupResource{Group: configReference.ConfigGroupResource.Group, Resource: configReference.ConfigGroupResource.Resource}]
 		if !ok {
 			continue
 		}
@@ -265,8 +263,4 @@ func getIndex(config addonapiv1alpha1.ConfigReference) string {
 	}
 
 	return fmt.Sprintf("%s/%s/%s", config.Group, config.Resource, config.Name)
-}
-
-func toListerKey(group, resource string) string {
-	return fmt.Sprintf("%s/%s", group, resource)
 }

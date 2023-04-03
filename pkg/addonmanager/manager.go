@@ -25,6 +25,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addoninstall"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/agentdeploy"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/certificate"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/managementaddonconfig"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/registration"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
@@ -171,10 +172,17 @@ func (a *addonManager) Start(ctx context.Context) error {
 	)
 
 	var addonConfigController factory.Controller
+	var managementAddonConfigController factory.Controller
 	if len(a.addonConfigs) != 0 {
 		addonConfigController = addonconfig.NewAddonConfigController(
 			addonClient,
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+			dynamicInformers,
+			a.addonConfigs,
+		)
+		managementAddonConfigController = managementaddonconfig.NewManagementAddonConfigController(
+			addonClient,
+			addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 			dynamicInformers,
 			a.addonConfigs,
 		)
@@ -227,6 +235,9 @@ func (a *addonManager) Start(ctx context.Context) error {
 	go addonHealthCheckController.Run(ctx, 1)
 	if addonConfigController != nil {
 		go addonConfigController.Run(ctx, 1)
+	}
+	if managementAddonConfigController != nil {
+		go managementAddonConfigController.Run(ctx, 1)
 	}
 	if csrApproveController != nil {
 		go csrApproveController.Run(ctx, 1)

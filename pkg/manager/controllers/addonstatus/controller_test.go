@@ -17,7 +17,7 @@ import (
 )
 
 func newClusterManagementOwner(name string) metav1.OwnerReference {
-	clusterManagementAddon := addontesting.NewClusterManagementAddon(name, "testcrd", "testcr")
+	clusterManagementAddon := addontesting.NewClusterManagementAddon(name, "testcrd", "testcr").Build()
 	return *metav1.NewControllerRef(clusterManagementAddon, addonapiv1alpha1.GroupVersion.WithKind("ClusterManagementAddOn"))
 }
 
@@ -40,7 +40,7 @@ func TestReconcile(t *testing.T) {
 			name:                   "no managedclusteraddon to sync",
 			syncKey:                "cluster1/test",
 			managedClusteraddon:    []runtime.Object{},
-			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr")},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").Build()},
 			validateAddonActions:   addontesting.AssertNoActions,
 		},
 		{
@@ -49,7 +49,7 @@ func TestReconcile(t *testing.T) {
 			managedClusteraddon: []runtime.Object{
 				addontesting.NewAddon("test", "cluster1", newClusterManagementOwner("test")),
 			},
-			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr")},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").Build()},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
@@ -91,7 +91,7 @@ func TestReconcile(t *testing.T) {
 					return addon
 				}(),
 			},
-			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "", "")},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "", "").Build()},
 			validateAddonActions:   addontesting.AssertNoActions,
 		},
 		{
@@ -110,7 +110,7 @@ func TestReconcile(t *testing.T) {
 					return addon
 				}(),
 			},
-			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "", "")},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "", "").Build()},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
@@ -152,7 +152,7 @@ func TestReconcile(t *testing.T) {
 					return addon
 				}(),
 			},
-			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "", "")},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "", "").Build()},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()

@@ -32,7 +32,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 		{
 			name:                   "no installStrategy",
 			managedClusteraddon:    []runtime.Object{},
-			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", ""),
+			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", "").Build(),
 			placements:             []runtime.Object{},
 			placementDecisions:     []runtime.Object{},
 			validateAddonActions:   addontesting.AssertNoActions,
@@ -41,7 +41,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 			name:                "manual installStrategy",
 			managedClusteraddon: []runtime.Object{},
 			clusterManagementAddon: func() *addonv1alpha1.ClusterManagementAddOn {
-				addon := addontesting.NewClusterManagementAddon("test", "", "")
+				addon := addontesting.NewClusterManagementAddon("test", "", "").Build()
 				addon.Spec.InstallStrategy = addonv1alpha1.InstallStrategy{
 					Type: addonv1alpha1.AddonInstallStrategyManual,
 				}
@@ -55,7 +55,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 			name:                "placement is missting",
 			managedClusteraddon: []runtime.Object{},
 			clusterManagementAddon: func() *addonv1alpha1.ClusterManagementAddOn {
-				addon := addontesting.NewClusterManagementAddon("test", "", "")
+				addon := addontesting.NewClusterManagementAddon("test", "", "").Build()
 				addon.Spec.InstallStrategy = addonv1alpha1.InstallStrategy{
 					Type: addonv1alpha1.AddonInstallStrategyPlacements,
 					Placements: []addonv1alpha1.PlacementStrategy{
@@ -74,7 +74,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 			name:                "placement decision is missting",
 			managedClusteraddon: []runtime.Object{},
 			clusterManagementAddon: func() *addonv1alpha1.ClusterManagementAddOn {
-				addon := addontesting.NewClusterManagementAddon("test", "", "")
+				addon := addontesting.NewClusterManagementAddon("test", "", "").Build()
 				addon.Spec.InstallStrategy = addonv1alpha1.InstallStrategy{
 					Type: addonv1alpha1.AddonInstallStrategyPlacements,
 					Placements: []addonv1alpha1.PlacementStrategy{
@@ -95,7 +95,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 			name:                "install addon",
 			managedClusteraddon: []runtime.Object{},
 			clusterManagementAddon: func() *addonv1alpha1.ClusterManagementAddOn {
-				addon := addontesting.NewClusterManagementAddon("test", "", "")
+				addon := addontesting.NewClusterManagementAddon("test", "", "").Build()
 				addon.Spec.InstallStrategy = addonv1alpha1.InstallStrategy{
 					Type: addonv1alpha1.AddonInstallStrategyPlacements,
 					Placements: []addonv1alpha1.PlacementStrategy{
@@ -132,7 +132,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 				addontesting.NewAddon("test", "cluster1"),
 			},
 			clusterManagementAddon: func() *addonv1alpha1.ClusterManagementAddOn {
-				addon := addontesting.NewClusterManagementAddon("test", "", "")
+				addon := addontesting.NewClusterManagementAddon("test", "", "").Build()
 				addon.Spec.InstallStrategy = addonv1alpha1.InstallStrategy{
 					Type: addonv1alpha1.AddonInstallStrategyPlacements,
 					Placements: []addonv1alpha1.PlacementStrategy{
@@ -169,7 +169,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 				addontesting.NewAddon("test", "cluster1"),
 			},
 			clusterManagementAddon: func() *addonv1alpha1.ClusterManagementAddOn {
-				addon := addontesting.NewClusterManagementAddon("test", "", "")
+				addon := addontesting.NewClusterManagementAddon("test", "", "").Build()
 				addon.Spec.InstallStrategy = addonv1alpha1.InstallStrategy{
 					Type: addonv1alpha1.AddonInstallStrategyPlacements,
 					Placements: []addonv1alpha1.PlacementStrategy{

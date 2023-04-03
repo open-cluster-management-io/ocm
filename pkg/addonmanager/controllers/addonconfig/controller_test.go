@@ -189,7 +189,7 @@ func TestSync(t *testing.T) {
 			ctrl := &addonConfigController{
 				addonClient:   fakeAddonClient,
 				addonLister:   addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				configListers: map[string]dynamiclister.Lister{},
+				configListers: map[schema.GroupResource]dynamiclister.Lister{},
 			}
 
 			ctrl.buildConfigInformers(configInformerFactory, map[schema.GroupVersionResource]bool{fakeGVR: true})

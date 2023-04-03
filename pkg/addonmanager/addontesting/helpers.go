@@ -119,21 +119,47 @@ func SetAddonFinalizers(addon *addonapiv1alpha1.ManagedClusterAddOn, finalizers 
 	return addon
 }
 
-func NewClusterManagementAddon(name, crd, cr string) *addonapiv1alpha1.ClusterManagementAddOn {
-	return &addonapiv1alpha1.ClusterManagementAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
-			AddOnConfiguration: addonapiv1alpha1.ConfigCoordinates{
-				CRDName: crd,
-				CRName:  cr,
+type clusterManagementAddonBuilder struct {
+	clusterManagementAddOn *addonapiv1alpha1.ClusterManagementAddOn
+}
+
+func NewClusterManagementAddon(name, crd, cr string) *clusterManagementAddonBuilder {
+	return &clusterManagementAddonBuilder{
+		&addonapiv1alpha1.ClusterManagementAddOn{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
 			},
-			InstallStrategy: addonapiv1alpha1.InstallStrategy{
-				Type: addonapiv1alpha1.AddonInstallStrategyManual,
+			Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
+				AddOnConfiguration: addonapiv1alpha1.ConfigCoordinates{
+					CRDName: crd,
+					CRName:  cr,
+				},
+				InstallStrategy: addonapiv1alpha1.InstallStrategy{
+					Type: addonapiv1alpha1.AddonInstallStrategyManual,
+				},
 			},
 		},
 	}
+}
+
+func (b *clusterManagementAddonBuilder) WithSupportedConfigs(supportedConfigs ...addonapiv1alpha1.ConfigMeta) *clusterManagementAddonBuilder {
+	b.clusterManagementAddOn.Spec.SupportedConfigs = supportedConfigs
+	return b
+}
+
+func (b *clusterManagementAddonBuilder) WithPlacementStrategy(placements ...addonapiv1alpha1.PlacementStrategy) *clusterManagementAddonBuilder {
+	b.clusterManagementAddOn.Spec.InstallStrategy.Type = addonapiv1alpha1.AddonInstallStrategyPlacements
+	b.clusterManagementAddOn.Spec.InstallStrategy.Placements = placements
+	return b
+}
+
+func (b *clusterManagementAddonBuilder) WithInstallProgression(installProgressions ...addonapiv1alpha1.InstallProgression) *clusterManagementAddonBuilder {
+	b.clusterManagementAddOn.Status.InstallProgressions = installProgressions
+	return b
+}
+
+func (b *clusterManagementAddonBuilder) Build() *addonapiv1alpha1.ClusterManagementAddOn {
+	return b.clusterManagementAddOn
 }
 
 func NewManifestWork(name, namespace string, objects ...*unstructured.Unstructured) *workapiv1.ManifestWork {
