@@ -32,12 +32,10 @@ spec:
             description: Spec represents a desired deployment configuration of controllers that govern registration and work distribution for attached Klusterlets.
             properties:
               addOnManagerConfiguration:
-                default:
-                  mode: Disable
                 description: AddOnManagerConfiguration contains the configuration of addon manager
                 properties:
                   featureGates:
-                    description: "FeatureGates represents the list of feature gates for addon manager If it is set empty, default feature gates will be used. If it is set, featuregate/Foo is an example of one item in FeatureGates:   1. If featuregate/Foo does not exist, registration-operator will discard it   2. If featuregate/Foo exists and is false by default. It is now possible to set featuregate/Foo=[false|true]   3. If featuregate/Foo exists and is true by default. If a cluster-admin upgrading from 1 to 2 wants to continue having featuregate/Foo=false,  \the can set featuregate/Foo=false before upgrading. Let's say the cluster-admin wants featuregate/Foo=false."
+                    description: 'FeatureGates represents the list of feature gates for addon manager If it is set empty, default feature gates will be used. If it is set, featuregate/Foo is an example of one item in FeatureGates: 1. If featuregate/Foo does not exist, registration-operator will discard it 2. If featuregate/Foo exists and is false by default. It is now possible to set featuregate/Foo=[false|true] 3. If featuregate/Foo exists and is true by default. If a cluster-admin upgrading from 1 to 2 wants to continue having featuregate/Foo=false, he can set featuregate/Foo=false before upgrading. Let''s say the cluster-admin wants featuregate/Foo=false.'
                     items:
                       properties:
                         feature:
@@ -54,13 +52,6 @@ spec:
                       - feature
                       type: object
                     type: array
-                  mode:
-                    default: Disable
-                    description: Mode is either Enable, Disable, "" where "" is Disable by default. In Enable mode, the component will be installed. In Disable mode, the component will not be installed.
-                    enum:
-                    - Enable
-                    - Disable
-                    type: string
                 type: object
               addOnManagerImagePullSpec:
                 default: quay.io/open-cluster-management/addon-manager
@@ -157,7 +148,7 @@ spec:
                 description: RegistrationConfiguration contains the configuration of registration
                 properties:
                   featureGates:
-                    description: "FeatureGates represents the list of feature gates for registration If it is set empty, default feature gates will be used. If it is set, featuregate/Foo is an example of one item in FeatureGates:   1. If featuregate/Foo does not exist, registration-operator will discard it   2. If featuregate/Foo exists and is false by default. It is now possible to set featuregate/Foo=[false|true]   3. If featuregate/Foo exists and is true by default. If a cluster-admin upgrading from 1 to 2 wants to continue having featuregate/Foo=false,  \the can set featuregate/Foo=false before upgrading. Let's say the cluster-admin wants featuregate/Foo=false."
+                    description: 'FeatureGates represents the list of feature gates for registration If it is set empty, default feature gates will be used. If it is set, featuregate/Foo is an example of one item in FeatureGates: 1. If featuregate/Foo does not exist, registration-operator will discard it 2. If featuregate/Foo exists and is false by default. It is now possible to set featuregate/Foo=[false|true] 3. If featuregate/Foo exists and is true by default. If a cluster-admin upgrading from 1 to 2 wants to continue having featuregate/Foo=false, he can set featuregate/Foo=false before upgrading. Let''s say the cluster-admin wants featuregate/Foo=false.'
                     items:
                       properties:
                         feature:
@@ -183,7 +174,7 @@ spec:
                 description: WorkConfiguration contains the configuration of work
                 properties:
                   featureGates:
-                    description: "FeatureGates represents the list of feature gates for work If it is set empty, default feature gates will be used. If it is set, featuregate/Foo is an example of one item in FeatureGates:   1. If featuregate/Foo does not exist, registration-operator will discard it   2. If featuregate/Foo exists and is false by default. It is now possible to set featuregate/Foo=[false|true]   3. If featuregate/Foo exists and is true by default. If a cluster-admin upgrading from 1 to 2 wants to continue having featuregate/Foo=false,  \the can set featuregate/Foo=false before upgrading. Let's say the cluster-admin wants featuregate/Foo=false."
+                    description: 'FeatureGates represents the list of feature gates for work If it is set empty, default feature gates will be used. If it is set, featuregate/Foo is an example of one item in FeatureGates: 1. If featuregate/Foo does not exist, registration-operator will discard it 2. If featuregate/Foo exists and is false by default. It is now possible to set featuregate/Foo=[false|true] 3. If featuregate/Foo exists and is true by default. If a cluster-admin upgrading from 1 to 2 wants to continue having featuregate/Foo=false, he can set featuregate/Foo=false before upgrading. Let''s say the cluster-admin wants featuregate/Foo=false.'
                     items:
                       properties:
                         feature:
@@ -212,7 +203,7 @@ spec:
               conditions:
                 description: 'Conditions contain the different condition statuses for this ClusterManager. Valid condition types are: Applied: Components in hub are applied. Available: Components in hub are available and ready to serve. Progressing: Components in hub are in a transitioning state. Degraded: Components in hub do not match the desired configuration and only provide degraded service.'
                 items:
-                  description: "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, type FooStatus struct{     // Represents the observations of a foo's current state.     // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\"     // +patchMergeKey=type     // +patchStrategy=merge     // +listType=map     // +listMapKey=type     Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n     // other fields }"
+                  description: "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n type FooStatus struct{ // Represents the observations of a foo's current state. // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge // +listType=map // +listMapKey=type Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
                   properties:
                     lastTransitionTime:
                       description: lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.

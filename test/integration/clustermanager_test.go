@@ -289,8 +289,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				}
 
 				// Check addon manager enabled mode
-				clusterManager.Spec.AddOnManagerConfiguration.FeatureGates = []operatorapiv1.FeatureGate{
-					{Feature: "AddonManagement", Mode: operatorapiv1.FeatureGateModeTypeEnable},
+				clusterManager.Spec.AddOnManagerConfiguration = &operatorapiv1.AddOnManagerConfiguration{
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{Feature: "AddonManagement", Mode: operatorapiv1.FeatureGateModeTypeEnable},
+					},
 				}
 				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
