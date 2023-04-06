@@ -174,6 +174,14 @@ var _ = ginkgo.BeforeSuite(func() {
 					},
 				},
 			},
+			WorkConfiguration: &operatorapiv1.WorkConfiguration{
+				FeatureGates: []operatorapiv1.FeatureGate{
+					{
+						Feature: "ManifestWorkReplicaSet",
+						Mode:    "Enable",
+					},
+				},
+			},
 		},
 	}, metav1.CreateOptions{})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())

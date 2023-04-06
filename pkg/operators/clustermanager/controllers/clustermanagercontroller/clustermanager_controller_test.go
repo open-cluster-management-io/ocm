@@ -46,6 +46,11 @@ type testController struct {
 }
 
 func newClusterManager(name string) *operatorapiv1.ClusterManager {
+	featureGate := operatorapiv1.FeatureGate{
+		Feature: "ManifestWorkReplicaSet",
+		Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+	}
+
 	return &operatorapiv1.ClusterManager{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       name,
@@ -60,6 +65,9 @@ func newClusterManager(name string) *operatorapiv1.ClusterManager {
 				FeatureGates: []operatorapiv1.FeatureGate{
 					{Feature: "AddonManagement", Mode: operatorapiv1.FeatureGateModeTypeEnable},
 				},
+			},
+			WorkConfiguration: &operatorapiv1.WorkConfiguration{
+				FeatureGates: []operatorapiv1.FeatureGate{featureGate},
 			},
 		},
 	}

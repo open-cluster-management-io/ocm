@@ -31,6 +31,7 @@ import (
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
@@ -57,6 +58,7 @@ type Tester struct {
 	hubPlacementDeployment           string
 	operatorNamespace                string
 	klusterletOperator               string
+	hubWorkControllerEnabled         bool
 }
 
 // kubeconfigPath is the path of kubeconfig file, will be get from env "KUBECONFIG" by default.
@@ -76,6 +78,7 @@ func NewTester(kubeconfigPath string) *Tester {
 		hubPlacementDeployment:           "cluster-manager-placement-controller",
 		operatorNamespace:                "open-cluster-management",
 		klusterletOperator:               "klusterlet",
+		hubWorkControllerEnabled:         false,
 	}
 
 	return &tester
@@ -535,19 +538,21 @@ func (t *Tester) CheckHubReady() error {
 		return nil
 	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeNil())
 
-	gomega.Eventually(func() error {
-		workHubControllerDeployment, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
-			Get(context.TODO(), t.hubWorkControllerDeployment, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		replicas := *workHubControllerDeployment.Spec.Replicas
-		readyReplicas := workHubControllerDeployment.Status.ReadyReplicas
-		if readyReplicas != replicas {
-			return fmt.Errorf("deployment %s should have %d but got %d ready replicas", t.hubWorkControllerDeployment, replicas, readyReplicas)
-		}
-		return nil
-	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeNil())
+	if t.hubWorkControllerEnabled {
+		gomega.Eventually(func() error {
+			workHubControllerDeployment, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
+				Get(context.TODO(), t.hubWorkControllerDeployment, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			replicas := *workHubControllerDeployment.Spec.Replicas
+			readyReplicas := workHubControllerDeployment.Status.ReadyReplicas
+			if readyReplicas != replicas {
+				return fmt.Errorf("deployment %s should have %d but got %d ready replicas", t.hubWorkControllerDeployment, replicas, readyReplicas)
+			}
+			return nil
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeNil())
+	}
 
 	if _, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
 		Get(context.TODO(), t.hubPlacementDeployment, metav1.GetOptions{}); err != nil {
@@ -574,6 +579,10 @@ func (t *Tester) CheckClusterManagerStatus() error {
 	if !meta.IsStatusConditionFalse(cm.Status.Conditions, "Progressing") {
 		return fmt.Errorf("ClusterManager is still progressing")
 	}
+	if cm.Spec.WorkConfiguration != nil {
+		t.hubWorkControllerEnabled = helpers.FeatureGateEnabled(cm.Spec.WorkConfiguration.FeatureGates, ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.ManifestWorkReplicaSet)
+	}
+
 	return nil
 }
 

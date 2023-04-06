@@ -3,7 +3,6 @@ package clustermanagercontroller
 import (
 	"context"
 	"encoding/base64"
-	ocmfeature "open-cluster-management.io/api/feature"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
@@ -30,6 +29,7 @@ import (
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
+	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/registration-operator/manifests"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
@@ -165,6 +165,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		workFeatureGates = clusterManager.Spec.WorkConfiguration.FeatureGates
 	}
 	config.WorkFeatureGates, workFeatureMsgs = helpers.ConvertToFeatureGateFlags("Work", workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates)
+	config.MWReplicaSetEnabled = helpers.FeatureGateEnabled(workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.ManifestWorkReplicaSet)
 
 	addonFeatureGates := []operatorapiv1.FeatureGate{}
 	if clusterManager.Spec.AddOnManagerConfiguration != nil {
