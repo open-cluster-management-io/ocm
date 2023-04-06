@@ -198,9 +198,10 @@ func TestSync(t *testing.T) {
 			}
 
 			recorder := eventstesting.NewTestingEventRecorder(t)
-			ctrl := &csrApprovingController{
-				informerFactory.Certificates().V1().CertificateSigningRequests().Lister(),
-				[]Reconciler{
+			ctrl := &csrApprovingController[*certificatesv1.CertificateSigningRequest]{
+				lister:   informerFactory.Certificates().V1().CertificateSigningRequests().Lister(),
+				approver: NewCSRV1Approver(kubeClient),
+				reconcilers: []Reconciler{
 					&csrBootstrapReconciler{
 						kubeClient:    kubeClient,
 						eventRecorder: recorder,

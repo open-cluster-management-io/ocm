@@ -2,6 +2,8 @@ package hub
 
 import (
 	"context"
+	certv1 "k8s.io/api/certificates/v1"
+	certv1beta1 "k8s.io/api/certificates/v1beta1"
 	"time"
 
 	ocmfeature "open-cluster-management.io/api/feature"
@@ -124,8 +126,10 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 		}
 
 		if !v1CSRSupported && v1beta1CSRSupported {
-			csrController = csr.NewV1beta1CSRApprovingController(
-				kubeInfomers.Certificates().V1beta1().CertificateSigningRequests(),
+			csrController = csr.NewCSRApprovingController[*certv1beta1.CertificateSigningRequest](
+				kubeInfomers.Certificates().V1beta1().CertificateSigningRequests().Informer(),
+				kubeInfomers.Certificates().V1beta1().CertificateSigningRequests().Lister(),
+				csr.NewCSRV1beta1Approver(kubeClient),
 				csrReconciles,
 				controllerContext.EventRecorder,
 			)
@@ -133,8 +137,10 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 		}
 	}
 	if csrController == nil {
-		csrController = csr.NewCSRApprovingController(
-			kubeInfomers.Certificates().V1().CertificateSigningRequests(),
+		csrController = csr.NewCSRApprovingController[*certv1.CertificateSigningRequest](
+			kubeInfomers.Certificates().V1().CertificateSigningRequests().Informer(),
+			kubeInfomers.Certificates().V1().CertificateSigningRequests().Lister(),
+			csr.NewCSRV1Approver(kubeClient),
 			csrReconciles,
 			controllerContext.EventRecorder,
 		)
