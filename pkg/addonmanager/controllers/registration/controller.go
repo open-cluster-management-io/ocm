@@ -113,36 +113,24 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 	configs := registrationOption.CSRConfigurations(managedCluster)
 
 	managedClusterAddonCopy.Status.Registrations = configs
-	meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-		Type:    "RegistrationApplied",
-		Status:  metav1.ConditionTrue,
-		Reason:  "RegistrationConfigured",
-		Message: "Registration of the addon agent is configured",
-	})
 
-	// sync supported configs
-	var supportedConfigs []addonapiv1alpha1.ConfigGroupResource
-	for _, config := range agentAddon.GetAgentAddonOptions().SupportedConfigGVRs {
-		supportedConfigs = append(supportedConfigs, addonapiv1alpha1.ConfigGroupResource{
-			Group:    config.Group,
-			Resource: config.Resource,
-		})
+	managedClusterAddonCopy.Status.Namespace = registrationOption.Namespace
+	if len(managedClusterAddon.Spec.InstallNamespace) != 0 {
+		managedClusterAddonCopy.Status.Namespace = managedClusterAddon.Spec.InstallNamespace
 	}
-	managedClusterAddonCopy.Status.SupportedConfigs = supportedConfigs
 
 	return c.patchAddonStatus(ctx, managedClusterAddonCopy, managedClusterAddon)
 }
 
 func (c *addonConfigurationController) patchAddonStatus(ctx context.Context, new, old *addonapiv1alpha1.ManagedClusterAddOn) error {
-	if equality.Semantic.DeepEqual(new.Status, old.Status) {
+	if equality.Semantic.DeepEqual(new.Status.Registrations, old.Status.Registrations) && new.Status.Namespace == old.Status.Namespace {
 		return nil
 	}
 
 	oldData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
 		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-			Registrations:    old.Status.Registrations,
-			SupportedConfigs: old.Status.SupportedConfigs,
-			Conditions:       old.Status.Conditions,
+			Registrations: old.Status.Registrations,
+			Namespace:     old.Status.Namespace,
 		},
 	})
 	if err != nil {
@@ -155,9 +143,8 @@ func (c *addonConfigurationController) patchAddonStatus(ctx context.Context, new
 			ResourceVersion: new.ResourceVersion,
 		},
 		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-			Registrations:    new.Status.Registrations,
-			SupportedConfigs: new.Status.SupportedConfigs,
-			Conditions:       new.Status.Conditions,
+			Registrations: new.Status.Registrations,
+			Namespace:     new.Status.Namespace,
 		},
 	})
 	if err != nil {

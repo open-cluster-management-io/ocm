@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
@@ -22,6 +21,7 @@ import (
 
 type testAgent struct {
 	name          string
+	namespace     string
 	registrations []addonapiv1alpha1.RegistrationConfig
 }
 
@@ -44,6 +44,7 @@ func (t *testAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 			PermissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
 				return nil
 			},
+			Namespace: t.namespace,
 		},
 	}
 }
@@ -82,7 +83,6 @@ func TestReconcile(t *testing.T) {
 			addon: []runtime.Object{
 				func() *addonapiv1alpha1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Spec.InstallNamespace = "default"
 					return addon
 				}(),
 			},
@@ -97,11 +97,42 @@ func TestReconcile(t *testing.T) {
 				if addOn.Status.Registrations[0].SignerName != "test" {
 					t.Errorf("Registration config is not updated")
 				}
-				if meta.IsStatusConditionFalse(addOn.Status.Conditions, "RegistrationApplied") {
-					t.Errorf("addon condition is not correct: %v", addOn.Status.Conditions)
+				if addOn.Status.Namespace != "default" {
+					t.Errorf("Namespace in status is not correct")
 				}
 			},
-			testaddon: &testAgent{name: "test", registrations: []addonapiv1alpha1.RegistrationConfig{
+			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1alpha1.RegistrationConfig{
+				{
+					SignerName: "test",
+				},
+			}},
+		},
+		{
+			name:    "with registrations and override namespace",
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			addon: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1")
+					addon.Spec.InstallNamespace = "default2"
+					return addon
+				}(),
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				actual := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(actual, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if addOn.Status.Registrations[0].SignerName != "test" {
+					t.Errorf("Registration config is not updated")
+				}
+				if addOn.Status.Namespace != "default2" {
+					t.Errorf("Namespace in status is not correct")
+				}
+			},
+			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1alpha1.RegistrationConfig{
 				{
 					SignerName: "test",
 				},

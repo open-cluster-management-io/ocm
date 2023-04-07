@@ -93,6 +93,7 @@ func (c *addonStatusController) sync(ctx context.Context, syncCtx factory.SyncCo
 	}
 
 	// update namespace here also
+	// TODO this is to handle the case of the old versioned addon-framework, and should be removed finally
 	if len(addonCopy.Spec.InstallNamespace) != 0 && addonCopy.Status.Namespace != addonCopy.Spec.InstallNamespace {
 		addonCopy.Status.Namespace = addonCopy.Spec.InstallNamespace
 	}
