@@ -19,6 +19,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 var _ webhook.CustomValidator = &ManagedClusterWebhook{}
@@ -33,17 +35,22 @@ func (r *ManagedClusterWebhook) ValidateCreate(ctx context.Context, obj runtime.
 	if err != nil {
 		return apierrors.NewBadRequest(err.Error())
 	}
+
 	//Validate if Spec.ManagedClusterClientConfigs is Valid HTTPS URL
 	err = r.validateManagedClusterObj(*managedCluster)
 	if err != nil {
 		return err
 	}
 
-	// the HubAcceptsClient field is changed, we need to check the request user whether
-	// has been allowed to change the HubAcceptsClient field with SubjectAccessReview api
+	// the HubAcceptsClient field is changed, we need to:
+	// 1. check whether cluster namespace is terminating.
+	// 2. check the request user whether has been allowed to change the HubAcceptsClient field with
+	// SubjectAccessReview api.
 	if managedCluster.Spec.HubAcceptsClient {
-		err := r.allowUpdateAcceptField(managedCluster.Name, req.UserInfo)
-		if err != nil {
+		if err := r.validateAcceptByClusterNamespace(managedCluster.Name); err != nil {
+			return err
+		}
+		if err := r.allowUpdateAcceptField(managedCluster.Name, req.UserInfo); err != nil {
 			return err
 		}
 	}
@@ -78,12 +85,16 @@ func (r *ManagedClusterWebhook) ValidateUpdate(ctx context.Context, oldObj, newO
 		return err
 	}
 
-	// the HubAcceptsClient field is changed, we need to check the request user whether
-	// has been allowed to change the HubAcceptsClient field with SubjectAccessReview api
+	// the HubAcceptsClient field is changed, we need to:
+	// 1. check whether cluster namespace is terminating.
+	// 2. check the request user whether has been allowed to change the HubAcceptsClient field with
+	// SubjectAccessReview api.
 	if managedCluster.Spec.HubAcceptsClient != oldManagedCluster.Spec.HubAcceptsClient {
 		if managedCluster.Spec.HubAcceptsClient {
-			err := r.allowUpdateAcceptField(managedCluster.Name, req.UserInfo)
-			if err != nil {
+			if err := r.validateAcceptByClusterNamespace(managedCluster.Name); err != nil {
+				return err
+			}
+			if err := r.allowUpdateAcceptField(managedCluster.Name, req.UserInfo); err != nil {
 				return err
 			}
 		}
@@ -170,6 +181,29 @@ func (r *ManagedClusterWebhook) allowUpdateAcceptField(clusterName string, userI
 		)
 	}
 
+	return nil
+}
+
+// validateClusterNamespace checks the cluster namespace, if the namespace is terminating, reject the accept request.
+func (r *ManagedClusterWebhook) validateAcceptByClusterNamespace(clusterName string) error {
+	clusterNamespace, err := r.kubeClient.CoreV1().Namespaces().Get(context.TODO(), clusterName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return apierrors.NewForbidden(
+			v1.Resource("managedclusters/accept"),
+			clusterName,
+			err,
+		)
+	}
+	if clusterNamespace.Status.Phase == corev1.NamespaceTerminating {
+		return apierrors.NewForbidden(
+			v1.Resource("managedclusters/accept"),
+			clusterName,
+			fmt.Errorf("cluster namespace %q is terminating", clusterName),
+		)
+	}
 	return nil
 }
 
