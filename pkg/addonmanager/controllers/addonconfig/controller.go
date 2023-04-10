@@ -24,6 +24,7 @@ import (
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/managementaddonconfig"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 )
 
@@ -131,11 +132,6 @@ func (c *addonConfigController) indexByConfig(obj interface{}) ([]string, error)
 		return nil, fmt.Errorf("obj is supposed to be a ManagedClusterAddOn, but is %T", obj)
 	}
 
-	if len(addon.Status.ConfigReferences) == 0 {
-		// no config references, ignore
-		return nil, nil
-	}
-
 	configNames := []string{}
 	for _, configReference := range addon.Status.ConfigReferences {
 		if configReference.Name == "" {
@@ -167,34 +163,30 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 
 	addonCopy := addon.DeepCopy()
 
-	if err := c.updateConfigGenerations(addonCopy); err != nil {
+	if err := c.updateConfigSpecHashAndGenerations(addonCopy); err != nil {
 		return err
 	}
 
 	return c.patchConfigReferences(ctx, addon, addonCopy)
 }
 
-func (c *addonConfigController) updateConfigGenerations(addon *addonapiv1alpha1.ManagedClusterAddOn) error {
-	if len(addon.Status.ConfigReferences) == 0 {
-		// no config references, ignore
-		return nil
+func (c *addonConfigController) updateConfigSpecHashAndGenerations(addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	supportedConfigSet := map[addonapiv1alpha1.ConfigGroupResource]bool{}
+	for _, config := range addon.Status.SupportedConfigs {
+		supportedConfigSet[config] = true
 	}
-
 	for index, configReference := range addon.Status.ConfigReferences {
 		lister, ok := c.configListers[schema.GroupResource{Group: configReference.ConfigGroupResource.Group, Resource: configReference.ConfigGroupResource.Resource}]
 		if !ok {
 			continue
 		}
 
-		namespace := configReference.ConfigReferent.Namespace
-		name := configReference.ConfigReferent.Name
-
 		var config *unstructured.Unstructured
 		var err error
-		if namespace == "" {
-			config, err = lister.Get(name)
+		if configReference.Namespace == "" {
+			config, err = lister.Get(configReference.Name)
 		} else {
-			config, err = lister.Namespace(namespace).Get(name)
+			config, err = lister.Namespace(configReference.Namespace).Get(configReference.Name)
 		}
 
 		if errors.IsNotFound(err) {
@@ -205,9 +197,26 @@ func (c *addonConfigController) updateConfigGenerations(addon *addonapiv1alpha1.
 			return err
 		}
 
-		// TODO if config is configmap or secret, the generation will not be increased automatically,
-		// we may need to consider how to handle this in the future
+		// update LastObservedGeneration for all the configs in status
 		addon.Status.ConfigReferences[index].LastObservedGeneration = config.GetGeneration()
+
+		// update desired spec hash only for the configs in spec
+		for _, addonconfig := range addon.Spec.Configs {
+			// do not update spec hash for unsupported configs
+			if _, ok := supportedConfigSet[addonconfig.ConfigGroupResource]; !ok {
+				continue
+			}
+			if configReference.DesiredConfig == nil {
+				continue
+			}
+			if configReference.ConfigGroupResource == addonconfig.ConfigGroupResource && configReference.DesiredConfig.ConfigReferent == addonconfig.ConfigReferent {
+				specHash, err := managementaddonconfig.GetSpecHash(config)
+				if err != nil {
+					return err
+				}
+				addon.Status.ConfigReferences[index].DesiredConfig.SpecHash = specHash
+			}
+		}
 	}
 
 	return nil

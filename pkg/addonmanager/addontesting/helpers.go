@@ -153,6 +153,13 @@ func (b *clusterManagementAddonBuilder) WithPlacementStrategy(placements ...addo
 	return b
 }
 
+func (b *clusterManagementAddonBuilder) WithDefaultConfigReferences(
+	defaultConfigReferences ...addonapiv1alpha1.DefaultConfigReference,
+) *clusterManagementAddonBuilder {
+	b.clusterManagementAddOn.Status.DefaultConfigReferences = defaultConfigReferences
+	return b
+}
+
 func (b *clusterManagementAddonBuilder) WithInstallProgression(installProgressions ...addonapiv1alpha1.InstallProgression) *clusterManagementAddonBuilder {
 	b.clusterManagementAddOn.Status.InstallProgressions = installProgressions
 	return b

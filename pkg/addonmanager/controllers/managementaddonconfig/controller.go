@@ -266,7 +266,13 @@ func (c *clusterManagementAddonConfigController) getConfigSpecHash(gr addonapiv1
 		return "", nil
 	}
 
-	config, err := lister.Namespace(cr.Namespace).Get(cr.Name)
+	var config *unstructured.Unstructured
+	var err error
+	if cr.Namespace == "" {
+		config, err = lister.Get(cr.Name)
+	} else {
+		config, err = lister.Namespace(cr.Namespace).Get(cr.Name)
+	}
 	if errors.IsNotFound(err) {
 		return "", nil
 	}

@@ -39,7 +39,7 @@ func (d addonConfigMap) copy() addonConfigMap {
 	return output
 }
 
-func newGraph(supportedConfigs []addonv1alpha1.ConfigMeta) *configurationGraph {
+func newGraph(supportedConfigs []addonv1alpha1.ConfigMeta, defaultConfigReferences []addonv1alpha1.DefaultConfigReference) *configurationGraph {
 	graph := &configurationGraph{
 		nodes: []*installStrategyNode{},
 		defaults: &installStrategyNode{
@@ -48,15 +48,26 @@ func newGraph(supportedConfigs []addonv1alpha1.ConfigMeta) *configurationGraph {
 		},
 	}
 
+	// init graph.defaults.desiredConfigs with supportedConfigs
 	for _, config := range supportedConfigs {
 		if config.DefaultConfig != nil {
 			graph.defaults.desiredConfigs[config.ConfigGroupResource] = addonv1alpha1.ConfigReference{
 				ConfigGroupResource: config.ConfigGroupResource,
-				ConfigReferent: addonv1alpha1.ConfigReferent{
-					Name:      config.DefaultConfig.Name,
-					Namespace: config.DefaultConfig.Namespace,
+				ConfigReferent:      *config.DefaultConfig,
+				DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+					ConfigReferent: *config.DefaultConfig,
 				},
 			}
+		}
+	}
+	// copy the spechash from cma status defaultConfigReferences
+	for _, configRef := range defaultConfigReferences {
+		if configRef.DesiredConfig == nil {
+			continue
+		}
+		defaultsDesiredConfig, ok := graph.defaults.desiredConfigs[configRef.ConfigGroupResource]
+		if ok && (defaultsDesiredConfig.DesiredConfig.ConfigReferent == configRef.DesiredConfig.ConfigReferent) {
+			defaultsDesiredConfig.DesiredConfig.SpecHash = configRef.DesiredConfig.SpecHash
 		}
 	}
 
@@ -76,7 +87,7 @@ func (g *configurationGraph) addAddonNode(mca *addonv1alpha1.ManagedClusterAddOn
 }
 
 // addNode delete clusters on existing graph so the new configuration overrides the previous
-func (g *configurationGraph) addPlacementNode(configs []addonv1alpha1.AddOnConfig, clusters []string) {
+func (g *configurationGraph) addPlacementNode(installConfigReference []addonv1alpha1.InstallConfigReference, clusters []string) {
 	node := &installStrategyNode{
 		desiredConfigs: g.defaults.desiredConfigs,
 		children:       map[string]*addonNode{},
@@ -84,12 +95,16 @@ func (g *configurationGraph) addPlacementNode(configs []addonv1alpha1.AddOnConfi
 	}
 
 	// overrides configuration by install strategy
-	if len(configs) > 0 {
+	if len(installConfigReference) > 0 {
 		node.desiredConfigs = node.desiredConfigs.copy()
-		for _, config := range configs {
-			node.desiredConfigs[config.ConfigGroupResource] = addonv1alpha1.ConfigReference{
-				ConfigGroupResource: config.ConfigGroupResource,
-				ConfigReferent:      config.ConfigReferent,
+		for _, configRef := range installConfigReference {
+			if configRef.DesiredConfig == nil {
+				continue
+			}
+			node.desiredConfigs[configRef.ConfigGroupResource] = addonv1alpha1.ConfigReference{
+				ConfigGroupResource: configRef.ConfigGroupResource,
+				ConfigReferent:      configRef.DesiredConfig.ConfigReferent,
+				DesiredConfig:       configRef.DesiredConfig.DeepCopy(),
 			}
 		}
 	}
@@ -135,6 +150,19 @@ func (n *installStrategyNode) addNode(addon *addonv1alpha1.ManagedClusterAddOn) 
 			n.children[addon.Namespace].desiredConfigs[config.ConfigGroupResource] = addonv1alpha1.ConfigReference{
 				ConfigGroupResource: config.ConfigGroupResource,
 				ConfigReferent:      config.ConfigReferent,
+				DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+					ConfigReferent: config.ConfigReferent,
+				},
+			}
+			// copy the spechash from mca status
+			for _, configRef := range addon.Status.ConfigReferences {
+				if configRef.DesiredConfig == nil {
+					continue
+				}
+				nodeDesiredConfig, ok := n.children[addon.Namespace].desiredConfigs[configRef.ConfigGroupResource]
+				if ok && (nodeDesiredConfig.DesiredConfig.ConfigReferent == configRef.DesiredConfig.ConfigReferent) {
+					nodeDesiredConfig.DesiredConfig.SpecHash = configRef.DesiredConfig.SpecHash
+				}
 			}
 		}
 	}

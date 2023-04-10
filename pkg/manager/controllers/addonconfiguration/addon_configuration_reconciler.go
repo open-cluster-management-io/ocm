@@ -30,7 +30,7 @@ type managedClusterAddonConfigurationReconciler struct {
 }
 
 func (d *managedClusterAddonConfigurationReconciler) buildConfigurationGraph(cma *addonv1alpha1.ClusterManagementAddOn) (*configurationGraph, error) {
-	graph := newGraph(cma.Spec.SupportedConfigs)
+	graph := newGraph(cma.Spec.SupportedConfigs, cma.Status.DefaultConfigReferences)
 	addons, err := d.managedClusterAddonIndexer.ByIndex(index.ManagedClusterAddonByName, cma.Name)
 	if err != nil {
 		return graph, err
@@ -46,12 +46,12 @@ func (d *managedClusterAddonConfigurationReconciler) buildConfigurationGraph(cma
 		return graph, nil
 	}
 
-	// check each install strategy and override the default configs.
+	// check each install strategy in status and override the default configs.
 	var errs []error
-	for _, strategy := range cma.Spec.InstallStrategy.Placements {
-		clusters, err := d.getClustersByPlacementRef(strategy.PlacementRef)
+	for _, installProgression := range cma.Status.InstallProgressions {
+		clusters, err := d.getClustersByPlacementRef(installProgression.PlacementRef)
 		if errors.IsNotFound(err) {
-			klog.V(2).Infof("placement %s/%s is not found for addon %s", strategy.PlacementRef.Namespace, strategy.PlacementRef.Name, cma.Name)
+			klog.V(2).Infof("placement %s/%s is not found for addon %s", installProgression.PlacementRef.Namespace, installProgression.PlacementRef.Name, cma.Name)
 			continue
 		}
 		if err != nil {
@@ -59,7 +59,7 @@ func (d *managedClusterAddonConfigurationReconciler) buildConfigurationGraph(cma
 			continue
 		}
 
-		graph.addPlacementNode(strategy.Configs, clusters)
+		graph.addPlacementNode(installProgression.ConfigReferences, clusters)
 	}
 
 	return graph, utilerrors.NewAggregate(errs)
@@ -116,7 +116,7 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 
 	var mergedConfigs []addonv1alpha1.ConfigReference
 	// remove configs that are not desired
-	for _, config := range mca.Status.ConfigReferences {
+	for _, config := range mcaCopy.Status.ConfigReferences {
 		if _, ok := desiredConfigMap[config.ConfigGroupResource]; ok {
 			mergedConfigs = append(mergedConfigs, config)
 		}
@@ -131,10 +131,12 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 			}
 
 			match = true
-			if mergedConfigs[i].ConfigReferent != config.ConfigReferent {
-				mergedConfigs[i].ConfigReferent = config.ConfigReferent
+			// set LastObservedGeneration to 0 when config name/namespace changes
+			if mergedConfigs[i].DesiredConfig.ConfigReferent != config.DesiredConfig.ConfigReferent {
 				mergedConfigs[i].LastObservedGeneration = 0
 			}
+			mergedConfigs[i].ConfigReferent = config.ConfigReferent
+			mergedConfigs[i].DesiredConfig = config.DesiredConfig.DeepCopy()
 		}
 
 		if !match {
