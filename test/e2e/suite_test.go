@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -36,6 +37,7 @@ var (
 	workImage             string
 	managedKubeconfig     string
 	webhookDeploymentName string
+	eventuallyTimeout     time.Duration
 
 	hubNamespace = "open-cluster-management-hub"
 )
@@ -43,11 +45,12 @@ var (
 func init() {
 	flag.StringVar(&clusterName, "cluster-name", "", "The name of the managed cluster on which the testing will be run")
 	flag.StringVar(&hubKubeconfig, "hub-kubeconfig", "", "The kubeconfig of the hub cluster")
-	flag.BoolVar(&nilExecutorValidating, "nil-executor-validating", false, "Whether validate the nil executor or not")
-	flag.BoolVar(&deployWorkAgent, "deploy-agent", false, "Whether deploy the work agent on the managed cluster or not")
+	flag.BoolVar(&nilExecutorValidating, "nil-executor-validating", false, "Whether validate the nil executor or not (default false)")
+	flag.BoolVar(&deployWorkAgent, "deploy-agent", false, "Whether deploy the work agent on the managed cluster or not (default false)")
 	flag.StringVar(&workImage, "work-image", "", "The image used to deploy the work agent")
 	flag.StringVar(&managedKubeconfig, "managed-kubeconfig", "", "The kubeconfig of the managed cluster")
 	flag.StringVar(&webhookDeploymentName, "webhook-deployment-name", "", "The deployment name of the work validating webhook on the hub cluster. If specified, the webhook status will be checked before run the test cases")
+	flag.DurationVar(&eventuallyTimeout, "eventually-timeout", 60*time.Second, "The timeout of Gomega's Eventually (default 60 seconds)")
 }
 
 var (

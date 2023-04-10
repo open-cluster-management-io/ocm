@@ -28,8 +28,7 @@ import (
 )
 
 const (
-	eventuallyTimeout  = 60 // seconds
-	eventuallyInterval = 1  // seconds
+	eventuallyInterval = 1 // seconds
 
 	guestBookCRDJson = `{
 		"apiVersion": "apiextensions.k8s.io/v1",
