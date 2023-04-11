@@ -1,0 +1,14 @@
+# Role for both registration and work agent.
+# This is a replacement of role 'extension-apiserver-authentication-reader' under 'kube-system' namespace,
+# because role 'extension-apiserver-authentication-reader' on k8s v1.11.0 (ocp3.11) has some permissions 
+# missing, like "list" and "watch".
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: open-cluster-management:registration-agent:extension-apiserver
+  namespace: kube-system
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  resourceNames: ["extension-apiserver-authentication"]
+  verbs: ["get", "list", "watch"]

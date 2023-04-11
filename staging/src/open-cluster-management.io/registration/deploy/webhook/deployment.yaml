@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: managedcluster-admission
+  labels:
+    app: managedcluster-admission
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: managedcluster-admission
+  template:
+    metadata:
+      labels:
+        app: managedcluster-admission
+    spec:
+      serviceAccountName: managedcluster-admission-sa
+      containers:
+      - name: webhook
+        image: quay.io/open-cluster-management/registration:latest
+        args:
+        - /registration
+        - "webhook-server"
+        - "port=9443"
+        - "--feature-gates=DefaultClusterSet=true"
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTP
+            port: 8000
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            scheme: HTTP
+            port: 8000
+          initialDelaySeconds: 2
+        ports:
+        - containerPort: 9443
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: webhook-secret
+          readOnly: true
+      volumes:
+      - name: webhook-secret
+        secret:
+          secretName: registration-webhook-serving-cert

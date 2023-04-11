@@ -1,0 +1,45 @@
+
+# Adds namespace to all resources.
+namespace: open-cluster-management-hub
+
+# Value of this field is prepended to the
+# names of all resources, e.g. a deployment named
+# "wordpress" becomes "alices-wordpress".
+# Note that it should also match with the prefix (text before '-') of the namespace
+# field above.
+#namePrefix: multicloud-
+
+# Labels to add to all resources and selectors.
+#commonLabels:
+#  someName: someValue
+
+# Each entry in this list must resolve to an existing
+# resource definition in YAML.  These are the resource
+# files that kustomize reads, modifies and emits as a
+# YAML string, with resources separated by document
+# markers ("---").
+#
+# General rule here is anything deployed by OLM bundles should go here as well,
+# this is used in "make deploy" for developers and should mimic what OLM deploys
+# for you. CRDs are an exception to this as we don't want to have to list them all
+# here. These are deployed via a "make install" dependency.
+
+resources:
+- ./0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml
+- ./0000_05_clusters.open-cluster-management.io_addonplacementscores.crd.yaml
+- ./0000_00_clusters.open-cluster-management.io_managedclustersets.crd.yaml
+- ./0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml
+- ./0000_02_clusters.open-cluster-management.io_placements.crd.yaml
+- ./0000_03_clusters.open-cluster-management.io_placementdecisions.crd.yaml
+- ./namespace.yaml
+- ./serviceaccount.yaml
+- ./clusterrolebinding.yaml
+- ./clusterrole.yaml
+- ./deployment.yaml
+
+images:
+- name: quay.io/open-cluster-management/placement:latest
+  newName: quay.io/open-cluster-management/placement
+  newTag: latest
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization

@@ -1,0 +1,111 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ .KlusterletName }}-work-agent
+  namespace: {{ .AgentNamespace }}
+  labels:
+    app: klusterlet-manifestwork-agent
+spec:
+  replicas: {{ .Replica }}
+  selector:
+    matchLabels:
+      app: klusterlet-manifestwork-agent
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        app: klusterlet-manifestwork-agent
+    spec:
+      {{if .HubApiServerHostAlias }}
+      hostAliases:
+      - ip: {{ .HubApiServerHostAlias.IP }}
+        hostnames:
+        - {{ .HubApiServerHostAlias.Hostname }}
+      {{end}}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 70
+            podAffinityTerm:
+              topologyKey: failure-domain.beta.kubernetes.io/zone
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - klusterlet-manifestwork-agent
+          - weight: 30
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - klusterlet-manifestwork-agent
+      serviceAccountName: {{ .KlusterletName }}-work-sa
+      containers:
+      - name: klusterlet-manifestwork-agent
+        image: {{ .WorkImage }}
+        args:
+          - "/work"
+          - "agent"
+          - "--spoke-cluster-name={{ .ClusterName }}"
+          - "--hub-kubeconfig=/spoke/hub-kubeconfig/kubeconfig"
+          - "--agent-id={{ .AgentID }}"
+          {{ if gt (len .WorkFeatureGates) 0 }}
+          {{range .WorkFeatureGates}}
+          - {{ . }}
+          {{ end }}
+          {{ end }}
+          {{if eq .InstallMode "Hosted"}}
+          - "--spoke-kubeconfig=/spoke/config/kubeconfig"
+          - "--terminate-on-files=/spoke/config/kubeconfig"
+          {{end}}
+          - "--terminate-on-files=/spoke/hub-kubeconfig/kubeconfig"
+          {{if eq .Replica 1}}
+          - "--disable-leader-election"
+          {{end}}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
+        volumeMounts:
+        - name: hub-kubeconfig-secret
+          mountPath: "/spoke/hub-kubeconfig"
+          readOnly: true
+        {{if eq .InstallMode "Hosted"}}
+        - name: spoke-kubeconfig-secret
+          mountPath: "/spoke/config"
+          readOnly: true
+        {{end}}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+        resources:
+          requests:
+            cpu: 2m
+            memory: 16Mi
+      volumes:
+      - name: hub-kubeconfig-secret
+        secret:
+          secretName: {{ .HubKubeConfigSecret }}
+      {{if eq .InstallMode "Hosted"}}
+      - name: spoke-kubeconfig-secret
+        secret:
+          secretName: {{ .ExternalManagedKubeConfigWorkSecret }}
+      {{end}}

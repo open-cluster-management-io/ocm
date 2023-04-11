@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: open-cluster-management:{{ .ClusterManagerName }}-addon-manager:controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: open-cluster-management:{{ .ClusterManagerName }}-addon-manager:controller
+subjects:
+- kind: ServiceAccount
+  namespace: {{ .ClusterManagerNamespace }}
+  name: {{ .ClusterManagerName }}-addon-manager-controller-sa

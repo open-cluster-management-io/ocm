@@ -1,0 +1,16 @@
+# Mandatory ClusterRole permission for registartion agent
+# Registartion agent can not run without these permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: open-cluster-management:spoke
+rules:
+# Allow agent to get/list/watch nodes
+# list nodes to calculates the capacity and allocatable resources of the managed cluster
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+# Allow agent to list clusterclaims
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["clusterclaims"]
+  verbs: ["get", "list", "watch"]

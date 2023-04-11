@@ -1,0 +1,118 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ .KlusterletName }}-registration-agent
+  namespace: {{ .AgentNamespace }}
+  labels:
+    app: klusterlet-registration-agent
+spec:
+  replicas: {{ .Replica }}
+  selector:
+    matchLabels:
+      app: klusterlet-registration-agent
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        app: klusterlet-registration-agent
+    spec:
+      {{if .HubApiServerHostAlias }}
+      hostAliases:
+      - ip: {{ .HubApiServerHostAlias.IP }}
+        hostnames:
+        - {{ .HubApiServerHostAlias.Hostname }}
+      {{end}}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 70
+            podAffinityTerm:
+              topologyKey: failure-domain.beta.kubernetes.io/zone
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - klusterlet-registration-agent
+          - weight: 30
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - klusterlet-registration-agent
+      serviceAccountName: {{ .KlusterletName }}-registration-sa
+      containers:
+      - name: registration-controller
+        image: {{ .RegistrationImage }}
+        args:
+          - "/registration"
+          - "agent"
+          - "--cluster-name={{ .ClusterName }}"
+          - "--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig"
+          {{ if gt (len .RegistrationFeatureGates) 0 }}
+          {{range .RegistrationFeatureGates}}
+          - {{ . }}
+          {{end}}
+          {{ end }}
+          {{if .ExternalServerURL}}
+          - "--spoke-external-server-urls={{ .ExternalServerURL }}"
+          {{end}}
+          {{if eq .InstallMode "Hosted"}}
+          - "--spoke-kubeconfig=/spoke/config/kubeconfig"
+          - "--terminate-on-files=/spoke/config/kubeconfig"
+          {{end}}
+          - "--terminate-on-files=/spoke/hub-kubeconfig/kubeconfig"
+          {{if eq .Replica 1}}
+          - "--disable-leader-election"
+          {{end}}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
+        volumeMounts:
+        - name: bootstrap-secret
+          mountPath: "/spoke/bootstrap"
+          readOnly: true
+        - name: hub-kubeconfig
+          mountPath: "/spoke/hub-kubeconfig"
+        {{if eq .InstallMode "Hosted"}}
+        - name: spoke-kubeconfig-secret
+          mountPath: "/spoke/config"
+          readOnly: true
+        {{end}}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+        resources:
+          requests:
+            cpu: 2m
+            memory: 16Mi
+      volumes:
+      - name: bootstrap-secret
+        secret:
+          secretName: {{ .BootStrapKubeConfigSecret }}
+      - name: hub-kubeconfig
+        emptyDir:
+          medium: Memory
+      {{if eq .InstallMode "Hosted"}}
+      - name: spoke-kubeconfig-secret
+        secret:
+          secretName: {{ .ExternalManagedKubeConfigRegistrationSecret }}
+      {{end}}

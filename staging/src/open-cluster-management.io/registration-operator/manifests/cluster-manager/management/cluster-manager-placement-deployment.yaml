@@ -1,0 +1,84 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ .ClusterManagerName }}-placement-controller
+  namespace: {{ .ClusterManagerNamespace }}
+  labels:
+    app: clustermanager-controller
+spec:
+  replicas: {{ .Replica }}
+  selector:
+    matchLabels:
+      app: clustermanager-placement-controller
+  template:
+    metadata:
+      labels:
+        app: clustermanager-placement-controller
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 70
+            podAffinityTerm:
+              topologyKey: failure-domain.beta.kubernetes.io/zone
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - clustermanager-placement-controller
+          - weight: 30
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - clustermanager-placement-controller
+      {{ if not .HostedMode }}
+      serviceAccountName: {{ .ClusterManagerName }}-placement-controller-sa
+      {{ end }}
+      containers:
+      - name: placement-controller
+        image: {{ .PlacementImage }}
+        args:
+          - "/placement"
+          - "controller"
+          {{ if .HostedMode }}
+          - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
+          {{ end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+        resources:
+          requests:
+            cpu: 2m
+            memory: 16Mi
+      {{ if .HostedMode }}
+        volumeMounts:
+        - mountPath: /var/run/secrets/hub
+          name: kubeconfig
+          readOnly: true    
+      volumes:
+      - name: kubeconfig
+        secret:
+          secretName: {{ .ClusterManagerName }}-placement-controller-sa-kubeconfig
+      {{ end }}

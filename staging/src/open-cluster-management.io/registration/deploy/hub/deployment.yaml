@@ -1,0 +1,32 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: hub-registration-controller
+  labels:
+    app: hub-registration-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hub-registration-controller
+  template:
+    metadata:
+      labels:
+        app: hub-registration-controller
+    spec:
+      serviceAccountName: hub-sa
+      containers:
+      - name: hub-controller
+        image: quay.io/open-cluster-management/registration:latest
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/registration"
+          - "controller"
+          - "--feature-gates=DefaultClusterSet=true"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true

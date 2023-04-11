@@ -1,0 +1,17 @@
+# Mandatory Role permission for work agent
+# Work agent can not run without these permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: open-cluster-management:work-hub-controller
+rules:
+# leader election needs to operate configmaps
+- apiGroups: [ "" ]
+  resources: [ "configmaps" ]
+  verbs: [ "get", "list", "watch", "create", "delete", "update", "patch" ]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["create", "get", "list", "update", "watch", "patch"]
+- apiGroups: ["", "events.k8s.io"]
+  resources: ["events"]
+  verbs: ["create", "patch", "update"]
