@@ -145,7 +145,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 			}
 			finalizers := addon.GetFinalizers()
 			for _, f := range finalizers {
-				if f == constants.PreDeleteHookFinalizer {
+				if f == addonapiv1alpha1.AddonPreDeleteHookFinalizer {
 					return nil
 				}
 			}

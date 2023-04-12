@@ -59,7 +59,7 @@ func TestDefaultHookReconcile(t *testing.T) {
 				addontesting.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
 				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
-				if !addonHasFinalizer(addOn, constants.PreDeleteHookFinalizer) {
+				if !addonHasFinalizer(addOn, addonapiv1alpha1.AddonPreDeleteHookFinalizer) {
 					t.Errorf("the preDeleteHookFinalizer should be added.")
 				}
 			},
@@ -70,7 +70,7 @@ func TestDefaultHookReconcile(t *testing.T) {
 			addon: []runtime.Object{
 				func() runtime.Object {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.SetFinalizers([]string{constants.PreDeleteHookFinalizer})
+					addon.SetFinalizers([]string{addonapiv1alpha1.AddonPreDeleteHookFinalizer})
 					addon.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 					return addon
 				}(),
@@ -96,7 +96,7 @@ func TestDefaultHookReconcile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, constants.AddonHookManifestCompleted) {
+				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHookManifestCompleted) {
 					t.Errorf("HookManifestCompleted condition should be false,but got true.")
 				}
 			},
@@ -107,7 +107,7 @@ func TestDefaultHookReconcile(t *testing.T) {
 			addon: []runtime.Object{
 				addontesting.SetAddonFinalizers(
 					addontesting.SetAddonDeletionTimestamp(addontesting.NewAddon("test", "cluster1"), time.Now()),
-					constants.PreDeleteHookFinalizer),
+					addonapiv1alpha1.AddonPreDeleteHookFinalizer),
 			},
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			testaddon: &testAgent{name: "test", objects: []runtime.Object{
@@ -178,7 +178,7 @@ func TestDefaultHookReconcile(t *testing.T) {
 				addontesting.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
 				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
-				if addonHasFinalizer(addOn, constants.PreDeleteHookFinalizer) {
+				if addonHasFinalizer(addOn, addonapiv1alpha1.AddonPreDeleteHookFinalizer) {
 					t.Errorf("expected no pre delete hook finalizer on managedCluster.")
 				}
 			},

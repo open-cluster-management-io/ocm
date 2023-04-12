@@ -184,7 +184,7 @@ func TestReconcileWithWork(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if meta.IsStatusConditionTrue(addOn.Status.Conditions, "Available") {
+	if meta.IsStatusConditionTrue(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionAvailable) {
 		t.Errorf("addon condition should be unavailable: %v", addOn.Status.Conditions)
 	}
 
@@ -223,7 +223,7 @@ func TestReconcileWithWork(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
+	cond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionAvailable)
 	if cond == nil && cond.Status != metav1.ConditionUnknown {
 		t.Errorf("addon condition should be unknown: %v", addOn.Status.Conditions)
 	}
@@ -255,7 +255,7 @@ func TestReconcileWithWork(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cond = meta.FindStatusCondition(addOn.Status.Conditions, "Available")
+	cond = meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionAvailable)
 	if cond == nil && cond.Status != metav1.ConditionUnknown {
 		t.Errorf("addon condition should be unknown: %v", addOn.Status.Conditions)
 	}
@@ -287,7 +287,7 @@ func TestReconcileWithWork(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cond = meta.FindStatusCondition(addOn.Status.Conditions, "Available")
+	cond = meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionAvailable)
 	if cond == nil && cond.Status != metav1.ConditionTrue {
 		t.Errorf("addon condition should be available: %v", addOn.Status.Conditions)
 	}
@@ -417,7 +417,7 @@ func TestReconcileWithProbe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
+	cond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionAvailable)
 	if cond == nil && cond.Status != metav1.ConditionUnknown {
 		t.Errorf("addon condition should be unknown: %v", addOn.Status.Conditions)
 	}
@@ -460,7 +460,7 @@ func TestReconcileWithProbe(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !meta.IsStatusConditionFalse(addOn.Status.Conditions, "Available") {
+	if !meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionAvailable) {
 		t.Errorf("addon condition should be unavailable: %v", addOn.Status.Conditions)
 	}
 
@@ -480,7 +480,7 @@ func TestReconcileWithProbe(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cond = meta.FindStatusCondition(addOn.Status.Conditions, "Available")
+	cond = meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionAvailable)
 	if cond == nil && cond.Status != metav1.ConditionUnknown {
 		t.Errorf("addon condition should be unknown: %v", addOn.Status.Conditions)
 	}
@@ -522,7 +522,7 @@ func TestReconcileWithProbe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !meta.IsStatusConditionTrue(addOn.Status.Conditions, "Available") {
+	if !meta.IsStatusConditionTrue(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionAvailable) {
 		t.Errorf("addon condition should be available: %v", addOn.Status.Conditions)
 	}
 }

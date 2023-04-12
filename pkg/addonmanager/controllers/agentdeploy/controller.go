@@ -243,7 +243,7 @@ func (c *addonDeployController) applyWork(ctx context.Context, appliedType strin
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 			Type:    appliedType,
 			Status:  metav1.ConditionFalse,
-			Reason:  constants.AddonManifestAppliedReasonWorkApplyFailed,
+			Reason:  addonapiv1alpha1.AddonManifestAppliedReasonWorkApplyFailed,
 			Message: fmt.Sprintf("failed to apply manifestWork: %v", err),
 		})
 		return work, err
@@ -254,14 +254,14 @@ func (c *addonDeployController) applyWork(ctx context.Context, appliedType strin
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 			Type:    appliedType,
 			Status:  metav1.ConditionTrue,
-			Reason:  constants.AddonManifestAppliedReasonManifestsApplied,
+			Reason:  addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied,
 			Message: "manifests of addon are applied successfully",
 		})
 	} else {
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 			Type:    appliedType,
 			Status:  metav1.ConditionFalse,
-			Reason:  constants.AddonManifestAppliedReasonManifestsApplyFailed,
+			Reason:  addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplyFailed,
 			Message: "failed to apply the manifests of addon",
 		})
 	}
@@ -281,10 +281,10 @@ func (c *addonDeployController) buildDeployManifestWorks(installMode, workNamesp
 
 	switch installMode {
 	case constants.InstallModeHosted:
-		appliedType = constants.AddonHostingManifestApplied
+		appliedType = addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied
 		addonWorkBuilder = newHostingAddonWorksBuilder(agentAddon.GetAgentAddonOptions().HostedModeEnabled, c.workBuilder)
 	case constants.InstallModeDefault:
-		appliedType = constants.AddonManifestApplied
+		appliedType = addonapiv1alpha1.ManagedClusterAddOnManifestApplied
 		addonWorkBuilder = newAddonWorksBuilder(agentAddon.GetAgentAddonOptions().HostedModeEnabled, c.workBuilder)
 	default:
 		return nil, nil, fmt.Errorf("invalid install mode %v", installMode)
@@ -295,7 +295,7 @@ func (c *addonDeployController) buildDeployManifestWorks(installMode, workNamesp
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 			Type:    appliedType,
 			Status:  metav1.ConditionFalse,
-			Reason:  constants.AddonManifestAppliedReasonWorkApplyFailed,
+			Reason:  addonapiv1alpha1.AddonManifestAppliedReasonWorkApplyFailed,
 			Message: fmt.Sprintf("failed to get manifest from agent interface: %v", err),
 		})
 		return nil, nil, err
@@ -314,7 +314,7 @@ func (c *addonDeployController) buildDeployManifestWorks(installMode, workNamesp
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 			Type:    appliedType,
 			Status:  metav1.ConditionFalse,
-			Reason:  constants.AddonManifestAppliedReasonWorkApplyFailed,
+			Reason:  addonapiv1alpha1.AddonManifestAppliedReasonWorkApplyFailed,
 			Message: fmt.Sprintf("failed to build manifestwork: %v", err),
 		})
 		return nil, nil, err
@@ -333,10 +333,10 @@ func (c *addonDeployController) buildHookManifestWork(installMode, workNamespace
 
 	switch installMode {
 	case constants.InstallModeHosted:
-		appliedType = constants.AddonHostingManifestApplied
+		appliedType = addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied
 		addonWorkBuilder = newHostingAddonWorksBuilder(agentAddon.GetAgentAddonOptions().HostedModeEnabled, c.workBuilder)
 	case constants.InstallModeDefault:
-		appliedType = constants.AddonManifestApplied
+		appliedType = addonapiv1alpha1.ManagedClusterAddOnManifestApplied
 		addonWorkBuilder = newAddonWorksBuilder(agentAddon.GetAgentAddonOptions().HostedModeEnabled, c.workBuilder)
 	default:
 		return nil, fmt.Errorf("invalid install mode %v", installMode)
@@ -347,7 +347,7 @@ func (c *addonDeployController) buildHookManifestWork(installMode, workNamespace
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 			Type:    appliedType,
 			Status:  metav1.ConditionFalse,
-			Reason:  constants.AddonManifestAppliedReasonWorkApplyFailed,
+			Reason:  addonapiv1alpha1.AddonManifestAppliedReasonWorkApplyFailed,
 			Message: fmt.Sprintf("failed to get manifest from agent interface: %v", err),
 		})
 		return nil, err
@@ -361,7 +361,7 @@ func (c *addonDeployController) buildHookManifestWork(installMode, workNamespace
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 			Type:    appliedType,
 			Status:  metav1.ConditionFalse,
-			Reason:  constants.AddonManifestAppliedReasonWorkApplyFailed,
+			Reason:  addonapiv1alpha1.AddonManifestAppliedReasonWorkApplyFailed,
 			Message: fmt.Sprintf("failed to build manifestwork: %v", err),
 		})
 		return nil, err

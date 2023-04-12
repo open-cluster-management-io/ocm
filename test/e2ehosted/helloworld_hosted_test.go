@@ -73,7 +73,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld hosted addons in Hosted mo
 				return err
 			}
 
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, constants.HostingClusterValidity) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingClusterValidity) {
 				return fmt.Errorf("addon hosting cluster should be valid, but get condition %v",
 					addon.Status.Conditions)
 			}
@@ -110,7 +110,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld hosted addons in Hosted mo
 			if err != nil {
 				return err
 			}
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, constants.AddonHostingManifestApplied) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied) {
 				return fmt.Errorf("addon should be applied to hosting cluster, but get condition %v",
 					addon.Status.Conditions)
 			}

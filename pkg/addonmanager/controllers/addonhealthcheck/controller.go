@@ -183,17 +183,17 @@ func (c *addonHealthCheckController) probeAddonStatus(ctx context.Context, addon
 		switch {
 		case workCond == nil:
 			meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
-				Type:    "Available",
+				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionUnknown,
-				Reason:  "WorkNotApplied",
+				Reason:  addonapiv1alpha1.AddonAvailableReasonWorkNotApply,
 				Message: "Work is not applied yet",
 			})
 			return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
 		case workCond.Status == metav1.ConditionFalse:
 			meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
-				Type:    "Available",
+				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionFalse,
-				Reason:  "WorkApplyFailed",
+				Reason:  addonapiv1alpha1.AddonAvailableReasonWorkApplyFailed,
 				Message: workCond.Message,
 			})
 			return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
@@ -204,9 +204,9 @@ func (c *addonHealthCheckController) probeAddonStatus(ctx context.Context, addon
 
 	if agentAddon.GetAgentAddonOptions().HealthProber.WorkProber == nil {
 		meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
-			Type:    "Available",
+			Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
 			Status:  metav1.ConditionTrue,
-			Reason:  "WorkApplied",
+			Reason:  addonapiv1alpha1.AddonAvailableReasonWorkApply,
 			Message: "Addon work is applied",
 		})
 		return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
@@ -220,9 +220,9 @@ func (c *addonHealthCheckController) probeAddonStatus(ctx context.Context, addon
 		// mark condition to unknown
 		if result == nil {
 			meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
-				Type:    "Available",
+				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionUnknown,
-				Reason:  "NoProbeResult",
+				Reason:  addonapiv1alpha1.AddonAvailableReasonNoProbeResult,
 				Message: "Probe results are not returned",
 			})
 			return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
@@ -231,9 +231,9 @@ func (c *addonHealthCheckController) probeAddonStatus(ctx context.Context, addon
 		err := agentAddon.GetAgentAddonOptions().HealthProber.WorkProber.HealthCheck(field.ResourceIdentifier, *result)
 		if err != nil {
 			meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
-				Type:    "Available",
+				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionFalse,
-				Reason:  "ProbeUnavailable",
+				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeUnavailable,
 				Message: fmt.Sprintf("Probe addon unavailable with err %v", err),
 			})
 			return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)
@@ -241,9 +241,9 @@ func (c *addonHealthCheckController) probeAddonStatus(ctx context.Context, addon
 	}
 
 	meta.SetStatusCondition(&addonCopy.Status.Conditions, metav1.Condition{
-		Type:    "Available",
+		Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
 		Status:  metav1.ConditionTrue,
-		Reason:  "ProbeAvailable",
+		Reason:  addonapiv1alpha1.AddonAvailableReasonProbeAvailable,
 		Message: "Addon is available",
 	})
 	return utils.PatchAddonCondition(ctx, c.addonClient, addonCopy, addon)

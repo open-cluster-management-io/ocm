@@ -96,11 +96,11 @@ func TestHostingReconcile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, constants.HostingClusterValidity)
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingClusterValidity)
 				if addOnCond == nil {
 					t.Fatal("condition should not be nil")
 				}
-				if addOnCond.Reason != constants.HostingClusterValidityReasonInvalid {
+				if addOnCond.Reason != addonapiv1alpha1.HostingClusterValidityReasonInvalid {
 					t.Errorf("Condition Reason is not correct: %v", addOnCond.Reason)
 				}
 			},
@@ -135,7 +135,7 @@ func TestHostingReconcile(t *testing.T) {
 				if len(addOn.Finalizers) != 1 {
 					t.Errorf("expected 1 finalizer, but got %v", len(addOn.Finalizers))
 				}
-				if !addonHasFinalizer(addOn, constants.HostingManifestFinalizer) {
+				if !addonHasFinalizer(addOn, addonapiv1alpha1.AddonHostingManifestFinalizer) {
 					t.Errorf("expected hosting manifest finalizer")
 				}
 			},
@@ -166,11 +166,11 @@ func TestHostingReconcile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, constants.AddonHostingManifestApplied)
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied)
 				if addOnCond == nil {
 					t.Fatal("condition should not be nil")
 				}
-				if addOnCond.Reason != constants.AddonManifestAppliedReasonManifestsApplyFailed {
+				if addOnCond.Reason != addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplyFailed {
 					t.Errorf("Condition Reason is not correct: %v", addOnCond.Reason)
 				}
 			},
@@ -226,7 +226,7 @@ func TestHostingReconcile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if meta.IsStatusConditionFalse(addOn.Status.Conditions, constants.AddonHostingManifestApplied) {
+				if meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied) {
 					t.Errorf("Condition Reason is not correct: %v", addOn.Status.Conditions)
 				}
 			},
@@ -274,7 +274,7 @@ func TestHostingReconcile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if meta.IsStatusConditionFalse(addOn.Status.Conditions, constants.AddonHostingManifestApplied) {
+				if meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied) {
 					t.Errorf("Condition Reason is not correct: %v", addOn.Status.Conditions)
 				}
 			},
@@ -321,7 +321,7 @@ func TestHostingReconcile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, constants.AddonHostingManifestApplied) {
+				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied) {
 					t.Errorf("Condition Reason is not correct: %v", addOn.Status.Conditions)
 				}
 			},
@@ -368,7 +368,7 @@ func TestHostingReconcile(t *testing.T) {
 				addontesting.AssertActions(t, actions, "update")
 				update := actions[0].(clienttesting.UpdateActionImpl).Object
 				addOn := update.(*addonapiv1alpha1.ManagedClusterAddOn)
-				if addonHasFinalizer(addOn, constants.HostingManifestFinalizer) {
+				if addonHasFinalizer(addOn, addonapiv1alpha1.AddonHostingManifestFinalizer) {
 					t.Errorf("expected hosting manifest finalizer")
 				}
 			},
@@ -444,11 +444,11 @@ func assertHostingClusterValid(t *testing.T, actions clienttesting.Action) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, constants.HostingClusterValidity)
+	addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingClusterValidity)
 	if addOnCond == nil {
 		t.Fatal("condition should not be nil")
 	}
-	if addOnCond.Reason != constants.HostingClusterValidityReasonValid {
+	if addOnCond.Reason != addonapiv1alpha1.HostingClusterValidityReasonValid {
 		t.Errorf("Condition Reason is not correct: %v", addOnCond.Reason)
 	}
 }

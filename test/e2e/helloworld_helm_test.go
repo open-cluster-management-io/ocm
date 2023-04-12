@@ -12,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
@@ -83,7 +82,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			}
 			hasPreDeleteFinalizer := false
 			for _, f := range addon.Finalizers {
-				if f == constants.PreDeleteHookFinalizer {
+				if f == addonapiv1alpha1.AddonPreDeleteHookFinalizer {
 					hasPreDeleteFinalizer = true
 				}
 			}

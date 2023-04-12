@@ -7,55 +7,11 @@ import (
 )
 
 const (
-	// PreDeleteHookFinalizer is the finalizer for an addon which has deployed hook objects
-	PreDeleteHookFinalizer = "cluster.open-cluster-management.io/addon-pre-delete"
-
-	// HostingPreDeleteHookFinalizer is the finalizer for an addon which has deployed hook objects on hosting cluster
-	HostingPreDeleteHookFinalizer = "cluster.open-cluster-management.io/hosting-addon-pre-delete"
-
-	// AddonManifestApplied is a condition type representing whether the manifest of an addon
-	// is applied correctly.
-	AddonManifestApplied = "ManifestApplied"
-
-	// AddonManifestAppliedReasonWorkApplyFailed is the reason of condition AddonManifestApplied indicating
-	// the failure of apply manifestwork of the manifests
-	AddonManifestAppliedReasonWorkApplyFailed = "ManifestWorkApplyFailed"
-
-	// AddonManifestAppliedReasonManifestsApplied is the reason of condition AddonManifestApplied indicating
-	// the manifests is applied on the managedcluster.
-	AddonManifestAppliedReasonManifestsApplied = "AddonManifestApplied"
-
-	// AddonManifestAppliedReasonManifestsApplyFailed is the reason of condition AddonManifestApplied indicating
-	// the failure to apply manifests on the managedcluster
-	AddonManifestAppliedReasonManifestsApplyFailed = "AddonManifestAppliedFailed"
-
-	// AddonHookManifestCompleted is a condition type representing whether the addon hook is completed.
-	AddonHookManifestCompleted = "HookManifestCompleted"
-
 	// InstallModeBuiltinValueKey is the key of the build in value to represent the addon install mode, addon developers
 	// can use this built in value in manifests.
 	InstallModeBuiltinValueKey = "InstallMode"
 	InstallModeHosted          = "Hosted"
 	InstallModeDefault         = "Default"
-
-	// HostingManifestFinalizer is the finalizer for an addon which has deployed manifests on the external
-	// hosting cluster in Hosted mode
-	HostingManifestFinalizer = "cluster.open-cluster-management.io/hosting-manifests-cleanup"
-
-	// AddonHostingManifestApplied is a condition type representing whether the manifest of an addon
-	// is applied on the hosting cluster correctly.
-	AddonHostingManifestApplied = "HostingManifestApplied"
-
-	// HostingClusterValid is a condition type representing whether the hosting cluster is valid in Hosted mode
-	HostingClusterValidity = "HostingClusterValidity"
-
-	// HostingClusterValidityReasonValid is the reason of condition HostingClusterValidity indicating the hosting
-	// cluster is valid
-	HostingClusterValidityReasonValid = "HostingClusterValid"
-
-	// HostingClusterValidityReasonInvalid is the reason of condition HostingClusterValidity indicating the hosting
-	// cluster is invalid
-	HostingClusterValidityReasonInvalid = "HostingClusterInvalid"
 )
 
 // DeployWorkNamePrefix returns the prefix of the work name for the addon

@@ -63,7 +63,7 @@ func (s *defaultSyncer) sync(ctx context.Context,
 	}
 
 	for _, deployWork := range deployWorks {
-		_, err = s.applyWork(ctx, constants.AddonManifestApplied, deployWork, addon)
+		_, err = s.applyWork(ctx, addonapiv1alpha1.ManagedClusterAddOnManifestApplied, deployWork, addon)
 		if err != nil {
 			errs = append(errs, err)
 		}

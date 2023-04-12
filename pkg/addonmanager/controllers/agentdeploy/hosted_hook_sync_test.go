@@ -58,7 +58,7 @@ func TestHostingHookReconcile(t *testing.T) {
 				addontesting.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
 				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
-				if !addonHasFinalizer(addOn, constants.HostingPreDeleteHookFinalizer) {
+				if !addonHasFinalizer(addOn, addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer) {
 					t.Errorf("the preDeleteHookFinalizer should be added.")
 				}
 			},
@@ -69,7 +69,7 @@ func TestHostingHookReconcile(t *testing.T) {
 			addon: []runtime.Object{
 				addontesting.SetAddonFinalizers(
 					addontesting.NewHostedModeAddon("test", "cluster1", "cluster2"),
-					constants.HostingPreDeleteHookFinalizer, constants.HostingManifestFinalizer)},
+					addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer, addonapiv1alpha1.AddonHostingManifestFinalizer)},
 			cluster: []runtime.Object{
 				addontesting.NewManagedCluster("cluster1"),
 				addontesting.NewManagedCluster("cluster2"),
@@ -92,7 +92,7 @@ func TestHostingHookReconcile(t *testing.T) {
 				addontesting.SetAddonFinalizers(
 					addontesting.SetAddonDeletionTimestamp(
 						addontesting.NewHostedModeAddon("test", "cluster1", "cluster2"), time.Now()),
-					constants.HostingPreDeleteHookFinalizer, constants.HostingManifestFinalizer),
+					addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer, addonapiv1alpha1.AddonHostingManifestFinalizer),
 			},
 			cluster: []runtime.Object{
 				addontesting.NewManagedCluster("cluster1"),
@@ -120,7 +120,7 @@ func TestHostingHookReconcile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, constants.AddonHookManifestCompleted) {
+				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHookManifestCompleted) {
 					t.Errorf("HookManifestCompleted condition should be false,but got true.")
 				}
 			},
@@ -132,7 +132,7 @@ func TestHostingHookReconcile(t *testing.T) {
 				addontesting.SetAddonFinalizers(
 					addontesting.SetAddonDeletionTimestamp(
 						addontesting.NewHostedModeAddon("test", "cluster1", "cluster2"), time.Now()),
-					constants.HostingManifestFinalizer, constants.HostingPreDeleteHookFinalizer),
+					addonapiv1alpha1.AddonHostingManifestFinalizer, addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer),
 			},
 			cluster: []runtime.Object{
 				addontesting.NewManagedCluster("cluster1"),
@@ -217,7 +217,7 @@ func TestHostingHookReconcile(t *testing.T) {
 				addontesting.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
 				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
-				if addonHasFinalizer(addOn, constants.HostingPreDeleteHookFinalizer) {
+				if addonHasFinalizer(addOn, addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer) {
 					t.Errorf("expected no HostingManifestFinalizer on addon.")
 				}
 			},
@@ -229,7 +229,7 @@ func TestHostingHookReconcile(t *testing.T) {
 				addontesting.SetAddonFinalizers(
 					addontesting.SetAddonDeletionTimestamp(
 						addontesting.NewHostedModeAddon("test", "cluster1", "cluster2"), time.Now()),
-					constants.HostingPreDeleteHookFinalizer),
+					addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer),
 			},
 			cluster: []runtime.Object{
 				addontesting.NewManagedCluster("cluster1"),
@@ -311,7 +311,7 @@ func TestHostingHookReconcile(t *testing.T) {
 				addontesting.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
 				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
-				if addonHasFinalizer(addOn, constants.HostingPreDeleteHookFinalizer) {
+				if addonHasFinalizer(addOn, addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer) {
 					t.Errorf("expected no HostingPreDeleteHookFinalizer on addon.")
 				}
 			},

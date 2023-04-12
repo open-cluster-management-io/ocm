@@ -17,7 +17,6 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/events"
 )
 
@@ -104,7 +103,7 @@ func NewHostedModeAddon(name, namespace string, hostingCluster string,
 func NewHostedModeAddonWithFinalizer(name, namespace string, hostingCluster string,
 	owners ...metav1.OwnerReference) *addonapiv1alpha1.ManagedClusterAddOn {
 	addon := NewHostedModeAddon(name, namespace, hostingCluster)
-	addon.SetFinalizers([]string{constants.HostingManifestFinalizer})
+	addon.SetFinalizers([]string{addonapiv1alpha1.AddonHostingManifestFinalizer})
 	return addon
 }
 

@@ -35,11 +35,11 @@ func (s *defaultHookSyncer) sync(ctx context.Context,
 	}
 
 	if hookWork == nil {
-		addonRemoveFinalizer(addon, constants.PreDeleteHookFinalizer)
+		addonRemoveFinalizer(addon, addonapiv1alpha1.AddonPreDeleteHookFinalizer)
 		return addon, nil
 	}
 
-	if addonAddFinalizer(addon, constants.PreDeleteHookFinalizer) {
+	if addonAddFinalizer(addon, addonapiv1alpha1.AddonPreDeleteHookFinalizer) {
 		return addon, nil
 	}
 
@@ -48,7 +48,7 @@ func (s *defaultHookSyncer) sync(ctx context.Context,
 	}
 
 	// will deploy the pre-delete hook manifestWork when the addon is deleting
-	hookWork, err = s.applyWork(ctx, constants.AddonManifestApplied, hookWork, addon)
+	hookWork, err = s.applyWork(ctx, addonapiv1alpha1.ManagedClusterAddOnManifestApplied, hookWork, addon)
 	if err != nil {
 		return addon, err
 	}
@@ -56,18 +56,18 @@ func (s *defaultHookSyncer) sync(ctx context.Context,
 	// TODO: will surface more message here
 	if hookWorkIsCompleted(hookWork) {
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-			Type:    constants.AddonHookManifestCompleted,
+			Type:    addonapiv1alpha1.ManagedClusterAddOnHookManifestCompleted,
 			Status:  metav1.ConditionTrue,
 			Reason:  "HookManifestIsCompleted",
 			Message: fmt.Sprintf("hook manifestWork %v is completed.", hookWork.Name),
 		})
 
-		addonRemoveFinalizer(addon, constants.PreDeleteHookFinalizer)
+		addonRemoveFinalizer(addon, addonapiv1alpha1.AddonPreDeleteHookFinalizer)
 		return addon, nil
 	}
 
 	meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-		Type:    constants.AddonHookManifestCompleted,
+		Type:    addonapiv1alpha1.ManagedClusterAddOnHookManifestCompleted,
 		Status:  metav1.ConditionFalse,
 		Reason:  "HookManifestIsNotCompleted",
 		Message: fmt.Sprintf("hook manifestWork %v is not completed.", hookWork.Name),

@@ -184,7 +184,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 			}
 			finalizers := addon.GetFinalizers()
 			for _, f := range finalizers {
-				if f == constants.HostingPreDeleteHookFinalizer {
+				if f == addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer {
 					return nil
 				}
 			}
@@ -208,7 +208,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 				return err
 			}
 
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, constants.AddonHostingManifestApplied) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied) {
 				return fmt.Errorf("Unexpected addon applied condition, %v", addon.Status.Conditions)
 			}
 			return nil

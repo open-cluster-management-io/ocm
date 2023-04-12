@@ -25,7 +25,6 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 )
 
@@ -95,11 +94,11 @@ func TestDefaultReconcile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, constants.AddonManifestApplied)
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied)
 				if addOnCond == nil {
 					t.Fatal("condition should not be nil")
 				}
-				if addOnCond.Reason != constants.AddonManifestAppliedReasonManifestsApplyFailed {
+				if addOnCond.Reason != addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplyFailed {
 					t.Errorf("Condition Reason is not correct: %v", addOnCond.Reason)
 				}
 			},
@@ -145,7 +144,7 @@ func TestDefaultReconcile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if meta.IsStatusConditionFalse(addOn.Status.Conditions, constants.AddonManifestApplied) {
+				if meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied) {
 					t.Errorf("Condition Reason is not correct: %v", addOn.Status.Conditions)
 				}
 			},
@@ -186,7 +185,7 @@ func TestDefaultReconcile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if meta.IsStatusConditionFalse(addOn.Status.Conditions, constants.AddonManifestApplied) {
+				if meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied) {
 					t.Errorf("Condition Reason is not correct: %v", addOn.Status.Conditions)
 				}
 			},
@@ -227,7 +226,7 @@ func TestDefaultReconcile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, constants.AddonManifestApplied) {
+				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied) {
 					t.Errorf("Condition Reason is not correct: %v", addOn.Status.Conditions)
 				}
 			},
