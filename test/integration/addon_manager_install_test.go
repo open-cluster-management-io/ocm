@@ -26,6 +26,9 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		cma = &addonapiv1alpha1.ClusterManagementAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("test-%s", suffix),
+				Annotations: map[string]string{
+					addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue,
+				},
 			},
 			Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
 				InstallStrategy: addonapiv1alpha1.InstallStrategy{

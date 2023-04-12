@@ -14,8 +14,9 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/index"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonconfiguration"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonmanagement"
-	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonstatus"
+	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonowner"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/managementaddonstatus"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
@@ -62,12 +63,14 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
 		clusterInformerFactory.Cluster().V1beta1().Placements(),
 		clusterInformerFactory.Cluster().V1beta1().PlacementDecisions(),
+		utils.ManagedByAddonManager,
 	)
 
-	addonStatusController := addonstatus.NewAddonStatusController(
+	addonOwnerController := addonowner.NewAddonOwnerController(
 		addonClient,
 		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
 		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
+		utils.ManagedByAddonManager,
 	)
 
 	mgmtAddonStatusController := managementaddonstatus.NewMagementAddonStatusController(
@@ -78,7 +81,7 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 
 	go addonManagementController.Run(ctx, 2)
 	go addonConfigurationController.Run(ctx, 2)
-	go addonStatusController.Run(ctx, 2)
+	go addonOwnerController.Run(ctx, 2)
 	go mgmtAddonStatusController.Run(ctx, 2)
 
 	go clusterInformerFactory.Start(ctx.Done())

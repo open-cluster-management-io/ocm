@@ -282,3 +282,45 @@ func PatchAddonCondition(ctx context.Context, addonClient addonv1alpha1client.In
 		ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	return err
 }
+
+// AddonManagementFilterFunc is to check if the addon should be managed by addon manager or self-managed
+type AddonManagementFilterFunc func(cma *addonapiv1alpha1.ClusterManagementAddOn) bool
+
+func ManagedByAddonManager(cma *addonapiv1alpha1.ClusterManagementAddOn) bool {
+	if len(cma.Annotations) == 0 {
+		return false
+	}
+
+	value, ok := cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey]
+	if !ok {
+		return false
+	}
+
+	return value == addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue
+}
+
+func ManagedBySelf(cma *addonapiv1alpha1.ClusterManagementAddOn) bool {
+	if len(cma.Annotations) == 0 {
+		return true
+	}
+
+	value, ok := cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey]
+	if !ok {
+		return true
+	}
+
+	return value == addonapiv1alpha1.AddonLifecycleSelfManageAnnotationValue
+}
+
+func IsOwnedByCMA(addon *addonapiv1alpha1.ManagedClusterAddOn) bool {
+	for _, owner := range addon.OwnerReferences {
+		if owner.Kind != "ClusterManagementAddOn" {
+			continue
+		}
+		if owner.Name != addon.Name {
+			continue
+		}
+		return true
+	}
+	return false
+}

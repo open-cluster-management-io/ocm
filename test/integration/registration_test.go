@@ -38,6 +38,20 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: managedClusterName}}
 		_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		// Create clustermanagement addon
+		clusterManagementAddon := &addonapiv1alpha1.ClusterManagementAddOn{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: testAddonImpl.name,
+			},
+			Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
+				InstallStrategy: addonapiv1alpha1.InstallStrategy{
+					Type: addonapiv1alpha1.AddonInstallStrategyManual,
+				},
+			},
+		}
+		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(), clusterManagementAddon, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.AfterEach(func() {
@@ -46,6 +60,8 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		delete(testAddonImpl.registrations, managedClusterName)
+		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(), testAddonImpl.name, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("Should setup registration successfully", func() {

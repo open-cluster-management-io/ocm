@@ -339,3 +339,18 @@ type ClusterManagementAddOnList struct {
 	// Items is a list of cluster management add-ons.
 	Items []ClusterManagementAddOn `json:"items"`
 }
+
+const (
+	// AddonLifecycleAnnotationKey is an annotation key on ClusterManagementAddon to indicate the installation
+	// and upgrade of addon should be handled by the general addon manager or addon itself. The valid values are
+	// addon-manager and self. If the annotation is not set, addon lifecycle is handled by addon itself.
+	AddonLifecycleAnnotationKey = "addon.open-cluster-management.io/lifecycle"
+	// AddonLifecycleAddonManagerAnnotationValue is the value of annotation AddonLifecycleAnnotationKey indicating
+	// that the addon installation and upgrade is handled by the general addon manager. This should be set only
+	// when featugate AddonManager on hub is enabled
+	AddonLifecycleAddonManagerAnnotationValue = "addon-manager"
+	// AddonLifecycleSelfManageAnnotationValue is the value of annotation AddonLifecycleAnnotationKey indicating
+	// that the addon installation and upgrade is handled the addon itself. The general addon manager will ignore
+	// addons with this annotation.
+	AddonLifecycleSelfManageAnnotationValue = "self"
+)

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
 	"time"
 
@@ -71,18 +73,50 @@ func TestReconcile(t *testing.T) {
 			testaddon:            &testAgent{name: "test", registrations: []addonapiv1alpha1.RegistrationConfig{}},
 		},
 		{
-			name:                 "no registrations",
-			cluster:              []runtime.Object{addontesting.NewManagedCluster("cluster1")},
-			addon:                []runtime.Object{addontesting.NewAddon("test", "cluster1")},
+			name:    "no registrations",
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			addon: []runtime.Object{addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
+				Kind: "ClusterManagementAddOn",
+				Name: "test"})},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				actual := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(actual, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !meta.IsStatusConditionTrue(addOn.Status.Conditions, "RegistrationApplied") {
+					t.Errorf("Unexpected status condition patch, got %s", string(actual))
+				}
+			},
+			testaddon: &testAgent{name: "test", registrations: []addonapiv1alpha1.RegistrationConfig{}},
+		},
+		{
+			name:    "no owner",
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			addon: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1")
+					return addon
+				}(),
+			},
+			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1alpha1.RegistrationConfig{
+				{
+					SignerName: "test",
+				},
+			}},
 			validateAddonActions: addontesting.AssertNoActions,
-			testaddon:            &testAgent{name: "test", registrations: []addonapiv1alpha1.RegistrationConfig{}},
 		},
 		{
 			name:    "with registrations",
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			addon: []runtime.Object{
 				func() *addonapiv1alpha1.ManagedClusterAddOn {
-					addon := addontesting.NewAddon("test", "cluster1")
+					addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
+						Kind: "ClusterManagementAddOn",
+						Name: "test",
+					})
 					return addon
 				}(),
 			},
@@ -112,7 +146,10 @@ func TestReconcile(t *testing.T) {
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			addon: []runtime.Object{
 				func() *addonapiv1alpha1.ManagedClusterAddOn {
-					addon := addontesting.NewAddon("test", "cluster1")
+					addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
+						Kind: "ClusterManagementAddOn",
+						Name: "test",
+					})
 					addon.Spec.InstallNamespace = "default2"
 					return addon
 				}(),

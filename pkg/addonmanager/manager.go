@@ -5,6 +5,12 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/client-go/tools/cache"
+
+	"open-cluster-management.io/addon-framework/pkg/index"
+	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonconfiguration"
+	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonowner"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -102,10 +108,10 @@ func (a *addonManager) Start(ctx context.Context) error {
 		return err
 	}
 
-	addonNames := []string{}
-	for key, agent := range a.addonAgents {
+	var addonNames []string
+	for key, agentImpl := range a.addonAgents {
 		addonNames = append(addonNames, key)
-		for _, configGVR := range agent.GetAgentAddonOptions().SupportedConfigGVRs {
+		for _, configGVR := range agentImpl.GetAgentAddonOptions().SupportedConfigGVRs {
 			a.addonConfigs[configGVR] = true
 		}
 	}
@@ -171,8 +177,16 @@ func (a *addonManager) Start(ctx context.Context) error {
 		a.addonAgents,
 	)
 
-	var addonConfigController factory.Controller
-	var managementAddonConfigController factory.Controller
+	// This is a duplicate controller in general addon-manager. This should be removed when we
+	// alway enable the addon-manager
+	addonOwnerController := addonowner.NewAddonOwnerController(
+		addonClient,
+		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
+		utils.ManagedBySelf,
+	)
+
+	var addonConfigController, managementAddonConfigController, addonConfigurationController factory.Controller
 	if len(a.addonConfigs) != 0 {
 		addonConfigController = addonconfig.NewAddonConfigController(
 			addonClient,
@@ -185,6 +199,32 @@ func (a *addonManager) Start(ctx context.Context) error {
 			addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 			dynamicInformers,
 			a.addonConfigs,
+		)
+
+		// start addonConfiguration controller, note this is to handle the case when the general addon-manager
+		// is not started, we should consider to remove this when the general addon-manager are always started.
+		// This controller will also ignore the installStrategy part.
+		err = addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
+			cache.Indexers{
+				index.ClusterManagementAddonByPlacement: index.IndexClusterManagementAddonByPlacement,
+			})
+		if err != nil {
+			return err
+		}
+
+		err = addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
+			cache.Indexers{
+				index.ManagedClusterAddonByName: index.IndexManagedClusterAddonByName,
+			})
+		if err != nil {
+			return err
+		}
+		addonConfigurationController = addonconfiguration.NewAddonConfigurationController(
+			addonClient,
+			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+			addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
+			nil, nil,
+			utils.ManagedBySelf,
 		)
 	}
 
@@ -233,11 +273,15 @@ func (a *addonManager) Start(ctx context.Context) error {
 	go registrationController.Run(ctx, 1)
 	go addonInstallController.Run(ctx, 1)
 	go addonHealthCheckController.Run(ctx, 1)
+	go addonOwnerController.Run(ctx, 1)
 	if addonConfigController != nil {
 		go addonConfigController.Run(ctx, 1)
 	}
 	if managementAddonConfigController != nil {
 		go managementAddonConfigController.Run(ctx, 1)
+	}
+	if addonConfigurationController != nil {
+		go addonConfigurationController.Run(ctx, 1)
 	}
 	if csrApproveController != nil {
 		go csrApproveController.Run(ctx, 1)

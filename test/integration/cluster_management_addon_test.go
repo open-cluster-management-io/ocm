@@ -3,13 +3,13 @@ package integration
 import (
 	"context"
 	"fmt"
-
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	certificatesv1 "k8s.io/api/certificates/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	corev1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -37,6 +37,12 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: managedClusterName}}
 		_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		testAddonImpl.registrations[managedClusterName] = []addonapiv1alpha1.RegistrationConfig{
+			{
+				SignerName: certificatesv1.KubeAPIServerClientSignerName,
+			},
+		}
 	})
 
 	ginkgo.AfterEach(func() {
@@ -78,20 +84,16 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 			if err != nil {
 				return err
 			}
-			relatedObjects := []addonapiv1alpha1.ObjectReference{
-				{
-					Name:     clusterManagementAddon.Name,
-					Group:    "addon.open-cluster-management.io",
-					Resource: "clustermanagementaddons",
-				},
-			}
-			if !apiequality.Semantic.DeepEqual(relatedObjects, actual.Status.RelatedObjects) {
-				return fmt.Errorf("Expected related object is not correct, actual: %v", actual.Status.RelatedObjects)
+			if meta.IsStatusConditionTrue(actual.Status.Conditions, "RegistrationApplied") {
+				return fmt.Errorf("Expected RegistrationApplied condition to be true")
 			}
 			if actual.Status.Namespace != "test" {
 				return fmt.Errorf("Expected namespace in status is not correct, actual %s", actual.Status.Namespace)
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(), testAddonImpl.name, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 })

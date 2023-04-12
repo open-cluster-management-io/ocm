@@ -413,10 +413,14 @@ func TestAddonConfigReconcile(t *testing.T) {
 				}
 			}
 
+			controller := &addonConfigurationController{
+				placementDecisionLister: clusterInformers.Cluster().V1beta1().PlacementDecisions().Lister(),
+				placementLister:         clusterInformers.Cluster().V1beta1().Placements().Lister(),
+			}
+
 			reconcile := &managedClusterAddonConfigurationReconciler{
 				addonClient:                fakeAddonClient,
-				placementLister:            clusterInformers.Cluster().V1beta1().Placements().Lister(),
-				placementDecisionLister:    clusterInformers.Cluster().V1beta1().PlacementDecisions().Lister(),
+				getClustersByPlacement:     controller.getClustersByPlacement,
 				managedClusterAddonIndexer: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetIndexer(),
 			}
 
