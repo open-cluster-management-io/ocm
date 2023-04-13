@@ -1,6 +1,7 @@
 package agentdeploy
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 	"testing"
 
@@ -72,6 +73,82 @@ func TestConfigsToAnnotations(t *testing.T) {
 			assert.NoError(t, err)
 			if !reflect.DeepEqual(annotations, c.expectAnnotations) {
 				t.Fatalf("Expected annotations to be equal but got %v (expected) and %v (actual)", c.expectAnnotations, annotations)
+			}
+		})
+	}
+}
+
+func TestAddonRemoveFinalizer(t *testing.T) {
+	cases := []struct {
+		name               string
+		existingFinalizers []string
+		finalizerToRemove  string
+		expectedFinalizers []string
+	}{
+		{
+			name: "no finalizers",
+		},
+		{
+			name:               "no matched finalizer",
+			existingFinalizers: []string{"test"},
+			finalizerToRemove:  "test1",
+			expectedFinalizers: []string{"test"},
+		},
+		{
+			name:               "remove deprecated",
+			existingFinalizers: []string{addonapiv1alpha1.AddonDeprecatedHostingPreDeleteHookFinalizer, "test"},
+			finalizerToRemove:  "test1",
+			expectedFinalizers: []string{"test"},
+		},
+		{
+			name:               "remove deprecated and matched",
+			existingFinalizers: []string{addonapiv1alpha1.AddonDeprecatedHostingPreDeleteHookFinalizer, "test"},
+			finalizerToRemove:  "test",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			addon := &addonapiv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Finalizers: c.existingFinalizers},
+			}
+			addonRemoveFinalizer(addon, c.finalizerToRemove)
+			if !reflect.DeepEqual(c.expectedFinalizers, addon.GetFinalizers()) {
+				t.Errorf("expected finalizer is not correct expects %v got %v", c.expectedFinalizers, addon.Finalizers)
+			}
+		})
+	}
+}
+
+func TestAddonAddFinalizer(t *testing.T) {
+	finalizerToAdd := "test"
+	cases := []struct {
+		name               string
+		existingFinalizers []string
+		expectedFinalizers []string
+	}{
+		{
+			name:               "no finalizers",
+			expectedFinalizers: []string{"test"},
+		},
+		{
+			name:               "append finalizer",
+			existingFinalizers: []string{"test1"},
+			expectedFinalizers: []string{"test1", "test"},
+		},
+		{
+			name:               "remove deprecated",
+			existingFinalizers: []string{addonapiv1alpha1.AddonDeprecatedHostingPreDeleteHookFinalizer},
+			expectedFinalizers: []string{"test"},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			addon := &addonapiv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Finalizers: c.existingFinalizers},
+			}
+			addonAddFinalizer(addon, finalizerToAdd)
+			if !reflect.DeepEqual(c.expectedFinalizers, addon.GetFinalizers()) {
+				t.Errorf("expected finalizer is not correct expects %v got %v", c.expectedFinalizers, addon.Finalizers)
 			}
 		})
 	}

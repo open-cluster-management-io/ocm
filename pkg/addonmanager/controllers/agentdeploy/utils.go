@@ -29,9 +29,16 @@ func addonHasFinalizer(addon *addonapiv1alpha1.ManagedClusterAddOn, finalizer st
 func addonRemoveFinalizer(addon *addonapiv1alpha1.ManagedClusterAddOn, finalizer string) bool {
 	var rst []string
 	for _, f := range addon.Finalizers {
-		if f != finalizer {
-			rst = append(rst, f)
+		if f == finalizer {
+			continue
 		}
+		// remove deperecated finalizers also
+		if f == addonapiv1alpha1.AddonDeprecatedHostingManifestFinalizer ||
+			f == addonapiv1alpha1.AddonDeprecatedPreDeleteHookFinalizer ||
+			f == addonapiv1alpha1.AddonDeprecatedHostingPreDeleteHookFinalizer {
+			continue
+		}
+		rst = append(rst, f)
 	}
 	if len(rst) != len(addon.Finalizers) {
 		addon.SetFinalizers(rst)
@@ -41,10 +48,20 @@ func addonRemoveFinalizer(addon *addonapiv1alpha1.ManagedClusterAddOn, finalizer
 }
 
 func addonAddFinalizer(addon *addonapiv1alpha1.ManagedClusterAddOn, finalizer string) bool {
-	rst := addon.Finalizers
-	if rst == nil {
+	if addon.Finalizers == nil {
 		addon.SetFinalizers([]string{finalizer})
 		return true
+	}
+
+	var rst []string
+	for _, f := range addon.Finalizers {
+		// remove deperecated finalizers also
+		if f == addonapiv1alpha1.AddonDeprecatedHostingManifestFinalizer ||
+			f == addonapiv1alpha1.AddonDeprecatedPreDeleteHookFinalizer ||
+			f == addonapiv1alpha1.AddonDeprecatedHostingPreDeleteHookFinalizer {
+			continue
+		}
+		rst = append(rst, f)
 	}
 
 	for _, f := range addon.Finalizers {
