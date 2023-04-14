@@ -49,6 +49,7 @@ type Tester struct {
 	bootstrapHubSecret               *corev1.Secret
 	EventuallyTimeout                time.Duration
 	EventuallyInterval               time.Duration
+	clusterManagerName               string
 	clusterManagerNamespace          string
 	klusterletDefaultNamespace       string
 	hubRegistrationDeployment        string
@@ -69,8 +70,9 @@ type Tester struct {
 func NewTester(kubeconfigPath string) *Tester {
 	var tester = Tester{
 		kubeconfigPath:                   kubeconfigPath,
-		EventuallyTimeout:                60 * time.Second, // seconds
-		EventuallyInterval:               1 * time.Second,  // seconds
+		EventuallyTimeout:                60 * time.Second,  // seconds
+		EventuallyInterval:               1 * time.Second,   // seconds
+		clusterManagerName:               "cluster-manager", // same name as deploy/cluster-manager/config/samples
 		clusterManagerNamespace:          helpers.ClusterManagerDefaultNamespace,
 		klusterletDefaultNamespace:       helpers.KlusterletDefaultNamespace,
 		hubRegistrationDeployment:        "cluster-manager-registration-controller",
@@ -582,14 +584,11 @@ func (t *Tester) CheckHubReady() error {
 }
 
 func (t *Tester) CheckClusterManagerStatus() error {
-	cms, err := t.OperatorClient.OperatorV1().ClusterManagers().List(context.TODO(), metav1.ListOptions{})
+
+	cm, err := t.OperatorClient.OperatorV1().ClusterManagers().Get(context.TODO(), t.clusterManagerName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	if len(cms.Items) == 0 {
-		return fmt.Errorf("ClusterManager not found")
-	}
-	cm := cms.Items[0]
 	if meta.IsStatusConditionFalse(cm.Status.Conditions, "Applied") {
 		return fmt.Errorf("components of cluster manager are not all applied")
 	}

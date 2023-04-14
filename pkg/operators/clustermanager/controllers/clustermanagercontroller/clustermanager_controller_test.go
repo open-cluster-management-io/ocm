@@ -312,7 +312,7 @@ func TestSyncDeploy(t *testing.T) {
 
 	// Check if resources are created as expected
 	// We expect create the namespace twice respectively in the management cluster and the hub cluster.
-	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 28)
+	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 27)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager)
 	}
@@ -394,7 +394,7 @@ func TestSyncDelete(t *testing.T) {
 			deleteKubeActions = append(deleteKubeActions, deleteKubeAction)
 		}
 	}
-	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 28) // delete namespace both from the hub cluster and the mangement cluster
+	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 27) // delete namespace both from the hub cluster and the mangement cluster
 
 	deleteCRDActions := []clienttesting.DeleteActionImpl{}
 	crdActions := tc.apiExtensionClient.Actions()

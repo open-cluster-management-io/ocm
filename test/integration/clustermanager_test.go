@@ -334,8 +334,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 44 {
-					return fmt.Errorf("should get 44 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 43 {
+					return fmt.Errorf("should get 43 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -392,8 +392,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 40 {
-					return fmt.Errorf("should get 40 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 39 {
+					return fmt.Errorf("should get 39 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -466,8 +466,8 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 40 {
-					return fmt.Errorf("should get 40 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 39 {
+					return fmt.Errorf("should get 39 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
