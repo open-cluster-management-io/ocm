@@ -82,14 +82,7 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 	}
 
 	// don't do work if the finalizer is not present
-	found := false
-	for i := range appliedManifestWork.Finalizers {
-		if appliedManifestWork.Finalizers[i] == controllers.AppliedManifestWorkFinalizer {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !helper.HasFinalizer(appliedManifestWork.Finalizers, controllers.AppliedManifestWorkFinalizer) {
 		return nil
 	}
 

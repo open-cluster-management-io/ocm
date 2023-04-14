@@ -2,6 +2,7 @@ package finalizercontroller
 
 import (
 	"context"
+	"open-cluster-management.io/work/pkg/helper"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
@@ -70,11 +71,10 @@ func (m *AddFinalizerController) syncManifestWork(ctx context.Context, originalM
 	}
 
 	// don't add finalizer to instances that already have it
-	for i := range manifestWork.Finalizers {
-		if manifestWork.Finalizers[i] == controllers.ManifestWorkFinalizer {
-			return nil
-		}
+	if helper.HasFinalizer(manifestWork.Finalizers, controllers.ManifestWorkFinalizer) {
+		return nil
 	}
+
 	// if this conflicts, we'll simply try again later
 	manifestWork.Finalizers = append(manifestWork.Finalizers, controllers.ManifestWorkFinalizer)
 	_, err := m.manifestWorkClient.Update(ctx, manifestWork, metav1.UpdateOptions{})

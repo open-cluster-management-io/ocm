@@ -2,6 +2,7 @@ package statuscontroller
 
 import (
 	"context"
+	"open-cluster-management.io/work/pkg/spoke/controllers"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -29,7 +30,10 @@ func TestSyncManifestWork(t *testing.T) {
 			name: "unknown available status from work whose manifests become empty",
 			workConditions: []metav1.Condition{
 				{
-					Type: string(workapiv1.WorkAvailable),
+					Type: workapiv1.WorkApplied,
+				},
+				{
+					Type: workapiv1.WorkAvailable,
 				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -38,12 +42,23 @@ func TestSyncManifestWork(t *testing.T) {
 				}
 
 				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
-				if len(work.Status.Conditions) != 1 {
-					t.Fatal(spew.Sdump(actions))
-				}
 
-				if !hasStatusCondition(work.Status.Conditions, string(workapiv1.WorkAvailable), metav1.ConditionUnknown) {
+				if !hasStatusCondition(work.Status.Conditions, workapiv1.WorkAvailable, metav1.ConditionUnknown) {
 					t.Fatal(spew.Sdump(work.Status.Conditions))
+				}
+			},
+		},
+		{
+			name: "No work applied condition",
+			existingResources: []runtime.Object{
+				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
+			},
+			manifests: []workapiv1.ManifestCondition{
+				newManifestWthCondition("", "v1", "secrets", "ns1", "n1"),
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 0 {
+					t.Fatal(spew.Sdump(actions))
 				}
 			},
 		},
@@ -57,7 +72,10 @@ func TestSyncManifestWork(t *testing.T) {
 			},
 			workConditions: []metav1.Condition{
 				{
-					Type:    string(workapiv1.WorkAvailable),
+					Type: workapiv1.WorkApplied,
+				},
+				{
+					Type:    workapiv1.WorkAvailable,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ResourcesAvailable",
 					Message: "All resources are available",
@@ -76,6 +94,11 @@ func TestSyncManifestWork(t *testing.T) {
 			},
 			manifests: []workapiv1.ManifestCondition{
 				newManifest("", "v1", "secrets", "ns1", "n1"),
+			},
+			workConditions: []metav1.Condition{
+				{
+					Type: workapiv1.WorkApplied,
+				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 1 {
@@ -104,6 +127,11 @@ func TestSyncManifestWork(t *testing.T) {
 				newManifest("", "v1", "secrets", "ns1", "n1"),
 				newManifest("", "v1", "secrets", "ns2", "n2"),
 			},
+			workConditions: []metav1.Condition{
+				{
+					Type: workapiv1.WorkApplied,
+				},
+			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 1 {
 					t.Fatal(spew.Sdump(actions))
@@ -120,7 +148,7 @@ func TestSyncManifestWork(t *testing.T) {
 					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests[1].Conditions))
 				}
 
-				if !hasStatusCondition(work.Status.Conditions, string(workapiv1.WorkAvailable), metav1.ConditionFalse) {
+				if !hasStatusCondition(work.Status.Conditions, workapiv1.WorkAvailable, metav1.ConditionFalse) {
 					t.Fatal(spew.Sdump(work.Status.Conditions))
 				}
 			},
@@ -133,6 +161,11 @@ func TestSyncManifestWork(t *testing.T) {
 			manifests: []workapiv1.ManifestCondition{
 				newManifest("", "v1", "secrets", "ns1", "n1"),
 				newManifest("", "", "", "", ""),
+			},
+			workConditions: []metav1.Condition{
+				{
+					Type: workapiv1.WorkApplied,
+				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 1 {
@@ -160,6 +193,7 @@ func TestSyncManifestWork(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			testingWork, _ := spoketesting.NewManifestWork(0)
+			testingWork.Finalizers = []string{controllers.ManifestWorkFinalizer}
 			testingWork.Status = workapiv1.ManifestWorkStatus{
 				Conditions: c.workConditions,
 				ResourceStatus: workapiv1.ManifestResourceStatus{
@@ -346,10 +380,14 @@ func TestStatusFeedback(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			testingWork, _ := spoketesting.NewManifestWork(0)
+			testingWork.Finalizers = []string{controllers.ManifestWorkFinalizer}
 			testingWork.Spec.ManifestConfigs = c.configOption
 			testingWork.Status = workapiv1.ManifestWorkStatus{
 				ResourceStatus: workapiv1.ManifestResourceStatus{
 					Manifests: c.manifests,
+				},
+				Conditions: []metav1.Condition{
+					{Type: workapiv1.WorkApplied},
 				},
 			}
 

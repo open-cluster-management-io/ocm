@@ -127,14 +127,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 
 	// don't do work if the finalizer is not present
 	// it ensures all maintained resources will be cleaned once manifestwork is deleted
-	found := false
-	for i := range manifestWork.Finalizers {
-		if manifestWork.Finalizers[i] == controllers.ManifestWorkFinalizer {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !helper.HasFinalizer(manifestWork.Finalizers, controllers.ManifestWorkFinalizer) {
 		return nil
 	}
 
@@ -245,6 +238,9 @@ func (m *ManifestWorkController) applyAppliedManifestWork(ctx context.Context, w
 	}
 
 	oldData, err := json.Marshal(workapiv1.AppliedManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			Finalizers: appliedManifestWork.Finalizers,
+		},
 		Spec: appliedManifestWork.Spec,
 	})
 	if err != nil {
@@ -255,6 +251,7 @@ func (m *ManifestWorkController) applyAppliedManifestWork(ctx context.Context, w
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             appliedManifestWork.UID,
 			ResourceVersion: appliedManifestWork.ResourceVersion,
+			Finalizers:      requiredAppliedWork.Finalizers,
 		}, // to ensure they appear in the patch as preconditions
 		Spec: requiredAppliedWork.Spec,
 	})
