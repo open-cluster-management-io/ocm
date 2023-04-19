@@ -31,7 +31,11 @@ PWD=$(shell pwd)
 # It will generate target "image-$(1)" for builing the image an binding it as a prerequisite to target "images".
 $(call build-image,work,$(IMAGE_REGISTRY)/work:$(IMAGE_TAG),./Dockerfile,.)
 
-verify:
+verify-gosec:
+	go install github.com/securego/gosec/v2/cmd/gosec@v2.15.0
+	gosec ./...
+
+verify: verify-gosec
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
 	golangci-lint run --timeout=3m --modules-download-mode vendor ./...
 
@@ -75,7 +79,7 @@ deploy-work-agent: ensure-kustomize create-cluster-ns hub-kubeconfig-secret
 	$(KUBECTL) config use-context $(SPOKE_KUBECONFIG_CONTEXT) --kubeconfig $(SPOKE_KUBECONFIG)
 	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) apply -f -
 	mv deploy/spoke/kustomization.yaml.tmp deploy/spoke/kustomization.yaml
-	$(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) apply -f deploy/spoke/role_extension-apiserver.yaml 
+	$(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) apply -f deploy/spoke/role_extension-apiserver.yaml
 	$(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) apply -f deploy/spoke/role_binding_extension-apiserver.yaml
 
 deploy-hub: ensure-kustomize
