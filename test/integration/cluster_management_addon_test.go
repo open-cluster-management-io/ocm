@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -43,6 +44,7 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 				SignerName: certificatesv1.KubeAPIServerClientSignerName,
 			},
 		}
+
 	})
 
 	ginkgo.AfterEach(func() {
@@ -54,17 +56,6 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 	})
 
 	ginkgo.It("Should update config related object successfully", func() {
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testAddonImpl.name,
-			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
-				InstallNamespace: "test",
-			},
-		}
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
 		// Create clustermanagement addon
 		clusterManagementAddon := &addonapiv1alpha1.ClusterManagementAddOn{
 			ObjectMeta: metav1.ObjectMeta{
@@ -79,12 +70,24 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(), clusterManagementAddon, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+		// Create managed cluster addon
+		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: testAddonImpl.name,
+			},
+			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+				InstallNamespace: "test",
+			},
+		}
+		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 		gomega.Eventually(func() error {
 			actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
-			if meta.IsStatusConditionTrue(actual.Status.Conditions, "RegistrationApplied") {
+			if !meta.IsStatusConditionTrue(actual.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied) {
 				return fmt.Errorf("expected RegistrationApplied condition to be true")
 			}
 			if actual.Status.Namespace != "test" {

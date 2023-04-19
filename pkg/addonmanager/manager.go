@@ -156,7 +156,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 		a.addonAgents,
 	)
 
-	registrationController := registration.NewAddonConfigurationController(
+	registrationController := registration.NewAddonRegistrationController(
 		addonClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),

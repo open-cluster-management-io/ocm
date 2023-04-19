@@ -170,6 +170,7 @@ func (f *internalWorkBuilder) buildManifestWorks(objects []runtime.Object) (appl
 	for workIndex := 0; workIndex < len(f.existingManifestWorks); workIndex++ {
 		work := f.existingManifestWorks[workIndex].DeepCopy()
 		f.setManifestWorkOptions(work)
+		f.setAnnotations(work)
 		work.Spec.Workload.Manifests = []workapiv1.Manifest{}
 		for manifestIndex := 0; manifestIndex < len(f.existingManifestWorks[workIndex].Spec.Workload.Manifests); manifestIndex++ {
 			manifest := f.existingManifestWorks[workIndex].Spec.Workload.Manifests[manifestIndex]

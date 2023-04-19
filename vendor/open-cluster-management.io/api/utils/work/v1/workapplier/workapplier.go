@@ -62,11 +62,14 @@ func (w *WorkApplier) Apply(ctx context.Context, work *workapiv1.ManifestWork) (
 		return existingWork, nil
 	}
 
-	if ManifestWorkSpecEqual(work.Spec, existingWork.Spec) {
+	if ManifestWorkEqual(work, existingWork) {
 		return existingWork, nil
 	}
 
 	oldData, err := json.Marshal(&workapiv1.ManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: existingWork.Annotations,
+		},
 		Spec: existingWork.Spec,
 	})
 	if err != nil {
@@ -77,6 +80,7 @@ func (w *WorkApplier) Apply(ctx context.Context, work *workapiv1.ManifestWork) (
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             existingWork.UID,
 			ResourceVersion: existingWork.ResourceVersion,
+			Annotations:     work.Annotations,
 		},
 		Spec: work.Spec,
 	})
@@ -124,14 +128,17 @@ func manifestsEqual(new, old []workapiv1.Manifest) bool {
 	return true
 }
 
-func ManifestWorkSpecEqual(new, old workapiv1.ManifestWorkSpec) bool {
-	if !manifestsEqual(new.Workload.Manifests, old.Workload.Manifests) {
+func ManifestWorkEqual(new, old *workapiv1.ManifestWork) bool {
+	if !manifestsEqual(new.Spec.Workload.Manifests, old.Spec.Workload.Manifests) {
 		return false
 	}
-	if !equality.Semantic.DeepEqual(new.ManifestConfigs, old.ManifestConfigs) {
+	if !equality.Semantic.DeepEqual(new.Spec.ManifestConfigs, old.Spec.ManifestConfigs) {
 		return false
 	}
-	if !equality.Semantic.DeepEqual(new.DeleteOption, old.DeleteOption) {
+	if !equality.Semantic.DeepEqual(new.Spec.DeleteOption, old.Spec.DeleteOption) {
+		return false
+	}
+	if !equality.Semantic.DeepEqual(new.Annotations, old.Annotations) {
 		return false
 	}
 	return true

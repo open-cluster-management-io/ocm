@@ -99,6 +99,9 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 	for _, config := range desiredConfigMap {
 		var match bool
 		for i := range mergedConfigs {
+			if mergedConfigs[i].DesiredConfig == nil {
+				continue
+			}
 			if mergedConfigs[i].ConfigGroupResource != config.ConfigGroupResource {
 				continue
 			}

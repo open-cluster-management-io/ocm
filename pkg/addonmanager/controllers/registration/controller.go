@@ -27,21 +27,21 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 )
 
-// addonConfigurationController reconciles instances of ManagedClusterAddon on the hub.
-type addonConfigurationController struct {
+// addonRegistrationController reconciles instances of ManagedClusterAddon on the hub.
+type addonRegistrationController struct {
 	addonClient               addonv1alpha1client.Interface
 	managedClusterLister      clusterlister.ManagedClusterLister
 	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
 	agentAddons               map[string]agent.AgentAddon
 }
 
-func NewAddonConfigurationController(
+func NewAddonRegistrationController(
 	addonClient addonv1alpha1client.Interface,
 	clusterInformers clusterinformers.ManagedClusterInformer,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	agentAddons map[string]agent.AgentAddon,
 ) factory.Controller {
-	c := &addonConfigurationController{
+	c := &addonRegistrationController{
 		addonClient:               addonClient,
 		managedClusterLister:      clusterInformers.Lister(),
 		managedClusterAddonLister: addonInformers.Lister(),
@@ -65,7 +65,7 @@ func NewAddonConfigurationController(
 		WithSync(c.sync).ToController("addon-registration-controller")
 }
 
-func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
+func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
 	klog.V(4).Infof("Reconciling addon registration %q", key)
 
 	clusterName, addonName, err := cache.SplitMetaNamespaceKey(key)
@@ -115,9 +115,9 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 	registrationOption := agentAddon.GetAgentAddonOptions().Registration
 	if registrationOption == nil {
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-			Type:    "RegistrationApplied",
+			Type:    addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied,
 			Status:  metav1.ConditionTrue,
-			Reason:  "NilRegistration",
+			Reason:  addonapiv1alpha1.RegistrationAppliedNilRegistration,
 			Message: "Registration of the addon agent is configured",
 		})
 		return c.patchAddonStatus(ctx, managedClusterAddonCopy, managedClusterAddon)
@@ -127,9 +127,9 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 		err = registrationOption.PermissionConfig(managedCluster, managedClusterAddon)
 		if err != nil {
 			meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-				Type:    "RegistrationApplied",
+				Type:    addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied,
 				Status:  metav1.ConditionFalse,
-				Reason:  "SetPermissionFailed",
+				Reason:  addonapiv1alpha1.RegistrationAppliedSetPermissionFailed,
 				Message: fmt.Sprintf("Failed to set permission for hub agent: %v", err),
 			})
 			if patchErr := c.patchAddonStatus(ctx, managedClusterAddonCopy, managedClusterAddon); patchErr != nil {
@@ -141,9 +141,9 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 
 	if registrationOption.CSRConfigurations == nil {
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-			Type:    "RegistrationApplied",
+			Type:    addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied,
 			Status:  metav1.ConditionTrue,
-			Reason:  "NilRegistration",
+			Reason:  addonapiv1alpha1.RegistrationAppliedNilRegistration,
 			Message: "Registration of the addon agent is configured",
 		})
 		return c.patchAddonStatus(ctx, managedClusterAddonCopy, managedClusterAddon)
@@ -157,10 +157,17 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 		managedClusterAddonCopy.Status.Namespace = managedClusterAddonCopy.Spec.InstallNamespace
 	}
 
+	meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
+		Type:    addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied,
+		Status:  metav1.ConditionTrue,
+		Reason:  addonapiv1alpha1.RegistrationAppliedSetPermissionApplied,
+		Message: "Registration of the addon agent is configured",
+	})
+
 	return c.patchAddonStatus(ctx, managedClusterAddonCopy, managedClusterAddon)
 }
 
-func (c *addonConfigurationController) patchAddonStatus(ctx context.Context, new, old *addonapiv1alpha1.ManagedClusterAddOn) error {
+func (c *addonRegistrationController) patchAddonStatus(ctx context.Context, new, old *addonapiv1alpha1.ManagedClusterAddOn) error {
 	if equality.Semantic.DeepEqual(new.Status.Registrations, old.Status.Registrations) &&
 		equality.Semantic.DeepEqual(new.Status.Conditions, old.Status.Conditions) &&
 		equality.Semantic.DeepEqual(new.Status.SupportedConfigs, old.Status.SupportedConfigs) &&
