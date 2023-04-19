@@ -42,7 +42,11 @@ update: copy-crd
 copy-crd:
 	bash -x hack/copy-crds.sh
 
-verify: verify-crds
+verify: verify-crds verify-gosec
+
+verify-gosec:
+	go install github.com/securego/gosec/v2/cmd/gosec@v2.15.0
+	gosec -exclude-dir=testing -exclude-dir=debugger ./...
 
 verify-crds:
 	bash -x hack/verify-crds.sh
