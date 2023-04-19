@@ -52,7 +52,7 @@ func (v *v1beta1CSRControl) getIssuedCertificate(name string) ([]byte, error) {
 	return v1beta1CSR.Status.Certificate, nil
 }
 
-func (v *v1beta1CSRControl) create(ctx context.Context, recorder events.Recorder, objMeta metav1.ObjectMeta, csrData []byte, signerName string) (string, error) {
+func (v *v1beta1CSRControl) create(ctx context.Context, recorder events.Recorder, objMeta metav1.ObjectMeta, csrData []byte, signerName string, expirationSeconds *int32) (string, error) {
 	csr := &certificates.CertificateSigningRequest{
 		ObjectMeta: objMeta,
 		Spec: certificates.CertificateSigningRequestSpec{
@@ -62,7 +62,8 @@ func (v *v1beta1CSRControl) create(ctx context.Context, recorder events.Recorder
 				certificates.UsageKeyEncipherment,
 				certificates.UsageClientAuth,
 			},
-			SignerName: &signerName,
+			SignerName:        &signerName,
+			ExpirationSeconds: expirationSeconds,
 		},
 	}
 

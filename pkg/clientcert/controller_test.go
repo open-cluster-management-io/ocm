@@ -268,7 +268,7 @@ type mockCSRControl struct {
 	csrClient      *clienttesting.Fake
 }
 
-func (m *mockCSRControl) create(ctx context.Context, recorder events.Recorder, objMeta metav1.ObjectMeta, csrData []byte, signerName string) (string, error) {
+func (m *mockCSRControl) create(ctx context.Context, recorder events.Recorder, objMeta metav1.ObjectMeta, csrData []byte, signerName string, expirationSeconds *int32) (string, error) {
 	mockCSR := &unstructured.Unstructured{}
 	_, err := m.csrClient.Invokes(clienttesting.CreateActionImpl{
 		ActionImpl: clienttesting.ActionImpl{

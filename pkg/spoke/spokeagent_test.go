@@ -186,6 +186,34 @@ func TestValidate(t *testing.T) {
 			options:     defaultCompletedOptions,
 			expectedErr: "",
 		},
+		{
+			name: "default completed options",
+			options: &SpokeAgentOptions{
+				HubKubeconfigSecret:         "hub-kubeconfig-secret",
+				HubKubeconfigDir:            "/spoke/hub-kubeconfig",
+				ClusterHealthCheckPeriod:    1 * time.Minute,
+				MaxCustomClusterClaims:      20,
+				BootstrapKubeconfig:         "/spoke/bootstrap/kubeconfig",
+				ClusterName:                 "testcluster",
+				AgentName:                   "testagent",
+				ClientCertExpirationSeconds: 599,
+			},
+			expectedErr: "client certificate expiration seconds must greater or qual to 600",
+		},
+		{
+			name: "default completed options",
+			options: &SpokeAgentOptions{
+				HubKubeconfigSecret:         "hub-kubeconfig-secret",
+				HubKubeconfigDir:            "/spoke/hub-kubeconfig",
+				ClusterHealthCheckPeriod:    1 * time.Minute,
+				MaxCustomClusterClaims:      20,
+				BootstrapKubeconfig:         "/spoke/bootstrap/kubeconfig",
+				ClusterName:                 "testcluster",
+				AgentName:                   "testagent",
+				ClientCertExpirationSeconds: 600,
+			},
+			expectedErr: "",
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

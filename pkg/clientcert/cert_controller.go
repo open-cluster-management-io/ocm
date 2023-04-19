@@ -62,6 +62,18 @@ type CSROption struct {
 	// SignerName is the name of the signer specified in the created csrs
 	SignerName string
 
+	// ExpirationSeconds is the requested duration of validity of the issued
+	// certificate.
+	// Certificate signers may not honor this field for various reasons:
+	//
+	//   1. Old signer that is unaware of the field (such as the in-tree
+	//      implementations prior to v1.22)
+	//   2. Signer whose configured maximum is shorter than the requested duration
+	//   3. Signer whose configured minimum is longer than the requested duration
+	//
+	// The minimum valid value for expirationSeconds is 600, i.e. 10 minutes.
+	ExpirationSeconds *int32
+
 	// EventFilterFunc matches csrs created with above options
 	EventFilterFunc factory.EventFilterFunc
 
@@ -324,7 +336,7 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 	if err != nil {
 		return fmt.Errorf("unable to generate certificate request: %w", err)
 	}
-	createdCSRName, err := c.csrControl.create(ctx, syncCtx.Recorder(), c.ObjectMeta, csrData, c.SignerName)
+	createdCSRName, err := c.csrControl.create(ctx, syncCtx.Recorder(), c.ObjectMeta, csrData, c.SignerName, c.ExpirationSeconds)
 	if err != nil {
 		return err
 	}
