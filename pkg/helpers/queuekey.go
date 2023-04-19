@@ -37,7 +37,7 @@ const (
 
 	RegistrationWebhookSecret  = "registration-webhook-serving-cert"
 	RegistrationWebhookService = "cluster-manager-registration-webhook"
-	WorkWebhookSecret          = "work-webhook-serving-cert"
+	WorkWebhookSecret          = "work-webhook-serving-cert" // #nosec G101
 	WorkWebhookService         = "cluster-manager-work-webhook"
 )
 

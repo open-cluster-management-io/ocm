@@ -3,9 +3,10 @@ package klusterletcontroller
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ocmfeature "open-cluster-management.io/api/feature"
-	"strings"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -40,7 +41,7 @@ const (
 	klusterletApplied                     = "Applied"
 	klusterletReadyToApply                = "ReadyToApply"
 	hubConnectionDegraded                 = "HubConnectionDegraded"
-	hubKubeConfigSecretMissing            = "HubKubeConfigSecretMissing"
+	hubKubeConfigSecretMissing            = "HubKubeConfigSecretMissing" // #nosec G101
 	appliedManifestWorkFinalizer          = "cluster.open-cluster-management.io/applied-manifest-work-cleanup"
 	managedResourcesEvictionTimestampAnno = "operator.open-cluster-management.io/managed-resources-eviction-timestamp"
 )

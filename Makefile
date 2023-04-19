@@ -87,7 +87,11 @@ verify-gocilint:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
 	golangci-lint run --timeout=3m --modules-download-mode vendor ./...
 
-verify: verify-crds verify-gocilint
+verify-gosec:
+	go install github.com/securego/gosec/v2/cmd/gosec@v2.15.0
+	gosec -exclude-dir=test ./...
+
+verify: verify-crds verify-gocilint verify-gosec
 
 update-csv: ensure-operator-sdk
 	cd deploy/cluster-manager && ../../$(OPERATOR_SDK) generate bundle --manifests --deploy-dir config/ --crds-dir config/crds/ --output-dir olm-catalog/cluster-manager/ --version $(CSV_VERSION)
