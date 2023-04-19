@@ -399,7 +399,7 @@ func jitter(percentage float64, maxFactor float64) float64 {
 	if maxFactor <= 0.0 {
 		maxFactor = 1.0
 	}
-	newPercentage := percentage + percentage*rand.Float64()*maxFactor
+	newPercentage := percentage + percentage*rand.Float64()*maxFactor //#nosec G404
 	return newPercentage
 }
 

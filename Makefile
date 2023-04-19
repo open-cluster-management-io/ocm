@@ -39,6 +39,10 @@ verify-gocilint:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
 	golangci-lint run --timeout=3m --modules-download-mode vendor ./...
 
+verify-gosec:
+	go install github.com/securego/gosec/v2/cmd/gosec@v2.15.0
+	gosec -exclude-dir=testing -exclude-dir=test ./...
+
 update-crds:
 	bash -x hack/copy-crds.sh
 
@@ -47,7 +51,7 @@ update: update-crds
 verify-crds:
 	bash -x hack/verify-crds.sh
 
-verify: verify-crds verify-gocilint
+verify: verify-crds verify-gocilint verify-gosec
 
 deploy-hub: ensure-kustomize
 	cp deploy/hub/kustomization.yaml deploy/hub/kustomization.yaml.tmp
@@ -94,7 +98,7 @@ deploy-spoke: ensure-kustomize
 	$(KUBECTL) config use-context $(SPOKE_KUBECONFIG_CONTEXT) --kubeconfig $(SPOKE_KUBECONFIG)
 	$(KUSTOMIZE) build deploy/spoke | $(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) apply -f -
 	mv deploy/spoke/kustomization.yaml.tmp deploy/spoke/kustomization.yaml
-	$(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) apply -f deploy/spoke/role_extension-apiserver.yaml 
+	$(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) apply -f deploy/spoke/role_extension-apiserver.yaml
 	$(KUBECTL) --kubeconfig $(SPOKE_KUBECONFIG) apply -f deploy/spoke/role_binding_extension-apiserver.yaml
 
 clean-hub:
