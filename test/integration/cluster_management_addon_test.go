@@ -85,10 +85,10 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 				return err
 			}
 			if meta.IsStatusConditionTrue(actual.Status.Conditions, "RegistrationApplied") {
-				return fmt.Errorf("Expected RegistrationApplied condition to be true")
+				return fmt.Errorf("expected RegistrationApplied condition to be true")
 			}
 			if actual.Status.Namespace != "test" {
-				return fmt.Errorf("Expected namespace in status is not correct, actual %s", actual.Status.Namespace)
+				return fmt.Errorf("expected namespace in status is not correct, actual: %s", actual.Status.Namespace)
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
