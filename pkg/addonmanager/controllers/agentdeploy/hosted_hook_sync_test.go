@@ -42,7 +42,8 @@ func TestHostingHookReconcile(t *testing.T) {
 			name: "deploy hook manifest for a created addon, add finalizer",
 			key:  "cluster1/test",
 			addon: []runtime.Object{
-				addontesting.NewHostedModeAddonWithFinalizer("test", "cluster1", "cluster2")},
+				addontesting.NewHostedModeAddonWithFinalizer("test", "cluster1", "cluster2",
+					registrationAppliedCondition)},
 			cluster: []runtime.Object{
 				addontesting.NewManagedCluster("cluster1"),
 				addontesting.NewManagedCluster("cluster2"),
@@ -68,7 +69,8 @@ func TestHostingHookReconcile(t *testing.T) {
 			key:  "cluster1/test",
 			addon: []runtime.Object{
 				addontesting.SetAddonFinalizers(
-					addontesting.NewHostedModeAddon("test", "cluster1", "cluster2"),
+					addontesting.NewHostedModeAddon("test", "cluster1", "cluster2",
+						registrationAppliedCondition),
 					addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer, addonapiv1alpha1.AddonHostingManifestFinalizer)},
 			cluster: []runtime.Object{
 				addontesting.NewManagedCluster("cluster1"),
@@ -91,7 +93,8 @@ func TestHostingHookReconcile(t *testing.T) {
 			addon: []runtime.Object{
 				addontesting.SetAddonFinalizers(
 					addontesting.SetAddonDeletionTimestamp(
-						addontesting.NewHostedModeAddon("test", "cluster1", "cluster2"), time.Now()),
+						addontesting.NewHostedModeAddon("test", "cluster1", "cluster2",
+							registrationAppliedCondition), time.Now()),
 					addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer, addonapiv1alpha1.AddonHostingManifestFinalizer),
 			},
 			cluster: []runtime.Object{
@@ -131,7 +134,8 @@ func TestHostingHookReconcile(t *testing.T) {
 			addon: []runtime.Object{
 				addontesting.SetAddonFinalizers(
 					addontesting.SetAddonDeletionTimestamp(
-						addontesting.NewHostedModeAddon("test", "cluster1", "cluster2"), time.Now()),
+						addontesting.NewHostedModeAddon("test", "cluster1", "cluster2",
+							registrationAppliedCondition), time.Now()),
 					addonapiv1alpha1.AddonHostingManifestFinalizer, addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer),
 			},
 			cluster: []runtime.Object{
@@ -228,7 +232,8 @@ func TestHostingHookReconcile(t *testing.T) {
 			addon: []runtime.Object{
 				addontesting.SetAddonFinalizers(
 					addontesting.SetAddonDeletionTimestamp(
-						addontesting.NewHostedModeAddon("test", "cluster1", "cluster2"), time.Now()),
+						addontesting.NewHostedModeAddon("test", "cluster1", "cluster2",
+							registrationAppliedCondition), time.Now()),
 					addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer),
 			},
 			cluster: []runtime.Object{

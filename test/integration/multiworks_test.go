@@ -112,12 +112,21 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: managedClusterName}}
 		_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		cma := newClusterManagementAddon(testMultiWorksAddonImpl.name)
+		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(),
+			cma, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.AfterEach(func() {
 		err = hubKubeClient.CoreV1().Namespaces().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(),
+			testMultiWorksAddonImpl.name, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
@@ -375,6 +384,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 			work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), workName, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "WorkAvailable"})
+			meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "WorkApplied"})
 			// update work0 status to a wrong feedback status
 			work.Status.ResourceStatus = workapiv1.ManifestResourceStatus{
 				Manifests: []workapiv1.ManifestCondition{

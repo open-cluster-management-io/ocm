@@ -42,7 +42,7 @@ func TestDefaultHookReconcile(t *testing.T) {
 		{
 			name:    "deploy hook manifest for a created addon, add finalizer",
 			key:     "cluster1/test",
-			addon:   []runtime.Object{addontesting.NewAddon("test", "cluster1")},
+			addon:   []runtime.Object{addontesting.NewAddonWithConditions("test", "cluster1", registrationAppliedCondition)},
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			testaddon: &testAgent{name: "test", objects: []runtime.Object{
 				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
@@ -69,7 +69,7 @@ func TestDefaultHookReconcile(t *testing.T) {
 			key:  "cluster1/test",
 			addon: []runtime.Object{
 				func() runtime.Object {
-					addon := addontesting.NewAddon("test", "cluster1")
+					addon := addontesting.NewAddonWithConditions("test", "cluster1", registrationAppliedCondition)
 					addon.SetFinalizers([]string{addonapiv1alpha1.AddonPreDeleteHookFinalizer})
 					addon.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 					return addon
@@ -106,7 +106,9 @@ func TestDefaultHookReconcile(t *testing.T) {
 			key:  "cluster1/test",
 			addon: []runtime.Object{
 				addontesting.SetAddonFinalizers(
-					addontesting.SetAddonDeletionTimestamp(addontesting.NewAddon("test", "cluster1"), time.Now()),
+					addontesting.SetAddonDeletionTimestamp(
+						addontesting.NewAddonWithConditions("test", "cluster1", registrationAppliedCondition),
+						time.Now()),
 					addonapiv1alpha1.AddonPreDeleteHookFinalizer),
 			},
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
@@ -120,6 +122,18 @@ func TestDefaultHookReconcile(t *testing.T) {
 						"cluster1",
 						addontesting.NewHookJob("test", "default"),
 					)
+					work.SetLabels(map[string]string{addonapiv1alpha1.AddonLabelKey: "test"})
+					pTrue := true
+					work.SetOwnerReferences([]metav1.OwnerReference{
+						{
+							APIVersion:         "addon.open-cluster-management.io/v1alpha1",
+							Kind:               "ManagedClusterAddOn",
+							Name:               "test",
+							UID:                "",
+							Controller:         &pTrue,
+							BlockOwnerDeletion: &pTrue,
+						},
+					})
 					work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
 						{
 							ResourceIdentifier: workapiv1.ResourceIdentifier{
@@ -187,7 +201,9 @@ func TestDefaultHookReconcile(t *testing.T) {
 			name: "deploy hook manifest for a deleting addon without finalizer, completed",
 			key:  "cluster1/test",
 			addon: []runtime.Object{
-				addontesting.SetAddonDeletionTimestamp(addontesting.NewAddon("test", "cluster1"), time.Now())},
+				addontesting.SetAddonDeletionTimestamp(
+					addontesting.NewAddonWithConditions("test", "cluster1", registrationAppliedCondition),
+					time.Now())},
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			testaddon: &testAgent{name: "test", objects: []runtime.Object{
 				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),

@@ -87,23 +87,37 @@ func NewAddon(name, namespace string, owners ...metav1.OwnerReference) *addonapi
 		},
 	}
 }
-
-func NewHostedModeAddon(name, namespace string, hostingCluster string,
-	owners ...metav1.OwnerReference) *addonapiv1alpha1.ManagedClusterAddOn {
+func NewAddonWithConditions(name, namespace string, conditions ...metav1.Condition) *addonapiv1alpha1.ManagedClusterAddOn {
 	return &addonapiv1alpha1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            name,
-			Namespace:       namespace,
-			OwnerReferences: owners,
-			Annotations:     map[string]string{addonapiv1alpha1.HostingClusterNameAnnotationKey: hostingCluster},
+			Name:      name,
+			Namespace: namespace,
+		},
+		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+			Conditions: conditions,
+		},
+	}
+}
+
+func NewHostedModeAddon(name, namespace string, hostingCluster string,
+	conditions ...metav1.Condition) *addonapiv1alpha1.ManagedClusterAddOn {
+	return &addonapiv1alpha1.ManagedClusterAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Namespace:   namespace,
+			Annotations: map[string]string{addonapiv1alpha1.HostingClusterNameAnnotationKey: hostingCluster},
+		},
+		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+			Conditions: conditions,
 		},
 	}
 }
 
 func NewHostedModeAddonWithFinalizer(name, namespace string, hostingCluster string,
-	owners ...metav1.OwnerReference) *addonapiv1alpha1.ManagedClusterAddOn {
+	conditions ...metav1.Condition) *addonapiv1alpha1.ManagedClusterAddOn {
 	addon := NewHostedModeAddon(name, namespace, hostingCluster)
 	addon.SetFinalizers([]string{addonapiv1alpha1.AddonHostingManifestFinalizer})
+	addon.Status.Conditions = conditions
 	return addon
 }
 

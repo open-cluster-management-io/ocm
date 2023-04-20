@@ -27,7 +27,6 @@ import (
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addonconfig"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addonhealthcheck"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addoninstall"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/agentdeploy"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/certificate"
@@ -170,13 +169,6 @@ func (a *addonManager) Start(ctx context.Context) error {
 		a.addonAgents,
 	)
 
-	addonHealthCheckController := addonhealthcheck.NewAddonHealthCheckController(
-		addonClient,
-		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
-		workInformers.Work().V1().ManifestWorks(),
-		a.addonAgents,
-	)
-
 	// This is a duplicate controller in general addon-manager. This should be removed when we
 	// alway enable the addon-manager
 	addonOwnerController := addonowner.NewAddonOwnerController(
@@ -272,7 +264,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 	go deployController.Run(ctx, 1)
 	go registrationController.Run(ctx, 1)
 	go addonInstallController.Run(ctx, 1)
-	go addonHealthCheckController.Run(ctx, 1)
+
 	go addonOwnerController.Run(ctx, 1)
 	if addonConfigController != nil {
 		go addonConfigController.Run(ctx, 1)

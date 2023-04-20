@@ -3,6 +3,9 @@ package integration
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/types"
+	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -13,11 +16,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
-	"open-cluster-management.io/addon-framework/pkg/agent"
-	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -99,12 +99,21 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: managedClusterName}}
 		_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		cma := newClusterManagementAddon(testAddonImpl.name)
+		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(),
+			cma, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 	})
 
 	ginkgo.AfterEach(func() {
 		err = hubKubeClient.CoreV1().Namespaces().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(),
+			testAddonImpl.name, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
@@ -147,7 +156,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		// Update work status to trigger addon status
 		work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: "Applied", Status: metav1.ConditionTrue, Reason: "WorkApplied"})
+		meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "WorkApplied"})
 		_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -277,6 +286,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 				},
 			},
 		}
+		meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "WorkApplied"})
 		_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 

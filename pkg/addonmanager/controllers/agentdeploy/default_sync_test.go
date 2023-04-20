@@ -28,6 +28,20 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/agent"
 )
 
+var registrationAppliedCondition = metav1.Condition{
+	Type:    addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied,
+	Status:  metav1.ConditionTrue,
+	Reason:  addonapiv1alpha1.RegistrationAppliedSetPermissionApplied,
+	Message: "Registration of the addon agent is configured",
+}
+
+var mainfestWorkAppliedCondition = metav1.Condition{
+	Type:    addonapiv1alpha1.ManagedClusterAddOnManifestApplied,
+	Status:  metav1.ConditionTrue,
+	Reason:  addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied,
+	Message: "Registration of the addon agent is configured",
+}
+
 type testAgent struct {
 	name    string
 	objects []runtime.Object
@@ -81,27 +95,12 @@ func TestDefaultReconcile(t *testing.T) {
 		{
 			name:    "deploy manifests for an addon",
 			key:     "cluster1/test",
-			addon:   []runtime.Object{addontesting.NewAddon("test", "cluster1")},
+			addon:   []runtime.Object{addontesting.NewAddonWithConditions("test", "cluster1", registrationAppliedCondition)},
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			testaddon: &testAgent{name: "test", objects: []runtime.Object{
 				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
 			}},
-			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch")
-				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
-				err := json.Unmarshal(patch, addOn)
-				if err != nil {
-					t.Fatal(err)
-				}
-				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied)
-				if addOnCond == nil {
-					t.Fatal("condition should not be nil")
-				}
-				if addOnCond.Reason != addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplyFailed {
-					t.Errorf("Condition Reason is not correct: %v", addOnCond.Reason)
-				}
-			},
+			validateAddonActions: addontesting.AssertNoActions,
 			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "create")
 			},
@@ -109,7 +108,7 @@ func TestDefaultReconcile(t *testing.T) {
 		{
 			name:    "update manifest for an addon",
 			key:     "cluster1/test",
-			addon:   []runtime.Object{addontesting.NewAddon("test", "cluster1")},
+			addon:   []runtime.Object{addontesting.NewAddonWithConditions("test", "cluster1", registrationAppliedCondition)},
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			testaddon: &testAgent{name: "test", objects: []runtime.Object{
 				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
@@ -152,7 +151,7 @@ func TestDefaultReconcile(t *testing.T) {
 		{
 			name:    "do not update manifest for an addon",
 			key:     "cluster1/test",
-			addon:   []runtime.Object{addontesting.NewAddon("test", "cluster1")},
+			addon:   []runtime.Object{addontesting.NewAddonWithConditions("test", "cluster1", registrationAppliedCondition)},
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			testaddon: &testAgent{name: "test", objects: []runtime.Object{
 				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
@@ -167,6 +166,17 @@ func TestDefaultReconcile(t *testing.T) {
 				)
 				work.SetLabels(map[string]string{
 					addonapiv1alpha1.AddonLabelKey: "test",
+				})
+				pTrue := true
+				work.SetOwnerReferences([]metav1.OwnerReference{
+					{
+						APIVersion:         "addon.open-cluster-management.io/v1alpha1",
+						Kind:               "ManagedClusterAddOn",
+						Name:               "test",
+						UID:                "",
+						Controller:         &pTrue,
+						BlockOwnerDeletion: &pTrue,
+					},
 				})
 				work.Status.Conditions = []metav1.Condition{
 					{
@@ -193,7 +203,7 @@ func TestDefaultReconcile(t *testing.T) {
 		{
 			name:    "get error when run manifest from agent",
 			key:     "cluster1/test",
-			addon:   []runtime.Object{addontesting.NewAddon("test", "cluster1")},
+			addon:   []runtime.Object{addontesting.NewAddonWithConditions("test", "cluster1", registrationAppliedCondition)},
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			testaddon: &testAgent{
 				name: "test",

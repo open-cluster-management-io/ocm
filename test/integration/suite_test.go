@@ -8,6 +8,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -191,4 +192,18 @@ func (t *testAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 	}
 
 	return option
+}
+
+func newClusterManagementAddon(name string) *addonapiv1alpha1.ClusterManagementAddOn {
+	return &addonapiv1alpha1.ClusterManagementAddOn{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
+			InstallStrategy: addonapiv1alpha1.InstallStrategy{
+				Type: addonapiv1alpha1.AddonInstallStrategyManual,
+			},
+		},
+	}
 }

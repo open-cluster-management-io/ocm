@@ -112,6 +112,11 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 		ns = &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: hostingClusterName}}
 		_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		cma := newClusterManagementAddon(testHostedAddonImpl.name)
+		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(),
+			cma, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.AfterEach(func() {
