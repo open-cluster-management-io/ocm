@@ -1,4 +1,4 @@
-package managementaddonstatus
+package managementaddoninstallprogression
 
 import (
 	"context"
@@ -234,7 +234,7 @@ func TestReconcile(t *testing.T) {
 				}
 			}
 
-			controller := managementAddonStatusController{
+			controller := managementAddonInstallProgressionController{
 				addonClient:                  fakeAddonClient,
 				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
 				managedClusterAddonLister:    addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),

@@ -525,28 +525,11 @@ func configsToAnnotations(configReference []addonapiv1alpha1.ConfigReference) (m
 		return nil, nil
 	}
 
-	// annotations is a map stores the config name and config spec hash.
-	//
-	// config name follows the format of <resource>.<group>/<namespace>/<name>, for example,
-	// addondeploymentconfigs.addon.open-cluster-management.io/open-cluster-management/default.
-	// for a cluster scoped resource, the namespace would be empty, for example,
-	// addonhubconfigs.addon.open-cluster-management.io//default.
-	annotations := make(map[string]string, len(configReference))
-	for _, v := range configReference {
-		if v.DesiredConfig == nil {
-			continue
-		}
-		resourceStr := v.Resource
-		if len(v.Group) > 0 {
-			resourceStr += fmt.Sprintf(".%s", v.Group)
-		}
-		resourceStr += fmt.Sprintf("/%s/%s", v.DesiredConfig.Namespace, v.DesiredConfig.Name)
+	// converts the configReference into a map, key is config name, value is spec hash.
+	specHashMap := ConfigsToMap(configReference)
 
-		annotations[resourceStr] = v.DesiredConfig.SpecHash
-	}
-
-	// converts the annotations map into a JSON byte string.
-	jsonBytes, err := json.Marshal(annotations)
+	// converts the map into a JSON byte string.
+	jsonBytes, err := json.Marshal(specHashMap)
 	if err != nil {
 		return nil, err
 	}
@@ -558,4 +541,27 @@ func configsToAnnotations(configReference []addonapiv1alpha1.ConfigReference) (m
 	return map[string]string{
 		workapiv1.ManifestConfigSpecHashAnnotationKey: string(jsonBytes),
 	}, nil
+}
+
+// configsToMap returns a map stores the config name as the key and config spec hash as the value.
+func ConfigsToMap(configReference []addonapiv1alpha1.ConfigReference) map[string]string {
+	// config name follows the format of <resource>.<group>/<namespace>/<name>, for example,
+	// addondeploymentconfigs.addon.open-cluster-management.io/open-cluster-management/default.
+	// for a cluster scoped resource, the namespace would be empty, for example,
+	// addonhubconfigs.addon.open-cluster-management.io//default.
+	specHashMap := make(map[string]string, len(configReference))
+	for _, v := range configReference {
+		if v.DesiredConfig == nil {
+			continue
+		}
+		resourceStr := v.Resource
+		if len(v.Group) > 0 {
+			resourceStr += fmt.Sprintf(".%s", v.Group)
+		}
+		resourceStr += fmt.Sprintf("/%s/%s", v.DesiredConfig.Namespace, v.DesiredConfig.Name)
+
+		specHashMap[resourceStr] = v.DesiredConfig.SpecHash
+	}
+
+	return specHashMap
 }

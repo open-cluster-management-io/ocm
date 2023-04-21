@@ -1,4 +1,4 @@
-package managementaddonstatus
+package managementaddoninstallprogression
 
 import (
 	"context"
@@ -21,20 +21,20 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 )
 
-// managementAddonStatusController reconciles instances of clustermanagementaddon the hub
+// managementAddonInstallProgressionController reconciles instances of clustermanagementaddon the hub
 // based to update related object and status condition.
-type managementAddonStatusController struct {
+type managementAddonInstallProgressionController struct {
 	addonClient                  addonv1alpha1client.Interface
 	managedClusterAddonLister    addonlisterv1alpha1.ManagedClusterAddOnLister
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
 }
 
-func NewMagementAddonStatusController(
+func NewManagementAddonInstallProgressionController(
 	addonClient addonv1alpha1client.Interface,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 ) factory.Controller {
-	c := &managementAddonStatusController{
+	c := &managementAddonInstallProgressionController{
 		addonClient:                  addonClient,
 		managedClusterAddonLister:    addonInformers.Lister(),
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
@@ -50,7 +50,7 @@ func NewMagementAddonStatusController(
 
 }
 
-func (c *managementAddonStatusController) sync(ctx context.Context, syncCtx factory.SyncContext, addonName string) error {
+func (c *managementAddonInstallProgressionController) sync(ctx context.Context, syncCtx factory.SyncContext, addonName string) error {
 	klog.V(4).Infof("Reconciling addon %q", addonName)
 
 	mgmtAddon, err := c.clusterManagementAddonLister.Get(addonName)
@@ -76,15 +76,11 @@ func (c *managementAddonStatusController) sync(ctx context.Context, syncCtx fact
 	mgmtAddonCopy.Status.InstallProgressions = setInstallProgression(mgmtAddonCopy.Spec.SupportedConfigs,
 		mgmtAddonCopy.Spec.InstallStrategy.Placements, mgmtAddonCopy.Status.InstallProgressions)
 
-	// TODO
-	// update last applied
-	// update last knowngood
-	// update condition
-
+	// update cma status
 	return c.patchMgmtAddonStatus(ctx, mgmtAddonCopy, mgmtAddon)
 }
 
-func (c *managementAddonStatusController) patchMgmtAddonStatus(ctx context.Context, new, old *addonv1alpha1.ClusterManagementAddOn) error {
+func (c *managementAddonInstallProgressionController) patchMgmtAddonStatus(ctx context.Context, new, old *addonv1alpha1.ClusterManagementAddOn) error {
 	if equality.Semantic.DeepEqual(new.Status, old.Status) {
 		return nil
 	}

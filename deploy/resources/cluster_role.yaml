@@ -33,3 +33,6 @@
     - apiGroups: ["addon.open-cluster-management.io"]
       resources: ["managedclusteraddons/status"]
       verbs: ["update", "patch"]
+    - apiGroups: ["work.open-cluster-management.io"]
+      resources: ["manifestworks"]
+      verbs: ["get", "list", "watch"]

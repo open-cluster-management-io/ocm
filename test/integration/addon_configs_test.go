@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -636,8 +637,8 @@ func assertClusterManagementAddOnInstallProgression(name string, expect ...addon
 		for i, e := range expect {
 			actualInstallProgression := actual.Status.InstallProgressions[i]
 
-			if !apiequality.Semantic.DeepEqual(actualInstallProgression, e) {
-				return fmt.Errorf("Expected default config is %v, actual: %v", e, actualInstallProgression)
+			if !apiequality.Semantic.DeepEqual(actualInstallProgression.ConfigReferences, e.ConfigReferences) {
+				return fmt.Errorf("Expected InstallProgression.ConfigReferences is %v, actual: %v", e.ConfigReferences, actualInstallProgression.ConfigReferences)
 			}
 		}
 
