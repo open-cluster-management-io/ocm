@@ -175,7 +175,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 		addonClient,
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
-		utils.ManagedBySelf,
+		utils.ManagedBySelf(a.addonAgents),
 	)
 
 	var addonConfigController, managementAddonConfigController, addonConfigurationController factory.Controller
@@ -216,7 +216,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 			addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 			nil, nil,
-			utils.ManagedBySelf,
+			utils.ManagedBySelf(a.addonAgents),
 		)
 	}
 

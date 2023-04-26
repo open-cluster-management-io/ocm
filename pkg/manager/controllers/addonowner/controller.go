@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
@@ -25,14 +26,14 @@ type addonOwnerController struct {
 	addonClient                  addonv1alpha1client.Interface
 	managedClusterAddonLister    addonlisterv1alpha1.ManagedClusterAddOnLister
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
-	addonFilterFunc              utils.AddonManagementFilterFunc
+	addonFilterFunc              factory.EventFilterFunc
 }
 
 func NewAddonOwnerController(
 	addonClient addonv1alpha1client.Interface,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
-	addonFilterFunc utils.AddonManagementFilterFunc,
+	addonFilterFunc factory.EventFilterFunc,
 ) factory.Controller {
 	c := &addonOwnerController{
 		addonClient:                  addonClient,
@@ -41,13 +42,18 @@ func NewAddonOwnerController(
 		addonFilterFunc:              addonFilterFunc,
 	}
 
-	return factory.New().WithInformersQueueKeysFunc(
+	return factory.New().WithFilteredEventsInformersQueueKeysFunc(
 		func(obj runtime.Object) []string {
 			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			return []string{key}
 		},
-		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
-		WithSync(c.sync).ToController("addon-owner-controller")
+		c.addonFilterFunc, clusterManagementAddonInformers.Informer()).
+		WithInformersQueueKeysFunc(
+			func(obj runtime.Object) []string {
+				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+				return []string{key}
+			},
+			addonInformers.Informer()).WithSync(c.sync).ToController("addon-owner-controller")
 }
 
 func (c *addonOwnerController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {

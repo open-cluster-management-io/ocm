@@ -75,7 +75,7 @@ func TestReconcile(t *testing.T) {
 				addonClient:                  fakeAddonClient,
 				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
 				managedClusterAddonLister:    addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				addonFilterFunc:              utils.ManagedBySelf,
+				addonFilterFunc:              utils.ManagedByAddonManager,
 			}
 
 			syncContext := addontesting.NewFakeSyncContext(t)

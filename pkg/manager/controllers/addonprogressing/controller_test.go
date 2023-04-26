@@ -3,6 +3,7 @@ package addonprogressing
 import (
 	"context"
 	"encoding/json"
+	"open-cluster-management.io/addon-framework/pkg/agent"
 	"testing"
 	"time"
 
@@ -598,7 +599,7 @@ func TestReconcile(t *testing.T) {
 				managedClusterAddonLister:    addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
 				workLister:                   workInformers.Work().V1().ManifestWorks().Lister(),
-				addonFilterFunc:              utils.ManagedBySelf,
+				addonFilterFunc:              utils.ManagedBySelf(map[string]agent.AgentAddon{"test": nil}),
 			}
 
 			syncContext := addontesting.NewFakeSyncContext(t)

@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -19,6 +20,9 @@ import (
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+
+	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 )
 
 func MergeRelatedObjects(modified *bool, objs *[]addonapiv1alpha1.ObjectReference, obj addonapiv1alpha1.ObjectReference) {
@@ -286,12 +290,14 @@ func PatchAddonCondition(ctx context.Context, addonClient addonv1alpha1client.In
 // AddonManagementFilterFunc is to check if the addon should be managed by addon manager or self-managed
 type AddonManagementFilterFunc func(cma *addonapiv1alpha1.ClusterManagementAddOn) bool
 
-func ManagedByAddonManager(cma *addonapiv1alpha1.ClusterManagementAddOn) bool {
-	if len(cma.Annotations) == 0 {
+func ManagedByAddonManager(obj interface{}) bool {
+	accessor, _ := meta.Accessor(obj)
+	annotations := accessor.GetAnnotations()
+	if len(annotations) == 0 {
 		return false
 	}
 
-	value, ok := cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey]
+	value, ok := annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey]
 	if !ok {
 		return false
 	}
@@ -299,17 +305,26 @@ func ManagedByAddonManager(cma *addonapiv1alpha1.ClusterManagementAddOn) bool {
 	return value == addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue
 }
 
-func ManagedBySelf(cma *addonapiv1alpha1.ClusterManagementAddOn) bool {
-	if len(cma.Annotations) == 0 {
-		return true
-	}
+func ManagedBySelf(agentAddons map[string]agent.AgentAddon) factory.EventFilterFunc {
+	return func(obj interface{}) bool {
+		accessor, _ := meta.Accessor(obj)
+		if _, ok := agentAddons[accessor.GetName()]; !ok {
+			return false
+		}
 
-	value, ok := cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey]
-	if !ok {
-		return true
-	}
+		annotations := accessor.GetAnnotations()
 
-	return value == addonapiv1alpha1.AddonLifecycleSelfManageAnnotationValue
+		if len(annotations) == 0 {
+			return true
+		}
+
+		value, ok := annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey]
+		if !ok {
+			return true
+		}
+
+		return value == addonapiv1alpha1.AddonLifecycleSelfManageAnnotationValue
+	}
 }
 
 func IsOwnedByCMA(addon *addonapiv1alpha1.ManagedClusterAddOn) bool {

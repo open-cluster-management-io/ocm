@@ -9,7 +9,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
@@ -20,7 +19,6 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	"open-cluster-management.io/addon-framework/pkg/index"
-	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 // addonConfigurationController is a controller to update configuration of mca with the following order
@@ -31,7 +29,7 @@ type addonConfigurationController struct {
 	addonClient                   addonv1alpha1client.Interface
 	clusterManagementAddonLister  addonlisterv1alpha1.ClusterManagementAddOnLister
 	clusterManagementAddonIndexer cache.Indexer
-	addonFilterFunc               utils.AddonManagementFilterFunc
+	addonFilterFunc               factory.EventFilterFunc
 	placementLister               clusterlisterv1beta1.PlacementLister
 	placementDecisionLister       clusterlisterv1beta1.PlacementDecisionLister
 
@@ -55,7 +53,7 @@ func NewAddonConfigurationController(
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	placementInformer clusterinformersv1beta1.PlacementInformer,
 	placementDecisionInformer clusterinformersv1beta1.PlacementDecisionInformer,
-	addonFilterFunc utils.AddonManagementFilterFunc,
+	addonFilterFunc factory.EventFilterFunc,
 ) factory.Controller {
 	c := &addonConfigurationController{
 		addonClient:                   addonClient,
@@ -72,15 +70,21 @@ func NewAddonConfigurationController(
 		},
 	}
 
-	controllerFactory := factory.New().WithInformersQueueKeysFunc(
+	controllerFactory := factory.New().WithFilteredEventsInformersQueueKeysFunc(
 		func(obj runtime.Object) []string {
 			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			return []string{key}
 		},
-		addonInformers.Informer(), clusterManagementAddonInformers.Informer())
+		c.addonFilterFunc,
+		clusterManagementAddonInformers.Informer()).WithInformersQueueKeysFunc(
+		func(obj runtime.Object) []string {
+			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+			return []string{key}
+		},
+		addonInformers.Informer())
 
 	// This is to handle the case the self managed addon-manager does not have placementInformer/placementDecisionInformer.
-	// we will not consider installStratgy related placement for self managed addon-manager.
+	// we will not consider installStrategy related placement for self managed addon-manager.
 	if placementInformer != nil && placementDecisionInformer != nil {
 		controllerFactory = controllerFactory.WithInformersQueueKeysFunc(
 			index.ClusterManagementAddonByPlacementDecisionQueueKey(clusterManagementAddonInformers), placementDecisionInformer.Informer()).

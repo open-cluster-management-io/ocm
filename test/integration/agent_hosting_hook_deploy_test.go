@@ -133,6 +133,9 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(
 			context.Background(), hostingClusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(),
+			testHostedAddonImpl.name, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("Should install and uninstall agent successfully", func() {

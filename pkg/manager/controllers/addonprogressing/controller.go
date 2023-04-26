@@ -28,7 +28,6 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/agentdeploy"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
-	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 const (
@@ -44,7 +43,7 @@ type addonProgressingController struct {
 	managedClusterAddonLister    addonlisterv1alpha1.ManagedClusterAddOnLister
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
 	workLister                   worklister.ManifestWorkLister
-	addonFilterFunc              utils.AddonManagementFilterFunc
+	addonFilterFunc              factory.EventFilterFunc
 }
 
 func NewAddonProgressingController(
@@ -52,7 +51,7 @@ func NewAddonProgressingController(
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	workInformers workinformers.ManifestWorkInformer,
-	addonFilterFunc utils.AddonManagementFilterFunc,
+	addonFilterFunc factory.EventFilterFunc,
 ) factory.Controller {
 	c := &addonProgressingController{
 		addonClient:                  addonClient,
