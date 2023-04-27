@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -75,9 +76,9 @@ func (w *WorkApplier) Apply(ctx context.Context, work *workapiv1.ManifestWork) (
 
 	oldData, err := json.Marshal(&workapiv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:          work.Labels,
-			Annotations:     work.Annotations,
-			OwnerReferences: work.OwnerReferences,
+			Labels:          existingWork.Labels,
+			Annotations:     existingWork.Annotations,
+			OwnerReferences: existingWork.OwnerReferences,
 		},
 		Spec: existingWork.Spec,
 	})

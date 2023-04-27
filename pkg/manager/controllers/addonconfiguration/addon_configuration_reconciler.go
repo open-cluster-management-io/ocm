@@ -7,70 +7,22 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
-
-	"open-cluster-management.io/addon-framework/pkg/index"
 )
 
 type managedClusterAddonConfigurationReconciler struct {
-	addonClient                addonv1alpha1client.Interface
-	managedClusterAddonIndexer cache.Indexer
-	getClustersByPlacement     func(name, namespace string) ([]string, error)
-}
-
-func (d *managedClusterAddonConfigurationReconciler) buildConfigurationGraph(cma *addonv1alpha1.ClusterManagementAddOn) (*configurationGraph, error) {
-	graph := newGraph(cma.Spec.SupportedConfigs, cma.Status.DefaultConfigReferences)
-	addons, err := d.managedClusterAddonIndexer.ByIndex(index.ManagedClusterAddonByName, cma.Name)
-	if err != nil {
-		return graph, err
-	}
-
-	// add all existing addons to the default at first
-	for _, addonObject := range addons {
-		addon := addonObject.(*addonv1alpha1.ManagedClusterAddOn)
-		graph.addAddonNode(addon)
-	}
-
-	if cma.Spec.InstallStrategy.Type == "" || cma.Spec.InstallStrategy.Type == addonv1alpha1.AddonInstallStrategyManual {
-		return graph, nil
-	}
-
-	// check each install strategy in status and override the default configs.
-	var errs []error
-	for _, installProgression := range cma.Status.InstallProgressions {
-		clusters, err := d.getClustersByPlacement(installProgression.PlacementRef.Name, installProgression.PlacementRef.Namespace)
-		if errors.IsNotFound(err) {
-			klog.V(2).Infof("placement %s/%s is not found for addon %s", installProgression.PlacementRef.Namespace, installProgression.PlacementRef.Name, cma.Name)
-			continue
-		}
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
-		graph.addPlacementNode(installProgression.ConfigReferences, clusters)
-	}
-
-	return graph, utilerrors.NewAggregate(errs)
+	addonClient addonv1alpha1client.Interface
 }
 
 func (d *managedClusterAddonConfigurationReconciler) reconcile(
-	ctx context.Context, cma *addonv1alpha1.ClusterManagementAddOn) (*addonv1alpha1.ClusterManagementAddOn, reconcileState, error) {
-
+	ctx context.Context, cma *addonv1alpha1.ClusterManagementAddOn, graph *configurationGraph) (*addonv1alpha1.ClusterManagementAddOn, reconcileState, error) {
 	var errs []error
-	// build the configuration graph
-	graph, err := d.buildConfigurationGraph(cma)
-	if err != nil {
-		errs = append(errs, err)
-	}
 
 	for _, addon := range graph.addonToUpdate() {
 		mca := d.mergeAddonConfig(addon.mca, addon.desiredConfigs)
@@ -99,16 +51,13 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 	for _, config := range desiredConfigMap {
 		var match bool
 		for i := range mergedConfigs {
-			if mergedConfigs[i].DesiredConfig == nil {
-				continue
-			}
 			if mergedConfigs[i].ConfigGroupResource != config.ConfigGroupResource {
 				continue
 			}
 
 			match = true
 			// set LastObservedGeneration to 0 when config name/namespace changes
-			if mergedConfigs[i].DesiredConfig.ConfigReferent != config.DesiredConfig.ConfigReferent {
+			if mergedConfigs[i].DesiredConfig != nil && (mergedConfigs[i].DesiredConfig.ConfigReferent != config.DesiredConfig.ConfigReferent) {
 				mergedConfigs[i].LastObservedGeneration = 0
 			}
 			mergedConfigs[i].ConfigReferent = config.ConfigReferent

@@ -1,8 +1,20 @@
 package addonconfiguration
 
 import (
+	"fmt"
+	"math"
+	"sort"
+	"strconv"
+
+	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+)
+
+var (
+	defaultMaxConcurrency = intstr.FromString("25%")
+	maxMaxConcurrency     = intstr.FromString("100%")
 )
 
 // configurationTree is a 2 level snapshot tree on the configuration of addons
@@ -17,6 +29,8 @@ type configurationGraph struct {
 
 // installStrategyNode is a node in configurationGraph defined by a install strategy
 type installStrategyNode struct {
+	placementRef   addonv1alpha1.PlacementRef
+	maxConcurrency intstr.IntOrString
 	desiredConfigs addonConfigMap
 	// children keeps a map of addons node as the children of this node
 	children map[string]*addonNode
@@ -24,12 +38,51 @@ type installStrategyNode struct {
 }
 
 // addonNode is node as a child of installStrategy node represting a mca
+// addonnode
 type addonNode struct {
 	desiredConfigs addonConfigMap
 	mca            *addonv1alpha1.ManagedClusterAddOn
+	// record mca upgrade status
+	mcaUpgradeStatus upgradeStatus
 }
 
+type upgradeStatus int
+
+const (
+	// mca desired configs not synced from desiredConfigs yet
+	toupgrade upgradeStatus = iota
+	// mca desired configs upgraded and last applied configs not upgraded
+	upgrading
+	// both desired configs and last applied configs are upgraded
+	upgraded
+)
+
 type addonConfigMap map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference
+
+// set addon upgrade status
+func (n *addonNode) setUpgradeStatus() {
+	if len(n.mca.Status.ConfigReferences) != len(n.desiredConfigs) {
+		n.mcaUpgradeStatus = toupgrade
+		return
+	}
+
+	for _, actual := range n.mca.Status.ConfigReferences {
+		if desired, ok := n.desiredConfigs[actual.ConfigGroupResource]; ok {
+			if !equality.Semantic.DeepEqual(desired.DesiredConfig, actual.DesiredConfig) {
+				n.mcaUpgradeStatus = toupgrade
+				return
+			} else if !equality.Semantic.DeepEqual(actual.LastAppliedConfig, actual.DesiredConfig) {
+				n.mcaUpgradeStatus = upgrading
+				return
+			}
+		} else {
+			n.mcaUpgradeStatus = toupgrade
+			return
+		}
+	}
+
+	n.mcaUpgradeStatus = upgraded
+}
 
 func (d addonConfigMap) copy() addonConfigMap {
 	output := addonConfigMap{}
@@ -43,6 +96,7 @@ func newGraph(supportedConfigs []addonv1alpha1.ConfigMeta, defaultConfigReferenc
 	graph := &configurationGraph{
 		nodes: []*installStrategyNode{},
 		defaults: &installStrategyNode{
+			maxConcurrency: maxMaxConcurrency,
 			desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{},
 			children:       map[string]*addonNode{},
 		},
@@ -87,11 +141,29 @@ func (g *configurationGraph) addAddonNode(mca *addonv1alpha1.ManagedClusterAddOn
 }
 
 // addNode delete clusters on existing graph so the new configuration overrides the previous
-func (g *configurationGraph) addPlacementNode(installConfigReference []addonv1alpha1.InstallConfigReference, clusters []string) {
+func (g *configurationGraph) addPlacementNode(
+	installStrategy addonv1alpha1.PlacementStrategy,
+	installProgression addonv1alpha1.InstallProgression,
+	clusters []string,
+) {
+	placementRef := installProgression.PlacementRef
+	installConfigReference := installProgression.ConfigReferences
+
 	node := &installStrategyNode{
+		placementRef:   placementRef,
+		maxConcurrency: maxMaxConcurrency,
 		desiredConfigs: g.defaults.desiredConfigs,
 		children:       map[string]*addonNode{},
 		clusters:       sets.New[string](clusters...),
+	}
+
+	// set max concurrency
+	if installStrategy.RolloutStrategy.Type == addonv1alpha1.AddonRolloutStrategyRollingUpdate {
+		if installStrategy.RolloutStrategy.RollingUpdate != nil {
+			node.maxConcurrency = installStrategy.RolloutStrategy.RollingUpdate.MaxConcurrency
+		} else {
+			node.maxConcurrency = defaultMaxConcurrency
+		}
 	}
 
 	// overrides configuration by install strategy
@@ -123,6 +195,15 @@ func (g *configurationGraph) addPlacementNode(installConfigReference []addonv1al
 		}
 	}
 	g.nodes = append(g.nodes, node)
+}
+
+func (g *configurationGraph) getPlacementNodes() map[addonv1alpha1.PlacementRef]*installStrategyNode {
+	placementNodeMap := map[addonv1alpha1.PlacementRef]*installStrategyNode{}
+	for _, node := range g.nodes {
+		placementNodeMap[node.placementRef] = node
+	}
+
+	return placementNodeMap
 }
 
 func (g *configurationGraph) addonToUpdate() []*addonNode {
@@ -166,15 +247,78 @@ func (n *installStrategyNode) addNode(addon *addonv1alpha1.ManagedClusterAddOn) 
 			}
 		}
 	}
+
+	// set addon node upgrade status
+	n.children[addon.Namespace].setUpgradeStatus()
+}
+
+func (n *installStrategyNode) addonUpgraded() int {
+	count := 0
+	for _, addon := range n.children {
+		if addon.mcaUpgradeStatus == upgraded {
+			count += 1
+		}
+	}
+	return count
+}
+
+func (n *installStrategyNode) addonUpgrading() int {
+	count := 0
+	for _, addon := range n.children {
+		if addon.mcaUpgradeStatus == upgrading {
+			count += 1
+		}
+	}
+	return count
 }
 
 // addonToUpdate finds the addons to be updated by placement
 func (n *installStrategyNode) addonToUpdate() []*addonNode {
 	var addons []*addonNode
 
-	for _, addon := range n.children {
-		addons = append(addons, addon)
+	// sort the children by key
+	keys := make([]string, 0, len(n.children))
+	for k := range n.children {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	total := len(n.clusters)
+	if total == 0 {
+		total = len(n.children)
+	}
+	length, _ := parseMaxConcurrency(n.maxConcurrency, total)
+
+	for i, k := range keys {
+		if (i%length == 0) && len(addons) > 0 {
+			return addons
+		}
+
+		addon := n.children[k]
+		if addon.mcaUpgradeStatus != upgraded {
+			addons = append(addons, addon)
+		}
 	}
 
 	return addons
+}
+
+func parseMaxConcurrency(maxConcurrency intstr.IntOrString, total int) (int, error) {
+	var length int
+
+	switch maxConcurrency.Type {
+	case intstr.String:
+		str := maxConcurrency.StrVal
+		f, err := strconv.ParseFloat(str[:len(str)-1], 64)
+		if err != nil {
+			return length, err
+		}
+		length = int(math.Ceil(f / 100 * float64(total)))
+	case intstr.Int:
+		length = maxConcurrency.IntValue()
+	default:
+		return length, fmt.Errorf("incorrect MaxConcurrency type %v", maxConcurrency.Type)
+	}
+
+	return length, nil
 }

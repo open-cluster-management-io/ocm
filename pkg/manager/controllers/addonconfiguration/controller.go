@@ -29,6 +29,7 @@ type addonConfigurationController struct {
 	addonClient                   addonv1alpha1client.Interface
 	clusterManagementAddonLister  addonlisterv1alpha1.ClusterManagementAddOnLister
 	clusterManagementAddonIndexer cache.Indexer
+	managedClusterAddonIndexer    cache.Indexer
 	addonFilterFunc               factory.EventFilterFunc
 	placementLister               clusterlisterv1beta1.PlacementLister
 	placementDecisionLister       clusterlisterv1beta1.PlacementDecisionLister
@@ -37,7 +38,8 @@ type addonConfigurationController struct {
 }
 
 type addonConfigurationReconcile interface {
-	reconcile(ctx context.Context, cma *addonv1alpha1.ClusterManagementAddOn) (*addonv1alpha1.ClusterManagementAddOn, reconcileState, error)
+	reconcile(ctx context.Context, cma *addonv1alpha1.ClusterManagementAddOn,
+		graph *configurationGraph) (*addonv1alpha1.ClusterManagementAddOn, reconcileState, error)
 }
 
 type reconcileState int64
@@ -59,14 +61,16 @@ func NewAddonConfigurationController(
 		addonClient:                   addonClient,
 		clusterManagementAddonLister:  clusterManagementAddonInformers.Lister(),
 		clusterManagementAddonIndexer: clusterManagementAddonInformers.Informer().GetIndexer(),
+		managedClusterAddonIndexer:    addonInformers.Informer().GetIndexer(),
 		addonFilterFunc:               addonFilterFunc,
 	}
 
 	c.reconcilers = []addonConfigurationReconcile{
 		&managedClusterAddonConfigurationReconciler{
-			addonClient:                addonClient,
-			managedClusterAddonIndexer: addonInformers.Informer().GetIndexer(),
-			getClustersByPlacement:     c.getClustersByPlacement,
+			addonClient: addonClient,
+		},
+		&clusterManagementAddonProgressingReconciler{
+			addonClient: addonClient,
 		},
 	}
 
@@ -118,11 +122,15 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 	}
 
 	cma = cma.DeepCopy()
+	graph, err := c.buildConfigurationGraph(cma)
+	if err != nil {
+		return err
+	}
 
 	var state reconcileState
 	var errs []error
 	for _, reconciler := range c.reconcilers {
-		cma, state, err = reconciler.reconcile(ctx, cma)
+		cma, state, err = reconciler.reconcile(ctx, cma, graph)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -132,6 +140,47 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 	}
 
 	return utilerrors.NewAggregate(errs)
+}
+
+func (c *addonConfigurationController) buildConfigurationGraph(cma *addonv1alpha1.ClusterManagementAddOn) (*configurationGraph, error) {
+	graph := newGraph(cma.Spec.SupportedConfigs, cma.Status.DefaultConfigReferences)
+	addons, err := c.managedClusterAddonIndexer.ByIndex(index.ManagedClusterAddonByName, cma.Name)
+	if err != nil {
+		return graph, err
+	}
+
+	// add all existing addons to the default at first
+	for _, addonObject := range addons {
+		addon := addonObject.(*addonv1alpha1.ManagedClusterAddOn)
+		graph.addAddonNode(addon)
+	}
+
+	if cma.Spec.InstallStrategy.Type == "" || cma.Spec.InstallStrategy.Type == addonv1alpha1.AddonInstallStrategyManual {
+		return graph, nil
+	}
+
+	// check each install strategy in status
+	var errs []error
+	for _, installProgression := range cma.Status.InstallProgressions {
+		clusters, err := c.getClustersByPlacement(installProgression.PlacementRef.Name, installProgression.PlacementRef.Namespace)
+		if errors.IsNotFound(err) {
+			klog.V(2).Infof("placement %s/%s is not found for addon %s", installProgression.PlacementRef.Namespace, installProgression.PlacementRef.Name, cma.Name)
+			continue
+		}
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		for _, installStrategy := range cma.Spec.InstallStrategy.Placements {
+			if installStrategy.PlacementRef == installProgression.PlacementRef {
+				graph.addPlacementNode(installStrategy, installProgression, clusters)
+
+			}
+		}
+	}
+
+	return graph, utilerrors.NewAggregate(errs)
 }
 
 func (c *addonConfigurationController) getClustersByPlacement(name, namespace string) ([]string, error) {

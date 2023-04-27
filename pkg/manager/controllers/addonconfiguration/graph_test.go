@@ -9,8 +9,8 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 )
 
-type placementStrategy struct {
-	configs  []addonv1alpha1.AddOnConfig
+type placementDesicion struct {
+	addonv1alpha1.PlacementRef
 	clusters []string
 }
 
@@ -20,7 +20,8 @@ func TestConfigurationGraph(t *testing.T) {
 		defaultConfigs         []addonv1alpha1.ConfigMeta
 		defaultConfigReference []addonv1alpha1.DefaultConfigReference
 		addons                 []*addonv1alpha1.ManagedClusterAddOn
-		placementStrategies    []placementStrategy
+		placementDesicions     []placementDesicion
+		placementStrategies    []addonv1alpha1.PlacementStrategy
 		installProgressions    []addonv1alpha1.InstallProgression
 		expected               []*addonNode
 	}{
@@ -88,25 +89,25 @@ func TestConfigurationGraph(t *testing.T) {
 				addontesting.NewAddon("test", "cluster2"),
 				addontesting.NewAddon("test", "cluster3"),
 			},
-			placementStrategies: []placementStrategy{
-				{configs: []addonv1alpha1.AddOnConfig{
-					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"}},
-				}, clusters: []string{"cluster1"}},
-				{configs: []addonv1alpha1.AddOnConfig{
-					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"}},
-					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"}},
-				}, clusters: []string{"cluster2"}},
+			placementDesicions: []placementDesicion{
+				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement1", Namespace: "test"},
+					clusters: []string{"cluster1"}},
+				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement2", Namespace: "test"},
+					clusters: []string{"cluster2"}},
+			},
+			placementStrategies: []addonv1alpha1.PlacementStrategy{
+				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement1", Namespace: "test"}},
+				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement2", Namespace: "test"}},
 			},
 			installProgressions: []addonv1alpha1.InstallProgression{
 				{
+					PlacementRef: addonv1alpha1.PlacementRef{Name: "placement1", Namespace: "test"},
 					ConfigReferences: []addonv1alpha1.InstallConfigReference{
 						newInstallConfigReference("core", "Bar", "test1", "<core-bar-test1-hash>"),
 					},
 				},
 				{
+					PlacementRef: addonv1alpha1.PlacementRef{Name: "placement2", Namespace: "test"},
 					ConfigReferences: []addonv1alpha1.InstallConfigReference{
 						newInstallConfigReference("core", "Bar", "test2", "<core-bar-test2-hash>"),
 						newInstallConfigReference("core", "Foo", "test2", "<core-foo-test2-hash>"),
@@ -180,6 +181,114 @@ func TestConfigurationGraph(t *testing.T) {
 			},
 		},
 		{
+			name: "placement overlap",
+			defaultConfigs: []addonv1alpha1.ConfigMeta{
+				{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+					DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}},
+				{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+					DefaultConfig: &addonv1alpha1.ConfigReferent{Name: "test"}},
+			},
+			defaultConfigReference: []addonv1alpha1.DefaultConfigReference{
+				newDefaultConfigReference("core", "Bar", "test", "<core-bar-test-hash>"),
+				newDefaultConfigReference("core", "Foo", "test", "<core-foo-test-hash>"),
+			},
+			addons: []*addonv1alpha1.ManagedClusterAddOn{
+				addontesting.NewAddon("test", "cluster1"),
+				addontesting.NewAddon("test", "cluster2"),
+				addontesting.NewAddon("test", "cluster3"),
+			},
+			placementStrategies: []addonv1alpha1.PlacementStrategy{
+				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement1", Namespace: "test"}},
+				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement2", Namespace: "test"}},
+			},
+			placementDesicions: []placementDesicion{
+				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement1", Namespace: "test"},
+					clusters: []string{"cluster1", "cluster2"}},
+				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement2", Namespace: "test"},
+					clusters: []string{"cluster2", "cluster3"}},
+			},
+			installProgressions: []addonv1alpha1.InstallProgression{
+				{
+					PlacementRef: addonv1alpha1.PlacementRef{Name: "placement1", Namespace: "test"},
+					ConfigReferences: []addonv1alpha1.InstallConfigReference{
+						newInstallConfigReference("core", "Bar", "test1", "<core-bar-test1-hash>"),
+					},
+				},
+				{
+					PlacementRef: addonv1alpha1.PlacementRef{Name: "placement2", Namespace: "test"},
+					ConfigReferences: []addonv1alpha1.InstallConfigReference{
+						newInstallConfigReference("core", "Bar", "test2", "<core-bar-test2-hash>"),
+						newInstallConfigReference("core", "Foo", "test2", "<core-foo-test2-hash>"),
+					},
+				},
+			},
+			expected: []*addonNode{
+				{
+					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
+						{Group: "core", Resource: "Bar"}: {
+							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+								SpecHash:       "<core-bar-test1-hash>",
+							},
+						},
+						{Group: "core", Resource: "Foo"}: {
+							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
+							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
+								SpecHash:       "<core-foo-test-hash>",
+							},
+						},
+					},
+					mca: addontesting.NewAddon("test", "cluster1"),
+				},
+				{
+					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
+						{Group: "core", Resource: "Bar"}: {
+							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+								SpecHash:       "<core-bar-test2-hash>",
+							},
+						},
+						{Group: "core", Resource: "Foo"}: {
+							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+								SpecHash:       "<core-foo-test2-hash>",
+							},
+						},
+					},
+					mca: addontesting.NewAddon("test", "cluster2"),
+				},
+				{
+					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
+						{Group: "core", Resource: "Bar"}: {
+							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
+							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+								SpecHash:       "<core-bar-test2-hash>",
+							},
+						},
+						{Group: "core", Resource: "Foo"}: {
+							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+							ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
+							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
+								SpecHash:       "<core-foo-test2-hash>",
+							},
+						},
+					},
+					mca: addontesting.NewAddon("test", "cluster3"),
+				},
+			},
+		},
+		{
 			name: "mca override",
 			defaultConfigs: []addonv1alpha1.ConfigMeta{
 				{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
@@ -199,25 +308,25 @@ func TestConfigurationGraph(t *testing.T) {
 				addontesting.NewAddon("test", "cluster2"),
 				addontesting.NewAddon("test", "cluster3"),
 			},
-			placementStrategies: []placementStrategy{
-				{configs: []addonv1alpha1.AddOnConfig{
-					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"}},
-				}, clusters: []string{"cluster1"}},
-				{configs: []addonv1alpha1.AddOnConfig{
-					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
-						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"}},
-					{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"}},
-				}, clusters: []string{"cluster2"}},
+			placementStrategies: []addonv1alpha1.PlacementStrategy{
+				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement1", Namespace: "test"}},
+				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement2", Namespace: "test"}},
+			},
+			placementDesicions: []placementDesicion{
+				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement1", Namespace: "test"},
+					clusters: []string{"cluster1"}},
+				{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement2", Namespace: "test"},
+					clusters: []string{"cluster2"}},
 			},
 			installProgressions: []addonv1alpha1.InstallProgression{
 				{
+					PlacementRef: addonv1alpha1.PlacementRef{Name: "placement1", Namespace: "test"},
 					ConfigReferences: []addonv1alpha1.InstallConfigReference{
 						newInstallConfigReference("core", "Foo", "test1", "<core-foo-test1-hash>"),
 					},
 				},
 				{
+					PlacementRef: addonv1alpha1.PlacementRef{Name: "placement2", Namespace: "test"},
 					ConfigReferences: []addonv1alpha1.InstallConfigReference{
 						newInstallConfigReference("core", "Bar", "test2", "<core-bar-test2-hash>"),
 						newInstallConfigReference("core", "Foo", "test2", "<core-foo-test2-hash>"),
@@ -301,8 +410,8 @@ func TestConfigurationGraph(t *testing.T) {
 			for _, addon := range c.addons {
 				graph.addAddonNode(addon)
 			}
-			for i, strategy := range c.placementStrategies {
-				graph.addPlacementNode(c.installProgressions[i].ConfigReferences, strategy.clusters)
+			for i, decision := range c.placementDesicions {
+				graph.addPlacementNode(c.placementStrategies[i], c.installProgressions[i], decision.clusters)
 			}
 
 			actual := graph.addonToUpdate()
