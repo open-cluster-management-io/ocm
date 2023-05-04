@@ -55,6 +55,11 @@ type AgentAddonOptions struct {
 	// +optional
 	InstallStrategy *InstallStrategy
 
+	// Updaters select a set of resources and define the strategies to update them.
+	// UpdateStrategy is Update if no Updater is defined for a resource.
+	// +optional
+	Updaters []Updater
+
 	// HealthProber defines how is the healthiness status of the ManagedClusterAddon probed.
 	// Note that the prescribed prober type here only applies to the automatically installed
 	// addons configured via InstallStrategy.
@@ -137,6 +142,14 @@ func (s *InstallStrategy) GetManagedClusterFilter() func(cluster *clusterv1.Mana
 	return s.managedClusterFilter
 }
 
+type Updater struct {
+	// ResourceIdentifier sets what resources the strategy applies to
+	ResourceIdentifier workapiv1.ResourceIdentifier
+
+	// UpdateStrategy defines the strategy used to update the manifests.
+	UpdateStrategy workapiv1.UpdateStrategy
+}
+
 type HealthProber struct {
 	Type HealthProberType
 
@@ -155,7 +168,7 @@ type WorkHealthProber struct {
 
 // ProbeField defines the field of a resource to be probed
 type ProbeField struct {
-	// ResourceIdentifier sets what resource shoule be probed
+	// ResourceIdentifier sets what resource should be probed
 	ResourceIdentifier workapiv1.ResourceIdentifier
 
 	// ProbeRules sets the rules to probe the field

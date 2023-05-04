@@ -474,26 +474,29 @@ func newAddonWorkObjectMeta(namePrefix, addonName, addonNamespace, workNamespace
 }
 
 func getManifestConfigOption(agentAddon agent.AgentAddon) []workapiv1.ManifestConfigOption {
-	if agentAddon.GetAgentAddonOptions().HealthProber == nil {
-		return nil
-	}
-
-	if agentAddon.GetAgentAddonOptions().HealthProber.Type != agent.HealthProberTypeWork {
-		return nil
-	}
-
-	if agentAddon.GetAgentAddonOptions().HealthProber.WorkProber == nil {
-		return nil
-	}
-
 	manifestConfigs := []workapiv1.ManifestConfigOption{}
-	probeRules := agentAddon.GetAgentAddonOptions().HealthProber.WorkProber.ProbeFields
-	for _, rule := range probeRules {
-		manifestConfigs = append(manifestConfigs, workapiv1.ManifestConfigOption{
-			ResourceIdentifier: rule.ResourceIdentifier,
-			FeedbackRules:      rule.ProbeRules,
-		})
+
+	if agentAddon.GetAgentAddonOptions().HealthProber != nil &&
+		agentAddon.GetAgentAddonOptions().HealthProber.Type == agent.HealthProberTypeWork &&
+		agentAddon.GetAgentAddonOptions().HealthProber.WorkProber != nil {
+		probeRules := agentAddon.GetAgentAddonOptions().HealthProber.WorkProber.ProbeFields
+		for _, rule := range probeRules {
+			manifestConfigs = append(manifestConfigs, workapiv1.ManifestConfigOption{
+				ResourceIdentifier: rule.ResourceIdentifier,
+				FeedbackRules:      rule.ProbeRules,
+			})
+		}
 	}
+
+	if updaters := agentAddon.GetAgentAddonOptions().Updaters; updaters != nil {
+		for _, updater := range updaters {
+			manifestConfigs = append(manifestConfigs, workapiv1.ManifestConfigOption{
+				ResourceIdentifier: updater.ResourceIdentifier,
+				UpdateStrategy:     &updater.UpdateStrategy,
+			})
+		}
+	}
+
 	return manifestConfigs
 }
 
