@@ -24,6 +24,9 @@ rules:
 - apiGroups: [ "addon.open-cluster-management.io" ]
   resources: [ "clustermanagementaddons/finalizers" ]
   verbs: [ "update" ]
+- apiGroups: [ "addon.open-cluster-management.io" ]
+  resources: [ "clustermanagementaddons/status" ]
+  verbs: ["update", "patch"]
 - apiGroups: ["addon.open-cluster-management.io"]
   resources: ["clustermanagementaddons"]
   verbs: ["get", "list", "watch"]
@@ -33,3 +36,7 @@ rules:
 - apiGroups: ["addon.open-cluster-management.io"]
   resources: ["managedclusteraddons/status"]
   verbs: ["update", "patch"]
+# Allow controller to read manifestworks 
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["manifestworks"]
+  verbs: ["get", "list", "watch"]
