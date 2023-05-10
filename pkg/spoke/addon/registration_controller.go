@@ -143,9 +143,10 @@ func (c *addOnRegistrationController) syncAddOn(ctx context.Context, syncCtx fac
 		return err
 	}
 
-	// addon is deleting
+	// do not clean up during addon is deleting.
+	// in some case the addon agent may need hub-kubeconfig to do cleanup during deleting.
 	if !addOn.DeletionTimestamp.IsZero() {
-		return c.cleanup(ctx, addOnName)
+		return nil
 	}
 
 	cachedConfigs := c.addOnRegistrationConfigs[addOnName]
