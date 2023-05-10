@@ -190,7 +190,7 @@ func setInstallProgression(supportedConfigs []addonv1alpha1.ConfigMeta, placemen
 		}
 		installProgression.ConfigReferences = installConfigReferences
 
-		// if the config already exists in status, keep the existing spec hash
+		// if the config group resource already exists in status, merge the install progression
 		if existInstallProgression, exist := findInstallProgression(&installProgression, existInstallProgressions); exist {
 			mergeInstallProgression(&installProgression, existInstallProgression)
 		}
@@ -205,7 +205,7 @@ func findInstallProgression(newobj *addonv1alpha1.InstallProgression, oldobjs []
 			count := 0
 			for _, oldconfig := range oldobj.ConfigReferences {
 				for _, newconfig := range newobj.ConfigReferences {
-					if oldconfig.ConfigGroupResource == newconfig.ConfigGroupResource && oldconfig.DesiredConfig.ConfigReferent == newconfig.DesiredConfig.ConfigReferent {
+					if oldconfig.ConfigGroupResource == newconfig.ConfigGroupResource {
 						count += 1
 					}
 				}
@@ -222,11 +222,12 @@ func mergeInstallProgression(newobj, oldobj *addonv1alpha1.InstallProgression) {
 	// merge config reference
 	for i := range newobj.ConfigReferences {
 		for _, oldconfig := range oldobj.ConfigReferences {
-			if newobj.ConfigReferences[i].ConfigGroupResource == oldconfig.ConfigGroupResource &&
-				newobj.ConfigReferences[i].DesiredConfig.ConfigReferent == oldconfig.DesiredConfig.ConfigReferent {
-				newobj.ConfigReferences[i].DesiredConfig.SpecHash = oldconfig.DesiredConfig.SpecHash
-				newobj.ConfigReferences[i].LastAppliedConfig = oldconfig.LastAppliedConfig
-				newobj.ConfigReferences[i].LastKnownGoodConfig = oldconfig.LastKnownGoodConfig
+			if newobj.ConfigReferences[i].ConfigGroupResource == oldconfig.ConfigGroupResource {
+				if newobj.ConfigReferences[i].DesiredConfig.ConfigReferent == oldconfig.DesiredConfig.ConfigReferent {
+					newobj.ConfigReferences[i].DesiredConfig.SpecHash = oldconfig.DesiredConfig.SpecHash
+				}
+				newobj.ConfigReferences[i].LastAppliedConfig = oldconfig.LastAppliedConfig.DeepCopy()
+				newobj.ConfigReferences[i].LastKnownGoodConfig = oldconfig.LastKnownGoodConfig.DeepCopy()
 			}
 		}
 	}

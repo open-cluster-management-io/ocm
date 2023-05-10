@@ -66,6 +66,7 @@ const (
 var _ = ginkgo.Describe("Addon upgrade", func() {
 	var configDefaultNamespace string
 	var configDefaultName string
+	var configUpdateName string
 	var placementName string
 	var placementNamespace string
 	var manifestWorkName string
@@ -78,6 +79,7 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 		suffix = rand.String(5)
 		configDefaultNamespace = fmt.Sprintf("default-config-%s", suffix)
 		configDefaultName = fmt.Sprintf("default-config-%s", suffix)
+		configUpdateName = fmt.Sprintf("update-config-%s", suffix)
 		placementName = fmt.Sprintf("ns-%s", suffix)
 		placementNamespace = fmt.Sprintf("ns-%s", suffix)
 		manifestWorkName = fmt.Sprintf("%s-0", constants.DeployWorkNamePrefix(testAddOnConfigsImpl.name))
@@ -188,6 +190,17 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 			Spec: addOnDefaultConfigSpec,
 		}
 		_, err = hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(configDefaultNamespace).Create(context.Background(), addOnDefaultConfig, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		// prepare update config
+		addOnUpdateConfig := &addonapiv1alpha1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      configUpdateName,
+				Namespace: configDefaultNamespace,
+			},
+			Spec: addOnTest2ConfigSpec,
+		}
+		_, err = hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(configDefaultNamespace).Create(context.Background(), addOnUpdateConfig, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
@@ -416,14 +429,8 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			cma.Spec.InstallStrategy.Placements[0].RolloutStrategy.Type = addonapiv1alpha1.AddonRolloutStrategyRollingUpdate
 			cma.Spec.InstallStrategy.Placements[0].RolloutStrategy.RollingUpdate = &addonapiv1alpha1.RollingUpdate{MaxConcurrency: intstr.FromString("50%")}
+			cma.Spec.InstallStrategy.Placements[0].Configs[0].ConfigReferent = addonapiv1alpha1.ConfigReferent{Namespace: configDefaultNamespace, Name: configUpdateName}
 			_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Update(context.Background(), cma, metav1.UpdateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-			ginkgo.By("upgrade configs to test2")
-			addOnConfig, err = hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(configDefaultNamespace).Get(context.Background(), configDefaultName, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			addOnConfig.Spec = addOnTest2ConfigSpec
-			_, err = hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(configDefaultNamespace).Update(context.Background(), addOnConfig, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			ginkgo.By("check mca status")
@@ -435,13 +442,13 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 					},
 					ConfigReferent: addonapiv1alpha1.ConfigReferent{
 						Namespace: configDefaultNamespace,
-						Name:      configDefaultName,
+						Name:      configUpdateName,
 					},
-					LastObservedGeneration: 3,
+					LastObservedGeneration: 1,
 					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 						ConfigReferent: addonapiv1alpha1.ConfigReferent{
 							Namespace: configDefaultNamespace,
-							Name:      configDefaultName,
+							Name:      configUpdateName,
 						},
 						SpecHash: addOnTest2ConfigSpecHash,
 					},
@@ -470,7 +477,7 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 						Namespace: configDefaultNamespace,
 						Name:      configDefaultName,
 					},
-					LastObservedGeneration: 3,
+					LastObservedGeneration: 2,
 					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 						ConfigReferent: addonapiv1alpha1.ConfigReferent{
 							Namespace: configDefaultNamespace,
@@ -506,7 +513,7 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 							ConfigReferent: addonapiv1alpha1.ConfigReferent{
 								Namespace: configDefaultNamespace,
-								Name:      configDefaultName,
+								Name:      configUpdateName,
 							},
 							SpecHash: addOnTest2ConfigSpecHash,
 						},
@@ -560,20 +567,20 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 					},
 					ConfigReferent: addonapiv1alpha1.ConfigReferent{
 						Namespace: configDefaultNamespace,
-						Name:      configDefaultName,
+						Name:      configUpdateName,
 					},
-					LastObservedGeneration: 3,
+					LastObservedGeneration: 1,
 					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 						ConfigReferent: addonapiv1alpha1.ConfigReferent{
 							Namespace: configDefaultNamespace,
-							Name:      configDefaultName,
+							Name:      configUpdateName,
 						},
 						SpecHash: addOnTest2ConfigSpecHash,
 					},
 					LastAppliedConfig: &addonapiv1alpha1.ConfigSpecHash{
 						ConfigReferent: addonapiv1alpha1.ConfigReferent{
 							Namespace: configDefaultNamespace,
-							Name:      configDefaultName,
+							Name:      configUpdateName,
 						},
 						SpecHash: addOnTest2ConfigSpecHash,
 					},
@@ -598,7 +605,7 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 							ConfigReferent: addonapiv1alpha1.ConfigReferent{
 								Namespace: configDefaultNamespace,
-								Name:      configDefaultName,
+								Name:      configUpdateName,
 							},
 							SpecHash: addOnTest2ConfigSpecHash,
 						},
@@ -655,21 +662,21 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 							ConfigReferent: addonapiv1alpha1.ConfigReferent{
 								Namespace: configDefaultNamespace,
-								Name:      configDefaultName,
+								Name:      configUpdateName,
 							},
 							SpecHash: addOnTest2ConfigSpecHash,
 						},
 						LastAppliedConfig: &addonapiv1alpha1.ConfigSpecHash{
 							ConfigReferent: addonapiv1alpha1.ConfigReferent{
 								Namespace: configDefaultNamespace,
-								Name:      configDefaultName,
+								Name:      configUpdateName,
 							},
 							SpecHash: addOnTest2ConfigSpecHash,
 						},
 						LastKnownGoodConfig: &addonapiv1alpha1.ConfigSpecHash{
 							ConfigReferent: addonapiv1alpha1.ConfigReferent{
 								Namespace: configDefaultNamespace,
-								Name:      configDefaultName,
+								Name:      configUpdateName,
 							},
 							SpecHash: addOnTest2ConfigSpecHash,
 						},
