@@ -287,7 +287,11 @@ func (n *installStrategyNode) addonToUpdate() []*addonNode {
 	if total == 0 {
 		total = len(n.children)
 	}
+
 	length, _ := parseMaxConcurrency(n.maxConcurrency, total)
+	if length == 0 {
+		return addons
+	}
 
 	for i, k := range keys {
 		if (i%length == 0) && len(addons) > 0 {

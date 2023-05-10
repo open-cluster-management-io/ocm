@@ -437,6 +437,47 @@ func TestAddonConfigReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "placement rolling update with MaxConcurrency 0",
+			managedClusteraddon: []runtime.Object{
+				addontesting.NewAddon("test", "cluster1"),
+				addontesting.NewAddon("test", "cluster2"),
+				addontesting.NewAddon("test", "cluster3"),
+			},
+			placements: []runtime.Object{
+				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
+			},
+			placementDecisions: []runtime.Object{
+				&clusterv1beta1.PlacementDecision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-placement",
+						Namespace: "default",
+						Labels:    map[string]string{clusterv1beta1.PlacementLabel: "test-placement"},
+					},
+					Status: clusterv1beta1.PlacementDecisionStatus{
+						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster2"}, {ClusterName: "cluster3"}},
+					},
+				},
+			},
+			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", "").WithPlacementStrategy(addonv1alpha1.PlacementStrategy{
+				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				RolloutStrategy: addonv1alpha1.RolloutStrategy{
+					Type:          addonv1alpha1.AddonRolloutStrategyRollingUpdate,
+					RollingUpdate: &addonv1alpha1.RollingUpdate{MaxConcurrency: intstr.FromString("0%")}},
+			}).WithInstallProgression(addonv1alpha1.InstallProgression{
+				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				ConfigReferences: []addonv1alpha1.InstallConfigReference{
+					{
+						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1"},
+							SpecHash:       "hash1",
+						},
+					},
+				},
+			}).Build(),
+			validateAddonActions: addontesting.AssertNoActions,
+		},
+		{
 			name: "placement rolling update with default MaxConcurrency",
 			managedClusteraddon: []runtime.Object{
 				addontesting.NewAddon("test", "cluster1"),
