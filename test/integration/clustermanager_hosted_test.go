@@ -49,11 +49,11 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 	var hubRegistrationWebhookClusterRole = fmt.Sprintf("open-cluster-management:%s-registration:webhook", clusterManagerName)
 	var hubWorkWebhookClusterRole = fmt.Sprintf("open-cluster-management:%s-registration:webhook", clusterManagerName)
 	var hubAddOnManagerClusterRole = fmt.Sprintf("open-cluster-management:%s-addon-manager:controller", clusterManagerName)
-	var hubRegistrationSA = fmt.Sprintf("%s-registration-controller-sa", clusterManagerName)
-	var hubRegistrationWebhookSA = fmt.Sprintf("%s-registration-webhook-sa", clusterManagerName)
-	var hubWorkWebhookSA = fmt.Sprintf("%s-work-webhook-sa", clusterManagerName)
-	var hubWorkControllerSA = fmt.Sprintf("%s-work-controller-sa", clusterManagerName)
-	var hubAddOnManagerSA = fmt.Sprintf("%s-addon-manager-controller-sa", clusterManagerName)
+	var hubRegistrationSA = "registration-controller-sa"
+	var hubRegistrationWebhookSA = "registration-webhook-sa"
+	var hubWorkWebhookSA = "work-webhook-sa"
+	var hubWorkControllerSA = "work-controller-sa"
+	var hubAddOnManagerSA = "addon-manager-controller-sa"
 
 	ginkgo.BeforeEach(func() {
 		hostedCtx, hostedCancel = context.WithCancel(context.Background())
@@ -251,12 +251,12 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 			// Check validating webhook
 			registrationValidtingWebhook := "managedclustervalidators.admission.cluster.open-cluster-management.io"
 
-			//Should not apply the webhook config if the replica and observed is not set
+			// Should not apply the webhook config if the replica and observed is not set
 			_, err := hostedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(hostedCtx, registrationValidtingWebhook, metav1.GetOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 
 			workValidtingWebhook := "manifestworkvalidators.admission.work.open-cluster-management.io"
-			//Should not apply the webhook config if the replica and observed is not set
+			// Should not apply the webhook config if the replica and observed is not set
 			_, err = hostedKubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(hostedCtx, workValidtingWebhook, metav1.GetOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 

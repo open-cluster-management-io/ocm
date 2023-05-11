@@ -8,5 +8,5 @@ roleRef:
   name: open-cluster-management:{{ .ClusterManagerName }}-work:webhook
 subjects:
   - kind: ServiceAccount
-    name: {{ .ClusterManagerName }}-work-webhook-sa
+    name: work-webhook-sa
     namespace: {{ .ClusterManagerNamespace }}

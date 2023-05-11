@@ -37,7 +37,7 @@ spec:
                   values:
                   - clustermanager-placement-controller
       {{ if not .HostedMode }}
-      serviceAccountName: {{ .ClusterManagerName }}-placement-controller-sa
+      serviceAccountName: placement-controller-sa
       {{ end }}
       containers:
       - name: placement-controller
@@ -80,5 +80,5 @@ spec:
       volumes:
       - name: kubeconfig
         secret:
-          secretName: {{ .ClusterManagerName }}-placement-controller-sa-kubeconfig
+          secretName: placement-controller-sa-kubeconfig
       {{ end }}

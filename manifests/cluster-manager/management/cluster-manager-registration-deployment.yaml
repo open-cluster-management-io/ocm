@@ -37,7 +37,7 @@ spec:
                   values:
                   - clustermanager-registration-controller
       {{ if not .HostedMode }}
-      serviceAccountName: {{ .ClusterManagerName }}-registration-controller-sa
+      serviceAccountName: registration-controller-sa
       {{ end }}
       containers:
       - name: hub-registration-controller
@@ -85,5 +85,5 @@ spec:
       volumes:
       - name: kubeconfig
         secret:
-          secretName: {{ .ClusterManagerName }}-registration-controller-sa-kubeconfig
+          secretName: registration-controller-sa-kubeconfig
       {{ end }}

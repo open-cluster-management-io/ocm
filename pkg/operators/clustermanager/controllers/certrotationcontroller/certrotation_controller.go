@@ -26,9 +26,7 @@ import (
 )
 
 const (
-	signerSecret      = "signer-secret"
-	caBundleConfigmap = "ca-bundle-configmap"
-	signerNamePrefix  = "cluster-manager-webhook"
+	signerNamePrefix = "cluster-manager-webhook"
 )
 
 // Follow the rules below to set the value of SigningCertValidity/TargetCertValidity/ResyncInterval:
@@ -37,7 +35,7 @@ const (
 // 2) TargetCertValidity * 1/5 > ResyncInterval * 2
 var SigningCertValidity = time.Hour * 24 * 365
 var TargetCertValidity = time.Hour * 24 * 30
-var ResyncInterval = time.Minute * 5
+var ResyncInterval = time.Minute * 10
 
 // certRotationController does:
 //
@@ -50,7 +48,7 @@ var ResyncInterval = time.Minute * 5
 type certRotationController struct {
 	rotationMap          map[string]rotations // key is clusterManager's name, value is a rotations struct
 	kubeClient           kubernetes.Interface
-	secretInformer       corev1informers.SecretInformer
+	secretInformers      map[string]corev1informers.SecretInformer
 	configMapInformer    corev1informers.ConfigMapInformer
 	recorder             events.Recorder
 	clusterManagerLister operatorlister.ClusterManagerLister
@@ -64,7 +62,7 @@ type rotations struct {
 
 func NewCertRotationController(
 	kubeClient kubernetes.Interface,
-	secretInformer corev1informers.SecretInformer,
+	secretInformers map[string]corev1informers.SecretInformer,
 	configMapInformer corev1informers.ConfigMapInformer,
 	clusterManagerInformer operatorinformer.ClusterManagerInformer,
 	recorder events.Recorder,
@@ -72,7 +70,7 @@ func NewCertRotationController(
 	c := &certRotationController{
 		rotationMap:          make(map[string]rotations),
 		kubeClient:           kubeClient,
-		secretInformer:       secretInformer,
+		secretInformers:      secretInformers,
 		configMapInformer:    configMapInformer,
 		recorder:             recorder,
 		clusterManagerLister: clusterManagerInformer.Lister(),
@@ -80,30 +78,15 @@ func NewCertRotationController(
 	return factory.New().
 		ResyncEvery(ResyncInterval).
 		WithSync(c.sync).
-		WithFilteredEventsInformersQueueKeyFunc(
-			helpers.ClusterManagerConfigmapQueueKeyFunc(c.clusterManagerLister),
-			func(obj interface{}) bool {
-				accessor, _ := meta.Accessor(obj)
-				if name := accessor.GetName(); name != caBundleConfigmap {
-					return false
-				}
-				return true
-			},
-			configMapInformer.Informer()).
-		WithFilteredEventsInformersQueueKeyFunc(
-			helpers.ClusterManagerSecretQueueKeyFunc(c.clusterManagerLister),
-			func(obj interface{}) bool {
-				accessor, _ := meta.Accessor(obj)
-				if name := accessor.GetName(); name != signerSecret && name != helpers.RegistrationWebhookSecret && name != helpers.WorkWebhookSecret {
-					return false
-				}
-				return true
-			},
-			secretInformer.Informer()).
 		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
 			accessor, _ := meta.Accessor(obj)
 			return accessor.GetName()
 		}, clusterManagerInformer.Informer()).
+		WithInformersQueueKeyFunc(helpers.ClusterManagerQueueKeyFunc(c.clusterManagerLister),
+			configMapInformer.Informer(),
+			secretInformers[helpers.SignerSecret].Informer(),
+			secretInformers[helpers.RegistrationWebhookSecret].Informer(),
+			secretInformers[helpers.WorkWebhookSecret].Informer()).
 		ToController("CertRotationController", recorder)
 }
 
@@ -160,13 +143,13 @@ func (c certRotationController) syncOne(ctx context.Context, syncCtx factory.Syn
 		// clean up all resources related with this clustermanager
 		if _, ok := c.rotationMap[clustermanagerName]; ok {
 			// delete signerSecret
-			err = c.kubeClient.CoreV1().Secrets(clustermanagerNamespace).Delete(ctx, signerSecret, metav1.DeleteOptions{})
+			err = c.kubeClient.CoreV1().Secrets(clustermanagerNamespace).Delete(ctx, helpers.SignerSecret, metav1.DeleteOptions{})
 			if err != nil {
 				return fmt.Errorf("clean up deleted cluster-manager, deleting signer secret failed, err:%s", err.Error())
 			}
 
 			// delete caBundleConfig
-			err = c.kubeClient.CoreV1().ConfigMaps(clustermanagerNamespace).Delete(ctx, caBundleConfigmap, metav1.DeleteOptions{})
+			err = c.kubeClient.CoreV1().ConfigMaps(clustermanagerNamespace).Delete(ctx, helpers.CaBundleConfigmap, metav1.DeleteOptions{})
 			if err != nil {
 				return fmt.Errorf("clean up deleted cluster-manager, deleting caBundle config failed, err:%s", err.Error())
 			}
@@ -200,16 +183,16 @@ func (c certRotationController) syncOne(ctx context.Context, syncCtx factory.Syn
 	if _, ok := c.rotationMap[clustermanager.Name]; !ok {
 		signingRotation := certrotation.SigningRotation{
 			Namespace:        clustermanagerNamespace,
-			Name:             signerSecret,
+			Name:             helpers.SignerSecret,
 			SignerNamePrefix: signerNamePrefix,
 			Validity:         SigningCertValidity,
-			Lister:           c.secretInformer.Lister(),
+			Lister:           c.secretInformers[helpers.SignerSecret].Lister(),
 			Client:           c.kubeClient.CoreV1(),
 			EventRecorder:    c.recorder,
 		}
 		caBundleRotation := certrotation.CABundleRotation{
 			Namespace:     clustermanagerNamespace,
-			Name:          caBundleConfigmap,
+			Name:          helpers.CaBundleConfigmap,
 			Lister:        c.configMapInformer.Lister(),
 			Client:        c.kubeClient.CoreV1(),
 			EventRecorder: c.recorder,
@@ -220,7 +203,7 @@ func (c certRotationController) syncOne(ctx context.Context, syncCtx factory.Syn
 				Name:          helpers.RegistrationWebhookSecret,
 				Validity:      TargetCertValidity,
 				HostNames:     []string{fmt.Sprintf("%s.%s.svc", helpers.RegistrationWebhookService, clustermanagerNamespace)},
-				Lister:        c.secretInformer.Lister(),
+				Lister:        c.secretInformers[helpers.RegistrationWebhookSecret].Lister(),
 				Client:        c.kubeClient.CoreV1(),
 				EventRecorder: c.recorder,
 			},
@@ -229,7 +212,7 @@ func (c certRotationController) syncOne(ctx context.Context, syncCtx factory.Syn
 				Name:          helpers.WorkWebhookSecret,
 				Validity:      TargetCertValidity,
 				HostNames:     []string{fmt.Sprintf("%s.%s.svc", helpers.WorkWebhookService, clustermanagerNamespace)},
-				Lister:        c.secretInformer.Lister(),
+				Lister:        c.secretInformers[helpers.WorkWebhookSecret].Lister(),
 				Client:        c.kubeClient.CoreV1(),
 				EventRecorder: c.recorder,
 			},

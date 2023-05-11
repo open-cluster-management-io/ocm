@@ -41,8 +41,6 @@ const (
 	clusterManagerApplied     = "Applied"
 	clusterManagerProgressing = "Progressing"
 
-	caBundleConfigmap = "ca-bundle-configmap"
-
 	defaultWebhookPort       = int32(9443)
 	clusterManagerReSyncTime = 5 * time.Second
 )
@@ -104,7 +102,7 @@ func NewClusterManagerController(
 			helpers.ClusterManagerConfigmapQueueKeyFunc(controller.clusterManagerLister),
 			func(obj interface{}) bool {
 				accessor, _ := meta.Accessor(obj)
-				if name := accessor.GetName(); name != caBundleConfigmap {
+				if name := accessor.GetName(); name != helpers.CaBundleConfigmap {
 					return false
 				}
 				return true
@@ -232,9 +230,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		return removeClusterManagerFinalizer(ctx, n.clusterManagerClient, clusterManager)
 	}
 
-	//get caBundle
+	// get caBundle
 	caBundle := "placeholder"
-	configmap, err := n.configMapLister.ConfigMaps(clusterManagerNamespace).Get(caBundleConfigmap)
+	configmap, err := n.configMapLister.ConfigMaps(clusterManagerNamespace).Get(helpers.CaBundleConfigmap)
 	switch {
 	case errors.IsNotFound(err):
 		// do nothing
@@ -356,9 +354,8 @@ func generateHubClients(hubKubeConfig *rest.Config) (kubernetes.Interface, apiex
 // Finally, a deployment on the management cluster would use the kubeconfig to access resources on the hub cluster.
 func ensureSAKubeconfigs(ctx context.Context, clusterManagerName, clusterManagerNamespace string,
 	hubKubeConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error {
-	sas := getSAs(clusterManagerName)
-	for _, sa := range sas {
-		tokenGetter := helpers.SATokenGetter(ctx, sa, clusterManagerNamespace, hubClient)
+	for _, sa := range getSAs() {
+		tokenGetter := helpers.SATokenCreater(ctx, sa, clusterManagerNamespace, hubClient)
 		err := helpers.SyncKubeConfigSecret(ctx, sa+"-kubeconfig", clusterManagerNamespace, "/var/run/secrets/hub/kubeconfig", &rest.Config{
 			Host: hubKubeConfig.Host,
 			TLSClientConfig: rest.TLSClientConfig{

@@ -37,7 +37,7 @@ spec:
                   values:
                   - {{ .ClusterManagerName }}-work-webhook
       {{ if not .HostedMode }}
-      serviceAccountName: {{ .ClusterManagerName }}-work-webhook-sa
+      serviceAccountName: work-webhook-sa
       {{ end }}
       containers:
       - name: {{ .ClusterManagerName }}-webhook
@@ -97,5 +97,5 @@ spec:
       {{ if .HostedMode }}
       - name: kubeconfig
         secret:
-          secretName: {{ .ClusterManagerName }}-work-webhook-sa-kubeconfig
+          secretName: work-webhook-sa-kubeconfig
       {{ end }}

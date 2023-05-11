@@ -5,8 +5,24 @@ metadata:
 rules:
 # Allow the registration-operator to create workload
 - apiGroups: [""]
-  resources: ["configmaps", "namespaces", "serviceaccounts", "services", "secrets"]
+  resources: ["configmaps", "namespaces", "serviceaccounts", "services"]
   verbs: ["create", "get", "list", "update", "watch", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch", "update", "patch", "delete"]
+  resourceNames:
+    - "signer-secret"
+    - "registration-webhook-serving-cert"
+    - "work-webhook-serving-cert"
+    - "registration-controller-sa-kubeconfig"
+    - "registration-webhook-sa-kubeconfig"
+    - "work-webhook-sa-kubeconfig"
+    - "placement-controller-sa-kubeconfig"
+    - "work-controller-sa-kubeconfig"
+    - "external-hub-kubeconfig"
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create"]
 - apiGroups: ["coordination.k8s.io"]
   resources: ["leases"]
   verbs: ["create", "get", "list", "update", "watch", "patch"]

@@ -59,11 +59,11 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 	var hubWorkWebhookClusterRole = fmt.Sprintf("open-cluster-management:%s-work:webhook", clusterManagerName)
 	var hubWorkControllerClusterRole = fmt.Sprintf("open-cluster-management:%s-work:controller", clusterManagerName)
 	var hubAddOnManagerClusterRole = fmt.Sprintf("open-cluster-management:%s-addon-manager:controller", clusterManagerName)
-	var hubRegistrationSA = fmt.Sprintf("%s-registration-controller-sa", clusterManagerName)
-	var hubRegistrationWebhookSA = fmt.Sprintf("%s-registration-webhook-sa", clusterManagerName)
-	var hubWorkWebhookSA = fmt.Sprintf("%s-work-webhook-sa", clusterManagerName)
-	var hubWorkControllerSA = fmt.Sprintf("%s-work-controller-sa", clusterManagerName)
-	var hubAddOnManagerSA = fmt.Sprintf("%s-addon-manager-controller-sa", clusterManagerName)
+	var hubRegistrationSA = "registration-controller-sa"
+	var hubRegistrationWebhookSA = "registration-webhook-sa"
+	var hubWorkWebhookSA = "work-webhook-sa"
+	var hubWorkControllerSA = "work-controller-sa"
+	var hubAddOnManagerSA = "addon-manager-controller-sa"
 
 	ginkgo.BeforeEach(func() {
 		var ctx context.Context
@@ -250,11 +250,11 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 			// Check validating webhook
 			registrationValidtingWebhook := "managedclustervalidators.admission.cluster.open-cluster-management.io"
 
-			//Should not apply the webhook config if the replica and observed is not set
+			// Should not apply the webhook config if the replica and observed is not set
 			_, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(context.Background(), registrationValidtingWebhook, metav1.GetOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			workValidtingWebhook := "manifestworkvalidators.admission.work.open-cluster-management.io"
-			//Should not apply the webhook config if the replica and observed is not set
+			// Should not apply the webhook config if the replica and observed is not set
 			_, err = kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(context.Background(), workValidtingWebhook, metav1.GetOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 

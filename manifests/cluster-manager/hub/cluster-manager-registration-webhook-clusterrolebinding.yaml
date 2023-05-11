@@ -8,5 +8,5 @@ roleRef:
   name: open-cluster-management:{{ .ClusterManagerName }}-registration:webhook
 subjects:
   - kind: ServiceAccount
-    name: {{ .ClusterManagerName }}-registration-webhook-sa
+    name: registration-webhook-sa
     namespace: {{ .ClusterManagerNamespace }}

@@ -37,7 +37,7 @@ spec:
                   values:
                   - clustermanager-addon-manager-controller
       {{ if not .HostedMode }}
-      serviceAccountName: {{ .ClusterManagerName }}-addon-manager-controller-sa
+      serviceAccountName: addon-manager-controller-sa
       {{ end }}
       containers:
       - name: addon-manager-controller
@@ -80,5 +80,5 @@ spec:
       volumes:
       - name: kubeconfig
         secret:
-          secretName: {{ .ClusterManagerName }}-addon-manager-controller-sa-kubeconfig
+          secretName: addon-manager-controller-sa-kubeconfig
       {{ end }}

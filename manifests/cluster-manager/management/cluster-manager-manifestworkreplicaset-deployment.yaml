@@ -37,7 +37,7 @@ spec:
                   values:
                   - {{ .ClusterManagerName }}-work-controller
       {{ if not .HostedMode }}
-      serviceAccountName: {{ .ClusterManagerName }}-work-controller-sa
+      serviceAccountName: work-controller-sa
       {{ end }}
       containers:
       - name: {{ .ClusterManagerName }}-work-controller
@@ -83,5 +83,5 @@ spec:
       {{ if .HostedMode }}
       - name: kubeconfig
         secret:
-          secretName: {{ .ClusterManagerName }}-work-controller-sa-kubeconfig
+          secretName: work-controller-sa-kubeconfig
       {{ end }}
