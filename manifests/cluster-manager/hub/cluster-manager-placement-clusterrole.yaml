@@ -5,8 +5,11 @@ metadata:
 rules:
 # Allow controller to get/list/watch/create/delete configmaps
 - apiGroups: [""]
-  resources: ["configmaps"]
+  resources: ["configmaps", "pods"]
   verbs: ["get", "list", "watch", "create", "delete", "update"]
+- apiGroups: ["apps"]
+  resources: ["replicasets"]
+  verbs: ["get"] 
 # Allow controller to create/patch/update events
 - apiGroups: ["", "events.k8s.io"]
   resources: ["events"]
@@ -36,3 +39,6 @@ rules:
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["placements/finalizers"]
   verbs: ["update"]
+- apiGroups: ["config.openshift.io"]
+  resources: ["infrastructures"]
+  verbs: ["get"]
