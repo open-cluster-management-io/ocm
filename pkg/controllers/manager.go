@@ -18,6 +18,9 @@ import (
 
 // RunControllerManager starts the controllers on hub to make placement decisions.
 func RunControllerManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+	kubeConf := controllerContext.KubeConfig
+	kubeConf.QPS = 50
+	kubeConf.Burst = 100
 	clusterClient, err := clusterclient.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
