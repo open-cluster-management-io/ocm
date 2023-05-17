@@ -143,10 +143,16 @@ func Test_v1beta1CSRApprovingController_sync(t *testing.T) {
 				}
 			}
 
-			ctrl := &v1beta1CSRApprovingController{
-				kubeClient,
-				informerFactory.Certificates().V1beta1().CertificateSigningRequests().Lister(),
-				eventstesting.NewTestingEventRecorder(t),
+			ctrl := &csrApprovingController[*certificatesv1beta1.CertificateSigningRequest]{
+				lister:   informerFactory.Certificates().V1beta1().CertificateSigningRequests().Lister(),
+				approver: NewCSRV1beta1Approver(kubeClient),
+				reconcilers: []Reconciler{
+					&csrBootstrapReconciler{},
+					&csrRenewalReconciler{
+						kubeClient:    kubeClient,
+						eventRecorder: eventstesting.NewTestingEventRecorder(t),
+					},
+				},
 			}
 			if err := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, validV1beta1CSR.Name)); (err != nil) != tt.wantErr {
 				t.Errorf("v1beta1CSRApprovingController.sync() error = %v, wantErr %v", err, tt.wantErr)

@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -45,6 +46,19 @@ type ControllerCommandConfig struct {
 
 	// DisableLeaderElection allows leader election to be suspended
 	DisableLeaderElection bool
+
+	// LeaseDuration is the duration that non-leader candidates will
+	// wait to force acquire leadership. This is measured against time of
+	// last observed ack.
+	LeaseDuration metav1.Duration
+
+	// RenewDeadline is the duration that the acting controlplane will retry
+	// refreshing leadership before giving up.
+	RenewDeadline metav1.Duration
+
+	// RetryPeriod is the duration the LeaderElector clients should wait
+	// between tries of actions.
+	RetryPeriod metav1.Duration
 
 	ComponentOwnerReference *corev1.ObjectReference
 }
@@ -277,6 +291,9 @@ func (c *ControllerCommandConfig) StartController(ctx context.Context) error {
 	}()
 
 	config.LeaderElection.Disable = c.DisableLeaderElection
+	config.LeaderElection.LeaseDuration = c.LeaseDuration
+	config.LeaderElection.RenewDeadline = c.RenewDeadline
+	config.LeaderElection.RetryPeriod = c.RetryPeriod
 
 	builder := NewController(c.componentName, c.startFunc).
 		WithKubeConfigFile(c.basicFlags.KubeConfigFile, nil).

@@ -80,7 +80,7 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 
 		// start hub controller
 		go func() {
-			err := hub.RunControllerManager(ctx, &controllercmd.ControllerContext{
+			err := hub.NewHubManagerOptions().RunControllerManager(ctx, &controllercmd.ControllerContext{
 				KubeConfig:    cfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
 			})

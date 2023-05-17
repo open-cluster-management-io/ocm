@@ -239,6 +239,62 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
 			})
 
+			ginkgo.It("Should forbid the request when creating a managed cluster with a termaniting namespace", func() {
+				var err error
+
+				sa := fmt.Sprintf("webhook-sa-%s", rand.String(6))
+				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
+
+				authorizedClient, err := buildClusterClient(saNamespace, sa, []rbacv1.PolicyRule{
+					{
+						APIGroups: []string{"cluster.open-cluster-management.io"},
+						Resources: []string{"managedclusters"},
+						Verbs:     []string{"create", "get", "update"},
+					},
+					{
+						APIGroups: []string{"cluster.open-cluster-management.io"},
+						Resources: []string{"managedclustersets/join"},
+						Verbs:     []string{"create"},
+					},
+					{
+						APIGroups:     []string{"register.open-cluster-management.io"},
+						Resources:     []string{"managedclusters/accept"},
+						ResourceNames: []string{clusterName},
+						Verbs:         []string{"update"},
+					},
+				}, nil)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// create a namespace, add a finilizer to it, and delete it
+				_, err = hubClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: clusterName,
+						Finalizers: []string{
+							"open-cluster-mangement.io/finalizer",
+						},
+					},
+				}, metav1.CreateOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// delete the namespace
+				err = hubClient.CoreV1().Namespaces().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// create a managed cluster, should be denied
+				managedCluster := newManagedCluster(clusterName, true, validURL)
+				_, err = authorizedClient.ClusterV1().ManagedClusters().Create(context.TODO(), managedCluster, metav1.CreateOptions{})
+				gomega.Expect(errors.IsForbidden(err)).Should(gomega.BeTrue())
+
+				// remove the finalizer to truely delete the namespace
+				ns, err := hubClient.CoreV1().Namespaces().Get(context.TODO(), clusterName, metav1.GetOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				ns.Finalizers = []string{}
+				_, err = hubClient.CoreV1().Namespaces().Update(context.TODO(), ns, metav1.UpdateOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
+			})
+
 			ginkgo.It("Should accept the request when creating an accepted managed cluster by authorized user", func() {
 				sa := fmt.Sprintf("webhook-sa-%s", rand.String(6))
 				clusterName := fmt.Sprintf("webhook-spoke-%s", rand.String(6))
@@ -501,6 +557,58 @@ var _ = ginkgo.Describe("Admission webhook", func() {
 				})
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(errors.IsForbidden(err)).Should(gomega.BeTrue())
+
+				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
+			})
+
+			ginkgo.It("Should forbid the request when updating a managed cluster with a terminating namespace", func() {
+				sa := fmt.Sprintf("webhook-sa-%s", rand.String(6))
+				var err error
+				authorizedClient, err := buildClusterClient(saNamespace, sa, []rbacv1.PolicyRule{
+					{
+						APIGroups: []string{"cluster.open-cluster-management.io"},
+						Resources: []string{"managedclusters"},
+						Verbs:     []string{"create", "get", "update"},
+					},
+					{
+						APIGroups: []string{"cluster.open-cluster-management.io"},
+						Resources: []string{"managedclustersets/join"},
+						Verbs:     []string{"create"},
+					},
+					{
+						APIGroups:     []string{"register.open-cluster-management.io"},
+						Resources:     []string{"managedclusters/accept"},
+						ResourceNames: []string{clusterName},
+						Verbs:         []string{"update"},
+					},
+				}, nil)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// create a namespace, add a finilizer to it, and delete it
+				_, err = hubClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: clusterName,
+						Finalizers: []string{
+							"open-cluster-mangement.io/finalizer",
+						},
+					},
+				}, metav1.CreateOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// delete the namespace
+				err = hubClient.CoreV1().Namespaces().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// update the HubAcceptsClient field to true
+				err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+					managedCluster, err := authorizedClient.ClusterV1().ManagedClusters().Get(context.TODO(), clusterName, metav1.GetOptions{})
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+					managedCluster.Spec.HubAcceptsClient = true
+					_, err = authorizedClient.ClusterV1().ManagedClusters().Update(context.TODO(), managedCluster, metav1.UpdateOptions{})
+					return err
+				})
+				gomega.Expect(errors.IsForbidden(err)).To(gomega.BeTrue())
 
 				gomega.Expect(cleanupClusterClient(saNamespace, sa)).ToNot(gomega.HaveOccurred())
 			})

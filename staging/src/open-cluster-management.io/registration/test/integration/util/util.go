@@ -45,6 +45,8 @@ const (
 	TestDir                  = "/tmp/registration-integration-test"
 )
 
+const AutoApprovalBootstrapUser = "autoapproval-user"
+
 var (
 	CertDir          = path.Join(TestDir, "client-certs")
 	caFile           = path.Join(CertDir, "ca.crt")
@@ -171,6 +173,14 @@ func (t *TestAuthn) Stop() error {
 }
 
 func (t *TestAuthn) CreateBootstrapKubeConfigWithCertAge(configFileName, serverCertFile, securePort string, certAge time.Duration) error {
+	return t.CreateBootstrapKubeConfig(configFileName, serverCertFile, securePort, bootstrapUser, certAge)
+}
+
+func (t *TestAuthn) CreateBootstrapKubeConfigWithUser(configFileName, serverCertFile, securePort, bootstrapUser string) error {
+	return t.CreateBootstrapKubeConfig(configFileName, serverCertFile, securePort, bootstrapUser, 24*time.Hour)
+}
+
+func (t *TestAuthn) CreateBootstrapKubeConfig(configFileName, serverCertFile, securePort, bootstrapUser string, certAge time.Duration) error {
 	certData, keyData, err := t.signClientCertKeyWithCA(bootstrapUser, bootstrapGroups, certAge)
 	if err != nil {
 		return err
@@ -418,6 +428,27 @@ func (t *TestAuthn) ApproveSpokeClusterCSR(kubeClient kubernetes.Interface, spok
 }
 
 func (t *TestAuthn) ApproveCSR(kubeClient kubernetes.Interface, csr *certificates.CertificateSigningRequest, notBefore, notAfter time.Time) error {
+	if err := t.FillCertificateToApprovedCSR(kubeClient, csr, notBefore, notAfter); err != nil {
+		return err
+	}
+
+	// approve the csr
+	approved, err := kubeClient.CertificatesV1().CertificateSigningRequests().Get(context.TODO(), csr.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	approved.Status.Conditions = append(approved.Status.Conditions, certificates.CertificateSigningRequestCondition{
+		Type:           certificates.CertificateApproved,
+		Status:         corev1.ConditionTrue,
+		Reason:         "Approved",
+		Message:        "CSR Approved.",
+		LastUpdateTime: metav1.Now(),
+	})
+	_, err = kubeClient.CertificatesV1().CertificateSigningRequests().UpdateApproval(context.TODO(), approved.Name, approved, metav1.UpdateOptions{})
+	return err
+}
+
+func (t *TestAuthn) FillCertificateToApprovedCSR(kubeClient kubernetes.Interface, csr *certificates.CertificateSigningRequest, notBefore, notAfter time.Time) error {
 	block, _ := pem.Decode(csr.Spec.Request)
 	cr, err := x509.ParseCertificateRequest(block.Bytes)
 	if err != nil {
@@ -470,29 +501,13 @@ func (t *TestAuthn) ApproveCSR(kubeClient kubernetes.Interface, csr *certificate
 	}
 
 	// set cert
-	csr.Status = certificates.CertificateSigningRequestStatus{
-		Certificate: certBuffer.Bytes(),
-		Conditions:  []certificates.CertificateSigningRequestCondition{},
-	}
+	csr.Status.Certificate = certBuffer.Bytes()
 	_, err = kubeClient.CertificatesV1().CertificateSigningRequests().UpdateStatus(context.TODO(), csr, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
 
-	// approve the csr
-	approved, err := kubeClient.CertificatesV1().CertificateSigningRequests().Get(context.TODO(), csr.Name, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	approved.Status.Conditions = append(approved.Status.Conditions, certificates.CertificateSigningRequestCondition{
-		Type:           certificates.CertificateApproved,
-		Status:         corev1.ConditionTrue,
-		Reason:         "Approved",
-		Message:        "CSR Approved.",
-		LastUpdateTime: metav1.Now(),
-	})
-	_, err = kubeClient.CertificatesV1().CertificateSigningRequests().UpdateApproval(context.TODO(), approved.Name, approved, metav1.UpdateOptions{})
-	return err
+	return nil
 }
 
 func GetManagedCluster(clusterClient clusterclientset.Interface, spokeClusterName string) (*clusterv1.ManagedCluster, error) {

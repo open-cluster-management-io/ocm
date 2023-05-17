@@ -7,6 +7,9 @@ rules:
 - apiGroups: [""]
   resources: ["configmaps"]
   verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get"]
 # Allow managedcluster admission to create subjectaccessreviews
 - apiGroups: ["authorization.k8s.io"]
   resources: ["subjectaccessreviews"]

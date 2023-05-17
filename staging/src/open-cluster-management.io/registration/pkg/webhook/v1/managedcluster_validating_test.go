@@ -15,12 +15,15 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	v1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/api/cluster/v1beta1"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 func TestValidateCreate(t *testing.T) {
 	cases := []struct {
 		name                   string
 		cluster                *v1.ManagedCluster
+		preObjs                []runtime.Object
 		expectedError          bool
 		allowUpdateAcceptField bool
 		allowClusterset        bool
@@ -58,6 +61,52 @@ func TestValidateCreate(t *testing.T) {
 				},
 				Spec: v1.ManagedClusterSpec{
 					HubAcceptsClient: true,
+				},
+			},
+		},
+		{
+			name:                   "validate cluster namespace, namespace is active",
+			expectedError:          false,
+			allowUpdateAcceptField: true,
+			cluster: &v1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "set-1",
+				},
+				Spec: v1.ManagedClusterSpec{
+					HubAcceptsClient: true,
+				},
+			},
+			preObjs: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "set-1",
+					},
+					Status: corev1.NamespaceStatus{
+						Phase: corev1.NamespaceActive,
+					},
+				},
+			},
+		},
+		{
+			name:                   "validate cluster namespace, namespace is terminating",
+			expectedError:          true,
+			allowUpdateAcceptField: true,
+			cluster: &v1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "set-1",
+				},
+				Spec: v1.ManagedClusterSpec{
+					HubAcceptsClient: true,
+				},
+			},
+			preObjs: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "set-1",
+					},
+					Status: corev1.NamespaceStatus{
+						Phase: corev1.NamespaceTerminating,
+					},
 				},
 			},
 		},
@@ -136,7 +185,7 @@ func TestValidateCreate(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			kubeClient := kubefake.NewSimpleClientset()
+			kubeClient := kubefake.NewSimpleClientset(c.preObjs...)
 			kubeClient.PrependReactor(
 				"create",
 				"subjectaccessreviews",
@@ -194,6 +243,7 @@ func TestValidateUpdate(t *testing.T) {
 		name                   string
 		cluster                *v1.ManagedCluster
 		oldCluster             *v1.ManagedCluster
+		preObjs                []runtime.Object
 		expectedError          bool
 		allowUpdateAcceptField bool
 		allowClusterset        bool
@@ -243,6 +293,66 @@ func TestValidateUpdate(t *testing.T) {
 					HubAcceptsClient: true,
 				},
 			},
+		},
+		{
+			name:                   "validate update ManagedCluster when namespace is terminating",
+			expectedError:          true,
+			allowUpdateAcceptField: true,
+			cluster: &v1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "set-1",
+				},
+				Spec: v1.ManagedClusterSpec{
+					HubAcceptsClient: true,
+				},
+			},
+			oldCluster: &v1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "set-1",
+				},
+				Spec: v1.ManagedClusterSpec{
+					HubAcceptsClient: false,
+				},
+			},
+			preObjs: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "set-1",
+					},
+					Status: corev1.NamespaceStatus{
+						Phase: corev1.NamespaceTerminating,
+					},
+				}},
+		},
+		{
+			name:                   "validate update ManagedCluster when namespace is active",
+			expectedError:          false,
+			allowUpdateAcceptField: true,
+			cluster: &v1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "set-1",
+				},
+				Spec: v1.ManagedClusterSpec{
+					HubAcceptsClient: true,
+				},
+			},
+			oldCluster: &v1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "set-1",
+				},
+				Spec: v1.ManagedClusterSpec{
+					HubAcceptsClient: false,
+				},
+			},
+			preObjs: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "set-1",
+					},
+					Status: corev1.NamespaceStatus{
+						Phase: corev1.NamespaceActive,
+					},
+				}},
 		},
 		{
 			name:                   "validate updating an accepted ManagedCluster with permission",
@@ -443,7 +553,7 @@ func TestValidateUpdate(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			kubeClient := kubefake.NewSimpleClientset()
+			kubeClient := kubefake.NewSimpleClientset(c.preObjs...)
 			kubeClient.PrependReactor(
 				"create",
 				"subjectaccessreviews",

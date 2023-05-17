@@ -53,6 +53,27 @@ func TestGetRegistrationConfigs(t *testing.T) {
 			},
 		},
 		{
+			name: "namespace in status",
+			addon: &addonv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testinghelpers.TestManagedClusterName,
+					Name:      addOnName,
+				},
+				Spec: addonv1alpha1.ManagedClusterAddOnSpec{},
+				Status: addonv1alpha1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1alpha1.RegistrationConfig{
+						{
+							SignerName: "kubernetes.io/kube-apiserver-client",
+						},
+					},
+					Namespace: addOnNamespace,
+				},
+			},
+			configs: []registrationConfig{
+				newRegistrationConfig(addOnName, addOnNamespace, "kubernetes.io/kube-apiserver-client", "", nil, false),
+			},
+		},
+		{
 			name: "with default signer hosted mode",
 			addon: &addonv1alpha1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{

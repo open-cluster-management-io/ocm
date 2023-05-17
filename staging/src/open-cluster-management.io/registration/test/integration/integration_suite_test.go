@@ -3,7 +3,6 @@ package integration_test
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -66,7 +65,7 @@ func TestIntegration(t *testing.T) {
 	ginkgo.RunSpecs(t, "Integration Suite")
 }
 
-var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
+var _ = ginkgo.BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
 
 	ginkgo.By("bootstrapping test environment")
@@ -141,7 +140,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	gomega.Expect(clusterClient).ToNot(gomega.BeNil())
 
 	// prepare test namespace
-	nsBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	nsBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err != nil {
 		testNamespace = "open-cluster-management-agent"
 	} else {
@@ -154,16 +153,20 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	err = features.DefaultHubMutableFeatureGate.Set("DefaultClusterSet=true")
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+	// enable ManagedClusterAutoApproval feature gate
+	err = features.DefaultHubMutableFeatureGate.Set("ManagedClusterAutoApproval=true")
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 	// start hub controller
 	go func() {
-		err := hub.RunControllerManager(ctx, &controllercmd.ControllerContext{
+		m := hub.NewHubManagerOptions()
+		m.ClusterAutoApprovalUsers = []string{util.AutoApprovalBootstrapUser}
+		err := m.RunControllerManager(ctx, &controllercmd.ControllerContext{
 			KubeConfig:    cfg,
 			EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
 		})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	}()
-
-	close(done)
 })
 
 var _ = ginkgo.AfterSuite(func() {

@@ -38,7 +38,7 @@ func (c *Options) RunWebhookServer() error {
 		Port:                   c.Port,
 		HealthProbeBindAddress: ":8000",
 		CertDir:                c.CertDir,
-		WebhookServer:          &webhook.Server{TLSMinVersion: "1.2"},
+		WebhookServer:          &webhook.Server{TLSMinVersion: "1.3"},
 	})
 
 	if err != nil {

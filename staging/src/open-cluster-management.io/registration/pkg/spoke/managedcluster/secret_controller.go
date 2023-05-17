@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -93,7 +94,7 @@ func DumpSecret(
 	// create/update files from the secret
 	for key, data := range secret.Data {
 		filename := path.Clean(path.Join(outputDir, key))
-		lastData, err := ioutil.ReadFile(filename)
+		lastData, err := ioutil.ReadFile(filepath.Clean(filename))
 		switch {
 		case os.IsNotExist(err):
 			// create file

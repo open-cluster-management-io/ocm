@@ -3,9 +3,10 @@ package managedcluster
 import (
 	"crypto/x509/pkix"
 	"fmt"
+	"strings"
+
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	"strings"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -43,6 +44,7 @@ func NewClientCertForHubController(
 	kubeconfigData []byte,
 	spokeSecretInformer corev1informers.SecretInformer,
 	csrControl clientcert.CSRControl,
+	csrExpirationSeconds int32,
 	spokeKubeClient kubernetes.Interface,
 	statusUpdater clientcert.StatusUpdateFunc,
 	recorder events.Recorder,
@@ -62,6 +64,11 @@ func NewClientCertForHubController(
 			clientcert.AgentNameFile:   []byte(agentName),
 			clientcert.KubeconfigFile:  kubeconfigData,
 		},
+	}
+
+	var csrExpirationSecondsInCSROption *int32
+	if csrExpirationSeconds != 0 {
+		csrExpirationSecondsInCSROption = &csrExpirationSeconds
 	}
 	csrOption := clientcert.CSROption{
 		ObjectMeta: metav1.ObjectMeta{
@@ -99,7 +106,8 @@ func NewClientCertForHubController(
 			// only enqueue csr whose name starts with the cluster name
 			return strings.HasPrefix(accessor.GetName(), fmt.Sprintf("%s-", clusterName))
 		},
-		HaltCSRCreation: haltCSRCreationFunc(csrControl.Informer().GetIndexer(), clusterName),
+		HaltCSRCreation:   haltCSRCreationFunc(csrControl.Informer().GetIndexer(), clusterName),
+		ExpirationSeconds: csrExpirationSecondsInCSROption,
 	}
 
 	return clientcert.NewClientCertificateController(

@@ -59,10 +59,13 @@ func (c *registrationConfig) x509Subject(clusterName, agentName string) *pkix.Na
 }
 
 // getAddOnInstallationNamespace returns addon installation namespace from addon spec.
-// If the installation namespace is not specified on addon spec, the addon default
+// It first checks the installation namespace in status then addon spec, the addon default
 // installation namespace open-cluster-management-agent-addon will be returned.
 func getAddOnInstallationNamespace(addOn *addonv1alpha1.ManagedClusterAddOn) string {
-	installationNamespace := addOn.Spec.InstallNamespace
+	installationNamespace := addOn.Status.Namespace
+	if installationNamespace == "" {
+		installationNamespace = addOn.Spec.InstallNamespace
+	}
 	if installationNamespace == "" {
 		installationNamespace = defaultAddOnInstallationNamespace
 	}

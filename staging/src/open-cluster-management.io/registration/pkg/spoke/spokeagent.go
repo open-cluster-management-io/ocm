@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"os"
 	"path"
 	"time"
 
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -54,16 +54,17 @@ var AddOnLeaseControllerSyncInterval = 30 * time.Second
 
 // SpokeAgentOptions holds configuration for spoke cluster agent
 type SpokeAgentOptions struct {
-	ComponentNamespace       string
-	ClusterName              string
-	AgentName                string
-	BootstrapKubeconfig      string
-	HubKubeconfigSecret      string
-	HubKubeconfigDir         string
-	SpokeExternalServerURLs  []string
-	ClusterHealthCheckPeriod time.Duration
-	MaxCustomClusterClaims   int
-	SpokeKubeconfig          string
+	ComponentNamespace          string
+	ClusterName                 string
+	AgentName                   string
+	BootstrapKubeconfig         string
+	HubKubeconfigSecret         string
+	HubKubeconfigDir            string
+	SpokeExternalServerURLs     []string
+	ClusterHealthCheckPeriod    time.Duration
+	MaxCustomClusterClaims      int
+	SpokeKubeconfig             string
+	ClientCertExpirationSeconds int32
 }
 
 // NewSpokeAgentOptions returns a SpokeAgentOptions
@@ -217,6 +218,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 			// store the secret in the cluster where the agent pod runs
 			bootstrapNamespacedManagementKubeInformerFactory.Core().V1().Secrets(),
 			csrControl,
+			o.ClientCertExpirationSeconds,
 			managementKubeClient,
 			managedcluster.GenerateBootstrapStatusUpdater(),
 			controllerContext.EventRecorder,
@@ -302,6 +304,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		kubeconfigData,
 		namespacedManagementKubeInformerFactory.Core().V1().Secrets(),
 		csrControl,
+		o.ClientCertExpirationSeconds,
 		managementKubeClient,
 		managedcluster.GenerateStatusUpdater(hubClusterClient, o.ClusterName),
 		controllerContext.EventRecorder,
@@ -425,6 +428,8 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 		"The period to check managed cluster kube-apiserver health")
 	fs.IntVar(&o.MaxCustomClusterClaims, "max-custom-cluster-claims", o.MaxCustomClusterClaims,
 		"The max number of custom cluster claims to expose.")
+	fs.Int32Var(&o.ClientCertExpirationSeconds, "client-cert-expiration-seconds", o.ClientCertExpirationSeconds,
+		"The requested duration in seconds of validity of the issued client certificate. If this is not set, the value of --cluster-signing-duration command-line flag of the kube-controller-manager will be used.")
 }
 
 // Validate verifies the inputs.
@@ -452,6 +457,10 @@ func (o *SpokeAgentOptions) Validate() error {
 
 	if o.ClusterHealthCheckPeriod <= 0 {
 		return errors.New("cluster healthcheck period must greater than zero")
+	}
+
+	if o.ClientCertExpirationSeconds != 0 && o.ClientCertExpirationSeconds < 600 {
+		return errors.New("client certificate expiration seconds must greater or qual to 600")
 	}
 
 	return nil
