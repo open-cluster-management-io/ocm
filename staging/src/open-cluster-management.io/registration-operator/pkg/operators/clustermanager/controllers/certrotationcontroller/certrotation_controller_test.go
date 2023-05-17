@@ -2,6 +2,8 @@ package certrotationcontroller
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/fields"
+	corev1informers "k8s.io/client-go/informers/core/v1"
 	"testing"
 	"time"
 
@@ -27,7 +29,7 @@ const (
 	testClusterManagerNameHosted  = "testclustermanager-hosted"
 )
 
-var secretNames = []string{signerSecret, helpers.RegistrationWebhookSecret, helpers.WorkWebhookSecret}
+var secretNames = []string{helpers.SignerSecret, helpers.RegistrationWebhookSecret, helpers.WorkWebhookSecret}
 
 func newClusterManager(name string, mode operatorapiv1.InstallMode) *operatorapiv1.ClusterManager {
 	return &operatorapiv1.ClusterManager{
@@ -147,7 +149,22 @@ func TestCertRotation(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			kubeClient := fakekube.NewSimpleClientset(c.existingObjects...)
-			kubeInformer := kubeinformers.NewSharedInformerFactory(kubeClient, 5*time.Minute)
+
+			newOnTermInformer := func(name string) kubeinformers.SharedInformerFactory {
+				return kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, 5*time.Minute,
+					kubeinformers.WithTweakListOptions(func(options *metav1.ListOptions) {
+						options.FieldSelector = fields.OneTermEqualSelector("metadata.name", name).String()
+					}))
+			}
+
+			secretInformers := map[string]corev1informers.SecretInformer{
+				helpers.SignerSecret:              newOnTermInformer(helpers.SignerSecret).Core().V1().Secrets(),
+				helpers.RegistrationWebhookSecret: newOnTermInformer(helpers.RegistrationWebhookSecret).Core().V1().Secrets(),
+				helpers.WorkWebhookSecret:         newOnTermInformer(helpers.WorkWebhookSecret).Core().V1().Secrets(),
+			}
+
+			configmapInformer := newOnTermInformer(helpers.CaBundleConfigmap).Core().V1().ConfigMaps()
+
 			clusterManagers := []runtime.Object{}
 			for i := range c.clusterManagers {
 				clusterManagers = append(clusterManagers, c.clusterManagers[i])
@@ -164,7 +181,7 @@ func TestCertRotation(t *testing.T) {
 			syncContext := testinghelper.NewFakeSyncContext(t, c.queueKey)
 			recorder := syncContext.Recorder()
 
-			controller := NewCertRotationController(kubeClient, kubeInformer.Core().V1().Secrets(), kubeInformer.Core().V1().ConfigMaps(), operatorInformers.Operator().V1().ClusterManagers(), recorder)
+			controller := NewCertRotationController(kubeClient, secretInformers, configmapInformer, operatorInformers.Operator().V1().ClusterManagers(), recorder)
 
 			err := controller.Sync(context.TODO(), syncContext)
 			c.validate(t, kubeClient, err)

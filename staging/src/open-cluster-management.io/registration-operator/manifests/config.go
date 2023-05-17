@@ -15,7 +15,8 @@ type HubConfig struct {
 	RegistrationFeatureGates       []string
 	WorkFeatureGates               []string
 	AddOnManagerImage              string
-	AddOnManagerComponentMode      string
+	AddOnManagerEnabled            bool
+	MWReplicaSetEnabled            bool
 }
 
 type Webhook struct {

@@ -17,8 +17,7 @@ type Interface interface {
 	AddonV1alpha1() addonv1alpha1.AddonV1alpha1Interface
 }
 
-// Clientset contains the clients for groups. Each group has exactly one
-// version included in a Clientset.
+// Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
 	addonV1alpha1 *addonv1alpha1.AddonV1alpha1Client

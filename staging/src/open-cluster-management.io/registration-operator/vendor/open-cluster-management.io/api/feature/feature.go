@@ -23,8 +23,11 @@ const (
 	// itself to avoid impact to users.
 	ClusterClaim featuregate.Feature = "ClusterClaim"
 
-	// AddonManagement will start new controllers in the spoke-agent to manage the managed cluster addons
+	// AddonManagement is a feature gate on hub controller and spoke-agent. When it is enabled on the
+	//spoke agent, it will start a new controllers to manage the managed cluster addons
 	// registration and maintains the status of managed cluster addons through watching their leases.
+	// When it is enabled on hub controller, it will start a new controller to process addon automatic
+	// installation and rolling out.
 	AddonManagement featuregate.Feature = "AddonManagement"
 
 	// DefaultClusterSet will make registration hub controller to maintain a default clusterset and a global clusterset.
@@ -78,6 +81,10 @@ var DefaultHubRegistrationFeatureGates = map[featuregate.Feature]featuregate.Fea
 	DefaultClusterSet:          {Default: false, PreRelease: featuregate.Alpha},
 	V1beta1CSRAPICompatibility: {Default: false, PreRelease: featuregate.Alpha},
 	ManagedClusterAutoApproval: {Default: false, PreRelease: featuregate.Alpha},
+}
+
+var DefaultHubAddonManagerFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	AddonManagement: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 // DefaultHubWorkFeatureGates consists of all known acm work wehbook feature keys.

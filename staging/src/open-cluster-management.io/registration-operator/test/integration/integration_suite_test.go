@@ -142,6 +142,10 @@ var _ = ginkgo.BeforeSuite(func() {
 						Feature: "NilExecutorValidating",
 						Mode:    "Enable",
 					},
+					{
+						Feature: "ManifestWorkReplicaSet",
+						Mode:    "Enable",
+					},
 				},
 			},
 		},
@@ -167,6 +171,14 @@ var _ = ginkgo.BeforeSuite(func() {
 					WorkWebhookConfiguration: operatorapiv1.WebhookConfiguration{
 						Address: "localhost",
 						Port:    443,
+					},
+				},
+			},
+			WorkConfiguration: &operatorapiv1.WorkConfiguration{
+				FeatureGates: []operatorapiv1.FeatureGate{
+					{
+						Feature: "ManifestWorkReplicaSet",
+						Mode:    "Enable",
 					},
 				},
 			},

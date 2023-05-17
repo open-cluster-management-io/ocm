@@ -29,6 +29,7 @@ import (
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
+	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/registration-operator/manifests"
 	"open-cluster-management.io/registration-operator/pkg/helpers"
@@ -39,8 +40,6 @@ const (
 	clusterManagerFinalizer   = "operator.open-cluster-management.io/cluster-manager-cleanup"
 	clusterManagerApplied     = "Applied"
 	clusterManagerProgressing = "Progressing"
-
-	caBundleConfigmap = "ca-bundle-configmap"
 
 	defaultWebhookPort       = int32(9443)
 	clusterManagerReSyncTime = 5 * time.Second
@@ -103,7 +102,7 @@ func NewClusterManagerController(
 			helpers.ClusterManagerConfigmapQueueKeyFunc(controller.clusterManagerLister),
 			func(obj interface{}) bool {
 				accessor, _ := meta.Accessor(obj)
-				if name := accessor.GetName(); name != caBundleConfigmap {
+				if name := accessor.GetName(); name != helpers.CaBundleConfigmap {
 					return false
 				}
 				return true
@@ -150,17 +149,31 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		},
 	}
 
-	if clusterManager.Spec.AddOnManagerConfiguration != nil {
-		config.AddOnManagerComponentMode = string(clusterManager.Spec.AddOnManagerConfiguration.Mode)
-	}
-
-	var featureGateCondition metav1.Condition
+	var registrationFeatureMsgs, workFeatureMsgs, addonFeatureMsgs string
 	// If there are some invalid feature gates of registration or work, will output
 	// condition `ValidFeatureGates` False in ClusterManager.
-	config.RegistrationFeatureGates, config.WorkFeatureGates, featureGateCondition = helpers.CheckFeatureGates(
-		helpers.OperatorTypeClusterManager,
-		clusterManager.Spec.RegistrationConfiguration,
-		clusterManager.Spec.WorkConfiguration)
+	registrationFeatureGates := helpers.DefaultHubRegistrationFeatureGates
+	if clusterManager.Spec.RegistrationConfiguration != nil {
+		registrationFeatureGates = clusterManager.Spec.RegistrationConfiguration.FeatureGates
+	}
+	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration", registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates)
+
+	workFeatureGates := []operatorapiv1.FeatureGate{}
+	if clusterManager.Spec.WorkConfiguration != nil {
+		workFeatureGates = clusterManager.Spec.WorkConfiguration.FeatureGates
+	}
+	config.WorkFeatureGates, workFeatureMsgs = helpers.ConvertToFeatureGateFlags("Work", workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates)
+	config.MWReplicaSetEnabled = helpers.FeatureGateEnabled(workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.ManifestWorkReplicaSet)
+
+	addonFeatureGates := []operatorapiv1.FeatureGate{}
+	if clusterManager.Spec.AddOnManagerConfiguration != nil {
+		addonFeatureGates = clusterManager.Spec.AddOnManagerConfiguration.FeatureGates
+	}
+	_, addonFeatureMsgs = helpers.ConvertToFeatureGateFlags("Addon", addonFeatureGates, ocmfeature.DefaultHubAddonManagerFeatureGates)
+	featureGateCondition := helpers.BuildFeatureCondition(registrationFeatureMsgs, workFeatureMsgs, addonFeatureMsgs)
+
+	// Check if addon management is enabled by the feature gate
+	config.AddOnManagerEnabled = helpers.FeatureGateEnabled(addonFeatureGates, ocmfeature.DefaultHubAddonManagerFeatureGates, ocmfeature.AddonManagement)
 
 	// If we are deploying in the hosted mode, it requires us to create webhook in a different way with the default mode.
 	// In the hosted mode, the webhook servers is running in the management cluster but the users are accessing the hub cluster.
@@ -217,9 +230,9 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		return removeClusterManagerFinalizer(ctx, n.clusterManagerClient, clusterManager)
 	}
 
-	//get caBundle
+	// get caBundle
 	caBundle := "placeholder"
-	configmap, err := n.configMapLister.ConfigMaps(clusterManagerNamespace).Get(caBundleConfigmap)
+	configmap, err := n.configMapLister.ConfigMaps(clusterManagerNamespace).Get(helpers.CaBundleConfigmap)
 	switch {
 	case errors.IsNotFound(err):
 		// do nothing
@@ -341,9 +354,8 @@ func generateHubClients(hubKubeConfig *rest.Config) (kubernetes.Interface, apiex
 // Finally, a deployment on the management cluster would use the kubeconfig to access resources on the hub cluster.
 func ensureSAKubeconfigs(ctx context.Context, clusterManagerName, clusterManagerNamespace string,
 	hubKubeConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error {
-	sas := getSAs(clusterManagerName)
-	for _, sa := range sas {
-		tokenGetter := helpers.SATokenGetter(ctx, sa, clusterManagerNamespace, hubClient)
+	for _, sa := range getSAs() {
+		tokenGetter := helpers.SATokenCreater(ctx, sa, clusterManagerNamespace, hubClient)
 		err := helpers.SyncKubeConfigSecret(ctx, sa+"-kubeconfig", clusterManagerNamespace, "/var/run/secrets/hub/kubeconfig", &rest.Config{
 			Host: hubKubeConfig.Host,
 			TLSClientConfig: rest.TLSClientConfig{

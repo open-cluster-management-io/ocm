@@ -9,4 +9,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   namespace: {{ .ClusterManagerNamespace }}
-  name: {{ .ClusterManagerName }}-placement-controller-sa
+  name: placement-controller-sa

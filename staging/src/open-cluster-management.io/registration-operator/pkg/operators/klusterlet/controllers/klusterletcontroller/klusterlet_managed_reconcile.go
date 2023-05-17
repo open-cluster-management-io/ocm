@@ -7,7 +7,6 @@ package klusterletcontroller
 import (
 	"context"
 	"fmt"
-
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -178,20 +177,20 @@ func (r *managedReconcile) cleanUpAppliedManifestWorks(ctx context.Context, klus
 	}
 
 	var errs []error
-	for _, appliedManifestWork := range appliedManifestWorks.Items {
+	for index := range appliedManifestWorks.Items {
 		// ignore AppliedManifestWork for other klusterlet
-		if string(klusterlet.UID) != appliedManifestWork.Spec.AgentID {
+		if string(klusterlet.UID) != appliedManifestWorks.Items[index].Spec.AgentID {
 			continue
 		}
 
 		// remove finalizer if exists
-		if mutated := removeFinalizer(&appliedManifestWork, appliedManifestWorkFinalizer); !mutated {
+		if mutated := removeFinalizer(&appliedManifestWorks.Items[index], appliedManifestWorkFinalizer); !mutated {
 			continue
 		}
 
-		_, err := r.managedClusterClients.appliedManifestWorkClient.Update(ctx, &appliedManifestWork, metav1.UpdateOptions{})
+		_, err := r.managedClusterClients.appliedManifestWorkClient.Update(ctx, &appliedManifestWorks.Items[index], metav1.UpdateOptions{})
 		if err != nil && !errors.IsNotFound(err) {
-			errs = append(errs, fmt.Errorf("unable to remove finalizer from AppliedManifestWork %q: %w", appliedManifestWork.Name, err))
+			errs = append(errs, fmt.Errorf("unable to remove finalizer from AppliedManifestWork %q: %w", appliedManifestWorks.Items[index].Name, err))
 		}
 	}
 	return utilerrors.NewAggregate(errs)

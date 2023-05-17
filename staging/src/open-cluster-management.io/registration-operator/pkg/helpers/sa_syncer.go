@@ -73,6 +73,27 @@ func SATokenGetter(ctx context.Context, saName, saNamespace string, saClient kub
 	}
 }
 
+// SATokenCreater create the saToken of target sa.
+func SATokenCreater(ctx context.Context, saName, saNamespace string, saClient kubernetes.Interface) TokenGetterFunc {
+	return func() ([]byte, []byte, error) {
+		// 8640 hour
+		tr, err := saClient.CoreV1().ServiceAccounts(saNamespace).
+			CreateToken(ctx, saName, &authv1.TokenRequest{
+				Spec: authv1.TokenRequestSpec{
+					ExpirationSeconds: pointer.Int64Ptr(8640 * 3600),
+				},
+			}, metav1.CreateOptions{})
+		if err != nil {
+			return nil, nil, err
+		}
+		expiration, err := tr.Status.ExpirationTimestamp.MarshalText()
+		if err != nil {
+			return nil, nil, nil
+		}
+		return []byte(tr.Status.Token), expiration, nil
+	}
+}
+
 func SyncKubeConfigSecret(ctx context.Context, secretName, secretNamespace, kubeconfigPath string, templateKubeconfig *rest.Config, secretClient coreclientv1.SecretsGetter, tokenGetter TokenGetterFunc, recorder events.Recorder) error {
 	secret, err := secretClient.Secrets(secretNamespace).Get(ctx, secretName, metav1.GetOptions{})
 	switch {

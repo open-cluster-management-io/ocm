@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/openshift/api"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -36,7 +37,6 @@ import (
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
-	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
 
@@ -44,26 +44,9 @@ const (
 	defaultReplica = 3
 	singleReplica  = 1
 
-	componentKeyHubRegistration   = "hub-registration"
-	componentKeySpokeRegistration = "spoke-registration"
-	componentKeyHubWork           = "hub-work"
-	componentKeySpokeWork         = "spoke-work"
-
-	componentNameRegistration = "Registration"
-	componentNameWork         = "Work"
-
 	FeatureGatesTypeValid             = "ValidFeatureGates"
 	FeatureGatesReasonAllValid        = "FeatureGatesAllValid"
 	FeatureGatesReasonInvalidExisting = "InvalidFeatureGatesExisting"
-)
-
-// OperatorType represents the type of operator supported by the current controller, value could be
-// ClusterManager or Klusterlet
-type OperatorType string
-
-const (
-	OperatorTypeClusterManager OperatorType = "ClusterManager"
-	OperatorTypeKlusterlet     OperatorType = "Klusterlet"
 )
 
 var (
@@ -71,18 +54,11 @@ var (
 	genericCodecs = serializer.NewCodecFactory(genericScheme)
 	genericCodec  = genericCodecs.UniversalDeserializer()
 
-	featureGatesMap = map[string]map[featuregate.Feature]featuregate.FeatureSpec{
-		componentKeyHubRegistration:   ocmfeature.DefaultHubRegistrationFeatureGates,
-		componentKeySpokeRegistration: ocmfeature.DefaultSpokeRegistrationFeatureGates,
-		componentKeyHubWork:           ocmfeature.DefaultHubWorkFeatureGates,
-		componentKeySpokeWork:         ocmfeature.DefaultSpokeWorkFeatureGates,
+	DefaultHubRegistrationFeatureGates = []operatorapiv1.FeatureGate{
+		{Feature: "DefaultClusterSet", Mode: operatorapiv1.FeatureGateModeTypeEnable},
 	}
-
-	defaultNilFeatureGatesMap = map[string][]string{
-		componentKeyHubRegistration:   {"--feature-gates=DefaultClusterSet=true"},
-		componentKeySpokeRegistration: {"--feature-gates=AddonManagement=true"},
-		componentKeyHubWork:           {},
-		componentKeySpokeWork:         {},
+	DefaultSpokeRegistrationFeatureGates = []operatorapiv1.FeatureGate{
+		{Feature: "AddonManagement", Mode: operatorapiv1.FeatureGateModeTypeEnable},
 	}
 )
 
@@ -881,110 +857,63 @@ func GetHubKubeconfig(ctx context.Context,
 	}
 }
 
-// featureGatesArgs is used to generate feature gates args
-func featureGatesArgs(featureGates []operatorapiv1.FeatureGate, component string) (featureGatesArgs []string, invalidFeatureGates []string) {
-	for _, featureGate := range featureGates {
-		if !isValidFeatureGate(featureGate.Feature, component) {
-			invalidFeatureGates = append(invalidFeatureGates, featureGate.Feature)
-		} else {
-			value := false
-			if featureGate.Mode == operatorapiv1.FeatureGateModeTypeEnable {
-				value = true
-			}
-			featureGatesArgs = append(featureGatesArgs, fmt.Sprintf("--feature-gates=%s=%t", featureGate.Feature, value))
-		}
-	}
-
-	return featureGatesArgs, invalidFeatureGates
-}
-
-func isValidFeatureGate(feature string, component string) bool {
-	if featureGates, ok := featureGatesMap[component]; ok {
-		if _, ok := featureGates[featuregate.Feature(feature)]; ok {
-			return true
-		}
-	}
-
-	return false
-}
-
-func getComponentKey(operatorType OperatorType, componentName string) string {
-	var componentKey string
-	switch componentName {
-	case componentNameRegistration:
-		if operatorType == OperatorTypeClusterManager {
-			componentKey = componentKeyHubRegistration
-		}
-		if operatorType == OperatorTypeKlusterlet {
-			componentKey = componentKeySpokeRegistration
-		}
-	case componentNameWork:
-		if operatorType == OperatorTypeClusterManager {
-			componentKey = componentKeyHubWork
-		}
-		if operatorType == OperatorTypeKlusterlet {
-			componentKey = componentKeySpokeWork
-		}
-	}
-
-	return componentKey
-}
-
-// CheckFeatureGates check if feature gates are valid for RegistrationConfiguration
-// and WorkConfiguration, return the corresponding valid feature gates for them and
-// the condition, this func will not update the condition to the status of the
-// cluster manager or klusterlet
-func CheckFeatureGates(operatorType OperatorType, registrationConfiguration *operatorapiv1.RegistrationConfiguration,
-	workConfiguration *operatorapiv1.WorkConfiguration) (registrationFeatureGates []string,
-	workFeatureGates []string, condition metav1.Condition) {
-
-	componentRegistrationKey := getComponentKey(operatorType, componentNameRegistration)
-	componentWorkKey := getComponentKey(operatorType, componentNameWork)
-
-	var invalidRegistrationFeatureGates, invalidWorkFeatureGates []string
-	if registrationConfiguration == nil {
-		registrationFeatureGates = defaultNilFeatureGatesMap[componentRegistrationKey]
-	} else {
-		registrationFeatureGates, invalidRegistrationFeatureGates = featureGatesArgs(
-			registrationConfiguration.FeatureGates, componentRegistrationKey)
-	}
-
-	if workConfiguration == nil {
-		workFeatureGates = defaultNilFeatureGatesMap[componentWorkKey]
-	} else {
-		workFeatureGates, invalidWorkFeatureGates = featureGatesArgs(
-			workConfiguration.FeatureGates, componentWorkKey)
-	}
-
-	if invalidRegistrationFeatureGates == nil && invalidWorkFeatureGates == nil {
-		condition = metav1.Condition{
+func BuildFeatureCondition(invalidMsgs ...string) metav1.Condition {
+	if len(strings.Join(invalidMsgs, "")) == 0 {
+		return metav1.Condition{
 			Type:    FeatureGatesTypeValid,
 			Status:  metav1.ConditionTrue,
 			Reason:  FeatureGatesReasonAllValid,
 			Message: fmt.Sprintf("Feature gates are all valid"),
 		}
-		return registrationFeatureGates, workFeatureGates, condition
 	}
 
-	var invalidFeatureGatesMsg []string
-	if invalidRegistrationFeatureGates != nil {
-		invalidFeatureGatesMsg = append(invalidFeatureGatesMsg,
-			fmt.Sprintf("%s: %v", componentNameRegistration, invalidRegistrationFeatureGates))
-	}
-	if invalidWorkFeatureGates != nil {
-		invalidFeatureGatesMsg = append(invalidFeatureGatesMsg,
-			fmt.Sprintf("%s: %v", componentNameWork, invalidWorkFeatureGates))
-	}
-
-	// for the invalid feature gates, we show them in the condition, here only return the valid
-	// feature gates, so the caller can use the valid ones and degrade the invalid ones to the
-	// default values
-	condition = metav1.Condition{
+	return metav1.Condition{
 		Type:   FeatureGatesTypeValid,
 		Status: metav1.ConditionFalse,
 		Reason: FeatureGatesReasonInvalidExisting,
 		Message: fmt.Sprintf("There are some invalid feature gates of %v, will process them with default values",
-			invalidFeatureGatesMsg),
+			invalidMsgs),
 	}
-	return registrationFeatureGates, workFeatureGates, condition
+}
+
+func ConvertToFeatureGateFlags(component string, features []operatorapiv1.FeatureGate, defaultFeatureGates map[featuregate.Feature]featuregate.FeatureSpec) ([]string, string) {
+	var flags, invalidFeatures []string
+
+	for _, feature := range features {
+		defaultFeature, ok := defaultFeatureGates[featuregate.Feature(feature.Feature)]
+		if !ok {
+			invalidFeatures = append(invalidFeatures, feature.Feature)
+			continue
+		}
+
+		if feature.Mode == operatorapiv1.FeatureGateModeTypeDisable && defaultFeature.Default {
+			flags = append(flags, fmt.Sprintf("--feature-gates=%s=false", feature.Feature))
+		}
+		if feature.Mode == operatorapiv1.FeatureGateModeTypeEnable && !defaultFeature.Default {
+			flags = append(flags, fmt.Sprintf("--feature-gates=%s=true", feature.Feature))
+		}
+	}
+
+	if len(invalidFeatures) > 0 {
+		return flags, fmt.Sprintf("%s: %v", component, invalidFeatures)
+	}
+
+	return flags, ""
+}
+
+// FeatureGateEnabled checks if a feature is enabled or disabled in operator API, or fallback to use the
+// the default setting
+func FeatureGateEnabled(features []operatorapiv1.FeatureGate, defaultFeatures map[featuregate.Feature]featuregate.FeatureSpec, featureName featuregate.Feature) bool {
+	for _, feature := range features {
+		if feature.Feature == string(featureName) {
+			return feature.Mode == operatorapiv1.FeatureGateModeTypeEnable
+		}
+	}
+
+	defaultFeature, ok := defaultFeatures[featureName]
+	if !ok {
+		return false
+	}
+
+	return defaultFeature.Default
 }

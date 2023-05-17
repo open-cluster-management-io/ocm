@@ -376,7 +376,6 @@ func applyStorageVersionMigration(
 }
 
 func getStorageVersionMigrationStatusCondition(svmcr *migrationv1alpha1.StorageVersionMigration) *migrationv1alpha1.MigrationCondition {
-	var runningCon *migrationv1alpha1.MigrationCondition
 	for _, c := range svmcr.Status.Conditions {
 		switch c.Type {
 		case migrationv1alpha1.MigrationSucceeded:
@@ -391,12 +390,12 @@ func getStorageVersionMigrationStatusCondition(svmcr *migrationv1alpha1.StorageV
 			continue
 		case migrationv1alpha1.MigrationRunning:
 			if c.Status == corev1.ConditionTrue {
-				runningCon = &c
+				return &c
 			}
 			continue
 		}
 	}
-	return runningCon
+	return nil
 }
 
 func generateHubClients(hubKubeConfig *rest.Config) (apiextensionsclient.Interface, migrationv1alpha1client.StorageVersionMigrationsGetter, error) {

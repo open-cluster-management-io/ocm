@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"k8s.io/component-base/featuregate"
+	ocmfeature "open-cluster-management.io/api/feature"
 	"reflect"
 	"testing"
 	"time"
@@ -1872,60 +1874,95 @@ func TestGetHubKubeconfig(t *testing.T) {
 	}
 }
 
-func TestFeatureGatesArgs(t *testing.T) {
-	tt := []struct {
-		name              string
-		component         string
-		inputFeatureGates []operatorapiv1.FeatureGate
-		expect1           []string
-		expect2           []string
+func TestConvertToFeatureGateFlags(t *testing.T) {
+	cases := []struct {
+		name         string
+		features     []operatorapiv1.FeatureGate
+		desiredFlags []string
+		desiredMsg   string
 	}{
 		{
-			name:              "empty input feature gates",
-			component:         componentKeyHubRegistration,
-			inputFeatureGates: []operatorapiv1.FeatureGate{},
-			expect1:           []string{},
-			expect2:           []string{},
+			name:         "unset",
+			features:     []operatorapiv1.FeatureGate{},
+			desiredFlags: []string{},
 		},
 		{
-			name:      "valid input feature gates",
-			component: componentKeySpokeRegistration,
-			inputFeatureGates: []operatorapiv1.FeatureGate{
-				{
-					Feature: "AddonManagement",
-					Mode:    operatorapiv1.FeatureGateModeTypeEnable,
-				},
-				{
-					Feature: "V1beta1CSRAPICompatibility",
-					Mode:    operatorapiv1.FeatureGateModeTypeEnable,
-				},
+			name: "enable feature",
+			features: []operatorapiv1.FeatureGate{
+				{Feature: "ClusterClaim", Mode: operatorapiv1.FeatureGateModeTypeEnable},
+				{Feature: "AddonManagement", Mode: operatorapiv1.FeatureGateModeTypeEnable},
 			},
-			expect1: []string{"--feature-gates=AddonManagement=true", "--feature-gates=V1beta1CSRAPICompatibility=true"},
-			expect2: []string{},
+			desiredFlags: []string{"--feature-gates=AddonManagement=true"},
 		},
 		{
-			name:      "invalid input feature gates",
-			component: componentKeySpokeRegistration,
-			inputFeatureGates: []operatorapiv1.FeatureGate{
-				{
-					Feature: "AddonManagementInvalid",
-					Mode:    operatorapiv1.FeatureGateModeTypeEnable,
-				},
+			name: "disable feature",
+			features: []operatorapiv1.FeatureGate{
+				{Feature: "ClusterClaim", Mode: operatorapiv1.FeatureGateModeTypeDisable},
+				{Feature: "AddonManagement", Mode: operatorapiv1.FeatureGateModeTypeDisable},
 			},
-			expect1: []string{},
-			expect2: []string{"AddonManagementInvalid"},
+			desiredFlags: []string{"--feature-gates=ClusterClaim=false"},
+		},
+		{
+			name: "invalid feature",
+			features: []operatorapiv1.FeatureGate{
+				{Feature: "Foo", Mode: operatorapiv1.FeatureGateModeTypeDisable},
+				{Feature: "Bar", Mode: operatorapiv1.FeatureGateModeTypeDisable},
+			},
+			desiredFlags: []string{},
+			desiredMsg:   "test: [Foo Bar]",
 		},
 	}
 
-	for _, tc := range tt {
+	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			output1, output2 := featureGatesArgs(tc.inputFeatureGates, tc.component)
-			if len(output1) == len(tc.expect1) && len(output2) == len(tc.expect2) {
-				return
+			flags, msg := ConvertToFeatureGateFlags("test", tc.features, ocmfeature.DefaultSpokeRegistrationFeatureGates)
+			if msg != tc.desiredMsg {
+				t.Errorf("unexpected message, got: %s, desired %s", msg, tc.desiredMsg)
 			}
+			if !equality.Semantic.DeepEqual(flags, tc.desiredFlags) {
+				t.Errorf("Unexpected flags, got %v, desired %v", flags, tc.desiredFlags)
+			}
+		})
+	}
+}
 
-			if !reflect.DeepEqual(output1, tc.expect1) || !reflect.DeepEqual(output2, tc.expect2) {
-				t.Errorf("Expect to get %v,%v, but got %v,%v", tc.expect1, tc.expect2, output1, output2)
+func TestFeatureGateEnabled(t *testing.T) {
+	cases := []struct {
+		name          string
+		features      []operatorapiv1.FeatureGate
+		featureName   featuregate.Feature
+		desiredResult bool
+	}{
+		{
+			name:          "default",
+			features:      []operatorapiv1.FeatureGate{},
+			featureName:   ocmfeature.ClusterClaim,
+			desiredResult: true,
+		},
+		{
+			name: "disable",
+			features: []operatorapiv1.FeatureGate{
+				{Feature: "ClusterClaim", Mode: operatorapiv1.FeatureGateModeTypeDisable},
+			},
+			featureName:   ocmfeature.ClusterClaim,
+			desiredResult: false,
+		},
+		{
+			name: "enable",
+			features: []operatorapiv1.FeatureGate{
+				{Feature: "AddonManagement", Mode: operatorapiv1.FeatureGateModeTypeEnable},
+				{Feature: "ClusterClaim", Mode: operatorapiv1.FeatureGateModeTypeDisable},
+			},
+			featureName:   ocmfeature.AddonManagement,
+			desiredResult: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			enabled := FeatureGateEnabled(tc.features, ocmfeature.DefaultSpokeRegistrationFeatureGates, tc.featureName)
+			if enabled != tc.desiredResult {
+				t.Errorf("Expect feature enabled is %v, but got %v", tc.desiredResult, enabled)
 			}
 		})
 	}

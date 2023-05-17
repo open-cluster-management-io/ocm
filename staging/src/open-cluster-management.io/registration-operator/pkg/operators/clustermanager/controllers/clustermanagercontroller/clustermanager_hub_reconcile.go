@@ -43,6 +43,13 @@ var (
 		"cluster-manager/hub/cluster-manager-placement-serviceaccount.yaml",
 	}
 
+	mwReplicaSetResourceFiles = []string{
+		// manifestworkreplicaset
+		"cluster-manager/hub/cluster-manager-manifestworkreplicaset-clusterrole.yaml",
+		"cluster-manager/hub/cluster-manager-manifestworkreplicaset-clusterrolebinding.yaml",
+		"cluster-manager/hub/cluster-manager-manifestworkreplicaset-serviceaccount.yaml",
+	}
+
 	hubAddOnManagerRbacResourceFiles = []string{
 		// addon-manager
 		"cluster-manager/hub/cluster-manager-addon-manager-clusterrole.yaml",
@@ -73,8 +80,16 @@ type hubReoncile struct {
 
 func (c *hubReoncile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager, config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
 	// If AddOnManager is not enabled, remove related resources
-	if operatorapiv1.ComponentModeType(config.AddOnManagerComponentMode) != operatorapiv1.ComponentModeTypeEnable {
+	if !config.AddOnManagerEnabled {
 		_, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, hubAddOnManagerRbacResourceFiles...)
+		if err != nil {
+			return cm, reconcileStop, err
+		}
+	}
+
+	// Remove ManifestWokReplicaSet deployment if feature not enabled
+	if !config.MWReplicaSetEnabled {
+		_, _, err := cleanResources(ctx, c.hubKubeClient, cm, config, mwReplicaSetResourceFiles...)
 		if err != nil {
 			return cm, reconcileStop, err
 		}
@@ -127,8 +142,12 @@ func (c *hubReoncile) clean(ctx context.Context, cm *operatorapiv1.ClusterManage
 func getHubResources(mode operatorapiv1.InstallMode, config manifests.HubConfig) []string {
 	hubResources := []string{namespaceResource}
 	hubResources = append(hubResources, hubRbacResourceFiles...)
-	if operatorapiv1.ComponentModeType(config.AddOnManagerComponentMode) == operatorapiv1.ComponentModeTypeEnable {
+	if config.AddOnManagerEnabled {
 		hubResources = append(hubResources, hubAddOnManagerRbacResourceFiles...)
+	}
+
+	if config.MWReplicaSetEnabled {
+		hubResources = append(hubResources, mwReplicaSetResourceFiles...)
 	}
 	// the hubHostedWebhookServiceFiles are only used in hosted mode
 	if mode == operatorapiv1.InstallModeHosted {

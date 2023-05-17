@@ -12,7 +12,6 @@ package v1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_AddOnManagerConfiguration = map[string]string{
-	"mode":         "Mode is either Enable, Disable, \"\" where \"\" is Disable by default. In Enable mode, the component will be installed. In Disable mode, the component will not be installed.",
 	"featureGates": "FeatureGates represents the list of feature gates for addon manager If it is set empty, default feature gates will be used. If it is set, featuregate/Foo is an example of one item in FeatureGates:\n  1. If featuregate/Foo does not exist, registration-operator will discard it\n  2. If featuregate/Foo exists and is false by default. It is now possible to set featuregate/Foo=[false|true]\n  3. If featuregate/Foo exists and is true by default. If a cluster-admin upgrading from 1 to 2 wants to continue having featuregate/Foo=false,\n \the can set featuregate/Foo=false before upgrading. Let's say the cluster-admin wants featuregate/Foo=false.",
 }
 

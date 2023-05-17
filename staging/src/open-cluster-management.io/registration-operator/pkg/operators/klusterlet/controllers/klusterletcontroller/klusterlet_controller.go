@@ -3,9 +3,14 @@ package klusterletcontroller
 import (
 	"context"
 	"fmt"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"strings"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	ocmfeature "open-cluster-management.io/api/feature"
+
+	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -18,29 +23,27 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
 	"open-cluster-management.io/registration-operator/pkg/helpers"
 )
 
 const (
 
 	// klusterletHostedFinalizer is used to clean up resources on the managed/hosted cluster in Hosted mode
-	klusterletHostedFinalizer    = "operator.open-cluster-management.io/klusterlet-hosted-cleanup"
-	klusterletFinalizer          = "operator.open-cluster-management.io/klusterlet-cleanup"
-	imagePullSecret              = "open-cluster-management-image-pull-credentials"
-	klusterletApplied            = "Applied"
-	klusterletReadyToApply       = "ReadyToApply"
-	hubConnectionDegraded        = "HubConnectionDegraded"
-	hubKubeConfigSecretMissing   = "HubKubeConfigSecretMissing"
-	appliedManifestWorkFinalizer = "cluster.open-cluster-management.io/applied-manifest-work-cleanup"
+	klusterletHostedFinalizer             = "operator.open-cluster-management.io/klusterlet-hosted-cleanup"
+	klusterletFinalizer                   = "operator.open-cluster-management.io/klusterlet-cleanup"
+	imagePullSecret                       = "open-cluster-management-image-pull-credentials"
+	klusterletApplied                     = "Applied"
+	klusterletReadyToApply                = "ReadyToApply"
+	hubConnectionDegraded                 = "HubConnectionDegraded"
+	hubKubeConfigSecretMissing            = "HubKubeConfigSecretMissing" // #nosec G101
+	appliedManifestWorkFinalizer          = "cluster.open-cluster-management.io/applied-manifest-work-cleanup"
+	managedResourcesEvictionTimestampAnno = "operator.open-cluster-management.io/managed-resources-eviction-timestamp"
 )
 
 type klusterletController struct {
@@ -210,16 +213,24 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		return nil
 	}
 
-	var featureGateCondition metav1.Condition
 	// If there are some invalid feature gates of registration or work, will output condition `ValidFeatureGates`
 	// False in Klusterlet.
 	// TODO: For the work feature gates, when splitting permissions in the future, if the ExecutorValidatingCaches
 	//       function is enabled, additional permissions for get, list, and watch RBAC resources required by this
 	//       function need to be applied
-	config.RegistrationFeatureGates, config.WorkFeatureGates, featureGateCondition = helpers.CheckFeatureGates(
-		helpers.OperatorTypeKlusterlet,
-		klusterlet.Spec.RegistrationConfiguration,
-		klusterlet.Spec.WorkConfiguration)
+	var registrationFeatureMsgs, workFeatureMsgs string
+	registrationFeatureGates := helpers.DefaultSpokeRegistrationFeatureGates
+	if klusterlet.Spec.RegistrationConfiguration != nil {
+		registrationFeatureGates = klusterlet.Spec.RegistrationConfiguration.FeatureGates
+	}
+	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration", registrationFeatureGates, ocmfeature.DefaultSpokeRegistrationFeatureGates)
+
+	workFeatureGates := []operatorapiv1.FeatureGate{}
+	if klusterlet.Spec.WorkConfiguration != nil {
+		workFeatureGates = klusterlet.Spec.WorkConfiguration.FeatureGates
+	}
+	config.WorkFeatureGates, workFeatureMsgs = helpers.ConvertToFeatureGateFlags("Work", workFeatureGates, ocmfeature.DefaultSpokeWorkFeatureGates)
+	featureGateCondition := helpers.BuildFeatureCondition(registrationFeatureMsgs, workFeatureMsgs)
 
 	reconcilers := []klusterletReconcile{
 		&crdReconcile{

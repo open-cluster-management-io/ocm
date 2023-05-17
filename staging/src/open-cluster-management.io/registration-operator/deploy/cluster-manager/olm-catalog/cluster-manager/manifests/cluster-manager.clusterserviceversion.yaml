@@ -11,6 +11,14 @@ metadata:
             "name": "cluster-manager"
           },
           "spec": {
+            "addOnManagerConfiguration": {
+              "featureGates": [
+                {
+                  "feature": "AddonManagement",
+                  "mode": "Enable"
+                }
+              ]
+            },
             "addOnManagerImagePullSpec": "quay.io/open-cluster-management/addon-manager",
             "deployOption": {
               "mode": "Default"
@@ -21,10 +29,30 @@ metadata:
                 {
                   "feature": "DefaultClusterSet",
                   "mode": "Enable"
+                },
+                {
+                  "feature": "V1beta1CSRAPICompatibility",
+                  "mode": "Enable"
+                },
+                {
+                  "feature": "ManagedClusterAutoApproval",
+                  "mode": "Enable"
                 }
               ]
             },
             "registrationImagePullSpec": "quay.io/open-cluster-management/registration",
+            "workConfiguration": {
+              "featureGates": [
+                {
+                  "feature": "ManifestWorkReplicaSet",
+                  "mode": "Enable"
+                },
+                {
+                  "feature": "NilExecutorValidating",
+                  "mode": "Enable"
+                }
+              ]
+            },
             "workImagePullSpec": "quay.io/open-cluster-management/work"
           }
         },
@@ -124,7 +152,7 @@ spec:
           - namespaces
           - serviceaccounts
           - services
-          - secrets
+          - pods
           verbs:
           - create
           - get
@@ -133,6 +161,34 @@ spec:
           - watch
           - patch
           - delete
+          - deletecollection
+        - apiGroups:
+          - ""
+          resourceNames:
+          - signer-secret
+          - registration-webhook-serving-cert
+          - work-webhook-serving-cert
+          - registration-controller-sa-kubeconfig
+          - registration-webhook-sa-kubeconfig
+          - work-webhook-sa-kubeconfig
+          - placement-controller-sa-kubeconfig
+          - work-controller-sa-kubeconfig
+          - external-hub-kubeconfig
+          resources:
+          - secrets
+          verbs:
+          - get
+          - list
+          - watch
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - ""
+          resources:
+          - secrets
+          verbs:
+          - create
         - apiGroups:
           - coordination.k8s.io
           resources:
@@ -144,6 +200,7 @@ spec:
           - update
           - watch
           - patch
+          - delete
         - apiGroups:
           - ""
           resources:
@@ -158,15 +215,21 @@ spec:
           - subjectaccessreviews
           verbs:
           - create
+          - get
         - apiGroups:
           - ""
           - events.k8s.io
           resources:
           - events
           verbs:
+          - get
+          - list
+          - watch
           - create
           - patch
           - update
+          - delete
+          - deletecollection
         - apiGroups:
           - apps
           resources:
@@ -179,6 +242,12 @@ spec:
           - watch
           - patch
           - delete
+        - apiGroups:
+          - apps
+          resources:
+          - replicasets
+          verbs:
+          - get
         - apiGroups:
           - rbac.authorization.k8s.io
           resources:
@@ -205,8 +274,6 @@ spec:
           - watch
           - patch
           - delete
-          - escalate
-          - bind
         - apiGroups:
           - apiextensions.k8s.io
           resources:
@@ -280,6 +347,176 @@ spec:
           - watch
           - patch
           - delete
+        - apiGroups:
+          - addon.open-cluster-management.io
+          resources:
+          - managedclusteraddons
+          - clustermanagementaddons
+          verbs:
+          - create
+          - update
+          - patch
+          - get
+          - list
+          - watch
+          - delete
+        - apiGroups:
+          - addon.open-cluster-management.io
+          resources:
+          - managedclusteraddons/status
+          - clustermanagementaddons/status
+          verbs:
+          - patch
+          - update
+        - apiGroups:
+          - addon.open-cluster-management.io
+          resources:
+          - managedclusteraddons/finalizers
+          - clustermanagementaddons/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - authentication.k8s.io
+          resources:
+          - tokenreviews
+          verbs:
+          - create
+        - apiGroups:
+          - certificates.k8s.io
+          resources:
+          - certificatesigningrequests
+          verbs:
+          - create
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - certificates.k8s.io
+          resources:
+          - certificatesigningrequests/approval
+          - certificatesigningrequests/status
+          verbs:
+          - update
+        - apiGroups:
+          - certificates.k8s.io
+          resourceNames:
+          - kubernetes.io/kube-apiserver-client
+          resources:
+          - signers
+          verbs:
+          - approve
+        - apiGroups:
+          - cluster.open-cluster-management.io
+          resources:
+          - managedclusters
+          verbs:
+          - get
+          - list
+          - watch
+          - update
+          - patch
+        - apiGroups:
+          - cluster.open-cluster-management.io
+          resources:
+          - managedclustersetbindings
+          - placements
+          - addonplacementscores
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - cluster.open-cluster-management.io
+          resources:
+          - managedclustersets
+          - placementdecisions
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - cluster.open-cluster-management.io
+          resources:
+          - managedclusters/status
+          - managedclustersetbindings/status
+          - managedclustersets/status
+          - placements/status
+          - placementdecisions/status
+          verbs:
+          - update
+          - patch
+        - apiGroups:
+          - cluster.open-cluster-management.io
+          resources:
+          - placements/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - register.open-cluster-management.io
+          resources:
+          - managedclusters/clientcertificates
+          verbs:
+          - renew
+        - apiGroups:
+          - work.open-cluster-management.io
+          resources:
+          - manifestworkreplicasets
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - delete
+          - deletecollection
+          - patch
+        - apiGroups:
+          - work.open-cluster-management.io
+          resources:
+          - manifestworkreplicasets/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - work.open-cluster-management.io
+          resources:
+          - manifestworks
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - delete
+          - deletecollection
+          - patch
+          - execute-as
+        - apiGroups:
+          - work.open-cluster-management.io
+          resources:
+          - manifestworks/status
+          - manifestworkreplicasets/status
+          verbs:
+          - update
+          - patch
+        - apiGroups:
+          - flowcontrol.apiserver.k8s.io
+          resources:
+          - flowschemas
+          - prioritylevelconfigurations
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - infrastructures
+          verbs:
+          - get
         serviceAccountName: cluster-manager
       deployments:
       - name: cluster-manager

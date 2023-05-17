@@ -34,6 +34,10 @@ var (
 	addOnManagerDeploymentFiles = []string{
 		"cluster-manager/management/cluster-manager-addon-manager-deployment.yaml",
 	}
+
+	mwReplicaSetDeploymentFiles = []string{
+		"cluster-manager/management/cluster-manager-manifestworkreplicaset-deployment.yaml",
+	}
 )
 
 type runtimeReconcile struct {
@@ -49,8 +53,16 @@ type runtimeReconcile struct {
 
 func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager, config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
 	// If AddOnManager is not enabled, remove related resources
-	if operatorapiv1.ComponentModeType(config.AddOnManagerComponentMode) != operatorapiv1.ComponentModeTypeEnable {
+	if !config.AddOnManagerEnabled {
 		_, _, err := cleanResources(ctx, c.kubeClient, cm, config, addOnManagerDeploymentFiles...)
+		if err != nil {
+			return cm, reconcileStop, err
+		}
+	}
+
+	// Remove ManifestWokReplicaSet deployment if feature not enabled
+	if !config.MWReplicaSetEnabled {
+		_, _, err := cleanResources(ctx, c.kubeClient, cm, config, mwReplicaSetDeploymentFiles...)
 		if err != nil {
 			return cm, reconcileStop, err
 		}
@@ -103,8 +115,11 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 
 	var progressingDeployments []string
 	deployResources := deploymentFiles
-	if operatorapiv1.ComponentModeType(config.AddOnManagerComponentMode) == operatorapiv1.ComponentModeTypeEnable {
+	if config.AddOnManagerEnabled {
 		deployResources = append(deployResources, addOnManagerDeploymentFiles...)
+	}
+	if config.MWReplicaSetEnabled {
+		deployResources = append(deployResources, mwReplicaSetDeploymentFiles...)
 	}
 	for _, file := range deployResources {
 		updatedDeployment, currentGeneration, err := helpers.ApplyDeployment(
@@ -170,11 +185,12 @@ func (c *runtimeReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterM
 }
 
 // getSAs return serviceaccount names of all hub components
-func getSAs(clusterManagerName string) []string {
+func getSAs() []string {
 	return []string{
-		clusterManagerName + "-registration-controller-sa",
-		clusterManagerName + "-registration-webhook-sa",
-		clusterManagerName + "-work-webhook-sa",
-		clusterManagerName + "-placement-controller-sa",
+		"registration-controller-sa",
+		"registration-webhook-sa",
+		"work-webhook-sa",
+		"placement-controller-sa",
+		"work-controller-sa",
 	}
 }
