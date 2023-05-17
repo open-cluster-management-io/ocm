@@ -99,9 +99,12 @@ func NewSchedulingController(
 	// informers/listers of clusterset/clustersetbinding/placement are synced during
 	// controller booting. But that should not cause any problem because all existing
 	// placements will be enqueued by the controller anyway when booting.
-	clusterInformer.Informer().AddEventHandler(&clusterEventHandler{
+	_, err := clusterInformer.Informer().AddEventHandler(&clusterEventHandler{
 		enqueuer: enQueuer,
 	})
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
 
 	// setup event handler for clusterset informer
 	// Once a clusterset changes, clusterSetEventHandler enqueues all placements which are
@@ -109,13 +112,16 @@ func NewSchedulingController(
 	// informers/listers of clustersetbinding/placement are synced during controller
 	// booting. But that should not cause any problem because all existing placements will
 	// be enqueued by the controller anyway when booting.
-	clusterSetInformer.Informer().AddEventHandler(&cache.ResourceEventHandlerFuncs{
+	_, err = clusterSetInformer.Informer().AddEventHandler(&cache.ResourceEventHandlerFuncs{
 		AddFunc: enQueuer.enqueueClusterSet,
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			enQueuer.enqueueClusterSet(newObj)
 		},
 		DeleteFunc: enQueuer.enqueueClusterSet,
 	})
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
 
 	// setup event handler for clustersetbinding informer
 	// Once a clustersetbinding changes, clusterSetBindingEventHandler enqueues all placements
@@ -123,22 +129,28 @@ func NewSchedulingController(
 	// the informers/listers of clusterset/placement are synced during controller booting. But
 	// that should not cause any problem because all existing placements will be enqueued by
 	// the controller anyway when booting.
-	clusterSetBindingInformer.Informer().AddEventHandler(&cache.ResourceEventHandlerFuncs{
+	_, err = clusterSetBindingInformer.Informer().AddEventHandler(&cache.ResourceEventHandlerFuncs{
 		AddFunc: enQueuer.enqueueClusterSetBinding,
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			enQueuer.enqueueClusterSetBinding(newObj)
 		},
 		DeleteFunc: enQueuer.enqueueClusterSetBinding,
 	})
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
 
 	// setup event handler for placementscore informer
-	placementScoreInformer.Informer().AddEventHandler(&cache.ResourceEventHandlerFuncs{
+	_, err = placementScoreInformer.Informer().AddEventHandler(&cache.ResourceEventHandlerFuncs{
 		AddFunc: enQueuer.enqueuePlacementScore,
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			enQueuer.enqueuePlacementScore(newObj)
 		},
 		DeleteFunc: enQueuer.enqueuePlacementScore,
 	})
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
 
 	return factory.New().
 		WithSyncContext(syncCtx).
