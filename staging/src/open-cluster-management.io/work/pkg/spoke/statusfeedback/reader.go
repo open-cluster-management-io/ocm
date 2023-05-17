@@ -29,7 +29,7 @@ func (s *StatusReader) GetValuesByRule(obj *unstructured.Unstructured, rule work
 	case workapiv1.WellKnownStatusType:
 		paths := s.wellKnownStatus.GetPathsByKind(obj.GroupVersionKind())
 		if len(paths) == 0 {
-			return values, fmt.Errorf("cannot find the wellknown statuses for resrouce with gvk %s", obj.GroupVersionKind().String())
+			return values, fmt.Errorf("cannot find the wellknown statuses for resource with gvk %s", obj.GroupVersionKind().String())
 		}
 
 		for _, path := range paths {

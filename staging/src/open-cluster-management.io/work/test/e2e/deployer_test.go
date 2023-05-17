@@ -166,7 +166,7 @@ func (d *defaultWorkAgentDeployer) Deploy() error {
 func (d *defaultWorkAgentDeployer) Undeploy() error {
 	errs := []error{}
 	// delete all manifest works
-	err := wait.Poll(1*time.Second, 10*time.Second, func() (bool, error) {
+	err := wait.Poll(2*time.Second, 30*time.Second, func() (bool, error) {
 		manifestWorkList, err := d.hubWorkClient.WorkV1().ManifestWorks(d.clusterName).List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			return false, nil
@@ -176,13 +176,7 @@ func (d *defaultWorkAgentDeployer) Undeploy() error {
 			return true, nil
 		}
 
-		for _, manifestWork := range manifestWorkList.Items {
-			if manifestWork.DeletionTimestamp != nil && !manifestWork.DeletionTimestamp.IsZero() {
-				continue
-			}
-
-			_ = d.hubWorkClient.WorkV1().ManifestWorks(d.clusterName).Delete(context.Background(), manifestWork.Name, metav1.DeleteOptions{})
-		}
+		_ = d.hubWorkClient.WorkV1().ManifestWorks(d.clusterName).DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 		return false, nil
 	})

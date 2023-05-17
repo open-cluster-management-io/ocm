@@ -3,6 +3,7 @@ package statuscontroller
 import (
 	"context"
 	"fmt"
+	"open-cluster-management.io/work/pkg/spoke/controllers"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -65,7 +66,7 @@ func NewAvailableStatusController(
 
 func (c *AvailableStatusController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	manifestWorkName := controllerContext.QueueKey()
-	if manifestWorkName != "key" {
+	if manifestWorkName != factory.DefaultQueueKey {
 		// sync a particular manifestwork
 		manifestWork, err := c.manifestWorkLister.Get(manifestWorkName)
 		if errors.IsNotFound(err) {
@@ -84,28 +85,32 @@ func (c *AvailableStatusController) sync(ctx context.Context, controllerContext 
 	}
 
 	// resync all manifestworks
-	klog.V(4).Infof("Reconciling all ManifestWorks")
+	klog.V(4).Infof("Resync all ManifestWorks by adding them to the queue")
 	manifestWorks, err := c.manifestWorkLister.List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("unable to list manifestworks: %w", err)
 	}
 
-	errs := []error{}
 	for _, manifestWork := range manifestWorks {
-		err = c.syncManifestWork(ctx, manifestWork)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("unable to sync manifestwork %q: %w", manifestWork.Name, err))
-		}
+		controllerContext.Queue().Add(manifestWork.Name)
 	}
-	if len(errs) > 0 {
-		return fmt.Errorf("unable to resync manifestworks: %w", utilerrors.NewAggregate(errs))
-	}
+
 	return nil
 }
 
 func (c *AvailableStatusController) syncManifestWork(ctx context.Context, originalManifestWork *workapiv1.ManifestWork) error {
 	klog.V(4).Infof("Reconciling ManifestWork %q", originalManifestWork.Name)
 	manifestWork := originalManifestWork.DeepCopy()
+
+	// do nothing when finalizer is not added.
+	if !helper.HasFinalizer(manifestWork.Finalizers, controllers.ManifestWorkFinalizer) {
+		return nil
+	}
+
+	// wait until work has the applied condition.
+	if cond := meta.FindStatusCondition(manifestWork.Status.Conditions, workapiv1.WorkApplied); cond == nil {
+		return nil
+	}
 
 	// handle status condition of manifests
 	// TODO revist this controller since this might bring races when user change the manifests in spec.

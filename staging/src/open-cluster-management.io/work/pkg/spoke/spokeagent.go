@@ -26,6 +26,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
+const (
+	// If a controller queue size is too large (>500), the processing speed of the controller will drop significantly
+	// with one worker, increasing the work numbers can imporve the processing speed.
+	// We compared the two situations where the worker is set to 1 and 10, when the worker is 10, the resource
+	// utilization of the kubeapi-server and work agent do not increase significantly.
+	//
+	// TODO expose a flag to set the worker for each controller
+	appliedManifestWorkFinalizeControllerWorkers = 10
+	manifestWorkFinalizeControllerWorkers        = 10
+	availableStatusControllerWorkers             = 10
+)
+
 // WorkloadAgentOptions defines the flags for workload agent
 type WorkloadAgentOptions struct {
 	HubKubeconfigFile                      string
@@ -192,12 +204,12 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 	go workInformerFactory.Start(ctx.Done())
 	go spokeWorkInformerFactory.Start(ctx.Done())
 	go addFinalizerController.Run(ctx, 1)
-	go appliedManifestWorkFinalizeController.Run(ctx, 1)
+	go appliedManifestWorkFinalizeController.Run(ctx, appliedManifestWorkFinalizeControllerWorkers)
 	go unmanagedAppliedManifestWorkController.Run(ctx, 1)
 	go appliedManifestWorkController.Run(ctx, 1)
 	go manifestWorkController.Run(ctx, 1)
-	go manifestWorkFinalizeController.Run(ctx, 1)
-	go availableStatusController.Run(ctx, 1)
+	go manifestWorkFinalizeController.Run(ctx, manifestWorkFinalizeControllerWorkers)
+	go availableStatusController.Run(ctx, availableStatusControllerWorkers)
 	<-ctx.Done()
 	return nil
 }
