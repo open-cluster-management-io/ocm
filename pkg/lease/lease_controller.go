@@ -2,6 +2,7 @@ package lease
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
@@ -9,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
@@ -75,7 +77,7 @@ func (r *leaseUpdater) updateLease(ctx context.Context, namespace string, client
 	lease, err := client.CoordinationV1().Leases(namespace).Get(ctx, r.leaseName, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
-		//create lease
+		// create lease
 		lease := &coordinationv1.Lease{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      r.leaseName,
@@ -94,7 +96,7 @@ func (r *leaseUpdater) updateLease(ctx context.Context, namespace string, client
 	case err != nil:
 		return err
 	default:
-		//update lease
+		// update lease
 		lease.Spec.RenewTime = &metav1.MicroTime{Time: time.Now()}
 		if _, err = client.CoordinationV1().Leases(namespace).Update(context.TODO(), lease, metav1.UpdateOptions{}); err != nil {
 			return err
@@ -145,4 +147,25 @@ func CheckAddonPodFunc(podGetter corev1client.PodsGetter, namespace, labelSelect
 		return false
 	}
 
+}
+
+// CheckManagedClusterHealthFunc checks the health status of the cluster api server
+func CheckManagedClusterHealthFunc(managedClusterDiscoveryClient discovery.DiscoveryInterface) func() bool {
+	return func() bool {
+		statusCode := 0
+		_ = managedClusterDiscoveryClient.RESTClient().Get().AbsPath("/livez").Do(context.TODO()).StatusCode(&statusCode)
+		if statusCode == http.StatusOK {
+			return true
+		}
+
+		// for backward compatible, the livez endpoint is supported from Kubernetes 1.16, so if the livez is not found or
+		// forbidden, the healthz endpoint will be used.
+		if statusCode == http.StatusNotFound || statusCode == http.StatusForbidden {
+			_ = managedClusterDiscoveryClient.RESTClient().Get().AbsPath("/healthz").Do(context.TODO()).StatusCode(&statusCode)
+			if statusCode == http.StatusOK {
+				return true
+			}
+		}
+		return false
+	}
 }

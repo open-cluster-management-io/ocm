@@ -2,7 +2,10 @@ package lease
 
 import (
 	"context"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/rest"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
@@ -30,7 +33,7 @@ func TestReconcile(t *testing.T) {
 		leaseNamespace:       agentNs,
 	}
 
-	//create lease
+	// create lease
 	leaseReconciler.reconcile(context.TODO())
 	addontesting.AssertActions(t, kubeClient.Actions(), "get", "create")
 	lease := kubeClient.Actions()[1].(clienttesting.CreateActionImpl).Object.(*coordinationv1.Lease)
@@ -40,7 +43,7 @@ func TestReconcile(t *testing.T) {
 			lease.ObjectMeta.Namespace, agentNs)
 	}
 
-	//update lease
+	// update lease
 	kubeClient.ClearActions()
 	leaseReconciler.reconcile(context.TODO())
 	addontesting.AssertActions(t, kubeClient.Actions(), "get", "update")
@@ -75,7 +78,7 @@ func TestReconcileWithInvalidLease(t *testing.T) {
 		}
 	})
 
-	//create lease
+	// create lease
 	leaseReconciler.reconcile(context.TODO())
 	addontesting.AssertActions(t, hubClient.Actions(), "get", "create")
 
@@ -101,7 +104,7 @@ func TestReconcileWithHealthCheck(t *testing.T) {
 		},
 	}
 
-	//create lease
+	// create lease
 	leaseReconciler.reconcile(context.TODO())
 	addontesting.AssertNoActions(t, kubeClient.Actions())
 
@@ -159,4 +162,58 @@ func TestCheckAddonPodFunc(t *testing.T) {
 		})
 	}
 
+}
+
+func TestCheckManagedClusterHealthFunc(t *testing.T) {
+	var healthzServerStatus, livezServerStatus int
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path == "/healthz" {
+			w.WriteHeader(healthzServerStatus)
+			return
+		}
+		if req.URL.Path == "/livez" {
+			w.WriteHeader(livezServerStatus)
+			return
+		}
+	}))
+	defer apiServer.Close()
+
+	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(&rest.Config{Host: apiServer.URL})
+
+	cases := []struct {
+		name          string
+		healthzStatus int
+		livezStatus   int
+		expected      bool
+	}{
+		{
+			name:          "livez healthy",
+			healthzStatus: http.StatusNotFound,
+			livezStatus:   http.StatusOK,
+			expected:      true,
+		},
+		{
+			name:          "healthz healthy",
+			healthzStatus: http.StatusOK,
+			livezStatus:   http.StatusNotFound,
+			expected:      true,
+		},
+		{
+			name:          "unhealthy",
+			healthzStatus: http.StatusNotFound,
+			livezStatus:   http.StatusNotFound,
+			expected:      false,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			healthzServerStatus = c.healthzStatus
+			livezServerStatus = c.livezStatus
+
+			if CheckManagedClusterHealthFunc(discoveryClient)() != c.expected {
+				t.Errorf("expected %v, but got %v", c.expected, CheckManagedClusterHealthFunc(discoveryClient)())
+
+			}
+		})
+	}
 }
