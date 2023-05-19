@@ -69,6 +69,9 @@ spec:
           {{if eq .Replica 1}}
           - "--disable-leader-election"
           {{end}}
+          {{if gt .ClientCertExpirationSeconds 0}}
+          - "--client-cert-expiration-seconds={{ .ClientCertExpirationSeconds }}"
+          {{end}}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

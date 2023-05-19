@@ -3,6 +3,7 @@ package clustermanagercontroller
 import (
 	"context"
 	"encoding/base64"
+	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
@@ -155,6 +156,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	registrationFeatureGates := helpers.DefaultHubRegistrationFeatureGates
 	if clusterManager.Spec.RegistrationConfiguration != nil {
 		registrationFeatureGates = clusterManager.Spec.RegistrationConfiguration.FeatureGates
+		config.AutoApproveUsers = strings.Join(clusterManager.Spec.RegistrationConfiguration.AutoApproveUsers, ",")
 	}
 	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration", registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates)
 

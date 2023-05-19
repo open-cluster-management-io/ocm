@@ -50,6 +50,9 @@ spec:
           - {{ . }}
           {{ end }}
           {{ end }}
+          {{if .AutoApproveUsers}}
+          - "--cluster-auto-approval-users={{ .AutoApproveUsers }}"
+          {{end}}
           {{ if .HostedMode }}
           - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
           {{ end }}

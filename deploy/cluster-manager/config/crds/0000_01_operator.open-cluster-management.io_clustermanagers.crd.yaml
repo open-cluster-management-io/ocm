@@ -212,6 +212,16 @@ spec:
                 description: RegistrationConfiguration contains the configuration
                   of registration
                 properties:
+                  autoApproveUsers:
+                    description: AutoApproveUser represents a list of users that can
+                      auto approve CSR and accept client. If the credential of the
+                      bootstrap-hub-kubeconfig matches to the users, the cluster created
+                      by the bootstrap-hub-kubeconfig will be auto-registered into
+                      the hub cluster. This takes effect only when ManagedClusterAutoApproval
+                      feature gate is enabled.
+                    items:
+                      type: string
+                    type: array
                   featureGates:
                     description: 'FeatureGates represents the list of feature gates
                       for registration If it is set empty, default feature gates will

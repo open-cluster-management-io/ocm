@@ -947,7 +947,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 		})
 	})
 
-	ginkgo.Context("klusterlet feature gates", func() {
+	ginkgo.Context("klusterlet feature gates and configuration", func() {
 		ginkgo.BeforeEach(func() {
 			registrationDeploymentName = fmt.Sprintf("%s-registration-agent", klusterlet.Name)
 			workDeploymentName = fmt.Sprintf("%s-work-agent", klusterlet.Name)
@@ -1015,6 +1015,57 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			gomega.Expect(workDeployment.Spec.Template.Spec.Containers[0].Args).ShouldNot(
 				gomega.ContainElement("--feature-gates="))
 
+		})
+
+		ginkgo.It("should set certDurationSeconds correctly", func() {
+			klusterlet.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationConfiguration{
+				ClientCertExpirationSeconds: 120,
+			}
+
+			ginkgo.By("Create the klusterlet with valid RegistrationConfiguration")
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(),
+				klusterlet, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Create a bootstrap secret and make sure the kubeconfig can work")
+			bootStrapSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      helpers.BootstrapHubKubeConfig,
+					Namespace: klusterletNamespace,
+				},
+				Data: map[string][]byte{
+					"kubeconfig": util.NewKubeConfig(restConfig),
+				},
+			}
+			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(),
+				bootStrapSecret, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(),
+				helpers.HubKubeConfig, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			ginkgo.By("Update hub secret and make sure the kubeconfig can work")
+			hubSecret = hubSecret.DeepCopy()
+			hubSecret.Data["cluster-name"] = []byte("testcluster")
+			hubSecret.Data["kubeconfig"] = util.NewKubeConfig(restConfig)
+			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(),
+				hubSecret, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient,
+				"HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient,
+				"RegistrationDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient,
+				"WorkDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
+
+			ginkgo.By("Check the registration-agent has the expected agrs")
+			registrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
+				context.Background(), registrationDeploymentName, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(registrationDeployment.Spec.Template.Spec.Containers[0].Args).Should(
+				gomega.ContainElement("--client-cert-expiration-seconds=120"))
 		})
 
 		ginkgo.It("should be set correctly", func() {

@@ -169,6 +169,15 @@ spec:
                 description: RegistrationConfiguration contains the configuration
                   of registration
                 properties:
+                  clientCertExpirationSeconds:
+                    description: clientCertExpirationSeconds represents the seconds
+                      of a client certificate to expire. If it is not set or 0, the
+                      default duration seconds will be set by the hub cluster. If
+                      the value is larger than the max signing duration seconds set
+                      on the hub cluster, the max signing duration seconds will be
+                      set.
+                    format: int32
+                    type: integer
                   featureGates:
                     description: 'FeatureGates represents the list of feature gates
                       for registration If it is set empty, default feature gates will

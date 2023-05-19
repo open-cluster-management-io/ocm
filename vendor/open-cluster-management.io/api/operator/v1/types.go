@@ -61,7 +61,7 @@ type ClusterManagerSpec struct {
 
 	// RegistrationConfiguration contains the configuration of registration
 	// +optional
-	RegistrationConfiguration *RegistrationConfiguration `json:"registrationConfiguration,omitempty"`
+	RegistrationConfiguration *RegistrationHubConfiguration `json:"registrationConfiguration,omitempty"`
 
 	// WorkConfiguration contains the configuration of work
 	// +optional
@@ -72,7 +72,32 @@ type ClusterManagerSpec struct {
 	AddOnManagerConfiguration *AddOnManagerConfiguration `json:"addOnManagerConfiguration,omitempty"`
 }
 
+type RegistrationHubConfiguration struct {
+	// AutoApproveUser represents a list of users that can auto approve CSR and accept client. If the credential of the
+	// bootstrap-hub-kubeconfig matches to the users, the cluster created by the bootstrap-hub-kubeconfig will
+	// be auto-registered into the hub cluster. This takes effect only when ManagedClusterAutoApproval feature gate
+	// is enabled.
+	// +optional
+	AutoApproveUsers []string `json:"autoApproveUsers,omitempty"`
+
+	// FeatureGates represents the list of feature gates for registration
+	// If it is set empty, default feature gates will be used.
+	// If it is set, featuregate/Foo is an example of one item in FeatureGates:
+	//   1. If featuregate/Foo does not exist, registration-operator will discard it
+	//   2. If featuregate/Foo exists and is false by default. It is now possible to set featuregate/Foo=[false|true]
+	//   3. If featuregate/Foo exists and is true by default. If a cluster-admin upgrading from 1 to 2 wants to continue having featuregate/Foo=false,
+	//  	he can set featuregate/Foo=false before upgrading. Let's say the cluster-admin wants featuregate/Foo=false.
+	// +optional
+	FeatureGates []FeatureGate `json:"featureGates,omitempty"`
+}
+
 type RegistrationConfiguration struct {
+	// clientCertExpirationSeconds represents the seconds of a client certificate to expire. If it is not set or 0, the default
+	// duration seconds will be set by the hub cluster. If the value is larger than the max signing duration seconds set on
+	// the hub cluster, the max signing duration seconds will be set.
+	// +optional
+	ClientCertExpirationSeconds int32 `json:"clientCertExpirationSeconds,omitempty"`
+
 	// FeatureGates represents the list of feature gates for registration
 	// If it is set empty, default feature gates will be used.
 	// If it is set, featuregate/Foo is an example of one item in FeatureGates:

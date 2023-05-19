@@ -564,6 +564,42 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 		})
 
+		ginkgo.It("should have auto approver user set on registration when configured", func() {
+			// Update cluster manager configuration
+			gomega.Eventually(func() error {
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				// Check addon manager enabled mode
+				if clusterManager.Spec.RegistrationConfiguration == nil {
+					clusterManager.Spec.RegistrationConfiguration = &operatorapiv1.RegistrationHubConfiguration{}
+				}
+				clusterManager.Spec.RegistrationConfiguration.AutoApproveUsers = []string{"user1", "user2"}
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			gomega.Eventually(func() error {
+				actual, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
+				var match bool
+				for _, arg := range actual.Spec.Template.Spec.Containers[0].Args {
+					if arg == "--cluster-auto-approval-users=user1,user2" {
+						match = true
+					}
+				}
+				if !match {
+					return fmt.Errorf("do not find the cluster-auto-approval-users args, got %v", actual.Spec.Template.Spec.Containers[0].Args)
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+		})
+
 	})
 
 	ginkgo.Context("Cluster manager statuses", func() {
@@ -671,7 +707,19 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 	})
 
 	ginkgo.Context("Cluster manager feature gates", func() {
-		ginkgo.It("should be set correctly", func() {
+		ginkgo.It("default should be set correctly", func() {
+			// remove cluster manager configuration
+			gomega.Eventually(func() error {
+				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				// Check addon manager enabled mode
+				clusterManager.Spec.RegistrationConfiguration = nil
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 			gomega.Eventually(func() error {
 				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(),
 					hubRegistrationDeployment, metav1.GetOptions{}); err != nil {

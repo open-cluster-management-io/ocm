@@ -337,9 +337,9 @@ const (
 	// valid in Hosted mode.
 	ManagedClusterAddOnHostingClusterValidity = "HostingClusterValidity"
 
-	// ManagedClusterAddOnUnsupportedConfigurationType is a condition type representing whether the config resources
-	// are supported.
-	ManagedClusterAddOnUnsupportedConfigurationType = "UnsupportedConfiguration"
+	// ManagedClusterAddOnRegistrationApplied is a condition type representing whether the registration of
+	// the addon agent is configured.
+	ManagedClusterAddOnRegistrationApplied = "RegistrationApplied"
 )
 
 // the reasons of condition ManagedClusterAddOnConditionAvailable
@@ -411,13 +411,52 @@ const (
 	HostingClusterValidityReasonInvalid = "HostingClusterInvalid"
 )
 
-// the reason of condition ManagedClusterAddOnUnsupportedConfigurationType
+// the reason of condition ManagedClusterAddOnConditionProgressing
 const (
-	// AddonReasonConfigurationSupported is the reason of condition UnsupportedConfiguration indicating the configuration
-	// in clusterManagementAddon is supported.
-	AddonReasonConfigurationSupported = "ConfigurationSupported"
+	// ProgressingReasonInstalling is the reason of condition Progressing indicating the addon configuration is
+	// installing.
+	ProgressingReasonInstalling = "Installing"
 
-	// AddonReasonConfigurationUnsupported is the reason of condition UnsupportedConfiguration indicating the configuration
-	// in clusterManagementAddon is not supported.
-	AddonReasonConfigurationUnsupported = "ConfigurationUnsupported"
+	// ProgressingReasonInstallSucceed is the reason of condition Progressing indicating the addon configuration is
+	// installed successfully.
+	ProgressingReasonInstallSucceed = "InstallSucceed"
+
+	// ProgressingReasonInstallFailed is the reason of condition Progressing indicating the addon configuration is
+	// installed failed.
+	ProgressingReasonInstallFailed = "InstallFailed"
+
+	// ProgressingReasonUpgrading is the reason of condition Progressing indicating the addon configuration is
+	// upgrading.
+	ProgressingReasonUpgrading = "Upgrading"
+
+	// ProgressingReasonUpgradeSucceed is the reason of condition Progressing indicating the addon configuration is
+	// upgraded successfully.
+	ProgressingReasonUpgradeSucceed = "UpgradeSucceed"
+
+	// ProgressingReasonUpgradeFailed is the reason of condition Progressing indicating the addon configuration is
+	// upgraded failed.
+	ProgressingReasonUpgradeFailed = "UpgradeFailed"
+
+	// ProgressingReasonWaitingForCanary is the reason of condition Progressing indicating the addon configuration
+	// upgrade is pending and waiting for canary is done.
+	ProgressingReasonWaitingForCanary = "WaitingForCanary"
+
+	// ProgressingReasonConfigurationUnsupported is the reason of condition Progressing indicating the addon configuration
+	// is not supported.
+	ProgressingReasonConfigurationUnsupported = "ConfigurationUnsupported"
+)
+
+// the reasons of condition ManagedClusterAddOnRegistrationApplied
+const (
+	// RegistrationAppliedNilRegistration is the reason of condition RegistrationApplied indicating that there is no
+	// registration option.
+	RegistrationAppliedNilRegistration = "NilRegistration"
+
+	// RegistrationAppliedSetPermissionFailed is the reason of condition RegistrationApplied indicating that it is
+	// failed to set up rbac for the addon agent.
+	RegistrationAppliedSetPermissionFailed = "SetPermissionFailed"
+
+	// RegistrationAppliedSetPermissionApplied is the reason of condition RegistrationApplied indicating that it is
+	// successful to set up rbac for the addon agent.
+	RegistrationAppliedSetPermissionApplied = "SetPermissionApplied"
 )

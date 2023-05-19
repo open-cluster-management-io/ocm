@@ -17,6 +17,7 @@ type HubConfig struct {
 	AddOnManagerImage              string
 	AddOnManagerEnabled            bool
 	MWReplicaSetEnabled            bool
+	AutoApproveUsers               string
 }
 
 type Webhook struct {

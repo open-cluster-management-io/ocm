@@ -117,16 +117,17 @@ type klusterletConfig struct {
 	//     namespace as KlusterletNamespace;
 	// 2). In the Hosted mode, it is on the management cluster and has the same name as
 	//     the klusterlet.
-	AgentNamespace            string
-	AgentID                   string
-	RegistrationImage         string
-	WorkImage                 string
-	ClusterName               string
-	ExternalServerURL         string
-	HubKubeConfigSecret       string
-	BootStrapKubeConfigSecret string
-	OperatorNamespace         string
-	Replica                   int32
+	AgentNamespace              string
+	AgentID                     string
+	RegistrationImage           string
+	WorkImage                   string
+	ClusterName                 string
+	ExternalServerURL           string
+	HubKubeConfigSecret         string
+	BootStrapKubeConfigSecret   string
+	OperatorNamespace           string
+	Replica                     int32
+	ClientCertExpirationSeconds int32
 
 	ExternalManagedKubeConfigSecret             string
 	ExternalManagedKubeConfigRegistrationSecret string
@@ -222,6 +223,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	registrationFeatureGates := helpers.DefaultSpokeRegistrationFeatureGates
 	if klusterlet.Spec.RegistrationConfiguration != nil {
 		registrationFeatureGates = klusterlet.Spec.RegistrationConfiguration.FeatureGates
+		config.ClientCertExpirationSeconds = klusterlet.Spec.RegistrationConfiguration.ClientCertExpirationSeconds
 	}
 	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration", registrationFeatureGates, ocmfeature.DefaultSpokeRegistrationFeatureGates)
 
