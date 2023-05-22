@@ -255,7 +255,7 @@ func (n *installStrategyNode) addNode(addon *addonv1alpha1.ManagedClusterAddOn) 
 func (n *installStrategyNode) addonUpgraded() int {
 	count := 0
 	for _, addon := range n.children {
-		if addon.mcaUpgradeStatus == upgraded {
+		if desiredConfigsEqual(addon.desiredConfigs, n.desiredConfigs) && addon.mcaUpgradeStatus == upgraded {
 			count += 1
 		}
 	}
@@ -265,7 +265,7 @@ func (n *installStrategyNode) addonUpgraded() int {
 func (n *installStrategyNode) addonUpgrading() int {
 	count := 0
 	for _, addon := range n.children {
-		if addon.mcaUpgradeStatus == upgrading {
+		if desiredConfigsEqual(addon.desiredConfigs, n.desiredConfigs) && addon.mcaUpgradeStatus == upgrading {
 			count += 1
 		}
 	}
@@ -325,4 +325,18 @@ func parseMaxConcurrency(maxConcurrency intstr.IntOrString, total int) (int, err
 	}
 
 	return length, nil
+}
+
+func desiredConfigsEqual(a, b addonConfigMap) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for configgrA := range a {
+		if a[configgrA] != b[configgrA] {
+			return false
+		}
+	}
+
+	return true
 }

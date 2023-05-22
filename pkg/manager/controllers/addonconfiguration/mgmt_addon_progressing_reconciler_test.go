@@ -401,6 +401,87 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "mca override cma configs",
+			managedClusteraddon: []runtime.Object{func() *addonv1alpha1.ManagedClusterAddOn {
+				addon := addontesting.NewAddon("test", "cluster1")
+				addon.Spec.Configs = []addonv1alpha1.AddOnConfig{
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "testmca"},
+					},
+				}
+				addon.Status.ConfigReferences = []addonv1alpha1.ConfigReference{
+					{
+						ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "testmca"},
+							SpecHash:       "hashmca",
+						},
+						LastAppliedConfig: &addonv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "testmca"},
+							SpecHash:       "hashmca",
+						},
+					},
+				}
+				return addon
+			}()},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "", "").
+				WithPlacementStrategy(addonv1alpha1.PlacementStrategy{PlacementRef: addonv1alpha1.PlacementRef{Name: "placement1", Namespace: "test"}}).
+				WithInstallProgression(addonv1alpha1.InstallProgression{
+					PlacementRef: addonv1alpha1.PlacementRef{Name: "placement1", Namespace: "test"},
+					ConfigReferences: []addonv1alpha1.InstallConfigReference{
+						{
+							ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+							DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+								SpecHash:       "hash1",
+							},
+							LastAppliedConfig: &addonv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+								SpecHash:       "hash",
+							},
+						},
+					},
+				}).Build()},
+			placements: []runtime.Object{
+				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "placement1", Namespace: "test"}},
+			},
+			placementDecisions: []runtime.Object{
+				&clusterv1beta1.PlacementDecision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "placement1",
+						Namespace: "test",
+						Labels:    map[string]string{clusterv1beta1.PlacementLabel: "placement1"},
+					},
+					Status: clusterv1beta1.PlacementDecisionStatus{
+						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}},
+					},
+				},
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				actual := actions[0].(clienttesting.PatchActionImpl).Patch
+				cma := &addonv1alpha1.ClusterManagementAddOn{}
+				err := json.Unmarshal(actual, cma)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if len(cma.Status.DefaultConfigReferences) != 0 {
+					t.Errorf("DefaultConfigReferences object is not correct: %v", cma.Status.DefaultConfigReferences)
+				}
+				if cma.Status.InstallProgressions[0].ConfigReferences[0].LastKnownGoodConfig != nil {
+					t.Errorf("InstallProgressions LastKnownGoodConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
+				}
+				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonUpgrading {
+					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
+				}
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "0/1 upgrading..." {
+					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
+				}
+			},
+		},
+		{
 			name: "update clustermanagementaddon status with condition Progressing ConfigurationUnsupported",
 			managedClusteraddon: []runtime.Object{func() *addonv1alpha1.ManagedClusterAddOn {
 				addon := addontesting.NewAddon("test", "cluster1")
