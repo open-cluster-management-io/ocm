@@ -33,6 +33,7 @@ func (AddOnDeploymentConfigList) SwaggerDoc() map[string]string {
 var map_AddOnDeploymentConfigSpec = map[string]string{
 	"customizedVariables": "CustomizedVariables is a list of name-value variables for the current add-on deployment. The add-on implementation can use these variables to render its add-on deployment. The default is an empty list.",
 	"nodePlacement":       "NodePlacement enables explicit control over the scheduling of the add-on agents on the managed cluster. All add-on agent pods are expected to comply with this node placement. If the placement is nil, the placement is not specified, it will be omitted. If the placement is an empty object, the placement will match all nodes and tolerate nothing.",
+	"registries":          "Registries describes how to override images used by the addon agent on the managed cluster. the following example will override image \"quay.io/open-cluster-management/addon-agent\" to \"quay.io/ocm/addon-agent\" when deploying the addon agent\n\nregistries:\n  - source: quay.io/open-cluster-management/addon-agent\n    mirror: quay.io/ocm/addon-agent",
 }
 
 func (AddOnDeploymentConfigSpec) SwaggerDoc() map[string]string {
@@ -47,6 +48,16 @@ var map_CustomizedVariable = map[string]string{
 
 func (CustomizedVariable) SwaggerDoc() map[string]string {
 	return map_CustomizedVariable
+}
+
+var map_ImageMirror = map[string]string{
+	"":       "ImageMirror describes how to mirror images from a source",
+	"mirror": "Mirror is the mirrored registry of the Source. Will be ignored if Mirror is empty.",
+	"source": "Source is the source registry. All image registries will be replaced by Mirror if Source is empty.",
+}
+
+func (ImageMirror) SwaggerDoc() map[string]string {
+	return map_ImageMirror
 }
 
 var map_NodePlacement = map[string]string{

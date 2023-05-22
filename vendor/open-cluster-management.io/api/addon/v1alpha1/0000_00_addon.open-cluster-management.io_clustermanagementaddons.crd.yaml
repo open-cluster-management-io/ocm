@@ -8,6 +8,9 @@ spec:
     kind: ClusterManagementAddOn
     listKind: ClusterManagementAddOnList
     plural: clustermanagementaddons
+    shortNames:
+    - cma
+    - cmas
     singular: clustermanagementaddon
   preserveUnknownFields: false
   scope: Cluster

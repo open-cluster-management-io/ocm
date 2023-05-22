@@ -118,6 +118,27 @@ spec:
                       type: object
                     type: array
                 type: object
+              registries:
+                description: "Registries describes how to override images used by
+                  the addon agent on the managed cluster. the following example will
+                  override image \"quay.io/open-cluster-management/addon-agent\" to
+                  \"quay.io/ocm/addon-agent\" when deploying the addon agent \n registries:
+                  - source: quay.io/open-cluster-management/addon-agent mirror: quay.io/ocm/addon-agent"
+                items:
+                  description: ImageMirror describes how to mirror images from a source
+                  properties:
+                    mirror:
+                      description: Mirror is the mirrored registry of the Source.
+                        Will be ignored if Mirror is empty.
+                      type: string
+                    source:
+                      description: Source is the source registry. All image registries
+                        will be replaced by Mirror if Source is empty.
+                      type: string
+                  required:
+                  - mirror
+                  type: object
+                type: array
             type: object
         type: object
     served: true

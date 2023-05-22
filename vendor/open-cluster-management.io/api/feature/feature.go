@@ -63,6 +63,10 @@ const (
 	// ManifestWorkReplicaSet will start new controller in the Hub that can be used to deploy manifestWorks to group
 	// of clusters selected by a placement. For more info check ManifestWorkReplicaSet APIs
 	ManifestWorkReplicaSet featuregate.Feature = "ManifestWorkReplicaSet"
+
+	// RawFeedbackJsonString will make the work agent to return the feedback result as a json string if the result
+	// is not a scalar value.
+	RawFeedbackJsonString featuregate.Feature = "RawFeedbackJsonString"
 )
 
 // DefaultSpokeRegistrationFeatureGates consists of all known ocm-registration
@@ -98,4 +102,5 @@ var DefaultHubWorkFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec
 // To add a new feature, define a key for it above and add it here.
 var DefaultSpokeWorkFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	ExecutorValidatingCaches: {Default: false, PreRelease: featuregate.Alpha},
+	RawFeedbackJsonString:    {Default: false, PreRelease: featuregate.Alpha},
 }

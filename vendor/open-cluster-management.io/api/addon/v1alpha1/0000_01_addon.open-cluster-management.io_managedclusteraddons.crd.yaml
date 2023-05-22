@@ -8,6 +8,9 @@ spec:
     kind: ManagedClusterAddOn
     listKind: ManagedClusterAddOnList
     plural: managedclusteraddons
+    shortNames:
+    - mca
+    - mcas
     singular: managedclusteraddon
   preserveUnknownFields: false
   scope: Namespaced
