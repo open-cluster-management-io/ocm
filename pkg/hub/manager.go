@@ -53,7 +53,7 @@ func NewHubManagerOptions() *HubManagerOptions {
 // AddFlags registers flags for manager
 func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	features.DefaultHubMutableFeatureGate.AddFlag(fs)
-	fs.StringArrayVar(&m.ClusterAutoApprovalUsers, "cluster-auto-approval-users", m.ClusterAutoApprovalUsers,
+	fs.StringSliceVar(&m.ClusterAutoApprovalUsers, "cluster-auto-approval-users", m.ClusterAutoApprovalUsers,
 		"A bootstrap user list whose cluster registration requests can be automatically approved.")
 
 }
