@@ -94,3 +94,6 @@ rules:
 - apiGroups: ["register.open-cluster-management.io"]
   resources: ["managedclusters/clientcertificates"]
   verbs: ["renew"]
+- apiGroups: ["register.open-cluster-management.io"]
+  resources: ["managedclusters/accept"]
+  verbs: ["update"]

@@ -462,6 +462,12 @@ spec:
           verbs:
           - renew
         - apiGroups:
+            - register.open-cluster-management.io
+          resources:
+            - managedclusters/accept
+          verbs:
+            - update
+        - apiGroups:
           - work.open-cluster-management.io
           resources:
           - manifestworkreplicasets

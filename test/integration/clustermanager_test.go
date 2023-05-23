@@ -535,7 +535,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 			gomega.Eventually(func() error {
 				registrationoDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubRegistrationDeployment, metav1.GetOptions{})
 				if err != nil {
-					return appsv1.ErrInvalidLengthGenerated
+					return err
 				}
 				if registrationoDeployment.Spec.Template.Spec.Containers[0].Image != "testimage:latest" {
 					return fmt.Errorf("image should be testimage:latest, but get %s", registrationoDeployment.Spec.Template.Spec.Containers[0].Image)
@@ -587,16 +587,12 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 					return err
 				}
 				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
-				var match bool
 				for _, arg := range actual.Spec.Template.Spec.Containers[0].Args {
 					if arg == "--cluster-auto-approval-users=user1,user2" {
-						match = true
+						return nil
 					}
 				}
-				if !match {
-					return fmt.Errorf("do not find the cluster-auto-approval-users args, got %v", actual.Spec.Template.Spec.Containers[0].Args)
-				}
-				return nil
+				return fmt.Errorf("do not find the cluster-auto-approval-users args, got %v", actual.Spec.Template.Spec.Containers[0].Args)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 		})
 
@@ -721,21 +717,21 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 			gomega.Eventually(func() error {
-				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(),
-					hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
+				actual, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(),
+					hubRegistrationDeployment, metav1.GetOptions{})
+				if err != nil {
 					return err
 				}
-				return nil
+				for _, arg := range actual.Spec.Template.Spec.Containers[0].Args {
+					if arg == "--feature-gates=DefaultClusterSet=true" {
+						return nil
+					}
+				}
+				return fmt.Errorf("do not find the --feature-gates=DefaultClusterSet=true args, got %v", actual.Spec.Template.Spec.Containers[0].Args)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
 			util.AssertClusterManagerCondition(clusterManagerName, operatorClient,
 				helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue)
-
-			registrationDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(),
-				hubRegistrationDeployment, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(registrationDeployment.Spec.Template.Spec.Containers[0].Args).Should(
-				gomega.ContainElement("--feature-gates=DefaultClusterSet=true"))
 
 			workDeployment, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(),
 				hubWorkWebhookDeployment, metav1.GetOptions{})
