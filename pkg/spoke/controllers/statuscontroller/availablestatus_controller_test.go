@@ -2,6 +2,7 @@ package statuscontroller
 
 import (
 	"context"
+	"k8s.io/utils/pointer"
 	"open-cluster-management.io/work/pkg/spoke/controllers"
 	"testing"
 
@@ -15,7 +16,6 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/work/pkg/spoke/spoketesting"
 	"open-cluster-management.io/work/pkg/spoke/statusfeedback"
-	"open-cluster-management.io/work/test/integration/util"
 )
 
 func TestSyncManifestWork(t *testing.T) {
@@ -289,21 +289,21 @@ func TestStatusFeedback(t *testing.T) {
 						Name: "ReadyReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: util.Int64Ptr(2),
+							Integer: pointer.Int64(2),
 						},
 					},
 					{
 						Name: "Replicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: util.Int64Ptr(3),
+							Integer: pointer.Int64(3),
 						},
 					},
 					{
 						Name: "AvailableReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: util.Int64Ptr(2),
+							Integer: pointer.Int64(2),
 						},
 					},
 				}
@@ -363,7 +363,7 @@ func TestStatusFeedback(t *testing.T) {
 						Name: "Replicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: util.Int64Ptr(3),
+							Integer: pointer.Int64(3),
 						},
 					},
 				}

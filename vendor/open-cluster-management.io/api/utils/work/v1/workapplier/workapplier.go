@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+
 	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -46,15 +49,20 @@ func NewWorkApplierWithTypedClient(workClient workv1client.Interface,
 func (w *WorkApplier) Apply(ctx context.Context, work *workapiv1.ManifestWork) (*workapiv1.ManifestWork, error) {
 	existingWork, err := w.getWork(ctx, work.Namespace, work.Name)
 	existingWork = existingWork.DeepCopy()
-	if err != nil {
-		if errors.IsNotFound(err) {
-			existingWork, err = w.createWork(ctx, work)
-			if err == nil {
-				w.cache.updateCache(work, existingWork)
-				return existingWork, nil
-			}
+	if errors.IsNotFound(err) {
+		existingWork, err = w.createWork(ctx, work)
+		switch {
+		case errors.IsAlreadyExists(err):
+			return work, nil
+		case err != nil:
 			return nil, err
+		default:
+			w.cache.updateCache(work, existingWork)
+			return existingWork, nil
 		}
+	}
+
+	if err != nil {
 		return nil, err
 	}
 
@@ -62,11 +70,16 @@ func (w *WorkApplier) Apply(ctx context.Context, work *workapiv1.ManifestWork) (
 		return existingWork, nil
 	}
 
-	if ManifestWorkSpecEqual(work.Spec, existingWork.Spec) {
+	if ManifestWorkEqual(work, existingWork) {
 		return existingWork, nil
 	}
 
 	oldData, err := json.Marshal(&workapiv1.ManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:          existingWork.Labels,
+			Annotations:     existingWork.Annotations,
+			OwnerReferences: existingWork.OwnerReferences,
+		},
 		Spec: existingWork.Spec,
 	})
 	if err != nil {
@@ -77,6 +90,9 @@ func (w *WorkApplier) Apply(ctx context.Context, work *workapiv1.ManifestWork) (
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             existingWork.UID,
 			ResourceVersion: existingWork.ResourceVersion,
+			Labels:          work.Labels,
+			Annotations:     work.Annotations,
+			OwnerReferences: work.OwnerReferences,
 		},
 		Spec: work.Spec,
 	})
@@ -111,28 +127,60 @@ func (w *WorkApplier) Delete(ctx context.Context, namespace, name string) error 
 	return nil
 }
 
-func manifestsEqual(new, old []workapiv1.Manifest) bool {
-	if len(new) != len(old) {
+func shouldUpdateMap(required, existing map[string]string) bool {
+	if len(required) > len(existing) {
+		return true
+	}
+	for key, value := range required {
+		if existing[key] != value {
+			return true
+		}
+	}
+	return false
+}
+
+func ManifestWorkEqual(new, old *workapiv1.ManifestWork) bool {
+	mutatedNewWork := mutateWork(new)
+	mutatedOldWork := mutateWork(old)
+	if !equality.Semantic.DeepEqual(mutatedNewWork.Spec, mutatedOldWork.Spec) {
 		return false
 	}
 
-	for i := range new {
-		if !equality.Semantic.DeepEqual(new[i].Raw, old[i].Raw) {
-			return false
-		}
+	if shouldUpdateMap(mutatedNewWork.Annotations, mutatedOldWork.Annotations) {
+		return false
+	}
+	if shouldUpdateMap(mutatedNewWork.Labels, mutatedOldWork.Labels) {
+		return false
+	}
+	if !equality.Semantic.DeepEqual(mutatedNewWork.OwnerReferences, mutatedOldWork.OwnerReferences) {
+		return false
 	}
 	return true
 }
 
-func ManifestWorkSpecEqual(new, old workapiv1.ManifestWorkSpec) bool {
-	if !manifestsEqual(new.Workload.Manifests, old.Workload.Manifests) {
-		return false
+// mutate work to easy compare works.
+func mutateWork(work *workapiv1.ManifestWork) *workapiv1.ManifestWork {
+	mutatedWork := work.DeepCopy()
+	newManifests := []workapiv1.Manifest{}
+	for _, manifest := range work.Spec.Workload.Manifests {
+		unstructuredManifest := &unstructured.Unstructured{}
+		if err := unstructuredManifest.UnmarshalJSON(manifest.Raw); err != nil {
+			klog.Errorf("failed to unmarshal work manifest.err: %v", err)
+			return mutatedWork
+		}
+
+		// the filed creationTimestamp should be removed before compare since it is added during transition from raw data to runtime object.
+		unstructured.RemoveNestedField(unstructuredManifest.Object, "metadata", "creationTimestamp")
+		unstructured.RemoveNestedField(unstructuredManifest.Object, "spec", "template", "metadata", "creationTimestamp")
+
+		newManifestRaw, err := unstructuredManifest.MarshalJSON()
+		if err != nil {
+			klog.Errorf("failed to 	marshal work manifest.err: %v", err)
+			return mutatedWork
+		}
+		newManifests = append(newManifests, workapiv1.Manifest{RawExtension: runtime.RawExtension{Raw: newManifestRaw}})
 	}
-	if !equality.Semantic.DeepEqual(new.ManifestConfigs, old.ManifestConfigs) {
-		return false
-	}
-	if !equality.Semantic.DeepEqual(new.DeleteOption, old.DeleteOption) {
-		return false
-	}
-	return true
+
+	mutatedWork.Spec.Workload.Manifests = newManifests
+	return mutatedWork
 }

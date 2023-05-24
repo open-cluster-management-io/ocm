@@ -1,15 +1,21 @@
 package statusfeedback
 
 import (
+	"encoding/json"
 	"fmt"
+	"k8s.io/utils/pointer"
+	ocmfeature "open-cluster-management.io/api/feature"
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/util/jsonpath"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/work/pkg/features"
 	"open-cluster-management.io/work/pkg/spoke/statusfeedback/rules"
 )
+
+const maxJsonRawLength = 1024
 
 type StatusReader struct {
 	wellKnownStatus rules.WellKnownStatusRuleResolver
@@ -121,6 +127,24 @@ func getValueByJsonPath(name, path string, obj *unstructured.Unstructured) (*wor
 			Name:  name,
 			Value: fieldValue,
 		}, nil
+	default:
+		if features.DefaultSpokeMutableFeatureGate.Enabled(ocmfeature.RawFeedbackJsonString) {
+			jsonRaw, err := json.Marshal(&t)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse the resource to json string for name %s: %v", name, err)
+			}
+			if len(jsonRaw) > maxJsonRawLength {
+				return nil, fmt.Errorf("the length of returned json raw string for name %s is larger than the maximum length %d", name, maxJsonRawLength)
+			}
+			fieldValue = workapiv1.FieldValue{
+				Type:    workapiv1.JsonRaw,
+				JsonRaw: pointer.String(string(jsonRaw)),
+			}
+			return &workapiv1.FeedbackValue{
+				Name:  name,
+				Value: fieldValue,
+			}, nil
+		}
 	}
 
 	return nil, fmt.Errorf("the type %v of the value for %s is not found", reflect.TypeOf(value), name)

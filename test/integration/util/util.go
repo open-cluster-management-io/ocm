@@ -180,11 +180,3 @@ func (r *IntegrationTestEventRecorder) Warningf(reason, messageFmt string, args 
 
 func (r *IntegrationTestEventRecorder) Shutdown() {
 }
-
-func Int64Ptr(val int64) *int64 {
-	return &val
-}
-
-func StringPtr(val string) *string {
-	return &val
-}

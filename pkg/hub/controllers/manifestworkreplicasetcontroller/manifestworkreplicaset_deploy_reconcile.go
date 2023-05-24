@@ -45,7 +45,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 	}
 
 	errs := []error{}
-	addedClusters, deletedClusters, existingClusters := sets.NewString(), sets.NewString(), sets.NewString()
+	addedClusters, deletedClusters, existingClusters := sets.New[string](), sets.New[string](), sets.New[string]()
 	for _, mw := range manifestWorks {
 		existingClusters.Insert(mw.Namespace)
 	}

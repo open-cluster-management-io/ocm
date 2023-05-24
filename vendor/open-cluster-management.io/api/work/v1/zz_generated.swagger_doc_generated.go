@@ -93,8 +93,9 @@ var map_FieldValue = map[string]string{
 	"":        "FieldValue is the value of the status field. The value of the status field can only be integer, string or boolean.",
 	"type":    "Type represents the type of the value, it can be integer, string or boolean.",
 	"integer": "Integer is the integer value when type is integer.",
-	"string":  "String is the string value when when type is string.",
+	"string":  "String is the string value when type is string.",
 	"boolean": "Boolean is bool value when type is boolean.",
+	"jsonRaw": "JsonRaw is a json string when type is a list or object",
 }
 
 func (FieldValue) SwaggerDoc() map[string]string {

@@ -3,6 +3,9 @@ package integration
 import (
 	"context"
 	"fmt"
+	"k8s.io/utils/pointer"
+	ocmfeature "open-cluster-management.io/api/feature"
+	"open-cluster-management.io/work/pkg/features"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -34,12 +37,8 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 
 		ns := &corev1.Namespace{}
 		ns.Name = o.SpokeClusterName
-		_, err := spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err = spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		var ctx context.Context
-		ctx, cancel = context.WithCancel(context.Background())
-		go startWorkAgent(ctx, o)
 
 		// reset manifests
 		manifests = nil
@@ -51,9 +50,6 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		if cancel != nil {
-			cancel()
-		}
 		err := spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), o.SpokeClusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
@@ -63,6 +59,16 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 			u, _, err := util.NewDeployment(o.SpokeClusterName, "deploy1", "sa")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			manifests = append(manifests, util.ToManifest(u))
+
+			var ctx context.Context
+			ctx, cancel = context.WithCancel(context.Background())
+			go startWorkAgent(ctx, o)
+		})
+
+		ginkgo.AfterEach(func() {
+			if cancel != nil {
+				cancel()
+			}
 		})
 
 		ginkgo.It("should return well known statuses", func() {
@@ -123,21 +129,21 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 						Name: "ReadyReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: util.Int64Ptr(2),
+							Integer: pointer.Int64(2),
 						},
 					},
 					{
 						Name: "Replicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: util.Int64Ptr(3),
+							Integer: pointer.Int64(3),
 						},
 					},
 					{
 						Name: "AvailableReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: util.Int64Ptr(2),
+							Integer: pointer.Int64(2),
 						},
 					},
 				}
@@ -185,21 +191,21 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 						Name: "ReadyReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: util.Int64Ptr(3),
+							Integer: pointer.Int64(3),
 						},
 					},
 					{
 						Name: "Replicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: util.Int64Ptr(3),
+							Integer: pointer.Int64(3),
 						},
 					},
 					{
 						Name: "AvailableReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: util.Int64Ptr(3),
+							Integer: pointer.Int64(3),
 						},
 					},
 				}
@@ -285,7 +291,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 						Name: "Available",
 						Value: workapiv1.FieldValue{
 							Type:   workapiv1.String,
-							String: util.StringPtr("True"),
+							String: pointer.String("True"),
 						},
 					},
 				}
@@ -294,7 +300,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 				}
 
 				if !util.HaveManifestCondition(work.Status.ResourceStatus.Manifests, "StatusFeedbackSynced", []metav1.ConditionStatus{metav1.ConditionFalse}) {
-					return fmt.Errorf("Status sync condition should be True")
+					return fmt.Errorf("Status sync condition should be False")
 				}
 
 				return nil
@@ -375,21 +381,21 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 						Name: "ReadyReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: util.Int64Ptr(2),
+							Integer: pointer.Int64(2),
 						},
 					},
 					{
 						Name: "Replicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: util.Int64Ptr(3),
+							Integer: pointer.Int64(3),
 						},
 					},
 					{
 						Name: "AvailableReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: util.Int64Ptr(2),
+							Integer: pointer.Int64(2),
 						},
 					},
 				}
@@ -402,6 +408,143 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 				}
 
 				if !util.HaveManifestCondition(work.Status.ResourceStatus.Manifests, "StatusFeedbackSynced", []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionFalse}) {
+					return fmt.Errorf("Status sync condition should be True")
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("Should return raw json string if the result is a structure", func() {
+			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Namespace: o.SpokeClusterName,
+						Name:      "deploy1",
+					},
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.JSONPathsType,
+							JsonPaths: []workapiv1.JsonPath{
+								{
+									Name: "wrong json path",
+									Path: ".status.conditions",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+		})
+	})
+
+	ginkgo.Context("Deployment Status feedback with RawJsonString enabled", func() {
+		ginkgo.BeforeEach(func() {
+			u, _, err := util.NewDeployment(o.SpokeClusterName, "deploy1", "sa")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			manifests = append(manifests, util.ToManifest(u))
+
+			err = features.DefaultSpokeMutableFeatureGate.Set(fmt.Sprintf("%s=true", ocmfeature.RawFeedbackJsonString))
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			var ctx context.Context
+			ctx, cancel = context.WithCancel(context.Background())
+			go startWorkAgent(ctx, o)
+		})
+
+		ginkgo.AfterEach(func() {
+			if cancel != nil {
+				cancel()
+			}
+		})
+
+		ginkgo.It("Should return raw json string if the result is a structure", func() {
+			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Namespace: o.SpokeClusterName,
+						Name:      "deploy1",
+					},
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.JSONPathsType,
+							JsonPaths: []workapiv1.JsonPath{
+								{
+									Name: "conditions",
+									Path: ".status.conditions",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
+
+			gomega.Eventually(func() error {
+				deploy, err := spokeKubeClient.AppsV1().Deployments(o.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				deploy.Status.Conditions = []appsv1.DeploymentCondition{
+					{
+						Type:   "Available",
+						Status: "True",
+					},
+				}
+
+				_, err = spokeKubeClient.AppsV1().Deployments(o.SpokeClusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			// Check if we get status of deployment on work api
+			gomega.Eventually(func() error {
+				work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if len(work.Status.ResourceStatus.Manifests) != 1 {
+					return fmt.Errorf("The size of resource status is not correct, expect to be 1 but got %d", len(work.Status.ResourceStatus.Manifests))
+				}
+
+				values := work.Status.ResourceStatus.Manifests[0].StatusFeedbacks.Values
+
+				expectedValues := []workapiv1.FeedbackValue{
+					{
+						Name: "conditions",
+						Value: workapiv1.FieldValue{
+							Type:    workapiv1.JsonRaw,
+							JsonRaw: pointer.String(`[{"lastTransitionTime":null,"lastUpdateTime":null,"status":"True","type":"Available"}]`),
+						},
+					},
+				}
+				if !apiequality.Semantic.DeepEqual(values, expectedValues) {
+					if len(values) > 0 {
+						return fmt.Errorf("Status feedback values are not correct, we got %v", *values[0].Value.JsonRaw)
+					}
+					return fmt.Errorf("Status feedback values are not correct, we got %v", values)
+				}
+
+				if !util.HaveManifestCondition(work.Status.ResourceStatus.Manifests, "StatusFeedbackSynced", []metav1.ConditionStatus{metav1.ConditionTrue}) {
 					return fmt.Errorf("Status sync condition should be True")
 				}
 

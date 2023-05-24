@@ -119,11 +119,11 @@ type PlacementDecisionGetter interface {
 type PlacementDecisionClustersTracker struct {
 	placement                 *Placement
 	placementDecisionGetter   PlacementDecisionGetter
-	existingScheduledClusters sets.String
+	existingScheduledClusters sets.Set[string]
 	lock                      sync.RWMutex
 }
 
-func NewPlacementDecisionClustersTracker(placement *Placement, pdl PlacementDecisionGetter, existingScheduledClusters sets.String) *PlacementDecisionClustersTracker {
+func NewPlacementDecisionClustersTracker(placement *Placement, pdl PlacementDecisionGetter, existingScheduledClusters sets.Set[string]) *PlacementDecisionClustersTracker {
 	pdct := &PlacementDecisionClustersTracker{
 		placement:                 placement,
 		placementDecisionGetter:   pdl,
@@ -133,7 +133,7 @@ func NewPlacementDecisionClustersTracker(placement *Placement, pdl PlacementDeci
 }
 
 // Get() update the tracker's decisionClusters and return the added and deleted cluster names.
-func (pdct *PlacementDecisionClustersTracker) Get() (sets.String, sets.String, error) {
+func (pdct *PlacementDecisionClustersTracker) Get() (sets.Set[string], sets.Set[string], error) {
 	pdct.lock.Lock()
 	defer pdct.lock.Unlock()
 
@@ -151,7 +151,7 @@ func (pdct *PlacementDecisionClustersTracker) Get() (sets.String, sets.String, e
 	}
 
 	// Get the decision cluster names
-	newScheduledClusters := sets.NewString()
+	newScheduledClusters := sets.New[string]()
 	for _, d := range decisions {
 		for _, sd := range d.Status.Decisions {
 			newScheduledClusters.Insert(sd.ClusterName)
@@ -169,7 +169,7 @@ func (pdct *PlacementDecisionClustersTracker) Get() (sets.String, sets.String, e
 }
 
 // Existing() returns the tracker's existing decision cluster names.
-func (pdct *PlacementDecisionClustersTracker) Existing() sets.String {
+func (pdct *PlacementDecisionClustersTracker) Existing() sets.Set[string] {
 	pdct.lock.RLock()
 	defer pdct.lock.RUnlock()
 
