@@ -206,6 +206,11 @@ func (in *FieldValue) DeepCopyInto(out *FieldValue) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.JsonRaw != nil {
+		in, out := &in.JsonRaw, &out.JsonRaw
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

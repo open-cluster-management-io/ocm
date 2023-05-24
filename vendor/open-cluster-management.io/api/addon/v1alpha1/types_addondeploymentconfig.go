@@ -34,6 +34,17 @@ type AddOnDeploymentConfigSpec struct {
 	// If the placement is an empty object, the placement will match all nodes and tolerate nothing.
 	// +optional
 	NodePlacement *NodePlacement `json:"nodePlacement,omitempty"`
+
+	// Registries describes how to override images used by the addon agent on the managed cluster.
+	// the following example will override image "quay.io/open-cluster-management/addon-agent" to
+	// "quay.io/ocm/addon-agent" when deploying the addon agent
+	//
+	// registries:
+	//   - source: quay.io/open-cluster-management/addon-agent
+	//     mirror: quay.io/ocm/addon-agent
+	//
+	// +optional
+	Registries []ImageMirror `json:"registries,omitempty"`
 }
 
 // CustomizedVariable represents a customized variable for add-on deployment.
@@ -64,6 +75,18 @@ type NodePlacement struct {
 	// The default is an empty list.
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+}
+
+// ImageMirror describes how to mirror images from a source
+type ImageMirror struct {
+	// Mirror is the mirrored registry of the Source. Will be ignored if Mirror is empty.
+	// +kubebuilder:validation:Required
+	// +required
+	Mirror string `json:"mirror"`
+
+	// Source is the source registry. All image registries will be replaced by Mirror if Source is empty.
+	// +optional
+	Source string `json:"source"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

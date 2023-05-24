@@ -26,6 +26,12 @@ type ManifestWork struct {
 	Status ManifestWorkStatus `json:"status,omitempty"`
 }
 
+const (
+	// ManifestConfigSpecHashAnnotationKey is the annotation key to identify the configurations
+	// used by the manifestwork.
+	ManifestConfigSpecHashAnnotationKey = "open-cluster-management.io/config-spec-hash"
+)
+
 // ManifestWorkSpec represents a desired configuration of manifests to be deployed on the managed cluster.
 type ManifestWorkSpec struct {
 	// Workload represents the manifest workload to be deployed on a managed cluster.
@@ -446,22 +452,27 @@ type FieldValue struct {
 	// +optional
 	Integer *int64 `json:"integer,omitempty"`
 
-	// String is the string value when when type is string.
+	// String is the string value when type is string.
 	// +optional
 	String *string `json:"string,omitempty"`
 
 	// Boolean is bool value when type is boolean.
 	// +optional
 	Boolean *bool `json:"boolean,omitempty"`
+
+	// JsonRaw is a json string when type is a list or object
+	// +kubebuilder:validation:MaxLength=1024
+	JsonRaw *string `json:"jsonRaw,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Integer;String;Boolean
+// +kubebuilder:validation:Enum=Integer;String;Boolean;JsonRaw
 type ValueType string
 
 const (
 	Integer ValueType = "Integer"
 	String  ValueType = "String"
 	Boolean ValueType = "Boolean"
+	JsonRaw ValueType = "JsonRaw"
 )
 
 // ManifestConditionType represents the condition type of a single

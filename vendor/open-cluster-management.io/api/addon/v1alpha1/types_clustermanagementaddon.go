@@ -2,13 +2,14 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope="Cluster"
+// +kubebuilder:resource:scope="Cluster",shortName={"cma","cmas"}
 // +kubebuilder:printcolumn:name="DISPLAY NAME",type=string,JSONPath=`.spec.addOnMeta.displayName`
 // +kubebuilder:printcolumn:name="CRD NAME",type=string,JSONPath=`.spec.addOnConfiguration.crdName`
 
@@ -57,7 +58,7 @@ type ClusterManagementAddOnSpec struct {
 	// on certain clusters.
 	// +optional
 	// +kubebuilder:default={type: Manual}
-	InstallStrategy *InstallStrategy `json:"installStrategy,omitempty"`
+	InstallStrategy InstallStrategy `json:"installStrategy,omitempty"`
 }
 
 // AddOnMeta represents a collection of metadata information for the add-on.
@@ -127,6 +128,15 @@ type ConfigReferent struct {
 	Name string `json:"name"`
 }
 
+// ConfigSpecHash represents the namespace,name and spec hash for an add-on configuration.
+type ConfigSpecHash struct {
+	// namespace and name for an add-on configuration.
+	ConfigReferent `json:",inline"`
+
+	// spec hash for an add-on configuration.
+	SpecHash string `json:"specHash"`
+}
+
 // InstallStrategy represents that related ManagedClusterAddOns should be installed
 // on certain clusters.
 type InstallStrategy struct {
@@ -151,9 +161,9 @@ type InstallStrategy struct {
 const (
 	// AddonInstallStrategyManual is the addon install strategy representing no automatic addon installation
 	AddonInstallStrategyManual string = "Manual"
-	// AddonInstallStrategyManualPlacements is the addon install strategy representing the addon installation
+	// AddonInstallStrategyPlacements is the addon install strategy representing the addon installation
 	// is based on placement decisions.
-	AddonInstallStrategyManualPlacements string = "Placements"
+	AddonInstallStrategyPlacements string = "Placements"
 )
 
 type PlacementRef struct {
@@ -175,10 +185,146 @@ type PlacementStrategy struct {
 	// User can override the configuration by updating the managedClusterAddon directly.
 	// +optional
 	Configs []AddOnConfig `json:"configs,omitempty"`
+	// The rollout strategy to apply addon configurations change.
+	// The rollout strategy only watches the addon configurations defined in ClusterManagementAddOn.
+	// +kubebuilder:default={type: UpdateAll}
+	// +optional
+	RolloutStrategy RolloutStrategy `json:"rolloutStrategy,omitempty"`
+}
+
+// RolloutStrategy represents the rollout strategy of the add-on configuration.
+type RolloutStrategy struct {
+	// Type is the type of the rollout strategy, it supports UpdateAll, RollingUpdate and RollingUpdateWithCanary:
+	// - UpdateAll: when configs change, apply the new configs to all the selected clusters at once.
+	//   This is the default strategy.
+	// - RollingUpdate: when configs change, apply the new configs to all the selected clusters with
+	//   the concurrence rate defined in MaxConcurrency.
+	// - RollingUpdateWithCanary: when configs change, wait and check if add-ons on the canary placement
+	//   selected clusters have applied the new configs and are healthy, then apply the new configs to
+	//   all the selected clusters with the concurrence rate defined in MaxConcurrency.
+	//
+	//   The field lastKnownGoodConfig in the status record the last successfully applied
+	//   spec hash of canary placement. If the config spec hash changes after the canary is passed and
+	//   before the rollout is done, the current rollout will continue, then roll out to the latest change.
+	//
+	//   For example, the addon configs have spec hash A. The canary is passed and the lastKnownGoodConfig
+	//   would be A, and all the selected clusters are rolling out to A.
+	//   Then the config spec hash changes to B. At this time, the clusters will continue rolling out to A.
+	//   When the rollout is done and canary passed B, the lastKnownGoodConfig would be B and
+	//   all the clusters will start rolling out to B.
+	//
+	//   The canary placement does not have to be a subset of the install placement, and it is more like a
+	//   reference for finding and checking canary clusters before upgrading all. To trigger the rollout
+	//   on the canary clusters, you can define another rollout strategy with the type RollingUpdate, or even
+	//   manually upgrade the addons on those clusters.
+	//
+	// +kubebuilder:validation:Enum=UpdateAll;RollingUpdate;RollingUpdateWithCanary
+	// +kubebuilder:default:=UpdateAll
+	// +optional
+	Type string `json:"type"`
+
+	// Rolling update with placement config params. Present only if the type is RollingUpdate.
+	// +optional
+	RollingUpdate *RollingUpdate `json:"rollingUpdate,omitempty"`
+
+	// Rolling update with placement config params. Present only if the type is RollingUpdateWithCanary.
+	// +optional
+	RollingUpdateWithCanary *RollingUpdateWithCanary `json:"rollingUpdateWithCanary,omitempty"`
+}
+
+const (
+	// AddonRolloutStrategyUpdateAll is the addon rollout strategy representing apply the new configs to
+	// all the selected clusters at once.
+	AddonRolloutStrategyUpdateAll string = "UpdateAll"
+	// AddonRolloutStrategyRollingUpdate is the addon rollout strategy representing apply the new configs to
+	// all the selected clusters with the concurrency rate.
+	AddonRolloutStrategyRollingUpdate string = "RollingUpdate"
+	// AddonRolloutStrategyRollingUpdate is the addon rollout strategy representing wait and check
+	// if add-ons on the canary have applied the new configs, then apply the new configs to
+	// all the selected clusters with the concurrency rate.
+	AddonRolloutStrategyRollingUpdateWithCanary string = "RollingUpdateWithCanary"
+)
+
+// RollingUpdate represents the behavior to rolling update add-on configurations
+// on the selected clusters.
+type RollingUpdate struct {
+	// The maximum concurrently updating number of clusters.
+	// Value can be an absolute number (ex: 5) or a percentage of desired addons (ex: 10%).
+	// Absolute number is calculated from percentage by rounding up.
+	// Defaults to 25%.
+	// Example: when this is set to 30%, once the addon configs change, the addon on 30% of the selected clusters
+	// will adopt the new configs. When the addons with new configs are healthy, the addon on the remaining clusters
+	// will be further updated.
+	// +kubebuilder:default:="25%"
+	// +optional
+	MaxConcurrency intstr.IntOrString `json:"maxConcurrency,omitempty"`
+}
+
+// RollingUpdateWithCanary represents the canary placement and behavior to rolling update add-on configurations
+// on the selected clusters.
+type RollingUpdateWithCanary struct {
+	// Canary placement reference.
+	// +kubebuilder:validation:Required
+	// +required
+	Placement PlacementRef `json:"placement,omitempty"`
+
+	// the behavior to rolling update add-on configurations.
+	RollingUpdate `json:",inline"`
 }
 
 // ClusterManagementAddOnStatus represents the current status of cluster management add-on.
 type ClusterManagementAddOnStatus struct {
+	// defaultconfigReferences is a list of current add-on default configuration references.
+	// +optional
+	DefaultConfigReferences []DefaultConfigReference `json:"defaultconfigReferences,omitempty"`
+	// installProgression is a list of current add-on configuration references per placement.
+	// +optional
+	InstallProgressions []InstallProgression `json:"installProgressions,omitempty"`
+}
+
+type InstallProgression struct {
+	PlacementRef `json:",inline"`
+
+	// configReferences is a list of current add-on configuration references.
+	// +optional
+	ConfigReferences []InstallConfigReference `json:"configReferences,omitempty"`
+
+	// conditions describe the state of the managed and monitored components for the operator.
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"  patchStrategy:"merge" patchMergeKey:"type"`
+}
+
+// DefaultConfigReference is a reference to the current add-on configuration.
+// This resource is used to record the configuration resource for the current add-on.
+type DefaultConfigReference struct {
+	// This field is synced from ClusterManagementAddOn Configurations.
+	ConfigGroupResource `json:",inline"`
+
+	// desiredConfig record the desired config spec hash.
+	DesiredConfig *ConfigSpecHash `json:"desiredConfig"`
+}
+
+// InstallConfigReference is a reference to the current add-on configuration.
+// This resource is used to record the configuration resource for the current add-on.
+type InstallConfigReference struct {
+	// This field is synced from ClusterManagementAddOn Configurations.
+	ConfigGroupResource `json:",inline"`
+
+	// desiredConfig record the desired config name and spec hash.
+	DesiredConfig *ConfigSpecHash `json:"desiredConfig"`
+
+	// lastKnownGoodConfig records the last known good config spec hash.
+	// For fresh install or rollout with type UpdateAll or RollingUpdate, the
+	// lastKnownGoodConfig is the same as lastAppliedConfig.
+	// For rollout with type RollingUpdateWithCanary, the lastKnownGoodConfig
+	// is the last successfully applied config spec hash of the canary placement.
+	LastKnownGoodConfig *ConfigSpecHash `json:"lastKnownGoodConfig"`
+
+	// lastAppliedConfig records the config spec hash when the all the corresponding
+	// ManagedClusterAddOn are applied successfully.
+	LastAppliedConfig *ConfigSpecHash `json:"lastAppliedConfig"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -193,3 +339,18 @@ type ClusterManagementAddOnList struct {
 	// Items is a list of cluster management add-ons.
 	Items []ClusterManagementAddOn `json:"items"`
 }
+
+const (
+	// AddonLifecycleAnnotationKey is an annotation key on ClusterManagementAddon to indicate the installation
+	// and upgrade of addon should be handled by the general addon manager or addon itself. The valid values are
+	// addon-manager and self. If the annotation is not set, addon lifecycle is handled by addon itself.
+	AddonLifecycleAnnotationKey = "addon.open-cluster-management.io/lifecycle"
+	// AddonLifecycleAddonManagerAnnotationValue is the value of annotation AddonLifecycleAnnotationKey indicating
+	// that the addon installation and upgrade is handled by the general addon manager. This should be set only
+	// when featugate AddonManager on hub is enabled
+	AddonLifecycleAddonManagerAnnotationValue = "addon-manager"
+	// AddonLifecycleSelfManageAnnotationValue is the value of annotation AddonLifecycleAnnotationKey indicating
+	// that the addon installation and upgrade is handled the addon itself. The general addon manager will ignore
+	// addons with this annotation.
+	AddonLifecycleSelfManageAnnotationValue = "self"
+)
