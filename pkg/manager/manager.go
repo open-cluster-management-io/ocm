@@ -78,6 +78,7 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
 		clusterInformerFactory.Cluster().V1beta1().Placements(),
 		clusterInformerFactory.Cluster().V1beta1().PlacementDecisions(),
+		utils.ManagedByAddonManager,
 	)
 
 	addonConfigurationController := addonconfiguration.NewAddonConfigurationController(
@@ -108,6 +109,7 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 		addonClient,
 		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
 		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
+		utils.ManagedByAddonManager,
 	)
 
 	go addonManagementController.Run(ctx, 2)

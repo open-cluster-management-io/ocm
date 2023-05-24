@@ -44,6 +44,7 @@ func NewAddonManagementController(
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	placementInformer clusterinformersv1beta1.PlacementInformer,
 	placementDecisionInformer clusterinformersv1beta1.PlacementDecisionInformer,
+	addonFilterFunc factory.EventFilterFunc,
 ) factory.Controller {
 	c := &addonManagementController{
 		addonClient:                   addonClient,
@@ -56,6 +57,7 @@ func NewAddonManagementController(
 				placementDecisionLister:    placementDecisionInformer.Lister(),
 				placementLister:            placementInformer.Lister(),
 				managedClusterAddonIndexer: addonInformers.Informer().GetIndexer(),
+				addonFilterFunc:            addonFilterFunc,
 			},
 		},
 	}

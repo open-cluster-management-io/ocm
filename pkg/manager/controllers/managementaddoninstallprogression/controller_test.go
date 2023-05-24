@@ -9,6 +9,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
+	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	"open-cluster-management.io/api/addon/v1alpha1"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
@@ -238,6 +240,7 @@ func TestReconcile(t *testing.T) {
 				addonClient:                  fakeAddonClient,
 				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
 				managedClusterAddonLister:    addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				addonFilterFunc:              utils.ManagedBySelf(map[string]agent.AgentAddon{"test": nil}),
 			}
 
 			syncContext := addontesting.NewFakeSyncContext(t)

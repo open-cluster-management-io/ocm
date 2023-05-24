@@ -27,17 +27,20 @@ type managementAddonInstallProgressionController struct {
 	addonClient                  addonv1alpha1client.Interface
 	managedClusterAddonLister    addonlisterv1alpha1.ManagedClusterAddOnLister
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
+	addonFilterFunc              factory.EventFilterFunc
 }
 
 func NewManagementAddonInstallProgressionController(
 	addonClient addonv1alpha1client.Interface,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
+	addonFilterFunc factory.EventFilterFunc,
 ) factory.Controller {
 	c := &managementAddonInstallProgressionController{
 		addonClient:                  addonClient,
 		managedClusterAddonLister:    addonInformers.Lister(),
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
+		addonFilterFunc:              addonFilterFunc,
 	}
 
 	return factory.New().WithInformersQueueKeysFunc(
@@ -63,12 +66,26 @@ func (c *managementAddonInstallProgressionController) sync(ctx context.Context, 
 
 	mgmtAddonCopy := mgmtAddon.DeepCopy()
 
+	clusterManagementAddon, err := c.clusterManagementAddonLister.Get(addonName)
+	if errors.IsNotFound(err) {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
 	// set default config reference
 	mgmtAddonCopy.Status.DefaultConfigReferences = setDefaultConfigReference(mgmtAddonCopy.Spec.SupportedConfigs, mgmtAddonCopy.Status.DefaultConfigReferences)
 
 	// update default config reference when type is manual
 	if mgmtAddonCopy.Spec.InstallStrategy.Type == "" || mgmtAddonCopy.Spec.InstallStrategy.Type == addonv1alpha1.AddonInstallStrategyManual {
 		mgmtAddonCopy.Status.InstallProgressions = []addonv1alpha1.InstallProgression{}
+		return c.patchMgmtAddonStatus(ctx, mgmtAddonCopy, mgmtAddon)
+	}
+
+	// only update default config references and skip updating install progression for self-managed addon
+	if !c.addonFilterFunc(clusterManagementAddon) {
 		return c.patchMgmtAddonStatus(ctx, mgmtAddonCopy, mgmtAddon)
 	}
 
