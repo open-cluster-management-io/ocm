@@ -1,6 +1,26 @@
 # Changelog 
 All notable changes to this project will be documented in this file.
 
+## v0.6.1
+
+### New Features
+* Add addon manager for install strategy ([#150](https://github.com/open-cluster-management-io/addon-framework/pull/150) [@qiujian16](https://github.com/qiujian16))
+
+### Added
+* Add the Helm default variable of hostingClusterCapabilities ([#149](https://github.com/open-cluster-management-io/addon-framework/pull/149) [@mprahl](https://github.com/mprahl))
+
+### Changes
+* Upgrade imagebuilder to 1.2.3. ([#147](https://github.com/open-cluster-management-io/addon-framework/pull/147) [@zhujian7](https://github.com/zhujian7))
+* Refactor for cmd factory. ([#148](https://github.com/open-cluster-management-io/addon-framework/pull/148) [@qiujian16](https://github.com/qiujian16))
+* Use golang:1.19 in the build Dockerfile. ([#153](https://github.com/open-cluster-management-io/addon-framework/pull/153) [@skitt](https://github.com/skitt))
+* Bump to controller-runtime 0.14.4. ([#141](https://github.com/open-cluster-management-io/addon-framework/pull/141) [@skitt](https://github.com/skitt))
+
+### Bug Fixes
+* Set the manifest limit size to 500k. ([#154](https://github.com/open-cluster-management-io/addon-framework/pull/154) [@zhiweiyin318](https://github.com/zhiweiyin318))
+
+### Removed & Deprecated
+* Helper func `GetAddOnDeloymentConfigValues` and `GetAddOnDeloymentConfigValues` are deprecated.  ([#152](https://github.com/open-cluster-management-io/addon-framework/pull/152) [@zhiweiyin318](https://github.com/zhiweiyin318))
+
 ## v0.6.0
 
 ### New Features
