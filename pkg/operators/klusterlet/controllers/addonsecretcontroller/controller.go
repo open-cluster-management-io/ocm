@@ -6,6 +6,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	coreinformer "k8s.io/client-go/informers/core/v1"
@@ -58,11 +59,18 @@ func (c *addonPullImageSecretController) sync(ctx context.Context, controllerCon
 		return nil
 	}
 
-	// If namespace does't have addon label, do nothing
+	// If namespace is not found or deleting or does't have addon label, do nothing
 	ns, err := c.kubeClient.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
+	if !ns.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
 	if ns.Labels[addonInstallNamespaceLabelKey] != "true" {
 		return nil
 	}
