@@ -1,0 +1,13 @@
+# ClusterRoleBinding for registration mandatory permissions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: open-cluster-management:spoke
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: open-cluster-management:spoke
+subjects:
+  - kind: ServiceAccount
+    name: spoke-agent-sa
+    namespace: open-cluster-management-agent

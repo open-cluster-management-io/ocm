@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: open-cluster-management:management:{{ .KlusterletName }}-work:agent
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: open-cluster-management:management:{{ .KlusterletName }}:extension-apiserver
+subjects:
+  - kind: ServiceAccount
+    name: {{ .KlusterletName }}-work-sa
+    namespace: {{ .AgentNamespace }}

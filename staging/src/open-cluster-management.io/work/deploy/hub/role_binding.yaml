@@ -1,0 +1,13 @@
+# RoleBinding for work mandatory permissions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: open-cluster-management:work-hub-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: open-cluster-management:work-hub-controller
+subjects:
+  - kind: ServiceAccount
+    name: work-hub-sa
+    namespace: open-cluster-management-hub

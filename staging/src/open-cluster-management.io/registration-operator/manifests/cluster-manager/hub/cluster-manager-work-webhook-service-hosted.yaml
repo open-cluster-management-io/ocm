@@ -1,0 +1,23 @@
+{{if .WorkWebhook.IsIPFormat}}
+kind: Service
+apiVersion: v1
+metadata:
+  name: cluster-manager-work-webhook
+  namespace: {{ .ClusterManagerNamespace }}
+spec:
+  type: ClusterIP
+  ports:
+  - protocol: TCP
+    port: {{.WorkWebhook.Port}}
+    targetPort: {{.WorkWebhook.Port}}
+    name: tls
+{{else}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: cluster-manager-work-webhook
+  namespace: {{ .ClusterManagerNamespace }}
+spec:
+  type: ExternalName
+  externalName: {{.WorkWebhook.Address}}
+{{end}}

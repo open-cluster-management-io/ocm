@@ -1,0 +1,10 @@
+
+resources:
+- ./cluster_namespace.yaml
+
+images:
+  - name: quay.io/open-cluster-management/work:latest
+    newName: quay.io/open-cluster-management/work
+    newTag: latest
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
