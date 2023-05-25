@@ -38,13 +38,13 @@ metadata:
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
     containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2023-02-17T20:00:31Z"
+    createdAt: "2023-05-24T20:00:31Z"
     description: Manages the installation and upgrade of the Klusterlet.
     operators.operatorframework.io/builder: operator-sdk-v1.1.0
     operators.operatorframework.io/project_layout: go
     repository: https://github.com/open-cluster-management-io/registration-operator
     support: Red Hat, Inc.
-  name: klusterlet.v0.11.0
+  name: klusterlet.v0.12.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -77,12 +77,8 @@ spec:
     ```
     $ kubectl get pods -n open-cluster-management-agent
     NAME                                             READY   STATUS    RESTARTS   AGE
-    klusterlet-registration-agent-7fdd5b549b-4q88s   1/1     Running   0          27s
-    klusterlet-registration-agent-7fdd5b549b-ccdgn   1/1     Running   0          27s
-    klusterlet-registration-agent-7fdd5b549b-djhl9   1/1     Running   0          27s
-    klusterlet-work-agent-cbbb7f945-g7m45            1/1     Running   0          27s
-    klusterlet-work-agent-cbbb7f945-mxdbg            1/1     Running   1          27s
-    klusterlet-work-agent-cbbb7f945-pnjxk            1/1     Running   0          27s
+    klusterlet-registration-agent-86b4858546-w5t7x   1/1     Running   1          65m
+    klusterlet-work-agent-94d67fb4b-985sr            1/1     Running   0          64m
     ```
 
     There is a ManagedCluster created in the Hub cluster.
@@ -322,8 +318,8 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc.
-  replaces: klusterlet.v0.10.0
+  replaces: klusterlet.v0.11.0
   selector:
     matchLabels:
       app: klusterlet
-  version: 0.11.0
+  version: 0.12.0
