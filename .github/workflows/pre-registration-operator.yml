@@ -1,0 +1,81 @@
+name: Pre-registration-operator
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    branches:
+      - main
+      - release-*
+    paths:
+      - "staging/src/open-cluster-management.io/registration-operator/**"
+
+env:
+  GO_VERSION: '1.19'
+  GO_REQUIRED_MIN_VERSION: ''
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v3
+      - name: install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: verify
+        run: make -C ./staging/src/open-cluster-management.io/registration-operator verify
+
+  verify-deps:
+    name: verify-deps
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v3
+      - name: install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: verify-deps
+        run: make -C ./staging/src/open-cluster-management.io/registration-operator verify-deps
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v3
+      - name: install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: build
+        run: make -C ./staging/src/open-cluster-management.io/registration-operator build
+
+  unit:
+    name: unit
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v3
+      - name: install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: unit
+        run: make -C ./staging/src/open-cluster-management.io/registration-operator test
+
+  integration:
+    name: integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v3
+      - name: install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: integration
+        run: make -C ./staging/src/open-cluster-management.io/registration-operator test-integration
+        
