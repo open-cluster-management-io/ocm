@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .ClusterManagerName }}-work-webhook
+  namespace: {{ .ClusterManagerNamespace }}
+  labels:
+    app: {{ .ClusterManagerName }}-work-webhook
+spec:
+  replicas: {{ .Replica }}
+  selector:
+    matchLabels:
+      app: {{ .ClusterManagerName }}-work-webhook
+  template:
+    metadata:
+      labels:
+        app: {{ .ClusterManagerName }}-work-webhook
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 70
+            podAffinityTerm:
+              topologyKey: failure-domain.beta.kubernetes.io/zone
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - {{ .ClusterManagerName }}-work-webhook
+          - weight: 30
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - {{ .ClusterManagerName }}-work-webhook
+      {{ if not .HostedMode }}
+      serviceAccountName: work-webhook-sa
+      {{ end }}
+      containers:
+      - name: {{ .ClusterManagerName }}-webhook
+        image: {{ .WorkImage }}
+        args:
+          - /work
+          - "webhook-server"
+          - "port=9443"
+          {{ if gt (len .WorkFeatureGates) 0 }}
+          {{range .WorkFeatureGates}}
+          - {{ . }}
+          {{ end }}
+          {{ end }}
+          {{ if .HostedMode }}
+          - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
+          {{ end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTP
+            port: 8000
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTP
+            port: 8000
+          initialDelaySeconds: 2
+        resources:
+          requests:
+            cpu: 2m
+            memory: 16Mi
+        ports:
+        - containerPort: 9443
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: webhook-secret
+          readOnly: true
+        {{ if .HostedMode }}
+        - mountPath: /var/run/secrets/hub
+          name: kubeconfig
+          readOnly: true
+        {{ end }}
+      volumes:
+      - name: webhook-secret
+        secret:
+          secretName: work-webhook-serving-cert
+      {{ if .HostedMode }}
+      - name: kubeconfig
+        secret:
+          secretName: work-webhook-sa-kubeconfig
+      {{ end }}
