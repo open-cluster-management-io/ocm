@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: work-webhook
+spec:
+  selector:
+    app: work-webhook
+  ports:
+  - port: 9443
+    targetPort: 9443

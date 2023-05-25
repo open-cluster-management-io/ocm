@@ -1,0 +1,22 @@
+# Adddition ClusterRole permission for work agent 
+# Work agent needs these permission to apply some resources on the managed cluster.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: open-cluster-management:work:execution
+rules:
+# Allow agent to get/list/watch/create/delete crds.
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "list", "watch", "create", "delete", "update"]
+# Allow agent to create/update/patch/delete namespaces, get/list/watch are contained in admin role already
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["create", "update", "patch", "delete"]
+# Allow agent to manage role/rolebinding/clusterrole/clusterrolebinding
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["clusterrolebindings", "rolebindings"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["clusterroles", "roles"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "escalate", "bind"]

@@ -1,0 +1,23 @@
+
+# Adds namespace to all resources.
+namespace: open-cluster-management-agent
+
+resources:
+- ./appliedmanifestworks.crd.yaml
+- ./component_namespace.yaml
+- ./service_account.yaml
+- ./role.yaml
+- ./role_binding.yaml
+- ./clusterrole.yaml
+- ./clusterrole_execution.yaml
+- ./clusterrole_binding.yaml
+- ./clusterrole_binding_execution.yaml
+- ./clusterrole_binding_execution-admin.yaml
+- ./deployment.yaml
+
+images:
+- name: quay.io/open-cluster-management/work:latest
+  newName: quay.io/open-cluster-management/work
+  newTag: latest
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization

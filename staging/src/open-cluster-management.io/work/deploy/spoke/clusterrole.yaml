@@ -1,0 +1,24 @@
+# Mandatory ClusterRole permission for work agent
+# Work agent can not run without these permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: open-cluster-management:work:agent
+rules:
+# Allow agent to managed appliedmanifestworks
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["appliedmanifestworks"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["appliedmanifestworks/status"]
+  verbs: ["patch", "update"]
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["appliedmanifestworks/finalizers"]
+  verbs: ["update"]
+# Allow agent to check executor permissions
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["create"]
+- apiGroups: [""]
+  resources: ["serviceaccounts"]
+  verbs: ["impersonate"]

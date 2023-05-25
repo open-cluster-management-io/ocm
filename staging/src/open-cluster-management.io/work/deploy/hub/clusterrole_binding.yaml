@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: open-cluster-management:work-webhook
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: open-cluster-management:work-hub-controller
+subjects:
+  - kind: ServiceAccount
+    name: work-hub-sa
+    namespace: open-cluster-management-hub
