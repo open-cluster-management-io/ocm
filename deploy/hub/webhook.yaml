@@ -1,0 +1,27 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: manifestworkvalidators.admission.work.open-cluster-management.io
+webhooks:
+- name: manifestworkvalidators.admission.work.open-cluster-management.io
+  failurePolicy: Fail
+  clientConfig:
+    service:
+      namespace: open-cluster-management-hub
+      name: work-webhook
+      path: /validate-work-open-cluster-management-io-v1-manifestwork
+      port: 9443
+    caBundle: CA_PLACE_HOLDER
+  rules:
+  - operations:
+    - CREATE
+    - UPDATE
+    apiGroups:
+    - work.open-cluster-management.io
+    apiVersions:
+    - "*"
+    resources:
+    - manifestworks
+  admissionReviewVersions: ["v1beta1","v1"]
+  sideEffects: None
+  timeoutSeconds: 3
