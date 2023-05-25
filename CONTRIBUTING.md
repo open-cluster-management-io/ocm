@@ -10,6 +10,32 @@
 
 # Contributing guidelines
 
+The ocm repo contains 4 core components:
+* registration
+* placement
+* work
+* registration-operator
+
+Before 0.11.0, the 4 components has independent repos, now we are going through [the task of consolidating code](https://github.com/open-cluster-management-io/OCM/issues/128) to merge all code into this repo to gain all kinds of benifits.
+
+We're contiously working on migrate code from `/staging` folder to outside. Finally, the `/staging` folder will be empty and removed.
+
+Here is a table of the migration status:
+
+| Component | Status |
+| --- | --- |
+| registration | staging |
+| placement | staging |
+| work | staging |
+| registration-operator | staging |
+
+Status:
+* staging: the component is having all code in `staging` folder.
+* mix: the component is having code in both `staging` and outside.
+* done: the component is having all code outside `staging` folder and done of the migration.
+
+If a component is in the `staging` status, you need to open project in the `/staging` folder and contribute there.
+
 ## Terms
 
 All contributions to the repository must be submitted under the terms of the [Apache Public License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
