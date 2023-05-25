@@ -1,5 +1,5 @@
 # Binaries for programs and plugins
-registration
+/registration
 dev-kubeconfig
 e2e-kubeconfig
 integration.test

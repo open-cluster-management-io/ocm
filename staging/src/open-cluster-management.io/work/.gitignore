@@ -1,5 +1,5 @@
 # Binaries for programs and plugins
-work
+/work
 *.exe
 *.dll
 *.so
