@@ -1,0 +1,70 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: cluster-manager-placement-controller
+  namespace: open-cluster-management-hub
+  labels:
+    app: clustermanager-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clustermanager-placement-controller
+  template:
+    metadata:
+      labels:
+        app: clustermanager-placement-controller
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 70
+            podAffinityTerm:
+              topologyKey: failure-domain.beta.kubernetes.io/zone
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - clustermanager-placement-controller
+          - weight: 30
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - clustermanager-placement-controller
+      serviceAccountName: cluster-manager-placement-controller-sa
+      containers:
+      - name: placement-controller
+        image: quay.io/open-cluster-management/placement:latest
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/placement"
+          - "controller"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
