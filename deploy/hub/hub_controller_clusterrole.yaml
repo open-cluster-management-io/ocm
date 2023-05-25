@@ -1,0 +1,77 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: open-cluster-management:hub
+rules:
+# Allow hub to monitor and update status of csr
+- apiGroups: ["certificates.k8s.io"]
+  resources: ["certificatesigningrequests"]
+  verbs: ["create", "get", "list", "watch"]
+- apiGroups: ["certificates.k8s.io"]
+  resources: ["certificatesigningrequests/status"]
+  verbs: ["update"]
+# Allow hub to get/list/watch/create/delete configmap, namespace and service account
+- apiGroups: [""]
+  resources: ["namespaces", "serviceaccounts", "configmaps", "events"]
+  verbs: ["get", "list", "watch", "create", "delete", "update"]
+# Allow hub to record events
+- apiGroups: ["", "events.k8s.io"]
+  resources: ["events"]
+  verbs: ["get", "create", "delete", "update", "patch"]
+# Allow hub to manage clusterrole/clusterrolebinding/role/rolebinding
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["clusterroles", "clusterrolebindings", "roles", "rolebindings"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Allow hub to manage coordination.k8s.io/lease
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "delete", "update"]
+# Allow hub to manage managedclusters
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclusters"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclusters/status"]
+  verbs: ["update", "patch"]
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["manifestworks"]
+  verbs: ["get", "list", "watch", "update", "patch", "delete"]
+- apiGroups: ["register.open-cluster-management.io"]
+  resources: ["managedclusters/clientcertificates"]
+  verbs: ["renew"]
+- apiGroups: ["register.open-cluster-management.io"]
+  resources: ["managedclusters/accept"]
+  verbs: ["update"]
+# Allow hub to approve certificates that are signed by kubernetes.io/kube-apiserver-client (kube1.18.3+ needs)
+- apiGroups: ["certificates.k8s.io"]
+  resources: ["signers"]
+  resourceNames: ["kubernetes.io/kube-apiserver-client"]
+  verbs: ["approve"]
+# Allow hub to manage managedclustersetbindings
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclustersetbindings"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclustersetbindings/status"]
+  verbs: ["update", "patch"]
+# Allow hub to manage managedclustersets
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclustersets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclustersets/status"]
+  verbs: ["update", "patch"]
+# Allow to access metrics API
+- apiGroups: ["authentication.k8s.io"]
+  resources: ["tokenreviews"]
+  verbs: ["create"]
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["create"]
+# Allow hub to manage managed cluster addons
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["managedclusteraddons"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["managedclusteraddons/status"]
+  verbs: ["patch", "update"]

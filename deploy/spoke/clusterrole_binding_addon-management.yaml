@@ -1,0 +1,16 @@
+# ClusterRoleBinding for registration addon management permissions.
+# TODO: 1 When addon-management feature gate is disabled, do not install this ClusterRoleBinding and ClusterRole,
+# and registration agent should run successfully. 2 Replace this ClusterRoleBinding with RoleBinding, and bind 
+# ClusterRole and ServiceAccount to user defined addon namespaces.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: open-cluster-management:spoke-addon-management
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: open-cluster-management:spoke-addon-management
+subjects:
+  - kind: ServiceAccount
+    name: spoke-agent-sa
+    namespace: open-cluster-management-agent
