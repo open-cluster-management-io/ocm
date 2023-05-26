@@ -118,5 +118,3 @@ clean-e2e:
 	$(RM) ./e2e.test
 
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...
-
-include ./test/integration-test.mk

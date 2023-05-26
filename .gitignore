@@ -1,0 +1,30 @@
+# binaries created by `make build*` commands
+/placement
+/registration
+/work
+/registration-operator
+
+*.exe
+*.dll
+*.so
+*.dylib
+!deploy/**
+!vendor/**
+dev-kubeconfig
+e2e-kubeconfig
+hub-kubeconfig
+external-hub-kubeconfig
+external-managed-kubeconfig
+munge-csv
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+_output/
+
+.kubeconfig
+.hub-kubeconfig
+.external-hub-kubeconfig
+.external-managed-kubeconfig

@@ -13,8 +13,8 @@ import (
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 
-	"open-cluster-management.io/placement/pkg/cmd/hub"
-	"open-cluster-management.io/placement/pkg/version"
+	"open-cluster-management.io/ocm/pkg/placement/cmd/hub"
+	"open-cluster-management.io/ocm/pkg/placement/version"
 )
 
 func main() {

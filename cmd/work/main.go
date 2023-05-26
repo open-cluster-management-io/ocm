@@ -13,10 +13,10 @@ import (
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 
-	"open-cluster-management.io/work/pkg/cmd/hub"
-	"open-cluster-management.io/work/pkg/cmd/spoke"
-	"open-cluster-management.io/work/pkg/cmd/webhook"
-	"open-cluster-management.io/work/pkg/version"
+	"open-cluster-management.io/ocm/pkg/work/cmd/hub"
+	"open-cluster-management.io/ocm/pkg/work/cmd/spoke"
+	"open-cluster-management.io/ocm/pkg/work/cmd/webhook"
+	"open-cluster-management.io/ocm/pkg/work/version"
 )
 
 func main() {

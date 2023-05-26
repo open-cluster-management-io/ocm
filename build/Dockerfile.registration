@@ -1,24 +1,17 @@
 FROM golang:1.19 AS builder
 ARG OS=linux
 ARG ARCH=amd64
-WORKDIR /go/src/open-cluster-management.io/registration
+WORKDIR /go/src/open-cluster-management.io/ocm
 COPY . .
-ENV GO_PACKAGE open-cluster-management.io/registration
-
-# Copy the Go Modules manifests
-COPY go.mod go.mod
-COPY go.sum go.sum
-# cache deps before building and copying source so that we don't need to re-download as much
-# and so that source changes don't invalidate our downloaded layer
-RUN go mod download
+ENV GO_PACKAGE open-cluster-management.io/ocm
 
 RUN GOOS=${OS} \
     GOARCH=${ARCH} \
-    make build-registration
+    make build --warn-undefined-variables
 
 FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
 ENV USER_UID=10001
 
-COPY --from=builder /go/src/open-cluster-management.io/registration/registration /
+COPY --from=builder /go/src/open-cluster-management.io/ocm/registration /
 
 USER ${USER_UID}

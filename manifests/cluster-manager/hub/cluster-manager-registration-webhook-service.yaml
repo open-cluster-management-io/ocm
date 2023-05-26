@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cluster-manager-registration-webhook
+  namespace: {{ .ClusterManagerNamespace }}
+spec:
+  selector:
+    app: {{ .ClusterManagerName }}-registration-webhook
+  ports:
+  - name: webhook
+    port: 9443
+    targetPort: 9443

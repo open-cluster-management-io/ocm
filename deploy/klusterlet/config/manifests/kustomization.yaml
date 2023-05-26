@@ -1,0 +1,4 @@
+bases:
+  - ../crds
+  - ../rbac
+  - ../operator

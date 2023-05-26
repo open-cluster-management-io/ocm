@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- crds/0000_01_operator.open-cluster-management.io_clustermanagers.crd.yaml
+- rbac/cluster_role.yaml
+- rbac/cluster_role_binding.yaml
+- operator/namespace.yaml
+- operator/service_account.yaml
+- operator/operator.yaml
+
+replicas:
+- name: cluster-manager
+  count: 1
+
+images:
+  - name: quay.io/open-cluster-management/registration-operator:latest
+    newName: quay.io/open-cluster-management/registration-operator
+    newTag: latest
+
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: replace
+        path: "/spec/template/spec/containers/0/imagePullPolicy"
+        value: IfNotPresent

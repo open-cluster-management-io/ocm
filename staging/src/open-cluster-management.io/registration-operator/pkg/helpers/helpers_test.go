@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"k8s.io/component-base/featuregate"
-	ocmfeature "open-cluster-management.io/api/feature"
 	"reflect"
 	"testing"
 	"time"
+
+	"k8s.io/component-base/featuregate"
+	ocmfeature "open-cluster-management.io/api/feature"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/openshift/library-go/pkg/assets"

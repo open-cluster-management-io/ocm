@@ -1,0 +1,15 @@
+# ClusterRoleBinding for registration addon management permissions.
+# TODO: When addon-management feature gate is disabled, do not install this ClusterRoleBinding and ClusterRole,
+# and registration agent should run successfully.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: open-cluster-management:management:{{ .KlusterletName }}-registration:addon-management
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: open-cluster-management:management:{{ .KlusterletName }}-registration:addon-management
+subjects:
+  - kind: ServiceAccount
+    name: {{ .KlusterletName }}-registration-sa
+    namespace: {{ .AgentNamespace }}
