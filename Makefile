@@ -1,5 +1,23 @@
 SHELL :=/bin/bash
 
+all: build
+.PHONY: all
+
+# Include the library makefile
+include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
+	golang.mk \
+	targets/openshift/deps.mk \
+	targets/openshift/images.mk \
+	targets/openshift/yaml-patch.mk\
+	lib/tmp.mk\
+)
+
+# Include the integration setup makefile.
+include ./test/integration-test.mk
+
+# Add packages to do unit test
+GO_TEST_PACKAGES :=./pkg/...
+
 IMAGE_REGISTRY?=quay.io/open-cluster-management
 IMAGE_TAG?=latest
 
@@ -8,32 +26,20 @@ WORK_PATH=staging/src/open-cluster-management.io/work
 PLACEMENT_PATH=staging/src/open-cluster-management.io/placement
 REGISTRATION_OPERATOR_PATH=staging/src/open-cluster-management.io/registration-operator
 
-build-registration:
-	go build -o registration ./cmd/registration
-
 image-registration:
 	docker build \
 		-f build/Dockerfile.registration \
 		-t $(IMAGE_REGISTRY)/registration:$(IMAGE_TAG) .
-
-build-work:
-	go build -o work ./cmd/work
 
 image-work:
 	docker build \
 		-f build/Dockerfile.work \
 		-t $(IMAGE_REGISTRY)/work:$(IMAGE_TAG) .
 
-build-placement:
-	go build -o placement ./cmd/placement
-
 image-placement:
 	docker build \
 		-f build/Dockerfile.placement \
 		-t $(IMAGE_REGISTRY)/placement:$(IMAGE_TAG) .
-
-build-registration-operator:
-	go build -o registration-operator ./cmd/registration-operator
 
 image-registration-operator:
 	docker build \
@@ -45,3 +51,16 @@ images:
 	make image-work
 	make image-placement
 	make image-registration-operator
+
+copy-crd:
+	bash -x hack/copy-crds.sh
+
+patch-crd: ensure-yaml-patch
+	bash hack/patch/patch-crd.sh $(YAML_PATCH)
+
+update: patch-crd copy-crd
+
+verify-crds: patch-crd
+	bash -x hack/verify-crds.sh
+
+verify: verify-crds

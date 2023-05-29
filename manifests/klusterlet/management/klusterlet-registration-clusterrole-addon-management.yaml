@@ -1,0 +1,16 @@
+# Addition ClusterRole permission for registration agent 
+# Registration agent needs these permission to manage addons
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: open-cluster-management:management:{{ .KlusterletName }}-registration:addon-management
+rules:
+# Allow agent to get/list/watch/create/delete/update/patch secrets, registration agent needs secret permission for an 
+# arbitrary namespace to create hub-kubeconfig secret for an addon
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]
+# Allow agent to list addons lease
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["create", "get", "list", "update", "watch", "patch"]

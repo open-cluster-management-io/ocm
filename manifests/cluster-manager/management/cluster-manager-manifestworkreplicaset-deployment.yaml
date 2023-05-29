@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .ClusterManagerName }}-work-controller
+  namespace: {{ .ClusterManagerNamespace }}
+  labels:
+    app: {{ .ClusterManagerName }}-work-controller
+spec:
+  replicas:  {{ .Replica }}
+  selector:
+    matchLabels:
+      app: {{ .ClusterManagerName }}-work-controller
+  template:
+    metadata:
+      labels:
+        app: {{ .ClusterManagerName }}-work-controller
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 70
+            podAffinityTerm:
+              topologyKey: failure-domain.beta.kubernetes.io/zone
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - {{ .ClusterManagerName }}-work-controller
+          - weight: 30
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - {{ .ClusterManagerName }}-work-controller
+      {{ if not .HostedMode }}
+      serviceAccountName: work-controller-sa
+      {{ end }}
+      containers:
+      - name: {{ .ClusterManagerName }}-work-controller
+        image:  {{ .WorkImage }}
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/work"
+          - "manager"
+          {{ if .HostedMode }}
+          - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
+          {{ end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+        resources:
+          requests:
+            cpu: 2m
+            memory: 16Mi
+        volumeMounts:
+        {{ if .HostedMode }}
+        - mountPath: /var/run/secrets/hub
+          name: kubeconfig
+          readOnly: true
+        {{ end }}
+      volumes:
+      {{ if .HostedMode }}
+      - name: kubeconfig
+        secret:
+          secretName: work-controller-sa-kubeconfig
+      {{ end }}

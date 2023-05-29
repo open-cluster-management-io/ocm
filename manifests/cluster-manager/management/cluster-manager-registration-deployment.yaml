@@ -1,0 +1,92 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ .ClusterManagerName }}-registration-controller
+  namespace: {{ .ClusterManagerNamespace }}
+  labels:
+    app: clustermanager-controller
+spec:
+  replicas: {{ .Replica }}
+  selector:
+    matchLabels:
+      app: clustermanager-registration-controller
+  template:
+    metadata:
+      labels:
+        app: clustermanager-registration-controller
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 70
+            podAffinityTerm:
+              topologyKey: failure-domain.beta.kubernetes.io/zone
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - clustermanager-registration-controller
+          - weight: 30
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - clustermanager-registration-controller
+      {{ if not .HostedMode }}
+      serviceAccountName: registration-controller-sa
+      {{ end }}
+      containers:
+      - name: hub-registration-controller
+        image: {{ .RegistrationImage }}
+        args:
+          - "/registration"
+          - "controller"
+          {{ if gt (len .RegistrationFeatureGates) 0 }}
+          {{range .RegistrationFeatureGates}}
+          - {{ . }}
+          {{ end }}
+          {{ end }}
+          {{if .AutoApproveUsers}}
+          - "--cluster-auto-approval-users={{ .AutoApproveUsers }}"
+          {{end}}
+          {{ if .HostedMode }}
+          - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
+          {{ end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            scheme: HTTPS
+            port: 8443
+          initialDelaySeconds: 2
+        resources:
+          requests:
+            cpu: 2m
+            memory: 16Mi
+      {{ if .HostedMode }}
+        volumeMounts:
+        - mountPath: /var/run/secrets/hub
+          name: kubeconfig
+          readOnly: true
+      volumes:
+      - name: kubeconfig
+        secret:
+          secretName: registration-controller-sa-kubeconfig
+      {{ end }}
