@@ -22,13 +22,20 @@ const (
 )
 
 const (
-	addonName        = "helloworld"
-	deployConfigName = "deploy-config"
+	addonName                     = "helloworld"
+	deployConfigName              = "deploy-config"
+	deployImageOverrideConfigName = "image-override-deploy-config"
 )
 
 var (
 	nodeSelector = map[string]string{"kubernetes.io/os": "linux"}
 	tolerations  = []corev1.Toleration{{Key: "foo", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoExecute}}
+	registries   = []addonapiv1alpha1.ImageMirror{
+		{
+			Source: "quay.io/open-cluster-management/addon-examples",
+			Mirror: "quay.io/ocm/addon-examples",
+		},
+	}
 )
 
 var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
@@ -164,6 +171,36 @@ func prepareAddOnDeploymentConfig(namespace string) error {
 						NodeSelector: nodeSelector,
 						Tolerations:  tolerations,
 					},
+				},
+			},
+			metav1.CreateOptions{},
+		); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func prepareImageOverrideAddOnDeploymentConfig(namespace string) error {
+	_, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
+		context.Background(), deployImageOverrideConfigName, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		if _, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(managedClusterName).Create(
+			context.Background(),
+			&addonapiv1alpha1.AddOnDeploymentConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      deployImageOverrideConfigName,
+					Namespace: namespace,
+				},
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					Registries: registries,
 				},
 			},
 			metav1.CreateOptions{},

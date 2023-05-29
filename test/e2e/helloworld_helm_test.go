@@ -19,7 +19,8 @@ const (
 	helloWorldHelmAddonName = "helloworldhelm"
 	addonInstallNamespace   = "open-cluster-management-agent-addon"
 
-	imageConfigName = "image-config"
+	imageConfigName    = "image-config"
+	overrideImageValue = "quay.io/ocm/addon-examples:latest"
 )
 
 var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
@@ -61,15 +62,23 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 
 	ginkgo.AfterEach(func() {
 		gomega.Eventually(func() error {
-			_, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), helloWorldHelmAddonName, metav1.GetOptions{})
+			_, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+				context.Background(), helloWorldHelmAddonName, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
+					// only return nil if the addon is deleted
 					return nil
 				}
 				return err
 			}
 
-			return hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), helloWorldHelmAddonName, metav1.DeleteOptions{})
+			err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(
+				context.Background(), helloWorldHelmAddonName, metav1.DeleteOptions{})
+			if err != nil {
+				return err
+			}
+
+			return fmt.Errorf("addon %s/%s is not deleted", managedClusterName, helloWorldHelmAddonName)
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
@@ -181,7 +190,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
-	ginkgo.It("addon should be configured with mutiple configurations", func() {
+	ginkgo.It("addon should be configured with multiple configurations", func() {
 		ginkgo.By("Prepare a AddOnDeploymentConfig for addon nodeSelector and tolerations")
 		gomega.Eventually(func() error {
 			return prepareAddOnDeploymentConfig(managedClusterName)
@@ -198,7 +207,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 							Name:      imageConfigName,
 							Namespace: managedClusterName,
 						},
-						Data: map[string]string{"image": "quay.io/test:test", "imagePullPolicy": "Never"},
+						Data: map[string]string{"image": overrideImageValue, "imagePullPolicy": "Never"},
 					},
 					metav1.CreateOptions{},
 				); err != nil {
@@ -270,7 +279,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 				return fmt.Errorf("expect one container, but %v", containers)
 			}
 
-			if containers[0].Image != "quay.io/test:test" {
+			if containers[0].Image != overrideImageValue {
 				return fmt.Errorf("unexpected image %s", containers[0].Image)
 			}
 
@@ -284,6 +293,61 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 
 			if !equality.Semantic.DeepEqual(agentDeploy.Spec.Template.Spec.Tolerations, tolerations) {
 				return fmt.Errorf("unexpected tolerations %v", agentDeploy.Spec.Template.Spec.Tolerations)
+			}
+
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	})
+
+	ginkgo.It("addon should be configured by addon deployment config for image override", func() {
+		ginkgo.By("Prepare a AddOnDeploymentConfig for addon image override config")
+		gomega.Eventually(func() error {
+			return prepareImageOverrideAddOnDeploymentConfig(managedClusterName)
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Add the configs to ManagedClusterAddOn")
+		gomega.Eventually(func() error {
+			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+				context.Background(), helloWorldHelmAddonName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			newAddon := addon.DeepCopy()
+			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+				{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						Group:    "addon.open-cluster-management.io",
+						Resource: "addondeploymentconfigs",
+					},
+					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+						Namespace: managedClusterName,
+						Name:      deployImageOverrideConfigName,
+					},
+				},
+			}
+			_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(
+				context.Background(), newAddon, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Make sure addon is configured")
+		gomega.Eventually(func() error {
+			agentDeploy, err := hubKubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
+				context.Background(), "helloworldhelm-agent", metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			containers := agentDeploy.Spec.Template.Spec.Containers
+			if len(containers) != 1 {
+				return fmt.Errorf("expect one container, but %v", containers)
+			}
+
+			if containers[0].Image != overrideImageValue {
+				return fmt.Errorf("unexpected image %s", containers[0].Image)
 			}
 
 			return nil

@@ -2,6 +2,8 @@ package addonfactory
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,7 +83,7 @@ func GetAddOnDeloymentConfigValues(
 //
 //	{
 //		customizedVariables: [{name: "Image", value: "img"}, {name: "ImagePullPolicy", value: "Always"}],
-//	 nodePlacement: {nodeSelector: {"host": "ssd"}, tolerations: {"key": "test"}},
+//		nodePlacement: {nodeSelector: {"host": "ssd"}, tolerations: {"key": "test"}},
 //	}
 //
 // after transformed, the key set of Values object will be: {"Image", "ImagePullPolicy", "NodeSelector", "Tolerations"}
@@ -206,7 +208,7 @@ func GetAddOnDeploymentConfigValues(
 //
 //	{
 //		customizedVariables: [{name: "Image", value: "img"}, {name: "ImagePullPolicy", value: "Always"}],
-//	 nodePlacement: {nodeSelector: {"host": "ssd"}, tolerations: {"key": "test"}},
+//		nodePlacement: {nodeSelector: {"host": "ssd"}, tolerations: {"key": "test"}},
 //	}
 //
 // after transformed, the key set of Values object will be: {"Image", "ImagePullPolicy", "NodeSelector", "Tolerations"}
@@ -222,4 +224,83 @@ func ToAddOnDeploymentConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig
 	}
 
 	return values, nil
+}
+
+// ToImageOverrideValuesFunc return a func that can use the AddOnDeploymentConfig.spec.Registries to override image,
+// then return the overridden value with key imageKey.
+//
+// for example: the spec of one AddOnDeploymentConfig is:
+// { registries: [{source: "quay.io/open-cluster-management/addon-agent", mirror: "quay.io/ocm/addon-agent"}]}
+// the imageKey is "helloWorldImage", the image is "quay.io/open-cluster-management/addon-agent:v1"
+// after transformed, the Values object will be: {"helloWorldImage": "quay.io/ocm/addon-agent:v1"}
+//
+// Note: the imageKey can support the nested key, for example: "global.imageOverrides.helloWorldImage", the output
+// will be: {"global": {"imageOverrides": {"helloWorldImage": "quay.io/ocm/addon-agent:v1"}}}
+func ToImageOverrideValuesFunc(imageKey, image string) AddOnDeploymentConfigToValuesFunc {
+	return func(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
+		if len(imageKey) == 0 {
+			return nil, fmt.Errorf("imageKey is empty")
+		}
+		if len(image) == 0 {
+			return nil, fmt.Errorf("image is empty")
+		}
+
+		nestedMap := make(map[string]interface{})
+
+		keys := strings.Split(imageKey, ".")
+		currentMap := nestedMap
+
+		for i := 0; i < len(keys)-1; i++ {
+			key := keys[i]
+			nextMap := make(map[string]interface{})
+			currentMap[key] = nextMap
+			currentMap = nextMap
+		}
+
+		lastKey := keys[len(keys)-1]
+		currentMap[lastKey] = image
+
+		if config.Spec.Registries != nil {
+			currentMap[lastKey] = OverrideImage(config.Spec.Registries, image)
+		}
+
+		return nestedMap, nil
+	}
+}
+
+// OverrideImage checks whether the source configured in registries can match the imagedName, if yes will use the
+// mirror value in the registries to override the imageName
+func OverrideImage(registries []addonapiv1alpha1.ImageMirror, imageName string) string {
+	if len(registries) == 0 {
+		return imageName
+	}
+	overrideImageName := imageName
+	for i := 0; i < len(registries); i++ {
+		registry := registries[i]
+		name := overrideImageDirectly(registry.Source, registry.Mirror, imageName)
+		if name != imageName {
+			overrideImageName = name
+		}
+	}
+	return overrideImageName
+}
+
+func overrideImageDirectly(source, mirror, imageName string) string {
+	source = strings.TrimSuffix(source, "/")
+	mirror = strings.TrimSuffix(mirror, "/")
+	imageSegments := strings.Split(imageName, "/")
+	imageNameTag := imageSegments[len(imageSegments)-1]
+	if source == "" {
+		if mirror == "" {
+			return imageNameTag
+		}
+		return fmt.Sprintf("%s/%s", mirror, imageNameTag)
+	}
+
+	if !strings.HasPrefix(imageName, source) {
+		return imageName
+	}
+
+	trimSegment := strings.TrimPrefix(imageName, source)
+	return fmt.Sprintf("%s%s", mirror, trimSegment)
 }

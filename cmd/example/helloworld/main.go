@@ -99,6 +99,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 			addonfactory.GetAddOnDeploymentConfigValues(
 				addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
 				addonfactory.ToAddOnDeploymentConfigValues,
+				addonfactory.ToImageOverrideValuesFunc("Image", helloworld.DefaultHelloWorldExampleImage),
 			),
 		).
 		WithAgentRegistrationOption(registrationOption).

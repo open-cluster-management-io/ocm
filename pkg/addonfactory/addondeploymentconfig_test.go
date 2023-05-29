@@ -1,6 +1,8 @@
 package addonfactory
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -211,6 +213,153 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 			values, err := GetAddOnDeploymentConfigValues(getter, c.toValuesFuncs...)(nil, addOn)
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
+			}
+
+			if !equality.Semantic.DeepEqual(values, c.expectedValues) {
+				t.Errorf("expected values %v, but got values %v", c.expectedValues, values)
+			}
+		})
+	}
+}
+
+func TestToImageOverrideValuesFunc(t *testing.T) {
+	cases := []struct {
+		name           string
+		imageKey       string
+		imageValue     string
+		config         addonapiv1alpha1.AddOnDeploymentConfig
+		expectedValues Values
+		expectedErr    error
+	}{
+		{
+			name:       "no nested imagekey",
+			imageKey:   "image",
+			imageValue: "a/b/c:v1",
+			config: addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					Registries: []addonapiv1alpha1.ImageMirror{
+						{
+							Source: "a/b",
+							Mirror: "x/y",
+						},
+					},
+				},
+			},
+			expectedValues: Values{
+				"image": "x/y/c:v1",
+			},
+		},
+		{
+			name:       "nested imagekey",
+			imageKey:   "global.imageOverride.image",
+			imageValue: "a/b/c:v1",
+			config: addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					Registries: []addonapiv1alpha1.ImageMirror{
+						{
+							Source: "a",
+							Mirror: "x",
+						},
+					},
+				},
+			},
+			expectedValues: Values{
+				"global": map[string]interface{}{
+					"imageOverride": map[string]interface{}{
+						"image": "x/b/c:v1",
+					},
+				},
+			},
+		},
+		{
+			name:       "empty imagekey",
+			imageKey:   "",
+			imageValue: "a/b/c:v1",
+			config: addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					Registries: []addonapiv1alpha1.ImageMirror{
+						{
+							Source: "a",
+							Mirror: "x",
+						},
+					},
+				},
+			},
+			expectedErr: fmt.Errorf("imageKey is empty"),
+		},
+		{
+			name:       "empty image",
+			imageKey:   "global.imageOverride.image",
+			imageValue: "",
+			config: addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					Registries: []addonapiv1alpha1.ImageMirror{
+						{
+							Source: "a",
+							Mirror: "x",
+						},
+					},
+				},
+			},
+			expectedErr: fmt.Errorf("image is empty"),
+		},
+		{
+			name:       "source not match",
+			imageKey:   "global.imageOverride.image",
+			imageValue: "a/b/c",
+			config: addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					Registries: []addonapiv1alpha1.ImageMirror{
+						{
+							Source: "b",
+							Mirror: "y",
+						},
+					},
+				},
+			},
+			expectedValues: Values{
+				"global": map[string]interface{}{
+					"imageOverride": map[string]interface{}{
+						"image": "a/b/c",
+					},
+				},
+			},
+		},
+		{
+			name:       "source empty",
+			imageKey:   "global.imageOverride.image",
+			imageValue: "a/b/c:v1",
+			config: addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					Registries: []addonapiv1alpha1.ImageMirror{
+						{
+							Mirror: "y",
+						},
+					},
+				},
+			},
+			expectedValues: Values{
+				"global": map[string]interface{}{
+					"imageOverride": map[string]interface{}{
+						"image": "y/c:v1",
+					},
+				},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+
+			values, err := ToImageOverrideValuesFunc(c.imageKey, c.imageValue)(c.config)
+			if err != nil {
+				if c.expectedErr == nil || !strings.EqualFold(err.Error(), c.expectedErr.Error()) {
+					t.Errorf("expected error %v, but got error %s", c.expectedErr, err)
+				}
+			} else {
+				if c.expectedErr != nil {
+					t.Errorf("expected error %v, but got no error", c.expectedErr)
+				}
 			}
 
 			if !equality.Semantic.DeepEqual(values, c.expectedValues) {

@@ -49,7 +49,7 @@ func TestManifestAddonAgent(t *testing.T) {
 					t.Errorf("unexpected deployment namespace  %s", deployment.Namespace)
 				}
 
-				if deployment.Spec.Template.Spec.Containers[0].Image != defaultExampleImage {
+				if deployment.Spec.Template.Spec.Containers[0].Image != DefaultHelloWorldExampleImage {
 					t.Errorf("unexpected image  %s", deployment.Spec.Template.Spec.Containers[0].Image)
 				}
 			},
@@ -130,7 +130,7 @@ func TestManifestAddonAgent(t *testing.T) {
 					t.Errorf("unexpected deployment namespace  %s", deployment.Namespace)
 				}
 
-				if deployment.Spec.Template.Spec.Containers[0].Image != defaultExampleImage {
+				if deployment.Spec.Template.Spec.Containers[0].Image != DefaultHelloWorldExampleImage {
 					t.Errorf("unexpected image  %s", deployment.Spec.Template.Spec.Containers[0].Image)
 				}
 

@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	defaultExampleImage   = "quay.io/open-cluster-management/addon-examples:latest"
-	AddonName             = "helloworld"
-	InstallationNamespace = "default"
+	DefaultHelloWorldExampleImage = "quay.io/open-cluster-management/addon-examples:latest"
+	AddonName                     = "helloworld"
+	InstallationNamespace         = "default"
 )
 
 //go:embed manifests
@@ -43,7 +43,7 @@ func GetDefaultValues(cluster *clusterv1.ManagedCluster,
 
 	image := os.Getenv("EXAMPLE_IMAGE_NAME")
 	if len(image) == 0 {
-		image = defaultExampleImage
+		image = DefaultHelloWorldExampleImage
 	}
 
 	manifestConfig := struct {

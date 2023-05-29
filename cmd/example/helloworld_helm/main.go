@@ -109,6 +109,9 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 			addonfactory.GetAddOnDeploymentConfigValues(
 				addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
 				addonfactory.ToAddOnNodePlacementValues,
+				addonfactory.ToImageOverrideValuesFunc(
+					"global.imageOverrides.helloWorldHelm",
+					helloworld.DefaultHelloWorldExampleImage),
 			),
 			helloworld_helm.GetImageValues(kubeClient),
 			addonfactory.GetValuesFromAddonAnnotation,
