@@ -43,7 +43,7 @@ type ManagedClusterAddOnSpec struct {
 
 	// configs is a list of add-on configurations.
 	// In scenario where the current add-on has its own configurations.
-	// An empty list means there are no defautl configurations for add-on.
+	// An empty list means there are no default configurations for add-on.
 	// The default is an empty list
 	// +optional
 	Configs []AddOnConfig `json:"configs,omitempty"`
@@ -61,8 +61,9 @@ type RegistrationConfig struct {
 	// subject is the user subject of the addon agent to be registered to the hub.
 	// If it is not set, the addon agent will have the default subject
 	// "subject": {
-	//	"user": "system:open-cluster-management:addon:{addonName}:{clusterName}:{agentName}",
-	//	"groups: ["system:open-cluster-management:addon", "system:open-cluster-management:addon:{addonName}", "system:authenticated"]
+	//   "user": "system:open-cluster-management:cluster:{clusterName}:addon:{addonName}:agent:{agentName}",
+	//   "groups: ["system:open-cluster-management:cluster:{clusterName}:addon:{addonName}",
+	//             "system:open-cluster-management:addon:{addonName}", "system:authenticated"]
 	// }
 	//
 	// +optional
