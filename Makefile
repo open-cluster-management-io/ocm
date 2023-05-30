@@ -15,6 +15,8 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 # Include the integration setup makefile.
 include ./test/integration-test.mk
 
+RUNTIME ?= docker
+
 # Add packages to do unit test
 GO_TEST_PACKAGES :=./pkg/...
 
@@ -27,22 +29,22 @@ PLACEMENT_PATH=staging/src/open-cluster-management.io/placement
 REGISTRATION_OPERATOR_PATH=staging/src/open-cluster-management.io/registration-operator
 
 image-registration:
-	docker build \
+	$(RUNTIME) build \
 		-f build/Dockerfile.registration \
 		-t $(IMAGE_REGISTRY)/registration:$(IMAGE_TAG) .
 
 image-work:
-	docker build \
+	$(RUNTIME) build \
 		-f build/Dockerfile.work \
 		-t $(IMAGE_REGISTRY)/work:$(IMAGE_TAG) .
 
 image-placement:
-	docker build \
+	$(RUNTIME) build \
 		-f build/Dockerfile.placement \
 		-t $(IMAGE_REGISTRY)/placement:$(IMAGE_TAG) .
 
 image-registration-operator:
-	docker build \
+	$(RUNTIME) build \
 		-f build/Dockerfile.registration-operator \
 		-t $(IMAGE_REGISTRY)/registration-operator:$(IMAGE_TAG) .
 
