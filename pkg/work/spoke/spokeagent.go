@@ -3,12 +3,12 @@ package spoke
 import (
 	"context"
 	"fmt"
+	"open-cluster-management.io/ocm/pkg/features"
 	"time"
 
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	ocmfeature "open-cluster-management.io/api/feature"
-	"open-cluster-management.io/ocm/pkg/work/features"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/appliedmanifestcontroller"
@@ -63,7 +63,7 @@ func NewWorkloadAgentOptions() *WorkloadAgentOptions {
 // AddFlags register and binds the default flags
 func (o *WorkloadAgentOptions) AddFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
-	features.DefaultSpokeMutableFeatureGate.AddFlag(flags)
+	features.DefaultSpokeWorkMutableFeatureGate.AddFlag(flags)
 	// This command only supports reading from config
 	flags.StringVar(&o.HubKubeconfigFile, "hub-kubeconfig", o.HubKubeconfigFile, "Location of kubeconfig file to connect to hub cluster.")
 	flags.StringVar(&o.SpokeKubeconfigFile, "spoke-kubeconfig", o.SpokeKubeconfigFile,
@@ -135,7 +135,7 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 		o.SpokeClusterName,
 		controllerContext.EventRecorder,
 		restMapper,
-	).NewExecutorValidator(ctx, features.DefaultSpokeMutableFeatureGate.Enabled(ocmfeature.ExecutorValidatingCaches))
+	).NewExecutorValidator(ctx, features.DefaultSpokeWorkMutableFeatureGate.Enabled(ocmfeature.ExecutorValidatingCaches))
 
 	manifestWorkController := manifestcontroller.NewManifestWorkController(
 		controllerContext.EventRecorder,

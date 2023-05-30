@@ -22,8 +22,8 @@ import (
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/clientcert"
-	"open-cluster-management.io/ocm/pkg/registration/features"
 	"open-cluster-management.io/ocm/pkg/registration/hub"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/addon"
@@ -157,11 +157,11 @@ var _ = ginkgo.BeforeSuite(func() {
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	// enable DefaultClusterSet feature gate
-	err = features.DefaultHubMutableFeatureGate.Set("DefaultClusterSet=true")
+	err = features.DefaultHubRegistrationMutableFeatureGate.Set("DefaultClusterSet=true")
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	// enable ManagedClusterAutoApproval feature gate
-	err = features.DefaultHubMutableFeatureGate.Set("ManagedClusterAutoApproval=true")
+	err = features.DefaultHubRegistrationMutableFeatureGate.Set("ManagedClusterAutoApproval=true")
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	// start hub controller

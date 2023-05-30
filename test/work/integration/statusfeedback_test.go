@@ -3,11 +3,8 @@ package integration
 import (
 	"context"
 	"fmt"
+	"open-cluster-management.io/ocm/pkg/features"
 	"time"
-
-	"k8s.io/utils/pointer"
-	ocmfeature "open-cluster-management.io/api/feature"
-	"open-cluster-management.io/ocm/pkg/work/features"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -16,6 +13,8 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/utils/pointer"
+	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/ocm/pkg/work/spoke"
 	"open-cluster-management.io/ocm/test/work/integration/util"
@@ -455,7 +454,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			manifests = append(manifests, util.ToManifest(u))
 
-			err = features.DefaultSpokeMutableFeatureGate.Set(fmt.Sprintf("%s=true", ocmfeature.RawFeedbackJsonString))
+			err = features.DefaultSpokeWorkMutableFeatureGate.Set(fmt.Sprintf("%s=true", ocmfeature.RawFeedbackJsonString))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			var ctx context.Context
 			ctx, cancel = context.WithCancel(context.Background())

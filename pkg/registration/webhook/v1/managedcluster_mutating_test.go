@@ -12,7 +12,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/runtime"
 	ocmfeature "open-cluster-management.io/api/feature"
-	"open-cluster-management.io/ocm/pkg/registration/features"
+	"open-cluster-management.io/ocm/pkg/features"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -447,8 +447,8 @@ func TestDefault(t *testing.T) {
 			},
 		},
 	}
-	runtime.Must(features.DefaultHubMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates))
-	if err := features.DefaultHubMutableFeatureGate.Set(fmt.Sprintf("%s=true", string(ocmfeature.DefaultClusterSet))); err != nil {
+	runtime.Must(features.DefaultHubRegistrationMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates))
+	if err := features.DefaultHubRegistrationMutableFeatureGate.Set(fmt.Sprintf("%s=true", string(ocmfeature.DefaultClusterSet))); err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range cases {

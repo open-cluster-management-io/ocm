@@ -3,6 +3,7 @@ package statusfeedback
 import (
 	"encoding/json"
 	"fmt"
+	"open-cluster-management.io/ocm/pkg/features"
 	"reflect"
 
 	"k8s.io/utils/pointer"
@@ -12,7 +13,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/util/jsonpath"
 	workapiv1 "open-cluster-management.io/api/work/v1"
-	"open-cluster-management.io/ocm/pkg/work/features"
 	"open-cluster-management.io/ocm/pkg/work/spoke/statusfeedback/rules"
 )
 
@@ -129,7 +129,7 @@ func getValueByJsonPath(name, path string, obj *unstructured.Unstructured) (*wor
 			Value: fieldValue,
 		}, nil
 	default:
-		if features.DefaultSpokeMutableFeatureGate.Enabled(ocmfeature.RawFeedbackJsonString) {
+		if features.DefaultSpokeWorkMutableFeatureGate.Enabled(ocmfeature.RawFeedbackJsonString) {
 			jsonRaw, err := json.Marshal(&t)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse the resource to json string for name %s: %v", name, err)

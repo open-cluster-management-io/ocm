@@ -5,12 +5,12 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
+	"open-cluster-management.io/ocm/pkg/version"
 	"open-cluster-management.io/ocm/pkg/work/spoke"
-	"open-cluster-management.io/ocm/pkg/work/version"
 )
 
-// NewWorkloadAgent generates a command to start workload agent
-func NewWorkloadAgent() *cobra.Command {
+// NewWorkAgent generates a command to start work agent
+func NewWorkAgent() *cobra.Command {
 	o := spoke.NewWorkloadAgentOptions()
 	cmdConfig := controllercmd.
 		NewControllerCommandConfig("work-agent", version.Get(), o.RunWorkloadAgent)

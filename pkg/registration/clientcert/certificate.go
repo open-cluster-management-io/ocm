@@ -23,7 +23,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
 	ocmfeature "open-cluster-management.io/api/feature"
-	"open-cluster-management.io/ocm/pkg/registration/features"
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 )
 
@@ -256,7 +256,7 @@ func (v *v1CSRControl) get(name string) (metav1.Object, error) {
 }
 
 func NewCSRControl(hubCSRInformer certificatesinformers.Interface, hubKubeClient kubernetes.Interface) (CSRControl, error) {
-	if features.DefaultSpokeMutableFeatureGate.Enabled(ocmfeature.V1beta1CSRAPICompatibility) {
+	if features.DefaultSpokeRegistrationMutableFeatureGate.Enabled(ocmfeature.V1beta1CSRAPICompatibility) {
 		v1CSRSupported, v1beta1CSRSupported, err := helpers.IsCSRSupported(hubKubeClient)
 		if err != nil {
 			return nil, err

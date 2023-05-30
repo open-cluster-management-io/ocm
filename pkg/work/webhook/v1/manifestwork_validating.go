@@ -3,6 +3,7 @@ package v1
 import (
 	"context"
 	"fmt"
+	"open-cluster-management.io/ocm/pkg/features"
 	"reflect"
 
 	"open-cluster-management.io/ocm/pkg/work/webhook/common"
@@ -12,7 +13,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	ocmfeature "open-cluster-management.io/api/feature"
 	workv1 "open-cluster-management.io/api/work/v1"
@@ -75,7 +75,7 @@ func (r *ManifestWorkWebhook) validateRequest(newWork, oldWork *workv1.ManifestW
 
 func validateExecutor(kubeClient kubernetes.Interface, work *workv1.ManifestWork, userInfo authenticationv1.UserInfo) error {
 	executor := work.Spec.Executor
-	if !utilfeature.DefaultMutableFeatureGate.Enabled(ocmfeature.NilExecutorValidating) {
+	if !features.DefaultHubWorkMutableFeatureGate.Enabled(ocmfeature.NilExecutorValidating) {
 		if executor == nil {
 			return nil
 		}

@@ -4,6 +4,8 @@ import (
 	goflag "flag"
 	"fmt"
 	"math/rand"
+	"open-cluster-management.io/ocm/pkg/cmd/hub"
+	"open-cluster-management.io/ocm/pkg/cmd/spoke"
 	"os"
 	"time"
 
@@ -13,10 +15,8 @@ import (
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 
-	"open-cluster-management.io/ocm/pkg/registration/cmd/hub"
-	"open-cluster-management.io/ocm/pkg/registration/cmd/spoke"
-	"open-cluster-management.io/ocm/pkg/registration/cmd/webhook"
-	"open-cluster-management.io/ocm/pkg/registration/version"
+	"open-cluster-management.io/ocm/pkg/cmd/webhook"
+	"open-cluster-management.io/ocm/pkg/version"
 )
 
 // The registration binary contains both the hub-side controllers for the
@@ -57,8 +57,8 @@ func newRegistrationCommand() *cobra.Command {
 		cmd.Version = v
 	}
 
-	cmd.AddCommand(hub.NewController())
-	cmd.AddCommand(spoke.NewAgent())
-	cmd.AddCommand(webhook.NewWebhook())
+	cmd.AddCommand(hub.NewRegistrationController())
+	cmd.AddCommand(spoke.NewRegistrationAgent())
+	cmd.AddCommand(webhook.NewRegistrationWebhook())
 	return cmd
 }

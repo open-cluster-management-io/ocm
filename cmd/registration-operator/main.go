@@ -4,6 +4,8 @@ import (
 	goflag "flag"
 	"fmt"
 	"math/rand"
+	"open-cluster-management.io/ocm/pkg/cmd/hub"
+	"open-cluster-management.io/ocm/pkg/cmd/spoke"
 	"os"
 	"time"
 
@@ -13,8 +15,7 @@ import (
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 
-	"open-cluster-management.io/ocm/pkg/registration-operator/cmd/operator"
-	"open-cluster-management.io/ocm/pkg/registration-operator/version"
+	"open-cluster-management.io/ocm/pkg/version"
 )
 
 func main() {
@@ -50,8 +51,8 @@ func newNucleusCommand() *cobra.Command {
 		cmd.Version = v
 	}
 
-	cmd.AddCommand(operator.NewHubOperatorCmd())
-	cmd.AddCommand(operator.NewKlusterletOperatorCmd())
+	cmd.AddCommand(hub.NewHubOperatorCmd())
+	cmd.AddCommand(spoke.NewKlusterletOperatorCmd())
 
 	return cmd
 }

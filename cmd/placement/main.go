@@ -4,6 +4,7 @@ import (
 	goflag "flag"
 	"fmt"
 	"math/rand"
+	"open-cluster-management.io/ocm/pkg/cmd/hub"
 	"os"
 	"time"
 
@@ -13,8 +14,7 @@ import (
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 
-	"open-cluster-management.io/ocm/pkg/placement/cmd/hub"
-	"open-cluster-management.io/ocm/pkg/placement/version"
+	"open-cluster-management.io/ocm/pkg/version"
 )
 
 func main() {
@@ -49,7 +49,7 @@ func newPlacementCommand() *cobra.Command {
 		cmd.Version = v
 	}
 
-	cmd.AddCommand(hub.NewController())
+	cmd.AddCommand(hub.NewPlacementController())
 
 	return cmd
 }

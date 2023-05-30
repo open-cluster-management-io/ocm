@@ -8,10 +8,10 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
 	"open-cluster-management.io/ocm/pkg/registration/hub"
-	"open-cluster-management.io/ocm/pkg/registration/version"
+	"open-cluster-management.io/ocm/pkg/version"
 )
 
-func NewController() *cobra.Command {
+func NewRegistrationController() *cobra.Command {
 	manager := hub.NewHubManagerOptions()
 	cmdConfig := controllercmd.
 		NewControllerCommandConfig("registration-controller", version.Get(), manager.RunControllerManager)
