@@ -13,7 +13,7 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 )
 
 # Include the integration setup makefile.
-include ./test/integration-test.mk
+include ./test/integration/integration-test.mk
 
 # Add packages to do unit test
 GO_TEST_PACKAGES :=./pkg/...
