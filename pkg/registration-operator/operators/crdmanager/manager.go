@@ -21,7 +21,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog/v2"
-	"open-cluster-management.io/ocm/pkg/registration-operator/version"
+	"open-cluster-management.io/ocm/pkg/version"
 )
 
 // versionAnnotationKey is an annotation key on crd resources to mark the ocm version of the crds.

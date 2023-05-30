@@ -2,14 +2,13 @@ package statusfeedback
 
 import (
 	"fmt"
+	"open-cluster-management.io/ocm/pkg/features"
 	"testing"
-
-	"k8s.io/utils/pointer"
-	ocmfeature "open-cluster-management.io/api/feature"
-	"open-cluster-management.io/ocm/pkg/work/features"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/utils/pointer"
+	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
@@ -286,7 +285,7 @@ func TestStatusReader(t *testing.T) {
 	reader := NewStatusReader()
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			err := features.DefaultSpokeMutableFeatureGate.Set(fmt.Sprintf("%s=%t", ocmfeature.RawFeedbackJsonString, c.enableRaw))
+			err := features.DefaultSpokeWorkMutableFeatureGate.Set(fmt.Sprintf("%s=%t", ocmfeature.RawFeedbackJsonString, c.enableRaw))
 			if err != nil {
 				t.Fatal(err)
 			}

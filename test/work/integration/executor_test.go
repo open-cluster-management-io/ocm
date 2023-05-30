@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"open-cluster-management.io/ocm/pkg/features"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -15,7 +16,6 @@ import (
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workapiv1 "open-cluster-management.io/api/work/v1"
-	"open-cluster-management.io/ocm/pkg/work/features"
 	"open-cluster-management.io/ocm/pkg/work/spoke"
 	"open-cluster-management.io/ocm/test/work/integration/util"
 )
@@ -35,7 +35,7 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 		o.HubKubeconfigFile = hubKubeconfigFileName
 		o.SpokeClusterName = utilrand.String(5)
 		o.StatusSyncInterval = 3 * time.Second
-		err := features.DefaultSpokeMutableFeatureGate.Set("ExecutorValidatingCaches=true")
+		err := features.DefaultSpokeWorkMutableFeatureGate.Set("ExecutorValidatingCaches=true")
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ns := &corev1.Namespace{}

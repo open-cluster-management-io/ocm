@@ -6,10 +6,10 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
-	"open-cluster-management.io/ocm/pkg/registration/version"
+	"open-cluster-management.io/ocm/pkg/version"
 )
 
-func NewAgent() *cobra.Command {
+func NewRegistrationAgent() *cobra.Command {
 	agentOptions := spoke.NewSpokeAgentOptions()
 	cmdConfig := controllercmd.
 		NewControllerCommandConfig("registration-agent", version.Get(), agentOptions.RunSpokeAgent)

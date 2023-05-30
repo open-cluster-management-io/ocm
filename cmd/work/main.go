@@ -4,6 +4,8 @@ import (
 	goflag "flag"
 	"fmt"
 	"math/rand"
+	"open-cluster-management.io/ocm/pkg/cmd/hub"
+	"open-cluster-management.io/ocm/pkg/cmd/spoke"
 	"os"
 	"time"
 
@@ -13,10 +15,8 @@ import (
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 
-	"open-cluster-management.io/ocm/pkg/work/cmd/hub"
-	"open-cluster-management.io/ocm/pkg/work/cmd/spoke"
-	"open-cluster-management.io/ocm/pkg/work/cmd/webhook"
-	"open-cluster-management.io/ocm/pkg/work/version"
+	"open-cluster-management.io/ocm/pkg/cmd/webhook"
+	"open-cluster-management.io/ocm/pkg/version"
 )
 
 func main() {
@@ -52,8 +52,8 @@ func newWorkCommand() *cobra.Command {
 		cmd.Version = v
 	}
 
-	cmd.AddCommand(spoke.NewWorkloadAgent())
-	cmd.AddCommand(webhook.NewWebhook())
-	cmd.AddCommand(hub.NewHubManager())
+	cmd.AddCommand(spoke.NewWorkAgent())
+	cmd.AddCommand(webhook.NewWorkWebhook())
+	cmd.AddCommand(hub.NewWorkController())
 	return cmd
 }

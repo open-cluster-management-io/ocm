@@ -11,7 +11,7 @@ import (
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	"open-cluster-management.io/ocm/pkg/registration/features"
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/test/registration/integration/util"
 
@@ -164,7 +164,7 @@ var _ = ginkgo.Describe("Addon Lease Resync", func() {
 		hubKubeconfigDir = path.Join(util.TestDir, fmt.Sprintf("addontest-%s", suffix), "hub-kubeconfig")
 		addOnName = fmt.Sprintf("addon-%s", suffix)
 
-		err := features.DefaultSpokeMutableFeatureGate.Set("AddonManagement=true")
+		err := features.DefaultSpokeRegistrationMutableFeatureGate.Set("AddonManagement=true")
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		agentOptions := spoke.SpokeAgentOptions{

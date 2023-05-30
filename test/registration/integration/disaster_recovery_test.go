@@ -22,8 +22,8 @@ import (
 	addonclientset "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/clientcert"
-	"open-cluster-management.io/ocm/pkg/registration/features"
 	"open-cluster-management.io/ocm/pkg/registration/hub"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/test/registration/integration/util"
@@ -88,7 +88,7 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 	}
 
 	startRegistrationAgent := func(managedClusterName, bootstrapKubeConfigFile, hubKubeconfigSecret, hubKubeconfigDir string) context.CancelFunc {
-		err := features.DefaultSpokeMutableFeatureGate.Set("AddonManagement=true")
+		err := features.DefaultSpokeRegistrationMutableFeatureGate.Set("AddonManagement=true")
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		agentOptions := spoke.SpokeAgentOptions{

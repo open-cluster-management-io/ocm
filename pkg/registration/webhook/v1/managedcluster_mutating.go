@@ -13,7 +13,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	ocmfeature "open-cluster-management.io/api/feature"
-	"open-cluster-management.io/ocm/pkg/registration/features"
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -52,7 +52,7 @@ func (r *ManagedClusterWebhook) Default(ctx context.Context, obj runtime.Object)
 	}
 
 	//Set default clusterset label
-	if features.DefaultHubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
+	if features.DefaultHubRegistrationMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
 		r.addDefaultClusterSetLabel(managedCluster)
 	}
 

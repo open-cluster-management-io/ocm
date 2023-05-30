@@ -1,4 +1,4 @@
-package operator
+package hub
 
 import (
 	"github.com/spf13/cobra"
@@ -6,7 +6,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
 	"open-cluster-management.io/ocm/pkg/registration-operator/operators/clustermanager"
-	"open-cluster-management.io/ocm/pkg/registration-operator/version"
+	"open-cluster-management.io/ocm/pkg/version"
 )
 
 // NewHubOperatorCmd generatee a command to start hub operator

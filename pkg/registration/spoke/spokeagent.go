@@ -16,8 +16,8 @@ import (
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/clientcert"
-	"open-cluster-management.io/ocm/pkg/registration/features"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/addon"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/managedcluster"
@@ -347,7 +347,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	spokeClusterInformerFactory := clusterv1informers.NewSharedInformerFactory(spokeClusterClient, 10*time.Minute)
 
 	var managedClusterClaimController factory.Controller
-	if features.DefaultSpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
+	if features.DefaultSpokeRegistrationMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
 		// create managedClusterClaimController to sync cluster claims
 		managedClusterClaimController = managedcluster.NewManagedClusterClaimController(
 			o.ClusterName,
@@ -361,7 +361,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 
 	var addOnLeaseController factory.Controller
 	var addOnRegistrationController factory.Controller
-	if features.DefaultSpokeMutableFeatureGate.Enabled(ocmfeature.AddonManagement) {
+	if features.DefaultSpokeRegistrationMutableFeatureGate.Enabled(ocmfeature.AddonManagement) {
 		addOnLeaseController = addon.NewManagedClusterAddOnLeaseController(
 			o.ClusterName,
 			addOnClient,
@@ -397,10 +397,10 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	go managedClusterJoiningController.Run(ctx, 1)
 	go managedClusterLeaseController.Run(ctx, 1)
 	go managedClusterHealthCheckController.Run(ctx, 1)
-	if features.DefaultSpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
+	if features.DefaultSpokeRegistrationMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
 		go managedClusterClaimController.Run(ctx, 1)
 	}
-	if features.DefaultSpokeMutableFeatureGate.Enabled(ocmfeature.AddonManagement) {
+	if features.DefaultSpokeRegistrationMutableFeatureGate.Enabled(ocmfeature.AddonManagement) {
 		go addOnLeaseController.Run(ctx, 1)
 		go addOnRegistrationController.Run(ctx, 1)
 	}
@@ -411,7 +411,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 
 // AddFlags registers flags for Agent
 func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
-	features.DefaultSpokeMutableFeatureGate.AddFlag(fs)
+	features.DefaultSpokeRegistrationMutableFeatureGate.AddFlag(fs)
 	fs.StringVar(&o.ClusterName, "cluster-name", o.ClusterName,
 		"If non-empty, will use as cluster name instead of generated random name.")
 	fs.StringVar(&o.BootstrapKubeconfig, "bootstrap-kubeconfig", o.BootstrapKubeconfig,

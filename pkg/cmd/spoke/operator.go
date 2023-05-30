@@ -1,4 +1,4 @@
-package operator
+package spoke
 
 import (
 	"github.com/spf13/cobra"
@@ -6,7 +6,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
 	"open-cluster-management.io/ocm/pkg/registration-operator/operators/klusterlet"
-	"open-cluster-management.io/ocm/pkg/registration-operator/version"
+	"open-cluster-management.io/ocm/pkg/version"
 )
 
 // NewKlusterletOperatorCmd generatee a command to start klusterlet operator

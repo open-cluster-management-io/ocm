@@ -9,7 +9,7 @@ import (
 
 	ocmfeature "open-cluster-management.io/api/feature"
 
-	"open-cluster-management.io/ocm/pkg/registration/features"
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedclustersetbinding"
 	"open-cluster-management.io/ocm/pkg/registration/hub/taint"
@@ -53,7 +53,7 @@ func NewHubManagerOptions() *HubManagerOptions {
 
 // AddFlags registers flags for manager
 func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
-	features.DefaultHubMutableFeatureGate.AddFlag(fs)
+	features.DefaultHubRegistrationMutableFeatureGate.AddFlag(fs)
 	fs.StringSliceVar(&m.ClusterAutoApprovalUsers, "cluster-auto-approval-users", m.ClusterAutoApprovalUsers,
 		"A bootstrap user list whose cluster registration requests can be automatically approved.")
 
@@ -109,7 +109,7 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 	)
 
 	csrReconciles := []csr.Reconciler{csr.NewCSRRenewalReconciler(kubeClient, controllerContext.EventRecorder)}
-	if features.DefaultHubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
+	if features.DefaultHubRegistrationMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
 		csrReconciles = append(csrReconciles, csr.NewCSRBootstrapReconciler(
 			kubeClient,
 			clusterClient,
@@ -120,7 +120,7 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 	}
 
 	var csrController factory.Controller
-	if features.DefaultHubMutableFeatureGate.Enabled(ocmfeature.V1beta1CSRAPICompatibility) {
+	if features.DefaultHubRegistrationMutableFeatureGate.Enabled(ocmfeature.V1beta1CSRAPICompatibility) {
 		v1CSRSupported, v1beta1CSRSupported, err := helpers.IsCSRSupported(kubeClient)
 		if err != nil {
 			return errors.Wrapf(err, "failed CSR api discovery")
@@ -201,7 +201,7 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 	)
 
 	var defaultManagedClusterSetController, globalManagedClusterSetController factory.Controller
-	if features.DefaultHubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
+	if features.DefaultHubRegistrationMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
 		defaultManagedClusterSetController = managedclusterset.NewDefaultManagedClusterSetController(
 			clusterClient.ClusterV1beta2(),
 			clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
@@ -229,7 +229,7 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 	go clusterroleController.Run(ctx, 1)
 	go addOnHealthCheckController.Run(ctx, 1)
 	go addOnFeatureDiscoveryController.Run(ctx, 1)
-	if features.DefaultHubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
+	if features.DefaultHubRegistrationMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
 		go defaultManagedClusterSetController.Run(ctx, 1)
 		go globalManagedClusterSetController.Run(ctx, 1)
 	}

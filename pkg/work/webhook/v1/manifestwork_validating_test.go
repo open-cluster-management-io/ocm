@@ -8,11 +8,9 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	_ "open-cluster-management.io/ocm/pkg/work/features"
+	"open-cluster-management.io/ocm/pkg/features"
 
 	admissionv1 "k8s.io/api/admission/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-
 	clienttesting "k8s.io/client-go/testing"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -254,7 +252,7 @@ func TestManifestWorkExecutorValidate(t *testing.T) {
 		},
 	}
 
-	utilruntime.Must(utilfeature.DefaultMutableFeatureGate.Set(
+	utilruntime.Must(features.DefaultHubWorkMutableFeatureGate.Set(
 		fmt.Sprintf("%s=true", ocmfeature.NilExecutorValidating),
 	))
 
