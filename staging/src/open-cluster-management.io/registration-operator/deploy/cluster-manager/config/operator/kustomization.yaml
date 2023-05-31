@@ -1,4 +1,0 @@
-resources:
-  - namespace.yaml
-  - service_account.yaml
-  - operator.yaml
