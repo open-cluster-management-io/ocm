@@ -33,7 +33,7 @@ Your IP address is usually next to the last entry of 'inet'. An IP address is al
     cluster2   true           https://cluster2-control-plane:6443                        1s
     ```
     <details>
-    <summary>Known issue when running setup script</summary>
+    <summary>Known issue when running the setup script on a Linux environment</summary>
 
     You may run into this issue when trying to create multiple clusters
     ```
