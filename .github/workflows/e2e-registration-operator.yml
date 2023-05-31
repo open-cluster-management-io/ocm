@@ -42,6 +42,6 @@ jobs:
           kind load docker-image --name=kind quay.io/open-cluster-management/placement:latest
       - name: Test E2E
         run: |
-          make -C ./staging/src/open-cluster-management.io/registration-operator test-e2e
+          make test-e2e
         env:
           KUBECONFIG: /home/runner/.kube/config
