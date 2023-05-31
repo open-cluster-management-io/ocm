@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"open-cluster-management.io/ocm/test/integration/util"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -62,7 +63,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", func() {
 
 			// the work controller deployment should be running
 			Eventually(func() error {
-				hubWorkControllerDeployment, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
+				hubWorkControllerDeployment, err := t.HubKubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
 					Get(context.TODO(), t.hubWorkControllerDeployment, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -105,13 +106,13 @@ var _ = Describe("Test ManifestWorkReplicaSet", func() {
 				Name: namespace,
 			},
 		}
-		_, err := t.KubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err := t.HubKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	AfterEach(func() {
 		// delete namespace
-		err := t.KubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
+		err := t.HubKubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// delete clusters created
@@ -192,7 +193,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", func() {
 					Name: clsName,
 				},
 			}
-			_, err = t.KubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+			_, err = t.HubKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		}
 
@@ -217,7 +218,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", func() {
 
 		By("Create manifestWorkReplicaSet")
 		manifest := workapiv1.Manifest{}
-		manifest.Object = newConfigmap("default", "cm", map[string]string{"a": "b"})
+		manifest.Object = util.NewConfigmap("default", "cm", map[string]string{"a": "b"}, nil)
 		placementRef := workapiv1alpha1.LocalPlacementReference{Name: placementName}
 		mwReplicaSet := &workapiv1alpha1.ManifestWorkReplicaSet{
 			ObjectMeta: metav1.ObjectMeta{
@@ -235,12 +236,12 @@ var _ = Describe("Test ManifestWorkReplicaSet", func() {
 				PlacementRefs: []workapiv1alpha1.LocalPlacementReference{placementRef},
 			},
 		}
-		_, err = t.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Create(context.TODO(), mwReplicaSet, metav1.CreateOptions{})
+		_, err = t.HubWorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Create(context.TODO(), mwReplicaSet, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Check manifestWork replicaSet status is updated")
 		Eventually(func() bool {
-			mwrSet, err := t.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Get(context.TODO(), mwReplicaSetName, metav1.GetOptions{})
+			mwrSet, err := t.HubWorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Get(context.TODO(), mwReplicaSetName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
@@ -254,7 +255,7 @@ var _ = Describe("Test ManifestWorkReplicaSet", func() {
 
 		By("Check manifestWorks are created")
 		Eventually(func() bool {
-			manifestWorkList, err := t.WorkClient.WorkV1().ManifestWorks("").List(context.TODO(), metav1.ListOptions{
+			manifestWorkList, err := t.HubWorkClient.WorkV1().ManifestWorks("").List(context.TODO(), metav1.ListOptions{
 				LabelSelector: fmt.Sprintf("%s=%s.%s", mwrSetLabel, namespace, mwReplicaSetName),
 			})
 			if err != nil {
@@ -265,12 +266,12 @@ var _ = Describe("Test ManifestWorkReplicaSet", func() {
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(BeTrue())
 
 		By("Delete manifestWorkReplicaSet")
-		err = t.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Delete(context.TODO(), mwReplicaSetName, metav1.DeleteOptions{})
+		err = t.HubWorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Delete(context.TODO(), mwReplicaSetName, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Check manifestworks are deleted")
 		Eventually(func() bool {
-			manifestWorkList, err := t.WorkClient.WorkV1().ManifestWorks("").List(context.TODO(), metav1.ListOptions{
+			manifestWorkList, err := t.HubWorkClient.WorkV1().ManifestWorks("").List(context.TODO(), metav1.ListOptions{
 				LabelSelector: fmt.Sprintf("%s=%s.%s", mwrSetLabel, namespace, mwReplicaSetName),
 			})
 			if err != nil {

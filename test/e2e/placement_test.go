@@ -41,13 +41,13 @@ var _ = Describe("Placement", func() {
 				Name: placementNamespace,
 			},
 		}
-		_, err := t.KubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		_, err := t.HubKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	AfterEach(func() {
 		// delete namespace
-		err := t.KubeClient.CoreV1().Namespaces().Delete(context.Background(), placementNamespace, metav1.DeleteOptions{})
+		err := t.HubKubeClient.CoreV1().Namespaces().Delete(context.Background(), placementNamespace, metav1.DeleteOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
 		// delete clusters created

@@ -40,7 +40,7 @@ var _ = Describe("Enable addon management feature gate", func() {
 
 		// the addon manager deployment should be running
 		Eventually(func() error {
-			addonManagerControllerDeployment, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
+			addonManagerControllerDeployment, err := t.HubKubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
 				Get(context.TODO(), t.addonManagerDeployment, metav1.GetOptions{})
 			if err != nil {
 				return err

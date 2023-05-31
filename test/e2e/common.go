@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"k8s.io/client-go/dynamic"
+	"open-cluster-management.io/ocm/test/integration/util"
 	"os"
 	"strings"
 	"time"
@@ -38,14 +40,19 @@ import (
 )
 
 type Tester struct {
-	kubeconfigPath                   string
-	KubeClient                       kubernetes.Interface
+	hubKubeConfigPath                string
+	spokeKubeConfigPath              string
+	HubKubeClient                    kubernetes.Interface
+	SpokeKubeClient                  kubernetes.Interface
 	HubAPIExtensionClient            apiextensionsclient.Interface
-	ClusterCfg                       *rest.Config
+	HubClusterCfg                    *rest.Config
+	SpokeClusterCfg                  *rest.Config
 	OperatorClient                   operatorclient.Interface
 	ClusterClient                    clusterclient.Interface
-	WorkClient                       workv1client.Interface
+	HubWorkClient                    workv1client.Interface
+	SpokeWorkClient                  workv1client.Interface
 	AddOnClinet                      addonclient.Interface
+	SpokeDynamicClient               dynamic.Interface
 	bootstrapHubSecret               *corev1.Secret
 	EventuallyTimeout                time.Duration
 	EventuallyInterval               time.Duration
@@ -67,10 +74,11 @@ type Tester struct {
 // kubeconfigPath is the path of kubeconfig file, will be get from env "KUBECONFIG" by default.
 // bootstrapHubSecret is the bootstrap hub kubeconfig secret, and the format is "namespace/secretName".
 // Default of bootstrapHubSecret is helpers.KlusterletDefaultNamespace/helpers.BootstrapHubKubeConfig.
-func NewTester(kubeconfigPath string) *Tester {
+func NewTester(hubKubeConfigPath, spokeKubeConfigPath string, timeout time.Duration) *Tester {
 	var tester = Tester{
-		kubeconfigPath:                   kubeconfigPath,
-		EventuallyTimeout:                60 * time.Second,  // seconds
+		hubKubeConfigPath:                hubKubeConfigPath,
+		spokeKubeConfigPath:              spokeKubeConfigPath,
+		EventuallyTimeout:                timeout,           // seconds
 		EventuallyInterval:               1 * time.Second,   // seconds
 		clusterManagerName:               "cluster-manager", // same name as deploy/cluster-manager/config/samples
 		clusterManagerNamespace:          helpers.ClusterManagerDefaultNamespace,
@@ -91,41 +99,59 @@ func NewTester(kubeconfigPath string) *Tester {
 }
 
 func (t *Tester) Init() error {
-	var kubeconfigPath string
 	var err error
 
-	if t.kubeconfigPath == "" {
-		kubeconfigPath = os.Getenv("KUBECONFIG")
-	} else {
-		kubeconfigPath = t.kubeconfigPath
+	if t.hubKubeConfigPath == "" {
+		t.hubKubeConfigPath = os.Getenv("KUBECONFIG")
+	}
+	if t.spokeKubeConfigPath == "" {
+		t.spokeKubeConfigPath = os.Getenv("KUBECONFIG")
 	}
 
-	if t.ClusterCfg, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath); err != nil {
-		klog.Errorf("failed to get ClusterCfg from path %v . %v", kubeconfigPath, err)
+	if t.HubClusterCfg, err = clientcmd.BuildConfigFromFlags("", t.hubKubeConfigPath); err != nil {
+		klog.Errorf("failed to get HubClusterCfg from path %v . %v", t.hubKubeConfigPath, err)
 		return err
 	}
-	if t.KubeClient, err = kubernetes.NewForConfig(t.ClusterCfg); err != nil {
+	if t.SpokeClusterCfg, err = clientcmd.BuildConfigFromFlags("", t.spokeKubeConfigPath); err != nil {
+		klog.Errorf("failed to get SpokeClusterCfg from path %v . %v", t.spokeKubeConfigPath, err)
+		return err
+	}
+
+	if t.HubKubeClient, err = kubernetes.NewForConfig(t.HubClusterCfg); err != nil {
+		klog.Errorf("failed to get KubeClient. %v", err)
+		return err
+	}
+	if t.SpokeKubeClient, err = kubernetes.NewForConfig(t.SpokeClusterCfg); err != nil {
 		klog.Errorf("failed to get KubeClient. %v", err)
 		return err
 	}
 
-	if t.HubAPIExtensionClient, err = apiextensionsclient.NewForConfig(t.ClusterCfg); err != nil {
+	if t.SpokeDynamicClient, err = dynamic.NewForConfig(t.SpokeClusterCfg); err != nil {
+		klog.Errorf("failed to get DynamicClient. %v", err)
+		return err
+	}
+
+	if t.HubAPIExtensionClient, err = apiextensionsclient.NewForConfig(t.HubClusterCfg); err != nil {
 		klog.Errorf("failed to get HubApiExtensionClient. %v", err)
 		return err
 	}
-	if t.OperatorClient, err = operatorclient.NewForConfig(t.ClusterCfg); err != nil {
+	if t.OperatorClient, err = operatorclient.NewForConfig(t.HubClusterCfg); err != nil {
 		klog.Errorf("failed to get OperatorClient. %v", err)
 		return err
 	}
-	if t.ClusterClient, err = clusterclient.NewForConfig(t.ClusterCfg); err != nil {
+	if t.ClusterClient, err = clusterclient.NewForConfig(t.HubClusterCfg); err != nil {
 		klog.Errorf("failed to get ClusterClient. %v", err)
 		return err
 	}
-	if t.WorkClient, err = workv1client.NewForConfig(t.ClusterCfg); err != nil {
+	if t.HubWorkClient, err = workv1client.NewForConfig(t.HubClusterCfg); err != nil {
 		klog.Errorf("failed to get WorkClient. %v", err)
 		return err
 	}
-	if t.AddOnClinet, err = addonclient.NewForConfig(t.ClusterCfg); err != nil {
+	if t.SpokeWorkClient, err = workv1client.NewForConfig(t.SpokeClusterCfg); err != nil {
+		klog.Errorf("failed to get WorkClient. %v", err)
+		return err
+	}
+	if t.AddOnClinet, err = addonclient.NewForConfig(t.HubClusterCfg); err != nil {
 		klog.Errorf("failed to get AddOnClinet. %v", err)
 		return err
 	}
@@ -159,7 +185,7 @@ func (t *Tester) SetBootstrapHubSecret(bootstrapHubSecret string) error {
 			return err
 		}
 	}
-	if t.bootstrapHubSecret, err = t.KubeClient.CoreV1().Secrets(bootstrapHubSecretNamespace).
+	if t.bootstrapHubSecret, err = t.SpokeKubeClient.CoreV1().Secrets(bootstrapHubSecretNamespace).
 		Get(context.TODO(), bootstrapHubSecretName, metav1.GetOptions{}); err != nil {
 		klog.Errorf("failed to get bootstrapHubSecret %v in ns %v. %v", bootstrapHubSecretName,
 			bootstrapHubSecretNamespace, err)
@@ -210,13 +236,13 @@ func (t *Tester) CreateKlusterlet(name, clusterName, klusterletNamespace string,
 			},
 		},
 	}
-	if _, err := t.KubeClient.CoreV1().Namespaces().Get(context.TODO(), agentNamespace, metav1.GetOptions{}); err != nil {
+	if _, err := t.SpokeKubeClient.CoreV1().Namespaces().Get(context.TODO(), agentNamespace, metav1.GetOptions{}); err != nil {
 		if !errors.IsNotFound(err) {
 			klog.Errorf("failed to get ns %v. %v", agentNamespace, err)
 			return nil, err
 		}
 
-		if _, err := t.KubeClient.CoreV1().Namespaces().Create(context.TODO(),
+		if _, err := t.SpokeKubeClient.CoreV1().Namespaces().Create(context.TODO(),
 			namespace, metav1.CreateOptions{}); err != nil {
 			klog.Errorf("failed to create ns %v. %v", namespace, err)
 			return nil, err
@@ -225,12 +251,12 @@ func (t *Tester) CreateKlusterlet(name, clusterName, klusterletNamespace string,
 
 	// create bootstrap-hub-kubeconfig secret
 	secret := t.bootstrapHubSecret.DeepCopy()
-	if _, err := t.KubeClient.CoreV1().Secrets(agentNamespace).Get(context.TODO(), secret.Name, metav1.GetOptions{}); err != nil {
+	if _, err := t.SpokeKubeClient.CoreV1().Secrets(agentNamespace).Get(context.TODO(), secret.Name, metav1.GetOptions{}); err != nil {
 		if !errors.IsNotFound(err) {
 			klog.Errorf("failed to get secret %v in ns %v. %v", secret.Name, agentNamespace, err)
 			return nil, err
 		}
-		if _, err = t.KubeClient.CoreV1().Secrets(agentNamespace).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
+		if _, err = t.SpokeKubeClient.CoreV1().Secrets(agentNamespace).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
 			klog.Errorf("failed to create secret %v in ns %v. %v", secret, agentNamespace, err)
 			return nil, err
 		}
@@ -240,12 +266,12 @@ func (t *Tester) CreateKlusterlet(name, clusterName, klusterletNamespace string,
 		// create external-managed-kubeconfig, will use the same cluster to simulate the Hosted mode.
 		secret.Namespace = agentNamespace
 		secret.Name = helpers.ExternalManagedKubeConfig
-		if _, err := t.KubeClient.CoreV1().Secrets(agentNamespace).Get(context.TODO(), secret.Name, metav1.GetOptions{}); err != nil {
+		if _, err := t.HubKubeClient.CoreV1().Secrets(agentNamespace).Get(context.TODO(), secret.Name, metav1.GetOptions{}); err != nil {
 			if !errors.IsNotFound(err) {
 				klog.Errorf("failed to get secret %v in ns %v. %v", secret.Name, agentNamespace, err)
 				return nil, err
 			}
-			if _, err = t.KubeClient.CoreV1().Secrets(agentNamespace).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
+			if _, err = t.HubKubeClient.CoreV1().Secrets(agentNamespace).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
 				klog.Errorf("failed to create secret %v in ns %v. %v", secret, agentNamespace, err)
 				return nil, err
 			}
@@ -261,6 +287,32 @@ func (t *Tester) CreateKlusterlet(name, clusterName, klusterletNamespace string,
 	}
 
 	return realKlusterlet, nil
+}
+
+func (t *Tester) CreateApprovedKlusterlet(name, clusterName, klusterletNamespace string, mode operatorapiv1.InstallMode) (*operatorapiv1.Klusterlet, error) {
+	klusterlet, err := t.CreateKlusterlet(name, clusterName, klusterletNamespace, operatorapiv1.InstallModeDefault)
+	if err != nil {
+		return nil, err
+	}
+
+	gomega.Eventually(func() error {
+		_, err = t.GetCreatedManagedCluster(clusterName)
+		return err
+	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+
+	gomega.Eventually(func() error {
+		return t.ApproveCSR(clusterName)
+	}, t.EventuallyTimeout, t.EventuallyInterval).Should(gomega.Succeed())
+
+	gomega.Eventually(func() error {
+		return t.AcceptsClient(clusterName)
+	}, t.EventuallyTimeout, t.EventuallyInterval).Should(gomega.Succeed())
+
+	gomega.Eventually(func() error {
+		return t.CheckManagedClusterStatus(clusterName)
+	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+
+	return klusterlet, nil
 }
 
 func (t *Tester) CreatePureHostedKlusterlet(name, clusterName string) (*operatorapiv1.Klusterlet, error) {
@@ -313,7 +365,7 @@ func (t *Tester) GetCreatedManagedCluster(clusterName string) (*clusterv1.Manage
 
 func (t *Tester) ApproveCSR(clusterName string) error {
 	var csrs *certificatesv1.CertificateSigningRequestList
-	var csrClient = t.KubeClient.CertificatesV1().CertificateSigningRequests()
+	var csrClient = t.HubKubeClient.CertificatesV1().CertificateSigningRequests()
 	var err error
 
 	if csrs, err = csrClient.List(context.TODO(), metav1.ListOptions{
@@ -398,23 +450,9 @@ func (t *Tester) CheckManagedClusterStatus(clusterName string) error {
 	return fmt.Errorf("cluster %s condtions are not ready: %v", clusterName, managedCluster.Status.Conditions)
 }
 
-func newConfigmap(namespace, name string, data map[string]string) *corev1.ConfigMap {
-	return &corev1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ConfigMap",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
-		},
-		Data: data,
-	}
-}
-
 func (t *Tester) CreateWorkOfConfigMap(name, clusterName, configMapName, configMapNamespace string) (*workapiv1.ManifestWork, error) {
 	manifest := workapiv1.Manifest{}
-	manifest.Object = newConfigmap(configMapNamespace, configMapName, map[string]string{"a": "b"})
+	manifest.Object = util.NewConfigmap(configMapNamespace, configMapName, map[string]string{"a": "b"}, []string{})
 	manifestWork := &workapiv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -428,7 +466,7 @@ func (t *Tester) CreateWorkOfConfigMap(name, clusterName, configMapName, configM
 		},
 	}
 
-	return t.WorkClient.WorkV1().ManifestWorks(clusterName).
+	return t.HubWorkClient.WorkV1().ManifestWorks(clusterName).
 		Create(context.TODO(), manifestWork, metav1.CreateOptions{})
 }
 
@@ -506,18 +544,18 @@ func (t *Tester) cleanKlusterletResources(klusterletName, clusterName string) er
 
 func (t *Tester) CheckHubReady() error {
 	// make sure open-cluster-management-hub namespace is created
-	if _, err := t.KubeClient.CoreV1().Namespaces().
+	if _, err := t.HubKubeClient.CoreV1().Namespaces().
 		Get(context.TODO(), t.clusterManagerNamespace, metav1.GetOptions{}); err != nil {
 		return err
 	}
 
 	// make sure hub deployments are created
-	if _, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
+	if _, err := t.HubKubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
 		Get(context.TODO(), t.hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
 		return err
 	}
 	gomega.Eventually(func() error {
-		registrationWebhookDeployment, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
+		registrationWebhookDeployment, err := t.HubKubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
 			Get(context.TODO(), t.hubRegistrationWebhookDeployment, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -531,7 +569,7 @@ func (t *Tester) CheckHubReady() error {
 	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeNil())
 
 	gomega.Eventually(func() error {
-		workWebhookDeployment, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
+		workWebhookDeployment, err := t.HubKubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
 			Get(context.TODO(), t.hubWorkWebhookDeployment, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -546,7 +584,7 @@ func (t *Tester) CheckHubReady() error {
 
 	if t.hubWorkControllerEnabled {
 		gomega.Eventually(func() error {
-			workHubControllerDeployment, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
+			workHubControllerDeployment, err := t.HubKubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
 				Get(context.TODO(), t.hubWorkControllerDeployment, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -560,14 +598,14 @@ func (t *Tester) CheckHubReady() error {
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeNil())
 	}
 
-	if _, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
+	if _, err := t.HubKubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
 		Get(context.TODO(), t.hubPlacementDeployment, metav1.GetOptions{}); err != nil {
 		return err
 	}
 
 	if t.addonManagerControllerEnabled {
 		gomega.Eventually(func() error {
-			addonManagerControllerDeployment, err := t.KubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
+			addonManagerControllerDeployment, err := t.HubKubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
 				Get(context.TODO(), t.addonManagerDeployment, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -617,7 +655,7 @@ func (t *Tester) CheckClusterManagerStatus() error {
 
 func (t *Tester) CheckKlusterletOperatorReady() error {
 	// make sure klusterlet operator deployment is created
-	_, err := t.KubeClient.AppsV1().Deployments(t.operatorNamespace).
+	_, err := t.SpokeKubeClient.AppsV1().Deployments(t.operatorNamespace).
 		Get(context.TODO(), t.klusterletOperator, metav1.GetOptions{})
 	return err
 }
@@ -658,13 +696,13 @@ func (t *Tester) OutputDebugLogs() {
 		klog.Infof("managedCluster %v : %#v \n", managedCluster.Name, managedCluster)
 	}
 
-	registrationPods, err := t.KubeClient.CoreV1().Pods("").List(context.Background(),
+	registrationPods, err := t.SpokeKubeClient.CoreV1().Pods("").List(context.Background(),
 		metav1.ListOptions{LabelSelector: "app=klusterlet-registration-agent"})
 	if err != nil {
 		klog.Errorf("failed to list registration pods. error: %v", err)
 	}
 
-	manifestWorkPods, err := t.KubeClient.CoreV1().Pods("").List(context.Background(),
+	manifestWorkPods, err := t.SpokeKubeClient.CoreV1().Pods("").List(context.Background(),
 		metav1.ListOptions{LabelSelector: "app=klusterlet-manifestwork-agent"})
 	if err != nil {
 		klog.Errorf("failed to get manifestwork pods. error: %v", err)
@@ -673,7 +711,7 @@ func (t *Tester) OutputDebugLogs() {
 	agentPods := append(registrationPods.Items, manifestWorkPods.Items...)
 	for _, pod := range agentPods {
 		klog.Infof("klusterlet agent pod %v/%v\n", pod.Namespace, pod.Name)
-		logs, err := t.PodLog(pod.Name, pod.Namespace, int64(10))
+		logs, err := t.SpokePodLog(pod.Name, pod.Namespace, int64(10))
 		if err != nil {
 			klog.Errorf("failed to get pod %v/%v log. error: %v", pod.Namespace, pod.Name, err)
 			continue
@@ -681,7 +719,7 @@ func (t *Tester) OutputDebugLogs() {
 		klog.Infof("pod %v/%v logs:\n %v \n", pod.Namespace, pod.Name, logs)
 	}
 
-	manifestWorks, err := t.WorkClient.WorkV1().ManifestWorks("").List(context.TODO(), metav1.ListOptions{})
+	manifestWorks, err := t.HubWorkClient.WorkV1().ManifestWorks("").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		klog.Errorf("failed to list manifestWorks. error: %v", err)
 	}
@@ -690,8 +728,8 @@ func (t *Tester) OutputDebugLogs() {
 	}
 }
 
-func (t *Tester) PodLog(podName, nameSpace string, lines int64) (string, error) {
-	podLogs, err := t.KubeClient.CoreV1().Pods(nameSpace).
+func (t *Tester) SpokePodLog(podName, nameSpace string, lines int64) (string, error) {
+	podLogs, err := t.SpokeKubeClient.CoreV1().Pods(nameSpace).
 		GetLogs(podName, &corev1.PodLogOptions{TailLines: &lines}).Stream(context.TODO())
 	if err != nil {
 		return "", err
@@ -725,7 +763,7 @@ func (t *Tester) CreateManagedClusterAddOn(managedClusterNamespace, addOnName st
 }
 
 func (t *Tester) CreateManagedClusterAddOnLease(addOnInstallNamespace, addOnName string) error {
-	if _, err := t.KubeClient.CoreV1().Namespaces().Create(
+	if _, err := t.HubKubeClient.CoreV1().Namespaces().Create(
 		context.TODO(),
 		&corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
@@ -737,7 +775,7 @@ func (t *Tester) CreateManagedClusterAddOnLease(addOnInstallNamespace, addOnName
 		return err
 	}
 
-	_, err := t.KubeClient.CoordinationV1().Leases(addOnInstallNamespace).Create(
+	_, err := t.HubKubeClient.CoordinationV1().Leases(addOnInstallNamespace).Create(
 		context.TODO(),
 		&coordv1.Lease{
 			ObjectMeta: metav1.ObjectMeta{
@@ -772,7 +810,7 @@ func (t *Tester) CheckManagedClusterAddOnStatus(managedClusterNamespace, addOnNa
 
 func (t *Tester) DeleteExternalKubeconfigSecret(klusterlet *operatorapiv1.Klusterlet) error {
 	agentNamespace := helpers.AgentNamespace(klusterlet)
-	err := t.KubeClient.CoreV1().Secrets(agentNamespace).Delete(context.TODO(),
+	err := t.HubKubeClient.CoreV1().Secrets(agentNamespace).Delete(context.TODO(),
 		helpers.ExternalManagedKubeConfig, metav1.DeleteOptions{})
 	if err != nil {
 		klog.Errorf("failed to delete external managed secret in ns %v. %v", agentNamespace, err)
@@ -787,7 +825,7 @@ func (t *Tester) CreateFakeExternalKubeconfigSecret(klusterlet *operatorapiv1.Kl
 	klog.Infof("klusterlet: %s/%s, \t, \t agent namespace: %s",
 		klusterlet.Name, klusterlet.Namespace, agentNamespace)
 
-	bsSecret, err := t.KubeClient.CoreV1().Secrets(agentNamespace).Get(context.TODO(),
+	bsSecret, err := t.HubKubeClient.CoreV1().Secrets(agentNamespace).Get(context.TODO(),
 		t.bootstrapHubSecret.Name, metav1.GetOptions{})
 	if err != nil {
 		klog.Errorf("failed to get bootstrap secret %v in ns %v. %v", bsSecret, agentNamespace, err)
@@ -804,7 +842,7 @@ func (t *Tester) CreateFakeExternalKubeconfigSecret(klusterlet *operatorapiv1.Kl
 	secret.Name = helpers.ExternalManagedKubeConfig
 	secret.ResourceVersion = ""
 
-	_, err = t.KubeClient.CoreV1().Secrets(agentNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	_, err = t.HubKubeClient.CoreV1().Secrets(agentNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	if err != nil {
 		klog.Errorf("failed to create external managed secret %v in ns %v. %v", bsSecret, agentNamespace, err)
 		return err
