@@ -2,6 +2,11 @@ name: Post
 
 on:
   push:
+    paths-ignore:
+      - 'solutions/**'
+      - 'assets/**'
+      - 'troubleshooting/**'
+      - ".github/ISSUE_TEMPLATE/*"
     branches:
       - main
   workflow_dispatch: {}
