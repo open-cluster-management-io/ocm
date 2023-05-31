@@ -5,7 +5,6 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/kubernetes"
@@ -19,7 +18,6 @@ import (
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
 
-	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addonconfig"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/managementaddonconfig"
 	"open-cluster-management.io/addon-framework/pkg/index"
@@ -31,11 +29,6 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/managementaddoninstallprogression"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 )
-
-var builtInConfigGVRs = map[schema.GroupVersionResource]bool{
-	addonfactory.AddOnDeploymentConfigGVR: true,
-	addontemplate.AddOnTemplateGVR:        true,
-}
 
 func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 	hubKubeClient, err := kubernetes.NewForConfig(kubeConfig)
@@ -100,15 +93,16 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 	addonConfigController := addonconfig.NewAddonConfigController(
 		addonClient,
 		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
+		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
 		dynamicInformers,
-		builtInConfigGVRs,
+		utils.BuiltInAddOnConfigGVRs,
 		utils.ManagedByAddonManager,
 	)
 	managementAddonConfigController := managementaddonconfig.NewManagementAddonConfigController(
 		addonClient,
 		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
 		dynamicInformers,
-		builtInConfigGVRs,
+		utils.BuiltInAddOnConfigGVRs,
 		utils.ManagedByAddonManager,
 	)
 
@@ -166,7 +160,9 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 	go addonOwnerController.Run(ctx, 2)
 	go addonProgressingController.Run(ctx, 2)
 	go mgmtAddonInstallProgressionController.Run(ctx, 2)
-	go addonTemplateController.Run(ctx, 2)
+	// There should be only one instance of addonTemplateController running, since the addonTemplateController will
+	// start a goroutine for each addonTemplate it watches.
+	go addonTemplateController.Run(ctx, 1)
 
 	go clusterInformerFactory.Start(ctx.Done())
 	go addonInformerFactory.Start(ctx.Done())

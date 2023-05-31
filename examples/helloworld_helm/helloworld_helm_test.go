@@ -10,12 +10,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2"
-	"open-cluster-management.io/addon-framework/pkg/addonfactory"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
-	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	"open-cluster-management.io/addon-framework/pkg/addonfactory"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
+	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 const (
@@ -162,7 +164,7 @@ func TestManifestAddonAgent(t *testing.T) {
 		fakeAddonClient := fakeaddon.NewSimpleClientset(c.addOnDeploymentConfigs...)
 
 		agentAddon, err := addonfactory.NewAgentAddonFactory(AddonName, FS, "manifests/charts/helloworld").
-			WithConfigGVRs(addonfactory.AddOnDeploymentConfigGVR).
+			WithConfigGVRs(utils.AddOnDeploymentConfigGVR).
 			WithGetValuesFuncs(
 				GetDefaultValues,
 				addonfactory.GetAddOnDeploymentConfigValues(

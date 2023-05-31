@@ -181,16 +181,21 @@ func (a *addonManager) Start(ctx context.Context) error {
 		addonConfigController = addonconfig.NewAddonConfigController(
 			addonClient,
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+			addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 			dynamicInformers,
-			a.addonConfigs,
-			utils.ManagedBySelf(a.addonAgents),
+			utils.FilterOutTheBuiltInAddOnConfigGVRs(a.addonConfigs),
+			// even though the MCA has the managed-by-addon-manager label, we still need to handle the GVRs that
+			// is not supported by the addon-manager(not the built-in addonConfig GVRs)
+			utils.FilterByAddonName(a.addonAgents),
 		)
 		managementAddonConfigController = managementaddonconfig.NewManagementAddonConfigController(
 			addonClient,
 			addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 			dynamicInformers,
-			a.addonConfigs,
-			utils.ManagedBySelf(a.addonAgents),
+			utils.FilterOutTheBuiltInAddOnConfigGVRs(a.addonConfigs),
+			// even though the MCA has the managed-by-addon-manager label, we still need to handle the GVRs that
+			// is not supported by the addon-manager(not the built-in addonConfig GVRs)
+			utils.FilterByAddonName(a.addonAgents),
 		)
 
 		// start addonConfiguration controller, note this is to handle the case when the general addon-manager

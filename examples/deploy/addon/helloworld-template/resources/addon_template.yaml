@@ -12,6 +12,8 @@ spec:
             metadata:
               name: hello-template-agent
               namespace: open-cluster-management-agent-addon
+              annotations:
+                "addon.open-cluster-management.io/deletion-orphan": ""
               labels:
                 app: hello-template-agent
             spec:
@@ -30,7 +32,7 @@ spec:
                       image: quay.io/open-cluster-management/addon-examples
                       imagePullPolicy: IfNotPresent
                       args:
-                        - "/helloworld"
+                        - "/helloworld_helm"
                         - "agent"
                         - "--cluster-name={{CLUSTER_NAME}}"
                         - "--addon-namespace=open-cluster-management-agent-addon"
@@ -54,6 +56,33 @@ spec:
               - kind: ServiceAccount
                 name: hello-template-agent-sa
                 namespace: open-cluster-management-agent-addon
+          - kind: Job
+            apiVersion: batch/v1
+            metadata:
+              name: hello-template-cleanup-configmap
+              namespace: open-cluster-management-agent-addon
+              annotations:
+                "addon.open-cluster-management.io/addon-pre-delete": ""
+            spec:
+              manualSelector: true
+              selector:
+                matchLabels:
+                  job: hello-template-cleanup-configmap
+              template:
+                metadata:
+                  labels:
+                    job: hello-template-cleanup-configmap
+                spec:
+                  serviceAccountName: hello-template-agent-sa
+                  restartPolicy: Never
+                  containers:
+                  - name: hello-template-agent
+                    image: quay.io/open-cluster-management/addon-examples
+                    imagePullPolicy: IfNotPresent
+                    args:
+                      - "/helloworld_helm"
+                      - "cleanup"
+                      - "--addon-namespace=open-cluster-management-agent-addon"
   registration:
     # kubeClient or custom signer, if kubeClient, user and group is in a certain format.
     # user is "system:open-cluster-management:cluster:{clusterName}:addon:{addonName}:agent:{agentName}"

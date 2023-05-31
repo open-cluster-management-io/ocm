@@ -2,7 +2,6 @@ package managementaddonconfig
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 
@@ -27,6 +26,7 @@ import (
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 const (
@@ -44,6 +44,7 @@ type clusterManagementAddonConfigController struct {
 	configListers                 map[schema.GroupResource]dynamiclister.Lister
 	queue                         workqueue.RateLimitingInterface
 	addonFilterFunc               factory.EventFilterFunc
+	configGVRs                    map[schema.GroupVersionResource]bool
 }
 
 func NewManagementAddonConfigController(
@@ -62,6 +63,7 @@ func NewManagementAddonConfigController(
 		configListers:                 map[schema.GroupResource]dynamiclister.Lister{},
 		queue:                         syncCtx.Queue(),
 		addonFilterFunc:               addonFilterFunc,
+		configGVRs:                    configGVRs,
 	}
 
 	configInformers := c.buildConfigInformers(configInformerFactory, configGVRs)
@@ -85,7 +87,8 @@ func (c *clusterManagementAddonConfigController) buildConfigInformers(
 	configGVRs map[schema.GroupVersionResource]bool,
 ) []factory.Informer {
 	configInformers := []factory.Informer{}
-	for gvr := range configGVRs {
+	for gvrRaw := range configGVRs {
+		gvr := gvrRaw // copy the value since it will be used in the closure
 		indexInformer := configInformerFactory.ForResource(gvr).Informer()
 		_, err := indexInformer.AddEventHandler(
 			cache.ResourceEventHandlerFuncs{
@@ -190,6 +193,13 @@ func (c *clusterManagementAddonConfigController) sync(ctx context.Context, syncC
 func (c *clusterManagementAddonConfigController) updateConfigSpecHash(cma *addonapiv1alpha1.ClusterManagementAddOn) error {
 
 	for i, defaultConfigReference := range cma.Status.DefaultConfigReferences {
+		if !utils.ContainGR(
+			c.configGVRs,
+			defaultConfigReference.ConfigGroupResource.Group,
+			defaultConfigReference.ConfigGroupResource.Resource) {
+			continue
+		}
+
 		if defaultConfigReference.DesiredConfig == nil || defaultConfigReference.DesiredConfig.Name == "" {
 			continue
 		}
@@ -204,6 +214,13 @@ func (c *clusterManagementAddonConfigController) updateConfigSpecHash(cma *addon
 	for i, installProgression := range cma.Status.InstallProgressions {
 		for j, configReference := range installProgression.ConfigReferences {
 			if configReference.DesiredConfig == nil || configReference.DesiredConfig.Name == "" {
+				continue
+			}
+
+			if !utils.ContainGR(
+				c.configGVRs,
+				configReference.ConfigGroupResource.Group,
+				configReference.ConfigGroupResource.Resource) {
 				continue
 			}
 
@@ -286,7 +303,7 @@ func (c *clusterManagementAddonConfigController) getConfigSpecHash(gr addonapiv1
 		return "", err
 	}
 
-	return GetSpecHash(config)
+	return utils.GetSpecHash(config)
 }
 
 func getIndex(configGroupResource addonapiv1alpha1.ConfigGroupResource, configSpecHash addonapiv1alpha1.ConfigSpecHash) string {
@@ -295,22 +312,4 @@ func getIndex(configGroupResource addonapiv1alpha1.ConfigGroupResource, configSp
 	}
 
 	return fmt.Sprintf("%s/%s/%s", configGroupResource.Group, configGroupResource.Resource, configSpecHash.Name)
-}
-
-// GetSpecHash returns the sha256 hash of the spec field of the given object
-// TODO: move this to a common place
-func GetSpecHash(obj *unstructured.Unstructured) (string, error) {
-	spec, ok := obj.Object["spec"]
-	if !ok {
-		return "", fmt.Errorf("object has no spec field")
-	}
-
-	specBytes, err := json.Marshal(spec)
-	if err != nil {
-		return "", err
-	}
-
-	hash := sha256.Sum256(specBytes)
-
-	return fmt.Sprintf("%x", hash), nil
 }

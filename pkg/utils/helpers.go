@@ -327,6 +327,14 @@ func ManagedBySelf(agentAddons map[string]agent.AgentAddon) factory.EventFilterF
 	}
 }
 
+func FilterByAddonName(agentAddons map[string]agent.AgentAddon) factory.EventFilterFunc {
+	return func(obj interface{}) bool {
+		accessor, _ := meta.Accessor(obj)
+		_, ok := agentAddons[accessor.GetName()]
+		return ok
+	}
+}
+
 func IsOwnedByCMA(addon *addonapiv1alpha1.ManagedClusterAddOn) bool {
 	for _, owner := range addon.OwnerReferences {
 		if owner.Kind != "ClusterManagementAddOn" {

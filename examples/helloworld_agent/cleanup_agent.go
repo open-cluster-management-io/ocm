@@ -27,13 +27,12 @@ func NewCleanupAgentCommand(addonName string) *cobra.Command {
 
 // CleanupAgentOptions defines the flags for workload agent
 type CleanupAgentOptions struct {
-	AddonName             string
 	AddonNamespace        string
 	ManagedKubeconfigFile string
 }
 
 func NewCleanupAgentOptions(addonName string) *CleanupAgentOptions {
-	return &CleanupAgentOptions{AddonName: addonName}
+	return &CleanupAgentOptions{}
 }
 
 func (o *CleanupAgentOptions) AddFlags(cmd *cobra.Command) {

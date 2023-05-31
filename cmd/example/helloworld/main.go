@@ -23,6 +23,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	addonagent "open-cluster-management.io/addon-framework/pkg/agent"
 	cmdfactory "open-cluster-management.io/addon-framework/pkg/cmd/factory"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	"open-cluster-management.io/addon-framework/pkg/version"
 )
 
@@ -93,7 +94,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 	)
 
 	agentAddon, err := addonfactory.NewAgentAddonFactory(helloworld.AddonName, helloworld.FS, "manifests/templates").
-		WithConfigGVRs(addonfactory.AddOnDeploymentConfigGVR).
+		WithConfigGVRs(utils.AddOnDeploymentConfigGVR).
 		WithGetValuesFuncs(
 			helloworld.GetDefaultValues,
 			addonfactory.GetAddOnDeploymentConfigValues(

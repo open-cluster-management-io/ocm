@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	updradedeploymentJson = `{
+	upgradeDeploymentJson = `{
 		"apiVersion": "apps/v1",
 		"kind": "Deployment",
 		"metadata": {
@@ -144,7 +144,7 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 		// prepare manifestwork obj
 		for i := 0; i < 4; i++ {
 			obj := &unstructured.Unstructured{}
-			err := obj.UnmarshalJSON([]byte(updradedeploymentJson))
+			err := obj.UnmarshalJSON([]byte(upgradeDeploymentJson))
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			testAddOnConfigsImpl.manifests[clusterNames[i]] = []runtime.Object{obj}
 		}

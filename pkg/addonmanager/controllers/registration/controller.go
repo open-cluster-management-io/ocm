@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"open-cluster-management.io/addon-framework/pkg/utils"
-
 	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -25,6 +23,7 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 // addonRegistrationController reconciles instances of ManagedClusterAddon on the hub.
@@ -124,7 +123,7 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 	}
 
 	if registrationOption.PermissionConfig != nil {
-		err = registrationOption.PermissionConfig(managedCluster, managedClusterAddon)
+		err = registrationOption.PermissionConfig(managedCluster, managedClusterAddonCopy)
 		if err != nil {
 			meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
 				Type:    addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied,

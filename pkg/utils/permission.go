@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	rbacclientv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -357,7 +358,7 @@ func ApplyRoleBinding(ctx context.Context, client rbacclientv1.RoleBindingsGette
 // TemplateAddonHubPermission returns a func that can grant permission for addon agent
 // that is deployed by addon template.
 // the returned func will create a rolebinding to bind the clusterRole/role which is
-// specified by the user, so the is required to make sure the existence of the
+// specified by the user, so the user is required to make sure the existence of the
 // clusterRole/role
 func TemplateAddonHubPermission(hubKubeClient kubernetes.Interface,
 	kcrc *addonapiv1alpha1.KubeClientRegistrationConfig) agent.PermissionConfigFunc {
@@ -373,9 +374,13 @@ func TemplateAddonHubPermission(hubKubeClient kubernetes.Interface,
 		for _, pc := range kcrc.HubPermissions {
 			switch pc.Type {
 			case addonapiv1alpha1.HubPermissionsBindingCurrentCluster:
+				klog.V(5).Infof("Set hub permission for addon %s/%s, UID: %s, APIVersion: %s, Kind: %s",
+					addon.Namespace, addon.Name, addon.UID, addon.APIVersion, addon.Kind)
+
 				owner := metav1.OwnerReference{
-					APIVersion: addon.APIVersion,
-					Kind:       addon.Kind,
+					// TODO: use apiVersion and kind in addon object, but now they could be empty at some unknown reason
+					APIVersion: "addon.open-cluster-management.io/v1alpha1",
+					Kind:       "ManagedClusterAddOn",
 					Name:       addon.Name,
 					UID:        addon.UID,
 				}
@@ -410,6 +415,12 @@ func createPermissionBinding(hubKubeClient kubernetes.Interface,
 	clusterName, addonName, namespace string, roleRef rbacv1.RoleRef, owner metav1.OwnerReference) error {
 	// TODO: confirm the group
 	groups := agent.DefaultGroups(clusterName, addonName)
+	subject := []rbacv1.Subject{}
+	for _, group := range groups {
+		subject = append(subject, rbacv1.Subject{
+			Kind: "Group", APIGroup: "rbac.authorization.k8s.io", Name: group,
+		})
+	}
 	binding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("open-cluster-management:%s:%s:agent",
@@ -417,13 +428,12 @@ func createPermissionBinding(hubKubeClient kubernetes.Interface,
 			Namespace:       namespace,
 			OwnerReferences: []metav1.OwnerReference{owner},
 		},
-		RoleRef: roleRef,
-		Subjects: []rbacv1.Subject{
-			{Kind: "Group", APIGroup: "rbac.authorization.k8s.io", Name: groups[0]},
-		},
+		RoleRef:  roleRef,
+		Subjects: subject,
 	}
 
 	// TODO: check the existence of the role, cluster role
+
 	_, err := hubKubeClient.RbacV1().RoleBindings(namespace).Get(context.TODO(), binding.Name, metav1.GetOptions{})
 	switch {
 	case apierrors.IsNotFound(err):

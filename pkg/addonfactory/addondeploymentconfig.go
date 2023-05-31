@@ -7,17 +7,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-)
 
-var AddOnDeploymentConfigGVR = schema.GroupVersionResource{
-	Group:    "addon.open-cluster-management.io",
-	Version:  "v1alpha1",
-	Resource: "addondeploymentconfigs",
-}
+	"open-cluster-management.io/addon-framework/pkg/utils"
+)
 
 // AddOnDeloymentConfigToValuesFunc transform the AddOnDeploymentConfig object into Values object
 // The transformation logic depends on the definition of the addon template
@@ -55,8 +50,8 @@ func GetAddOnDeloymentConfigValues(
 	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
 		var lastValues = Values{}
 		for _, config := range addon.Status.ConfigReferences {
-			if config.ConfigGroupResource.Group != AddOnDeploymentConfigGVR.Group ||
-				config.ConfigGroupResource.Resource != AddOnDeploymentConfigGVR.Resource {
+			if config.ConfigGroupResource.Group != utils.AddOnDeploymentConfigGVR.Group ||
+				config.ConfigGroupResource.Resource != utils.AddOnDeploymentConfigGVR.Resource {
 				continue
 			}
 
@@ -180,8 +175,8 @@ func GetAddOnDeploymentConfigValues(
 	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
 		var lastValues = Values{}
 		for _, config := range addon.Status.ConfigReferences {
-			if config.ConfigGroupResource.Group != AddOnDeploymentConfigGVR.Group ||
-				config.ConfigGroupResource.Resource != AddOnDeploymentConfigGVR.Resource {
+			if config.ConfigGroupResource.Group != utils.AddOnDeploymentConfigGVR.Group ||
+				config.ConfigGroupResource.Resource != utils.AddOnDeploymentConfigGVR.Resource {
 				continue
 			}
 

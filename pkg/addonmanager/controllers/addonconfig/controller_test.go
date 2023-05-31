@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -363,6 +364,14 @@ func TestSync(t *testing.T) {
 				}
 			}
 
+			cmaStore := addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetStore()
+			if err := cmaStore.Add(&addonapiv1alpha1.ClusterManagementAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+			}); err != nil {
+				t.Fatal(err)
+			}
 			fakeDynamicClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
 			configInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(fakeDynamicClient, 0)
 			configInformer := configInformerFactory.ForResource(fakeGVR)
@@ -376,9 +385,12 @@ func TestSync(t *testing.T) {
 			syncContext := addontesting.NewFakeSyncContext(t)
 
 			ctrl := &addonConfigController{
-				addonClient:   fakeAddonClient,
-				addonLister:   addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				configListers: map[schema.GroupResource]dynamiclister.Lister{},
+				addonClient:                  fakeAddonClient,
+				addonLister:                  addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+				configListers:                map[schema.GroupResource]dynamiclister.Lister{},
+				addonFilterFunc:              func(obj interface{}) bool { return true },
+				configGVRs:                   map[schema.GroupVersionResource]bool{fakeGVR: true},
 			}
 
 			ctrl.buildConfigInformers(configInformerFactory, map[schema.GroupVersionResource]bool{fakeGVR: true})

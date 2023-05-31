@@ -9,7 +9,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -22,15 +21,9 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/managementaddonconfig"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 )
-
-var AddOnTemplateGVR = schema.GroupVersionResource{
-	Group:    "addon.open-cluster-management.io",
-	Version:  "v1alpha1",
-	Resource: "addontemplates",
-}
 
 // addonTemplateController monitors ManagedClusterAddOns on hub to get all the in-used addon templates,
 // and starts an addon manager for every addon template to handle agent requests deployed by this template
@@ -151,7 +144,7 @@ func hashTemplateSpec(template *addonapiv1alpha1.AddOnTemplate) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	specHash, err := managementaddonconfig.GetSpecHash(&unstructured.Unstructured{
+	specHash, err := utils.GetSpecHash(&unstructured.Unstructured{
 		Object: unstructuredTemplate,
 	})
 	if err != nil {
@@ -179,7 +172,7 @@ func (c *addonTemplateController) startManager(
 func (a *addonTemplateController) addonTemplateConfigRef(
 	configReferences []addonapiv1alpha1.ConfigReference) (bool, addonapiv1alpha1.ConfigReference) {
 	for _, config := range configReferences {
-		if config.Group == AddOnTemplateGVR.Group && config.Resource == AddOnTemplateGVR.Resource {
+		if config.Group == utils.AddOnTemplateGVR.Group && config.Resource == utils.AddOnTemplateGVR.Resource {
 			return true, config
 		}
 	}

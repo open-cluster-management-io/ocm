@@ -25,6 +25,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	cmdfactory "open-cluster-management.io/addon-framework/pkg/cmd/factory"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	"open-cluster-management.io/addon-framework/pkg/version"
 )
 
@@ -102,7 +103,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 	agentAddon, err := addonfactory.NewAgentAddonFactory(helloworld_helm.AddonName, helloworld_helm.FS, "manifests/charts/helloworld").
 		WithConfigGVRs(
 			schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
-			addonfactory.AddOnDeploymentConfigGVR,
+			utils.AddOnDeploymentConfigGVR,
 		).
 		WithGetValuesFuncs(
 			helloworld_helm.GetDefaultValues,
