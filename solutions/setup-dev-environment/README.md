@@ -23,3 +23,42 @@ NAME       HUB ACCEPTED   MANAGED CLUSTER URLS      JOINED   AVAILABLE   AGE
 cluster1   true           https://127.0.0.1:45325   True     True        116s
 cluster2   true           https://127.0.0.1:45325   True     True        98s
 ```
+
+<details>
+<summary>Known issue when running the setup script on a Linux environment</summary>
+
+You may run into this issue when trying to create multiple clusters
+```
+Creating cluster "cluster2" ...
+✓ Ensuring node image (kindest/node:v1.26.3) 🖼
+✗ Preparing nodes 📦  
+ERROR: failed to create cluster: could not find a log line that matches "Reached target .*Multi-User System.*|detected cgroup v1
+```
+This might be caused by kernel limits such as number of open files, inotifiy watches, etc.
+To solve this, try increasing your `max_user_instances` and `max_user_watches`:
+
+* To see the current limits
+    ```
+    $ cat /proc/sys/fs/inotify/max_user_watches
+    $ cat /proc/sys/fs/inotify/max_user_instances
+    ``` 
+* To temporarily increase the limits
+    ```
+    $ sudo sysctl fs.inotify.max_user_instances=8192
+    $ sudo sysctl fs.inotify.max_user_watches=524288
+    $ sudo sysctl -p
+    ``` 
+* To permanently increase the limits
+    ```
+    $ sudo echo "fs.inotify.max_user_watches=1024" >> /etc/sysctl.conf
+    $ sudo echo "fs.inotify.max_user_instances=1024" >> /etc/sysctl.conf
+    $ sudo sysctl -p /etc/sysctl.conf #reloads system settings to apply changes
+    ``` 
+Once you've increased the limits, delete the clusters already created and try again:
+```
+$ kind delete clusters hub cluster1 cluster2
+$ ./setup-ocm.sh
+```
+
+
+</details> 
