@@ -3,6 +3,11 @@ name: Pre
 on:
   workflow_dispatch: {}
   pull_request:
+    paths-ignore:
+      - 'solutions/**'
+      - 'assets/**'
+      - 'troubleshooting/**'
+      - ".github/ISSUE_TEMPLATE/*"
     branches:
       - main
       - release-*
