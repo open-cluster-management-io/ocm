@@ -21,36 +21,10 @@ GO_TEST_PACKAGES :=./pkg/...
 IMAGE_REGISTRY?=quay.io/open-cluster-management
 IMAGE_TAG?=latest
 
-REGISTRATION_PATH=staging/src/open-cluster-management.io/registration
-WORK_PATH=staging/src/open-cluster-management.io/work
-PLACEMENT_PATH=staging/src/open-cluster-management.io/placement
-REGISTRATION_OPERATOR_PATH=staging/src/open-cluster-management.io/registration-operator
-
-image-registration:
-	docker build \
-		-f build/Dockerfile.registration \
-		-t $(IMAGE_REGISTRY)/registration:$(IMAGE_TAG) .
-
-image-work:
-	docker build \
-		-f build/Dockerfile.work \
-		-t $(IMAGE_REGISTRY)/work:$(IMAGE_TAG) .
-
-image-placement:
-	docker build \
-		-f build/Dockerfile.placement \
-		-t $(IMAGE_REGISTRY)/placement:$(IMAGE_TAG) .
-
-image-registration-operator:
-	docker build \
-		-f build/Dockerfile.registration-operator \
-		-t $(IMAGE_REGISTRY)/registration-operator:$(IMAGE_TAG) .
-
-images:
-	make image-registration
-	make image-work
-	make image-placement
-	make image-registration-operator
+$(call build-image,registration,$(IMAGE_REGISTRY)/registration:$(IMAGE_TAG),./build/Dockerfile.registration,.)
+$(call build-image,work,$(IMAGE_REGISTRY)/work:$(IMAGE_TAG),./build/Dockerfile.work,.)
+$(call build-image,placement,$(IMAGE_REGISTRY)/placement:$(IMAGE_TAG),./build/Dockerfile.placement,.)
+$(call build-image,registration-operator,$(IMAGE_REGISTRY)/registration-operator:$(IMAGE_TAG),./build/Dockerfile.registration-operator,.)
 
 copy-crd:
 	bash -x hack/copy-crds.sh
