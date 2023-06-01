@@ -3,7 +3,6 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -39,35 +38,7 @@ var _ = Describe("Enable addon management feature gate", func() {
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
 
 		// the addon manager deployment should be running
-		Eventually(func() error {
-			addonManagerControllerDeployment, err := t.HubKubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
-				Get(context.TODO(), t.addonManagerDeployment, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			replicas := *addonManagerControllerDeployment.Spec.Replicas
-			readyReplicas := addonManagerControllerDeployment.Status.ReadyReplicas
-			if readyReplicas != replicas {
-				return fmt.Errorf("deployment %s should have %d but got %d ready replicas", t.addonManagerDeployment, replicas, readyReplicas)
-			}
-			return nil
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(BeNil())
-
-		// feature gate status should be valid
-		Eventually(func() error {
-			clusterManager, err := t.OperatorClient.OperatorV1().ClusterManagers().Get(context.TODO(), "cluster-manager", metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-
-			if meta.IsStatusConditionFalse(clusterManager.Status.Conditions, "Applied") {
-				return fmt.Errorf("components of cluster manager are not all applied")
-			}
-			if meta.IsStatusConditionFalse(clusterManager.Status.Conditions, "ValidFeatureGates") {
-				return fmt.Errorf("feature gates are not all valid")
-			}
-			return nil
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(BeNil())
+		Eventually(t.CheckHubReady, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
 	})
 	AfterEach(func() {
 		By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))

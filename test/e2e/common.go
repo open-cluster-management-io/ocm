@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"k8s.io/client-go/dynamic"
+	ocmfeature "open-cluster-management.io/api/feature"
 	"open-cluster-management.io/ocm/test/integration/util"
 	"os"
 	"strings"
@@ -33,42 +34,32 @@ import (
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/ocm/pkg/registration-operator/helpers"
 )
 
 type Tester struct {
-	hubKubeConfigPath                string
-	spokeKubeConfigPath              string
-	HubKubeClient                    kubernetes.Interface
-	SpokeKubeClient                  kubernetes.Interface
-	HubAPIExtensionClient            apiextensionsclient.Interface
-	HubClusterCfg                    *rest.Config
-	SpokeClusterCfg                  *rest.Config
-	OperatorClient                   operatorclient.Interface
-	ClusterClient                    clusterclient.Interface
-	HubWorkClient                    workv1client.Interface
-	SpokeWorkClient                  workv1client.Interface
-	AddOnClinet                      addonclient.Interface
-	SpokeDynamicClient               dynamic.Interface
-	bootstrapHubSecret               *corev1.Secret
-	EventuallyTimeout                time.Duration
-	EventuallyInterval               time.Duration
-	clusterManagerName               string
-	clusterManagerNamespace          string
-	klusterletDefaultNamespace       string
-	hubRegistrationDeployment        string
-	hubRegistrationWebhookDeployment string
-	hubWorkWebhookDeployment         string
-	hubWorkControllerDeployment      string
-	hubPlacementDeployment           string
-	addonManagerDeployment           string
-	operatorNamespace                string
-	klusterletOperator               string
-	hubWorkControllerEnabled         bool
-	addonManagerControllerEnabled    bool
+	hubKubeConfigPath       string
+	spokeKubeConfigPath     string
+	HubKubeClient           kubernetes.Interface
+	SpokeKubeClient         kubernetes.Interface
+	HubAPIExtensionClient   apiextensionsclient.Interface
+	HubClusterCfg           *rest.Config
+	SpokeClusterCfg         *rest.Config
+	OperatorClient          operatorclient.Interface
+	ClusterClient           clusterclient.Interface
+	HubWorkClient           workv1client.Interface
+	SpokeWorkClient         workv1client.Interface
+	AddOnClinet             addonclient.Interface
+	SpokeDynamicClient      dynamic.Interface
+	bootstrapHubSecret      *corev1.Secret
+	EventuallyTimeout       time.Duration
+	EventuallyInterval      time.Duration
+	clusterManagerName      string
+	clusterManagerNamespace string
+	operatorNamespace       string
+	klusterletOperator      string
 }
 
 // kubeconfigPath is the path of kubeconfig file, will be get from env "KUBECONFIG" by default.
@@ -76,23 +67,14 @@ type Tester struct {
 // Default of bootstrapHubSecret is helpers.KlusterletDefaultNamespace/helpers.BootstrapHubKubeConfig.
 func NewTester(hubKubeConfigPath, spokeKubeConfigPath string, timeout time.Duration) *Tester {
 	var tester = Tester{
-		hubKubeConfigPath:                hubKubeConfigPath,
-		spokeKubeConfigPath:              spokeKubeConfigPath,
-		EventuallyTimeout:                timeout,           // seconds
-		EventuallyInterval:               1 * time.Second,   // seconds
-		clusterManagerName:               "cluster-manager", // same name as deploy/cluster-manager/config/samples
-		clusterManagerNamespace:          helpers.ClusterManagerDefaultNamespace,
-		klusterletDefaultNamespace:       helpers.KlusterletDefaultNamespace,
-		hubRegistrationDeployment:        "cluster-manager-registration-controller",
-		hubRegistrationWebhookDeployment: "cluster-manager-registration-webhook",
-		hubWorkWebhookDeployment:         "cluster-manager-work-webhook",
-		hubWorkControllerDeployment:      "cluster-manager-work-controller",
-		hubPlacementDeployment:           "cluster-manager-placement-controller",
-		addonManagerDeployment:           "cluster-manager-addon-manager-controller",
-		operatorNamespace:                "open-cluster-management",
-		klusterletOperator:               "klusterlet",
-		hubWorkControllerEnabled:         false,
-		addonManagerControllerEnabled:    false,
+		hubKubeConfigPath:       hubKubeConfigPath,
+		spokeKubeConfigPath:     spokeKubeConfigPath,
+		EventuallyTimeout:       timeout,           // seconds
+		EventuallyInterval:      1 * time.Second,   // seconds
+		clusterManagerName:      "cluster-manager", // same name as deploy/cluster-manager/config/samples
+		clusterManagerNamespace: helpers.ClusterManagerDefaultNamespace,
+		operatorNamespace:       "open-cluster-management",
+		klusterletOperator:      "klusterlet",
 	}
 
 	return &tester
@@ -201,7 +183,7 @@ func (t *Tester) CreateKlusterlet(name, clusterName, klusterletNamespace string,
 		return nil, fmt.Errorf("the name should not be null")
 	}
 	if klusterletNamespace == "" {
-		klusterletNamespace = t.klusterletDefaultNamespace
+		klusterletNamespace = helpers.KlusterletDefaultNamespace
 	}
 
 	var klusterlet = &operatorapiv1.Klusterlet{
@@ -492,6 +474,23 @@ func (t *Tester) checkKlusterletStatus(klusterletName, condType, reason string, 
 	return nil
 }
 
+func (t *Tester) cleanManifestWorks(clusterName, workName string) error {
+	err := t.HubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(context.Background(), workName, metav1.DeleteOptions{})
+	if errors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	gomega.Eventually(func() bool {
+		_, err := t.HubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
+		return errors.IsNotFound(err)
+	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeTrue())
+
+	return nil
+}
+
 func (t *Tester) cleanKlusterletResources(klusterletName, clusterName string) error {
 	if klusterletName == "" {
 		return fmt.Errorf("the klusterlet name should not be null")
@@ -543,6 +542,10 @@ func (t *Tester) cleanKlusterletResources(klusterletName, clusterName string) er
 }
 
 func (t *Tester) CheckHubReady() error {
+	cm, err := t.checkClusterManagerStatus()
+	if err != nil {
+		return err
+	}
 	// make sure open-cluster-management-hub namespace is created
 	if _, err := t.HubKubeClient.CoreV1().Namespaces().
 		Get(context.TODO(), t.clusterManagerNamespace, metav1.GetOptions{}); err != nil {
@@ -550,70 +553,85 @@ func (t *Tester) CheckHubReady() error {
 	}
 
 	// make sure hub deployments are created
+	hubRegistrationDeployment := fmt.Sprintf("%s-registration-controller", t.clusterManagerName)
+	hubRegistrationWebhookDeployment := fmt.Sprintf("%s-registration-webhook", t.clusterManagerName)
+	hubWorkWebhookDeployment := fmt.Sprintf("%s-work-webhook", t.clusterManagerName)
+	hubWorkControllerDeployment := fmt.Sprintf("%s-work-controller", t.clusterManagerName)
+	hubPlacementDeployment := fmt.Sprintf("%s-placement-controller", t.clusterManagerName)
+	addonManagerDeployment := fmt.Sprintf("%s-addon-manager-controller", t.clusterManagerName)
 	if _, err := t.HubKubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
-		Get(context.TODO(), t.hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
+		Get(context.TODO(), hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
 		return err
 	}
 	gomega.Eventually(func() error {
 		registrationWebhookDeployment, err := t.HubKubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
-			Get(context.TODO(), t.hubRegistrationWebhookDeployment, metav1.GetOptions{})
+			Get(context.TODO(), hubRegistrationWebhookDeployment, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		replicas := *registrationWebhookDeployment.Spec.Replicas
 		readyReplicas := registrationWebhookDeployment.Status.ReadyReplicas
 		if readyReplicas != replicas {
-			return fmt.Errorf("deployment %s should have %d but got %d ready replicas", t.hubRegistrationWebhookDeployment, replicas, readyReplicas)
+			return fmt.Errorf("deployment %s should have %d but got %d ready replicas", hubRegistrationWebhookDeployment, replicas, readyReplicas)
 		}
 		return nil
 	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeNil())
 
 	gomega.Eventually(func() error {
 		workWebhookDeployment, err := t.HubKubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
-			Get(context.TODO(), t.hubWorkWebhookDeployment, metav1.GetOptions{})
+			Get(context.TODO(), hubWorkWebhookDeployment, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		replicas := *workWebhookDeployment.Spec.Replicas
 		readyReplicas := workWebhookDeployment.Status.ReadyReplicas
 		if readyReplicas != replicas {
-			return fmt.Errorf("deployment %s should have %d but got %d ready replicas", t.hubWorkWebhookDeployment, replicas, readyReplicas)
+			return fmt.Errorf("deployment %s should have %d but got %d ready replicas", hubWorkWebhookDeployment, replicas, readyReplicas)
 		}
 		return nil
 	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeNil())
 
-	if t.hubWorkControllerEnabled {
+	var hubWorkControllerEnabled, addonManagerControllerEnabled bool
+	if cm.Spec.WorkConfiguration != nil {
+		hubWorkControllerEnabled = helpers.FeatureGateEnabled(cm.Spec.WorkConfiguration.FeatureGates, ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.ManifestWorkReplicaSet)
+	}
+
+	if cm.Spec.AddOnManagerConfiguration != nil {
+		addonManagerControllerEnabled = helpers.FeatureGateEnabled(cm.Spec.AddOnManagerConfiguration.FeatureGates, ocmfeature.DefaultHubAddonManagerFeatureGates, ocmfeature.AddonManagement)
+	}
+
+	if hubWorkControllerEnabled {
 		gomega.Eventually(func() error {
 			workHubControllerDeployment, err := t.HubKubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
-				Get(context.TODO(), t.hubWorkControllerDeployment, metav1.GetOptions{})
+				Get(context.TODO(), hubWorkControllerDeployment, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			replicas := *workHubControllerDeployment.Spec.Replicas
 			readyReplicas := workHubControllerDeployment.Status.ReadyReplicas
 			if readyReplicas != replicas {
-				return fmt.Errorf("deployment %s should have %d but got %d ready replicas", t.hubWorkControllerDeployment, replicas, readyReplicas)
+				return fmt.Errorf("deployment %s should have %d but got %d ready replicas", hubWorkControllerDeployment, replicas, readyReplicas)
 			}
 			return nil
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeNil())
 	}
 
 	if _, err := t.HubKubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
-		Get(context.TODO(), t.hubPlacementDeployment, metav1.GetOptions{}); err != nil {
+		Get(context.TODO(), hubPlacementDeployment, metav1.GetOptions{}); err != nil {
 		return err
 	}
 
-	if t.addonManagerControllerEnabled {
+	if addonManagerControllerEnabled {
 		gomega.Eventually(func() error {
 			addonManagerControllerDeployment, err := t.HubKubeClient.AppsV1().Deployments(t.clusterManagerNamespace).
-				Get(context.TODO(), t.addonManagerDeployment, metav1.GetOptions{})
+				Get(context.TODO(), addonManagerDeployment, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			replicas := *addonManagerControllerDeployment.Spec.Replicas
 			readyReplicas := addonManagerControllerDeployment.Status.ReadyReplicas
 			if readyReplicas != replicas {
-				return fmt.Errorf("deployment %s should have %d but got %d ready replicas", t.addonManagerDeployment, replicas, readyReplicas)
+				return fmt.Errorf("deployment %s should have %d but got %d ready replicas", addonManagerDeployment, replicas, readyReplicas)
 			}
 			return nil
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeNil())
@@ -621,36 +639,78 @@ func (t *Tester) CheckHubReady() error {
 	return nil
 }
 
-func (t *Tester) CheckClusterManagerStatus() error {
-
+func (t *Tester) EnableWorkFeature(feature string) error {
 	cm, err := t.OperatorClient.OperatorV1().ClusterManagers().Get(context.TODO(), t.clusterManagerName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
+
+	if cm.Spec.WorkConfiguration == nil {
+		cm.Spec.WorkConfiguration = &operatorapiv1.WorkConfiguration{}
+	}
+
+	if len(cm.Spec.WorkConfiguration.FeatureGates) == 0 {
+		cm.Spec.WorkConfiguration.FeatureGates = make([]operatorapiv1.FeatureGate, 0)
+	}
+
+	for idx, f := range cm.Spec.WorkConfiguration.FeatureGates {
+		if f.Feature == feature {
+			if f.Mode == operatorapiv1.FeatureGateModeTypeEnable {
+				return nil
+			}
+			cm.Spec.WorkConfiguration.FeatureGates[idx].Mode = operatorapiv1.FeatureGateModeTypeEnable
+			_, err = t.OperatorClient.OperatorV1().ClusterManagers().Update(context.TODO(), cm, metav1.UpdateOptions{})
+			return err
+		}
+	}
+
+	featureGate := operatorapiv1.FeatureGate{
+		Feature: feature,
+		Mode:    operatorapiv1.FeatureGateModeTypeEnable,
+	}
+
+	cm.Spec.WorkConfiguration.FeatureGates = append(cm.Spec.WorkConfiguration.FeatureGates, featureGate)
+	_, err = t.OperatorClient.OperatorV1().ClusterManagers().Update(context.TODO(), cm, metav1.UpdateOptions{})
+	return err
+}
+
+func (t *Tester) RemoveWorkFeature(feature string) error {
+	clusterManager, err := t.OperatorClient.OperatorV1().ClusterManagers().Get(context.TODO(), t.clusterManagerName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	for indx, fg := range clusterManager.Spec.WorkConfiguration.FeatureGates {
+		if fg.Feature == feature {
+			clusterManager.Spec.WorkConfiguration.FeatureGates[indx].Mode = operatorapiv1.FeatureGateModeTypeDisable
+			break
+		}
+	}
+	_, err = t.OperatorClient.OperatorV1().ClusterManagers().Update(context.TODO(), clusterManager, metav1.UpdateOptions{})
+	return err
+}
+
+func (t *Tester) checkClusterManagerStatus() (*operatorapiv1.ClusterManager, error) {
+	cm, err := t.OperatorClient.OperatorV1().ClusterManagers().Get(context.TODO(), t.clusterManagerName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
 	if meta.IsStatusConditionFalse(cm.Status.Conditions, "Applied") {
-		return fmt.Errorf("components of cluster manager are not all applied")
+		return nil, fmt.Errorf("components of cluster manager are not all applied")
 	}
 	if meta.IsStatusConditionFalse(cm.Status.Conditions, "ValidFeatureGates") {
-		return fmt.Errorf("feature gates are not all valid")
+		return nil, fmt.Errorf("feature gates are not all valid")
 	}
 	if !meta.IsStatusConditionFalse(cm.Status.Conditions, "HubRegistrationDegraded") {
-		return fmt.Errorf("HubRegistration is degraded")
+		return nil, fmt.Errorf("HubRegistration is degraded")
 	}
 	if !meta.IsStatusConditionFalse(cm.Status.Conditions, "HubPlacementDegraded") {
-		return fmt.Errorf("HubPlacement is degraded")
+		return nil, fmt.Errorf("HubPlacement is degraded")
 	}
 	if !meta.IsStatusConditionFalse(cm.Status.Conditions, "Progressing") {
-		return fmt.Errorf("ClusterManager is still progressing")
-	}
-	if cm.Spec.WorkConfiguration != nil {
-		t.hubWorkControllerEnabled = helpers.FeatureGateEnabled(cm.Spec.WorkConfiguration.FeatureGates, ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.ManifestWorkReplicaSet)
+		return nil, fmt.Errorf("ClusterManager is still progressing")
 	}
 
-	if cm.Spec.AddOnManagerConfiguration != nil {
-		t.addonManagerControllerEnabled = helpers.FeatureGateEnabled(cm.Spec.AddOnManagerConfiguration.FeatureGates, ocmfeature.DefaultHubAddonManagerFeatureGates, ocmfeature.AddonManagement)
-	}
-
-	return nil
+	return cm, nil
 }
 
 func (t *Tester) CheckKlusterletOperatorReady() error {

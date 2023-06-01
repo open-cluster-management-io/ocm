@@ -49,12 +49,16 @@ var _ = BeforeSuite(func() {
 
 	Expect(t.Init()).ToNot(HaveOccurred())
 
-	Eventually(t.CheckClusterManagerStatus, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
-
 	Eventually(t.CheckHubReady, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
 
 	Eventually(t.CheckKlusterletOperatorReady, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
 
 	err = t.SetBootstrapHubSecret("")
+
+	if nilExecutorValidating {
+		Eventually(func() error {
+			return t.EnableWorkFeature("NilExecutorValidating")
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+	}
 	Expect(err).ToNot(HaveOccurred())
 })

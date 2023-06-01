@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/ocm/test/integration/util"
 
 	"github.com/onsi/ginkgo/v2"
@@ -22,19 +23,27 @@ import (
 // and well configured as sanity check. Resource leftovers should be cleaned up on both hub and managed cluster.
 var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validating-webhook", "sanity-check"), func() {
 	var nameSuffix string
-	var workName, clusterName string
+	var workName, klusterletName, clusterName string
 
 	ginkgo.BeforeEach(func() {
 		nameSuffix = rand.String(5)
 		workName = fmt.Sprintf("w1-%s", nameSuffix)
-		clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
+
+		if deployKlusterlet {
+			klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
+			clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
+			agentNamespace := fmt.Sprintf("open-cluster-management-agent-%s", rand.String(6))
+			_, err := t.CreateApprovedKlusterlet(klusterletName, clusterName, agentNamespace, operatorapiv1.InstallModeDefault)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		}
 	})
 
 	ginkgo.AfterEach(func() {
-		// delete work
-		err := t.HubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(context.Background(), workName, metav1.DeleteOptions{})
-		if err != nil {
-			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+		ginkgo.By(fmt.Sprintf("delete manifestwork %v/%v", clusterName, workName))
+		gomega.Expect(t.cleanManifestWorks(clusterName, workName)).To(gomega.BeNil())
+		if deployKlusterlet {
+			ginkgo.By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
+			gomega.Expect(t.cleanKlusterletResources(klusterletName, clusterName)).To(gomega.BeNil())
 		}
 	})
 

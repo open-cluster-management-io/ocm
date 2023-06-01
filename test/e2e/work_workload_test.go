@@ -166,16 +166,8 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 	})
 
 	ginkgo.AfterEach(func() {
-		err = t.HubWorkClient.WorkV1().ManifestWorks(clusterName).Delete(context.Background(), workName, metav1.DeleteOptions{})
-		if err != nil {
-			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
-		}
-
-		gomega.Eventually(func() bool {
-			_, err := t.HubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(), workName, metav1.GetOptions{})
-			return errors.IsNotFound(err)
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeTrue())
-
+		ginkgo.By(fmt.Sprintf("delete manifestwork %v/%v", clusterName, workName))
+		gomega.Expect(t.cleanManifestWorks(clusterName, workName)).To(gomega.BeNil())
 		if deployKlusterlet {
 			ginkgo.By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
 			gomega.Expect(t.cleanKlusterletResources(klusterletName, clusterName)).To(gomega.BeNil())
