@@ -26,20 +26,20 @@ import (
 var _ webhook.CustomValidator = &ManagedClusterWebhook{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *ManagedClusterWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) error {
+func (r *ManagedClusterWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	managedCluster, ok := obj.(*v1.ManagedCluster)
 	if !ok {
-		return apierrors.NewBadRequest("Request cluster obj format is not right")
+		return nil, apierrors.NewBadRequest("Request cluster obj format is not right")
 	}
 	req, err := admission.RequestFromContext(ctx)
 	if err != nil {
-		return apierrors.NewBadRequest(err.Error())
+		return nil, apierrors.NewBadRequest(err.Error())
 	}
 
 	//Validate if Spec.ManagedClusterClientConfigs is Valid HTTPS URL
 	err = r.validateManagedClusterObj(*managedCluster)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// the HubAcceptsClient field is changed, we need to:
@@ -48,10 +48,10 @@ func (r *ManagedClusterWebhook) ValidateCreate(ctx context.Context, obj runtime.
 	// SubjectAccessReview api.
 	if managedCluster.Spec.HubAcceptsClient {
 		if err := r.validateAcceptByClusterNamespace(managedCluster.Name); err != nil {
-			return err
+			return nil, err
 		}
 		if err := r.allowUpdateAcceptField(managedCluster.Name, req.UserInfo); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -61,28 +61,29 @@ func (r *ManagedClusterWebhook) ValidateCreate(ctx context.Context, obj runtime.
 		clusterSetName = managedCluster.Labels[clusterv1beta2.ClusterSetLabel]
 	}
 
-	return r.allowSetClusterSetLabel(req.UserInfo, "", clusterSetName)
+	return nil, r.allowSetClusterSetLabel(req.UserInfo, "", clusterSetName)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ManagedClusterWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) error {
+func (r *ManagedClusterWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (
+	admission.Warnings, error) {
 	managedCluster, ok := newObj.(*v1.ManagedCluster)
 	if !ok {
-		return apierrors.NewBadRequest("Request new cluster obj format is not right")
+		return nil, apierrors.NewBadRequest("Request new cluster obj format is not right")
 	}
 	oldManagedCluster, ok := oldObj.(*v1.ManagedCluster)
 	if !ok {
-		return apierrors.NewBadRequest("Request old cluster obj format is not right")
+		return nil, apierrors.NewBadRequest("Request old cluster obj format is not right")
 	}
 	req, err := admission.RequestFromContext(ctx)
 	if err != nil {
-		return apierrors.NewBadRequest(err.Error())
+		return nil, apierrors.NewBadRequest(err.Error())
 	}
 
 	//Validate if Spec.ManagedClusterClientConfigs is Valid HTTPS URL
 	err = r.validateManagedClusterObj(*managedCluster)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// the HubAcceptsClient field is changed, we need to:
@@ -92,10 +93,10 @@ func (r *ManagedClusterWebhook) ValidateUpdate(ctx context.Context, oldObj, newO
 	if managedCluster.Spec.HubAcceptsClient != oldManagedCluster.Spec.HubAcceptsClient {
 		if managedCluster.Spec.HubAcceptsClient {
 			if err := r.validateAcceptByClusterNamespace(managedCluster.Name); err != nil {
-				return err
+				return nil, err
 			}
 			if err := r.allowUpdateAcceptField(managedCluster.Name, req.UserInfo); err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
@@ -109,12 +110,12 @@ func (r *ManagedClusterWebhook) ValidateUpdate(ctx context.Context, oldObj, newO
 		currentClusterSetName = managedCluster.Labels[clusterv1beta2.ClusterSetLabel]
 	}
 
-	return r.allowSetClusterSetLabel(req.UserInfo, originalClusterSetName, currentClusterSetName)
+	return nil, r.allowSetClusterSetLabel(req.UserInfo, originalClusterSetName, currentClusterSetName)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ManagedClusterWebhook) ValidateDelete(_ context.Context, obj runtime.Object) error {
-	return nil
+func (r *ManagedClusterWebhook) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
+	return nil, nil
 }
 
 // validateManagedClusterObj validates the fileds of ManagedCluster object

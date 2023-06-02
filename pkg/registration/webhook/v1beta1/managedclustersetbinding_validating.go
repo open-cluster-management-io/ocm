@@ -21,41 +21,44 @@ import (
 var _ webhook.CustomValidator = &ManagedClusterSetBindingWebhook{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (b *ManagedClusterSetBindingWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) error {
+func (b *ManagedClusterSetBindingWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (
+	admission.Warnings, error) {
 	binding, ok := obj.(*v1beta1.ManagedClusterSetBinding)
 	if !ok {
-		return apierrors.NewBadRequest("Request clustersetbinding obj format is not right")
+		return nil, apierrors.NewBadRequest("Request clustersetbinding obj format is not right")
 	}
 
 	// force the instance name to match the target cluster set name
 	if binding.Name != binding.Spec.ClusterSet {
-		return apierrors.NewBadRequest("The ManagedClusterSetBinding must have the same name as the target ManagedClusterSet")
+		return nil, apierrors.NewBadRequest("The ManagedClusterSetBinding must have the same name as the target ManagedClusterSet")
 	}
 
 	req, err := admission.RequestFromContext(ctx)
 	if err != nil {
-		return apierrors.NewBadRequest(err.Error())
+		return nil, apierrors.NewBadRequest(err.Error())
 	}
-	return AllowBindingToClusterSet(b.kubeClient, binding.Spec.ClusterSet, req.UserInfo)
+	return nil, AllowBindingToClusterSet(b.kubeClient, binding.Spec.ClusterSet, req.UserInfo)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (b *ManagedClusterSetBindingWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) error {
+func (b *ManagedClusterSetBindingWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (
+	admission.Warnings, error) {
 	binding, ok := newObj.(*v1beta1.ManagedClusterSetBinding)
 	if !ok {
-		return apierrors.NewBadRequest("Request clustersetbinding obj format is not right")
+		return nil, apierrors.NewBadRequest("Request clustersetbinding obj format is not right")
 	}
 
 	// force the instance name to match the target cluster set name
 	if binding.Name != binding.Spec.ClusterSet {
-		return apierrors.NewBadRequest("The ManagedClusterSetBinding must have the same name as the target ManagedClusterSet")
+		return nil, apierrors.NewBadRequest("The ManagedClusterSetBinding must have the same name as the target ManagedClusterSet")
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (b *ManagedClusterSetBindingWebhook) ValidateDelete(_ context.Context, obj runtime.Object) error {
-	return nil
+func (b *ManagedClusterSetBindingWebhook) ValidateDelete(_ context.Context, obj runtime.Object) (
+	admission.Warnings, error) {
+	return nil, nil
 }
 
 // allowBindingToClusterSet checks if the user has permission to bind a particular cluster set
