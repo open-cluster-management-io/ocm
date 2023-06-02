@@ -5,7 +5,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	authv1 "k8s.io/api/authentication/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/utils/pointer"
 	ocmfeature "open-cluster-management.io/api/feature"
 	"open-cluster-management.io/ocm/test/integration/util"
 	"os"
@@ -906,6 +910,178 @@ func (t *Tester) CreateFakeExternalKubeconfigSecret(klusterlet *operatorapiv1.Kl
 	if err != nil {
 		klog.Errorf("failed to create external managed secret %v in ns %v. %v", bsSecret, agentNamespace, err)
 		return err
+	}
+
+	return nil
+}
+
+func (t *Tester) BuildClusterClient(saNamespace, saName string, clusterPolicyRules, policyRules []rbacv1.PolicyRule) (clusterclient.Interface, error) {
+	var err error
+
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: saNamespace,
+			Name:      saName,
+		},
+	}
+	_, err = t.HubKubeClient.CoreV1().ServiceAccounts(saNamespace).Create(context.TODO(), sa, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// create cluster role/rolebinding
+	if len(clusterPolicyRules) > 0 {
+		clusterRoleName := fmt.Sprintf("%s-clusterrole", saName)
+		clusterRole := &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: clusterRoleName,
+			},
+			Rules: clusterPolicyRules,
+		}
+		_, err = t.HubKubeClient.RbacV1().ClusterRoles().Create(context.TODO(), clusterRole, metav1.CreateOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		clusterRoleBinding := &rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("%s-clusterrolebinding", saName),
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      "ServiceAccount",
+					Namespace: saNamespace,
+					Name:      saName,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "ClusterRole",
+				Name:     clusterRoleName,
+			},
+		}
+		_, err = t.HubKubeClient.RbacV1().ClusterRoleBindings().Create(context.TODO(), clusterRoleBinding, metav1.CreateOptions{})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// create cluster role/rolebinding
+	if len(policyRules) > 0 {
+		roleName := fmt.Sprintf("%s-role", saName)
+		role := &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: saNamespace,
+				Name:      roleName,
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					APIGroups: []string{"cluster.open-cluster-management.io"},
+					Resources: []string{"managedclustersetbindings"},
+					Verbs:     []string{"create", "get", "update"},
+				},
+			},
+		}
+		_, err = t.HubKubeClient.RbacV1().Roles(saNamespace).Create(context.TODO(), role, metav1.CreateOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		roleBinding := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: saNamespace,
+				Name:      fmt.Sprintf("%s-rolebinding", saName),
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      "ServiceAccount",
+					Namespace: saNamespace,
+					Name:      saName,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "Role",
+				Name:     roleName,
+			},
+		}
+		_, err = t.HubKubeClient.RbacV1().RoleBindings(saNamespace).Create(context.TODO(), roleBinding, metav1.CreateOptions{})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	tokenRequest, err := t.HubKubeClient.CoreV1().ServiceAccounts(saNamespace).CreateToken(
+		context.TODO(),
+		saName,
+		&authv1.TokenRequest{
+			Spec: authv1.TokenRequestSpec{
+				ExpirationSeconds: pointer.Int64(8640 * 3600),
+			},
+		},
+		metav1.CreateOptions{},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	unauthorizedClusterClient, err := clusterclient.NewForConfig(&rest.Config{
+		Host: t.HubClusterCfg.Host,
+		TLSClientConfig: rest.TLSClientConfig{
+			CAData: t.HubClusterCfg.CAData,
+		},
+		BearerToken: tokenRequest.Status.Token,
+	})
+	return unauthorizedClusterClient, err
+}
+
+// cleanupClusterClient delete cluster-scope resource created by func "buildClusterClient",
+// the namespace-scope resources should be deleted by an additional namespace deleting func.
+// It is recommended be invoked as a pair with the func "buildClusterClient"
+func (t *Tester) CleanupClusterClient(saNamespace, saName string) error {
+	err := t.HubKubeClient.CoreV1().ServiceAccounts(saNamespace).Delete(context.TODO(), saName, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("delete sa %q/%q failed: %v", saNamespace, saName, err)
+	}
+
+	// delete cluster role and cluster role binding if exists
+	clusterRoleName := fmt.Sprintf("%s-clusterrole", saName)
+	err = t.HubKubeClient.RbacV1().ClusterRoles().Delete(context.TODO(), clusterRoleName, metav1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("delete cluster role %q failed: %v", clusterRoleName, err)
+	}
+	clusterRoleBindingName := fmt.Sprintf("%s-clusterrolebinding", saName)
+	err = t.HubKubeClient.RbacV1().ClusterRoleBindings().Delete(context.TODO(), clusterRoleBindingName, metav1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("delete cluster role binding %q failed: %v", clusterRoleBindingName, err)
+	}
+
+	return nil
+}
+
+func (t *Tester) DeleteManageClusterAndRelatedNamespace(clusterName string) error {
+	if err := wait.Poll(1*time.Second, 90*time.Second, func() (bool, error) {
+		err := t.ClusterClient.ClusterV1().ManagedClusters().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			return false, err
+		}
+		return true, nil
+	}); err != nil {
+		return fmt.Errorf("delete managed cluster %q failed: %v", clusterName, err)
+	}
+
+	// delete namespace created by hub automaticly
+	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
+		err := t.HubKubeClient.CoreV1().Namespaces().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
+		// some managed cluster just created, but the csr is not approved,
+		// so there is not a related namespace
+		if err != nil && !errors.IsNotFound(err) {
+			return false, err
+		}
+
+		return true, nil
+	}); err != nil {
+		return fmt.Errorf("delete related namespace %q failed: %v", clusterName, err)
 	}
 
 	return nil
