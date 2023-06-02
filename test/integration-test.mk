@@ -28,22 +28,22 @@ clean: clean-integration-test
 
 test-registration-integration: ensure-kubebuilder-tools
 	go test -c ./test/integration/registration -o ./registration-integration.test
-	./registration-integration.test -ginkgo.slowSpecThreshold=15 -ginkgo.v -ginkgo.failFast
+	./registration-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast
 .PHONY: test-registration-integration
 
 test-work-integration: ensure-kubebuilder-tools
 	go test -c ./test/integration/work -o ./work-integration.test
-	./work-integration.test -ginkgo.slowSpecThreshold=15 -ginkgo.v -ginkgo.failFast
+	./work-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast
 .PHONY: test-work-integration
 
 test-placement-integration: ensure-kubebuilder-tools
 	go test -c ./test/integration/placement -o ./placement-integration.test
-	./placement-integration.test -ginkgo.slowSpecThreshold=15 -ginkgo.v -ginkgo.failFast
+	./placement-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast
 .PHONY: test-placement-integration
 
 test-registration-operator-integration: ensure-kubebuilder-tools
 	go test -c ./test/integration/operator -o ./registration-operator-integration.test
-	./registration-operator-integration.test -ginkgo.slowSpecThreshold=15 -ginkgo.v -ginkgo.failFast
+	./registration-operator-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast
 .PHONY: test-registration-operator-integration
 
 test-integration: test-registration-operator-integration test-registration-integration test-placement-integration test-work-integration
