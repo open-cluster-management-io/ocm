@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
@@ -34,7 +35,7 @@ func TestGetClusterAgentNamesFromCertificate(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterName, agentName, err := GetClusterAgentNamesFromCertificate(c.certData)
-			testinghelpers.AssertErrorWithPrefix(t, err, c.expectedErrorPrefix)
+			testingcommon.AssertErrorWithPrefix(t, err, c.expectedErrorPrefix)
 
 			if clusterName != c.expectedClusterName {
 				t.Errorf("expect %v, but got %v", c.expectedClusterName, clusterName)

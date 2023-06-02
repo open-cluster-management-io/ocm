@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 
@@ -218,7 +219,7 @@ func TestValidate(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			err := c.options.Validate()
-			testinghelpers.AssertError(t, err, c.expectedErr)
+			testingcommon.AssertError(t, err, c.expectedErr)
 		})
 	}
 }
@@ -406,7 +407,7 @@ func TestGetSpokeClusterCABundle(t *testing.T) {
 				restConig.CAFile = path.Join(tempDir, c.caFile)
 			}
 			caData, err := c.options.getSpokeClusterCABundle(restConig)
-			testinghelpers.AssertError(t, err, c.expectedErr)
+			testingcommon.AssertError(t, err, c.expectedErr)
 			if c.expectedCAData == nil && caData == nil {
 				return
 			}

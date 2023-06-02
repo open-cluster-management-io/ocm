@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/hub/user"
 )
@@ -40,21 +41,21 @@ func Test_v1beta1CSRApprovingController_sync(t *testing.T) {
 			name:         "sync a deleted csr",
 			startingCSRs: []runtime.Object{},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
 			name:         "sync a denied csr",
 			startingCSRs: []runtime.Object{testinghelpers.NewDeniedV1beta1CSR(validV1beta1CSR)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
 			name:         "sync an approved csr",
 			startingCSRs: []runtime.Object{testinghelpers.NewApprovedV1beta1CSR(validV1beta1CSR)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
@@ -69,14 +70,14 @@ func Test_v1beta1CSRApprovingController_sync(t *testing.T) {
 				ReqBlockType: validV1beta1CSR.ReqBlockType,
 			})},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
 			name:         "deny an auto approving csr",
 			startingCSRs: []runtime.Object{testinghelpers.NewV1beta1CSR(validV1beta1CSR)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "create")
+				testingcommon.AssertActions(t, actions, "create")
 				testinghelpers.AssertSubjectAccessReviewObj(t, actions[0].(clienttesting.CreateActionImpl).Object)
 			},
 		},
@@ -91,7 +92,7 @@ func Test_v1beta1CSRApprovingController_sync(t *testing.T) {
 					Reason:  "AutoApprovedByHubCSRApprovingController",
 					Message: "Auto approving Managed cluster agent certificate after SubjectAccessReview.",
 				}
-				testinghelpers.AssertActions(t, actions, "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "update")
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				testinghelpers.AssertV1beta1CSRCondition(t, actual.(*certificatesv1beta1.CertificateSigningRequest).Status.Conditions, expectedCondition)
 			},
@@ -115,7 +116,7 @@ func Test_v1beta1CSRApprovingController_sync(t *testing.T) {
 					Reason:  "AutoApprovedByHubCSRApprovingController",
 					Message: "Auto approving Managed cluster agent certificate after SubjectAccessReview.",
 				}
-				testinghelpers.AssertActions(t, actions, "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "update")
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				testinghelpers.AssertV1beta1CSRCondition(t, actual.(*certificatesv1beta1.CertificateSigningRequest).Status.Conditions, expectedCondition)
 			},
@@ -154,7 +155,7 @@ func Test_v1beta1CSRApprovingController_sync(t *testing.T) {
 					},
 				},
 			}
-			if err := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, validV1beta1CSR.Name)); (err != nil) != tt.wantErr {
+			if err := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, validV1beta1CSR.Name)); (err != nil) != tt.wantErr {
 				t.Errorf("v1beta1CSRApprovingController.sync() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			tt.validateActions(t, kubeClient.Actions())

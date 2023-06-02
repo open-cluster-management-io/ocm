@@ -16,7 +16,7 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 func TestGetAddOnLabelValue(t *testing.T) {
@@ -100,7 +100,7 @@ func TestDiscoveryController_SyncAddOn(t *testing.T) {
 				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "update")
+				testingcommon.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
 				assertNoAddonLabel(t, actual.(*clusterv1.ManagedCluster), "addon1")
 			},
@@ -119,7 +119,7 @@ func TestDiscoveryController_SyncAddOn(t *testing.T) {
 					DeletionTimestamp: &deleteTime,
 				},
 			},
-			validateActions: testinghelpers.AssertNoActions,
+			validateActions: testingcommon.AssertNoActions,
 		},
 		{
 			name:      "new addon is added",
@@ -136,7 +136,7 @@ func TestDiscoveryController_SyncAddOn(t *testing.T) {
 				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "update")
+				testingcommon.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
 				assertAddonLabel(t, actual.(*clusterv1.ManagedCluster), "addon1", addOnStatusUnreachable)
 			},
@@ -159,7 +159,7 @@ func TestDiscoveryController_SyncAddOn(t *testing.T) {
 				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "update")
+				testingcommon.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
 				assertAddonLabel(t, actual.(*clusterv1.ManagedCluster), "addon1", addOnStatusUnreachable)
 			},
@@ -179,7 +179,7 @@ func TestDiscoveryController_SyncAddOn(t *testing.T) {
 					Namespace: clusterName,
 				},
 			},
-			validateActions: testinghelpers.AssertNoActions,
+			validateActions: testingcommon.AssertNoActions,
 		},
 	}
 
@@ -257,7 +257,7 @@ func TestDiscoveryController_Sync(t *testing.T) {
 				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "update")
+				testingcommon.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
 				assertAddonLabel(t, actual.(*clusterv1.ManagedCluster), "addon1", addOnStatusUnreachable)
 			},
@@ -265,7 +265,7 @@ func TestDiscoveryController_Sync(t *testing.T) {
 		{
 			name:            "cluster not found",
 			queueKey:        clusterName,
-			validateActions: testinghelpers.AssertNoActions,
+			validateActions: testingcommon.AssertNoActions,
 		},
 		{
 			name:     "cluster is deleting",
@@ -276,7 +276,7 @@ func TestDiscoveryController_Sync(t *testing.T) {
 					DeletionTimestamp: &deleteTime,
 				},
 			},
-			validateActions: testinghelpers.AssertNoActions,
+			validateActions: testingcommon.AssertNoActions,
 		},
 		{
 			name:     "no change",
@@ -286,7 +286,7 @@ func TestDiscoveryController_Sync(t *testing.T) {
 					Name: clusterName,
 				},
 			},
-			validateActions: testinghelpers.AssertNoActions,
+			validateActions: testingcommon.AssertNoActions,
 		},
 		{
 			name:     "cluster synced",
@@ -329,7 +329,7 @@ func TestDiscoveryController_Sync(t *testing.T) {
 				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "update")
+				testingcommon.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
 				assertAddonLabel(t, actual.(*clusterv1.ManagedCluster), "addon1", addOnStatusUnreachable)
 				assertAddonLabel(t, actual.(*clusterv1.ManagedCluster), "addon3", addOnStatusAvailable)
@@ -374,7 +374,7 @@ func TestDiscoveryController_Sync(t *testing.T) {
 				addOnLister:   addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 			}
 
-			err := controller.sync(context.Background(), testinghelpers.NewFakeSyncContext(t, c.queueKey))
+			err := controller.sync(context.Background(), testingcommon.NewFakeSyncContext(t, c.queueKey))
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}

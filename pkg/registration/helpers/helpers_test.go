@@ -12,6 +12,7 @@ import (
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
@@ -282,7 +283,7 @@ func TestCleanUpManagedClusterManifests(t *testing.T) {
 			},
 			applyFiles: applyFiles,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, expectedActions...)
+				testingcommon.AssertActions(t, actions, expectedActions...)
 			},
 		},
 		{
@@ -290,7 +291,7 @@ func TestCleanUpManagedClusterManifests(t *testing.T) {
 			applyObject: []runtime.Object{},
 			applyFiles:  applyFiles,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, expectedActions...)
+				testingcommon.AssertActions(t, actions, expectedActions...)
 			},
 		},
 		{
@@ -298,7 +299,7 @@ func TestCleanUpManagedClusterManifests(t *testing.T) {
 			applyObject:     []runtime.Object{},
 			applyFiles:      map[string]runtime.Object{"secret": testinghelpers.NewUnstructuredObj("v1", "Secret", "n1", "s1")},
 			expectedErr:     "unhandled type *v1.Secret",
-			validateActions: testinghelpers.AssertNoActions,
+			validateActions: testingcommon.AssertNoActions,
 		},
 	}
 	for _, c := range cases {
@@ -316,7 +317,7 @@ func TestCleanUpManagedClusterManifests(t *testing.T) {
 				},
 				getApplyFileNames(c.applyFiles)...,
 			)
-			testinghelpers.AssertError(t, cleanUpErr, c.expectedErr)
+			testingcommon.AssertError(t, cleanUpErr, c.expectedErr)
 			c.validateActions(t, kubeClient.Actions())
 		})
 	}

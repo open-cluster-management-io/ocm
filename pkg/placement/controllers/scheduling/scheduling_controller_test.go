@@ -3,6 +3,8 @@ package scheduling
 import (
 	"context"
 	"fmt"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	"open-cluster-management.io/ocm/test/integration/util"
 	"sort"
 	"strings"
 	"testing"
@@ -62,7 +64,7 @@ func TestSchedulingController_sync(t *testing.T) {
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
-				testinghelpers.AssertActions(t, actions, "create", "update", "update")
+				testingcommon.AssertActions(t, actions, "create", "update", "update")
 				// check if Placement has been updated
 				actual := actions[2].(clienttesting.UpdateActionImpl).Object
 				placement, ok := actual.(*clusterapiv1beta1.Placement)
@@ -73,7 +75,7 @@ func TestSchedulingController_sync(t *testing.T) {
 				if placement.Status.NumberOfSelectedClusters != int32(3) {
 					t.Errorf("expecte %d cluster selected, but got %d", 3, placement.Status.NumberOfSelectedClusters)
 				}
-				testinghelpers.HasCondition(
+				util.HasCondition(
 					placement.Status.Conditions,
 					clusterapiv1beta1.PlacementConditionSatisfied,
 					"AllDecisionsScheduled",
@@ -104,7 +106,7 @@ func TestSchedulingController_sync(t *testing.T) {
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
-				testinghelpers.AssertActions(t, actions, "create", "update", "update")
+				testingcommon.AssertActions(t, actions, "create", "update", "update")
 				// check if Placement has been updated
 				actual := actions[2].(clienttesting.UpdateActionImpl).Object
 				placement, ok := actual.(*clusterapiv1beta1.Placement)
@@ -115,7 +117,7 @@ func TestSchedulingController_sync(t *testing.T) {
 				if placement.Status.NumberOfSelectedClusters != int32(3) {
 					t.Errorf("expecte %d cluster selected, but got %d", 3, placement.Status.NumberOfSelectedClusters)
 				}
-				testinghelpers.HasCondition(
+				util.HasCondition(
 					placement.Status.Conditions,
 					clusterapiv1beta1.PlacementConditionSatisfied,
 					"NotAllDecisionsScheduled",
@@ -133,7 +135,7 @@ func TestSchedulingController_sync(t *testing.T) {
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
-				testinghelpers.AssertActions(t, actions, "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "update")
 				// check if emtpy PlacementDecision has been created
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
@@ -154,7 +156,7 @@ func TestSchedulingController_sync(t *testing.T) {
 				if placement.Status.NumberOfSelectedClusters != int32(0) {
 					t.Errorf("expecte %d cluster selected, but got %d", 0, placement.Status.NumberOfSelectedClusters)
 				}
-				testinghelpers.HasCondition(
+				util.HasCondition(
 					placement.Status.Conditions,
 					clusterapiv1beta1.PlacementConditionSatisfied,
 					"NoManagedClusterSetBindings",
@@ -176,7 +178,7 @@ func TestSchedulingController_sync(t *testing.T) {
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
-				testinghelpers.AssertActions(t, actions, "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "update")
 				// check if emtpy PlacementDecision has been created
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
@@ -197,7 +199,7 @@ func TestSchedulingController_sync(t *testing.T) {
 				if placement.Status.NumberOfSelectedClusters != int32(0) {
 					t.Errorf("expecte %d cluster selected, but got %d", 0, placement.Status.NumberOfSelectedClusters)
 				}
-				testinghelpers.HasCondition(
+				util.HasCondition(
 					placement.Status.Conditions,
 					clusterapiv1beta1.PlacementConditionSatisfied,
 					"AllManagedClusterSetsEmpty",
@@ -222,7 +224,7 @@ func TestSchedulingController_sync(t *testing.T) {
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
-				testinghelpers.AssertActions(t, actions, "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "update")
 				// check if emtpy PlacementDecision has been created
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
@@ -243,7 +245,7 @@ func TestSchedulingController_sync(t *testing.T) {
 				if placement.Status.NumberOfSelectedClusters != int32(0) {
 					t.Errorf("expecte %d cluster selected, but got %d", 0, placement.Status.NumberOfSelectedClusters)
 				}
-				testinghelpers.HasCondition(
+				util.HasCondition(
 					placement.Status.Conditions,
 					clusterapiv1beta1.PlacementConditionSatisfied,
 					"NoManagedClusterMatched",
@@ -276,7 +278,7 @@ func TestSchedulingController_sync(t *testing.T) {
 				},
 				unscheduledDecisions: 0,
 			},
-			validateActions: testinghelpers.AssertNoActions,
+			validateActions: testingcommon.AssertNoActions,
 		},
 		{
 			name: "placement schedule controller is disabled",
@@ -292,7 +294,7 @@ func TestSchedulingController_sync(t *testing.T) {
 				},
 				scheduledDecisions: []clusterapiv1beta1.ClusterDecision{},
 			},
-			validateActions: testinghelpers.AssertNoActions,
+			validateActions: testingcommon.AssertNoActions,
 		},
 	}
 
@@ -314,7 +316,7 @@ func TestSchedulingController_sync(t *testing.T) {
 				recorder:                kevents.NewFakeRecorder(100),
 			}
 
-			sysCtx := testinghelpers.NewFakeSyncContext(t, c.placement.Namespace+"/"+c.placement.Name)
+			sysCtx := testingcommon.NewFakeSyncContext(t, c.placement.Namespace+"/"+c.placement.Name)
 			syncErr := ctrl.sync(context.TODO(), sysCtx)
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
@@ -737,7 +739,7 @@ func TestBind(t *testing.T) {
 			name:             "create single placementdecision",
 			clusterDecisions: newClusterDecisions(10),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "update")
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
@@ -750,7 +752,7 @@ func TestBind(t *testing.T) {
 			name:             "create multiple placementdecisions",
 			clusterDecisions: newClusterDecisions(101),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "create", "update", "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "update", "create", "update")
 				selectedClusters := newSelectedClusters(101)
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
@@ -771,7 +773,7 @@ func TestBind(t *testing.T) {
 			name:             "create empty placementdecision",
 			clusterDecisions: newClusterDecisions(0),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "create")
+				testingcommon.AssertActions(t, actions, "create")
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
@@ -793,7 +795,7 @@ func TestBind(t *testing.T) {
 					WithLabel(placementLabel, placementName).
 					WithDecisions(newSelectedClusters(128)[100:]...).Build(),
 			},
-			validateActions: testinghelpers.AssertNoActions,
+			validateActions: testingcommon.AssertNoActions,
 		},
 		{
 			name:             "update one of placementdecisions",
@@ -804,7 +806,7 @@ func TestBind(t *testing.T) {
 					WithDecisions(newSelectedClusters(128)[:100]...).Build(),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "update")
 				selectedClusters := newSelectedClusters(128)
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
@@ -826,7 +828,7 @@ func TestBind(t *testing.T) {
 					WithDecisions(newSelectedClusters(128)[100:]...).Build(),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "update", "delete")
+				testingcommon.AssertActions(t, actions, "update", "delete")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
@@ -847,7 +849,7 @@ func TestBind(t *testing.T) {
 					WithDecisions(newSelectedClusters(128)[100:]...).Build(),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "update", "delete")
+				testingcommon.AssertActions(t, actions, "update", "delete")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {

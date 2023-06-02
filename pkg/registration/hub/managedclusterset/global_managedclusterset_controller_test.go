@@ -13,6 +13,7 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
@@ -33,7 +34,7 @@ func TestSyncGlobalClusterSet(t *testing.T) {
 			name:               "sync global cluster set",
 			existingClusterSet: newGlobalManagedClusterSet(GlobalManagedClusterSetName, GlobalManagedClusterSet.Spec, false),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
@@ -41,7 +42,7 @@ func TestSyncGlobalClusterSet(t *testing.T) {
 			existingClusterSet: newGlobalManagedClusterSet(GlobalManagedClusterSetName, editedGlobalManagedClusterSetSpec, false),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 
-				testinghelpers.AssertActions(t, actions, "update")
+				testingcommon.AssertActions(t, actions, "update")
 				clusterset := actions[0].(clienttesting.UpdateAction).GetObject().(*clusterv1beta2.ManagedClusterSet)
 				// if spec not rollbacked, error
 				if !equality.Semantic.DeepEqual(clusterset.Spec, GlobalManagedClusterSet.Spec) {
@@ -53,7 +54,7 @@ func TestSyncGlobalClusterSet(t *testing.T) {
 			name: "sync deleted global cluster set",
 			// global cluster set should be created if it is deleted.
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "create")
+				testingcommon.AssertActions(t, actions, "create")
 				clusterset := actions[0].(clienttesting.CreateAction).GetObject().(*clusterv1beta2.ManagedClusterSet)
 				if clusterset.ObjectMeta.Name != GlobalManagedClusterSetName {
 					t.Errorf("Failed to create global managed cluster set")
@@ -64,7 +65,7 @@ func TestSyncGlobalClusterSet(t *testing.T) {
 			name:               "sync global cluster set with disabled annotation",
 			existingClusterSet: newGlobalManagedClusterSetWithAnnotation(GlobalManagedClusterSetName, autoUpdateAnnotation, "false", GlobalManagedClusterSet.Spec, false),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 	}
@@ -92,7 +93,7 @@ func TestSyncGlobalClusterSet(t *testing.T) {
 				eventRecorder:    eventstesting.NewTestingEventRecorder(t),
 			}
 
-			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

@@ -11,6 +11,7 @@ import (
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	v1 "open-cluster-management.io/api/cluster/v1"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ func TestSync(t *testing.T) {
 			clusters:      []runtime.Object{testinghelpers.NewManagedCluster()},
 			clusterLeases: []runtime.Object{},
 			validateActions: func(t *testing.T, leaseActions, clusterActions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, leaseActions)
-				testinghelpers.AssertNoActions(t, clusterActions)
+				testingcommon.AssertNoActions(t, leaseActions)
+				testingcommon.AssertNoActions(t, clusterActions)
 			},
 		},
 		{
@@ -43,8 +44,8 @@ func TestSync(t *testing.T) {
 			clusters:      []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			clusterLeases: []runtime.Object{},
 			validateActions: func(t *testing.T, leaseActions, clusterActions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, leaseActions, "create")
-				testinghelpers.AssertNoActions(t, clusterActions)
+				testingcommon.AssertActions(t, leaseActions, "create")
+				testingcommon.AssertNoActions(t, clusterActions)
 			},
 		},
 		{
@@ -61,14 +62,14 @@ func TestSync(t *testing.T) {
 					Reason:  "ManagedClusterLeaseUpdateStopped",
 					Message: "Registration agent stopped updating its lease.",
 				}
-				testinghelpers.AssertActions(t, clusterActions, "get", "patch")
+				testingcommon.AssertActions(t, clusterActions, "get", "patch")
 				patch := clusterActions[1].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &v1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
 					t.Fatal(err)
 				}
-				testinghelpers.AssertCondition(t, managedCluster.Status.Conditions, expected)
+				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expected)
 			},
 		},
 		{
@@ -76,7 +77,7 @@ func TestSync(t *testing.T) {
 			clusters:      []runtime.Object{testinghelpers.NewAvailableManagedCluster()},
 			clusterLeases: []runtime.Object{testinghelpers.NewManagedClusterLease("managed-cluster-lease", now)},
 			validateActions: func(t *testing.T, leaseActions, clusterActions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, clusterActions)
+				testingcommon.AssertNoActions(t, clusterActions)
 			},
 		},
 		{
@@ -89,14 +90,14 @@ func TestSync(t *testing.T) {
 					Reason:  "ManagedClusterLeaseUpdateStopped",
 					Message: "Registration agent stopped updating its lease.",
 				}
-				testinghelpers.AssertActions(t, clusterActions, "get", "patch")
+				testingcommon.AssertActions(t, clusterActions, "get", "patch")
 				patch := clusterActions[1].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &v1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
 					t.Fatal(err)
 				}
-				testinghelpers.AssertCondition(t, managedCluster.Status.Conditions, expected)
+				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expected)
 			},
 		},
 		{
@@ -104,7 +105,7 @@ func TestSync(t *testing.T) {
 			clusters:      []runtime.Object{testinghelpers.NewUnknownManagedCluster()},
 			clusterLeases: []runtime.Object{testinghelpers.NewManagedClusterLease("managed-cluster-lease", now.Add(-5*time.Minute))},
 			validateActions: func(t *testing.T, leaseActions, clusterActions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, clusterActions)
+				testingcommon.AssertNoActions(t, clusterActions)
 			},
 		},
 	}
@@ -129,7 +130,7 @@ func TestSync(t *testing.T) {
 				}
 			}
 
-			syncCtx := testinghelpers.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName)
+			syncCtx := testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName)
 
 			ctrl := &leaseController{
 				kubeClient:    leaseClient,

@@ -23,6 +23,7 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 var roleName = fmt.Sprintf("%s:spoke-work", testinghelpers.TestManagedClusterName)
@@ -102,8 +103,8 @@ func TestSync(t *testing.T) {
 				rbacClient:         kubeClient.RbacV1(),
 				eventRecorder:      events.NewInMemoryRecorder(""),
 			}
-			err := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, c.key))
-			testinghelpers.AssertError(t, err, c.expectedErr)
+			err := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, c.key))
+			testingcommon.AssertError(t, err, c.expectedErr)
 		})
 	}
 }
@@ -127,7 +128,7 @@ func TestSyncRoleAndRoleBinding(t *testing.T) {
 			cluster:             testinghelpers.NewManagedCluster(),
 			namespace:           testinghelpers.NewNamespace(testinghelpers.TestManagedClusterName, false),
 			work:                testinghelpers.NewManifestWork(testinghelpers.TestManagedClusterName, "work1", nil, nil),
-			validateRbacActions: testinghelpers.AssertNoActions,
+			validateRbacActions: testingcommon.AssertNoActions,
 		},
 		{
 			name:                   "skip if neither role nor rolebinding has finalizer",
@@ -137,7 +138,7 @@ func TestSyncRoleAndRoleBinding(t *testing.T) {
 			namespace:              testinghelpers.NewNamespace(testinghelpers.TestManagedClusterName, false),
 			work:                   testinghelpers.NewManifestWork(testinghelpers.TestManagedClusterName, "work1", []string{manifestWorkFinalizer}, nil),
 			expectedWorkFinalizers: []string{manifestWorkFinalizer},
-			validateRbacActions:    testinghelpers.AssertNoActions,
+			validateRbacActions:    testingcommon.AssertNoActions,
 		},
 		{
 			name:                          "remove finalizer from deleting role within non-terminating namespace",
@@ -149,7 +150,7 @@ func TestSyncRoleAndRoleBinding(t *testing.T) {
 			expectedRoleBindingFinalizers: []string{manifestWorkFinalizer},
 			expectedWorkFinalizers:        []string{manifestWorkFinalizer},
 			validateRbacActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "update")
+				testingcommon.AssertActions(t, actions, "update")
 			},
 		},
 		{
@@ -159,7 +160,7 @@ func TestSyncRoleAndRoleBinding(t *testing.T) {
 			cluster:     testinghelpers.NewDeletingManagedCluster(),
 			namespace:   testinghelpers.NewNamespace(testinghelpers.TestManagedClusterName, false),
 			validateRbacActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "update", "update")
+				testingcommon.AssertActions(t, actions, "update", "update")
 			},
 		},
 		{
@@ -168,7 +169,7 @@ func TestSyncRoleAndRoleBinding(t *testing.T) {
 			roleBinding: testinghelpers.NewRoleBinding(testinghelpers.TestManagedClusterName, roleName, []string{manifestWorkFinalizer}, true),
 			namespace:   testinghelpers.NewNamespace(testinghelpers.TestManagedClusterName, true),
 			validateRbacActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "update", "update")
+				testingcommon.AssertActions(t, actions, "update", "update")
 			},
 		},
 	}
@@ -200,7 +201,7 @@ func TestSyncRoleAndRoleBinding(t *testing.T) {
 				rbacClient:         fakeClient.RbacV1(),
 			}
 
-			controllerContext := testinghelpers.NewFakeSyncContext(t, "")
+			controllerContext := testingcommon.NewFakeSyncContext(t, "")
 
 			func() {
 				ctx, cancel := context.WithTimeout(context.TODO(), 15*time.Second)

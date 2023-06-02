@@ -13,6 +13,7 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
@@ -33,7 +34,7 @@ func TestSyncDefaultClusterSet(t *testing.T) {
 			name:               "sync default cluster set",
 			existingClusterSet: newDefaultManagedClusterSet(DefaultManagedClusterSetName, DefaultManagedClusterSet.Spec, false),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
@@ -41,7 +42,7 @@ func TestSyncDefaultClusterSet(t *testing.T) {
 			existingClusterSet: newDefaultManagedClusterSet(DefaultManagedClusterSetName, editedDefaultManagedClusterSetSpec, false),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 
-				testinghelpers.AssertActions(t, actions, "update")
+				testingcommon.AssertActions(t, actions, "update")
 				clusterset := actions[0].(clienttesting.UpdateAction).GetObject().(*clusterv1beta2.ManagedClusterSet)
 				// if spec not rollbacked, error
 				if !equality.Semantic.DeepEqual(clusterset.Spec, DefaultManagedClusterSet.Spec) {
@@ -53,14 +54,14 @@ func TestSyncDefaultClusterSet(t *testing.T) {
 			name:               "sync deleting default cluster set",
 			existingClusterSet: newDefaultManagedClusterSet(DefaultManagedClusterSetName, DefaultManagedClusterSet.Spec, true),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
 			name: "sync deleted default cluster set",
 			// default cluster set should be created if it is deleted.
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "create")
+				testingcommon.AssertActions(t, actions, "create")
 				clusterset := actions[0].(clienttesting.CreateAction).GetObject().(*clusterv1beta2.ManagedClusterSet)
 				if clusterset.ObjectMeta.Name != DefaultManagedClusterSetName {
 					t.Errorf("Failed to create default managed cluster set")
@@ -71,7 +72,7 @@ func TestSyncDefaultClusterSet(t *testing.T) {
 			name:               "sync default cluster set with disabled annotation",
 			existingClusterSet: newDefaultManagedClusterSetWithAnnotation(DefaultManagedClusterSetName, autoUpdateAnnotation, "false", DefaultManagedClusterSet.Spec, false),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 	}
@@ -99,7 +100,7 @@ func TestSyncDefaultClusterSet(t *testing.T) {
 				eventRecorder:    eventstesting.NewTestingEventRecorder(t),
 			}
 
-			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

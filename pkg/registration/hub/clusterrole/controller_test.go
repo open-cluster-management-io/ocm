@@ -8,6 +8,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
@@ -31,7 +32,7 @@ func TestSyncManagedClusterClusterRole(t *testing.T) {
 			clusters:     []runtime.Object{testinghelpers.NewManagedCluster()},
 			clusterroles: []runtime.Object{},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get", "create", "get", "create")
+				testingcommon.AssertActions(t, actions, "get", "create", "get", "create")
 				registrationClusterRole := (actions[1].(clienttesting.CreateActionImpl).Object).(*rbacv1.ClusterRole)
 				if registrationClusterRole.Name != "open-cluster-management:managedcluster:registration" {
 					t.Errorf("expected registration clusterrole, but failed")
@@ -50,7 +51,7 @@ func TestSyncManagedClusterClusterRole(t *testing.T) {
 				&rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: "open-cluster-management:managedcluster:work"}},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "delete", "delete")
+				testingcommon.AssertActions(t, actions, "delete", "delete")
 				if actions[0].(clienttesting.DeleteActionImpl).Name != "open-cluster-management:managedcluster:registration" {
 					t.Errorf("expected registration clusterrole, but failed")
 				}
@@ -81,7 +82,7 @@ func TestSyncManagedClusterClusterRole(t *testing.T) {
 				eventRecorder: eventstesting.NewTestingEventRecorder(t),
 			}
 
-			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, "testmangedclsuterclusterrole"))
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, "testmangedclsuterclusterrole"))
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

@@ -2,38 +2,14 @@ package spoketesting
 
 import (
 	"fmt"
-	"testing"
-
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/restmapper"
-	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/util/workqueue"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
-
-type FakeSyncContext struct {
-	workKey  string
-	queue    workqueue.RateLimitingInterface
-	recorder events.Recorder
-}
-
-func NewFakeSyncContext(t *testing.T, workKey string) *FakeSyncContext {
-	return &FakeSyncContext{
-		workKey:  workKey,
-		queue:    workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-		recorder: eventstesting.NewTestingEventRecorder(t),
-	}
-}
-
-func (f FakeSyncContext) Queue() workqueue.RateLimitingInterface { return f.queue }
-func (f FakeSyncContext) QueueKey() string                       { return f.workKey }
-func (f FakeSyncContext) Recorder() events.Recorder              { return f.recorder }
 
 func NewSecret(name, namespace string, content string) *corev1.Secret {
 	return &corev1.Secret{
@@ -55,25 +31,6 @@ func NewSecretWithType(name, namespace string, content string, t corev1.SecretTy
 	secret := NewSecret(name, namespace, content)
 	secret.Type = t
 	return secret
-}
-
-func NewUnstructuredSecretBySize(namespace, name string, size int32) *unstructured.Unstructured {
-	data := ""
-	for i := int32(0); i < size; i++ {
-		data += "a"
-	}
-
-	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Secret",
-			"metadata": map[string]interface{}{
-				"namespace": namespace,
-				"name":      name,
-			},
-			"data": data,
-		},
-	}
 }
 
 func NewUnstructuredSecret(namespace, name string, terminated bool, uid string, owners ...metav1.OwnerReference) *unstructured.Unstructured {
@@ -187,10 +144,4 @@ func NewFakeRestMapper() meta.RESTMapper {
 		},
 	}
 	return restmapper.NewDiscoveryRESTMapper(resources)
-}
-
-func AssertAction(t *testing.T, actual clienttesting.Action, expected string) {
-	if actual.GetVerb() != expected {
-		t.Errorf("expected %s action but got: %#v", expected, actual)
-	}
 }

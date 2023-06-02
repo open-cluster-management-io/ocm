@@ -12,8 +12,8 @@ import (
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
-	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
 func TestSyncManifestWorkController(t *testing.T) {
@@ -65,11 +65,7 @@ func TestSyncManifestWorkController(t *testing.T) {
 				},
 			},
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("Expect 1 actions on appliedmanifestwork, but have %d", len(actions))
-				}
-
-				spoketesting.AssertAction(t, actions[0], "delete")
+				testingcommon.AssertActions(t, actions, "delete")
 			},
 			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 0 {
@@ -95,11 +91,7 @@ func TestSyncManifestWorkController(t *testing.T) {
 				},
 			},
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("Expect 1 actions on appliedmanifestwork, but have %d", len(actions))
-				}
-
-				spoketesting.AssertAction(t, actions[0], "delete")
+				testingcommon.AssertActions(t, actions, "delete")
 			},
 			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 0 {
@@ -159,10 +151,7 @@ func TestSyncManifestWorkController(t *testing.T) {
 				}
 			},
 			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("Suppose 1 action for manifestwork, but got %d", len(actions))
-				}
-				spoketesting.AssertAction(t, actions[0], "update")
+				testingcommon.AssertActions(t, actions, "update")
 				updateAction := actions[0].(clienttesting.UpdateActionImpl)
 				obj := updateAction.Object.(*workapiv1.ManifestWork)
 				if len(obj.Finalizers) != 0 {
@@ -214,7 +203,7 @@ func TestSyncManifestWorkController(t *testing.T) {
 				rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(0, 1*time.Second),
 			}
 
-			controllerContext := spoketesting.NewFakeSyncContext(t, c.workName)
+			controllerContext := testingcommon.NewFakeSyncContext(t, c.workName)
 			err := controller.sync(context.TODO(), controllerContext)
 			if err != nil {
 				t.Errorf("Expect no sync error, but got %v", err)

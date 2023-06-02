@@ -6,17 +6,17 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	clienttesting "k8s.io/client-go/testing"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
-
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	clienttesting "k8s.io/client-go/testing"
 )
 
 func TestSync(t *testing.T) {
@@ -31,7 +31,7 @@ func TestSync(t *testing.T) {
 			managedClusters: []runtime.Object{},
 			addOns:          []runtime.Object{},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
@@ -39,7 +39,7 @@ func TestSync(t *testing.T) {
 			managedClusters: []runtime.Object{testinghelpers.NewManagedCluster()},
 			addOns:          []runtime.Object{},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
@@ -47,7 +47,7 @@ func TestSync(t *testing.T) {
 			managedClusters: []runtime.Object{testinghelpers.NewAvailableManagedCluster()},
 			addOns:          []runtime.Object{},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
@@ -57,7 +57,7 @@ func TestSync(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Namespace: testinghelpers.TestManagedClusterName, Name: "test"},
 			}},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get", "patch")
+				testingcommon.AssertActions(t, actions, "get", "patch")
 
 				patch := actions[1].(clienttesting.PatchAction).GetPatch()
 				addOn := &addonv1alpha1.ManagedClusterAddOn{}
@@ -103,7 +103,7 @@ func TestSync(t *testing.T) {
 				clusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 			}
 
-			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

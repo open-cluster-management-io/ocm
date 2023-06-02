@@ -7,6 +7,7 @@ import (
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
@@ -29,7 +30,7 @@ func TestLeaseUpdate(t *testing.T) {
 			name:     "start lease update routine",
 			clusters: []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertUpdateActions(t, actions)
+				testingcommon.AssertUpdateActions(t, actions)
 				leaseObj := actions[1].(clienttesting.UpdateActionImpl).Object
 				lastLeaseObj := actions[len(actions)-1].(clienttesting.UpdateActionImpl).Object
 				testinghelpers.AssertLeaseUpdated(t, leaseObj.(*coordinationv1.Lease), lastLeaseObj.(*coordinationv1.Lease))
@@ -39,14 +40,14 @@ func TestLeaseUpdate(t *testing.T) {
 			name:                    "delete a managed cluster after lease update routine is started",
 			clusters:                []runtime.Object{},
 			needToStartUpdateBefore: true,
-			validateActions:         testinghelpers.AssertNoMoreUpdates,
+			validateActions:         testingcommon.AssertNoMoreUpdates,
 			expectedErr:             "unable to get managed cluster \"testmanagedcluster\" from hub: managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
 		},
 		{
 			name:                    "unaccept a managed cluster after lease update routine is started",
 			clusters:                []runtime.Object{testinghelpers.NewManagedCluster()},
 			needToStartUpdateBefore: true,
-			validateActions:         testinghelpers.AssertNoMoreUpdates,
+			validateActions:         testingcommon.AssertNoMoreUpdates,
 		},
 	}
 
@@ -81,8 +82,8 @@ func TestLeaseUpdate(t *testing.T) {
 				hubClusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				leaseUpdater:     leaseUpdater,
 			}
-			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, ""))
-			testinghelpers.AssertError(t, syncErr, c.expectedErr)
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""))
+			testingcommon.AssertError(t, syncErr, c.expectedErr)
 
 			// wait one cycle
 			time.Sleep(1200 * time.Millisecond)

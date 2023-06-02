@@ -14,6 +14,7 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/placement/helpers/testing"
 )
 
@@ -96,7 +97,7 @@ func TestOnClusterChange(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
 			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
 
-			syncCtx := testinghelpers.NewFakeSyncContext(t, "fake")
+			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 			q := newEnqueuer(
 				syncCtx.Queue(),
 				clusterInformerFactory.Cluster().V1().ManagedClusters(),
@@ -255,7 +256,7 @@ func TestOnClusterUpdate(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
 			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
 
-			syncCtx := testinghelpers.NewFakeSyncContext(t, "fake")
+			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 			q := newEnqueuer(
 				syncCtx.Queue(),
 				clusterInformerFactory.Cluster().V1().ManagedClusters(),
@@ -355,7 +356,7 @@ func TestOnClusterDelete(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
 			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
 
-			syncCtx := testinghelpers.NewFakeSyncContext(t, "fake")
+			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 			q := newEnqueuer(
 				syncCtx.Queue(),
 				clusterInformerFactory.Cluster().V1().ManagedClusters(),

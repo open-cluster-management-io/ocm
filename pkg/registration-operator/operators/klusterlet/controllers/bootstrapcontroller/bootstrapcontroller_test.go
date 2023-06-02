@@ -11,11 +11,6 @@ import (
 	"testing"
 	"time"
 
-	fakeoperatorclient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
-	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
-	operatorapiv1 "open-cluster-management.io/api/operator/v1"
-	testinghelper "open-cluster-management.io/ocm/pkg/registration-operator/helpers/testing"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,6 +21,10 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 	certutil "k8s.io/client-go/util/cert"
+	fakeoperatorclient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
+	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 func TestSync(t *testing.T) {
@@ -54,9 +53,9 @@ func TestSync(t *testing.T) {
 				newDeployment("test-work-agent", "test"),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelper.AssertDelete(t, actions[0], "secrets", "test", "hub-kubeconfig-secret")
-				testinghelper.AssertDelete(t, actions[1], "deployments", "test", "test-registration-agent")
-				testinghelper.AssertDelete(t, actions[2], "deployments", "test", "test-work-agent")
+				testingcommon.AssertDelete(t, actions[0], "secrets", "test", "hub-kubeconfig-secret")
+				testingcommon.AssertDelete(t, actions[1], "deployments", "test", "test-registration-agent")
+				testingcommon.AssertDelete(t, actions[2], "deployments", "test", "test-work-agent")
 			},
 		},
 		{
@@ -92,9 +91,9 @@ func TestSync(t *testing.T) {
 				newDeployment("test-work-agent", "test"),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelper.AssertDelete(t, actions[0], "secrets", "test", "hub-kubeconfig-secret")
-				testinghelper.AssertDelete(t, actions[1], "deployments", "test", "test-registration-agent")
-				testinghelper.AssertDelete(t, actions[2], "deployments", "test", "test-work-agent")
+				testingcommon.AssertDelete(t, actions[0], "secrets", "test", "hub-kubeconfig-secret")
+				testingcommon.AssertDelete(t, actions[1], "deployments", "test", "test-registration-agent")
+				testingcommon.AssertDelete(t, actions[2], "deployments", "test", "test-work-agent")
 			},
 		},
 	}
@@ -126,7 +125,7 @@ func TestSync(t *testing.T) {
 				secretLister:     kubeInformers.Core().V1().Secrets().Lister(),
 			}
 
-			syncContext := testinghelper.NewFakeSyncContext(t, c.queueKey)
+			syncContext := testingcommon.NewFakeSyncContext(t, c.queueKey)
 			if err := controller.sync(context.TODO(), syncContext); err != nil {
 				t.Errorf("Expected no errors, but got %v", err)
 			}

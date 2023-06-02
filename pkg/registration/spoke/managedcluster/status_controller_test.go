@@ -11,6 +11,7 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -75,7 +76,7 @@ func TestHealthCheck(t *testing.T) {
 		{
 			name:            "there are no managed clusters",
 			clusters:        []runtime.Object{},
-			validateActions: testinghelpers.AssertNoActions,
+			validateActions: testingcommon.AssertNoActions,
 			expectedErr:     "unable to get managed cluster \"testmanagedcluster\" from hub: managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
 		},
 		{
@@ -90,14 +91,14 @@ func TestHealthCheck(t *testing.T) {
 					Reason:  "ManagedClusterKubeAPIServerUnavailable",
 					Message: "The kube-apiserver is not ok, status code: 500, an error on the server (\"internal server error\") has prevented the request from succeeding",
 				}
-				testinghelpers.AssertActions(t, actions, "get", "patch")
+				testingcommon.AssertActions(t, actions, "get", "patch")
 				patch := actions[1].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
 					t.Fatal(err)
 				}
-				testinghelpers.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
+				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
 		},
 		{
@@ -127,14 +128,14 @@ func TestHealthCheck(t *testing.T) {
 						clusterv1.ResourceMemory: *resource.NewQuantity(int64(1024*1024*32), resource.BinarySI),
 					},
 				}
-				testinghelpers.AssertActions(t, actions, "get", "patch")
+				testingcommon.AssertActions(t, actions, "get", "patch")
 				patch := actions[1].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
 					t.Fatal(err)
 				}
-				testinghelpers.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
+				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
 				testinghelpers.AssertManagedClusterStatus(t, managedCluster.Status, expectedStatus)
 			},
 		},
@@ -150,14 +151,14 @@ func TestHealthCheck(t *testing.T) {
 					Reason:  "ManagedClusterAvailable",
 					Message: "Managed cluster is available",
 				}
-				testinghelpers.AssertActions(t, actions, "get", "patch")
+				testingcommon.AssertActions(t, actions, "get", "patch")
 				patch := actions[1].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
 					t.Fatal(err)
 				}
-				testinghelpers.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
+				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
 		},
 		{
@@ -172,14 +173,14 @@ func TestHealthCheck(t *testing.T) {
 					Reason:  "ManagedClusterAvailable",
 					Message: "Managed cluster is available",
 				}
-				testinghelpers.AssertActions(t, actions, "get", "patch")
+				testingcommon.AssertActions(t, actions, "get", "patch")
 				patch := actions[1].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
 					t.Fatal(err)
 				}
-				testinghelpers.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
+				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
 		},
 		{
@@ -219,14 +220,14 @@ func TestHealthCheck(t *testing.T) {
 						clusterv1.ResourceMemory: *resource.NewQuantity(int64(1024*1024*64), resource.BinarySI),
 					},
 				}
-				testinghelpers.AssertActions(t, actions, "get", "patch")
+				testingcommon.AssertActions(t, actions, "get", "patch")
 				patch := actions[1].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
 					t.Fatal(err)
 				}
-				testinghelpers.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
+				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
 				testinghelpers.AssertManagedClusterStatus(t, managedCluster.Status, expectedStatus)
 			},
 		},
@@ -261,8 +262,8 @@ func TestHealthCheck(t *testing.T) {
 				managedClusterDiscoveryClient: discoveryClient,
 				nodeLister:                    kubeInformerFactory.Core().V1().Nodes().Lister(),
 			}
-			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, ""))
-			testinghelpers.AssertError(t, syncErr, c.expectedErr)
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""))
+			testingcommon.AssertError(t, syncErr, c.expectedErr)
 
 			c.validateActions(t, clusterClient.Actions())
 		})

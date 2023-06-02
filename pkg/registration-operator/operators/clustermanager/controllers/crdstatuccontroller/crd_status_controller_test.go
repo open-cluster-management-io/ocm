@@ -18,7 +18,7 @@ import (
 	fakeoperatorlient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
-	testinghelper "open-cluster-management.io/ocm/pkg/registration-operator/helpers/testing"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/registration-operator/operators/clustermanager/controllers/migrationcontroller"
 )
 
@@ -26,7 +26,7 @@ func TestSync(t *testing.T) {
 	clusterManager := newClusterManager("testhub")
 	tc := newTestController(t, clusterManager)
 
-	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
+	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
 	//Do not support migration
 	err := tc.sync(context.Background(), syncContext)
 	if err != nil {

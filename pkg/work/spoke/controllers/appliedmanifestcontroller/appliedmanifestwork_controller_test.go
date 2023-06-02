@@ -17,6 +17,7 @@ import (
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
@@ -217,7 +218,7 @@ func TestSyncManifestWork(t *testing.T) {
 				rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(0, 1*time.Second),
 			}
 
-			controllerContext := spoketesting.NewFakeSyncContext(t, testingWork.Name)
+			controllerContext := testingcommon.NewFakeSyncContext(t, testingWork.Name)
 			err := controller.sync(context.TODO(), controllerContext)
 			if err != nil {
 				t.Fatal(err)

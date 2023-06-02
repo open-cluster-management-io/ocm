@@ -15,6 +15,7 @@ import (
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
@@ -83,13 +84,7 @@ func TestApplyUnstructred(t *testing.T) {
 			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 2 {
-					t.Errorf("Expect 2 actions, but have %d", len(actions))
-				}
-
-				spoketesting.AssertAction(t, actions[0], "get")
-				spoketesting.AssertAction(t, actions[1], "create")
-
+				testingcommon.AssertActions(t, actions, "get", "create")
 				obj := actions[1].(clienttesting.CreateActionImpl).Object.(*unstructured.Unstructured)
 				owners := obj.GetOwnerReferences()
 				if len(owners) != 1 {
@@ -111,8 +106,7 @@ func TestApplyUnstructred(t *testing.T) {
 					t.Errorf("Expect 2 actions, but have %d", len(actions))
 				}
 
-				spoketesting.AssertAction(t, actions[0], "get")
-				spoketesting.AssertAction(t, actions[1], "create")
+				testingcommon.AssertActions(t, actions, "get", "create")
 
 				obj := actions[1].(clienttesting.CreateActionImpl).Object.(*unstructured.Unstructured)
 				owners := obj.GetOwnerReferences()
@@ -133,8 +127,7 @@ func TestApplyUnstructred(t *testing.T) {
 					t.Errorf("Expect 2 actions, but have %d", len(actions))
 				}
 
-				spoketesting.AssertAction(t, actions[0], "get")
-				spoketesting.AssertAction(t, actions[1], "update")
+				testingcommon.AssertActions(t, actions, "get", "update")
 
 				obj := actions[1].(clienttesting.UpdateActionImpl).Object.(*unstructured.Unstructured)
 				owners := obj.GetOwnerReferences()
@@ -174,8 +167,7 @@ func TestApplyUnstructred(t *testing.T) {
 				if len(actions) != 2 {
 					t.Errorf("Expect 2 actions, but have %d", len(actions))
 				}
-				spoketesting.AssertAction(t, actions[0], "get")
-				spoketesting.AssertAction(t, actions[1], "update")
+				testingcommon.AssertActions(t, actions, "get", "update")
 
 				obj := actions[1].(clienttesting.UpdateActionImpl).Object.(*unstructured.Unstructured)
 				owners := obj.GetOwnerReferences()
@@ -204,8 +196,7 @@ func TestApplyUnstructred(t *testing.T) {
 				if len(actions) != 2 {
 					t.Errorf("Expect 2 actions, but have %d", len(actions))
 				}
-				spoketesting.AssertAction(t, actions[0], "get")
-				spoketesting.AssertAction(t, actions[1], "update")
+				testingcommon.AssertActions(t, actions, "get", "update")
 
 				obj := actions[1].(clienttesting.UpdateActionImpl).Object.(*unstructured.Unstructured)
 				labels := obj.GetLabels()
@@ -234,8 +225,7 @@ func TestApplyUnstructred(t *testing.T) {
 				if len(actions) != 2 {
 					t.Errorf("Expect 2 actions, but have %d", len(actions))
 				}
-				spoketesting.AssertAction(t, actions[0], "get")
-				spoketesting.AssertAction(t, actions[1], "update")
+				testingcommon.AssertActions(t, actions, "get", "update")
 
 				obj := actions[1].(clienttesting.UpdateActionImpl).Object.(*unstructured.Unstructured)
 				annotations := obj.GetAnnotations()
@@ -303,7 +293,7 @@ func TestApplyUnstructred(t *testing.T) {
 			applier := NewUpdateApply(dynamicClient, nil, nil)
 
 			c.required.SetOwnerReferences([]metav1.OwnerReference{c.owner})
-			syncContext := spoketesting.NewFakeSyncContext(t, "test")
+			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			_, _, err := applier.applyUnstructured(
 				context.TODO(), c.required, c.gvr, syncContext.Recorder())
 
@@ -335,8 +325,7 @@ func TestUpdateApplyKube(t *testing.T) {
 					t.Errorf("Expect 2 actions, but have %d", len(actions))
 				}
 
-				spoketesting.AssertAction(t, actions[0], "get")
-				spoketesting.AssertAction(t, actions[1], "create")
+				testingcommon.AssertActions(t, actions, "get", "create")
 			},
 		},
 		{
@@ -350,8 +339,7 @@ func TestUpdateApplyKube(t *testing.T) {
 					t.Errorf("Expect 2 actions, but have %d", len(actions))
 				}
 
-				spoketesting.AssertAction(t, actions[0], "get")
-				spoketesting.AssertAction(t, actions[1], "update")
+				testingcommon.AssertActions(t, actions, "get", "update")
 
 				obj := actions[1].(clienttesting.UpdateActionImpl).Object.(*corev1.Secret)
 				data, ok := obj.Data["test"]
@@ -372,7 +360,7 @@ func TestUpdateApplyKube(t *testing.T) {
 
 			applier := NewUpdateApply(nil, kubeclient, nil)
 
-			syncContext := spoketesting.NewFakeSyncContext(t, "test")
+			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			obj, err := applier.Apply(
 				context.TODO(), c.gvr, c.required, c.owner, nil, syncContext.Recorder())
 
@@ -441,7 +429,7 @@ func TestUpdateApplyDynamic(t *testing.T) {
 
 			applier := NewUpdateApply(dynamicclient, nil, nil)
 
-			syncContext := spoketesting.NewFakeSyncContext(t, "test")
+			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			obj, err := applier.Apply(
 				context.TODO(), c.gvr, c.required, c.owner, nil, syncContext.Recorder())
 
@@ -492,8 +480,7 @@ func TestUpdateApplyApiExtension(t *testing.T) {
 					t.Errorf("Expect 2 actions, but have %d", len(actions))
 				}
 
-				spoketesting.AssertAction(t, actions[0], "get")
-				spoketesting.AssertAction(t, actions[1], "create")
+				testingcommon.AssertActions(t, actions, "get", "create")
 			},
 		},
 		{
@@ -507,8 +494,7 @@ func TestUpdateApplyApiExtension(t *testing.T) {
 					t.Errorf("Expect 2 actions, but have %d", len(actions))
 				}
 
-				spoketesting.AssertAction(t, actions[0], "get")
-				spoketesting.AssertAction(t, actions[1], "update")
+				testingcommon.AssertActions(t, actions, "get", "update")
 			},
 		},
 	}
@@ -523,7 +509,7 @@ func TestUpdateApplyApiExtension(t *testing.T) {
 
 			applier := NewUpdateApply(nil, nil, apiextensionClient)
 
-			syncContext := spoketesting.NewFakeSyncContext(t, "test")
+			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			obj, err := applier.Apply(
 				context.TODO(), c.gvr, c.required, c.owner, nil, syncContext.Recorder())
 

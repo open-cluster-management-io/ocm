@@ -10,6 +10,7 @@ import (
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
@@ -28,14 +29,14 @@ func TestSyncTaintCluster(t *testing.T) {
 			name:            "ManagedClusterConditionAvailable conditionStatus is True",
 			startingObjects: []runtime.Object{testinghelpers.NewAvailableManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
 			name:            "ManagedClusterConditionAvailable conditionStatus is False",
 			startingObjects: []runtime.Object{testinghelpers.NewUnAvailableManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "update")
+				testingcommon.AssertActions(t, actions, "update")
 				managedCluster := (actions[0].(clienttesting.UpdateActionImpl).Object).(*v1.ManagedCluster)
 				taints := []v1.Taint{UnavailableTaint}
 				if !reflect.DeepEqual(managedCluster.Spec.Taints, taints) {
@@ -47,7 +48,7 @@ func TestSyncTaintCluster(t *testing.T) {
 			name:            "There is no ManagedClusterConditionAvailable",
 			startingObjects: []runtime.Object{testinghelpers.NewManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "update")
+				testingcommon.AssertActions(t, actions, "update")
 				managedCluster := (actions[0].(clienttesting.UpdateActionImpl).Object).(*v1.ManagedCluster)
 				taints := []v1.Taint{UnreachableTaint}
 				if !reflect.DeepEqual(managedCluster.Spec.Taints, taints) {
@@ -59,7 +60,7 @@ func TestSyncTaintCluster(t *testing.T) {
 			name:            "ManagedClusterConditionAvailable conditionStatus is Unknown",
 			startingObjects: []runtime.Object{testinghelpers.NewUnknownManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "update")
+				testingcommon.AssertActions(t, actions, "update")
 				managedCluster := (actions[0].(clienttesting.UpdateActionImpl).Object).(*v1.ManagedCluster)
 				taints := []v1.Taint{UnreachableTaint}
 				if !reflect.DeepEqual(managedCluster.Spec.Taints, taints) {
@@ -71,7 +72,7 @@ func TestSyncTaintCluster(t *testing.T) {
 			name:            "sync a deleted spoke cluster",
 			startingObjects: []runtime.Object{},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 	}
@@ -88,7 +89,7 @@ func TestSyncTaintCluster(t *testing.T) {
 			}
 
 			ctrl := taintController{clusterClient, clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(), eventstesting.NewTestingEventRecorder(t)}
-			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
-	testinghelpers "open-cluster-management.io/ocm/pkg/registration-operator/helpers/testing"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 func TestSync(t *testing.T) {
@@ -98,7 +98,7 @@ func TestSync(t *testing.T) {
 			namespaceInformer: kubeInformer.Core().V1().Namespaces(),
 		}
 
-		err := controller.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, tc.queueKey))
+		err := controller.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, tc.queueKey))
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 		}

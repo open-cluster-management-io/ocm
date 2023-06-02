@@ -6,6 +6,7 @@ import (
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,7 +31,7 @@ func TestCreateSpokeCluster(t *testing.T) {
 						CABundle: []byte("testcabundle"),
 					},
 				}
-				testinghelpers.AssertActions(t, actions, "get", "create")
+				testingcommon.AssertActions(t, actions, "get", "create")
 				actual := actions[1].(clienttesting.CreateActionImpl).Object
 				actualClientConfigs := actual.(*clusterv1.ManagedCluster).Spec.ManagedClusterClientConfigs
 				testinghelpers.AssertManagedClusterClientConfigs(t, actualClientConfigs, expectedClientConfigs)
@@ -40,7 +41,7 @@ func TestCreateSpokeCluster(t *testing.T) {
 			name:            "create an existed cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get", "update")
+				testingcommon.AssertActions(t, actions, "get", "update")
 			},
 		},
 	}
@@ -55,7 +56,7 @@ func TestCreateSpokeCluster(t *testing.T) {
 				hubClusterClient:        clusterClient,
 			}
 
-			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, ""))
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""))
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

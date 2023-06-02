@@ -10,8 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/registration-operator/helpers"
-	testinghelper "open-cluster-management.io/ocm/pkg/registration-operator/helpers/testing"
 )
 
 // TestSyncDelete test cleanup hub deploy
@@ -28,7 +28,7 @@ func TestSyncDelete(t *testing.T) {
 		newAppliedManifestWorks("testhost-2", []string{appliedManifestWorkFinalizer}, false),
 	}
 	controller := newTestController(t, klusterlet, appliedManifestWorks, namespace, bootstrapKubeConfigSecret)
-	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
 	err := controller.cleanupController.sync(context.TODO(), syncContext)
 	if err != nil {
@@ -86,7 +86,7 @@ func TestSyncDeleteHosted(t *testing.T) {
 		newAppliedManifestWorks("testhost-2", []string{appliedManifestWorkFinalizer}, false),
 	}
 	controller := newTestControllerHosted(t, klusterlet, appliedManifestWorks, bootstrapKubeConfigSecret, namespace /*externalManagedSecret*/)
-	syncContext := testinghelper.NewFakeSyncContext(t, klusterlet.Name)
+	syncContext := testingcommon.NewFakeSyncContext(t, klusterlet.Name)
 
 	err := controller.cleanupController.sync(context.TODO(), syncContext)
 	if err != nil {
@@ -150,7 +150,7 @@ func TestSyncDeleteHostedDeleteAgentNamespace(t *testing.T) {
 	now := metav1.Now()
 	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
 	controller := newTestControllerHosted(t, klusterlet, nil).setDefaultManagedClusterClientsBuilder()
-	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
 	err := controller.cleanupController.sync(context.TODO(), syncContext)
 	if err != nil {
@@ -159,7 +159,7 @@ func TestSyncDeleteHostedDeleteAgentNamespace(t *testing.T) {
 
 	kubeActions := controller.kubeClient.Actions()
 	// assert there last action is deleting the klusterlet agent namespace on the management cluster
-	testinghelper.AssertDelete(t, kubeActions[len(kubeActions)-1], "namespaces", "", "klusterlet")
+	testingcommon.AssertDelete(t, kubeActions[len(kubeActions)-1], "namespaces", "", "klusterlet")
 }
 
 func TestSyncDeleteHostedDeleteWaitKubeconfig(t *testing.T) {
@@ -167,7 +167,7 @@ func TestSyncDeleteHostedDeleteWaitKubeconfig(t *testing.T) {
 	now := metav1.Now()
 	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
 	controller := newTestControllerHosted(t, klusterlet, nil).setDefaultManagedClusterClientsBuilder()
-	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
 	err := controller.cleanupController.sync(context.TODO(), syncContext)
 	if err != nil {
@@ -188,7 +188,7 @@ func TestSyncAddHostedFinalizerWhenKubeconfigReady(t *testing.T) {
 		klusterletHostedFinalizer)
 
 	c := newTestControllerHosted(t, klusterlet, nil)
-	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
 	err := c.cleanupController.sync(context.TODO(), syncContext)
 	if err != nil {

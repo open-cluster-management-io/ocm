@@ -2,6 +2,7 @@ package clustermanagercontroller
 
 import (
 	"context"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"strings"
 	"testing"
 	"time"
@@ -30,7 +31,6 @@ import (
 	migrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/typed/migration/v1alpha1"
 
 	"open-cluster-management.io/ocm/pkg/registration-operator/helpers"
-	testinghelper "open-cluster-management.io/ocm/pkg/registration-operator/helpers/testing"
 )
 
 var (
@@ -272,7 +272,7 @@ func ensureObject(t *testing.T, object runtime.Object, hubCore *operatorapiv1.Cl
 
 	switch o := object.(type) {
 	case *corev1.Namespace:
-		testinghelper.AssertEqualNameNamespace(t, access.GetName(), "", helpers.ClusterManagerNamespace(hubCore.Name, hubCore.Spec.DeployOption.Mode), "")
+		testingcommon.AssertEqualNameNamespace(t, access.GetName(), "", helpers.ClusterManagerNamespace(hubCore.Name, hubCore.Spec.DeployOption.Mode), "")
 	case *appsv1.Deployment:
 		if strings.Contains(o.Name, "registration") && hubCore.Spec.RegistrationImagePullSpec != o.Spec.Template.Spec.Containers[0].Image {
 			t.Errorf("Registration image does not match to the expected.")
@@ -294,7 +294,7 @@ func TestSyncDeploy(t *testing.T) {
 	cd := setDeployment(clusterManager.Name, clusterManagerNamespace)
 	setup(t, tc, cd)
 
-	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
+	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
 
 	err := tc.clusterManagerController.sync(ctx, syncContext)
 	if err != nil {
@@ -312,7 +312,7 @@ func TestSyncDeploy(t *testing.T) {
 
 	// Check if resources are created as expected
 	// We expect create the namespace twice respectively in the management cluster and the hub cluster.
-	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 27)
+	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 27)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager)
 	}
@@ -326,7 +326,7 @@ func TestSyncDeploy(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(createCRDObjects), 11)
+	testingcommon.AssertEqualNumber(t, len(createCRDObjects), 11)
 }
 
 func TestSyncDeployNoWebhook(t *testing.T) {
@@ -334,7 +334,7 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 	tc := newTestController(t, clusterManager)
 	setup(t, tc, nil)
 
-	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
+	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
 
 	err := tc.clusterManagerController.sync(ctx, syncContext)
 	if err != nil {
@@ -352,7 +352,7 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 
 	// Check if resources are created as expected
 	// We expect create the namespace twice respectively in the management cluster and the hub cluster.
-	testinghelper.AssertEqualNumber(t, len(createKubeObjects), 28)
+	testingcommon.AssertEqualNumber(t, len(createKubeObjects), 28)
 	for _, object := range createKubeObjects {
 		ensureObject(t, object, clusterManager)
 	}
@@ -366,7 +366,7 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(createCRDObjects), 11)
+	testingcommon.AssertEqualNumber(t, len(createCRDObjects), 11)
 }
 
 // TestSyncDelete test cleanup hub deploy
@@ -378,7 +378,7 @@ func TestSyncDelete(t *testing.T) {
 	tc := newTestController(t, clusterManager)
 	setup(t, tc, nil)
 
-	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
+	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
 	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode)
 
 	err := tc.clusterManagerController.sync(ctx, syncContext)
@@ -394,7 +394,7 @@ func TestSyncDelete(t *testing.T) {
 			deleteKubeActions = append(deleteKubeActions, deleteKubeAction)
 		}
 	}
-	testinghelper.AssertEqualNumber(t, len(deleteKubeActions), 27) // delete namespace both from the hub cluster and the mangement cluster
+	testingcommon.AssertEqualNumber(t, len(deleteKubeActions), 27) // delete namespace both from the hub cluster and the mangement cluster
 
 	deleteCRDActions := []clienttesting.DeleteActionImpl{}
 	crdActions := tc.apiExtensionClient.Actions()
@@ -405,12 +405,12 @@ func TestSyncDelete(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	testinghelper.AssertEqualNumber(t, len(deleteCRDActions), 15)
+	testingcommon.AssertEqualNumber(t, len(deleteCRDActions), 15)
 
 	for _, action := range deleteKubeActions {
 		switch action.Resource.Resource {
 		case "namespaces":
-			testinghelper.AssertEqualNameNamespace(t, action.Name, "", clusterManagerNamespace, "")
+			testingcommon.AssertEqualNameNamespace(t, action.Name, "", clusterManagerNamespace, "")
 		}
 	}
 }
@@ -440,7 +440,7 @@ func TestDeleteCRD(t *testing.T) {
 			apiextensionsv1.Resource("customresourcedefinitions"), "clustermanagementaddons.addon.open-cluster-management.io")
 
 	})
-	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
+	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
 	err := tc.clusterManagerController.sync(ctx, syncContext)
 	if err == nil {
 		t.Fatalf("Expected error when sync at first time")

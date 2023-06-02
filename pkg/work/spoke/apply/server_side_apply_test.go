@@ -16,6 +16,7 @@ import (
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
@@ -45,11 +46,7 @@ func TestServerSideApply(t *testing.T) {
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			conflict: true,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("Expect 1 actions, but have %d", len(actions))
-				}
-
-				spoketesting.AssertAction(t, actions[0], "patch")
+				testingcommon.AssertActions(t, actions, "patch")
 			},
 		},
 	}
@@ -71,7 +68,7 @@ func TestServerSideApply(t *testing.T) {
 
 			applier := NewServerSideApply(dynamicClient)
 
-			syncContext := spoketesting.NewFakeSyncContext(t, "test")
+			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			option := &workapiv1.ManifestConfigOption{
 				UpdateStrategy: &workapiv1.UpdateStrategy{
 					Type: workapiv1.UpdateStrategyTypeServerSideApply,
