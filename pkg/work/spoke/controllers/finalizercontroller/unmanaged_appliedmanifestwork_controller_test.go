@@ -13,7 +13,7 @@ import (
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
-	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 func TestSyncUnamanagedAppliedWork(t *testing.T) {
@@ -56,11 +56,7 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 				},
 			},
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("Expect 1 actions on appliedmanifestwork, but have %d", len(actions))
-				}
-
-				spoketesting.AssertAction(t, actions[0], "patch")
+				testingcommon.AssertActions(t, actions, "patch")
 			},
 		},
 		{
@@ -89,11 +85,7 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 				},
 			},
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("Expect 1 actions on appliedmanifestwork, but have %d", len(actions))
-				}
-
-				spoketesting.AssertAction(t, actions[0], "patch")
+				testingcommon.AssertActions(t, actions, "patch")
 			},
 		},
 		{
@@ -128,11 +120,7 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 				},
 			},
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("Expect 1 actions on appliedmanifestwork, but have %d", len(actions))
-				}
-
-				spoketesting.AssertAction(t, actions[0], "delete")
+				testingcommon.AssertActions(t, actions, "delete")
 			},
 		},
 		{
@@ -166,11 +154,7 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 				},
 			},
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("Expect 1 actions on appliedmanifestwork, but have %d", len(actions))
-				}
-
-				spoketesting.AssertAction(t, actions[0], "patch")
+				testingcommon.AssertActions(t, actions, "patch")
 			},
 		},
 		{
@@ -227,7 +211,7 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 				rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(0, c.evictionGracePeriod),
 			}
 
-			controllerContext := spoketesting.NewFakeSyncContext(t, c.appliedManifestWorkName)
+			controllerContext := testingcommon.NewFakeSyncContext(t, c.appliedManifestWorkName)
 			if err := controller.sync(context.TODO(), controllerContext); err != nil {
 				t.Errorf("Expect no sync error, but got %v", err)
 			}

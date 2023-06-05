@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 func TestSyncManagedCluster(t *testing.T) {
@@ -30,14 +31,14 @@ func TestSyncManagedCluster(t *testing.T) {
 			name:            "sync a deleted spoke cluster",
 			startingObjects: []runtime.Object{},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
 			name:            "create a new spoke cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "patch")
+				testingcommon.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &v1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
@@ -57,21 +58,21 @@ func TestSyncManagedCluster(t *testing.T) {
 					Reason:  "HubClusterAdminAccepted",
 					Message: "Accepted by hub cluster admin",
 				}
-				testinghelpers.AssertActions(t, actions, "get", "patch")
+				testingcommon.AssertActions(t, actions, "get", "patch")
 				patch := actions[1].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &v1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
 					t.Fatal(err)
 				}
-				testinghelpers.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
+				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
 		},
 		{
 			name:            "sync an accepted spoke cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "get")
+				testingcommon.AssertActions(t, actions, "get")
 			},
 		},
 		{
@@ -84,21 +85,21 @@ func TestSyncManagedCluster(t *testing.T) {
 					Reason:  "HubClusterAdminDenied",
 					Message: "Denied by hub cluster admin",
 				}
-				testinghelpers.AssertActions(t, actions, "get", "patch")
+				testingcommon.AssertActions(t, actions, "get", "patch")
 				patch := actions[1].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &v1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
 					t.Fatal(err)
 				}
-				testinghelpers.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
+				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
 		},
 		{
 			name:            "delete a spoke cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewDeletingManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "patch")
+				testingcommon.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &v1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
@@ -123,7 +124,7 @@ func TestSyncManagedCluster(t *testing.T) {
 			}
 
 			ctrl := managedClusterController{kubeClient, clusterClient, clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(), resourceapply.NewResourceCache(), eventstesting.NewTestingEventRecorder(t)}
-			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
@@ -195,7 +196,7 @@ func TestFinalize(t *testing.T) {
 				rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(0, 1*time.Second),
 			}
 
-			controllerContext := spoketesting.NewFakeSyncContext(t, testingWork.Name)
+			controllerContext := testingcommon.NewFakeSyncContext(t, testingWork.Name)
 			err := controller.syncAppliedManifestWork(context.TODO(), controllerContext, testingWork)
 			if err != nil {
 				t.Fatal(err)

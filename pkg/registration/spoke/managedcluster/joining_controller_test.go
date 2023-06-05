@@ -9,6 +9,7 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,13 +27,13 @@ func TestSyncManagedCluster(t *testing.T) {
 		{
 			name:            "sync no managed cluster",
 			startingObjects: []runtime.Object{},
-			validateActions: testinghelpers.AssertNoActions,
+			validateActions: testingcommon.AssertNoActions,
 			expectedErr:     "unable to get managed cluster with name \"testmanagedcluster\" from hub: managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
 		},
 		{
 			name:            "sync an unaccepted managed cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewManagedCluster()},
-			validateActions: testinghelpers.AssertNoActions,
+			validateActions: testingcommon.AssertNoActions,
 		},
 		{
 			name:            "sync an accepted managed cluster",
@@ -44,14 +45,14 @@ func TestSyncManagedCluster(t *testing.T) {
 					Reason:  "ManagedClusterJoined",
 					Message: "Managed cluster joined",
 				}
-				testinghelpers.AssertActions(t, actions, "get", "patch")
+				testingcommon.AssertActions(t, actions, "get", "patch")
 				patch := actions[1].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
 					t.Fatal(err)
 				}
-				testinghelpers.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
+				testingcommon.AssertCondition(t, managedCluster.Status.Conditions, expectedCondition)
 			},
 		},
 	}
@@ -73,8 +74,8 @@ func TestSyncManagedCluster(t *testing.T) {
 				hubClusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 			}
 
-			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, ""))
-			testinghelpers.AssertError(t, syncErr, c.expectedErr)
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""))
+			testingcommon.AssertError(t, syncErr, c.expectedErr)
 
 			c.validateActions(t, clusterClient.Actions())
 		})

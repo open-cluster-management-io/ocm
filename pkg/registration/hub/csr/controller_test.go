@@ -8,6 +8,7 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/hub/user"
 
@@ -50,7 +51,7 @@ func TestSync(t *testing.T) {
 			startingClusters: []runtime.Object{},
 			startingCSRs:     []runtime.Object{},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
@@ -58,7 +59,7 @@ func TestSync(t *testing.T) {
 			startingClusters: []runtime.Object{},
 			startingCSRs:     []runtime.Object{testinghelpers.NewDeniedCSR(validCSR)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
@@ -66,7 +67,7 @@ func TestSync(t *testing.T) {
 			startingClusters: []runtime.Object{},
 			startingCSRs:     []runtime.Object{testinghelpers.NewApprovedCSR(validCSR)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
@@ -82,7 +83,7 @@ func TestSync(t *testing.T) {
 				ReqBlockType: validCSR.ReqBlockType,
 			})},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, actions)
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
@@ -90,7 +91,7 @@ func TestSync(t *testing.T) {
 			startingClusters: []runtime.Object{},
 			startingCSRs:     []runtime.Object{testinghelpers.NewCSR(validCSR)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "create")
+				testingcommon.AssertActions(t, actions, "create")
 				testinghelpers.AssertSubjectAccessReviewObj(t, actions[0].(clienttesting.CreateActionImpl).Object)
 			},
 		},
@@ -106,7 +107,7 @@ func TestSync(t *testing.T) {
 					Reason:  "AutoApprovedByHubCSRApprovingController",
 					Message: "Auto approving Managed cluster agent certificate after SubjectAccessReview.",
 				}
-				testinghelpers.AssertActions(t, actions, "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "update")
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				testinghelpers.AssertCSRCondition(t, actual.(*certificatesv1.CertificateSigningRequest).Status.Conditions, expectedCondition)
 			},
@@ -131,7 +132,7 @@ func TestSync(t *testing.T) {
 					Reason:  "AutoApprovedByHubCSRApprovingController",
 					Message: "Auto approving Managed cluster agent certificate after SubjectAccessReview.",
 				}
-				testinghelpers.AssertActions(t, actions, "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "update")
 				actual := actions[1].(clienttesting.UpdateActionImpl).Object
 				testinghelpers.AssertCSRCondition(t, actual.(*certificatesv1.CertificateSigningRequest).Status.Conditions, expectedCondition)
 			},
@@ -159,7 +160,7 @@ func TestSync(t *testing.T) {
 					Reason:  "AutoApprovedByHubCSRApprovingController",
 					Message: "Auto approving Managed cluster agent certificate after SubjectAccessReview.",
 				}
-				testinghelpers.AssertActions(t, actions, "update")
+				testingcommon.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
 				testinghelpers.AssertCSRCondition(t, actual.(*certificatesv1.CertificateSigningRequest).Status.Conditions, expectedCondition)
 			},
@@ -217,7 +218,7 @@ func TestSync(t *testing.T) {
 					),
 				},
 			}
-			syncErr := ctrl.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, validCSR.Name))
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, validCSR.Name))
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}

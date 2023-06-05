@@ -12,14 +12,10 @@ import (
 	"math/big"
 	"math/rand"
 	"net"
-	"testing"
 	"time"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
-
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 
 	certv1 "k8s.io/api/certificates/v1"
 	certv1beta1 "k8s.io/api/certificates/v1beta1"
@@ -34,31 +30,12 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
-	"k8s.io/client-go/util/workqueue"
 )
 
 const (
 	TestLeaseDurationSeconds int32 = 1
 	TestManagedClusterName         = "testmanagedcluster"
 )
-
-type FakeSyncContext struct {
-	spokeName string
-	recorder  events.Recorder
-	queue     workqueue.RateLimitingInterface
-}
-
-func (f FakeSyncContext) Queue() workqueue.RateLimitingInterface { return f.queue }
-func (f FakeSyncContext) QueueKey() string                       { return f.spokeName }
-func (f FakeSyncContext) Recorder() events.Recorder              { return f.recorder }
-
-func NewFakeSyncContext(t *testing.T, clusterName string) *FakeSyncContext {
-	return &FakeSyncContext{
-		spokeName: clusterName,
-		recorder:  eventstesting.NewTestingEventRecorder(t),
-		queue:     workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-	}
-}
 
 func NewManagedCluster() *clusterv1.ManagedCluster {
 	return &clusterv1.ManagedCluster{

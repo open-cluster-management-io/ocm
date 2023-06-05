@@ -18,7 +18,7 @@ import (
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
-	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 func TestFilterCSREvents(t *testing.T) {
@@ -146,7 +146,7 @@ func TestRegistrationSync(t *testing.T) {
 				if len(actions) != 1 {
 					t.Errorf("expect 1 actions but got %d", len(actions))
 				}
-				testinghelpers.AssertActions(t, actions, "delete")
+				testingcommon.AssertActions(t, actions, "delete")
 			},
 		},
 		{
@@ -171,7 +171,7 @@ func TestRegistrationSync(t *testing.T) {
 				if len(actions) != 1 {
 					t.Errorf("expect 1 actions but got %d", len(actions))
 				}
-				testinghelpers.AssertActions(t, actions, "delete")
+				testingcommon.AssertActions(t, actions, "delete")
 			},
 		},
 		{
@@ -191,7 +191,7 @@ func TestRegistrationSync(t *testing.T) {
 				if len(actions) != 1 {
 					t.Errorf("expect 1 actions but got %d", len(actions))
 				}
-				testinghelpers.AssertActions(t, actions, "delete")
+				testingcommon.AssertActions(t, actions, "delete")
 			},
 		},
 		{
@@ -238,7 +238,7 @@ func TestRegistrationSync(t *testing.T) {
 				if len(managementActions) != 1 {
 					t.Errorf("expect 1 management actions but got %d", len(managementActions))
 				}
-				testinghelpers.AssertActions(t, managementActions, "delete")
+				testingcommon.AssertActions(t, managementActions, "delete")
 			},
 		},
 		{
@@ -267,7 +267,7 @@ func TestRegistrationSync(t *testing.T) {
 				if len(managementActions) != 1 {
 					t.Errorf("expect 1 management actions but got %d", len(managementActions))
 				}
-				testinghelpers.AssertActions(t, managementActions, "delete")
+				testingcommon.AssertActions(t, managementActions, "delete")
 			},
 		},
 		{
@@ -297,7 +297,7 @@ func TestRegistrationSync(t *testing.T) {
 				if len(actions) != 1 {
 					t.Errorf("expect 1 management actions but got %d", len(actions))
 				}
-				testinghelpers.AssertActions(t, actions, "delete")
+				testingcommon.AssertActions(t, actions, "delete")
 			},
 		},
 		{
@@ -318,7 +318,7 @@ func TestRegistrationSync(t *testing.T) {
 				if len(managementActions) != 1 {
 					t.Errorf("expect 1 actions but got %d", len(managementActions))
 				}
-				testinghelpers.AssertActions(t, managementActions, "delete")
+				testingcommon.AssertActions(t, managementActions, "delete")
 			},
 		},
 		{
@@ -351,7 +351,7 @@ func TestRegistrationSync(t *testing.T) {
 				if len(actions) != 1 {
 					t.Errorf("expect 1 actions but got %d", len(actions))
 				}
-				testinghelpers.AssertActions(t, actions, "delete")
+				testingcommon.AssertActions(t, actions, "delete")
 			},
 		},
 	}
@@ -390,7 +390,7 @@ func TestRegistrationSync(t *testing.T) {
 				addOnRegistrationConfigs: c.addOnRegistrationConfigs,
 			}
 
-			err := controller.sync(context.Background(), testinghelpers.NewFakeSyncContext(t, c.queueKey))
+			err := controller.sync(context.Background(), testingcommon.NewFakeSyncContext(t, c.queueKey))
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

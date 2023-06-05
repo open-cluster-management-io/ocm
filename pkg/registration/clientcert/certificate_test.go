@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	certutil "k8s.io/client-go/util/cert"
 
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
@@ -217,7 +218,7 @@ func TestGetCertValidityPeriod(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			notBefore, notAfter, err := getCertValidityPeriod(c.secret)
-			testinghelpers.AssertError(t, err, c.expectedErr)
+			testingcommon.AssertError(t, err, c.expectedErr)
 			if err != nil {
 				return
 			}

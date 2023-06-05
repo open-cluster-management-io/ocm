@@ -18,6 +18,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/hub/user"
 )
@@ -54,12 +55,12 @@ func TestSync(t *testing.T) {
 			keyDataExpected: true,
 			csrNameExpected: true,
 			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, hubActions, "create")
+				testingcommon.AssertActions(t, hubActions, "create")
 				actual := hubActions[0].(clienttesting.CreateActionImpl).Object
 				if _, ok := actual.(*unstructured.Unstructured); !ok {
 					t.Errorf("expected csr was created, but failed")
 				}
-				testinghelpers.AssertActions(t, agentActions, "get")
+				testingcommon.AssertActions(t, agentActions, "get")
 			},
 		},
 		{
@@ -78,8 +79,8 @@ func TestSync(t *testing.T) {
 			},
 			approvedCSRCert: testinghelpers.NewTestCert(commonName, 10*time.Second),
 			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, hubActions, "get", "get")
-				testinghelpers.AssertActions(t, agentActions, "get", "update")
+				testingcommon.AssertActions(t, hubActions, "get", "get")
+				testingcommon.AssertActions(t, agentActions, "get", "update")
 				actual := agentActions[1].(clienttesting.UpdateActionImpl).Object
 				secret := actual.(*corev1.Secret)
 				valid, err := IsCertificateValid(secret.Data[TLSCertFile], testSubject)
@@ -102,8 +103,8 @@ func TestSync(t *testing.T) {
 				}),
 			},
 			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
-				testinghelpers.AssertNoActions(t, hubActions)
-				testinghelpers.AssertActions(t, agentActions, "get")
+				testingcommon.AssertNoActions(t, hubActions)
+				testingcommon.AssertActions(t, agentActions, "get")
 			},
 		},
 		{
@@ -119,12 +120,12 @@ func TestSync(t *testing.T) {
 			keyDataExpected: true,
 			csrNameExpected: true,
 			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, hubActions, "create")
+				testingcommon.AssertActions(t, hubActions, "create")
 				actual := hubActions[0].(clienttesting.CreateActionImpl).Object
 				if _, ok := actual.(*unstructured.Unstructured); !ok {
 					t.Errorf("expected csr was created, but failed")
 				}
-				testinghelpers.AssertActions(t, agentActions, "get")
+				testingcommon.AssertActions(t, agentActions, "get")
 			},
 		},
 		{
@@ -140,12 +141,12 @@ func TestSync(t *testing.T) {
 			csrNameExpected:              true,
 			additonalSecretDataSensitive: true,
 			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, hubActions, "create")
+				testingcommon.AssertActions(t, hubActions, "create")
 				actual := hubActions[0].(clienttesting.CreateActionImpl).Object
 				if _, ok := actual.(*unstructured.Unstructured); !ok {
 					t.Errorf("expected csr was created, but failed")
 				}
-				testinghelpers.AssertActions(t, agentActions, "get")
+				testingcommon.AssertActions(t, agentActions, "get")
 			},
 		},
 	}
@@ -207,7 +208,7 @@ func TestSync(t *testing.T) {
 				controller.keyData = c.approvedCSRCert.Key
 			}
 
-			err := controller.sync(context.TODO(), testinghelpers.NewFakeSyncContext(t, c.queueKey))
+			err := controller.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, c.queueKey))
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
 			}

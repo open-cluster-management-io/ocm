@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	testinghelper "open-cluster-management.io/ocm/pkg/registration-operator/helpers/testing"
-
 	fakeoperatorlient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
@@ -23,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	migrationv1alpha1 "sigs.k8s.io/kube-storage-version-migrator/pkg/apis/migration/v1alpha1"
 	fakemigrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/fake"
 	migrationv1alpha1client "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/typed/migration/v1alpha1"
@@ -395,7 +394,7 @@ func TestSync(t *testing.T) {
 	clusterManager := newClusterManager("testhub")
 	tc := newTestController(t, clusterManager)
 
-	syncContext := testinghelper.NewFakeSyncContext(t, "testhub")
+	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
 	//Do not support migration
 	err := tc.sync(context.Background(), syncContext)
 	if err != nil {

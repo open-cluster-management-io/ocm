@@ -19,7 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	clienttesting "k8s.io/client-go/testing"
-	testinghelpers "open-cluster-management.io/ocm/pkg/registration-operator/helpers/testing"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 func TestApplyV1CRD(t *testing.T) {
@@ -36,10 +36,7 @@ func TestApplyV1CRD(t *testing.T) {
 			requiredCRDs:   []runtime.Object{newV1CRD("foo", "")},
 			existingCRDs:   []runtime.Object{},
 			verify: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 2 {
-					t.Fatalf("actions are not expected: %v", actions)
-				}
-				testinghelpers.AssertAction(t, actions[1], "create")
+				testingcommon.AssertActions(t, actions, "get", "create")
 			},
 		},
 		{
@@ -48,10 +45,7 @@ func TestApplyV1CRD(t *testing.T) {
 			requiredCRDs:   []runtime.Object{newV1CRD("foo", "")},
 			existingCRDs:   []runtime.Object{newV1CRD("foo", "v0.8.0")},
 			verify: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 2 {
-					t.Fatalf("actions are not expected: %v", actions)
-				}
-				testinghelpers.AssertAction(t, actions[1], "update")
+				testingcommon.AssertActions(t, actions, "get", "update")
 				obj := actions[1].(clienttesting.UpdateActionImpl).Object
 				assertCRDVersion(t, obj, "0.9.0-16-g889bd8b")
 			},
@@ -62,10 +56,7 @@ func TestApplyV1CRD(t *testing.T) {
 			requiredCRDs:   []runtime.Object{newV1CRD("foo", "")},
 			existingCRDs:   []runtime.Object{newV1CRD("foo", "")},
 			verify: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 2 {
-					t.Fatalf("actions are not expected: %v", actions)
-				}
-				testinghelpers.AssertAction(t, actions[1], "update")
+				testingcommon.AssertActions(t, actions, "get", "update")
 				obj := actions[1].(clienttesting.UpdateActionImpl).Object
 				assertCRDVersion(t, obj, "0.9.0-16-g889bd8b")
 			},
@@ -76,10 +67,7 @@ func TestApplyV1CRD(t *testing.T) {
 			requiredCRDs:   []runtime.Object{newV1CRD("foo", "")},
 			existingCRDs:   []runtime.Object{newV1CRD("foo", "v0.9.0")},
 			verify: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatalf("actions are not expected: %v", actions)
-				}
-				testinghelpers.AssertAction(t, actions[0], "get")
+				testingcommon.AssertActions(t, actions, "get")
 			},
 		},
 		{
@@ -88,10 +76,7 @@ func TestApplyV1CRD(t *testing.T) {
 			requiredCRDs:   []runtime.Object{newV1CRD("foo", "")},
 			existingCRDs:   []runtime.Object{newV1CRD("foo", "0.0.0")},
 			verify: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatalf("actions are not expected: %v", actions)
-				}
-				testinghelpers.AssertAction(t, actions[0], "get")
+				testingcommon.AssertActions(t, actions, "get")
 			},
 		},
 	}
@@ -134,10 +119,7 @@ func TestApplyV1Beta1CRD(t *testing.T) {
 			requiredCRDs:   []runtime.Object{newV1Beta1CRD("foo", "")},
 			existingCRDs:   []runtime.Object{},
 			verify: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 2 {
-					t.Fatalf("actions are not expected: %v", actions)
-				}
-				testinghelpers.AssertAction(t, actions[1], "create")
+				testingcommon.AssertActions(t, actions, "get", "create")
 			},
 		},
 		{
@@ -146,10 +128,7 @@ func TestApplyV1Beta1CRD(t *testing.T) {
 			requiredCRDs:   []runtime.Object{newV1Beta1CRD("foo", "")},
 			existingCRDs:   []runtime.Object{newV1Beta1CRD("foo", "v0.8.0")},
 			verify: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 2 {
-					t.Fatalf("actions are not expected: %v", actions)
-				}
-				testinghelpers.AssertAction(t, actions[1], "update")
+				testingcommon.AssertActions(t, actions, "get", "update")
 				obj := actions[1].(clienttesting.UpdateActionImpl).Object
 				assertCRDVersion(t, obj, "0.9.0-16-g889bd8b")
 			},
@@ -160,10 +139,7 @@ func TestApplyV1Beta1CRD(t *testing.T) {
 			requiredCRDs:   []runtime.Object{newV1Beta1CRD("foo", "")},
 			existingCRDs:   []runtime.Object{newV1Beta1CRD("foo", "")},
 			verify: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 2 {
-					t.Fatalf("actions are not expected: %v", actions)
-				}
-				testinghelpers.AssertAction(t, actions[1], "update")
+				testingcommon.AssertActions(t, actions, "get", "update")
 				obj := actions[1].(clienttesting.UpdateActionImpl).Object
 				assertCRDVersion(t, obj, "0.9.0-16-g889bd8b")
 			},
@@ -174,10 +150,7 @@ func TestApplyV1Beta1CRD(t *testing.T) {
 			requiredCRDs:   []runtime.Object{newV1Beta1CRD("foo", "")},
 			existingCRDs:   []runtime.Object{newV1Beta1CRD("foo", "v0.9.0")},
 			verify: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatalf("actions are not expected: %v", actions)
-				}
-				testinghelpers.AssertAction(t, actions[0], "get")
+				testingcommon.AssertActions(t, actions, "get")
 			},
 		},
 	}
@@ -222,10 +195,7 @@ func TestClean(t *testing.T) {
 			requiredCRDs:   []runtime.Object{newV1CRD("foo", "")},
 			existingCRDs:   []runtime.Object{},
 			verify: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatalf("actions are not expected: %v", actions)
-				}
-				testinghelpers.AssertAction(t, actions[0], "delete")
+				testingcommon.AssertActions(t, actions, "delete")
 			},
 		},
 		{
@@ -235,10 +205,7 @@ func TestClean(t *testing.T) {
 			requiredCRDs:   []runtime.Object{newV1CRD("foo", "")},
 			existingCRDs:   []runtime.Object{newV1CRD("foo", "")},
 			verify: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatalf("actions are not expected: %v", actions)
-				}
-				testinghelpers.AssertAction(t, actions[0], "delete")
+				testingcommon.AssertActions(t, actions, "delete")
 			},
 		},
 		{
@@ -248,10 +215,7 @@ func TestClean(t *testing.T) {
 			requiredCRDs:   []runtime.Object{newV1CRD("foo", "")},
 			existingCRDs:   []runtime.Object{newV1CRD("foo", "0.9.0")},
 			verify: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 2 {
-					t.Fatalf("actions are not expected: %v", actions)
-				}
-				testinghelpers.AssertAction(t, actions[1], "update")
+				testingcommon.AssertActions(t, actions, "get", "update")
 				obj := actions[1].(clienttesting.UpdateActionImpl).Object
 				accessor, _ := meta.Accessor(obj)
 				if len(accessor.GetAnnotations()) != 0 {
@@ -266,10 +230,7 @@ func TestClean(t *testing.T) {
 			requiredCRDs:   []runtime.Object{newV1CRD("foo", "")},
 			existingCRDs:   []runtime.Object{newV1CRD("foo", "0.10.0")},
 			verify: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatalf("actions are not expected: %v", actions)
-				}
-				testinghelpers.AssertAction(t, actions[0], "get")
+				testingcommon.AssertActions(t, actions, "get")
 			},
 		},
 	}

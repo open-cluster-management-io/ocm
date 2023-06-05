@@ -2,6 +2,7 @@ package managedclusterset
 
 import (
 	"context"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"reflect"
 	"testing"
 	"time"
@@ -14,7 +15,6 @@ import (
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
-	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
 func TestSyncClusterSet(t *testing.T) {
@@ -377,7 +377,7 @@ func TestEnqueueUpdateClusterClusterSet(t *testing.T) {
 					t.Errorf("Failed to add clusterset: %v, error: %v", clusterset, err)
 				}
 			}
-			syncCtx := testinghelpers.NewFakeSyncContext(t, "fake")
+			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 
 			ctrl := managedClusterSetController{
 				clusterClient:    clusterClient,

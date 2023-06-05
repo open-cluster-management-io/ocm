@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
@@ -30,12 +31,7 @@ func TestCreateOnlyApply(t *testing.T) {
 			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 2 {
-					t.Errorf("Expect 2 actions, but have %d", len(actions))
-				}
-
-				spoketesting.AssertAction(t, actions[0], "get")
-				spoketesting.AssertAction(t, actions[1], "create")
+				testingcommon.AssertActions(t, actions, "get", "create")
 
 				obj := actions[1].(clienttesting.CreateActionImpl).Object.(*unstructured.Unstructured)
 				owners := obj.GetOwnerReferences()
@@ -55,11 +51,7 @@ func TestCreateOnlyApply(t *testing.T) {
 			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Errorf("Expect 1 actions, but have %d", len(actions))
-				}
-
-				spoketesting.AssertAction(t, actions[0], "get")
+				testingcommon.AssertActions(t, actions, "get")
 
 				action := actions[0].(clienttesting.GetActionImpl)
 				if action.Namespace != "ns1" || action.Name != "test" {
@@ -79,7 +71,7 @@ func TestCreateOnlyApply(t *testing.T) {
 			dynamicClient := fakedynamic.NewSimpleDynamicClient(scheme, objects...)
 			applier := NewCreateOnlyApply(dynamicClient)
 
-			syncContext := spoketesting.NewFakeSyncContext(t, "test")
+			syncContext := testingcommon.NewFakeSyncContext(t, "test")
 			obj, err := applier.Apply(
 				context.TODO(), c.gvr, c.required, c.owner, nil, syncContext.Recorder())
 

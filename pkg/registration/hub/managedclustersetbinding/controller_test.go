@@ -15,7 +15,7 @@ import (
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
-	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 func TestSync(t *testing.T) {
@@ -29,14 +29,14 @@ func TestSync(t *testing.T) {
 			name:              "wrong clustersetbinding",
 			clusterSets:       []runtime.Object{},
 			clusterSetBinding: newManagedClusterSetBinding("test", ""),
-			validateActions:   testinghelpers.AssertNoActions,
+			validateActions:   testingcommon.AssertNoActions,
 		},
 		{
 			name:              "no clusterset",
 			clusterSets:       []runtime.Object{},
 			clusterSetBinding: newManagedClusterSetBinding("test", "testns"),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "patch")
+				testingcommon.AssertActions(t, actions, "patch")
 				patchData := actions[0].(clienttesting.PatchActionImpl).Patch
 				binding := &clusterv1beta2.ManagedClusterSetBinding{}
 				err := json.Unmarshal(patchData, binding)
@@ -44,7 +44,7 @@ func TestSync(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				testinghelpers.AssertCondition(t, binding.Status.Conditions, metav1.Condition{
+				testingcommon.AssertCondition(t, binding.Status.Conditions, metav1.Condition{
 					Type:   clusterv1beta2.ClusterSetBindingBoundType,
 					Status: metav1.ConditionFalse,
 					Reason: "ClusterSetNotFound",
@@ -56,7 +56,7 @@ func TestSync(t *testing.T) {
 			clusterSets:       []runtime.Object{newManagedClusterSet("test")},
 			clusterSetBinding: newManagedClusterSetBinding("test", "testns"),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testinghelpers.AssertActions(t, actions, "patch")
+				testingcommon.AssertActions(t, actions, "patch")
 				patchData := actions[0].(clienttesting.PatchActionImpl).Patch
 				binding := &clusterv1beta2.ManagedClusterSetBinding{}
 				err := json.Unmarshal(patchData, binding)
@@ -64,7 +64,7 @@ func TestSync(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				testinghelpers.AssertCondition(t, binding.Status.Conditions, metav1.Condition{
+				testingcommon.AssertCondition(t, binding.Status.Conditions, metav1.Condition{
 					Type:   clusterv1beta2.ClusterSetBindingBoundType,
 					Status: metav1.ConditionTrue,
 					Reason: "ClusterSetBound",
@@ -83,7 +83,7 @@ func TestSync(t *testing.T) {
 				})
 				return binding
 			}(),
-			validateActions: testinghelpers.AssertNoActions,
+			validateActions: testingcommon.AssertNoActions,
 		},
 	}
 
@@ -113,7 +113,7 @@ func TestSync(t *testing.T) {
 
 			key, _ := cache.MetaNamespaceKeyFunc(c.clusterSetBinding)
 
-			syncErr := ctrl.sync(context.Background(), testinghelpers.NewFakeSyncContext(t, key))
+			syncErr := ctrl.sync(context.Background(), testingcommon.NewFakeSyncContext(t, key))
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)
 			}
@@ -172,7 +172,7 @@ func TestEnqueue(t *testing.T) {
 				}
 			}
 
-			syncCtx := testinghelpers.NewFakeSyncContext(t, "fake")
+			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 
 			ctrl := managedClusterSetBindingController{
 				clusterSetBindingIndexers: informerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Informer().GetIndexer(),

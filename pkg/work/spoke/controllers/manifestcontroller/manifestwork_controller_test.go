@@ -22,6 +22,7 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/basic"
@@ -202,33 +203,13 @@ func (t *testCase) validate(
 			actualAppliedWorkActions = append(actualAppliedWorkActions, workAction)
 		}
 	}
-	if len(actualWorkActions) != len(t.expectedWorkAction) {
-		ts.Errorf("Expected work client has %d action but got %#v", len(t.expectedWorkAction), actualWorkActions)
-	}
-	for index := range actualWorkActions {
-		spoketesting.AssertAction(ts, actualWorkActions[index], t.expectedWorkAction[index])
-	}
-	if len(actualAppliedWorkActions) != len(t.expectedAppliedWorkAction) {
-		ts.Errorf("Expected applied work client has %d action but got %#v", len(t.expectedAppliedWorkAction), actualAppliedWorkActions)
-	}
-	for index := range actualAppliedWorkActions {
-		spoketesting.AssertAction(ts, actualAppliedWorkActions[index], t.expectedAppliedWorkAction[index])
-	}
+	testingcommon.AssertActions(ts, actualWorkActions, t.expectedWorkAction...)
+	testingcommon.AssertActions(ts, actualAppliedWorkActions, t.expectedAppliedWorkAction...)
 
 	spokeDynamicActions := dynamicClient.Actions()
-	if len(spokeDynamicActions) != len(t.expectedDynamicAction) {
-		ts.Errorf("Expected dynamic client has %d action but got %#v", len(t.expectedDynamicAction), spokeDynamicActions)
-	}
-	for index := range spokeDynamicActions {
-		spoketesting.AssertAction(ts, spokeDynamicActions[index], t.expectedDynamicAction[index])
-	}
+	testingcommon.AssertActions(ts, spokeDynamicActions, t.expectedDynamicAction...)
 	spokeKubeActions := kubeClient.Actions()
-	if len(spokeKubeActions) != len(t.expectedKubeAction) {
-		ts.Errorf("Expected kube client has %d action but got %#v", len(t.expectedKubeAction), spokeKubeActions)
-	}
-	for index := range spokeKubeActions {
-		spoketesting.AssertAction(ts, spokeKubeActions[index], t.expectedKubeAction[index])
-	}
+	testingcommon.AssertActions(ts, spokeKubeActions, t.expectedKubeAction...)
 
 	actual, ok := actualWorkActions[len(actualWorkActions)-1].(clienttesting.UpdateActionImpl)
 	if !ok {
@@ -335,7 +316,7 @@ func TestSync(t *testing.T) {
 			controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
 				withKubeObject(c.spokeObject...).
 				withUnstructuredObject(c.spokeDynamicObject...)
-			syncContext := spoketesting.NewFakeSyncContext(t, workKey)
+			syncContext := testingcommon.NewFakeSyncContext(t, workKey)
 			err := controller.toController().sync(context.TODO(), syncContext)
 			if err != nil {
 				t.Errorf("Should be success with no err: %v", err)
@@ -375,7 +356,7 @@ func TestFailedToApplyResource(t *testing.T) {
 
 		return true, &corev1.Secret{}, fmt.Errorf("Fake error")
 	})
-	syncContext := spoketesting.NewFakeSyncContext(t, workKey)
+	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
 	err := controller.toController().sync(context.TODO(), syncContext)
 	if err == nil {
 		t.Errorf("Should return an err")
@@ -454,7 +435,7 @@ func TestUpdateStrategy(t *testing.T) {
 			controller.dynamicClient.PrependReactor("patch", "newobjects", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 				return true, spoketesting.NewUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}}), nil // clusterroleaggregator drops returned objects so no point in constructing them
 			})
-			syncContext := spoketesting.NewFakeSyncContext(t, workKey)
+			syncContext := testingcommon.NewFakeSyncContext(t, workKey)
 			err := controller.toController().sync(context.TODO(), syncContext)
 			if err != nil {
 				t.Errorf("Should be success with no err: %v", err)
@@ -487,7 +468,7 @@ func TestServerSideApplyConflict(t *testing.T) {
 	controller.dynamicClient.PrependReactor("patch", "newobjects", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 		return true, nil, errors.NewConflict(schema.GroupResource{Resource: "newobjects"}, "n1", fmt.Errorf("conflict error"))
 	})
-	syncContext := spoketesting.NewFakeSyncContext(t, workKey)
+	syncContext := testingcommon.NewFakeSyncContext(t, workKey)
 	err := controller.toController().sync(context.TODO(), syncContext)
 	if err != nil {
 		t.Errorf("Should be success with no err: %v", err)

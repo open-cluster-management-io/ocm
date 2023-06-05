@@ -33,6 +33,7 @@ import (
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/registration-operator/helpers"
 	testinghelper "open-cluster-management.io/ocm/pkg/registration-operator/helpers/testing"
 )
@@ -425,7 +426,7 @@ func ensureObject(t *testing.T, object runtime.Object, klusterlet *operatorapiv1
 	switch o := object.(type) {
 	case *appsv1.Deployment:
 		if strings.Contains(access.GetName(), "registration") {
-			testinghelper.AssertEqualNameNamespace(
+			testingcommon.AssertEqualNameNamespace(
 				t, access.GetName(), access.GetNamespace(),
 				fmt.Sprintf("%s-registration-agent", klusterlet.Name), namespace)
 			if klusterlet.Spec.RegistrationImagePullSpec != o.Spec.Template.Spec.Containers[0].Image {
@@ -433,7 +434,7 @@ func ensureObject(t *testing.T, object runtime.Object, klusterlet *operatorapiv1
 				return
 			}
 		} else if strings.Contains(access.GetName(), "work") {
-			testinghelper.AssertEqualNameNamespace(
+			testingcommon.AssertEqualNameNamespace(
 				t, access.GetName(), access.GetNamespace(),
 				fmt.Sprintf("%s-work-agent", klusterlet.Name), namespace)
 			if klusterlet.Spec.WorkImagePullSpec != o.Spec.Template.Spec.Containers[0].Image {
@@ -455,7 +456,7 @@ func TestSyncDeploy(t *testing.T) {
 	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	namespace := newNamespace("testns")
 	controller := newTestController(t, klusterlet, nil, bootStrapSecret, hubKubeConfigSecret, namespace)
-	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
 	err := controller.controller.sync(context.TODO(), syncContext)
 	if err != nil {
@@ -498,8 +499,8 @@ func TestSyncDeploy(t *testing.T) {
 		t.Errorf("Expect 4 actions in the sync loop, actual %#v", operatorAction)
 	}
 
-	testinghelper.AssertGet(t, operatorAction[0], "operator.open-cluster-management.io", "v1", "klusterlets")
-	testinghelper.AssertAction(t, operatorAction[1], "update")
+	testingcommon.AssertGet(t, operatorAction[0], "operator.open-cluster-management.io", "v1", "klusterlets")
+	testingcommon.AssertAction(t, operatorAction[1], "update")
 	testinghelper.AssertOnlyConditions(
 		t, operatorAction[1].(clienttesting.UpdateActionImpl).Object,
 		testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
@@ -524,7 +525,7 @@ func TestSyncDeployHosted(t *testing.T) {
 	pullSecret := newSecret(imagePullSecret, "open-cluster-management")
 
 	controller := newTestControllerHosted(t, klusterlet, nil, bootStrapSecret, hubKubeConfigSecret, namespace, pullSecret /*externalManagedSecret*/)
-	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
 	err := controller.controller.sync(context.TODO(), syncContext)
 	if err != nil {
@@ -599,9 +600,9 @@ func TestSyncDeployHosted(t *testing.T) {
 		t.Errorf("Expect 3 actions in the sync loop, actual %#v", len(operatorAction))
 	}
 
-	testinghelper.AssertGet(t, operatorAction[0], "operator.open-cluster-management.io", "v1", "klusterlets")
-	testinghelper.AssertGet(t, operatorAction[1], "operator.open-cluster-management.io", "v1", "klusterlets")
-	testinghelper.AssertAction(t, operatorAction[2], "update")
+	testingcommon.AssertGet(t, operatorAction[0], "operator.open-cluster-management.io", "v1", "klusterlets")
+	testingcommon.AssertGet(t, operatorAction[1], "operator.open-cluster-management.io", "v1", "klusterlets")
+	testingcommon.AssertAction(t, operatorAction[2], "update")
 
 	conditionReady := testinghelper.NamedCondition(klusterletReadyToApply, "KlusterletPrepared", metav1.ConditionTrue)
 	conditionApplied := testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue)
@@ -619,7 +620,7 @@ func TestSyncDeployHostedCreateAgentNamespace(t *testing.T) {
 		Message: fmt.Sprintf("Failed to build managed cluster clients: secrets \"external-managed-kubeconfig\" not found"),
 	})
 	controller := newTestControllerHosted(t, klusterlet, nil).setDefaultManagedClusterClientsBuilder()
-	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
 	err := controller.controller.sync(context.TODO(), syncContext)
 	if !errors.IsNotFound(err) {
@@ -627,8 +628,8 @@ func TestSyncDeployHostedCreateAgentNamespace(t *testing.T) {
 	}
 
 	kubeActions := controller.kubeClient.Actions()
-	testinghelper.AssertGet(t, kubeActions[0], "", "v1", "namespaces")
-	testinghelper.AssertAction(t, kubeActions[1], "create")
+	testingcommon.AssertGet(t, kubeActions[0], "", "v1", "namespaces")
+	testingcommon.AssertAction(t, kubeActions[1], "create")
 	if kubeActions[1].GetResource().Resource != "namespaces" {
 		t.Errorf("expect object namespaces, but got %v", kubeActions[2].GetResource().Resource)
 	}
@@ -690,7 +691,7 @@ func TestReplica(t *testing.T) {
 	}
 
 	controller := newTestController(t, klusterlet, nil, objects...)
-	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
 	err := controller.controller.sync(context.TODO(), syncContext)
 	if err != nil {
@@ -754,7 +755,7 @@ func TestClusterNameChange(t *testing.T) {
 	hubSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
 	hubSecret.Data["cluster-name"] = []byte("cluster1")
 	controller := newTestController(t, klusterlet, nil, bootStrapSecret, hubSecret, namespace)
-	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
 	err := controller.controller.sync(context.TODO(), syncContext)
 	if err != nil {
@@ -769,8 +770,8 @@ func TestClusterNameChange(t *testing.T) {
 		t.Errorf("Expect 2 actions in the sync loop, actual %#v", operatorAction)
 	}
 
-	testinghelper.AssertGet(t, operatorAction[0], "operator.open-cluster-management.io", "v1", "klusterlets")
-	testinghelper.AssertAction(t, operatorAction[1], "update")
+	testingcommon.AssertGet(t, operatorAction[0], "operator.open-cluster-management.io", "v1", "klusterlets")
+	testingcommon.AssertAction(t, operatorAction[1], "update")
 	updatedKlusterlet := operatorAction[1].(clienttesting.UpdateActionImpl).Object.(*operatorapiv1.Klusterlet)
 	testinghelper.AssertOnlyGenerationStatuses(
 		t, updatedKlusterlet,
@@ -841,7 +842,7 @@ func TestSyncWithPullSecret(t *testing.T) {
 	namespace := newNamespace("testns")
 	pullSecret := newSecret(imagePullSecret, "open-cluster-management")
 	controller := newTestController(t, klusterlet, nil, bootStrapSecret, hubKubeConfigSecret, namespace, pullSecret)
-	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
 	err := controller.controller.sync(context.TODO(), syncContext)
 	if err != nil {
@@ -873,7 +874,7 @@ func TestDeployOnKube111(t *testing.T) {
 	kubeVersion, _ := version.ParseGeneric("v1.11.0")
 	controller.controller.kubeVersion = kubeVersion
 	controller.cleanupController.kubeVersion = kubeVersion
-	syncContext := testinghelper.NewFakeSyncContext(t, "klusterlet")
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
 
 	ctx := context.TODO()
 	err := controller.controller.sync(ctx, syncContext)
@@ -904,8 +905,8 @@ func TestDeployOnKube111(t *testing.T) {
 		t.Errorf("Expect 4 actions in the sync loop, actual %#v", operatorAction)
 	}
 
-	testinghelper.AssertGet(t, operatorAction[0], "operator.open-cluster-management.io", "v1", "klusterlets")
-	testinghelper.AssertAction(t, operatorAction[1], "update")
+	testingcommon.AssertGet(t, operatorAction[0], "operator.open-cluster-management.io", "v1", "klusterlets")
+	testingcommon.AssertAction(t, operatorAction[1], "update")
 	testinghelper.AssertOnlyConditions(
 		t, operatorAction[1].(clienttesting.UpdateActionImpl).Object,
 		testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue),

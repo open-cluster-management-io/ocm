@@ -8,45 +8,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	clienttesting "k8s.io/client-go/testing"
-
 	opratorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/ocm/pkg/registration-operator/helpers"
 )
-
-func AssertAction(t *testing.T, actual clienttesting.Action, expected string) {
-	if actual.GetVerb() != expected {
-		t.Errorf("expected %s action but got: %#v", expected, actual)
-	}
-}
-
-func AssertGet(t *testing.T, actual clienttesting.Action, group, version, resource string) {
-	t.Helper()
-	if actual.GetVerb() != "get" {
-		t.Error(spew.Sdump(actual))
-	}
-	if actual.GetResource() != (schema.GroupVersionResource{Group: group, Version: version, Resource: resource}) {
-		t.Error(spew.Sdump(actual))
-	}
-}
-
-func AssertDelete(t *testing.T, actual clienttesting.Action, resource, namespace, name string) {
-	t.Helper()
-	deleteAction, ok := actual.(clienttesting.DeleteAction)
-	if !ok {
-		t.Error(spew.Sdump(actual))
-	}
-	if deleteAction.GetResource().Resource != resource {
-		t.Error(spew.Sdump(actual))
-	}
-	if deleteAction.GetNamespace() != namespace {
-		t.Error(spew.Sdump(actual))
-	}
-	if deleteAction.GetName() != name {
-		t.Error(spew.Sdump(actual))
-	}
-}
 
 func NamedCondition(name, reason string, status metav1.ConditionStatus) metav1.Condition {
 	return metav1.Condition{Type: name, Status: status, Reason: reason}
@@ -118,20 +82,4 @@ func AssertOnlyGenerationStatuses(t *testing.T, actual runtime.Object, expectedG
 		}
 	}
 
-}
-
-func AssertEqualNumber(t *testing.T, actual, expected int) {
-	if actual != expected {
-		t.Errorf("expected %d number of actions but got: %d", expected, actual)
-	}
-}
-
-func AssertEqualNameNamespace(t *testing.T, actualName, actualNamespace, name, namespace string) {
-	if actualName != name {
-		t.Errorf("Name of the object does not match, expected %s, actual %s", name, actualName)
-	}
-
-	if actualNamespace != namespace {
-		t.Errorf("Namespace of the object does not match, expected %s, actual %s", namespace, actualNamespace)
-	}
 }

@@ -22,6 +22,7 @@ import (
 	fakeoperatorclient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/registration-operator/helpers"
 	testinghelper "open-cluster-management.io/ocm/pkg/registration-operator/helpers/testing"
 )
@@ -244,7 +245,7 @@ func TestSync(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			controller := newTestController(t, c.klusterlet, c.object...)
-			syncContext := testinghelper.NewFakeSyncContext(t, c.klusterlet.Name)
+			syncContext := testingcommon.NewFakeSyncContext(t, c.klusterlet.Name)
 
 			response.allowToOperateManagedClusters = c.allowToOperateManagedClusters
 			response.allowToOperateManagedClusterStatus = c.allowToOperateManagedClusterStatus
@@ -262,9 +263,9 @@ func TestSync(t *testing.T) {
 
 			operatorActions := controller.operatorClient.Actions()
 
-			testinghelper.AssertEqualNumber(t, len(operatorActions), 2)
-			testinghelper.AssertGet(t, operatorActions[0], "operator.open-cluster-management.io", "v1", "klusterlets")
-			testinghelper.AssertAction(t, operatorActions[1], "update")
+			testingcommon.AssertEqualNumber(t, len(operatorActions), 2)
+			testingcommon.AssertGet(t, operatorActions[0], "operator.open-cluster-management.io", "v1", "klusterlets")
+			testingcommon.AssertAction(t, operatorActions[1], "update")
 			testinghelper.AssertOnlyConditions(t, operatorActions[1].(clienttesting.UpdateActionImpl).Object, c.expectedConditions...)
 		})
 	}
