@@ -25,6 +25,7 @@ endif
 
 # Add packages to do unit test
 GO_TEST_PACKAGES :=./pkg/...
+GO_TEST_FLAGS := -race -coverprofile=coverage.out
 
 IMAGE_REGISTRY?=quay.io/open-cluster-management
 IMAGE_TAG?=latest
