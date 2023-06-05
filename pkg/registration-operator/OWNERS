@@ -1,0 +1,5 @@
+approvers:
+- registration-operator
+
+reviewers:
+- registration-operator

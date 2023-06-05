@@ -1,0 +1,24 @@
+# See the OWNERS_ALIASES docs: https://git.k8s.io/community/contributors/guide/owners.md#owners_aliases
+
+aliases:
+  registration-operator:
+  - deads2k
+  - pmorie
+  - qiujian16
+  - zhiweiyin318
+  registration:
+  - deads2k
+  - pmorie
+  - qiujian16
+  - skeeey
+  work:
+  - deads2k
+  - pmorie
+  - qiujian16
+  - elgnay
+  placement:
+  - deads2k
+  - qiujian16
+  - elgnay
+  - suigh
+  - haoqing0110
