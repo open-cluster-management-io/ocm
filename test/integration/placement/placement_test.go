@@ -3,8 +3,9 @@ package placement
 import (
 	"context"
 	"fmt"
-	"open-cluster-management.io/ocm/test/integration/util"
 	"time"
+
+	"open-cluster-management.io/ocm/test/integration/util"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -125,11 +126,7 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertCreatingPlacementWithDecision(placementName, namespace, noc(10), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 
 			// update ClusterSets
-			placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			placement.Spec.ClusterSets = []string{clusterSet1Name}
-			placement, err = clusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			assertUpdatingPlacement(placementName, namespace, noc(10), []string{clusterSet1Name}, []clusterapiv1beta1.ClusterPredicate{}, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 
 			assertNumberOfDecisions(placementName, namespace, 2)
 		})
@@ -142,9 +139,7 @@ var _ = ginkgo.Describe("Placement", func() {
 
 			ginkgo.By("add the predicates")
 			// add a predicates
-			placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			placement.Spec.Predicates = []clusterapiv1beta1.ClusterPredicate{
+			predicates := []clusterapiv1beta1.ClusterPredicate{
 				{
 					RequiredClusterSelector: clusterapiv1beta1.ClusterSelector{
 						LabelSelector: metav1.LabelSelector{
@@ -155,15 +150,12 @@ var _ = ginkgo.Describe("Placement", func() {
 					},
 				},
 			}
-			placement, err = clusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			assertUpdatingPlacement(placementName, namespace, noc(10), []string{}, predicates, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 			assertNumberOfDecisions(placementName, namespace, 3)
 
 			ginkgo.By("change the predicates")
 			// change the predicates
-			placement, err = clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			placement.Spec.Predicates = []clusterapiv1beta1.ClusterPredicate{
+			predicates = []clusterapiv1beta1.ClusterPredicate{
 				{
 					RequiredClusterSelector: clusterapiv1beta1.ClusterSelector{
 						LabelSelector: metav1.LabelSelector{
@@ -174,8 +166,7 @@ var _ = ginkgo.Describe("Placement", func() {
 					},
 				},
 			}
-			placement, err = clusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			assertUpdatingPlacement(placementName, namespace, noc(10), []string{}, predicates, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 			assertNumberOfDecisions(placementName, namespace, 2)
 		})
 
@@ -187,9 +178,7 @@ var _ = ginkgo.Describe("Placement", func() {
 
 			ginkgo.By("add the predicates")
 			// add a predicates
-			placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			placement.Spec.Predicates = []clusterapiv1beta1.ClusterPredicate{
+			predicates := []clusterapiv1beta1.ClusterPredicate{
 				{
 					RequiredClusterSelector: clusterapiv1beta1.ClusterSelector{
 						ClaimSelector: clusterapiv1beta1.ClusterClaimSelector{
@@ -204,15 +193,12 @@ var _ = ginkgo.Describe("Placement", func() {
 					},
 				},
 			}
-			_, err = clusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			assertUpdatingPlacement(placementName, namespace, noc(10), []string{}, predicates, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 			assertNumberOfDecisions(placementName, namespace, 3)
 
 			ginkgo.By("change the predicates")
 			// change the predicates
-			placement, err = clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			placement.Spec.Predicates = []clusterapiv1beta1.ClusterPredicate{
+			predicates = []clusterapiv1beta1.ClusterPredicate{
 				{
 					RequiredClusterSelector: clusterapiv1beta1.ClusterSelector{
 						ClaimSelector: clusterapiv1beta1.ClusterClaimSelector{
@@ -227,8 +213,7 @@ var _ = ginkgo.Describe("Placement", func() {
 					},
 				},
 			}
-			_, err = clusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			assertUpdatingPlacement(placementName, namespace, noc(10), []string{}, predicates, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 			assertNumberOfDecisions(placementName, namespace, 2)
 		})
 
@@ -238,12 +223,8 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertCreatingPlacementWithDecision(placementName, namespace, noc(10), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 
 			ginkgo.By("Reduce NOC of the placement")
-			placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			noc := int32(4)
-			placement.Spec.NumberOfClusters = &noc
-			placement, err = clusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			assertUpdatingPlacement(placementName, namespace, &noc, []string{}, []clusterapiv1beta1.ClusterPredicate{}, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 
 			nod := int(noc)
 			assertNumberOfDecisions(placementName, namespace, nod)
@@ -256,12 +237,8 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertCreatingPlacementWithDecision(placementName, namespace, noc(5), 5, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 
 			ginkgo.By("Increase NOC of the placement")
-			placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			noc := int32(8)
-			placement.Spec.NumberOfClusters = &noc
-			placement, err = clusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			assertUpdatingPlacement(placementName, namespace, &noc, []string{}, []clusterapiv1beta1.ClusterPredicate{}, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 
 			nod := int(noc)
 			assertNumberOfDecisions(placementName, namespace, nod)
@@ -282,7 +259,7 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertNumberOfDecisions(placementName, namespace, 0)
 			assertPlacementConditionMisconfigured(placementName, namespace, true)
 
-			assertUpdatingPlacement(placementName, namespace, noc(1), clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
+			assertUpdatingPlacement(placementName, namespace, noc(1), []string{}, []clusterapiv1beta1.ClusterPredicate{}, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{})
 			assertNumberOfDecisions(placementName, namespace, 1)
 			assertPlacementConditionMisconfigured(placementName, namespace, false)
 			assertPlacementConditionSatisfied(placementName, namespace, 1, true)
