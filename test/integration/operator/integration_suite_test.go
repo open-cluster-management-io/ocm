@@ -24,8 +24,8 @@ import (
 
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
-	"open-cluster-management.io/ocm/pkg/registration-operator/operators/klusterlet/controllers/bootstrapcontroller"
-	"open-cluster-management.io/ocm/pkg/registration-operator/operators/klusterlet/controllers/ssarcontroller"
+	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/bootstrapcontroller"
+	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/ssarcontroller"
 )
 
 func TestIntegration(t *testing.T) {
@@ -73,7 +73,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	var err error
 
-	// install registration-operator CRDs and start a local kube-apiserver
+	// install operator CRDs and start a local kube-apiserver
 	testEnv = &envtest.Environment{
 		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths: []string{

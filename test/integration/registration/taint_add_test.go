@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	v1 "open-cluster-management.io/api/cluster/v1"
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/taint"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
@@ -34,12 +35,13 @@ var _ = ginkgo.Describe("ManagedCluster Taints Update", func() {
 		// run registration agent
 		go func() {
 			agentOptions := spoke.SpokeAgentOptions{
-				ClusterName:              managedClusterName,
+				AgentOptions:             commonoptions.NewAgentOptions(),
 				BootstrapKubeconfig:      bootstrapKubeConfigFile,
 				HubKubeconfigSecret:      hubKubeconfigSecret,
 				HubKubeconfigDir:         hubKubeconfigDir,
 				ClusterHealthCheckPeriod: 1 * time.Minute,
 			}
+			agentOptions.AgentOptions.SpokeClusterName = managedClusterName
 			err := agentOptions.RunSpokeAgent(ctx, &controllercmd.ControllerContext{
 				KubeConfig:    spokeCfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("cluster-tainttest"),

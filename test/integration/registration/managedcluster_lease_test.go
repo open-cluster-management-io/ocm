@@ -3,6 +3,7 @@ package registration_test
 import (
 	"context"
 	"fmt"
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/test/integration/util"
 	"path"
 	"time"
@@ -32,12 +33,13 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 	ginkgo.It("managed cluster lease should be updated constantly", func() {
 		// run registration agent
 		agentOptions := spoke.SpokeAgentOptions{
-			ClusterName:              managedClusterName,
+			AgentOptions:             commonoptions.NewAgentOptions(),
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
+		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
 		cancel := runAgent("cluster-leasetest", agentOptions, spokeCfg)
 		defer cancel()
 
@@ -50,12 +52,13 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 	ginkgo.It("managed cluster available condition should be recovered after its lease update is recovered", func() {
 		// run registration agent
 		agentOptions := spoke.SpokeAgentOptions{
-			ClusterName:              managedClusterName,
+			AgentOptions:             commonoptions.NewAgentOptions(),
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
+		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
 		stop := runAgent("cluster-availabletest", agentOptions, spokeCfg)
 
 		bootstrapManagedCluster(managedClusterName, hubKubeconfigSecret, util.TestLeaseDurationSeconds)
@@ -69,12 +72,13 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 		assertAvailableCondition(managedClusterName, metav1.ConditionUnknown, gracePeriod)
 
 		agentOptions = spoke.SpokeAgentOptions{
-			ClusterName:              managedClusterName,
+			AgentOptions:             commonoptions.NewAgentOptions(),
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
+		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
 		stop = runAgent("cluster-availabletest", agentOptions, spokeCfg)
 		defer stop()
 
@@ -86,12 +90,13 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 	ginkgo.It("managed cluster available condition should be recovered after the cluster is restored", func() {
 		// run registration agent
 		agentOptions := spoke.SpokeAgentOptions{
-			ClusterName:              managedClusterName,
+			AgentOptions:             commonoptions.NewAgentOptions(),
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
+		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
 		cancel := runAgent("cluster-leasetest", agentOptions, spokeCfg)
 		defer cancel()
 
@@ -136,12 +141,13 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 	ginkgo.It("should use a short lease duration", func() {
 		// run registration agent
 		agentOptions := spoke.SpokeAgentOptions{
-			ClusterName:              managedClusterName,
+			AgentOptions:             commonoptions.NewAgentOptions(),
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
+		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
 		stop := runAgent("cluster-leasetest", agentOptions, spokeCfg)
 
 		bootstrapManagedCluster(managedClusterName, hubKubeconfigSecret, 60)

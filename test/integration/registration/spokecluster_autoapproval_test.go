@@ -2,6 +2,7 @@ package registration_test
 
 import (
 	"fmt"
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/test/integration/util"
 	"path"
 	"time"
@@ -27,12 +28,13 @@ var _ = ginkgo.Describe("Cluster Auto Approval", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		agentOptions := spoke.SpokeAgentOptions{
-			ClusterName:              managedClusterName,
+			AgentOptions:             commonoptions.NewAgentOptions(),
 			BootstrapKubeconfig:      bootstrapFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
+		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
 
 		// run registration agent
 		cancel := runAgent("autoapprovaltest", agentOptions, spokeCfg)

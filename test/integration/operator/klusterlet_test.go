@@ -18,8 +18,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/rest"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
-	"open-cluster-management.io/ocm/pkg/registration-operator/helpers"
-	"open-cluster-management.io/ocm/pkg/registration-operator/operators/klusterlet"
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
+	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
@@ -506,7 +506,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				}
 				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
 				gomega.Expect(len(actual.Spec.Template.Spec.Containers[0].Args)).Should(gomega.Equal(8))
-				return actual.Spec.Template.Spec.Containers[0].Args[2] == "--cluster-name=cluster2"
+				return actual.Spec.Template.Spec.Containers[0].Args[2] == "--spoke-cluster-name=cluster2"
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Check if generations are correct

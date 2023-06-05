@@ -9,7 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
-	"open-cluster-management.io/ocm/pkg/registration-operator/helpers"
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 

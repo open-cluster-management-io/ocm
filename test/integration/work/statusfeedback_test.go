@@ -3,6 +3,7 @@ package work
 import (
 	"context"
 	"fmt"
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/test/integration/util"
 	"time"
@@ -32,11 +33,12 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 	ginkgo.BeforeEach(func() {
 		o = spoke.NewWorkloadAgentOptions()
 		o.HubKubeconfigFile = hubKubeconfigFileName
-		o.SpokeClusterName = utilrand.String(5)
+		o.AgentOptions = commonoptions.NewAgentOptions()
+		o.AgentOptions.SpokeClusterName = utilrand.String(5)
 		o.StatusSyncInterval = 3 * time.Second
 
 		ns := &corev1.Namespace{}
-		ns.Name = o.SpokeClusterName
+		ns.Name = o.AgentOptions.SpokeClusterName
 		_, err = spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -45,18 +47,18 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 	})
 
 	ginkgo.JustBeforeEach(func() {
-		work = util.NewManifestWork(o.SpokeClusterName, "", manifests)
+		work = util.NewManifestWork(o.AgentOptions.SpokeClusterName, "", manifests)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.AfterEach(func() {
-		err := spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), o.SpokeClusterName, metav1.DeleteOptions{})
+		err := spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), o.AgentOptions.SpokeClusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.Context("Deployment Status feedback", func() {
 		ginkgo.BeforeEach(func() {
-			u, _, err := util.NewDeployment(o.SpokeClusterName, "deploy1", "sa")
+			u, _, err := util.NewDeployment(o.AgentOptions.SpokeClusterName, "deploy1", "sa")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			manifests = append(manifests, util.ToManifest(u))
 
@@ -77,7 +79,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "apps",
 						Resource:  "deployments",
-						Namespace: o.SpokeClusterName,
+						Namespace: o.AgentOptions.SpokeClusterName,
 						Name:      "deploy1",
 					},
 					FeedbackRules: []workapiv1.FeedbackRule{
@@ -88,7 +90,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
@@ -98,7 +100,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 
 			// Update Deployment status on spoke
 			gomega.Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(o.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(o.AgentOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -107,13 +109,13 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 				deploy.Status.Replicas = 3
 				deploy.Status.ReadyReplicas = 2
 
-				_, err = spokeKubeClient.AppsV1().Deployments(o.SpokeClusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(o.AgentOptions.SpokeClusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Check if we get status of deployment on work api
 			gomega.Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -160,7 +162,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 
 			// Update replica of deployment
 			gomega.Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(o.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(o.AgentOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -169,13 +171,13 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 				deploy.Status.Replicas = 3
 				deploy.Status.ReadyReplicas = 3
 
-				_, err = spokeKubeClient.AppsV1().Deployments(o.SpokeClusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(o.AgentOptions.SpokeClusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Check if the status of deployment is synced on work api
 			gomega.Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -227,7 +229,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "apps",
 						Resource:  "deployments",
-						Namespace: o.SpokeClusterName,
+						Namespace: o.AgentOptions.SpokeClusterName,
 						Name:      "deploy1",
 					},
 					FeedbackRules: []workapiv1.FeedbackRule{
@@ -248,7 +250,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
@@ -257,7 +259,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			gomega.Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(o.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(o.AgentOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -269,13 +271,13 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 					},
 				}
 
-				_, err = spokeKubeClient.AppsV1().Deployments(o.SpokeClusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(o.AgentOptions.SpokeClusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Check if we get status of deployment on work api
 			gomega.Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -308,7 +310,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 		})
 
 		ginkgo.It("should return none for resources with no wellKnowne status", func() {
-			sa, _ := util.NewServiceAccount(o.SpokeClusterName, "sa")
+			sa, _ := util.NewServiceAccount(o.AgentOptions.SpokeClusterName, "sa")
 			work.Spec.Workload.Manifests = append(work.Spec.Workload.Manifests, util.ToManifest(sa))
 
 			work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
@@ -316,7 +318,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "apps",
 						Resource:  "deployments",
-						Namespace: o.SpokeClusterName,
+						Namespace: o.AgentOptions.SpokeClusterName,
 						Name:      "deploy1",
 					},
 					FeedbackRules: []workapiv1.FeedbackRule{
@@ -329,7 +331,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "",
 						Resource:  "serviceaccounts",
-						Namespace: o.SpokeClusterName,
+						Namespace: o.AgentOptions.SpokeClusterName,
 						Name:      "sa",
 					},
 					FeedbackRules: []workapiv1.FeedbackRule{
@@ -340,7 +342,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
@@ -350,7 +352,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 
 			// Update Deployment status on spoke
 			gomega.Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(o.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(o.AgentOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -359,13 +361,13 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 				deploy.Status.Replicas = 3
 				deploy.Status.ReadyReplicas = 2
 
-				_, err = spokeKubeClient.AppsV1().Deployments(o.SpokeClusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(o.AgentOptions.SpokeClusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Check if we get status of deployment on work api
 			gomega.Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -421,7 +423,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "apps",
 						Resource:  "deployments",
-						Namespace: o.SpokeClusterName,
+						Namespace: o.AgentOptions.SpokeClusterName,
 						Name:      "deploy1",
 					},
 					FeedbackRules: []workapiv1.FeedbackRule{
@@ -438,7 +440,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
@@ -450,7 +452,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 
 	ginkgo.Context("Deployment Status feedback with RawJsonString enabled", func() {
 		ginkgo.BeforeEach(func() {
-			u, _, err := util.NewDeployment(o.SpokeClusterName, "deploy1", "sa")
+			u, _, err := util.NewDeployment(o.AgentOptions.SpokeClusterName, "deploy1", "sa")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			manifests = append(manifests, util.ToManifest(u))
 
@@ -473,7 +475,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "apps",
 						Resource:  "deployments",
-						Namespace: o.SpokeClusterName,
+						Namespace: o.AgentOptions.SpokeClusterName,
 						Name:      "deploy1",
 					},
 					FeedbackRules: []workapiv1.FeedbackRule{
@@ -490,7 +492,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 				},
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
@@ -499,7 +501,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			gomega.Eventually(func() error {
-				deploy, err := spokeKubeClient.AppsV1().Deployments(o.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
+				deploy, err := spokeKubeClient.AppsV1().Deployments(o.AgentOptions.SpokeClusterName).Get(context.Background(), "deploy1", metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -511,13 +513,13 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 					},
 				}
 
-				_, err = spokeKubeClient.AppsV1().Deployments(o.SpokeClusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
+				_, err = spokeKubeClient.AppsV1().Deployments(o.AgentOptions.SpokeClusterName).UpdateStatus(context.Background(), deploy, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			// Check if we get status of deployment on work api
 			gomega.Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(o.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}

@@ -1,6 +1,7 @@
 package registration_test
 
 import (
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/test/integration/util"
 	"path"
 	"time"
@@ -20,12 +21,14 @@ var _ = ginkgo.Describe("Certificate Rotation", func() {
 		hubKubeconfigDir := path.Join(util.TestDir, "rotationtest", "hub-kubeconfig")
 
 		agentOptions := spoke.SpokeAgentOptions{
-			ClusterName:              managedClusterName,
+			AgentOptions:             commonoptions.NewAgentOptions(),
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
+
+		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
 
 		// run registration agent
 		cancel := runAgent("rotationtest", agentOptions, spokeCfg)

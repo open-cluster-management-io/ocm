@@ -3,6 +3,7 @@ package registration_test
 import (
 	"context"
 	"fmt"
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/test/integration/util"
 	"path"
 	"reflect"
@@ -48,13 +49,14 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 
 		// run registration agent
 		agentOptions := spoke.SpokeAgentOptions{
-			ClusterName:              managedClusterName,
+			AgentOptions:             commonoptions.NewAgentOptions(),
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 			MaxCustomClusterClaims:   maxCustomClusterClaims,
 		}
+		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
 		cancel = runAgent("claimtest", agentOptions, spokeCfg)
 	})
 

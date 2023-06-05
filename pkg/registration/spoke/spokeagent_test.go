@@ -3,7 +3,7 @@ package spoke
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"os"
 	"path"
 	"testing"
@@ -23,7 +23,7 @@ import (
 func TestComplete(t *testing.T) {
 	// get component namespace
 	var componentNamespace string
-	nsBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	nsBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err != nil {
 		componentNamespace = defaultSpokeComponentNamespace
 	} else {
@@ -102,14 +102,16 @@ func TestComplete(t *testing.T) {
 			kubeClient := kubefake.NewSimpleClientset(objects...)
 
 			// create a tmp dir to dump hub kubeconfig
-			dir, err := ioutil.TempDir("", "hub-kubeconfig")
+			dir, err := os.MkdirTemp("", "hub-kubeconfig")
 			if err != nil {
 				t.Error("unable to create a tmp dir")
 			}
 			defer os.RemoveAll(dir)
 
 			options := &SpokeAgentOptions{
-				ClusterName:         c.clusterName,
+				AgentOptions: &commonoptions.AgentOptions{
+					SpokeClusterName: c.clusterName,
+				},
 				HubKubeconfigSecret: "hub-kubeconfig-secret",
 				HubKubeconfigDir:    dir,
 			}
@@ -120,14 +122,14 @@ func TestComplete(t *testing.T) {
 			if options.ComponentNamespace == "" {
 				t.Error("component namespace should not be empty")
 			}
-			if options.ClusterName == "" {
+			if options.AgentOptions.SpokeClusterName == "" {
 				t.Error("cluster name should not be empty")
 			}
 			if options.AgentName == "" {
 				t.Error("agent name should not be empty")
 			}
-			if len(c.expectedClusterName) > 0 && options.ClusterName != c.expectedClusterName {
-				t.Errorf("expect cluster name %q but got %q", c.expectedClusterName, options.ClusterName)
+			if len(c.expectedClusterName) > 0 && options.AgentOptions.SpokeClusterName != c.expectedClusterName {
+				t.Errorf("expect cluster name %q but got %q", c.expectedClusterName, options.AgentOptions.SpokeClusterName)
 			}
 			if len(c.expectedAgentName) > 0 && options.AgentName != c.expectedAgentName {
 				t.Errorf("expect agent name %q but got %q", c.expectedAgentName, options.AgentName)
@@ -139,7 +141,7 @@ func TestComplete(t *testing.T) {
 func TestValidate(t *testing.T) {
 	defaultCompletedOptions := NewSpokeAgentOptions()
 	defaultCompletedOptions.BootstrapKubeconfig = "/spoke/bootstrap/kubeconfig"
-	defaultCompletedOptions.ClusterName = "testcluster"
+	defaultCompletedOptions.AgentOptions.SpokeClusterName = "testcluster"
 	defaultCompletedOptions.AgentName = "testagent"
 
 	cases := []struct {
@@ -154,19 +156,21 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name:        "no cluster name",
-			options:     &SpokeAgentOptions{BootstrapKubeconfig: "/spoke/bootstrap/kubeconfig"},
+			options:     &SpokeAgentOptions{BootstrapKubeconfig: "/spoke/bootstrap/kubeconfig", AgentOptions: &commonoptions.AgentOptions{}},
 			expectedErr: "cluster name is empty",
 		},
 		{
 			name:        "no agent name",
-			options:     &SpokeAgentOptions{BootstrapKubeconfig: "/spoke/bootstrap/kubeconfig", ClusterName: "testcluster"},
+			options:     &SpokeAgentOptions{BootstrapKubeconfig: "/spoke/bootstrap/kubeconfig", AgentOptions: &commonoptions.AgentOptions{SpokeClusterName: "testcluster"}},
 			expectedErr: "agent name is empty",
 		},
 		{
 			name: "invalid external server URLs",
 			options: &SpokeAgentOptions{
-				BootstrapKubeconfig:     "/spoke/bootstrap/kubeconfig",
-				ClusterName:             "testcluster",
+				BootstrapKubeconfig: "/spoke/bootstrap/kubeconfig",
+				AgentOptions: &commonoptions.AgentOptions{
+					SpokeClusterName: "testcluster",
+				},
 				AgentName:               "testagent",
 				SpokeExternalServerURLs: []string{"https://127.0.0.1:64433", "http://127.0.0.1:8080"},
 			},
@@ -175,8 +179,10 @@ func TestValidate(t *testing.T) {
 		{
 			name: "invalid cluster healthcheck period",
 			options: &SpokeAgentOptions{
-				BootstrapKubeconfig:      "/spoke/bootstrap/kubeconfig",
-				ClusterName:              "testcluster",
+				BootstrapKubeconfig: "/spoke/bootstrap/kubeconfig",
+				AgentOptions: &commonoptions.AgentOptions{
+					SpokeClusterName: "testcluster",
+				},
 				AgentName:                "testagent",
 				ClusterHealthCheckPeriod: 0,
 			},
@@ -190,12 +196,14 @@ func TestValidate(t *testing.T) {
 		{
 			name: "default completed options",
 			options: &SpokeAgentOptions{
-				HubKubeconfigSecret:         "hub-kubeconfig-secret",
-				HubKubeconfigDir:            "/spoke/hub-kubeconfig",
-				ClusterHealthCheckPeriod:    1 * time.Minute,
-				MaxCustomClusterClaims:      20,
-				BootstrapKubeconfig:         "/spoke/bootstrap/kubeconfig",
-				ClusterName:                 "testcluster",
+				HubKubeconfigSecret:      "hub-kubeconfig-secret",
+				HubKubeconfigDir:         "/spoke/hub-kubeconfig",
+				ClusterHealthCheckPeriod: 1 * time.Minute,
+				MaxCustomClusterClaims:   20,
+				BootstrapKubeconfig:      "/spoke/bootstrap/kubeconfig",
+				AgentOptions: &commonoptions.AgentOptions{
+					SpokeClusterName: "testcluster",
+				},
 				AgentName:                   "testagent",
 				ClientCertExpirationSeconds: 3599,
 			},
@@ -204,12 +212,14 @@ func TestValidate(t *testing.T) {
 		{
 			name: "default completed options",
 			options: &SpokeAgentOptions{
-				HubKubeconfigSecret:         "hub-kubeconfig-secret",
-				HubKubeconfigDir:            "/spoke/hub-kubeconfig",
-				ClusterHealthCheckPeriod:    1 * time.Minute,
-				MaxCustomClusterClaims:      20,
-				BootstrapKubeconfig:         "/spoke/bootstrap/kubeconfig",
-				ClusterName:                 "testcluster",
+				HubKubeconfigSecret:      "hub-kubeconfig-secret",
+				HubKubeconfigDir:         "/spoke/hub-kubeconfig",
+				ClusterHealthCheckPeriod: 1 * time.Minute,
+				MaxCustomClusterClaims:   20,
+				BootstrapKubeconfig:      "/spoke/bootstrap/kubeconfig",
+				AgentOptions: &commonoptions.AgentOptions{
+					SpokeClusterName: "testcluster",
+				},
 				AgentName:                   "testagent",
 				ClientCertExpirationSeconds: 3600,
 			},
@@ -225,7 +235,7 @@ func TestValidate(t *testing.T) {
 }
 
 func TestHasValidHubClientConfig(t *testing.T) {
-	tempDir, err := ioutil.TempDir("", "testvalidhubclientconfig")
+	tempDir, err := os.MkdirTemp("", "testvalidhubclientconfig")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -292,7 +302,9 @@ func TestHasValidHubClientConfig(t *testing.T) {
 			}
 
 			options := &SpokeAgentOptions{
-				ClusterName:      c.clusterName,
+				AgentOptions: &commonoptions.AgentOptions{
+					SpokeClusterName: c.clusterName,
+				},
 				AgentName:        c.agentName,
 				HubKubeconfigDir: tempDir,
 			}
@@ -308,7 +320,7 @@ func TestHasValidHubClientConfig(t *testing.T) {
 }
 
 func TestGetOrGenerateClusterAgentNames(t *testing.T) {
-	tempDir, err := ioutil.TempDir("", "testgetorgenerateclusteragentnames")
+	tempDir, err := os.MkdirTemp("", "testgetorgenerateclusteragentnames")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -322,12 +334,12 @@ func TestGetOrGenerateClusterAgentNames(t *testing.T) {
 	}{
 		{
 			name:                "cluster name is specified",
-			options:             &SpokeAgentOptions{ClusterName: "cluster0"},
+			options:             &SpokeAgentOptions{AgentOptions: &commonoptions.AgentOptions{SpokeClusterName: "cluster0"}},
 			expectedClusterName: "cluster0",
 		},
 		{
 			name:                "cluster name and agent name are in file",
-			options:             &SpokeAgentOptions{HubKubeconfigDir: tempDir},
+			options:             &SpokeAgentOptions{HubKubeconfigDir: tempDir, AgentOptions: &commonoptions.AgentOptions{}},
 			expectedClusterName: "cluster1",
 			expectedAgentName:   "agent1",
 		},
@@ -356,7 +368,7 @@ func TestGetOrGenerateClusterAgentNames(t *testing.T) {
 }
 
 func TestGetSpokeClusterCABundle(t *testing.T) {
-	tempDir, err := ioutil.TempDir("", "testgetspokeclustercabundle")
+	tempDir, err := os.MkdirTemp("", "testgetspokeclustercabundle")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

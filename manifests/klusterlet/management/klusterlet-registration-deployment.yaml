@@ -51,7 +51,7 @@ spec:
         args:
           - "/registration"
           - "agent"
-          - "--cluster-name={{ .ClusterName }}"
+          - "--spoke-cluster-name={{ .ClusterName }}"
           - "--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig"
           {{ if gt (len .RegistrationFeatureGates) 0 }}
           {{range .RegistrationFeatureGates}}

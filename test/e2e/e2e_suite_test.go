@@ -14,6 +14,7 @@ var t *Tester
 var (
 	clusterName           string
 	hubKubeconfig         string
+	imageTag              string
 	nilExecutorValidating bool
 	deployKlusterlet      bool
 	managedKubeconfig     string
@@ -27,10 +28,11 @@ func init() {
 	flag.BoolVar(&deployKlusterlet, "deploy-klusterlet", false, "Whether deploy the klusterlet on the managed cluster or not (default false)")
 	flag.StringVar(&managedKubeconfig, "managed-kubeconfig", "", "The kubeconfig of the managed cluster")
 	flag.DurationVar(&eventuallyTimeout, "eventually-timeout", 60*time.Second, "The timeout of Gomega's Eventually (default 60 seconds)")
+	flag.StringVar(&imageTag, "image-tag", "latest", "Image tag to run the klusterlet, only used when enable deploy-klusterlet")
 }
 
 func TestE2E(tt *testing.T) {
-	t = NewTester(hubKubeconfig, managedKubeconfig, eventuallyTimeout)
+	t = NewTester(hubKubeconfig, managedKubeconfig, imageTag, eventuallyTimeout)
 
 	OutputFail := func(message string, callerSkip ...int) {
 		t.OutputDebugLogs()
