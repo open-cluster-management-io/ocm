@@ -142,56 +142,6 @@ func TestDefaultCSRApprover(t *testing.T) {
 	}
 }
 
-func TestUnionApprover(t *testing.T) {
-	approveAll := func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
-		return true
-	}
-
-	approveNone := func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
-		return false
-	}
-
-	cases := []struct {
-		name        string
-		signer      string
-		approveFunc map[string]agent.CSRApproveFunc
-		approved    bool
-	}{
-		{
-			name:        "approve all",
-			signer:      "a",
-			approveFunc: map[string]agent.CSRApproveFunc{"a": approveAll, "b": approveAll},
-			approved:    true,
-		},
-		{
-			name:        "approve none",
-			signer:      "b",
-			approveFunc: map[string]agent.CSRApproveFunc{"a": approveAll, "b": approveNone},
-			approved:    false,
-		},
-		{
-			name:        "not match signer",
-			signer:      "c",
-			approveFunc: map[string]agent.CSRApproveFunc{"a": approveAll, "b": approveAll},
-			approved:    false,
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			approver := UnionCSRApprover(c.approveFunc)
-			approved := approver(
-				newCluster("cluster1"),
-				newAddon("addon1", "cluster1"),
-				newCSRWithSigner(c.signer, agent.DefaultUser("cluster1", "addon1", "test"), "cluster1", "group1"),
-			)
-			if approved != c.approved {
-				t.Errorf("Expected approve is %t, but got %t", c.approved, approved)
-			}
-		})
-	}
-}
-
 func TestIsCSRSupported(t *testing.T) {
 	cases := []struct {
 		apiResources    []*metav1.APIResourceList

@@ -9,11 +9,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	rbacclientv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -355,56 +357,74 @@ func ApplyRoleBinding(ctx context.Context, client rbacclientv1.RoleBindingsGette
 	return actual, true, err
 }
 
-// TemplateAddonHubPermission returns a func that can grant permission for addon agent
+// TemplatePermissionConfigFunc returns a func that can grant permission for addon agent
 // that is deployed by addon template.
 // the returned func will create a rolebinding to bind the clusterRole/role which is
 // specified by the user, so the user is required to make sure the existence of the
 // clusterRole/role
-func TemplateAddonHubPermission(hubKubeClient kubernetes.Interface,
-	kcrc *addonapiv1alpha1.KubeClientRegistrationConfig) agent.PermissionConfigFunc {
+func TemplatePermissionConfigFunc(
+	addonName string,
+	addonClient addonv1alpha1client.Interface,
+	hubKubeClient kubernetes.Interface,
+) agent.PermissionConfigFunc {
+
 	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
-		if kcrc == nil {
-			return nil
+		template, err := GetDesiredAddOnTemplate(addonClient, addon)
+		if err != nil {
+			return err
 		}
+		for _, registration := range template.Spec.Registration {
+			switch registration.Type {
+			case addonapiv1alpha1.RegistrationTypeKubeClient:
 
-		if kcrc.HubPermissions == nil {
-			return nil
-		}
+				kcrc := registration.KubeClient
+				if kcrc == nil {
+					continue
+				}
 
-		for _, pc := range kcrc.HubPermissions {
-			switch pc.Type {
-			case addonapiv1alpha1.HubPermissionsBindingCurrentCluster:
-				klog.V(5).Infof("Set hub permission for addon %s/%s, UID: %s, APIVersion: %s, Kind: %s",
-					addon.Namespace, addon.Name, addon.UID, addon.APIVersion, addon.Kind)
+				for _, pc := range kcrc.HubPermissions {
+					switch pc.Type {
+					case addonapiv1alpha1.HubPermissionsBindingCurrentCluster:
+						klog.V(5).Infof("Set hub permission for addon %s/%s, UID: %s, APIVersion: %s, Kind: %s",
+							addon.Namespace, addon.Name, addon.UID, addon.APIVersion, addon.Kind)
 
-				owner := metav1.OwnerReference{
-					// TODO: use apiVersion and kind in addon object, but now they could be empty at some unknown reason
-					APIVersion: "addon.open-cluster-management.io/v1alpha1",
-					Kind:       "ManagedClusterAddOn",
-					Name:       addon.Name,
-					UID:        addon.UID,
+						owner := metav1.OwnerReference{
+							// TODO: use apiVersion and kind in addon object, but now they could be empty at some unknown reason
+							APIVersion: "addon.open-cluster-management.io/v1alpha1",
+							Kind:       "ManagedClusterAddOn",
+							Name:       addon.Name,
+							UID:        addon.UID,
+						}
+						err := createPermissionBinding(hubKubeClient,
+							cluster.Name, addon.Name, cluster.Name, pc.RoleRef, owner)
+						if err != nil {
+							return err
+						}
+					case addonapiv1alpha1.HubPermissionsBindingSingleNamespace:
+						if pc.SingleNamespace == nil {
+							return fmt.Errorf("single namespace is nil")
+						}
+						owner := metav1.OwnerReference{
+							APIVersion: cluster.APIVersion,
+							Kind:       cluster.Kind,
+							Name:       cluster.Name,
+							UID:        cluster.UID,
+						}
+						err := createPermissionBinding(hubKubeClient,
+							cluster.Name, addon.Name, pc.SingleNamespace.Namespace, pc.RoleRef, owner)
+						if err != nil {
+							return err
+						}
+					}
 				}
-				err := createPermissionBinding(hubKubeClient,
-					cluster.Name, addon.Name, cluster.Name, pc.RoleRef, owner)
-				if err != nil {
-					return err
-				}
-			case addonapiv1alpha1.HubPermissionsBindingSingleNamespace:
-				if pc.SingleNamespace == nil {
-					return fmt.Errorf("single namespace is nil")
-				}
-				owner := metav1.OwnerReference{
-					APIVersion: cluster.APIVersion,
-					Kind:       cluster.Kind,
-					Name:       cluster.Name,
-					UID:        cluster.UID,
-				}
-				err := createPermissionBinding(hubKubeClient,
-					cluster.Name, addon.Name, pc.SingleNamespace.Namespace, pc.RoleRef, owner)
-				if err != nil {
-					return err
-				}
+
+			case addonapiv1alpha1.RegistrationTypeCustomSigner:
+				continue
+
+			default:
+				utilruntime.HandleError(fmt.Errorf("unsupported registration type %s", registration.Type))
 			}
+
 		}
 
 		return nil

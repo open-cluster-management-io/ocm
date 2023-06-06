@@ -150,7 +150,7 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 		kubeConfig,
 		hubKubeClient,
 		addonClient,
-		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
+		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
 	)
 
 	go addonConfigController.Run(ctx, 2)

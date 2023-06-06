@@ -4,17 +4,14 @@ import (
 	"fmt"
 	"sort"
 	"sync"
-	"time"
 
 	"github.com/valyala/fasttemplate"
 	appsv1 "k8s.io/api/apps/v1"
-	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -50,20 +47,19 @@ type templateCRDDefaultValues struct {
 
 type CRDTemplateAgentAddon struct {
 	getValuesFuncs     []GetValuesFunc
-	agentAddonOptions  agent.AgentAddonOptions
 	trimCRDDescription bool
 
 	hubKubeClient kubernetes.Interface
 	addonClient   addonv1alpha1client.Interface
 	addonName     string
-	templateSpec  addonapiv1alpha1.AddOnTemplateSpec
+	agentName     string
 }
 
 // NewCRDTemplateAgentAddon creates a CRDTemplateAgentAddon instance
 func NewCRDTemplateAgentAddon(
+	addonName string,
 	hubKubeClient kubernetes.Interface,
 	addonClient addonv1alpha1client.Interface,
-	templateSpec addonapiv1alpha1.AddOnTemplateSpec,
 	getValuesFuncs ...GetValuesFunc,
 ) *CRDTemplateAgentAddon {
 	a := &CRDTemplateAgentAddon{
@@ -72,18 +68,10 @@ func NewCRDTemplateAgentAddon(
 
 		hubKubeClient: hubKubeClient,
 		addonClient:   addonClient,
-		addonName:     templateSpec.AddonName,
-		templateSpec:  templateSpec,
+		addonName:     addonName,
+		agentName:     utilrand.String(5),
 	}
 
-	a.agentAddonOptions = agent.AgentAddonOptions{
-		AddonName:       templateSpec.AddonName,
-		Registration:    a.newRegistrationOption(utilrand.String(5)),
-		InstallStrategy: nil,
-		HealthProber:    nil,
-		// set supportedConfigGVRs to empty to disable the framework to start duplicated config related controllers
-		SupportedConfigGVRs: []schema.GroupVersionResource{},
-	}
 	return a
 }
 
@@ -91,14 +79,36 @@ func (a *CRDTemplateAgentAddon) Manifests(
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
 
-	return a.renderObjects(cluster, addon)
+	template, err := utils.GetDesiredAddOnTemplate(a.addonClient, addon)
+	if err != nil {
+		return nil, err
+	}
+
+	return a.renderObjects(cluster, addon, template)
+}
+
+func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
+	return agent.AgentAddonOptions{
+		AddonName:       a.addonName,
+		InstallStrategy: nil,
+		HealthProber:    nil,
+		// set supportedConfigGVRs to empty to disable the framework to start duplicated config related controllers
+		SupportedConfigGVRs: []schema.GroupVersionResource{},
+		Registration: &agent.RegistrationOption{
+			CSRConfigurations: utils.TemplateCSRConfigurationsFunc(a.addonName, a.agentName, a.addonClient),
+			PermissionConfig:  utils.TemplatePermissionConfigFunc(a.addonName, a.addonClient, a.hubKubeClient),
+			CSRApproveCheck:   utils.TemplateCSRApproveCheckFunc(a.addonName, a.agentName, a.addonClient),
+			CSRSign:           utils.TemplateCSRSignFunc(a.addonName, a.agentName, a.addonClient, a.hubKubeClient),
+		},
+	}
 }
 
 func (a *CRDTemplateAgentAddon) renderObjects(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
+	addon *addonapiv1alpha1.ManagedClusterAddOn,
+	template *addonapiv1alpha1.AddOnTemplate) ([]runtime.Object, error) {
 	var objects []runtime.Object
-	presetValues, configValues, privateValues, err := a.getValues(cluster, addon)
+	presetValues, configValues, privateValues, err := a.getValues(cluster, addon, template)
 	if err != nil {
 		return objects, err
 	}
@@ -110,7 +120,7 @@ func (a *CRDTemplateAgentAddon) renderObjects(
 	go func() {
 		defer wg.Done()
 
-		for _, manifest := range a.templateSpec.AgentSpec.Workload.Manifests {
+		for _, manifest := range template.Spec.AgentSpec.Workload.Manifests {
 
 			t := fasttemplate.New(string(manifest.Raw), "{{", "}}")
 			manifestStr := t.ExecuteString(configValues)
@@ -278,10 +288,6 @@ func (a *CRDTemplateAgentAddon) convertToDeployment(obj runtime.Object) (*appsv1
 	return nil, fmt.Errorf("not deployment object, %v", obj.GetObjectKind())
 }
 
-func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
-	return a.agentAddonOptions
-}
-
 type keyValuePair struct {
 	name  string
 	value string
@@ -291,12 +297,15 @@ type orderedValues []keyValuePair
 
 func (a *CRDTemplateAgentAddon) getValues(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (orderedValues, map[string]interface{}, map[string]interface{}, error) {
+	addon *addonapiv1alpha1.ManagedClusterAddOn,
+	template *addonapiv1alpha1.AddOnTemplate,
+) (orderedValues, map[string]interface{}, map[string]interface{}, error) {
+
 	presetValues := make([]keyValuePair, 0)
 	overrideValues := map[string]interface{}{}
 	privateValues := map[string]interface{}{}
 
-	defaultSortedKeys, defaultValues, err := a.getDefaultValues(cluster, addon)
+	defaultSortedKeys, defaultValues, err := a.getDefaultValues(cluster, addon, template)
 	if err != nil {
 		return presetValues, overrideValues, privateValues, nil
 	}
@@ -371,11 +380,12 @@ func (a *CRDTemplateAgentAddon) getBuiltinValues(
 
 func (a *CRDTemplateAgentAddon) getDefaultValues(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]string, Values, error) {
+	addon *addonapiv1alpha1.ManagedClusterAddOn,
+	template *addonapiv1alpha1.AddOnTemplate) ([]string, Values, error) {
 	defaultValues := templateCRDDefaultValues{}
 
 	// TODO: hubKubeConfigSecret depends on the signer configuration in registration, and the registration is an array.
-	if a.agentAddonOptions.Registration != nil {
+	if template.Spec.Registration != nil {
 		defaultValues.HubKubeConfigPath = a.hubKubeconfigPath()
 	}
 
@@ -401,44 +411,5 @@ func (a *CRDTemplateAgentAddon) hubKubeconfigPath() string {
 }
 
 func (a *CRDTemplateAgentAddon) hubKubeconfigSecretName() string {
-	return fmt.Sprintf("%s-hub-kubeconfig", a.agentAddonOptions.AddonName)
-}
-
-func (a *CRDTemplateAgentAddon) newRegistrationOption(
-	agentName string) *agent.RegistrationOption {
-	registrationOption := &agent.RegistrationOption{}
-	registrationConfigFuncs := make([]func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig, 0)
-	csrApprovers := make(map[string]agent.CSRApproveFunc, 0)
-	csrSigners := make([]agent.CSRSignerFunc, 0)
-
-	for _, registration := range a.templateSpec.Registration {
-		switch registration.Type {
-		case addonapiv1alpha1.RegistrationTypeKubeClient:
-			registrationConfigFuncs = append(registrationConfigFuncs,
-				agent.KubeClientSignerConfigurations(a.addonName, agentName))
-
-			csrApprovers[certificatesv1.KubeAPIServerClientSignerName] = utils.KubeClientCSRApprover(agentName)
-
-			registrationOption.PermissionConfig = utils.TemplateAddonHubPermission(
-				a.hubKubeClient, registration.KubeClient)
-		case addonapiv1alpha1.RegistrationTypeCustomSigner:
-			registrationConfigFuncs = append(registrationConfigFuncs,
-				agent.CustomSignerConfigurations(a.addonName, agentName, registration.CustomSigner))
-
-			if registration.CustomSigner != nil {
-				csrApprovers[registration.CustomSigner.SignerName] = utils.CustomerSignerCSRApprover(agentName)
-			}
-
-			csrSigners = append(csrSigners, utils.CustomSignerWithExpiry(
-				a.hubKubeClient, registration.CustomSigner, 24*time.Hour))
-		default:
-			utilruntime.HandleError(fmt.Errorf("unsupported registration type %s", registration.Type))
-		}
-
-	}
-
-	registrationOption.CSRConfigurations = utils.UnionSignerConfiguration(registrationConfigFuncs...)
-	registrationOption.CSRApproveCheck = utils.UnionCSRApprover(csrApprovers)
-	registrationOption.CSRSign = utils.UnionCSRSigner(csrSigners...)
-	return registrationOption
+	return fmt.Sprintf("%s-hub-kubeconfig", a.addonName)
 }

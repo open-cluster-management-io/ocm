@@ -45,7 +45,7 @@
       verbs: ["create", "get", "list", "watch", "patch", "update"]
     - apiGroups: ["certificates.k8s.io"]
       resources: ["signers"]
-      verbs: ["approve"]
+      verbs: ["approve", "sign"]
     - apiGroups: ["rbac.authorization.k8s.io"]
       resources: ["rolebindings", "clusterrolebindings"]
       verbs: ["get", "list", "watch", "create", "update", "delete"]

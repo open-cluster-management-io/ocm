@@ -38,12 +38,16 @@ spec:
                         - "--addon-namespace=open-cluster-management-agent-addon"
                         - "--addon-name=hello-template"
                         - "--hub-kubeconfig={{HUB_KUBECONFIG}}"
-                        - "--v={{LOG_LEVEL}}" # addonDeploymentConfig variables
+                      env:
+                        - name: LOG_LEVEL
+                          value: "{{LOG_LEVEL}}" # addonDeploymentConfig variables
           - kind: ServiceAccount
             apiVersion: v1
             metadata:
               name: hello-template-agent-sa
               namespace: open-cluster-management-agent-addon
+              annotations:
+                "addon.open-cluster-management.io/deletion-orphan": ""
           - kind: ClusterRoleBinding
             apiVersion: rbac.authorization.k8s.io/v1
             metadata:
