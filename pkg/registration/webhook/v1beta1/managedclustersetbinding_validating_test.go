@@ -95,7 +95,7 @@ func TestValidateCreate(t *testing.T) {
 
 			ctx := admission.NewContextWithRequest(context.Background(), req)
 
-			err := w.ValidateCreate(ctx, c.setbinding)
+			_, err := w.ValidateCreate(ctx, c.setbinding)
 			if err != nil && !c.expectedError {
 				t.Errorf("Case:%v, Expect nil Error but got err:%v", c.name, err)
 			}
@@ -105,7 +105,7 @@ func TestValidateCreate(t *testing.T) {
 		})
 	}
 	w := ManagedClusterSetBindingWebhook{}
-	err := w.ValidateCreate(context.Background(), &v1beta1.ManagedClusterSet{})
+	_, err := w.ValidateCreate(context.Background(), &v1beta1.ManagedClusterSet{})
 	if err == nil {
 		t.Errorf("Non setbinding obj, Expect Error but got nil")
 	}
@@ -159,7 +159,7 @@ func TestValidateUpddate(t *testing.T) {
 
 			ctx := admission.NewContextWithRequest(context.Background(), req)
 
-			err := w.ValidateUpdate(ctx, nil, c.setbinding)
+			_, err := w.ValidateUpdate(ctx, nil, c.setbinding)
 			if err != nil && !c.expectedError {
 				t.Errorf("Case:%v, Expect nil Error but not err:%v", c.name, err)
 			}
@@ -169,7 +169,7 @@ func TestValidateUpddate(t *testing.T) {
 		})
 	}
 	w := ManagedClusterSetBindingWebhook{}
-	err := w.ValidateUpdate(context.Background(), nil, &v1beta1.ManagedClusterSet{})
+	_, err := w.ValidateUpdate(context.Background(), nil, &v1beta1.ManagedClusterSet{})
 	if err == nil {
 		t.Errorf("Non setbinding obj, Expect Error but got nil")
 	}

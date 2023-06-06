@@ -3,8 +3,9 @@ package v1
 import (
 	"context"
 	"fmt"
-	"open-cluster-management.io/ocm/pkg/features"
 	"reflect"
+
+	"open-cluster-management.io/ocm/pkg/features"
 
 	"open-cluster-management.io/ocm/pkg/work/webhook/common"
 
@@ -24,32 +25,33 @@ import (
 var _ webhook.CustomValidator = &ManifestWorkWebhook{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *ManifestWorkWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) error {
+func (r *ManifestWorkWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	work, ok := obj.(*workv1.ManifestWork)
 	if !ok {
-		return apierrors.NewBadRequest("Request manifestwork obj format is not right")
+		return nil, apierrors.NewBadRequest("Request manifestwork obj format is not right")
 	}
-	return r.validateRequest(work, nil, ctx)
+	return nil, r.validateRequest(work, nil, ctx)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ManifestWorkWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) error {
+func (r *ManifestWorkWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (
+	admission.Warnings, error) {
 	newWork, ok := newObj.(*workv1.ManifestWork)
 	if !ok {
-		return apierrors.NewBadRequest("Request manifestwork obj format is not right")
+		return nil, apierrors.NewBadRequest("Request manifestwork obj format is not right")
 	}
 
 	oldWork, ok := oldObj.(*workv1.ManifestWork)
 	if !ok {
-		return apierrors.NewBadRequest("Request manifestwork obj format is not right")
+		return nil, apierrors.NewBadRequest("Request manifestwork obj format is not right")
 	}
 
-	return r.validateRequest(newWork, oldWork, ctx)
+	return nil, r.validateRequest(newWork, oldWork, ctx)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ManifestWorkWebhook) ValidateDelete(_ context.Context, obj runtime.Object) error {
-	return nil
+func (r *ManifestWorkWebhook) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
+	return nil, nil
 }
 
 func (r *ManifestWorkWebhook) validateRequest(newWork, oldWork *workv1.ManifestWork, ctx context.Context) error {

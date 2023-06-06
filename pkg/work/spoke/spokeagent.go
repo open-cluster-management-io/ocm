@@ -3,8 +3,9 @@ package spoke
 import (
 	"context"
 	"fmt"
-	"open-cluster-management.io/ocm/pkg/features"
 	"time"
+
+	"open-cluster-management.io/ocm/pkg/features"
 
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
@@ -123,7 +124,12 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 		return err
 	}
 	spokeWorkInformerFactory := workinformers.NewSharedInformerFactory(spokeWorkClient, 5*time.Minute)
-	restMapper, err := apiutil.NewDynamicRESTMapper(spokeRestConfig, apiutil.WithLazyDiscovery)
+
+	httpClient, err := rest.HTTPClientFor(spokeRestConfig)
+	if err != nil {
+		return err
+	}
+	restMapper, err := apiutil.NewDynamicRESTMapper(spokeRestConfig, httpClient)
 	if err != nil {
 		return err
 	}

@@ -13,7 +13,7 @@ type clusterEventHandler struct {
 	enqueuer *enqueuer
 }
 
-func (h *clusterEventHandler) OnAdd(obj interface{}) {
+func (h *clusterEventHandler) OnAdd(obj interface{}, isInInitialList bool) {
 	h.enqueuer.enqueueCluster(obj)
 }
 

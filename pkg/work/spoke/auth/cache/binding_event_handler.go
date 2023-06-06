@@ -11,7 +11,7 @@ type roleBindingEventHandler struct {
 	enqueueDeleteFunc func(key string, subjects []rbacapiv1.Subject)
 }
 
-func (h *roleBindingEventHandler) OnAdd(obj interface{}) {
+func (h *roleBindingEventHandler) OnAdd(obj interface{}, isInInitialList bool) {
 	rb, ok := obj.(*rbacapiv1.RoleBinding)
 	if ok {
 		key, _ := cache.MetaNamespaceKeyFunc(rb)
@@ -20,7 +20,7 @@ func (h *roleBindingEventHandler) OnAdd(obj interface{}) {
 }
 
 func (h *roleBindingEventHandler) OnUpdate(oldObj, newObj interface{}) {
-	h.OnAdd(newObj)
+	h.OnAdd(newObj, false)
 }
 
 func (h *roleBindingEventHandler) OnDelete(obj interface{}) {
@@ -46,7 +46,7 @@ type clusterRoleBindingEventHandler struct {
 	enqueueDeleteFunc func(key string, subjects []rbacapiv1.Subject)
 }
 
-func (h *clusterRoleBindingEventHandler) OnAdd(obj interface{}) {
+func (h *clusterRoleBindingEventHandler) OnAdd(obj interface{}, isInInitialList bool) {
 	crb, ok := obj.(*rbacapiv1.ClusterRoleBinding)
 	if ok {
 		key, _ := cache.MetaNamespaceKeyFunc(crb)
@@ -55,7 +55,7 @@ func (h *clusterRoleBindingEventHandler) OnAdd(obj interface{}) {
 }
 
 func (h *clusterRoleBindingEventHandler) OnUpdate(oldObj, newObj interface{}) {
-	h.OnAdd(newObj)
+	h.OnAdd(newObj, false)
 }
 
 func (h *clusterRoleBindingEventHandler) OnDelete(obj interface{}) {

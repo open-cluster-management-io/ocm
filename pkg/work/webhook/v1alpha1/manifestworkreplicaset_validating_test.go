@@ -63,7 +63,7 @@ func TestWebHookCreateRequest(t *testing.T) {
 
 	webHook := ManifestWorkReplicaSetWebhook{}
 	mwrSet := &workv1alpha1.ManifestWorkReplicaSet{}
-	err := webHook.ValidateCreate(context.Background(), mwrSet)
+	_, err := webHook.ValidateCreate(context.Background(), mwrSet)
 	if err == nil {
 		t.Fatal("Expecting error for empty mwrSet")
 	}
@@ -78,7 +78,7 @@ func TestWebHookCreateRequest(t *testing.T) {
 	}
 	ctx := admission.NewContextWithRequest(context.Background(), request)
 	mwrSet = helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
-	err = webHook.ValidateCreate(ctx, mwrSet)
+	_, err = webHook.ValidateCreate(ctx, mwrSet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestWebHookUpdateRequest(t *testing.T) {
 
 	webHook := ManifestWorkReplicaSetWebhook{}
 	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
-	err := webHook.ValidateUpdate(context.Background(), nil, mwrSet)
+	_, err := webHook.ValidateUpdate(context.Background(), nil, mwrSet)
 	if err == nil {
 		t.Fatal("Expecting error for nil oldPlaceMW")
 	}
@@ -97,7 +97,7 @@ func TestWebHookUpdateRequest(t *testing.T) {
 		t.Fatal("Expecting bad request error type")
 	}
 
-	err = webHook.ValidateUpdate(context.Background(), mwrSet, nil)
+	_, err = webHook.ValidateUpdate(context.Background(), mwrSet, nil)
 	if err == nil {
 		t.Fatal("Expecting error for nil newPlaceMW")
 	}
@@ -112,7 +112,7 @@ func TestWebHookUpdateRequest(t *testing.T) {
 		},
 	}
 	ctx := admission.NewContextWithRequest(context.Background(), request)
-	err = webHook.ValidateUpdate(ctx, mwrSet, mwrSet)
+	_, err = webHook.ValidateUpdate(ctx, mwrSet, mwrSet)
 	if err != nil {
 		t.Fatal(err)
 	}

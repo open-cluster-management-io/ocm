@@ -18,36 +18,39 @@ import (
 var _ webhook.CustomValidator = &ManifestWorkReplicaSetWebhook{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *ManifestWorkReplicaSetWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) error {
+func (r *ManifestWorkReplicaSetWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (
+	admission.Warnings, error) {
 	mwrSet, ok := obj.(*workv1alpha1.ManifestWorkReplicaSet)
 	if !ok {
-		return apierrors.NewBadRequest("Request manifestWorkReplicaSet obj format is not right")
+		return nil, apierrors.NewBadRequest("Request manifestWorkReplicaSet obj format is not right")
 	}
-	return r.validateRequest(mwrSet, nil, ctx)
+	return nil, r.validateRequest(mwrSet, nil, ctx)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ManifestWorkReplicaSetWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) error {
+func (r *ManifestWorkReplicaSetWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (
+	admission.Warnings, error) {
 	newmwrSet, ok := newObj.(*workv1alpha1.ManifestWorkReplicaSet)
 	if !ok {
-		return apierrors.NewBadRequest("Request manifestWorkReplicaSet obj format is not right")
+		return nil, apierrors.NewBadRequest("Request manifestWorkReplicaSet obj format is not right")
 	}
 
 	oldmwrSet, ok := oldObj.(*workv1alpha1.ManifestWorkReplicaSet)
 	if !ok {
-		return apierrors.NewBadRequest("Request manifestWorkReplicaSet obj format is not right")
+		return nil, apierrors.NewBadRequest("Request manifestWorkReplicaSet obj format is not right")
 	}
 
-	return r.validateRequest(newmwrSet, oldmwrSet, ctx)
+	return nil, r.validateRequest(newmwrSet, oldmwrSet, ctx)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ManifestWorkReplicaSetWebhook) ValidateDelete(_ context.Context, obj runtime.Object) error {
+func (r *ManifestWorkReplicaSetWebhook) ValidateDelete(_ context.Context, obj runtime.Object) (
+	admission.Warnings, error) {
 	if err := checkFeatureEnabled(); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (r *ManifestWorkReplicaSetWebhook) validateRequest(newmwrSet *workv1alpha1.ManifestWorkReplicaSet, oldmwrSet *workv1alpha1.ManifestWorkReplicaSet, ctx context.Context) error {
