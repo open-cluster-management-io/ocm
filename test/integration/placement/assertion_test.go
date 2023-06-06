@@ -3,9 +3,10 @@ package placement
 import (
 	"context"
 	"fmt"
-	"open-cluster-management.io/ocm/test/integration/util"
 	"sort"
 	"time"
+
+	"open-cluster-management.io/ocm/test/integration/util"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -410,16 +411,23 @@ func assertCreatingPlacementWithDecision(name, namespace string, noc *int32, nod
 	}
 }
 
-func assertUpdatingPlacement(name, namespace string, noc *int32, prioritizerPolicy clusterapiv1beta1.PrioritizerPolicy, tolerations []clusterapiv1beta1.Toleration) {
+func assertUpdatingPlacement(name, namespace string, noc *int32, clusterSet []string, predicate []clusterapiv1beta1.ClusterPredicate, prioritizerPolicy clusterapiv1beta1.PrioritizerPolicy, tolerations []clusterapiv1beta1.Toleration) {
 	ginkgo.By("Updating placement")
-	placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), name, metav1.GetOptions{})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	gomega.Eventually(func() error {
+		placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
 
-	placement.Spec.NumberOfClusters = noc
-	placement.Spec.Tolerations = tolerations
-	placement.Spec.PrioritizerPolicy = prioritizerPolicy
-	placement, err = clusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		placement.Spec.NumberOfClusters = noc
+		placement.Spec.ClusterSets = clusterSet
+		placement.Spec.Predicates = predicate
+		placement.Spec.PrioritizerPolicy = prioritizerPolicy
+		placement.Spec.Tolerations = tolerations
+
+		_, err = clusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
+		return err
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
 func assertCreatingAddOnPlacementScores(clusternamespace, crname, scorename string, score int32) {
