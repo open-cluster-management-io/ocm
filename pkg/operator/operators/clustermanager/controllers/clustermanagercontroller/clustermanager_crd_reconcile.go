@@ -46,6 +46,7 @@ var (
 		"cluster-manager/hub/0000_01_clusters.open-cluster-management.io_managedclustersetbindings.crd.yaml",
 		"cluster-manager/hub/0000_02_clusters.open-cluster-management.io_placements.crd.yaml",
 		"cluster-manager/hub/0000_02_addon.open-cluster-management.io_addondeploymentconfigs.crd.yaml",
+		"cluster-manager/hub/0000_03_addon.open-cluster-management.io_addontemplates.crd.yaml",
 		"cluster-manager/hub/0000_03_clusters.open-cluster-management.io_placementdecisions.crd.yaml",
 		"cluster-manager/hub/0000_05_clusters.open-cluster-management.io_addonplacementscores.crd.yaml",
 	}

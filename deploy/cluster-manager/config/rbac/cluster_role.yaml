@@ -9,7 +9,7 @@ rules:
   verbs: ["create", "get", "list", "update", "watch", "patch", "delete", "deletecollection"]
 - apiGroups: [""]
   resources: ["secrets"]
-  verbs: ["get", "list", "watch", "update", "patch", "delete"]
+  verbs: ["list", "watch", "update", "patch", "delete"]
   resourceNames:
     - "signer-secret"
     - "registration-webhook-serving-cert"
@@ -20,9 +20,10 @@ rules:
     - "placement-controller-sa-kubeconfig"
     - "work-controller-sa-kubeconfig"
     - "external-hub-kubeconfig"
+# addon manager needs this to sign the customized type csr
 - apiGroups: [""]
   resources: ["secrets"]
-  verbs: ["create"]
+  verbs: ["create", "get"]
 - apiGroups: ["coordination.k8s.io"]
   resources: ["leases"]
   verbs: ["create", "get", "list", "update", "watch", "patch", "delete"]
@@ -84,6 +85,9 @@ rules:
 - apiGroups: ["addon.open-cluster-management.io"]
   resources: [managedclusteraddons/finalizers, "clustermanagementaddons/finalizers"]
   verbs: ["update"]
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: [addondeploymentconfigs, "addontemplates"]
+  verbs: ["get", "list", "watch"]
 - apiGroups: ["authentication.k8s.io"]
   resources: ["tokenreviews"]
   verbs: ["create"]
@@ -95,8 +99,7 @@ rules:
   verbs: ["update"]
 - apiGroups: ["certificates.k8s.io"]
   resources: ["signers"]
-  resourceNames: ["kubernetes.io/kube-apiserver-client"]
-  verbs: ["approve"]
+  verbs: ["approve", "sign"]
 - apiGroups: ["cluster.open-cluster-management.io"]
   resources: ["managedclusters"]
   verbs: ["get", "list", "watch", "update", "patch"]

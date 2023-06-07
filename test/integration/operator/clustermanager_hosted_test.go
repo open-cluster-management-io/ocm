@@ -16,7 +16,6 @@ import (
 	"k8s.io/client-go/util/cert"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
-	v1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/test/integration/util"
@@ -83,7 +82,7 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 		_, _, err = resourceapply.ApplySecret(hostedCtx, hostedKubeClient.CoreV1(), recorder, hubKubeconfigSecret)
 		gomega.Expect(err).To(gomega.BeNil())
 
-		go startHubOperator(hostedCtx, v1.InstallModeHosted)
+		go startHubOperator(hostedCtx, operatorapiv1.InstallModeHosted)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -338,8 +337,8 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 43 {
-					return fmt.Errorf("should get 43 relatedResources, actual got %v, %v", len(actual.Status.RelatedResources), actual.Status.RelatedResources)
+				if len(actual.Status.RelatedResources) != 44 {
+					return fmt.Errorf("should get 44s relatedResources, actual got %v, %v", len(actual.Status.RelatedResources), actual.Status.RelatedResources)
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -396,8 +395,8 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 39 {
-					return fmt.Errorf("should get 39 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 40 {
+					return fmt.Errorf("should get 40 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -474,8 +473,8 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				if err != nil {
 					return err
 				}
-				if len(actual.Status.RelatedResources) != 39 {
-					return fmt.Errorf("should get 39 relatedResources, actual got %v", len(actual.Status.RelatedResources))
+				if len(actual.Status.RelatedResources) != 40 {
+					return fmt.Errorf("should get 40 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -487,7 +486,7 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				if err != nil {
 					return err
 				}
-				clusterManager.Spec.NodePlacement = v1.NodePlacement{
+				clusterManager.Spec.NodePlacement = operatorapiv1.NodePlacement{
 					NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
 					Tolerations: []corev1.Toleration{
 						{

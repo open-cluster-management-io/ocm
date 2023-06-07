@@ -327,7 +327,7 @@ func TestSyncDeploy(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	testingcommon.AssertEqualNumber(t, len(createCRDObjects), 11)
+	testingcommon.AssertEqualNumber(t, len(createCRDObjects), 12)
 }
 
 func TestSyncDeployNoWebhook(t *testing.T) {
@@ -367,7 +367,7 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	testingcommon.AssertEqualNumber(t, len(createCRDObjects), 11)
+	testingcommon.AssertEqualNumber(t, len(createCRDObjects), 12)
 }
 
 // TestSyncDelete test cleanup hub deploy
@@ -406,7 +406,7 @@ func TestSyncDelete(t *testing.T) {
 		}
 	}
 	// Check if resources are created as expected
-	testingcommon.AssertEqualNumber(t, len(deleteCRDActions), 15)
+	testingcommon.AssertEqualNumber(t, len(deleteCRDActions), 16)
 
 	for _, action := range deleteKubeActions {
 		switch action.Resource.Resource {
