@@ -459,8 +459,8 @@ func (o *SpokeAgentOptions) Validate() error {
 		return errors.New("cluster healthcheck period must greater than zero")
 	}
 
-	if o.ClientCertExpirationSeconds != 0 && o.ClientCertExpirationSeconds < 600 {
-		return errors.New("client certificate expiration seconds must greater or qual to 600")
+	if o.ClientCertExpirationSeconds != 0 && o.ClientCertExpirationSeconds < 3600 {
+		return errors.New("client certificate expiration seconds must greater or qual to 3600")
 	}
 
 	return nil

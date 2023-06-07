@@ -71,7 +71,7 @@ type CSROption struct {
 	//   2. Signer whose configured maximum is shorter than the requested duration
 	//   3. Signer whose configured minimum is longer than the requested duration
 	//
-	// The minimum valid value for expirationSeconds is 600, i.e. 10 minutes.
+	// The minimum valid value for expirationSeconds is 3600, i.e. 1 hour.
 	ExpirationSeconds *int32
 
 	// EventFilterFunc matches csrs created with above options
