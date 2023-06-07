@@ -2,11 +2,8 @@
 The [ArgoCD](https://argo-cd.readthedocs.io/en/stable/) application controller uses the hub-spoke pattern or pull model mechanism for decentralized resource delivery to remote clusters.
 By using [Open Cluster Management (OCM)](https://open-cluster-management.io/) APIs and components, 
 the ArgoCD Applications will be pulled from the multi-cluster control plane hub cluster down to 
-the registered OCM managed clusters. To try it out, check out the [Getting Started Guide](getting-started.md)
+the registered OCM managed clusters. To try it out, check out the [Getting Started Guide](getting-started.md).
 
-**Note:** The primary goal of this project is to migrate existing native OCM application delivery `AppSubscription` users to ArgoCD.
-The pull model described in this project might not be suitable for every situation.
-It is designed with the existing OCM AppSubscription users in mind to match their existing use cases.
 
 ## Overview
 The current ArgoCD resource delivery is primarily pushing resources from a centralized cluster to the remote/managed clusters.
