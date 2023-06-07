@@ -1,0 +1,44 @@
+# The following workflow is to handle skipped but required jobs when only documentations is changed.
+# Github doc: https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/troubleshooting-required-status-checks#handling-skipped-but-required-checks
+name: DOC-ONLY
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - 'solutions/**'
+      - 'assets/**'
+      - 'troubleshooting/**'
+      - ".github/ISSUE_TEMPLATE/*"
+    branches:
+      - main
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    steps:
+      - run: 'echo "Not required"'
+  verify-deps:
+    name: verify-deps
+    runs-on: ubuntu-latest
+    steps:
+      - run: 'echo "Not required"'
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - run: 'echo "Not required"'
+  unit:
+    name: unit
+    runs-on: ubuntu-latest
+    steps:
+      - run: 'echo "Not required"'
+  integration:
+    name: integration
+    runs-on: ubuntu-latest
+    steps:
+      - run: 'echo "Not required"'
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - run: 'echo "Not required"'
