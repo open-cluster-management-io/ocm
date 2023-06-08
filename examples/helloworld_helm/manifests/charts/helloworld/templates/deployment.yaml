@@ -1,0 +1,58 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ template "helloworldhelm.name" . }}-agent
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "helloworldhelm.name" . }}
+    chart: {{ template "helloworldhelm.chart" . }}
+    release: {{ .Release.Name }}
+    clusterName: {{ .Values.clusterName }}
+    addonInstallNamespace: {{ .Values.addonInstallNamespace }}
+  annotations:
+    kubeVersion: {{ .Capabilities.KubeVersion }}
+    "addon.open-cluster-management.io/deletion-orphan": ""
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ template "helloworldhelm.name" . }}
+      chart: {{ template "helloworldhelm.chart" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "helloworldhelm.name" . }}
+        chart: {{ template "helloworldhelm.chart" . }}
+        release: {{ .Release.Name }}
+    spec:
+      serviceAccountName: {{ template "helloworldhelm.name" . }}-agent-sa
+      volumes:
+      - name: hub-config
+        secret:
+          secretName: {{ .Values.hubKubeConfigSecret }}
+      {{- if .Values.tolerations }}
+      tolerations: {{ toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.global.nodeSelector }}
+      nodeSelector: {{ toYaml .Values.global.nodeSelector | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: {{ template "helloworldhelm.name" . }}-agent
+        image: {{ .Values.global.imageOverrides.helloWorldHelm }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        args:
+          - "/helloworld_helm"
+          - "agent"
+          - "--hub-kubeconfig=/var/run/hub/kubeconfig"
+          - "--cluster-name={{ .Values.clusterName }}"
+          - "--addon-namespace={{ .Values.addonInstallNamespace }}"
+        volumeMounts:
+          - name: hub-config
+            mountPath: /var/run/hub
+      {{- if .Values.global.imagePullSecret }}
+      imagePullSecrets:
+        - name: "{{ .Values.global.imagePullSecret }}"
+      {{- end }}

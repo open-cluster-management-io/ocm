@@ -1,0 +1,15 @@
+namespace: open-cluster-management
+
+resources:
+- resources/cluster_role.yaml
+- resources/cluster_role_binding.yaml
+- resources/service_account.yaml
+- resources/busybox_clustermanagementaddon.yaml
+- resources/busybox_controller.yaml
+
+images:
+  - name: quay.io/open-cluster-management/addon-examples
+    newName: quay.io/open-cluster-management/addon-examples
+    newTag: latest
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization

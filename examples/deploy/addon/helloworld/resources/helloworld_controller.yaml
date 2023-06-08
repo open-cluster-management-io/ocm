@@ -1,0 +1,27 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: helloworld-controller
+  labels:
+    app: helloworld-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: helloworld-controller
+  template:
+    metadata:
+      labels:
+        app: helloworld-controller
+    spec:
+      serviceAccountName: helloworld-addon-sa
+      containers:
+      - name: helloworld-controller
+        image: quay.io/open-cluster-management/addon-examples
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: EXAMPLE_IMAGE_NAME
+          value: $(EXAMPLE_IMAGE_NAME)
+        args:
+          - "/helloworld"
+          - "controller"

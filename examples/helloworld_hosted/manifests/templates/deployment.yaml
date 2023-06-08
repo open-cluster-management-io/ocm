@@ -1,0 +1,50 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: helloworldhosted-agent
+  namespace: {{ .AddonInstallNamespace }}
+  annotations:
+    addon.open-cluster-management.io/hosted-manifest-location: hosting
+  labels:
+    app: helloworldhosted-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: helloworldhosted-agent
+  template:
+    metadata:
+      labels:
+        app: helloworldhosted-agent
+    spec:
+      serviceAccountName: helloworldhosted-agent-sa
+      volumes:
+      - name: hub-config
+        secret:
+          secretName: {{ .KubeConfigSecret }}
+      {{- if eq .InstallMode "Hosted" }}
+      - name: managed-kubeconfig-secret
+        secret:
+          secretName: {{ .ManagedKubeConfigSecret }}
+      {{- end }}
+      containers:
+      - name: helloworldhosted-agent
+        image: {{ .Image }}
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/helloworld_hosted"
+          - "agent"
+          - "--hub-kubeconfig=/var/run/hub/kubeconfig"
+          {{- if eq .InstallMode "Hosted" }}
+          - "--managed-kubeconfig=/managed/config/kubeconfig"
+          {{- end }}
+          - "--cluster-name={{ .ClusterName }}"
+          - "--addon-namespace={{ .AddonInstallNamespace }}"
+        volumeMounts:
+          - name: hub-config
+            mountPath: /var/run/hub
+          {{- if eq .InstallMode "Hosted" }}
+          - name: managed-kubeconfig-secret
+            mountPath: "/managed/config"
+            readOnly: true
+          {{- end }}

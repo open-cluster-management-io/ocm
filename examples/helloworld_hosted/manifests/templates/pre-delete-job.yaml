@@ -1,0 +1,43 @@
+kind: Job
+apiVersion: batch/v1
+metadata:
+  name: helloworldhosted-cleanup-configmap
+  namespace: {{ .AddonInstallNamespace }}
+  annotations:
+    addon.open-cluster-management.io/addon-pre-delete: ""
+    addon.open-cluster-management.io/hosted-manifest-location: hosting
+spec:
+  manualSelector: true
+  selector:
+    matchLabels:
+      job: helloworldhosted-cleanup-configmap
+  template:
+    metadata:
+      labels:
+        job: helloworldhosted-cleanup-configmap
+    spec:
+      serviceAccountName: helloworldhosted-agent-sa
+      restartPolicy: Never
+      {{- if eq .InstallMode "Hosted" }}
+      volumes:
+      - name: managed-kubeconfig-secret
+        secret:
+          secretName: {{ .ManagedKubeConfigSecret }}
+      {{- end }}
+      containers:
+      - name: helloworldhosted-agent
+        image: {{ .Image }}
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/helloworld_hosted"
+          - "cleanup"
+          - "--addon-namespace={{ .AddonInstallNamespace }}"
+          {{- if eq .InstallMode "Hosted" }}
+          - "--managed-kubeconfig=/managed/config/kubeconfig"
+          {{- end }}
+        {{- if eq .InstallMode "Hosted" }}
+        volumeMounts:
+        - name: managed-kubeconfig-secret
+          mountPath: "/managed/config"
+          readOnly: true
+        {{- end }}

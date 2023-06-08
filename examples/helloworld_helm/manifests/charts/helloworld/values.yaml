@@ -1,0 +1,22 @@
+org: open-cluster-management.io
+
+nameOverride: null
+
+clusterName: null
+addonInstallNamespace: null
+hubKubeConfigSecret: null
+
+resources:
+  requests:
+    memory: 32Mi
+  limits:
+    memory: 128Mi
+
+tolerations: []
+
+global:
+  imagePullPolicy: IfNotPresent
+  imagePullSecret: null
+  imageOverrides:
+    helloWorldHelm: quay.io/open-cluster-management/addon-examples:latest
+  nodeSelector: {}

@@ -1,0 +1,12 @@
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: AddOnDeploymentConfig
+metadata:
+  name: deploy-config
+spec:
+  nodePlacement:
+    nodeSelector:
+      "kubernetes.io/os": "linux"
+    tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/infra
+      operator: Exists

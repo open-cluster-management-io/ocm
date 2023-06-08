@@ -1,0 +1,23 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: busybox-addon-controller
+  labels:
+    app: busybox-addon-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: busybox-addon-controller
+  template:
+    metadata:
+      labels:
+        app: busybox-addon-controller
+    spec:
+      serviceAccountName: busybox-addon-sa
+      containers:
+      - name: busybox-addon-controller
+        image: quay.io/open-cluster-management/addon-examples
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/busybox"

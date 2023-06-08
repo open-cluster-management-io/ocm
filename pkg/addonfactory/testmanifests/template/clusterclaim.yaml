@@ -1,0 +1,15 @@
+{{ if not (eq .ClusterName "local-cluster") }}
+---
+apiVersion: cluster.open-cluster-management.io/v1alpha1
+kind: ClusterClaim
+metadata:
+  annotations:
+    hubKubeConfigSecret: {{ .HubKubeConfigSecret }}
+    managedKubeConfigSecret: {{ .ManagedKubeConfigSecret }}
+  labels:
+    open-cluster-management.io/hub-managed: ""
+    open-cluster-management.io/spoke-only: ""
+  name: {{ .AddonInstallNamespace }}
+spec:
+  value: {{ .Image }}
+{{ end }}
