@@ -17,7 +17,7 @@ import (
 	"k8s.io/client-go/util/cert"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	v1 "open-cluster-management.io/api/operator/v1"
-	"open-cluster-management.io/ocm/pkg/registration-operator/helpers"
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
 func updateDeploymentStatus(kubeClient kubernetes.Interface, namespace, deploymentName string) {

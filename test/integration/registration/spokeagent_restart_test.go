@@ -3,6 +3,7 @@ package registration_test
 import (
 	"context"
 	"fmt"
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/test/integration/util"
 	"path"
 	"time"
@@ -33,12 +34,13 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 
 		ginkgo.By("run registration agent")
 		agentOptions := spoke.SpokeAgentOptions{
-			ClusterName:              managedClusterName,
+			AgentOptions:             commonoptions.NewAgentOptions(),
 			BootstrapKubeconfig:      bootstrapFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
+		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
 
 		stopAgent := runAgent("restart-test", agentOptions, spokeCfg)
 
@@ -109,12 +111,13 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 
 		ginkgo.By("Restart registration agent")
 		agentOptions = spoke.SpokeAgentOptions{
-			ClusterName:              managedClusterName,
+			AgentOptions:             commonoptions.NewAgentOptions(),
 			BootstrapKubeconfig:      bootstrapFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
+		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
 		stopAgent = runAgent("restart-test", agentOptions, spokeCfg)
 		defer stopAgent()
 
@@ -161,13 +164,13 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 
 		ginkgo.By("run registration agent")
 		agentOptions := spoke.SpokeAgentOptions{
-			ClusterName:              managedClusterName,
+			AgentOptions:             commonoptions.NewAgentOptions(),
 			BootstrapKubeconfig:      bootstrapFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
-
+		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
 		stopAgent := runAgent("restart-test", agentOptions, spokeCfg)
 
 		ginkgo.By("Check existence of csr and ManagedCluster")
@@ -223,12 +226,13 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 		ginkgo.By("Restart registration agent with a new cluster name")
 		managedClusterName = "restart-test-cluster3"
 		agentOptions = spoke.SpokeAgentOptions{
-			ClusterName:              managedClusterName,
+			AgentOptions:             commonoptions.NewAgentOptions(),
 			BootstrapKubeconfig:      bootstrapFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
+		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
 		stopAgent = runAgent("restart-test", agentOptions, spokeCfg)
 		defer stopAgent()
 

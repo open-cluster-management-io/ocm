@@ -32,7 +32,7 @@ test-e2e: deploy-hub deploy-spoke-operator run-e2e
 
 run-e2e: cluster-ip bootstrap-secret
 	go test -c ./test/e2e
-	./e2e.test -test.v -ginkgo.v -deploy-klusterlet=true -nil-executor-validating=true
+	./e2e.test -test.v -ginkgo.v -deploy-klusterlet=true -nil-executor-validating=true -image-tag=e2e
 
 clean-hub: clean-hub-cr clean-hub-operator
 

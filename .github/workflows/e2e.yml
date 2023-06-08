@@ -33,15 +33,15 @@ jobs:
       - name: install imagebuilder
         run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
       - name: Build images
-        run: make images
+        run: IMAGE_TAG=e2e make images
       - name: Load images
         run: |
-          kind load docker-image --name=kind quay.io/open-cluster-management/registration-operator:latest
-          kind load docker-image --name=kind quay.io/open-cluster-management/registration:latest
-          kind load docker-image --name=kind quay.io/open-cluster-management/work:latest
-          kind load docker-image --name=kind quay.io/open-cluster-management/placement:latest
+          kind load docker-image --name=kind quay.io/open-cluster-management/registration-operator:e2e
+          kind load docker-image --name=kind quay.io/open-cluster-management/registration:e2e
+          kind load docker-image --name=kind quay.io/open-cluster-management/work:e2e
+          kind load docker-image --name=kind quay.io/open-cluster-management/placement:e2e
       - name: Test E2E
         run: |
-          make test-e2e
+          IMAGE_TAG=e2e make test-e2e
         env:
           KUBECONFIG: /home/runner/.kube/config

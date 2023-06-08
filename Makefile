@@ -38,7 +38,7 @@ REGISTRATION_IMAGE ?= $(IMAGE_REGISTRY)/registration:$(IMAGE_TAG)
 # PLACEMENT_IMAGE can be set in the env to override calculated value
 PLACEMENT_IMAGE ?= $(IMAGE_REGISTRY)/placement:$(IMAGE_TAG)
 # ADDON_MANAGER_IMAGE can be set in the env to override calculated value
-ADDON_MANAGER_IMAGE ?= $(IMAGE_REGISTRY)/addon-manager:$(IMAGE_TAG)
+ADDON_MANAGER_IMAGE ?= $(IMAGE_REGISTRY)/addon-manager:latest
 
 $(call build-image,registration,$(REGISTRATION_IMAGE),./build/Dockerfile.registration,.)
 $(call build-image,work,$(WORK_IMAGE),./build/Dockerfile.work,.)

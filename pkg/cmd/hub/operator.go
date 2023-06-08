@@ -5,7 +5,7 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
-	"open-cluster-management.io/ocm/pkg/registration-operator/operators/clustermanager"
+	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager"
 	"open-cluster-management.io/ocm/pkg/version"
 )
 

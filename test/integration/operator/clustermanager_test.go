@@ -20,9 +20,9 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
-	"open-cluster-management.io/ocm/pkg/registration-operator/helpers"
-	"open-cluster-management.io/ocm/pkg/registration-operator/operators/clustermanager"
-	certrotation "open-cluster-management.io/ocm/pkg/registration-operator/operators/clustermanager/controllers/certrotationcontroller"
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
+	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager"
+	certrotation "open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/certrotationcontroller"
 )
 
 func startHubOperator(ctx context.Context, mode v1.InstallMode) {

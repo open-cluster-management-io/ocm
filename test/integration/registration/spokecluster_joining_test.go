@@ -2,6 +2,7 @@ package registration_test
 
 import (
 	"fmt"
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/test/integration/util"
 	"path"
 	"time"
@@ -24,12 +25,13 @@ var _ = ginkgo.Describe("Joining Process", func() {
 
 		// run registration agent
 		agentOptions := spoke.SpokeAgentOptions{
-			ClusterName:              managedClusterName,
+			AgentOptions:             commonoptions.NewAgentOptions(),
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
 			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
+		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
 
 		cancel := runAgent("joiningtest", agentOptions, spokeCfg)
 		defer cancel()

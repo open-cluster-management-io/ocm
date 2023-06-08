@@ -40,7 +40,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
-	"open-cluster-management.io/ocm/pkg/registration-operator/helpers"
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
 type Tester struct {
@@ -64,12 +64,13 @@ type Tester struct {
 	clusterManagerNamespace string
 	operatorNamespace       string
 	klusterletOperator      string
+	imageTag                string
 }
 
 // kubeconfigPath is the path of kubeconfig file, will be get from env "KUBECONFIG" by default.
 // bootstrapHubSecret is the bootstrap hub kubeconfig secret, and the format is "namespace/secretName".
 // Default of bootstrapHubSecret is helpers.KlusterletDefaultNamespace/helpers.BootstrapHubKubeConfig.
-func NewTester(hubKubeConfigPath, spokeKubeConfigPath string, timeout time.Duration) *Tester {
+func NewTester(hubKubeConfigPath, spokeKubeConfigPath, imageTag string, timeout time.Duration) *Tester {
 	var tester = Tester{
 		hubKubeConfigPath:       hubKubeConfigPath,
 		spokeKubeConfigPath:     spokeKubeConfigPath,
@@ -79,6 +80,7 @@ func NewTester(hubKubeConfigPath, spokeKubeConfigPath string, timeout time.Durat
 		clusterManagerNamespace: helpers.ClusterManagerDefaultNamespace,
 		operatorNamespace:       "open-cluster-management",
 		klusterletOperator:      "klusterlet",
+		imageTag:                imageTag,
 	}
 
 	return &tester
@@ -195,8 +197,8 @@ func (t *Tester) CreateKlusterlet(name, clusterName, klusterletNamespace string,
 			Name: name,
 		},
 		Spec: operatorapiv1.KlusterletSpec{
-			RegistrationImagePullSpec: "quay.io/open-cluster-management/registration:latest",
-			WorkImagePullSpec:         "quay.io/open-cluster-management/work:latest",
+			RegistrationImagePullSpec: "quay.io/open-cluster-management/registration:" + t.imageTag,
+			WorkImagePullSpec:         "quay.io/open-cluster-management/work:" + t.imageTag,
 			ExternalServerURLs: []operatorapiv1.ServerURL{
 				{
 					URL: "https://localhost",

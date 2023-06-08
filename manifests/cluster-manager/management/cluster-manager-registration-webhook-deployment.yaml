@@ -56,7 +56,6 @@ spec:
         {{ if .HostedMode }}
         - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
         {{ end }}
-        imagePullPolicy: Always
         resources:
           requests:
             cpu: 2m
