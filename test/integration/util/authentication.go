@@ -9,7 +9,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"os"
@@ -51,7 +50,7 @@ type TestAuthn struct {
 }
 
 func createKubeConfigByClientCert(context string, securePort string, serverCertFile, certFile, keyFile string) (*clientcmdapi.Config, error) {
-	caData, err := ioutil.ReadFile(serverCertFile)
+	caData, err := os.ReadFile(serverCertFile)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +122,7 @@ func (t *TestAuthn) Start() error {
 	if err := pem.Encode(&caCertBuffer, &pem.Block{Type: certutil.CertificateBlockType, Bytes: caDERBytes}); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(t.caFile, caCertBuffer.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(t.caFile, caCertBuffer.Bytes(), 0644); err != nil {
 		return err
 	}
 
@@ -132,7 +131,7 @@ func (t *TestAuthn) Start() error {
 		&caKeyBuffer, &pem.Block{Type: keyutil.RSAPrivateKeyBlockType, Bytes: x509.MarshalPKCS1PrivateKey(caKey)}); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(t.caKeyFile, caKeyBuffer.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(t.caKeyFile, caKeyBuffer.Bytes(), 0644); err != nil {
 		return err
 	}
 
@@ -182,10 +181,10 @@ func (t *TestAuthn) CreateBootstrapKubeConfig(configFileName, serverCertFile, se
 		}
 	}
 
-	if err := ioutil.WriteFile(path.Join(configDir, "bootstrap.crt"), certData, 0644); err != nil {
+	if err := os.WriteFile(path.Join(configDir, "bootstrap.crt"), certData, 0644); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(path.Join(configDir, "bootstrap.key"), keyData, 0644); err != nil {
+	if err := os.WriteFile(path.Join(configDir, "bootstrap.key"), keyData, 0644); err != nil {
 		return err
 	}
 
@@ -199,7 +198,7 @@ func (t *TestAuthn) CreateBootstrapKubeConfig(configFileName, serverCertFile, se
 
 func (t *TestAuthn) signClientCertKeyWithCA(user string, groups []string, maxAge time.Duration) ([]byte, []byte, error) {
 	now := time.Now()
-	caData, err := ioutil.ReadFile(t.caFile)
+	caData, err := os.ReadFile(t.caFile)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -209,7 +208,7 @@ func (t *TestAuthn) signClientCertKeyWithCA(user string, groups []string, maxAge
 		return nil, nil, err
 	}
 
-	caKeyData, err := ioutil.ReadFile(t.caKeyFile)
+	caKeyData, err := os.ReadFile(t.caKeyFile)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -388,7 +387,7 @@ func FindAutoApprovedSpokeCSR(kubeClient kubernetes.Interface, spokeClusterName 
 	}
 
 	if autoApproved == nil {
-		return nil, fmt.Errorf("failed to find autoapproved csr for spoke cluster %q", spokeClusterName)
+		return nil, fmt.Errorf("failed to find autoapproved csr for spoke cluster %q, crs: %+v", spokeClusterName, csrList)
 	}
 
 	return autoApproved, nil
@@ -444,7 +443,7 @@ func (t *TestAuthn) FillCertificateToApprovedCSR(kubeClient kubernetes.Interface
 		return err
 	}
 
-	caData, err := ioutil.ReadFile(t.caFile)
+	caData, err := os.ReadFile(t.caFile)
 	if err != nil {
 		return err
 	}
@@ -454,7 +453,7 @@ func (t *TestAuthn) FillCertificateToApprovedCSR(kubeClient kubernetes.Interface
 		return err
 	}
 
-	caKeyData, err := ioutil.ReadFile(t.caKeyFile)
+	caKeyData, err := os.ReadFile(t.caKeyFile)
 	if err != nil {
 		return err
 	}
