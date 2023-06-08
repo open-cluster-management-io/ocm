@@ -74,7 +74,7 @@ func TestLeaseUpdate(t *testing.T) {
 			if c.needToStartUpdateBefore {
 				leaseUpdater.start(context.TODO(), time.Duration(testinghelpers.TestLeaseDurationSeconds)*time.Second)
 				// wait a few milliseconds to start the lease update routine
-				time.Sleep(200 * time.Millisecond)
+				time.Sleep(500 * time.Millisecond)
 			}
 
 			ctrl := &managedClusterLeaseController{
@@ -85,8 +85,8 @@ func TestLeaseUpdate(t *testing.T) {
 			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""))
 			testingcommon.AssertError(t, syncErr, c.expectedErr)
 
-			// wait one cycle
-			time.Sleep(1200 * time.Millisecond)
+			// wait one cycle (1 ~ 1.25s)
+			time.Sleep(2000 * time.Millisecond)
 			c.validateActions(t, hubClient.Actions())
 		})
 	}
