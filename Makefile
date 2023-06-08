@@ -68,6 +68,21 @@ verify-gocilint:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
 	golangci-lint run --timeout=3m --modules-download-mode vendor ./...
 
+install-golang-gci:
+	go install github.com/daixiang0/gci@v0.10.1
+
+fmt-imports: install-golang-gci
+	gci write --skip-generated -s standard -s default -s "prefix(open-cluster-management.io)" -s "prefix(open-cluster-management.io/ocm)" cmd pkg test dependencymagnet
+
+verify-fmt-imports: install-golang-gci
+	@output=$$(gci diff --skip-generated -s standard -s default -s "prefix(open-cluster-management.io)" -s "prefix(open-cluster-management.io/ocm)" cmd pkg test dependencymagnet); \
+	if [ -n "$$output" ]; then \
+	    echo "Diff output is not empty: $$output"; \
+	    exit 1; \
+	else \
+	    echo "Diff output is empty"; \
+	fi
+
 verify: verify-crds
 
 ensure-operator-sdk:
