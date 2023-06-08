@@ -51,9 +51,7 @@ func (r *IntegrationTestEventRecorder) Warningf(reason, messageFmt string, args 
 	r.Warning(reason, fmt.Sprintf(messageFmt, args...))
 }
 
-func (r *IntegrationTestEventRecorder) Shutdown() {
-	return
-}
+func (r *IntegrationTestEventRecorder) Shutdown() {}
 
 func HasCondition(
 	conditions []metav1.Condition,
