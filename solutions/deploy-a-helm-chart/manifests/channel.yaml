@@ -1,0 +1,9 @@
+apiVersion: apps.open-cluster-management.io/v1
+kind: Channel
+metadata:
+  name: demo-helmrepo
+  namespace: default
+spec:
+    type: HelmRepo
+    pathname: https://charts.helm.sh/stable/
+    insecureSkipVerify: true

@@ -1,0 +1,9 @@
+secretGenerator:
+  - name: external-managed-kubeconfig
+    namespace: klusterlet
+    files:
+      - kubeconfig=external-managed-kubeconfig
+    type: "Opaque"
+
+generatorOptions:
+  disableNameSuffixHash: true

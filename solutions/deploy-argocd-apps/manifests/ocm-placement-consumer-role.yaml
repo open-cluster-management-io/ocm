@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ocm-placement-consumer
+  namespace: argocd
+rules:
+# Allow controller to manage placements/placementdecisions
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["placements"]
+  verbs: ["get", "list"]
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["placementdecisions"]
+  verbs: ["get", "list"]

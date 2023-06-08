@@ -1,0 +1,9 @@
+apiVersion: migration.k8s.io/v1alpha1
+kind: StorageVersionMigration
+metadata:
+  name: managedclustersetbindings.cluster.open-cluster-management.io
+spec:
+  resource:
+    group: cluster.open-cluster-management.io
+    resource: managedclustersetbindings
+    version: v1beta1

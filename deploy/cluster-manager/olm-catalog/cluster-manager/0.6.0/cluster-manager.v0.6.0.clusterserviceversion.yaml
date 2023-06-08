@@ -1,0 +1,326 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "operator.open-cluster-management.io/v1",
+          "kind": "ClusterManager",
+          "metadata": {
+            "name": "cluster-manager"
+          },
+          "spec": {
+            "deployOption": {
+              "mode": "Default"
+            },
+            "placementImagePullSpec": "quay.io/open-cluster-management/placement:v0.3.0",
+            "registrationImagePullSpec": "quay.io/open-cluster-management/registration:v0.6.0",
+            "workImagePullSpec": "quay.io/open-cluster-management/work:v0.6.0"
+          }
+        }
+      ]
+    capabilities: Basic Install
+    categories: Integration & Delivery,OpenShift Optional
+    certified: "false"
+    containerImage: quay.io/open-cluster-management/registration-operator:v0.6.0
+    createdAt: "2022-01-20T20:00:31Z"
+    description: Manages the installation and upgrade of the ClusterManager.
+    operators.operatorframework.io/builder: operator-sdk-v1.1.0
+    operators.operatorframework.io/project_layout: go
+    repository: https://github.com/open-cluster-management-io/registration-operator
+    support: Red Hat, Inc.
+  name: cluster-manager.v0.6.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: ClusterManager defines the configurations of controllers running hub that govern registration and work distribution for attached Klusterlets
+      displayName: ClusterManager
+      kind: ClusterManager
+      name: clustermanagers.operator.open-cluster-management.io
+      version: v1
+  description: |
+    The Cluster Manager provides the multicluster hub, which can manage Kubernetes-based clusters across data centers, public clouds, and private clouds. This operator supports the installation and upgrade of ClusterManager.
+
+    ## How to Install
+    Install ClusterManager operator by following instructions in top right button `Install`. After installing the operator, create an instance of the ClusterManager resource to install the ClusterManager.
+
+    The pods of ClusterManager are created in the `open-cluster-management-hub` namespace:
+
+    ```
+    $ kubectl get pods -n open-cluster-management-hub
+    NAME                                                       READY   STATUS    RESTARTS   AGE
+    cluster-manager-placement-controller-d76cffb7c-fvzjh       1/1     Running   0          22h
+    cluster-manager-placement-controller-d76cffb7c-qnpjl       1/1     Running   0          22h
+    cluster-manager-placement-controller-d76cffb7c-tt4h6       1/1     Running   0          22h
+    cluster-manager-registration-controller-66b7c65849-btmpp   1/1     Running   0          22h
+    cluster-manager-registration-controller-66b7c65849-gt6fv   1/1     Running   0          22h
+    cluster-manager-registration-controller-66b7c65849-pl46k   1/1     Running   0          22h
+    cluster-manager-registration-webhook-5f5499fccf-crr69      1/1     Running   0          22h
+    cluster-manager-registration-webhook-5f5499fccf-s2dkb      1/1     Running   0          22h
+    cluster-manager-registration-webhook-5f5499fccf-s7lp5      1/1     Running   0          22h
+    cluster-manager-work-webhook-b68fc9b84-ddz2d               1/1     Running   0          22h
+    cluster-manager-work-webhook-b68fc9b84-kd92j               1/1     Running   0          22h
+    cluster-manager-work-webhook-b68fc9b84-vdbkl               1/1     Running   0          22h
+    ```
+
+    There is a ManagedCluster created in the Hub cluster when the managed cluster is registered to the Hub cluster.
+
+    ```
+    $ kubectl get managedclusters.cluster.open-cluster-management.io
+    NAME                   HUB ACCEPTED   MANAGED CLUSTER URLS     JOINED   AVAILABLE   AGE
+    cluster-dev            true                                    True     True        7h20m
+    cluster-test           false          https://127.0.0.1:8443                        7h25m
+    ```
+  displayName: Cluster Manager
+  icon:
+  - base64data: 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
+    mediatype: image/png
+  install:
+    spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          - namespaces
+          - serviceaccounts
+          - services
+          - secrets
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+          - patch
+          - delete
+        - apiGroups:
+          - ""
+          resources:
+          - nodes
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
+        - apiGroups:
+          - ""
+          - events.k8s.io
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+          - update
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+          - patch
+          - delete
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterrolebindings
+          - rolebindings
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+          - patch
+          - delete
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterroles
+          - roles
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+          - patch
+          - delete
+          - escalate
+          - bind
+        - apiGroups:
+          - apiextensions.k8s.io
+          resources:
+          - customresourcedefinitions
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+          - patch
+          - delete
+        - apiGroups:
+          - apiregistration.k8s.io
+          resources:
+          - apiservices
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+          - patch
+          - delete
+        - apiGroups:
+          - admissionregistration.k8s.io
+          resources:
+          - validatingwebhookconfigurations
+          - mutatingwebhookconfigurations
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+          - patch
+          - delete
+        - apiGroups:
+          - operator.open-cluster-management.io
+          resources:
+          - clustermanagers
+          verbs:
+          - get
+          - list
+          - watch
+          - update
+          - delete
+        - apiGroups:
+          - operator.open-cluster-management.io
+          resources:
+          - clustermanagers/status
+          verbs:
+          - update
+          - patch
+        - apiGroups:
+          - migration.k8s.io
+          resources:
+          - storageversionmigrations
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+          - patch
+          - delete
+        serviceAccountName: cluster-manager
+      deployments:
+      - name: cluster-manager
+        spec:
+          replicas: 3
+          selector:
+            matchLabels:
+              app: cluster-manager
+          strategy: {}
+          template:
+            metadata:
+              labels:
+                app: cluster-manager
+            spec:
+              affinity:
+                podAntiAffinity:
+                  preferredDuringSchedulingIgnoredDuringExecution:
+                  - podAffinityTerm:
+                      labelSelector:
+                        matchExpressions:
+                        - key: app
+                          operator: In
+                          values:
+                          - cluster-manager
+                      topologyKey: failure-domain.beta.kubernetes.io/zone
+                    weight: 70
+                  - podAffinityTerm:
+                      labelSelector:
+                        matchExpressions:
+                        - key: app
+                          operator: In
+                          values:
+                          - cluster-manager
+                      topologyKey: kubernetes.io/hostname
+                    weight: 30
+              containers:
+              - args:
+                - /registration-operator
+                - hub
+                image: quay.io/open-cluster-management/registration-operator:v0.6.0
+                livenessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 8443
+                    scheme: HTTPS
+                  initialDelaySeconds: 2
+                  periodSeconds: 10
+                name: registration-operator
+                readinessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 8443
+                    scheme: HTTPS
+                  initialDelaySeconds: 2
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 128Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+                  privileged: false
+                  runAsNonRoot: true
+              serviceAccountName: cluster-manager
+    strategy: deployment
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: true
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - open-cluster-management
+  - ClusterManager
+  links:
+  - name: Registration Operator
+    url: https://github.com/open-cluster-management-io/registration-operator
+  maintainers:
+  - email: zyin@redhat.com
+    name: Zhiwei Yin
+  - email: deads@redhat.com
+    name: David Eads
+  - email: jqiu@redhat.com
+    name: Jian Qiu
+  maturity: alpha
+  provider:
+    name: Red Hat, Inc.
+  replaces: cluster-manager.v0.5.0
+  selector:
+    matchLabels:
+      app: cluster-manager
+  version: 0.6.0

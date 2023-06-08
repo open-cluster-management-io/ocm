@@ -1,0 +1,13 @@
+# ClusterRoleBinding for registration mandatory permissions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: open-cluster-management:{{ .KlusterletName }}-registration:agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: open-cluster-management:{{ .KlusterletName }}-registration:agent
+subjects:
+  - kind: ServiceAccount
+    name: {{ .KlusterletName }}-registration-sa
+    namespace: {{ .KlusterletNamespace }}
