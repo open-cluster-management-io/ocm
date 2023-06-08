@@ -2,16 +2,15 @@ package lease
 
 import (
 	"context"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"time"
 
+	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/events"
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	"open-cluster-management.io/ocm/pkg/registration/helpers"
-
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 
 	coordv1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -35,7 +34,7 @@ var (
 // leaseController checks the lease of managed clusters on hub cluster to determine whether a managed cluster is available.
 type leaseController struct {
 	kubeClient    kubernetes.Interface
-	clusterClient clientset.Interface
+	patcher       patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus]
 	clusterLister clusterv1listers.ManagedClusterLister
 	leaseLister   coordlisters.LeaseLister
 	eventRecorder events.Recorder
@@ -49,8 +48,10 @@ func NewClusterLeaseController(
 	leaseInformer coordinformers.LeaseInformer,
 	recorder events.Recorder) factory.Controller {
 	c := &leaseController{
-		kubeClient:    kubeClient,
-		clusterClient: clusterClient,
+		kubeClient: kubeClient,
+		patcher: patcher.NewPatcher[
+			*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
+			clusterClient.ClusterV1().ManagedClusters()),
 		clusterLister: clusterInformer.Lister(),
 		leaseLister:   leaseInformer.Lister(),
 		eventRecorder: recorder.WithComponentSuffix("managed-cluster-lease-controller"),
@@ -155,15 +156,15 @@ func (c *leaseController) updateClusterStatus(ctx context.Context, cluster *clus
 		return nil
 	}
 
-	// the lease is not constantly updated, update it to unknown
-	conditionUpdateFn := helpers.UpdateManagedClusterConditionFn(metav1.Condition{
+	newCluster := cluster.DeepCopy()
+	meta.SetStatusCondition(&newCluster.Status.Conditions, metav1.Condition{
 		Type:    clusterv1.ManagedClusterConditionAvailable,
 		Status:  metav1.ConditionUnknown,
 		Reason:  "ManagedClusterLeaseUpdateStopped",
 		Message: "Registration agent stopped updating its lease.",
 	})
 
-	_, updated, err := helpers.UpdateManagedClusterStatus(ctx, c.clusterClient, cluster.Name, conditionUpdateFn)
+	updated, err := c.patcher.PatchStatus(ctx, newCluster, newCluster.Status, cluster.Status)
 	if updated {
 		c.eventRecorder.Eventf("ManagedClusterAvailableConditionUpdated",
 			"update managed cluster %q available condition to unknown, due to its lease is not updated constantly",

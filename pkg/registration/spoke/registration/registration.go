@@ -1,8 +1,11 @@
-package managedcluster
+package registration
 
 import (
 	"crypto/x509/pkix"
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/errors"
+	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"strings"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -22,7 +25,6 @@ import (
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 
 	"open-cluster-management.io/ocm/pkg/registration/clientcert"
-	"open-cluster-management.io/ocm/pkg/registration/helpers"
 	"open-cluster-management.io/ocm/pkg/registration/hub/user"
 )
 
@@ -143,13 +145,22 @@ func GenerateBootstrapStatusUpdater() clientcert.StatusUpdateFunc {
 }
 
 // GenerateStatusUpdater generates status update func for the certificate management
-func GenerateStatusUpdater(hubClusterClient clientset.Interface, clusterName string) clientcert.StatusUpdateFunc {
+func GenerateStatusUpdater(hubClusterClient clientset.Interface, hubClusterLister clusterv1listers.ManagedClusterLister, clusterName string) clientcert.StatusUpdateFunc {
 	return func(ctx context.Context, cond metav1.Condition) error {
-		_, _, updatedErr := helpers.UpdateManagedClusterStatus(
-			ctx, hubClusterClient, clusterName, helpers.UpdateManagedClusterConditionFn(cond),
-		)
-
-		return updatedErr
+		cluster, err := hubClusterLister.Get(clusterName)
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		newCluster := cluster.DeepCopy()
+		meta.SetStatusCondition(&newCluster.Status.Conditions, cond)
+		patcher := patcher.NewPatcher[
+			*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
+			hubClusterClient.ClusterV1().ManagedClusters())
+		_, err = patcher.PatchStatus(ctx, newCluster, newCluster.Status, cluster.Status)
+		return err
 	}
 }
 

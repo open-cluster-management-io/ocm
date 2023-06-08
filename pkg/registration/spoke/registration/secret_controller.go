@@ -1,4 +1,4 @@
-package managedcluster
+package registration
 
 import (
 	"bytes"

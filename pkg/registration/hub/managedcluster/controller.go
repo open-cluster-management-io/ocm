@@ -3,8 +3,8 @@ package managedcluster
 import (
 	"context"
 	"embed"
-	"encoding/json"
 	"fmt"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	informerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
@@ -21,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 )
@@ -43,8 +42,8 @@ var staticFiles = []string{
 // managedClusterController reconciles instances of ManagedCluster on the hub.
 type managedClusterController struct {
 	kubeClient    kubernetes.Interface
-	clusterClient clientset.Interface
 	clusterLister listerv1.ManagedClusterLister
+	patcher       patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
 	cache         resourceapply.ResourceCache
 	eventRecorder events.Recorder
 }
@@ -57,8 +56,10 @@ func NewManagedClusterController(
 	recorder events.Recorder) factory.Controller {
 	c := &managedClusterController{
 		kubeClient:    kubeClient,
-		clusterClient: clusterClient,
 		clusterLister: clusterInformer.Lister(),
+		patcher: patcher.NewPatcher[
+			*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus](
+			clusterClient.ClusterV1().ManagedClusters()),
 		cache:         resourceapply.NewResourceCache(),
 		eventRecorder: recorder.WithComponentSuffix("managed-cluster-controller"),
 	}
@@ -83,24 +84,10 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		return err
 	}
 
-	managedCluster = managedCluster.DeepCopy()
+	newManagedCluster := managedCluster.DeepCopy()
 	if managedCluster.DeletionTimestamp.IsZero() {
-		hasFinalizer := false
-		for i := range managedCluster.Finalizers {
-			if managedCluster.Finalizers[i] == managedClusterFinalizer {
-				hasFinalizer = true
-				break
-			}
-		}
-		if !hasFinalizer {
-			finalizerBytes, err := json.Marshal(append(managedCluster.Finalizers, managedClusterFinalizer))
-			if err != nil {
-				return err
-			}
-			patch := fmt.Sprintf("{\"metadata\": {\"finalizers\": %s}}", string(finalizerBytes))
-
-			_, err = c.clusterClient.ClusterV1().ManagedClusters().Patch(
-				ctx, managedCluster.Name, types.MergePatchType, []byte(patch), metav1.PatchOptions{})
+		updated, err := c.patcher.AddFinalizer(ctx, managedCluster, managedClusterFinalizer)
+		if err != nil || updated {
 			return err
 		}
 	}
@@ -110,7 +97,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		if err := c.removeManagedClusterResources(ctx, managedClusterName); err != nil {
 			return err
 		}
-		return c.removeManagedClusterFinalizer(ctx, managedCluster)
+		return c.patcher.RemoveFinalizer(ctx, managedCluster, managedClusterFinalizer)
 	}
 
 	if !managedCluster.Spec.HubAcceptsClient {
@@ -126,18 +113,17 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 			return err
 		}
 
-		_, _, err := helpers.UpdateManagedClusterStatus(
-			ctx,
-			c.clusterClient,
-			managedClusterName,
-			helpers.UpdateManagedClusterConditionFn(metav1.Condition{
-				Type:    v1.ManagedClusterConditionHubAccepted,
-				Status:  metav1.ConditionFalse,
-				Reason:  "HubClusterAdminDenied",
-				Message: "Denied by hub cluster admin",
-			}),
-		)
-		return err
+		meta.SetStatusCondition(&newManagedCluster.Status.Conditions, metav1.Condition{
+			Type:    v1.ManagedClusterConditionHubAccepted,
+			Status:  metav1.ConditionFalse,
+			Reason:  "HubClusterAdminDenied",
+			Message: "Denied by hub cluster admin",
+		})
+
+		if _, err := c.patcher.PatchStatus(ctx, newManagedCluster, newManagedCluster.Status, managedCluster.Status); err != nil {
+			return err
+		}
+		return nil
 	}
 
 	// TODO consider to add the managedcluster-namespace.yaml back to staticFiles,
@@ -178,12 +164,8 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		acceptedCondition.Message = applyErrors.Error()
 	}
 
-	_, updated, updatedErr := helpers.UpdateManagedClusterStatus(
-		ctx,
-		c.clusterClient,
-		managedClusterName,
-		helpers.UpdateManagedClusterConditionFn(acceptedCondition),
-	)
+	meta.SetStatusCondition(&newManagedCluster.Status.Conditions, acceptedCondition)
+	updated, updatedErr := c.patcher.PatchStatus(ctx, newManagedCluster, newManagedCluster.Status, managedCluster.Status)
 	if updatedErr != nil {
 		errs = append(errs, updatedErr)
 	}
@@ -201,28 +183,4 @@ func (c *managedClusterController) removeManagedClusterResources(ctx context.Con
 		errs = append(errs, err)
 	}
 	return operatorhelpers.NewMultiLineAggregate(errs)
-}
-
-func (c *managedClusterController) removeManagedClusterFinalizer(ctx context.Context, managedCluster *v1.ManagedCluster) error {
-	copiedFinalizers := []string{}
-	for i := range managedCluster.Finalizers {
-		if managedCluster.Finalizers[i] == managedClusterFinalizer {
-			continue
-		}
-		copiedFinalizers = append(copiedFinalizers, managedCluster.Finalizers[i])
-	}
-
-	if len(managedCluster.Finalizers) != len(copiedFinalizers) {
-		finalizerBytes, err := json.Marshal(copiedFinalizers)
-		if err != nil {
-			return err
-		}
-		patch := fmt.Sprintf("{\"metadata\": {\"finalizers\": %s}}", string(finalizerBytes))
-
-		_, err = c.clusterClient.ClusterV1().ManagedClusters().Patch(
-			ctx, managedCluster.Name, types.MergePatchType, []byte(patch), metav1.PatchOptions{})
-		return err
-	}
-
-	return nil
 }

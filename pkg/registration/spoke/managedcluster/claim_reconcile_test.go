@@ -3,6 +3,9 @@ package managedcluster
 import (
 	"context"
 	"encoding/json"
+	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	kubeinformers "k8s.io/client-go/informers"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 	"reflect"
 	"testing"
 	"time"
@@ -30,7 +33,7 @@ func TestSync(t *testing.T) {
 		{
 			name:            "sync no managed cluster",
 			validateActions: testingcommon.AssertNoActions,
-			expectedErr:     "unable to get managed cluster with name \"testmanagedcluster\" from hub: managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
+			expectedErr:     "unable to get managed cluster \"testmanagedcluster\" from hub: managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
 		},
 		{
 			name:            "skip when managed cluster does not join the hub yet",
@@ -51,8 +54,8 @@ func TestSync(t *testing.T) {
 				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				cluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, cluster)
 				if err != nil {
@@ -71,6 +74,11 @@ func TestSync(t *testing.T) {
 			},
 		},
 	}
+
+	apiServer, discoveryClient := newDiscoveryServer(t, nil)
+	defer apiServer.Close()
+	kubeClient := kubefake.NewSimpleClientset()
+	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Minute*10)
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -93,13 +101,16 @@ func TestSync(t *testing.T) {
 				}
 			}
 
-			ctrl := managedClusterClaimController{
-				clusterName:            testinghelpers.TestManagedClusterName,
-				maxCustomClusterClaims: 20,
-				hubClusterClient:       clusterClient,
-				hubClusterLister:       clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				claimLister:            clusterInformerFactory.Cluster().V1alpha1().ClusterClaims().Lister(),
-			}
+			ctrl := newManagedClusterStatusController(
+				testinghelpers.TestManagedClusterName,
+				clusterClient,
+				clusterInformerFactory.Cluster().V1().ManagedClusters(),
+				discoveryClient,
+				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
+				kubeInformerFactory.Core().V1().Nodes(),
+				20,
+				eventstesting.NewTestingEventRecorder(t),
+			)
 
 			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""))
 			testingcommon.AssertError(t, syncErr, c.expectedErr)
@@ -132,8 +143,8 @@ func TestExposeClaims(t *testing.T) {
 				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				cluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, cluster)
 				if err != nil {
@@ -190,8 +201,8 @@ func TestExposeClaims(t *testing.T) {
 			},
 			maxCustomClusterClaims: 2,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				cluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, cluster)
 				if err != nil {
@@ -226,8 +237,8 @@ func TestExposeClaims(t *testing.T) {
 				},
 			}),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				cluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, cluster)
 				if err != nil {
@@ -262,8 +273,8 @@ func TestExposeClaims(t *testing.T) {
 				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				cluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, cluster)
 				if err != nil {
@@ -282,6 +293,11 @@ func TestExposeClaims(t *testing.T) {
 			},
 		},
 	}
+
+	apiServer, discoveryClient := newDiscoveryServer(t, nil)
+	defer apiServer.Close()
+	kubeClient := kubefake.NewSimpleClientset()
+	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Minute*10)
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -308,15 +324,18 @@ func TestExposeClaims(t *testing.T) {
 				c.maxCustomClusterClaims = 20
 			}
 
-			ctrl := managedClusterClaimController{
-				clusterName:            testinghelpers.TestManagedClusterName,
-				maxCustomClusterClaims: c.maxCustomClusterClaims,
-				hubClusterClient:       clusterClient,
-				hubClusterLister:       clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				claimLister:            clusterInformerFactory.Cluster().V1alpha1().ClusterClaims().Lister(),
-			}
+			ctrl := newManagedClusterStatusController(
+				testinghelpers.TestManagedClusterName,
+				clusterClient,
+				clusterInformerFactory.Cluster().V1().ManagedClusters(),
+				discoveryClient,
+				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
+				kubeInformerFactory.Core().V1().Nodes(),
+				c.maxCustomClusterClaims,
+				eventstesting.NewTestingEventRecorder(t),
+			)
 
-			syncErr := ctrl.exposeClaims(context.TODO(), testingcommon.NewFakeSyncContext(t, c.cluster.Name), c.cluster)
+			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, c.cluster.Name))
 			testingcommon.AssertError(t, syncErr, c.expectedErr)
 
 			c.validateActions(t, clusterClient.Actions())

@@ -3,6 +3,9 @@ package managedcluster
 import (
 	"context"
 	"encoding/json"
+	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	kubeinformers "k8s.io/client-go/informers"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 	"testing"
 	"time"
 
@@ -28,7 +31,7 @@ func TestSyncManagedCluster(t *testing.T) {
 			name:            "sync no managed cluster",
 			startingObjects: []runtime.Object{},
 			validateActions: testingcommon.AssertNoActions,
-			expectedErr:     "unable to get managed cluster with name \"testmanagedcluster\" from hub: managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
+			expectedErr:     "unable to get managed cluster \"testmanagedcluster\" from hub: managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
 		},
 		{
 			name:            "sync an unaccepted managed cluster",
@@ -45,8 +48,8 @@ func TestSyncManagedCluster(t *testing.T) {
 					Reason:  "ManagedClusterJoined",
 					Message: "Managed cluster joined",
 				}
-				testingcommon.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
@@ -56,6 +59,11 @@ func TestSyncManagedCluster(t *testing.T) {
 			},
 		},
 	}
+
+	apiServer, discoveryClient := newDiscoveryServer(t, nil)
+	defer apiServer.Close()
+	kubeClient := kubefake.NewSimpleClientset()
+	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Minute*10)
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -68,11 +76,16 @@ func TestSyncManagedCluster(t *testing.T) {
 				}
 			}
 
-			ctrl := managedClusterJoiningController{
-				clusterName:      testinghelpers.TestManagedClusterName,
-				hubClusterClient: clusterClient,
-				hubClusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-			}
+			ctrl := newManagedClusterStatusController(
+				testinghelpers.TestManagedClusterName,
+				clusterClient,
+				clusterInformerFactory.Cluster().V1().ManagedClusters(),
+				discoveryClient,
+				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
+				kubeInformerFactory.Core().V1().Nodes(),
+				20,
+				eventstesting.NewTestingEventRecorder(t),
+			)
 
 			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""))
 			testingcommon.AssertError(t, syncErr, c.expectedErr)

@@ -3,6 +3,7 @@ package addon
 import (
 	"context"
 	"fmt"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"time"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -25,7 +26,6 @@ import (
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	"open-cluster-management.io/ocm/pkg/registration/clientcert"
-	"open-cluster-management.io/ocm/pkg/registration/helpers"
 )
 
 const (
@@ -46,10 +46,11 @@ type addOnRegistrationController struct {
 	managementKubeClient kubernetes.Interface // in-cluster local management kubeClient
 	spokeKubeClient      kubernetes.Interface
 	hubAddOnLister       addonlisterv1alpha1.ManagedClusterAddOnLister
-	addOnClient          addonclient.Interface
-	csrControl           clientcert.CSRControl
-	recorder             events.Recorder
-	csrIndexer           cache.Indexer
+	patcher              patcher.Patcher[
+		*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus]
+	csrControl clientcert.CSRControl
+	recorder   events.Recorder
+	csrIndexer cache.Indexer
 
 	startRegistrationFunc func(ctx context.Context, config registrationConfig) context.CancelFunc
 
@@ -71,14 +72,16 @@ func NewAddOnRegistrationController(
 	recorder events.Recorder,
 ) factory.Controller {
 	c := &addOnRegistrationController{
-		clusterName:              clusterName,
-		agentName:                agentName,
-		kubeconfigData:           kubeconfigData,
-		managementKubeClient:     managementKubeClient,
-		spokeKubeClient:          managedKubeClient,
-		hubAddOnLister:           hubAddOnInformers.Lister(),
-		csrControl:               csrControl,
-		addOnClient:              addOnClient,
+		clusterName:          clusterName,
+		agentName:            agentName,
+		kubeconfigData:       kubeconfigData,
+		managementKubeClient: managementKubeClient,
+		spokeKubeClient:      managedKubeClient,
+		hubAddOnLister:       hubAddOnInformers.Lister(),
+		csrControl:           csrControl,
+		patcher: patcher.NewPatcher[
+			*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus](
+			addOnClient.AddonV1alpha1().ManagedClusterAddOns(clusterName)),
 		recorder:                 recorder,
 		csrIndexer:               csrControl.Informer().GetIndexer(),
 		addOnRegistrationConfigs: map[string]map[string]registrationConfig{},
@@ -276,11 +279,18 @@ func (c *addOnRegistrationController) haltCSRCreationFunc(addonName string) func
 
 func (c *addOnRegistrationController) generateStatusUpdate(clusterName, addonName string) clientcert.StatusUpdateFunc {
 	return func(ctx context.Context, cond metav1.Condition) error {
-		_, _, updatedErr := helpers.UpdateManagedClusterAddOnStatus(
-			ctx, c.addOnClient, clusterName, addonName, helpers.UpdateManagedClusterAddOnStatusFn(cond),
-		)
+		addon, err := c.hubAddOnLister.ManagedClusterAddOns(clusterName).Get(addonName)
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
 
-		return updatedErr
+		newAddon := addon.DeepCopy()
+		meta.SetStatusCondition(&newAddon.Status.Conditions, cond)
+		_, err = c.patcher.PatchStatus(ctx, newAddon, newAddon.Status, addon.Status)
+		return err
 	}
 }
 

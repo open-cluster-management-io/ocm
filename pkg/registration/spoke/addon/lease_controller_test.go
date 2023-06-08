@@ -3,6 +3,7 @@ package addon
 import (
 	"context"
 	"encoding/json"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"testing"
 	"time"
 
@@ -141,8 +142,8 @@ func TestSync(t *testing.T) {
 			hubLeases:   []runtime.Object{},
 			spokeLeases: []runtime.Object{},
 			validateActions: func(t *testing.T, ctx *testingcommon.FakeSyncContext, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				addOn := &addonv1alpha1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
@@ -175,8 +176,8 @@ func TestSync(t *testing.T) {
 				testinghelpers.NewAddOnLease("test", "test", now.Add(-5*time.Minute)),
 			},
 			validateActions: func(t *testing.T, ctx *testingcommon.FakeSyncContext, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				addOn := &addonv1alpha1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
@@ -209,8 +210,8 @@ func TestSync(t *testing.T) {
 				testinghelpers.NewAddOnLease("test", "test", now),
 			},
 			validateActions: func(t *testing.T, ctx *testingcommon.FakeSyncContext, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				addOn := &addonv1alpha1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
@@ -243,7 +244,7 @@ func TestSync(t *testing.T) {
 							Type:    "Available",
 							Status:  metav1.ConditionTrue,
 							Reason:  "ManagedClusterAddOnLeaseUpdated",
-							Message: "Managed cluster addon agent updates its lease constantly.",
+							Message: "test add-on is available.",
 						},
 					},
 				},
@@ -306,8 +307,8 @@ func TestSync(t *testing.T) {
 				testinghelpers.NewAddOnLease("test", "test", now),
 			},
 			validateActions: func(t *testing.T, ctx *testingcommon.FakeSyncContext, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				addOn := &addonv1alpha1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
@@ -335,8 +336,8 @@ func TestSync(t *testing.T) {
 			hubLeases:   []runtime.Object{testinghelpers.NewAddOnLease(testinghelpers.TestManagedClusterName, "test", now)},
 			spokeLeases: []runtime.Object{},
 			validateActions: func(t *testing.T, ctx *testingcommon.FakeSyncContext, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				addOn := &addonv1alpha1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
@@ -390,10 +391,12 @@ func TestSync(t *testing.T) {
 			spokeLeaseClient := kubefake.NewSimpleClientset(c.spokeLeases...)
 
 			ctrl := &managedClusterAddOnLeaseController{
-				clusterName:           testinghelpers.TestManagedClusterName,
-				clock:                 clocktesting.NewFakeClock(time.Now()),
-				hubLeaseClient:        hubClient.CoordinationV1(),
-				addOnClient:           addOnClient,
+				clusterName:    testinghelpers.TestManagedClusterName,
+				clock:          clocktesting.NewFakeClock(time.Now()),
+				hubLeaseClient: hubClient.CoordinationV1(),
+				patcher: patcher.NewPatcher[
+					*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus](
+					addOnClient.AddonV1alpha1().ManagedClusterAddOns(testinghelpers.TestManagedClusterName)),
 				addOnLister:           addOnInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 				managementLeaseClient: managementLeaseClient.CoordinationV1(),
 				spokeLeaseClient:      spokeLeaseClient.CoordinationV1(),

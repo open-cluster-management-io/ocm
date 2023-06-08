@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"testing"
 	"time"
 
@@ -62,8 +63,8 @@ func TestSync(t *testing.T) {
 					Reason:  "ManagedClusterLeaseUpdateStopped",
 					Message: "Registration agent stopped updating its lease.",
 				}
-				testingcommon.AssertActions(t, clusterActions, "get", "patch")
-				patch := clusterActions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, clusterActions, "patch")
+				patch := clusterActions[0].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &v1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
@@ -90,8 +91,8 @@ func TestSync(t *testing.T) {
 					Reason:  "ManagedClusterLeaseUpdateStopped",
 					Message: "Registration agent stopped updating its lease.",
 				}
-				testingcommon.AssertActions(t, clusterActions, "get", "patch")
-				patch := clusterActions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, clusterActions, "patch")
+				patch := clusterActions[0].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &v1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
@@ -133,8 +134,10 @@ func TestSync(t *testing.T) {
 			syncCtx := testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName)
 
 			ctrl := &leaseController{
-				kubeClient:    leaseClient,
-				clusterClient: clusterClient,
+				kubeClient: leaseClient,
+				patcher: patcher.NewPatcher[
+					*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
+					clusterClient.ClusterV1().ManagedClusters()),
 				clusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				leaseLister:   leaseInformerFactory.Coordination().V1().Leases().Lister(),
 				eventRecorder: syncCtx.Recorder(),

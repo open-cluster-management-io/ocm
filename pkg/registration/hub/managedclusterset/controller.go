@@ -3,6 +3,7 @@ package managedclusterset
 import (
 	"context"
 	"fmt"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"reflect"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -27,7 +28,7 @@ import (
 
 // managedClusterSetController reconciles instances of ManagedClusterSet on the hub.
 type managedClusterSetController struct {
-	clusterClient    clientset.Interface
+	patcher          patcher.Patcher[*clusterv1beta2.ManagedClusterSet, clusterv1beta2.ManagedClusterSetSpec, clusterv1beta2.ManagedClusterSetStatus]
 	clusterLister    clusterlisterv1.ManagedClusterLister
 	clusterSetLister clusterlisterv1beta2.ManagedClusterSetLister
 	eventRecorder    events.Recorder
@@ -45,7 +46,9 @@ func NewManagedClusterSetController(
 	syncCtx := factory.NewSyncContext(controllerName, recorder)
 
 	c := &managedClusterSetController{
-		clusterClient:    clusterClient,
+		patcher: patcher.NewPatcher[
+			*clusterv1beta2.ManagedClusterSet, clusterv1beta2.ManagedClusterSetSpec, clusterv1beta2.ManagedClusterSetStatus](
+			clusterClient.ClusterV1beta2().ManagedClusterSets()),
 		clusterLister:    clusterInformer.Lister(),
 		clusterSetLister: clusterSetInformer.Lister(),
 		eventRecorder:    recorder.WithComponentSuffix("managed-cluster-set-controller"),
@@ -164,12 +167,7 @@ func (c *managedClusterSetController) syncClusterSet(ctx context.Context, origin
 	}
 	meta.SetStatusCondition(&clusterSet.Status.Conditions, emptyCondition)
 
-	// skip update if cluster set status does not change
-	if reflect.DeepEqual(clusterSet.Status.Conditions, originalClusterSet.Status.Conditions) {
-		return nil
-	}
-
-	_, err = c.clusterClient.ClusterV1beta2().ManagedClusterSets().UpdateStatus(ctx, clusterSet, metav1.UpdateOptions{})
+	_, err = c.patcher.PatchStatus(ctx, clusterSet, clusterSet.Status, originalClusterSet.Status)
 	if err != nil {
 		return fmt.Errorf("failed to update status of ManagedClusterSet %q: %w", clusterSet.Name, err)
 	}
