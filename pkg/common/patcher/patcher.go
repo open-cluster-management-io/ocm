@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 )
 
 // Patcher is just the Patch API with a generic to keep use sites type safe.
@@ -32,11 +33,8 @@ type Resource[Sp any, St any] struct {
 	Status            St `json:"status,omitempty"`
 }
 
-type patchFunc[R runtime.Object, Sp any, St any] func(context.Context, R, *Resource[Sp, St], *Resource[Sp, St], ...string) error
-
 type patcher[R runtime.Object, Sp any, St any] struct {
-	client    PatchClient[R]
-	patchFunc patchFunc[R, Sp, St]
+	client PatchClient[R]
 }
 
 func NewPatcher[R runtime.Object, Sp any, St any](client PatchClient[R]) *patcher[R, Sp, St] {
@@ -130,6 +128,9 @@ func (p *patcher[R, Sp, St]) patch(ctx context.Context, object R, newObject, old
 
 	_, err = p.client.Patch(
 		ctx, accessor.GetName(), types.MergePatchType, patchBytes, metav1.PatchOptions{}, subresources...)
+	if err != nil {
+		klog.V(2).Infof("Object with type %t and name %s is patched with patch %s", object, accessor.GetName(), string(patchBytes))
+	}
 	return err
 }
 
