@@ -1,15 +1,15 @@
 package registration_test
 
 import (
-	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
-	"open-cluster-management.io/ocm/test/integration/util"
 	"path"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
+	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 var _ = ginkgo.Describe("Certificate Rotation", func() {

@@ -16,7 +16,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
 	"open-cluster-management.io/ocm/manifests"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )

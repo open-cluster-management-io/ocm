@@ -1,24 +1,22 @@
 package webhook
 
 import (
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/runtime"
-
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	internalv1 "open-cluster-management.io/ocm/pkg/registration/webhook/v1"
-	internalv1beta1 "open-cluster-management.io/ocm/pkg/registration/webhook/v1beta1"
-	internalv1beta2 "open-cluster-management.io/ocm/pkg/registration/webhook/v1beta2"
-
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	internalv1 "open-cluster-management.io/ocm/pkg/registration/webhook/v1"
+	internalv1beta1 "open-cluster-management.io/ocm/pkg/registration/webhook/v1beta1"
+	internalv1beta2 "open-cluster-management.io/ocm/pkg/registration/webhook/v1beta2"
 )
 
 var (

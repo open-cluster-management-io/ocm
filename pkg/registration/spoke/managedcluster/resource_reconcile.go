@@ -3,13 +3,15 @@ package managedcluster
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/discovery"
 	corev1lister "k8s.io/client-go/listers/core/v1"
-	"net/http"
+
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 

@@ -8,8 +8,10 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clienttesting "k8s.io/client-go/testing"
+
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )

@@ -5,20 +5,20 @@ import (
 	"embed"
 	"fmt"
 
-	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
-	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
-	"open-cluster-management.io/ocm/pkg/registration/helpers"
-
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	rbacv1informers "k8s.io/client-go/informers/rbac/v1"
 	"k8s.io/client-go/kubernetes"
+
+	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
+	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+
+	"open-cluster-management.io/ocm/pkg/registration/helpers"
 )
 
 const (

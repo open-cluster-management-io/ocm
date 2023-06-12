@@ -2,8 +2,6 @@ package registration_test
 
 import (
 	"fmt"
-	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
-	"open-cluster-management.io/ocm/test/integration/util"
 	"path"
 	"time"
 
@@ -12,7 +10,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
+	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 var _ = ginkgo.Describe("Joining Process", func() {

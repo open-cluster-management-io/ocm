@@ -6,9 +6,11 @@ package klusterletcontroller
 
 import (
 	"context"
+
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"

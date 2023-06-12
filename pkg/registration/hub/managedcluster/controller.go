@@ -4,25 +4,25 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"open-cluster-management.io/ocm/pkg/common/patcher"
-
-	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
-	informerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
-	listerv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
-	v1 "open-cluster-management.io/api/cluster/v1"
-	"open-cluster-management.io/ocm/pkg/registration/helpers"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+
+	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	informerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
+	listerv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	v1 "open-cluster-management.io/api/cluster/v1"
+
+	"open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/ocm/pkg/registration/helpers"
 )
 
 const (

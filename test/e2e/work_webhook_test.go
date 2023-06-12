@@ -3,20 +3,21 @@ package e2e
 import (
 	"context"
 	"fmt"
-	operatorapiv1 "open-cluster-management.io/api/operator/v1"
-	"open-cluster-management.io/ocm/test/integration/util"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/util/retry"
+
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
+	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 // Test cases with lable "sanity-check" could be ran on an existing enviroment with validating webhook installed

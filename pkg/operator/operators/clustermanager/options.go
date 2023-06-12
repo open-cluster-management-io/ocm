@@ -4,16 +4,17 @@ import (
 	"context"
 	"time"
 
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	corev1informers "k8s.io/client-go/informers/core/v1"
-	"open-cluster-management.io/ocm/pkg/operator/helpers"
-
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"k8s.io/client-go/informers"
+	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
+
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions"
+
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/certrotationcontroller"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/clustermanagercontroller"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/crdstatuccontroller"

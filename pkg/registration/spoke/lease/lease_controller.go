@@ -6,18 +6,17 @@ import (
 	"sync"
 	"time"
 
-	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
-	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
-
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+
+	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
+	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 const leaseUpdateJitterFactor = 0.25

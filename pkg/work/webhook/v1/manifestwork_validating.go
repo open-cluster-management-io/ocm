@@ -5,21 +5,20 @@ import (
 	"fmt"
 	"reflect"
 
-	"open-cluster-management.io/ocm/pkg/features"
-
-	"open-cluster-management.io/ocm/pkg/work/webhook/common"
-
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
 	ocmfeature "open-cluster-management.io/api/feature"
 	workv1 "open-cluster-management.io/api/work/v1"
 
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	"open-cluster-management.io/ocm/pkg/features"
+	"open-cluster-management.io/ocm/pkg/work/webhook/common"
 )
 
 var _ webhook.CustomValidator = &ManifestWorkWebhook{}

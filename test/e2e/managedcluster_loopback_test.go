@@ -3,25 +3,24 @@ package e2e
 import (
 	"context"
 	"fmt"
-	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"reflect"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-
+	certificatesv1 "k8s.io/api/certificates/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
-	certificatesv1 "k8s.io/api/certificates/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"

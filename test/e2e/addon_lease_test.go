@@ -3,22 +3,21 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/klog/v2"
-	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"time"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 	gomega "github.com/onsi/gomega"
-
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
-
 	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
+
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
 
 var _ = ginkgo.Describe("Addon Health Check", func() {

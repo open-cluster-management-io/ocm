@@ -9,7 +9,6 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -24,6 +23,7 @@ import (
 
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
 	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/bootstrapcontroller"
 	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/ssarcontroller"
 )

@@ -1,9 +1,8 @@
 package spoke
 
 import (
-	"github.com/spf13/cobra"
-
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
+	"github.com/spf13/cobra"
 
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/pkg/version"

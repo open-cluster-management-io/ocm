@@ -2,8 +2,9 @@ package v1
 
 import (
 	"k8s.io/client-go/kubernetes"
-	v1 "open-cluster-management.io/api/cluster/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	v1 "open-cluster-management.io/api/cluster/v1"
 )
 
 type ManagedClusterWebhook struct {

@@ -4,22 +4,23 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"testing"
 	"time"
-
-	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
-	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	v1 "open-cluster-management.io/api/cluster/v1"
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
-	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeinformers "k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+
+	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	v1 "open-cluster-management.io/api/cluster/v1"
+
+	"open-cluster-management.io/ocm/pkg/common/patcher"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
 var now = time.Now()

@@ -7,10 +7,6 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
-
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -18,6 +14,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/util/retry"
+
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
 const (

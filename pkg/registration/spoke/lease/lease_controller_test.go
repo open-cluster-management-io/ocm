@@ -5,17 +5,17 @@ import (
 	"testing"
 	"time"
 
-	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
-	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
-	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
-
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
-
 	coordinationv1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+
+	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
 func TestLeaseUpdate(t *testing.T) {

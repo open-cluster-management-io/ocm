@@ -3,16 +3,17 @@ package statusfeedback
 import (
 	"encoding/json"
 	"fmt"
-	"open-cluster-management.io/ocm/pkg/features"
 	"reflect"
-
-	"k8s.io/utils/pointer"
-	ocmfeature "open-cluster-management.io/api/feature"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/util/jsonpath"
+	"k8s.io/utils/pointer"
+
+	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/spoke/statusfeedback/rules"
 )
 

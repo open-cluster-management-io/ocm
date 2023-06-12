@@ -6,13 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
-	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
-	"open-cluster-management.io/ocm/pkg/operator/helpers"
-
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -27,6 +22,11 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
+
+	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
+	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
+
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
 const tlsCertFile = "tls.crt"

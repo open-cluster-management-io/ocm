@@ -1,13 +1,14 @@
 package testing
 
 import (
+	"strings"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clienttesting "k8s.io/client-go/testing"
-	"strings"
-	"testing"
 )
 
 // AssertError asserts the actual error representation is the same with the expected,

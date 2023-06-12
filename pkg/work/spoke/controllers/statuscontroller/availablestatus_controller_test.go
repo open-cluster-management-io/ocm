@@ -4,17 +4,18 @@ import (
 	"context"
 	"testing"
 
-	"k8s.io/utils/pointer"
-	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
-
 	"github.com/davecgh/go-spew/spew"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/utils/pointer"
+
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
+	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 	"open-cluster-management.io/ocm/pkg/work/spoke/statusfeedback"
 )

@@ -14,9 +14,11 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/diff"
+
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"

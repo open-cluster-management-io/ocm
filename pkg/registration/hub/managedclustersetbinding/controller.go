@@ -3,6 +3,7 @@ package managedclustersetbinding
 import (
 	"context"
 	"fmt"
+
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -13,10 +14,12 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterinformerv1beta2 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta2"
 	clusterlisterv1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 )
 

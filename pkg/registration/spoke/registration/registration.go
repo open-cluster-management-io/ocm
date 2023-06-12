@@ -3,18 +3,13 @@ package registration
 import (
 	"crypto/x509/pkix"
 	"fmt"
-	"k8s.io/apimachinery/pkg/api/errors"
-	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
-	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"strings"
-
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"golang.org/x/net/context"
 	certificates "k8s.io/api/certificates/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -22,8 +17,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	certutil "k8s.io/client-go/util/cert"
-	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 	"open-cluster-management.io/ocm/pkg/registration/hub/user"
 )

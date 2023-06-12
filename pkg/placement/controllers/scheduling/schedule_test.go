@@ -8,13 +8,14 @@ import (
 	"sort"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterlisterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
 	testinghelpers "open-cluster-management.io/ocm/pkg/placement/helpers/testing"
 )

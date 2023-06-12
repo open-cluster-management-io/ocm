@@ -3,20 +3,21 @@ package registration_test
 import (
 	"context"
 	"fmt"
-	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
-	"open-cluster-management.io/ocm/test/integration/util"
 	"path"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
+	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 var _ = ginkgo.Describe("Cluster Lease Update", func() {

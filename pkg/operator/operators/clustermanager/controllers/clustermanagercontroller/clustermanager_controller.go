@@ -3,38 +3,36 @@ package clustermanagercontroller
 import (
 	"context"
 	"encoding/base64"
-	"strings"
-
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-
 	errorhelpers "errors"
+	"strings"
 	"time"
-
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/klog/v2"
 
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
 	corev1informers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
+	migrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/typed/migration/v1alpha1"
 
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
 	"open-cluster-management.io/ocm/manifests"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
-	migrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/typed/migration/v1alpha1"
 )
 
 const (

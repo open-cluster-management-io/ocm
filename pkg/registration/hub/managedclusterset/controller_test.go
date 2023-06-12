@@ -2,8 +2,6 @@ package managedclusterset
 
 import (
 	"context"
-	"open-cluster-management.io/ocm/pkg/common/patcher"
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"reflect"
 	"testing"
 	"time"
@@ -12,10 +10,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+
+	"open-cluster-management.io/ocm/pkg/common/patcher"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 func TestSyncClusterSet(t *testing.T) {

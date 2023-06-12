@@ -5,15 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/fields"
-	corev1informers "k8s.io/client-go/informers/core/v1"
-
 	"github.com/openshift/library-go/pkg/controller/factory"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeinformers "k8s.io/client-go/informers"
+	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/util/cert"
@@ -21,6 +20,7 @@ import (
 	fakeoperatorclient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )

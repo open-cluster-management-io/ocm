@@ -4,32 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"open-cluster-management.io/ocm/pkg/registration/spoke/lease"
-	"open-cluster-management.io/ocm/pkg/registration/spoke/registration"
 	"os"
 	"path"
 	"time"
 
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	ocmfeature "open-cluster-management.io/api/feature"
-
-	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
-	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
-	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
-	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
-	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
-	"open-cluster-management.io/ocm/pkg/features"
-	"open-cluster-management.io/ocm/pkg/registration/clientcert"
-	"open-cluster-management.io/ocm/pkg/registration/helpers"
-	"open-cluster-management.io/ocm/pkg/registration/spoke/addon"
-	"open-cluster-management.io/ocm/pkg/registration/spoke/managedcluster"
-
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-
 	"github.com/spf13/pflag"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -41,6 +23,22 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
+
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
+	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	ocmfeature "open-cluster-management.io/api/feature"
+
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
+	"open-cluster-management.io/ocm/pkg/features"
+	"open-cluster-management.io/ocm/pkg/registration/clientcert"
+	"open-cluster-management.io/ocm/pkg/registration/helpers"
+	"open-cluster-management.io/ocm/pkg/registration/spoke/addon"
+	"open-cluster-management.io/ocm/pkg/registration/spoke/lease"
+	"open-cluster-management.io/ocm/pkg/registration/spoke/managedcluster"
+	"open-cluster-management.io/ocm/pkg/registration/spoke/registration"
 )
 
 const (

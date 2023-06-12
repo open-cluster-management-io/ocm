@@ -3,14 +3,17 @@ package patcher
 import (
 	"context"
 	"encoding/json"
+	"testing"
+
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clienttesting "k8s.io/client-go/testing"
+
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
-	"testing"
 )
 
 func TestAddFinalizer(t *testing.T) {

@@ -3,8 +3,6 @@ package registration_test
 import (
 	"context"
 	"fmt"
-	"open-cluster-management.io/ocm/pkg/registration/spoke/registration"
-	"open-cluster-management.io/ocm/test/integration/util"
 	"os"
 	"path"
 	"testing"
@@ -12,26 +10,27 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
-
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	addonclientset "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 	"open-cluster-management.io/ocm/pkg/registration/hub"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/addon"
-	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"open-cluster-management.io/ocm/pkg/registration/spoke/registration"
+	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 const (

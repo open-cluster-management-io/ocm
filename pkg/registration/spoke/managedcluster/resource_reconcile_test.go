@@ -3,18 +3,12 @@ package managedcluster
 import (
 	"context"
 	"encoding/json"
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
-	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
-	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
-
+	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,6 +19,13 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
+
+	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
 type serverResponse struct {

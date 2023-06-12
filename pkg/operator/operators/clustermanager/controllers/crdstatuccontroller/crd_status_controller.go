@@ -8,20 +8,20 @@ import (
 	"context"
 	"reflect"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
-	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
-
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
+
+	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
+	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
+
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/migrationcontroller"
 )

@@ -3,16 +3,10 @@ package addon
 import (
 	"context"
 	"fmt"
-	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,6 +15,13 @@ import (
 	coordv1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/clock"
+
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
+	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 )
 
 const leaseDurationTimes = 5

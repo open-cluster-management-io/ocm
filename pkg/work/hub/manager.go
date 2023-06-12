@@ -4,13 +4,14 @@ import (
 	"context"
 	"time"
 
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
+
 	"open-cluster-management.io/ocm/pkg/work/hub/controllers/manifestworkreplicasetcontroller"
 )
 

@@ -15,6 +15,7 @@ import (
 	fakeoperatorclient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelper "open-cluster-management.io/ocm/pkg/operator/helpers/testing"
 )

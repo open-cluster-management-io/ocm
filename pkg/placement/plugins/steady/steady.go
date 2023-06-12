@@ -7,8 +7,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
+
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
 	"open-cluster-management.io/ocm/pkg/placement/plugins"
 )

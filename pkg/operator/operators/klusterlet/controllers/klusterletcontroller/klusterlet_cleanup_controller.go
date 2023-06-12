@@ -20,6 +20,7 @@ import (
 	coreinformer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"

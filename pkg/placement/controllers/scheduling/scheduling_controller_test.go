@@ -3,8 +3,6 @@ package scheduling
 import (
 	"context"
 	"fmt"
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
-	"open-cluster-management.io/ocm/test/integration/util"
 	"sort"
 	"strings"
 	"testing"
@@ -15,13 +13,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clienttesting "k8s.io/client-go/testing"
 	kevents "k8s.io/client-go/tools/events"
+
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
 	testinghelpers "open-cluster-management.io/ocm/pkg/placement/helpers/testing"
+	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 type testScheduler struct {

@@ -5,19 +5,19 @@ import (
 	"testing"
 	"time"
 
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
-
 	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	certificates "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 

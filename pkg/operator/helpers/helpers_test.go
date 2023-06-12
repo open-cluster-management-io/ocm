@@ -9,9 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/component-base/featuregate"
-	ocmfeature "open-cluster-management.io/api/feature"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -33,9 +30,13 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
+	"k8s.io/component-base/featuregate"
 	fakeapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
+
 	opereatorfake "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
+	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
 	"open-cluster-management.io/ocm/manifests"
 )
 

@@ -4,17 +4,16 @@ import (
 	goflag "flag"
 	"fmt"
 	"math/rand"
-	"open-cluster-management.io/ocm/pkg/cmd/hub"
-	"open-cluster-management.io/ocm/pkg/cmd/spoke"
 	"os"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 
+	"open-cluster-management.io/ocm/pkg/cmd/hub"
+	"open-cluster-management.io/ocm/pkg/cmd/spoke"
 	"open-cluster-management.io/ocm/pkg/cmd/webhook"
 	"open-cluster-management.io/ocm/pkg/version"
 )

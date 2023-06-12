@@ -2,6 +2,8 @@ package spoke
 
 import (
 	"context"
+	"time"
+
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/cobra"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -9,9 +11,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	ocmfeature "open-cluster-management.io/api/feature"
+
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/helper"
@@ -20,8 +25,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/finalizercontroller"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/manifestcontroller"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers/statuscontroller"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
-	"time"
 )
 
 const (

@@ -6,10 +6,6 @@ import (
 	"testing"
 	"time"
 
-	fakeoperatorlient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
-	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
-	operatorapiv1 "open-cluster-management.io/api/operator/v1"
-
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	v1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -21,10 +17,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	migrationv1alpha1 "sigs.k8s.io/kube-storage-version-migrator/pkg/apis/migration/v1alpha1"
 	fakemigrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/fake"
 	migrationv1alpha1client "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/typed/migration/v1alpha1"
+
+	fakeoperatorlient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
+	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 func TestSupportStorageVersionMigration(t *testing.T) {

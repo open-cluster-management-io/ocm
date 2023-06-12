@@ -2,20 +2,21 @@ package registration_test
 
 import (
 	"fmt"
-	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
-	"open-cluster-management.io/ocm/test/integration/util"
 	"path"
 	"reflect"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
+	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 var _ = ginkgo.Describe("Agent Recovery", func() {

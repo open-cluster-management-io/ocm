@@ -3,20 +3,21 @@ package managedcluster
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/errors"
-	clusterv1alpha1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1alpha1"
-	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	"k8s.io/apimachinery/pkg/util/errors"
+	discovery "k8s.io/client-go/discovery"
+	corev1informers "k8s.io/client-go/informers/core/v1"
+
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
+	clusterv1alpha1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1alpha1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
-	discovery "k8s.io/client-go/discovery"
-	corev1informers "k8s.io/client-go/informers/core/v1"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 )
 
 // managedClusterStatusController checks the kube-apiserver health on managed cluster to determine it whether is available

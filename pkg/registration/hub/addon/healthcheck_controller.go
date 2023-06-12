@@ -2,11 +2,16 @@ package addon
 
 import (
 	"context"
-	patcher "open-cluster-management.io/ocm/pkg/common/patcher"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
@@ -15,11 +20,7 @@ import (
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
+	patcher "open-cluster-management.io/ocm/pkg/common/patcher"
 )
 
 // managedClusterAddonHealthCheckController udpates managed cluster addons status through watching the managed cluster status on

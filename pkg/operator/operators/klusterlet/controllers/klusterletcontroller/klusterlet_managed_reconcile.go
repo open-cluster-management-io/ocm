@@ -17,6 +17,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/kubernetes"
+
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/manifests"

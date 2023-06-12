@@ -21,6 +21,7 @@ import (
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/basic"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/store"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"

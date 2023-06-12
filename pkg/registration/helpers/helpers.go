@@ -6,15 +6,12 @@ import (
 	"fmt"
 	"net/url"
 
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
-
 	"github.com/openshift/api"
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 	errorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
-
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -28,6 +25,8 @@ import (
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
+
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 var (

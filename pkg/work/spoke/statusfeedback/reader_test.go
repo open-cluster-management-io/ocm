@@ -2,14 +2,16 @@ package statusfeedback
 
 import (
 	"fmt"
-	"open-cluster-management.io/ocm/pkg/features"
 	"testing"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/utils/pointer"
+
 	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
+	"open-cluster-management.io/ocm/pkg/features"
 )
 
 const (

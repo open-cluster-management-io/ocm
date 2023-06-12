@@ -2,10 +2,12 @@ package v1beta2
 
 import (
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/conversion"
+
 	"open-cluster-management.io/api/cluster/v1beta1"
 	"open-cluster-management.io/api/cluster/v1beta2"
+
 	internalv1beta1 "open-cluster-management.io/ocm/pkg/registration/webhook/v1beta1"
-	"sigs.k8s.io/controller-runtime/pkg/conversion"
 )
 
 /*

@@ -2,16 +2,10 @@ package lease
 
 import (
 	"context"
-	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
-	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
-	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
-
 	coordv1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -21,6 +15,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 	coordlisters "k8s.io/client-go/listers/coordination/v1"
 	"k8s.io/utils/pointer"
+
+	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
+	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 )
 
 const leaseDurationTimes = 5

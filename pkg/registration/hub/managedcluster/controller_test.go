@@ -3,23 +3,23 @@ package managedcluster
 import (
 	"context"
 	"encoding/json"
-	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
-	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
-	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
-	v1 "open-cluster-management.io/api/cluster/v1"
-	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
-
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
-
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+
+	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	v1 "open-cluster-management.io/api/cluster/v1"
+
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
 func TestSyncManagedCluster(t *testing.T) {

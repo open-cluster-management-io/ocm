@@ -3,13 +3,10 @@ package work
 import (
 	"context"
 	"fmt"
-	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
-	"open-cluster-management.io/ocm/test/integration/util"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -21,7 +18,10 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/work/spoke"
+	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 func startWorkAgent(ctx context.Context, o *spoke.WorkloadAgentOptions) {

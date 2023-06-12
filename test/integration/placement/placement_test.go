@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"open-cluster-management.io/ocm/test/integration/util"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -15,8 +13,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+
 	controllers "open-cluster-management.io/ocm/pkg/placement/controllers"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/scheduling"
+	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 const (

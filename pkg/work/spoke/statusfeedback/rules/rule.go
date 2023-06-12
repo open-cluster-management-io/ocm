@@ -2,6 +2,7 @@ package rules
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 

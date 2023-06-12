@@ -5,6 +5,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	kevents "k8s.io/client-go/tools/events"
+
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"

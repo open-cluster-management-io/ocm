@@ -17,6 +17,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 

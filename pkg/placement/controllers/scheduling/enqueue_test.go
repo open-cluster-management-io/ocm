@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
@@ -17,6 +18,7 @@ import (
 	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/placement/helpers/testing"
 )

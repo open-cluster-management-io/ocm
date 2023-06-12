@@ -8,9 +8,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
 

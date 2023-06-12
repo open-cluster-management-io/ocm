@@ -3,21 +3,21 @@ package spoke
 import (
 	"bytes"
 	"context"
-	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"os"
 	"path"
 	"testing"
 	"time"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
-	"open-cluster-management.io/ocm/pkg/registration/clientcert"
-	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	"open-cluster-management.io/ocm/pkg/registration/clientcert"
+	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
 func TestComplete(t *testing.T) {

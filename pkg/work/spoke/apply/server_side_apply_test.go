@@ -15,7 +15,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
+
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
