@@ -2,7 +2,9 @@ package manifestworkreplicasetcontroller
 
 import (
 	"context"
+
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
+
 	worklisterv1 "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"

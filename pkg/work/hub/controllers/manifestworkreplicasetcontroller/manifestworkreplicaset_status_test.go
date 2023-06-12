@@ -2,15 +2,18 @@ package manifestworkreplicasetcontroller
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
+
 	helpertest "open-cluster-management.io/ocm/pkg/work/hub/test"
-	"testing"
-	"time"
 )
 
 func TestStatusReconcileAsExpected(t *testing.T) {

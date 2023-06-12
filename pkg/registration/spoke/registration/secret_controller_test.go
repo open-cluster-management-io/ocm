@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
-	"open-cluster-management.io/ocm/pkg/registration/clientcert"
-	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	kubefake "k8s.io/client-go/kubernetes/fake"
+
+	"open-cluster-management.io/ocm/pkg/registration/clientcert"
+	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
 const (

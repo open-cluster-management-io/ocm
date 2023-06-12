@@ -4,20 +4,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
-	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"reflect"
 	"testing"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
-
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
 func TestIsValidHTTPSURL(t *testing.T) {

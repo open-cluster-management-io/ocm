@@ -6,24 +6,22 @@ import (
 	"reflect"
 	"testing"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
-	"open-cluster-management.io/ocm/pkg/features"
-
 	admissionv1 "k8s.io/api/admission/v1"
-	clienttesting "k8s.io/client-go/testing"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
-	fakekube "k8s.io/client-go/kubernetes/fake"
-
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/authorization/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	fakekube "k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
 	ocmfeature "open-cluster-management.io/api/feature"
 	workv1 "open-cluster-management.io/api/work/v1"
+
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 

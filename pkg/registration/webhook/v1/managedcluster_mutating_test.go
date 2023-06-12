@@ -8,19 +8,17 @@ import (
 	"testing"
 	"time"
 
-	apiruntime "k8s.io/apimachinery/pkg/runtime"
-
-	"k8s.io/apimachinery/pkg/util/runtime"
-	ocmfeature "open-cluster-management.io/api/feature"
-	"open-cluster-management.io/ocm/pkg/features"
-
 	admissionv1 "k8s.io/api/admission/v1"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+	ocmfeature "open-cluster-management.io/api/feature"
+
+	"open-cluster-management.io/ocm/pkg/features"
 )
 
 func TestDefault(t *testing.T) {

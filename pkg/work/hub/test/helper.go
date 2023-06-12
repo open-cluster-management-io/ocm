@@ -2,8 +2,10 @@ package test
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
+
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 

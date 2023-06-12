@@ -3,7 +3,6 @@ package operator
 import (
 	"context"
 	"fmt"
-	"open-cluster-management.io/ocm/test/integration/util"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -15,9 +14,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/cert"
+
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	v1 "open-cluster-management.io/api/operator/v1"
+
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
+	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 func updateDeploymentStatus(kubeClient kubernetes.Interface, namespace, deploymentName string) {

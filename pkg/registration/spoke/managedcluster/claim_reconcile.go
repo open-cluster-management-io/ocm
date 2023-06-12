@@ -3,17 +3,20 @@ package managedcluster
 import (
 	"context"
 	"fmt"
+	"sort"
+
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
+
 	clusterv1alpha1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	ocmfeature "open-cluster-management.io/api/feature"
+
 	"open-cluster-management.io/ocm/pkg/features"
-	"sort"
 )
 
 const labelCustomizedOnly = "open-cluster-management.io/spoke-only"

@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/openshift/library-go/pkg/controller/factory"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-
-	"github.com/openshift/library-go/pkg/controller/factory"
 
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"

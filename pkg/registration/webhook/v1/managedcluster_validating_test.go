@@ -5,18 +5,16 @@ import (
 	"testing"
 
 	admissionv1 "k8s.io/api/admission/v1"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
 	authorizationv1 "k8s.io/api/authorization/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
-
 	clienttesting "k8s.io/client-go/testing"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
 	v1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/api/cluster/v1beta1"
-
-	corev1 "k8s.io/api/core/v1"
 )
 
 func TestValidateCreate(t *testing.T) {

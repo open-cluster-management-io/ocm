@@ -2,18 +2,13 @@ package work
 
 import (
 	"context"
-	"open-cluster-management.io/ocm/test/integration/util"
 	"os"
 	"path"
 	"testing"
 
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
-	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
-	"open-cluster-management.io/ocm/pkg/work/hub"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -21,9 +16,13 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
 	"open-cluster-management.io/ocm/pkg/work/helper"
+	"open-cluster-management.io/ocm/pkg/work/hub"
+	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 const (

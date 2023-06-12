@@ -7,6 +7,7 @@ package dependencymagnet
 
 import (
 	_ "github.com/openshift/build-machinery-go"
+
 	_ "open-cluster-management.io/api/addon/v1alpha1"
 	_ "open-cluster-management.io/api/cluster/v1"
 	_ "open-cluster-management.io/api/cluster/v1alpha1"

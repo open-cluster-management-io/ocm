@@ -3,7 +3,6 @@ package placement
 import (
 	"context"
 	"fmt"
-	"open-cluster-management.io/ocm/test/integration/util"
 	"testing"
 	"time"
 
@@ -13,6 +12,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
+
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
@@ -21,7 +22,7 @@ import (
 
 	controllers "open-cluster-management.io/ocm/pkg/placement/controllers"
 	scheduling "open-cluster-management.io/ocm/pkg/placement/controllers/scheduling"
-	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 const (

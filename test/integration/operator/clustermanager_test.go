@@ -3,26 +3,25 @@ package operator
 import (
 	"context"
 	"fmt"
-	"open-cluster-management.io/ocm/test/integration/util"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
-	v1 "open-cluster-management.io/api/operator/v1"
-
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
 
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
-
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	v1 "open-cluster-management.io/api/operator/v1"
+
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager"
 	certrotation "open-cluster-management.io/ocm/pkg/operator/operators/clustermanager/controllers/certrotationcontroller"
+	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 func startHubOperator(ctx context.Context, mode v1.InstallMode) {

@@ -3,10 +3,11 @@ package addon
 import (
 	"testing"
 
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+
+	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
 func TestGetRegistrationConfigs(t *testing.T) {

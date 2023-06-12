@@ -3,22 +3,21 @@ package util
 import (
 	"context"
 	"fmt"
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
-	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
-	workapiv1 "open-cluster-management.io/api/work/v1"
 	"reflect"
 	"sort"
 
 	"github.com/onsi/gomega"
-
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 
 	operatorclientset "open-cluster-management.io/api/client/operator/clientset/versioned"
+	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
 const (

@@ -6,12 +6,12 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 

@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
 	scheduling "open-cluster-management.io/ocm/pkg/placement/controllers/scheduling"
 	testinghelpers "open-cluster-management.io/ocm/pkg/placement/helpers/testing"

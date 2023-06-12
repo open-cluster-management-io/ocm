@@ -2,9 +2,11 @@ package managedcluster
 
 import (
 	"context"
+
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 

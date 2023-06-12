@@ -1,15 +1,18 @@
 package manifestworkreplicasetcontroller
 
 import (
+	"testing"
+	"time"
+
 	"k8s.io/client-go/tools/cache"
+
 	fakeclusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	"open-cluster-management.io/api/utils/work/v1/workapplier"
+
 	helpertest "open-cluster-management.io/ocm/pkg/work/hub/test"
-	"testing"
-	"time"
 )
 
 func TestPlaceMWControllerIndex(t *testing.T) {

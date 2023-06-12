@@ -2,17 +2,20 @@ package manifestworkreplicasetcontroller
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	fakeclusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	"open-cluster-management.io/api/utils/work/v1/workapplier"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
+
 	helpertest "open-cluster-management.io/ocm/pkg/work/hub/test"
-	"testing"
-	"time"
 )
 
 func TestDeployReconcileAsExpected(t *testing.T) {

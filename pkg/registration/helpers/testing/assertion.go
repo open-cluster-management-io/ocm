@@ -7,8 +7,6 @@ import (
 	"reflect"
 	"testing"
 
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
-
 	authorizationv1 "k8s.io/api/authorization/v1"
 	certv1 "k8s.io/api/certificates/v1"
 	certv1beta1 "k8s.io/api/certificates/v1beta1"
@@ -17,6 +15,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/diff"
+
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 // AssertFinalizers asserts the given runtime object has the expected finalizers

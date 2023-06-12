@@ -4,13 +4,13 @@ import (
 	"context"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-
 	"k8s.io/apimachinery/pkg/runtime"
-	"open-cluster-management.io/api/cluster/v1beta2"
-	internalv1beta1 "open-cluster-management.io/ocm/pkg/registration/webhook/v1beta1"
-
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"open-cluster-management.io/api/cluster/v1beta2"
+
+	internalv1beta1 "open-cluster-management.io/ocm/pkg/registration/webhook/v1beta1"
 )
 
 var _ webhook.CustomValidator = &ManagedClusterSetBindingWebhook{}

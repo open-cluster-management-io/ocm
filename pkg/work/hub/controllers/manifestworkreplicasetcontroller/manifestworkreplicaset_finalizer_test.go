@@ -7,9 +7,11 @@ import (
 
 	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	fakeclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	"open-cluster-management.io/api/utils/work/v1/workapplier"
+
 	helpertest "open-cluster-management.io/ocm/pkg/work/hub/test"
 )
 

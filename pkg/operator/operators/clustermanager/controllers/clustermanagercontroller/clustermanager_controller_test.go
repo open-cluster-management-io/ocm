@@ -2,7 +2,6 @@ package clustermanagercontroller
 
 import (
 	"context"
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"strings"
 	"testing"
 	"time"
@@ -24,12 +23,14 @@ import (
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
-	fakeoperatorlient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
-	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
-	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	fakemigrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/fake"
 	migrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/typed/migration/v1alpha1"
 
+	fakeoperatorlient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
+	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 

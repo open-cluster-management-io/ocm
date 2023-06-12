@@ -2,10 +2,12 @@ package common
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	workv1 "open-cluster-management.io/api/work/v1"
 	"reflect"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	workv1 "open-cluster-management.io/api/work/v1"
 )
 
 func newManifest(size int) workv1.Manifest {

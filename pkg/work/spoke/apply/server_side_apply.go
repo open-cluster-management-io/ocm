@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/pointer"
+
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 

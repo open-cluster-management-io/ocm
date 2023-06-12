@@ -3,22 +3,21 @@ package taint
 import (
 	"context"
 	"encoding/json"
-	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"reflect"
 	"testing"
 	"time"
 
-	v1 "open-cluster-management.io/api/cluster/v1"
+	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	"k8s.io/apimachinery/pkg/runtime"
+	clienttesting "k8s.io/client-go/testing"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	v1 "open-cluster-management.io/api/cluster/v1"
+
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
-
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	clienttesting "k8s.io/client-go/testing"
 )
 
 func TestSyncTaintCluster(t *testing.T) {

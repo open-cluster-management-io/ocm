@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
-	"k8s.io/utils/pointer"
-
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -21,6 +19,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
+
 	"open-cluster-management.io/ocm/pkg/version"
 )
 

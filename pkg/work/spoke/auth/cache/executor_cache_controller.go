@@ -16,6 +16,7 @@ import (
 	rbacv1 "k8s.io/client-go/informers/rbac/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/store"

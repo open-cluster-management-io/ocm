@@ -7,9 +7,9 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/equality"
-	setcontroller "open-cluster-management.io/ocm/pkg/registration/hub/managedclusterset"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	setcontroller "open-cluster-management.io/ocm/pkg/registration/hub/managedclusterset"
 )
 
 var _ = ginkgo.Describe("DefaultManagedClusterSet", func() {

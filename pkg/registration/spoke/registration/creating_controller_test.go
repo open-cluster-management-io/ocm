@@ -4,13 +4,14 @@ import (
 	"context"
 	"testing"
 
-	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
-	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
+
+	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
 const testSpokeExternalServerUrl = "https://192.168.3.77:32769"

@@ -5,13 +5,8 @@ import (
 	"fmt"
 	"reflect"
 
-	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
-	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
-
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -25,6 +20,10 @@ import (
 	rbacv1listers "k8s.io/client-go/listers/rbac/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+
+	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 const (

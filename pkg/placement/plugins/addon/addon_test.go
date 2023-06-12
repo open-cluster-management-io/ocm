@@ -9,8 +9,10 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	testingclock "k8s.io/utils/clock/testing"
+
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapivbeta1 "open-cluster-management.io/api/cluster/v1beta1"
+
 	testinghelpers "open-cluster-management.io/ocm/pkg/placement/helpers/testing"
 )
 

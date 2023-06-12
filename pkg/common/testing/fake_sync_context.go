@@ -1,10 +1,11 @@
 package testing
 
 import (
+	"testing"
+
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"k8s.io/client-go/util/workqueue"
-	"testing"
 )
 
 type FakeSyncContext struct {
