@@ -2,6 +2,7 @@ package managedclusterset
 
 import (
 	"context"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"reflect"
 	"testing"
@@ -228,7 +229,9 @@ func TestSyncClusterSet(t *testing.T) {
 			}
 
 			ctrl := managedClusterSetController{
-				clusterClient:    clusterClient,
+				patcher: patcher.NewPatcher[
+					*clusterv1beta2.ManagedClusterSet, clusterv1beta2.ManagedClusterSetSpec, clusterv1beta2.ManagedClusterSetStatus](
+					clusterClient.ClusterV1beta2().ManagedClusterSets()),
 				clusterLister:    informerFactory.Cluster().V1().ManagedClusters().Lister(),
 				clusterSetLister: informerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
 				eventRecorder:    eventstesting.NewTestingEventRecorder(t),
@@ -380,7 +383,6 @@ func TestEnqueueUpdateClusterClusterSet(t *testing.T) {
 			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 
 			ctrl := managedClusterSetController{
-				clusterClient:    clusterClient,
 				clusterSetLister: informerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
 				eventRecorder:    eventstesting.NewTestingEventRecorder(t),
 				queue:            syncCtx.Queue(),

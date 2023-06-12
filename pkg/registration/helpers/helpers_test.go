@@ -4,216 +4,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
-	"testing"
-	"time"
-
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
-	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
+	"reflect"
+	"testing"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 )
-
-func TestUpdateStatusCondition(t *testing.T) {
-	nowish := metav1.Now()
-	beforeish := metav1.Time{Time: nowish.Add(-10 * time.Second)}
-	afterish := metav1.Time{Time: nowish.Add(10 * time.Second)}
-
-	cases := []struct {
-		name               string
-		startingConditions []metav1.Condition
-		newCondition       metav1.Condition
-		expextedUpdated    bool
-		expectedConditions []metav1.Condition
-	}{
-		{
-			name:               "add to empty",
-			startingConditions: []metav1.Condition{},
-			newCondition:       testinghelpers.NewManagedClusterCondition("test", "True", "my-reason", "my-message", nil),
-			expextedUpdated:    true,
-			expectedConditions: []metav1.Condition{testinghelpers.NewManagedClusterCondition("test", "True", "my-reason", "my-message", nil)},
-		},
-		{
-			name: "add to non-conflicting",
-			startingConditions: []metav1.Condition{
-				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
-			},
-			newCondition:    testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", nil),
-			expextedUpdated: true,
-			expectedConditions: []metav1.Condition{
-				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
-				testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", nil),
-			},
-		},
-		{
-			name: "change existing status",
-			startingConditions: []metav1.Condition{
-				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
-				testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", nil),
-			},
-			newCondition:    testinghelpers.NewManagedClusterCondition("one", "False", "my-different-reason", "my-othermessage", nil),
-			expextedUpdated: true,
-			expectedConditions: []metav1.Condition{
-				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
-				testinghelpers.NewManagedClusterCondition("one", "False", "my-different-reason", "my-othermessage", nil),
-			},
-		},
-		{
-			name: "leave existing transition time",
-			startingConditions: []metav1.Condition{
-				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
-				testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", &beforeish),
-			},
-			newCondition:    testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", &afterish),
-			expextedUpdated: false,
-			expectedConditions: []metav1.Condition{
-				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
-				testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", &beforeish),
-			},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			fakeClusterClient := clusterfake.NewSimpleClientset(&clusterv1.ManagedCluster{
-				ObjectMeta: metav1.ObjectMeta{Name: "testspokecluster"},
-				Status: clusterv1.ManagedClusterStatus{
-					Conditions: c.startingConditions,
-				},
-			})
-
-			status, updated, err := UpdateManagedClusterStatus(
-				context.TODO(),
-				fakeClusterClient,
-				"testspokecluster",
-				UpdateManagedClusterConditionFn(c.newCondition),
-			)
-			if err != nil {
-				t.Errorf("unexpected err: %v", err)
-			}
-			if updated != c.expextedUpdated {
-				t.Errorf("expected %t, but %t", c.expextedUpdated, updated)
-			}
-			for i := range c.expectedConditions {
-				expected := c.expectedConditions[i]
-				actual := status.Conditions[i]
-				if expected.LastTransitionTime == (metav1.Time{}) {
-					actual.LastTransitionTime = metav1.Time{}
-				}
-				if !equality.Semantic.DeepEqual(expected, actual) {
-					t.Errorf(diff.ObjectDiff(expected, actual))
-				}
-			}
-		})
-	}
-}
-
-func TestUpdateManagedClusterAddOnStatus(t *testing.T) {
-	nowish := metav1.Now()
-	beforeish := metav1.Time{Time: nowish.Add(-10 * time.Second)}
-	afterish := metav1.Time{Time: nowish.Add(10 * time.Second)}
-
-	cases := []struct {
-		name               string
-		startingConditions []metav1.Condition
-		newCondition       metav1.Condition
-		expextedUpdated    bool
-		expectedConditions []metav1.Condition
-	}{
-		{
-			name:               "add to empty",
-			startingConditions: []metav1.Condition{},
-			newCondition:       testinghelpers.NewManagedClusterCondition("test", "True", "my-reason", "my-message", nil),
-			expextedUpdated:    true,
-			expectedConditions: []metav1.Condition{testinghelpers.NewManagedClusterCondition("test", "True", "my-reason", "my-message", nil)},
-		},
-		{
-			name: "add to non-conflicting",
-			startingConditions: []metav1.Condition{
-				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
-			},
-			newCondition:    testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", nil),
-			expextedUpdated: true,
-			expectedConditions: []metav1.Condition{
-				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
-				testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", nil),
-			},
-		},
-		{
-			name: "change existing status",
-			startingConditions: []metav1.Condition{
-				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
-				testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", nil),
-			},
-			newCondition:    testinghelpers.NewManagedClusterCondition("one", "False", "my-different-reason", "my-othermessage", nil),
-			expextedUpdated: true,
-			expectedConditions: []metav1.Condition{
-				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
-				testinghelpers.NewManagedClusterCondition("one", "False", "my-different-reason", "my-othermessage", nil),
-			},
-		},
-		{
-			name: "leave existing transition time",
-			startingConditions: []metav1.Condition{
-				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
-				testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", &beforeish),
-			},
-			newCondition:    testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", &afterish),
-			expextedUpdated: false,
-			expectedConditions: []metav1.Condition{
-				testinghelpers.NewManagedClusterCondition("two", "True", "my-reason", "my-message", nil),
-				testinghelpers.NewManagedClusterCondition("one", "True", "my-reason", "my-message", &beforeish),
-			},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			fakeAddOnClient := addonfake.NewSimpleClientset(&addonv1alpha1.ManagedClusterAddOn{
-				ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "test"},
-				Status: addonv1alpha1.ManagedClusterAddOnStatus{
-					Conditions: c.startingConditions,
-				},
-			})
-
-			status, updated, err := UpdateManagedClusterAddOnStatus(
-				context.TODO(),
-				fakeAddOnClient,
-				"test", "test",
-				UpdateManagedClusterAddOnStatusFn(c.newCondition),
-			)
-			if err != nil {
-				t.Errorf("unexpected err: %v", err)
-			}
-			if updated != c.expextedUpdated {
-				t.Errorf("expected %t, but %t", c.expextedUpdated, updated)
-			}
-			for i := range c.expectedConditions {
-				expected := c.expectedConditions[i]
-				actual := status.Conditions[i]
-				if expected.LastTransitionTime == (metav1.Time{}) {
-					actual.LastTransitionTime = metav1.Time{}
-				}
-				if !equality.Semantic.DeepEqual(expected, actual) {
-					t.Errorf(diff.ObjectDiff(expected, actual))
-				}
-			}
-		})
-	}
-}
 
 func TestIsValidHTTPSURL(t *testing.T) {
 	cases := []struct {

@@ -3,16 +3,15 @@ package addon
 import (
 	"context"
 	"fmt"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"time"
 
+	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/events"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
-	"open-cluster-management.io/ocm/pkg/registration/helpers"
-
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -33,9 +32,10 @@ var AddOnLeaseControllerLeaseDurationSeconds = 60
 // managedClusterAddOnLeaseController updates the managed cluster addons status on the hub cluster through checking the add-on
 // lease on the managed/management cluster.
 type managedClusterAddOnLeaseController struct {
-	clusterName           string
-	clock                 clock.Clock
-	addOnClient           addonclient.Interface
+	clusterName string
+	clock       clock.Clock
+	patcher     patcher.Patcher[
+		*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus]
 	addOnLister           addonlisterv1alpha1.ManagedClusterAddOnLister
 	hubLeaseClient        coordv1client.CoordinationV1Interface
 	managementLeaseClient coordv1client.CoordinationV1Interface
@@ -52,9 +52,11 @@ func NewManagedClusterAddOnLeaseController(clusterName string,
 	resyncInterval time.Duration,
 	recorder events.Recorder) factory.Controller {
 	c := &managedClusterAddOnLeaseController{
-		clusterName:           clusterName,
-		clock:                 clock.RealClock{},
-		addOnClient:           addOnClient,
+		clusterName: clusterName,
+		clock:       clock.RealClock{},
+		patcher: patcher.NewPatcher[
+			*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus](
+			addOnClient.AddonV1alpha1().ManagedClusterAddOns(clusterName)),
 		addOnLister:           addOnInformer.Lister(),
 		hubLeaseClient:        hubLeaseClient,
 		managementLeaseClient: managementLeaseClient,
@@ -183,18 +185,9 @@ func (c *managedClusterAddOnLeaseController) syncSingle(ctx context.Context,
 		}
 	}
 
-	if meta.IsStatusConditionPresentAndEqual(addOn.Status.Conditions, condition.Type, condition.Status) {
-		// addon status is not changed, do nothing
-		return nil
-	}
-
-	_, updated, err := helpers.UpdateManagedClusterAddOnStatus(
-		ctx,
-		c.addOnClient,
-		c.clusterName,
-		addOn.Name,
-		helpers.UpdateManagedClusterAddOnStatusFn(condition),
-	)
+	newAddon := addOn.DeepCopy()
+	meta.SetStatusCondition(&newAddon.Status.Conditions, condition)
+	updated, err := c.patcher.PatchStatus(ctx, newAddon, newAddon.Status, addOn.Status)
 	if err != nil {
 		return err
 	}

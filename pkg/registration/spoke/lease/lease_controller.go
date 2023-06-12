@@ -1,4 +1,4 @@
-package managedcluster
+package lease
 
 import (
 	"context"

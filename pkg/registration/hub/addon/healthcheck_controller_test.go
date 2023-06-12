@@ -57,9 +57,9 @@ func TestSync(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Namespace: testinghelpers.TestManagedClusterName, Name: "test"},
 			}},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "get", "patch")
+				testingcommon.AssertActions(t, actions, "patch")
 
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				addOn := &addonv1alpha1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {

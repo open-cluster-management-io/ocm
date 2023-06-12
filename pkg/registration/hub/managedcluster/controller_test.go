@@ -3,6 +3,7 @@ package managedcluster
 import (
 	"context"
 	"encoding/json"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"testing"
 	"time"
 
@@ -58,8 +59,8 @@ func TestSyncManagedCluster(t *testing.T) {
 					Reason:  "HubClusterAdminAccepted",
 					Message: "Accepted by hub cluster admin",
 				}
-				testingcommon.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &v1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
@@ -72,7 +73,7 @@ func TestSyncManagedCluster(t *testing.T) {
 			name:            "sync an accepted spoke cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "get")
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
@@ -85,8 +86,8 @@ func TestSyncManagedCluster(t *testing.T) {
 					Reason:  "HubClusterAdminDenied",
 					Message: "Denied by hub cluster admin",
 				}
-				testingcommon.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &v1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
@@ -123,7 +124,12 @@ func TestSyncManagedCluster(t *testing.T) {
 				}
 			}
 
-			ctrl := managedClusterController{kubeClient, clusterClient, clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(), resourceapply.NewResourceCache(), eventstesting.NewTestingEventRecorder(t)}
+			ctrl := managedClusterController{
+				kubeClient,
+				clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
+				patcher.NewPatcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus](clusterClient.ClusterV1().ManagedClusters()),
+				resourceapply.NewResourceCache(),
+				eventstesting.NewTestingEventRecorder(t)}
 			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
 			if syncErr != nil {
 				t.Errorf("unexpected err: %v", syncErr)

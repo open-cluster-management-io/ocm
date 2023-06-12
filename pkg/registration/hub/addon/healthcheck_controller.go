@@ -2,7 +2,10 @@ package addon
 
 import (
 	"context"
+	patcher "open-cluster-management.io/ocm/pkg/common/patcher"
 
+	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/events"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -11,10 +14,6 @@ import (
 	clusterinformerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	"open-cluster-management.io/ocm/pkg/registration/helpers"
-
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -87,19 +86,20 @@ func (c *managedClusterAddOnHealthCheckController) sync(ctx context.Context, syn
 	}
 
 	errs := []error{}
+	patcher := patcher.NewPatcher[
+		*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus](
+		c.addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName),
+	)
 	for _, addOn := range addOns {
-		_, updated, err := helpers.UpdateManagedClusterAddOnStatus(
-			ctx,
-			c.addOnClient,
-			addOn.Namespace,
-			addOn.Name,
-			helpers.UpdateManagedClusterAddOnStatusFn(metav1.Condition{
-				Type:    addonv1alpha1.ManagedClusterAddOnConditionAvailable,
-				Status:  managedClusterAvailableCondition.Status,
-				Reason:  managedClusterAvailableCondition.Reason,
-				Message: managedClusterAvailableCondition.Message,
-			}),
-		)
+		newManagedClusterAddon := addOn.DeepCopy()
+		meta.SetStatusCondition(&newManagedClusterAddon.Status.Conditions, metav1.Condition{
+			Type:    addonv1alpha1.ManagedClusterAddOnConditionAvailable,
+			Status:  managedClusterAvailableCondition.Status,
+			Reason:  managedClusterAvailableCondition.Reason,
+			Message: managedClusterAvailableCondition.Message,
+		})
+
+		updated, err := patcher.PatchStatus(ctx, newManagedClusterAddon, newManagedClusterAddon.Status, addOn.Status)
 		if err != nil {
 			errs = append(errs, err)
 		}

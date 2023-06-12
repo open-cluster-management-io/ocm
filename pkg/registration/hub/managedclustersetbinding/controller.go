@@ -2,18 +2,13 @@ package managedclustersetbinding
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -22,6 +17,7 @@ import (
 	clusterinformerv1beta2 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta2"
 	clusterlisterv1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 )
 
 const (
@@ -148,6 +144,10 @@ func (c *managedClusterSetBindingController) sync(ctx context.Context, syncCtx f
 		return err
 	}
 
+	patcher := patcher.NewPatcher[
+		*clusterv1beta2.ManagedClusterSetBinding, clusterv1beta2.ManagedClusterSetBindingSpec, clusterv1beta2.ManagedClusterSetBindingStatus](
+		c.clusterClient.ClusterV1beta2().ManagedClusterSetBindings(bindingNamespace))
+
 	if len(bindingNamespace) == 0 {
 		return nil
 	}
@@ -170,7 +170,10 @@ func (c *managedClusterSetBindingController) sync(ctx context.Context, syncCtx f
 			Status: metav1.ConditionFalse,
 			Reason: "ClusterSetNotFound",
 		})
-		return c.patchCondition(ctx, binding, bindingCopy)
+		if _, err := patcher.PatchStatus(ctx, bindingCopy, bindingCopy.Status, binding.Status); err != nil {
+			return err
+		}
+		return nil
 	case err != nil:
 		return err
 	}
@@ -181,43 +184,9 @@ func (c *managedClusterSetBindingController) sync(ctx context.Context, syncCtx f
 		Reason: "ClusterSetBound",
 	})
 
-	return c.patchCondition(ctx, binding, bindingCopy)
-}
-
-func (c *managedClusterSetBindingController) patchCondition(ctx context.Context, old, new *clusterv1beta2.ManagedClusterSetBinding) error {
-	if equality.Semantic.DeepEqual(old.Status.Conditions, new.Status.Conditions) {
-		return nil
+	if _, err := patcher.PatchStatus(ctx, bindingCopy, bindingCopy.Status, binding.Status); err != nil {
+		return err
 	}
 
-	oldData, err := json.Marshal(clusterv1beta2.ManagedClusterSetBinding{
-		Status: clusterv1beta2.ManagedClusterSetBindingStatus{
-			Conditions: old.Status.Conditions,
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to Marshal old data for workspace %s: %w", old.Name, err)
-	}
-
-	newData, err := json.Marshal(clusterv1beta2.ManagedClusterSetBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:             old.UID,
-			ResourceVersion: old.ResourceVersion,
-		}, // to ensure they appear in the patch as preconditions
-		Status: clusterv1beta2.ManagedClusterSetBindingStatus{
-			Conditions: new.Status.Conditions,
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to Marshal new data for workspace %s: %w", new.Name, err)
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
-	if err != nil {
-		return fmt.Errorf("failed to create patch for workspace %s: %w", new.Name, err)
-	}
-
-	c.eventRecorder.Eventf("PatchClusterSetBindingCondition", "patch clustersetbinding %s/%s condition", new.Namespace, new.Name)
-
-	_, err = c.clusterClient.ClusterV1beta2().ManagedClusterSetBindings(new.Namespace).Patch(ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
-	return err
+	return nil
 }

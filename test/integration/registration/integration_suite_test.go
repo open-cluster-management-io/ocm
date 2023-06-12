@@ -3,6 +3,7 @@ package registration_test
 import (
 	"context"
 	"fmt"
+	"open-cluster-management.io/ocm/pkg/registration/spoke/registration"
 	"open-cluster-management.io/ocm/test/integration/util"
 	"os"
 	"path"
@@ -28,7 +29,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/hub"
 	"open-cluster-management.io/ocm/pkg/registration/spoke"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/addon"
-	"open-cluster-management.io/ocm/pkg/registration/spoke/managedcluster"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -101,7 +101,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	// crank up the sync speed
 	transport.CertCallbackRefreshDuration = 5 * time.Second
 	clientcert.ControllerResyncInterval = 5 * time.Second
-	managedcluster.CreatingControllerSyncInterval = 1 * time.Second
+	registration.CreatingControllerSyncInterval = 1 * time.Second
 	hub.ResyncInterval = 5 * time.Second
 
 	// crank up the addon lease sync and udpate speed

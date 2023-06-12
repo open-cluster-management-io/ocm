@@ -2,6 +2,7 @@ package taint
 
 import (
 	"context"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -31,7 +32,7 @@ var (
 
 // taintController
 type taintController struct {
-	clusterClient clientset.Interface
+	patcher       patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
 	clusterLister listerv1.ManagedClusterLister
 	eventRecorder events.Recorder
 }
@@ -42,7 +43,9 @@ func NewTaintController(
 	clusterInformer informerv1.ManagedClusterInformer,
 	recorder events.Recorder) factory.Controller {
 	c := &taintController{
-		clusterClient: clusterClient,
+		patcher: patcher.NewPatcher[
+			*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus](
+			clusterClient.ClusterV1().ManagedClusters()),
 		clusterLister: clusterInformer.Lister(),
 		eventRecorder: recorder.WithComponentSuffix("taint-controller"),
 	}
@@ -70,9 +73,9 @@ func (c *taintController) sync(ctx context.Context, syncCtx factory.SyncContext)
 		return nil
 	}
 
-	managedCluster = managedCluster.DeepCopy()
-	newTaints := managedCluster.Spec.Taints
-	cond := meta.FindStatusCondition(managedCluster.Status.Conditions, v1.ManagedClusterConditionAvailable)
+	newManagedCluster := managedCluster.DeepCopy()
+	newTaints := newManagedCluster.Spec.Taints
+	cond := meta.FindStatusCondition(newManagedCluster.Status.Conditions, v1.ManagedClusterConditionAvailable)
 	var updated bool
 
 	switch {
@@ -87,8 +90,8 @@ func (c *taintController) sync(ctx context.Context, syncCtx factory.SyncContext)
 	}
 
 	if updated {
-		managedCluster.Spec.Taints = newTaints
-		if _, err = c.clusterClient.ClusterV1().ManagedClusters().Update(ctx, managedCluster, metav1.UpdateOptions{}); err != nil {
+		newManagedCluster.Spec.Taints = newTaints
+		if _, err = c.patcher.PatchSpec(ctx, newManagedCluster, newManagedCluster.Spec, managedCluster.Spec); err != nil {
 			return err
 		}
 		c.eventRecorder.Eventf("ManagedClusterConditionAvailableUpdated", "Update the original taints to the %+v", newTaints)

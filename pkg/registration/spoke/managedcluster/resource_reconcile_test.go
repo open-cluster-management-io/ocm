@@ -3,6 +3,7 @@ package managedcluster
 import (
 	"context"
 	"encoding/json"
+	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -31,8 +32,13 @@ type serverResponse struct {
 	responseMsg string
 }
 
-func TestHealthCheck(t *testing.T) {
-	serverResponse := &serverResponse{}
+func newDiscoveryServer(t *testing.T, resp *serverResponse) (*httptest.Server, *discovery.DiscoveryClient) {
+	serverResponse := &serverResponse{
+		httpStatus: http.StatusOK,
+	}
+	if resp != nil {
+		serverResponse = resp
+	}
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.URL.Path == "/healthz" {
 			w.WriteHeader(http.StatusOK)
@@ -60,9 +66,14 @@ func TestHealthCheck(t *testing.T) {
 			t.Fatal(err)
 		}
 	}))
-	defer apiServer.Close()
-
 	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(&rest.Config{Host: apiServer.URL})
+	return apiServer, discoveryClient
+}
+
+func TestHealthCheck(t *testing.T) {
+	serverResponse := &serverResponse{}
+	apiServer, discoveryClient := newDiscoveryServer(t, serverResponse)
+	defer apiServer.Close()
 
 	cases := []struct {
 		name            string
@@ -91,8 +102,8 @@ func TestHealthCheck(t *testing.T) {
 					Reason:  "ManagedClusterKubeAPIServerUnavailable",
 					Message: "The kube-apiserver is not ok, status code: 500, an error on the server (\"internal server error\") has prevented the request from succeeding",
 				}
-				testingcommon.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
@@ -128,8 +139,8 @@ func TestHealthCheck(t *testing.T) {
 						clusterv1.ResourceMemory: *resource.NewQuantity(int64(1024*1024*32), resource.BinarySI),
 					},
 				}
-				testingcommon.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
@@ -151,8 +162,8 @@ func TestHealthCheck(t *testing.T) {
 					Reason:  "ManagedClusterAvailable",
 					Message: "Managed cluster is available",
 				}
-				testingcommon.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
@@ -173,8 +184,8 @@ func TestHealthCheck(t *testing.T) {
 					Reason:  "ManagedClusterAvailable",
 					Message: "Managed cluster is available",
 				}
-				testingcommon.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
@@ -220,8 +231,8 @@ func TestHealthCheck(t *testing.T) {
 						clusterv1.ResourceMemory: *resource.NewQuantity(int64(1024*1024*64), resource.BinarySI),
 					},
 				}
-				testingcommon.AssertActions(t, actions, "get", "patch")
-				patch := actions[1].(clienttesting.PatchAction).GetPatch()
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &clusterv1.ManagedCluster{}
 				err := json.Unmarshal(patch, managedCluster)
 				if err != nil {
@@ -254,14 +265,16 @@ func TestHealthCheck(t *testing.T) {
 
 			serverResponse.httpStatus = c.httpStatus
 			serverResponse.responseMsg = c.responseMsg
-
-			ctrl := &managedClusterStatusController{
-				clusterName:                   testinghelpers.TestManagedClusterName,
-				hubClusterClient:              clusterClient,
-				hubClusterLister:              clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
-				managedClusterDiscoveryClient: discoveryClient,
-				nodeLister:                    kubeInformerFactory.Core().V1().Nodes().Lister(),
-			}
+			ctrl := newManagedClusterStatusController(
+				testinghelpers.TestManagedClusterName,
+				clusterClient,
+				clusterInformerFactory.Cluster().V1().ManagedClusters(),
+				discoveryClient,
+				clusterInformerFactory.Cluster().V1alpha1().ClusterClaims(),
+				kubeInformerFactory.Core().V1().Nodes(),
+				20,
+				eventstesting.NewTestingEventRecorder(t),
+			)
 			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""))
 			testingcommon.AssertError(t, syncErr, c.expectedErr)
 
