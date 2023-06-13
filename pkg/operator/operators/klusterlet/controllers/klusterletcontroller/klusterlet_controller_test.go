@@ -3,6 +3,7 @@ package klusterletcontroller
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -33,6 +34,7 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 	testinghelper "open-cluster-management.io/ocm/pkg/operator/helpers/testing"
@@ -159,7 +161,8 @@ func newTestController(t *testing.T, klusterlet *operatorapiv1.Klusterlet, appli
 	kubeVersion, _ := version.ParseGeneric("v1.18.0")
 
 	hubController := &klusterletController{
-		klusterletClient:             fakeOperatorClient.OperatorV1().Klusterlets(),
+		patcher: patcher.NewPatcher[
+			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](fakeOperatorClient.OperatorV1().Klusterlets()),
 		kubeClient:                   fakeKubeClient,
 		klusterletLister:             operatorInformers.Operator().V1().Klusterlets().Lister(),
 		kubeVersion:                  kubeVersion,
@@ -169,7 +172,8 @@ func newTestController(t *testing.T, klusterlet *operatorapiv1.Klusterlet, appli
 	}
 
 	cleanupController := &klusterletCleanupController{
-		klusterletClient:             fakeOperatorClient.OperatorV1().Klusterlets(),
+		patcher: patcher.NewPatcher[
+			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](fakeOperatorClient.OperatorV1().Klusterlets()),
 		kubeClient:                   fakeKubeClient,
 		klusterletLister:             operatorInformers.Operator().V1().Klusterlets().Lister(),
 		kubeVersion:                  kubeVersion,
@@ -248,7 +252,8 @@ func newTestControllerHosted(t *testing.T, klusterlet *operatorapiv1.Klusterlet,
 	fakeManagedAPIExtensionClient := fakeapiextensions.NewSimpleClientset()
 	fakeManagedWorkClient := fakeworkclient.NewSimpleClientset(appliedManifestWorks...)
 	hubController := &klusterletController{
-		klusterletClient:  fakeOperatorClient.OperatorV1().Klusterlets(),
+		patcher: patcher.NewPatcher[
+			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](fakeOperatorClient.OperatorV1().Klusterlets()),
 		kubeClient:        fakeKubeClient,
 		klusterletLister:  operatorInformers.Operator().V1().Klusterlets().Lister(),
 		kubeVersion:       kubeVersion,
@@ -261,7 +266,8 @@ func newTestControllerHosted(t *testing.T, klusterlet *operatorapiv1.Klusterlet,
 		},
 	}
 	cleanupController := &klusterletCleanupController{
-		klusterletClient:  fakeOperatorClient.OperatorV1().Klusterlets(),
+		patcher: patcher.NewPatcher[
+			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](fakeOperatorClient.OperatorV1().Klusterlets()),
 		kubeClient:        fakeKubeClient,
 		klusterletLister:  operatorInformers.Operator().V1().Klusterlets().Lister(),
 		kubeVersion:       kubeVersion,
@@ -495,14 +501,15 @@ func TestSyncDeploy(t *testing.T) {
 	}
 
 	operatorAction := controller.operatorClient.Actions()
-	if len(operatorAction) != 2 {
-		t.Errorf("Expect 4 actions in the sync loop, actual %#v", operatorAction)
+	testingcommon.AssertActions(t, operatorAction, "patch")
+	klusterlet = &operatorapiv1.Klusterlet{}
+	patchData := operatorAction[0].(clienttesting.PatchActionImpl).Patch
+	err = json.Unmarshal(patchData, klusterlet)
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	testingcommon.AssertGet(t, operatorAction[0], "operator.open-cluster-management.io", "v1", "klusterlets")
-	testingcommon.AssertAction(t, operatorAction[1], "update")
 	testinghelper.AssertOnlyConditions(
-		t, operatorAction[1].(clienttesting.UpdateActionImpl).Object,
+		t, klusterlet,
 		testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
 		testinghelper.NamedCondition(helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue),
 	)
@@ -596,20 +603,19 @@ func TestSyncDeployHosted(t *testing.T) {
 		klog.Infof("operator actions, verb:%v \t resource:%v \t namespace:%v", action.GetVerb(), action.GetResource(), action.GetNamespace())
 	}
 
-	if len(operatorAction) != 3 {
-		t.Errorf("Expect 3 actions in the sync loop, actual %#v", len(operatorAction))
-	}
-
-	testingcommon.AssertGet(t, operatorAction[0], "operator.open-cluster-management.io", "v1", "klusterlets")
-	testingcommon.AssertGet(t, operatorAction[1], "operator.open-cluster-management.io", "v1", "klusterlets")
-	testingcommon.AssertAction(t, operatorAction[2], "update")
-
 	conditionReady := testinghelper.NamedCondition(klusterletReadyToApply, "KlusterletPrepared", metav1.ConditionTrue)
 	conditionApplied := testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue)
 	conditionFeaturesValid := testinghelper.NamedCondition(
 		helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue)
+	testingcommon.AssertActions(t, operatorAction, "patch")
+	klusterlet = &operatorapiv1.Klusterlet{}
+	patchData := operatorAction[0].(clienttesting.PatchActionImpl).Patch
+	err = json.Unmarshal(patchData, klusterlet)
+	if err != nil {
+		t.Fatal(err)
+	}
 	testinghelper.AssertOnlyConditions(
-		t, operatorAction[2].(clienttesting.UpdateActionImpl).Object, conditionReady, conditionApplied,
+		t, klusterlet, conditionReady, conditionApplied,
 		conditionFeaturesValid)
 }
 
@@ -766,15 +772,16 @@ func TestClusterNameChange(t *testing.T) {
 	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "create", "", "cluster1", 1)
 
 	operatorAction := controller.operatorClient.Actions()
-	if len(operatorAction) != 2 {
-		t.Errorf("Expect 2 actions in the sync loop, actual %#v", operatorAction)
+	testingcommon.AssertActions(t, operatorAction, "patch")
+	klusterlet = &operatorapiv1.Klusterlet{}
+	patchData := operatorAction[0].(clienttesting.PatchActionImpl).Patch
+	err = json.Unmarshal(patchData, klusterlet)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	testingcommon.AssertGet(t, operatorAction[0], "operator.open-cluster-management.io", "v1", "klusterlets")
-	testingcommon.AssertAction(t, operatorAction[1], "update")
-	updatedKlusterlet := operatorAction[1].(clienttesting.UpdateActionImpl).Object.(*operatorapiv1.Klusterlet)
 	testinghelper.AssertOnlyGenerationStatuses(
-		t, updatedKlusterlet,
+		t, klusterlet,
 		testinghelper.NamedDeploymentGenerationStatus("klusterlet-registration-agent", "testns", 0),
 		testinghelper.NamedDeploymentGenerationStatus("klusterlet-work-agent", "testns", 0),
 	)
@@ -901,14 +908,16 @@ func TestDeployOnKube111(t *testing.T) {
 	}
 
 	operatorAction := controller.operatorClient.Actions()
-	if len(operatorAction) != 2 {
-		t.Errorf("Expect 4 actions in the sync loop, actual %#v", operatorAction)
+	testingcommon.AssertActions(t, operatorAction, "patch")
+	updatedKlusterlet := &operatorapiv1.Klusterlet{}
+	patchData := operatorAction[0].(clienttesting.PatchActionImpl).Patch
+	err = json.Unmarshal(patchData, updatedKlusterlet)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	testingcommon.AssertGet(t, operatorAction[0], "operator.open-cluster-management.io", "v1", "klusterlets")
-	testingcommon.AssertAction(t, operatorAction[1], "update")
 	testinghelper.AssertOnlyConditions(
-		t, operatorAction[1].(clienttesting.UpdateActionImpl).Object,
+		t, updatedKlusterlet,
 		testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
 		testinghelper.NamedCondition(helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue),
 	)

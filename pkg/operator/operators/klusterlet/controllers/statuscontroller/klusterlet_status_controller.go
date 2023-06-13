@@ -8,6 +8,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
 	"k8s.io/client-go/kubernetes"
@@ -17,14 +18,16 @@ import (
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
 type klusterletStatusController struct {
 	kubeClient       kubernetes.Interface
 	deploymentLister appslister.DeploymentLister
-	klusterletClient operatorv1client.KlusterletInterface
+	patcher          patcher.Patcher[*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus]
 	klusterletLister operatorlister.KlusterletLister
 }
 
@@ -42,8 +45,9 @@ func NewKlusterletStatusController(
 	deploymentInformer appsinformer.DeploymentInformer,
 	recorder events.Recorder) factory.Controller {
 	controller := &klusterletStatusController{
-		kubeClient:       kubeClient,
-		klusterletClient: klusterletClient,
+		kubeClient: kubeClient,
+		patcher: patcher.NewPatcher[
+			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](klusterletClient),
 		deploymentLister: deploymentInformer.Lister(),
 		klusterletLister: klusterletInformer.Lister(),
 	}
@@ -66,7 +70,7 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 	case err != nil:
 		return err
 	}
-	klusterlet = klusterlet.DeepCopy()
+	newKlusterlet := klusterlet.DeepCopy()
 
 	agentNamespace := helpers.AgentNamespace(klusterlet)
 	registrationDeploymentName := fmt.Sprintf("%s-registration-agent", klusterlet.Name)
@@ -86,17 +90,18 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 		},
 	)
 	availableCondition.ObservedGeneration = klusterlet.Generation
+	meta.SetStatusCondition(&newKlusterlet.Status.Conditions, availableCondition)
 
 	registrationDesiredCondition := checkAgentDeploymentDesired(ctx,
 		k.kubeClient, agentNamespace, registrationDeploymentName, klusterletRegistrationDesiredDegraded)
 	registrationDesiredCondition.ObservedGeneration = klusterlet.Generation
+	meta.SetStatusCondition(&newKlusterlet.Status.Conditions, registrationDesiredCondition)
 
 	workDesiredCondition := checkAgentDeploymentDesired(ctx, k.kubeClient, agentNamespace, workDeploymentName, klusterletWorkDesiredDegraded)
 	workDesiredCondition.ObservedGeneration = klusterlet.Generation
+	meta.SetStatusCondition(&newKlusterlet.Status.Conditions, workDesiredCondition)
 
-	_, _, err = helpers.UpdateKlusterletStatus(ctx, k.klusterletClient, klusterletName,
-		helpers.UpdateKlusterletConditionFn(availableCondition, registrationDesiredCondition, workDesiredCondition),
-	)
+	_, err = k.patcher.PatchStatus(ctx, newKlusterlet, newKlusterlet.Status, klusterlet.Status)
 	return err
 }
 

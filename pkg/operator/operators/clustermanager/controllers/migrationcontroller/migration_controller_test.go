@@ -25,6 +25,7 @@ import (
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
@@ -393,7 +394,7 @@ func Test_syncStorageVersionMigrationsCondition(t *testing.T) {
 
 func TestSync(t *testing.T) {
 	clusterManager := newClusterManager("testhub")
-	tc := newTestController(t, clusterManager)
+	tc, client := newTestController(t, clusterManager)
 
 	syncContext := testingcommon.NewFakeSyncContext(t, "testhub")
 	//Do not support migration
@@ -402,7 +403,7 @@ func TestSync(t *testing.T) {
 		t.Fatalf("Expected no error when sync, %v", err)
 	}
 
-	clusterManager, err = tc.clusterManagerClient.Get(context.Background(), "testhub", metav1.GetOptions{})
+	clusterManager, err = client.OperatorV1().ClusterManagers().Get(context.Background(), "testhub", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error when sync, %v", err)
 	}
@@ -418,12 +419,12 @@ func TestSync(t *testing.T) {
 		},
 	}
 	migrateCrd := newCrd(migrationRequestCRDName)
-	tc = newTestController(t, clusterManager, migrateCrd)
+	tc, client = newTestController(t, clusterManager, migrateCrd)
 	err = tc.sync(context.Background(), syncContext)
 	if err != nil {
 		t.Fatalf("Expected no error when sync, %v", err)
 	}
-	clusterManager, err = tc.clusterManagerClient.Get(context.Background(), "testhub", metav1.GetOptions{})
+	clusterManager, err = client.OperatorV1().ClusterManagers().Get(context.Background(), "testhub", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error when sync, %v", err)
 	}
@@ -432,16 +433,18 @@ func TestSync(t *testing.T) {
 	}
 }
 
-func newTestController(t *testing.T, clustermanager *operatorapiv1.ClusterManager, crds ...runtime.Object) *crdMigrationController {
+func newTestController(t *testing.T, clustermanager *operatorapiv1.ClusterManager, crds ...runtime.Object) (*crdMigrationController, *fakeoperatorlient.Clientset) {
 	fakeOperatorClient := fakeoperatorlient.NewSimpleClientset(clustermanager)
 	operatorInformers := operatorinformers.NewSharedInformerFactory(fakeOperatorClient, 5*time.Minute)
 	fakeAPIExtensionClient := fakeapiextensions.NewSimpleClientset(crds...)
 	fakeMigrationClient := fakemigrationclient.NewSimpleClientset()
 
 	crdMigrationController := &crdMigrationController{
-		clusterManagerClient: fakeOperatorClient.OperatorV1().ClusterManagers(),
 		clusterManagerLister: operatorInformers.Operator().V1().ClusterManagers().Lister(),
 		recorder:             eventstesting.NewTestingEventRecorder(t),
+		patcher: patcher.NewPatcher[
+			*operatorapiv1.ClusterManager, operatorapiv1.ClusterManagerSpec, operatorapiv1.ClusterManagerStatus](
+			fakeOperatorClient.OperatorV1().ClusterManagers()),
 	}
 	crdMigrationController.generateHubClusterClients = func(hubKubeConfig *rest.Config) (apiextensionsclient.Interface, migrationv1alpha1client.StorageVersionMigrationsGetter, error) {
 		return fakeAPIExtensionClient, fakeMigrationClient.MigrationV1alpha1(), nil
@@ -451,7 +454,7 @@ func newTestController(t *testing.T, clustermanager *operatorapiv1.ClusterManage
 		t.Fatal(err)
 	}
 
-	return crdMigrationController
+	return crdMigrationController, fakeOperatorClient
 }
 
 func newClusterManager(name string) *operatorapiv1.ClusterManager {

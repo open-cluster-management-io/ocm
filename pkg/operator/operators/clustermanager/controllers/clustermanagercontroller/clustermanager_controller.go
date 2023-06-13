@@ -32,6 +32,7 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/manifests"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
@@ -45,7 +46,7 @@ const (
 )
 
 type clusterManagerController struct {
-	clusterManagerClient operatorv1client.ClusterManagerInterface
+	patcher              patcher.Patcher[*operatorapiv1.ClusterManager, operatorapiv1.ClusterManagerSpec, operatorapiv1.ClusterManagerStatus]
 	clusterManagerLister operatorlister.ClusterManagerLister
 	operatorKubeClient   kubernetes.Interface
 	operatorKubeconfig   *rest.Config
@@ -84,9 +85,11 @@ func NewClusterManagerController(
 	skipRemoveCRDs bool,
 ) factory.Controller {
 	controller := &clusterManagerController{
-		operatorKubeClient:        operatorKubeClient,
-		operatorKubeconfig:        operatorKubeconfig,
-		clusterManagerClient:      clusterManagerClient,
+		operatorKubeClient: operatorKubeClient,
+		operatorKubeconfig: operatorKubeconfig,
+		patcher: patcher.NewPatcher[
+			*operatorapiv1.ClusterManager, operatorapiv1.ClusterManagerSpec, operatorapiv1.ClusterManagerStatus](
+			clusterManagerClient),
 		clusterManagerLister:      clusterManagerInformer.Lister(),
 		configMapLister:           configMapInformer.Lister(),
 		recorder:                  recorder,
@@ -120,7 +123,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	clusterManagerName := controllerContext.QueueKey()
 	klog.V(4).Infof("Reconciling ClusterManager %q", clusterManagerName)
 
-	clusterManager, err := n.clusterManagerLister.Get(clusterManagerName)
+	originalClusterManager, err := n.clusterManagerLister.Get(clusterManagerName)
 	if errors.IsNotFound(err) {
 		// ClusterManager not found, could have been deleted, do nothing.
 		return nil
@@ -128,7 +131,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	if err != nil {
 		return err
 	}
-	clusterManager = clusterManager.DeepCopy()
+	clusterManager := originalClusterManager.DeepCopy()
 	clusterManagerMode := clusterManager.Spec.DeployOption.Mode
 	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManagerName, clusterManagerMode)
 
@@ -188,16 +191,8 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 
 	// Update finalizer at first
 	if clusterManager.DeletionTimestamp.IsZero() {
-		hasFinalizer := false
-		for i := range clusterManager.Finalizers {
-			if clusterManager.Finalizers[i] == clusterManagerFinalizer {
-				hasFinalizer = true
-				break
-			}
-		}
-		if !hasFinalizer {
-			clusterManager.Finalizers = append(clusterManager.Finalizers, clusterManagerFinalizer)
-			_, err := n.clusterManagerClient.Update(ctx, clusterManager, metav1.UpdateOptions{})
+		updated, err := n.patcher.AddFinalizer(ctx, clusterManager, clusterManagerFinalizer)
+		if updated {
 			return err
 		}
 	}
@@ -232,7 +227,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 				return err
 			}
 		}
-		return removeClusterManagerFinalizer(ctx, n.clusterManagerClient, clusterManager)
+		return n.patcher.RemoveFinalizer(ctx, clusterManager, clusterManagerFinalizer)
 	}
 
 	// get caBundle
@@ -267,75 +262,27 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	}
 
 	// Update status
-	var conds []metav1.Condition = []metav1.Condition{featureGateCondition}
-
-	if cond := meta.FindStatusCondition(clusterManager.Status.Conditions, clusterManagerProgressing); cond != nil {
-		conds = append(conds, *cond)
-	}
-
+	meta.SetStatusCondition(&clusterManager.Status.Conditions, featureGateCondition)
+	clusterManager.Status.ObservedGeneration = clusterManager.Generation
 	if len(errs) == 0 {
-		conds = append(conds, metav1.Condition{
+		meta.SetStatusCondition(&clusterManager.Status.Conditions, metav1.Condition{
 			Type:    clusterManagerApplied,
 			Status:  metav1.ConditionTrue,
 			Reason:  "ClusterManagerApplied",
 			Message: "Components of cluster manager are applied",
 		})
 	} else {
-		if cond := meta.FindStatusCondition(clusterManager.Status.Conditions, clusterManagerApplied); cond != nil {
-			conds = append(conds, *cond)
-		}
-
 		// When appliedCondition is false, we should not update related resources and resource generations
-		_, updated, updatedErr := helpers.UpdateClusterManagerStatus(
-			ctx, n.clusterManagerClient, clusterManager.Name,
-			helpers.UpdateClusterManagerConditionFn(conds...),
-			func(oldStatus *operatorapiv1.ClusterManagerStatus) error {
-				oldStatus.ObservedGeneration = clusterManager.Generation
-				return nil
-			},
-		)
-
-		if updated {
-			return updatedErr
-		}
-
-		return utilerrors.NewAggregate(errs)
+		clusterManager.Status.RelatedResources = originalClusterManager.Status.RelatedResources
+		clusterManager.Status.Generations = originalClusterManager.Status.Generations
 	}
 
-	_, _, updatedErr := helpers.UpdateClusterManagerStatus(
-		ctx, n.clusterManagerClient, clusterManager.Name,
-		helpers.UpdateClusterManagerConditionFn(conds...),
-		helpers.UpdateClusterManagerGenerationsFn(clusterManager.Status.Generations...),
-		helpers.UpdateClusterManagerRelatedResourcesFn(clusterManager.Status.RelatedResources...),
-		func(oldStatus *operatorapiv1.ClusterManagerStatus) error {
-			oldStatus.ObservedGeneration = clusterManager.Generation
-			return nil
-		},
-	)
+	_, updatedErr := n.patcher.PatchStatus(ctx, clusterManager, clusterManager.Status, originalClusterManager.Status)
 	if updatedErr != nil {
 		errs = append(errs, updatedErr)
 	}
 
 	return utilerrors.NewAggregate(errs)
-}
-
-func removeClusterManagerFinalizer(ctx context.Context,
-	clusterManagerClient operatorv1client.ClusterManagerInterface, deploy *operatorapiv1.ClusterManager) error {
-	copiedFinalizers := []string{}
-	for i := range deploy.Finalizers {
-		if deploy.Finalizers[i] == clusterManagerFinalizer {
-			continue
-		}
-		copiedFinalizers = append(copiedFinalizers, deploy.Finalizers[i])
-	}
-
-	if len(deploy.Finalizers) != len(copiedFinalizers) {
-		deploy.Finalizers = copiedFinalizers
-		_, err := clusterManagerClient.Update(ctx, deploy, metav1.UpdateOptions{})
-		return err
-	}
-
-	return nil
 }
 
 func generateHubClients(hubKubeConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface,

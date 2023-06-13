@@ -29,6 +29,7 @@ import (
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
@@ -47,7 +48,7 @@ const (
 )
 
 type klusterletController struct {
-	klusterletClient             operatorv1client.KlusterletInterface
+	patcher                      patcher.Patcher[*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus]
 	klusterletLister             operatorlister.KlusterletLister
 	kubeClient                   kubernetes.Interface
 	kubeVersion                  *version.Version
@@ -83,8 +84,9 @@ func NewKlusterletController(
 	recorder events.Recorder,
 	skipHubSecretPlaceholder bool) factory.Controller {
 	controller := &klusterletController{
-		kubeClient:                   kubeClient,
-		klusterletClient:             klusterletClient,
+		kubeClient: kubeClient,
+		patcher: patcher.NewPatcher[
+			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](klusterletClient),
 		klusterletLister:             klusterletInformer.Lister(),
 		kubeVersion:                  kubeVersion,
 		operatorNamespace:            operatorNamespace,
@@ -143,7 +145,7 @@ type klusterletConfig struct {
 func (n *klusterletController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	klusterletName := controllerContext.QueueKey()
 	klog.V(4).Infof("Reconciling Klusterlet %q", klusterletName)
-	klusterlet, err := n.klusterletLister.Get(klusterletName)
+	originalKlusterlet, err := n.klusterletLister.Get(klusterletName)
 	if errors.IsNotFound(err) {
 		// Klusterlet not found, could have been deleted, do nothing.
 		return nil
@@ -151,7 +153,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	if err != nil {
 		return err
 	}
-	klusterlet = klusterlet.DeepCopy()
+	klusterlet := originalKlusterlet.DeepCopy()
 
 	config := klusterletConfig{
 		KlusterletName:            klusterlet.Name,
@@ -182,19 +184,19 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	// update klusterletReadyToApply condition at first in hosted mode
 	// this conditions should be updated even when klusterlet is in deleting state.
 	if config.InstallMode == operatorapiv1.InstallModeHosted {
-		cond := metav1.Condition{
-			Type: klusterletReadyToApply, Status: metav1.ConditionTrue, Reason: "KlusterletPrepared",
-			Message: "Klusterlet is ready to apply",
-		}
 		if err != nil {
-			cond = metav1.Condition{
+			meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
 				Type: klusterletReadyToApply, Status: metav1.ConditionFalse, Reason: "KlusterletPrepareFailed",
 				Message: fmt.Sprintf("Failed to build managed cluster clients: %v", err),
-			}
+			})
+		} else {
+			meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
+				Type: klusterletReadyToApply, Status: metav1.ConditionTrue, Reason: "KlusterletPrepared",
+				Message: "Klusterlet is ready to apply",
+			})
 		}
 
-		_, updated, updateErr := helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName,
-			helpers.UpdateKlusterletConditionFn(cond))
+		updated, updateErr := n.patcher.PatchStatus(ctx, klusterlet, klusterlet.Status, originalKlusterlet.Status)
 		if updated {
 			return updateErr
 		}
@@ -233,7 +235,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		workFeatureGates = klusterlet.Spec.WorkConfiguration.FeatureGates
 	}
 	config.WorkFeatureGates, workFeatureMsgs = helpers.ConvertToFeatureGateFlags("Work", workFeatureGates, ocmfeature.DefaultSpokeWorkFeatureGates)
-	featureGateCondition := helpers.BuildFeatureCondition(registrationFeatureMsgs, workFeatureMsgs)
+	meta.SetStatusCondition(&klusterlet.Status.Conditions, helpers.BuildFeatureCondition(registrationFeatureMsgs, workFeatureMsgs))
 
 	reconcilers := []klusterletReconcile{
 		&crdReconcile{
@@ -272,45 +274,30 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		}
 	}
 
-	appliedCondition := meta.FindStatusCondition(klusterlet.Status.Conditions, klusterletApplied)
+	klusterlet.Status.ObservedGeneration = klusterlet.Generation
+
 	if len(errs) == 0 {
-		appliedCondition = &metav1.Condition{
+		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
 			Type: klusterletApplied, Status: metav1.ConditionTrue, Reason: "KlusterletApplied",
-			Message: "Klusterlet Component Applied"}
+			Message: "Klusterlet Component Applied"})
 	} else {
-		if appliedCondition == nil {
-			appliedCondition = &metav1.Condition{
+		if meta.FindStatusCondition(klusterlet.Status.Conditions, klusterletApplied) == nil {
+			meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
 				Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
-				Message: "Klusterlet Component Apply failed"}
+				Message: "Klusterlet Component Apply failed"})
 		}
 
 		// When appliedCondition is false, we should not update related resources and resource generations
-		_, updated, err := helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName,
-			helpers.UpdateKlusterletConditionFn(featureGateCondition, *appliedCondition),
-			func(oldStatus *operatorapiv1.KlusterletStatus) error {
-				oldStatus.ObservedGeneration = klusterlet.Generation
-				return nil
-			},
-		)
-
-		if updated {
-			return err
-		}
-
-		return utilerrors.NewAggregate(errs)
+		klusterlet.Status.RelatedResources = originalKlusterlet.Status.RelatedResources
+		klusterlet.Status.Generations = originalKlusterlet.Status.Generations
 	}
 
 	// If we get here, we have successfully applied everything.
-	_, _, err = helpers.UpdateKlusterletStatus(ctx, n.klusterletClient, klusterletName,
-		helpers.UpdateKlusterletConditionFn(featureGateCondition, *appliedCondition),
-		helpers.UpdateKlusterletGenerationsFn(klusterlet.Status.Generations...),
-		helpers.UpdateKlusterletRelatedResourcesFn(klusterlet.Status.RelatedResources...),
-		func(oldStatus *operatorapiv1.KlusterletStatus) error {
-			oldStatus.ObservedGeneration = klusterlet.Generation
-			return nil
-		},
-	)
-	return err
+	_, updatedErr := n.patcher.PatchStatus(ctx, klusterlet, klusterlet.Status, originalKlusterlet.Status)
+	if updatedErr != nil {
+		errs = append(errs, updatedErr)
+	}
+	return utilerrors.NewAggregate(errs)
 }
 
 // TODO also read CABundle from ExternalServerURLs and set into registration deployment

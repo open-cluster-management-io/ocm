@@ -35,7 +35,7 @@ func AssertOnlyConditions(t *testing.T, actual runtime.Object, expectedCondition
 	for _, expectedCondition := range expectedConditions {
 		actual := meta.FindStatusCondition(actualConditions, expectedCondition.Type)
 		if actual == nil {
-			t.Errorf("missing %v in %v", spew.Sdump(expectedCondition), spew.Sdump(actual))
+			t.Fatalf("missing %v in %v", spew.Sdump(expectedCondition), spew.Sdump(actual))
 		}
 		if actual.Status != expectedCondition.Status {
 			t.Errorf("wrong result for %v in %v", spew.Sdump(expectedCondition), spew.Sdump(actual))

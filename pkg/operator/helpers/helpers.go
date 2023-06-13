@@ -31,13 +31,11 @@ import (
 	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
-	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
 
@@ -69,144 +67,6 @@ func init() {
 	utilruntime.Must(apiextensionsv1.AddToScheme(genericScheme))
 	utilruntime.Must(apiregistrationv1.AddToScheme(genericScheme))
 	utilruntime.Must(admissionv1.AddToScheme(genericScheme))
-}
-
-type UpdateClusterManagerStatusFunc func(status *operatorapiv1.ClusterManagerStatus) error
-
-func UpdateClusterManagerStatus(
-	ctx context.Context,
-	client operatorv1client.ClusterManagerInterface,
-	clusterManagerName string,
-	updateFuncs ...UpdateClusterManagerStatusFunc) (*operatorapiv1.ClusterManagerStatus, bool, error) {
-	updated := false
-	var updatedClusterManagerStatus *operatorapiv1.ClusterManagerStatus
-	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		clusterManager, err := client.Get(ctx, clusterManagerName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		oldStatus := &clusterManager.Status
-
-		newStatus := oldStatus.DeepCopy()
-		// TODO: just for upgrading, we change the condition type from "InvalidRegistrationFeatureGates" to
-		// "ValidRegistrationFeatureGates", need to remove this in 0.11.0
-		if err := RemoveClusterManagerConditionFn(
-			"ValidRegistrationFeatureGates", "ValidWorkFeatureGates")(newStatus); err != nil {
-			return err
-		}
-
-		// update the cluster manager status by update functions
-		for _, update := range updateFuncs {
-			if err := update(newStatus); err != nil {
-				return err
-			}
-		}
-		if equality.Semantic.DeepEqual(oldStatus, newStatus) {
-			// We return the newStatus which is a deep copy of oldStatus but with all update funcs applied.
-			updatedClusterManagerStatus = newStatus
-			return nil
-		}
-
-		clusterManager.Status = *newStatus
-		updatedClusterManager, err := client.UpdateStatus(ctx, clusterManager, metav1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
-		updatedClusterManagerStatus = &updatedClusterManager.Status
-		updated = err == nil
-		return err
-	})
-
-	return updatedClusterManagerStatus, updated, err
-}
-
-func UpdateClusterManagerConditionFn(conds ...metav1.Condition) UpdateClusterManagerStatusFunc {
-	return func(oldStatus *operatorapiv1.ClusterManagerStatus) error {
-		for _, cond := range conds {
-			meta.SetStatusCondition(&oldStatus.Conditions, cond)
-		}
-		return nil
-	}
-}
-
-type UpdateKlusterletStatusFunc func(status *operatorapiv1.KlusterletStatus) error
-
-func UpdateKlusterletStatus(
-	ctx context.Context,
-	client operatorv1client.KlusterletInterface,
-	klusterletName string,
-	updateFuncs ...UpdateKlusterletStatusFunc) (*operatorapiv1.KlusterletStatus, bool, error) {
-	updated := false
-	var updatedKlusterletStatus *operatorapiv1.KlusterletStatus
-	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		klusterlet, err := client.Get(ctx, klusterletName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		oldStatus := &klusterlet.Status
-
-		newStatus := oldStatus.DeepCopy()
-		// TODO: just for upgrading, we change the condition type from "InvalidRegistrationFeatureGates" to
-		// "ValidRegistrationFeatureGates", need to remove this in 0.11.0
-		if err := RemoveKlusterletConditionFn(
-			"InvalidRegistrationFeatureGates", "ValidRegistrationFeatureGates")(newStatus); err != nil {
-			return err
-		}
-
-		// update the klusterlet status by update functions
-		for _, update := range updateFuncs {
-			if err := update(newStatus); err != nil {
-				return err
-			}
-		}
-		if equality.Semantic.DeepEqual(oldStatus, newStatus) {
-			// We return the newStatus which is a deep copy of oldStatus but with all update funcs applied.
-			updatedKlusterletStatus = newStatus
-			return nil
-		}
-
-		klusterlet.Status = *newStatus
-		updatedKlusterlet, err := client.UpdateStatus(ctx, klusterlet, metav1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
-		updatedKlusterletStatus = &updatedKlusterlet.Status
-		updated = err == nil
-		return err
-	})
-
-	return updatedKlusterletStatus, updated, err
-}
-
-func UpdateKlusterletConditionFn(conds ...metav1.Condition) UpdateKlusterletStatusFunc {
-	return func(oldStatus *operatorapiv1.KlusterletStatus) error {
-		for _, cond := range conds {
-			meta.SetStatusCondition(&oldStatus.Conditions, cond)
-		}
-		return nil
-	}
-}
-
-// RemoveKlusterletConditionFn return a function to remove a condition from the conditions
-// TODO: just for upgrading, we need to remove this in 0.11.0
-func RemoveKlusterletConditionFn(condTypes ...string) UpdateKlusterletStatusFunc {
-	return func(oldStatus *operatorapiv1.KlusterletStatus) error {
-		for _, t := range condTypes {
-			meta.RemoveStatusCondition(&oldStatus.Conditions, t)
-		}
-		return nil
-	}
-}
-
-// RemoveClusterManagerConditionFn return a function to remove a condition from the conditions
-// TODO: just for upgrading, we need to remove this in 0.11.0
-func RemoveClusterManagerConditionFn(condTypes ...string) UpdateClusterManagerStatusFunc {
-	return func(oldStatus *operatorapiv1.ClusterManagerStatus) error {
-		for _, t := range condTypes {
-			meta.RemoveStatusCondition(&oldStatus.Conditions, t)
-		}
-		return nil
-	}
 }
 
 func CleanUpStaticObject(
@@ -516,24 +376,6 @@ func SetGenerationStatuses(generationStatuses *[]operatorapiv1.GenerationStatus,
 	existingGeneration.LastGeneration = newGenerationStatus.LastGeneration
 }
 
-func UpdateClusterManagerGenerationsFn(generations ...operatorapiv1.GenerationStatus) UpdateClusterManagerStatusFunc {
-	return func(oldStatus *operatorapiv1.ClusterManagerStatus) error {
-		for _, generation := range generations {
-			SetGenerationStatuses(&oldStatus.Generations, generation)
-		}
-		return nil
-	}
-}
-
-func UpdateKlusterletGenerationsFn(generations ...operatorapiv1.GenerationStatus) UpdateKlusterletStatusFunc {
-	return func(oldStatus *operatorapiv1.KlusterletStatus) error {
-		for _, generation := range generations {
-			SetGenerationStatuses(&oldStatus.Generations, generation)
-		}
-		return nil
-	}
-}
-
 // LoadClientConfigFromSecret returns a client config loaded from the given secret
 func LoadClientConfigFromSecret(secret *corev1.Secret) (*rest.Config, error) {
 	kubeconfigData, ok := secret.Data["kubeconfig"]
@@ -740,24 +582,6 @@ func RemoveRelatedResourcesStatusesWithObj(
 		return
 	}
 	RemoveRelatedResourcesStatuses(relatedResourcesStatuses, res)
-}
-
-func UpdateClusterManagerRelatedResourcesFn(relatedResources ...operatorapiv1.RelatedResourceMeta) UpdateClusterManagerStatusFunc {
-	return func(oldStatus *operatorapiv1.ClusterManagerStatus) error {
-		if !reflect.DeepEqual(oldStatus.RelatedResources, relatedResources) {
-			oldStatus.RelatedResources = relatedResources
-		}
-		return nil
-	}
-}
-
-func UpdateKlusterletRelatedResourcesFn(relatedResources ...operatorapiv1.RelatedResourceMeta) UpdateKlusterletStatusFunc {
-	return func(oldStatus *operatorapiv1.KlusterletStatus) error {
-		if !reflect.DeepEqual(oldStatus.RelatedResources, relatedResources) {
-			oldStatus.RelatedResources = relatedResources
-		}
-		return nil
-	}
 }
 
 // KlusterletNamespace returns the klusterlet namespace on the managed cluster.

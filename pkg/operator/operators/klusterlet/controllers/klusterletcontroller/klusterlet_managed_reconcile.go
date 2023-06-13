@@ -19,8 +19,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/ocm/manifests"
+	patcher "open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
@@ -181,6 +183,10 @@ func (r *managedReconcile) cleanUpAppliedManifestWorks(ctx context.Context, klus
 		return nil
 	}
 
+	patcher := patcher.NewPatcher[
+		*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus](
+		r.managedClusterClients.appliedManifestWorkClient)
+
 	var errs []error
 	for index := range appliedManifestWorks.Items {
 		// ignore AppliedManifestWork for other klusterlet
@@ -189,12 +195,7 @@ func (r *managedReconcile) cleanUpAppliedManifestWorks(ctx context.Context, klus
 		}
 
 		// remove finalizer if exists
-		if mutated := removeFinalizer(&appliedManifestWorks.Items[index], appliedManifestWorkFinalizer); !mutated {
-			continue
-		}
-
-		_, err := r.managedClusterClients.appliedManifestWorkClient.Update(ctx, &appliedManifestWorks.Items[index], metav1.UpdateOptions{})
-		if err != nil && !errors.IsNotFound(err) {
+		if err := patcher.RemoveFinalizer(ctx, &appliedManifestWorks.Items[index], appliedManifestWorkFinalizer); err != nil && !errors.IsNotFound(err) {
 			errs = append(errs, fmt.Errorf("unable to remove finalizer from AppliedManifestWork %q: %w", appliedManifestWorks.Items[index].Name, err))
 		}
 	}

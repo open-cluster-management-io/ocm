@@ -28,8 +28,10 @@ import (
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/manifests"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
@@ -61,7 +63,7 @@ const (
 type crdMigrationController struct {
 	kubeconfig                *rest.Config
 	kubeClient                kubernetes.Interface
-	clusterManagerClient      operatorv1client.ClusterManagerInterface
+	patcher                   patcher.Patcher[*operatorapiv1.ClusterManager, operatorapiv1.ClusterManagerSpec, operatorapiv1.ClusterManagerStatus]
 	clusterManagerLister      operatorlister.ClusterManagerLister
 	recorder                  events.Recorder
 	generateHubClusterClients func(hubConfig *rest.Config) (apiextensionsclient.Interface, migrationv1alpha1client.StorageVersionMigrationsGetter, error)
@@ -75,9 +77,11 @@ func NewCRDMigrationController(
 	clusterManagerInformer operatorinformer.ClusterManagerInformer,
 	recorder events.Recorder) factory.Controller {
 	controller := &crdMigrationController{
-		kubeconfig:                kubeconfig,
-		kubeClient:                kubeClient,
-		clusterManagerClient:      clusterManagerClient,
+		kubeconfig: kubeconfig,
+		kubeClient: kubeClient,
+		patcher: patcher.NewPatcher[
+			*operatorapiv1.ClusterManager, operatorapiv1.ClusterManagerSpec, operatorapiv1.ClusterManagerStatus](
+			clusterManagerClient),
 		clusterManagerLister:      clusterManagerInformer.Lister(),
 		recorder:                  recorder,
 		generateHubClusterClients: generateHubClients,
@@ -129,16 +133,15 @@ func (c *crdMigrationController) sync(ctx context.Context, controllerContext fac
 		return err
 	}
 
+	newClusterManager := clusterManager.DeepCopy()
 	if !supported {
-		migrationCond := metav1.Condition{
+		meta.SetStatusCondition(&newClusterManager.Status.Conditions, metav1.Condition{
 			Type:    MigrationSucceeded,
 			Status:  metav1.ConditionFalse,
 			Reason:  "StorageVersionMigrationFailed",
 			Message: "Do not support StorageVersionMigration",
-		}
-		_, _, err = helpers.UpdateClusterManagerStatus(ctx, c.clusterManagerClient, clusterManagerName,
-			helpers.UpdateClusterManagerConditionFn(migrationCond),
-		)
+		})
+		_, err = c.patcher.PatchStatus(ctx, newClusterManager, newClusterManager.Status, clusterManager.Status)
 		return err
 	}
 
@@ -160,9 +163,9 @@ func (c *crdMigrationController) sync(ctx context.Context, controllerContext fac
 		return err
 	}
 
-	_, _, err = helpers.UpdateClusterManagerStatus(ctx, c.clusterManagerClient, clusterManagerName,
-		helpers.UpdateClusterManagerConditionFn(migrationCond),
-	)
+	meta.SetStatusCondition(&newClusterManager.Status.Conditions, migrationCond)
+
+	_, err = c.patcher.PatchStatus(ctx, newClusterManager, newClusterManager.Status, clusterManager.Status)
 	if err != nil {
 		return err
 	}

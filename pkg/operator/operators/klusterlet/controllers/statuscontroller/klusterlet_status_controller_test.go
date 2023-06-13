@@ -2,6 +2,7 @@ package statuscontroller
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelper "open-cluster-management.io/ocm/pkg/operator/helpers/testing"
 )
@@ -62,8 +64,9 @@ func newTestController(t *testing.T, klusterlet *operatorapiv1.Klusterlet, objec
 	kubeInformers := kubeinformers.NewSharedInformerFactory(fakeKubeClient, 5*time.Minute)
 
 	klusterletController := &klusterletStatusController{
-		kubeClient:       fakeKubeClient,
-		klusterletClient: fakeOperatorClient.OperatorV1().Klusterlets(),
+		kubeClient: fakeKubeClient,
+		patcher: patcher.NewPatcher[
+			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](fakeOperatorClient.OperatorV1().Klusterlets()),
 		deploymentLister: kubeInformers.Apps().V1().Deployments().Lister(),
 		klusterletLister: operatorInformers.Operator().V1().Klusterlets().Lister(),
 	}
@@ -166,10 +169,14 @@ func TestSync(t *testing.T) {
 			}
 			operatorActions := controller.operatorClient.Actions()
 
-			testingcommon.AssertEqualNumber(t, len(operatorActions), 2)
-			testingcommon.AssertGet(t, operatorActions[0], "operator.open-cluster-management.io", "v1", "klusterlets")
-			testingcommon.AssertAction(t, operatorActions[1], "update")
-			testinghelper.AssertOnlyConditions(t, operatorActions[1].(clienttesting.UpdateActionImpl).Object, c.expectedConditions...)
+			testingcommon.AssertActions(t, operatorActions, "patch")
+			klusterlet := &operatorapiv1.Klusterlet{}
+			patchData := operatorActions[0].(clienttesting.PatchActionImpl).Patch
+			err = json.Unmarshal(patchData, klusterlet)
+			if err != nil {
+				t.Fatal(err)
+			}
+			testinghelper.AssertOnlyConditions(t, klusterlet, c.expectedConditions...)
 		})
 	}
 }
