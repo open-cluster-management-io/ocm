@@ -308,7 +308,7 @@ func TestHasValidHubClientConfig(t *testing.T) {
 				AgentName:        c.agentName,
 				HubKubeconfigDir: tempDir,
 			}
-			valid, err := options.hasValidHubClientConfig()
+			valid, err := options.hasValidHubClientConfig(context.TODO())
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

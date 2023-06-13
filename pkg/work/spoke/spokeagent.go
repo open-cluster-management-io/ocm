@@ -92,7 +92,7 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 
 	// load spoke client config and create spoke clients,
 	// the work agent may not running in the spoke/managed cluster.
-	spokeRestConfig, err := o.AgentOptions.SpokeKubeConfig(controllerContext)
+	spokeRestConfig, err := o.AgentOptions.SpokeKubeConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}

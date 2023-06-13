@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/pflag"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/client-go/rest"
@@ -39,9 +38,9 @@ func (o *AgentOptions) AddFlags(flags *pflag.FlagSet) {
 }
 
 // spokeKubeConfig builds kubeconfig for the spoke/managed cluster
-func (o *AgentOptions) SpokeKubeConfig(controllerContext *controllercmd.ControllerContext) (*rest.Config, error) {
+func (o *AgentOptions) SpokeKubeConfig(managedRestConfig *rest.Config) (*rest.Config, error) {
 	if o.SpokeKubeconfigFile == "" {
-		return controllerContext.KubeConfig, nil
+		return managedRestConfig, nil
 	}
 
 	spokeRestConfig, err := clientcmd.BuildConfigFromFlags("" /* leave masterurl as empty */, o.SpokeKubeconfigFile)
