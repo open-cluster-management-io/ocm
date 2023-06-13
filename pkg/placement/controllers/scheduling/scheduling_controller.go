@@ -51,8 +51,6 @@ const (
 
 var ResyncInterval = time.Minute * 5
 
-type enqueuePlacementFunc func(namespace, name string)
-
 // schedulingController schedules cluster decisions for Placements
 type schedulingController struct {
 	clusterClient           clusterclient.Interface

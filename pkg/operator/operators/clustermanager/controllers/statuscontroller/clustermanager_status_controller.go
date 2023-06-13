@@ -100,10 +100,11 @@ func (s *clusterManagerStatusController) updateStatusOfRegistration(ctx context.
 
 	if unavailablePod := helpers.NumOfUnavailablePod(registrationDeployment); unavailablePod > 0 {
 		return metav1.Condition{
-			Type:    registrationDegraded,
-			Status:  metav1.ConditionTrue,
-			Reason:  "UnavailableRegistrationPod",
-			Message: fmt.Sprintf("%v of requested instances are unavailable of registration deployment %q %q", unavailablePod, clusterManagerNamespace, registrationDeploymentName),
+			Type:   registrationDegraded,
+			Status: metav1.ConditionTrue,
+			Reason: "UnavailableRegistrationPod",
+			Message: fmt.Sprintf("%v of requested instances are unavailable of registration deployment %q %q",
+				unavailablePod, clusterManagerNamespace, registrationDeploymentName),
 		}
 	}
 
@@ -131,10 +132,11 @@ func (s *clusterManagerStatusController) updateStatusOfPlacement(ctx context.Con
 
 	if unavailablePod := helpers.NumOfUnavailablePod(placementDeployment); unavailablePod > 0 {
 		return metav1.Condition{
-			Type:    placementDegraded,
-			Status:  metav1.ConditionTrue,
-			Reason:  "UnavailablePlacementPod",
-			Message: fmt.Sprintf("%v of requested instances are unavailable of placement deployment %q %q", unavailablePod, clusterManagerNamespace, placementDeploymentName),
+			Type:   placementDegraded,
+			Status: metav1.ConditionTrue,
+			Reason: "UnavailablePlacementPod",
+			Message: fmt.Sprintf("%v of requested instances are unavailable of placement deployment %q %q",
+				unavailablePod, clusterManagerNamespace, placementDeploymentName),
 		}
 	}
 

@@ -28,7 +28,7 @@ import (
 )
 
 // AppliedManifestWorkController is to sync the applied resources of appliedmanifestwork with related
-// manifestwork and delete any resouce which is no longer maintained by the manifestwork
+// manifestwork and delete any resource which is no longer maintained by the manifestwork
 type AppliedManifestWorkController struct {
 	manifestWorkClient        workv1client.ManifestWorkInterface
 	manifestWorkLister        worklister.ManifestWorkNamespaceLister
@@ -121,7 +121,11 @@ func (m *AppliedManifestWorkController) syncManifestWork(
 	var appliedResources []workapiv1.AppliedManifestResourceMeta
 	var errs []error
 	for _, resourceStatus := range manifestWork.Status.ResourceStatus.Manifests {
-		gvr := schema.GroupVersionResource{Group: resourceStatus.ResourceMeta.Group, Version: resourceStatus.ResourceMeta.Version, Resource: resourceStatus.ResourceMeta.Resource}
+		gvr := schema.GroupVersionResource{
+			Group:    resourceStatus.ResourceMeta.Group,
+			Version:  resourceStatus.ResourceMeta.Version,
+			Resource: resourceStatus.ResourceMeta.Resource,
+		}
 		if len(gvr.Resource) == 0 || len(gvr.Version) == 0 || len(resourceStatus.ResourceMeta.Name) == 0 {
 			continue
 		}

@@ -599,11 +599,13 @@ func (t *Tester) CheckHubReady() error {
 
 	var hubWorkControllerEnabled, addonManagerControllerEnabled bool
 	if cm.Spec.WorkConfiguration != nil {
-		hubWorkControllerEnabled = helpers.FeatureGateEnabled(cm.Spec.WorkConfiguration.FeatureGates, ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.ManifestWorkReplicaSet)
+		hubWorkControllerEnabled = helpers.FeatureGateEnabled(cm.Spec.WorkConfiguration.FeatureGates,
+			ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.ManifestWorkReplicaSet)
 	}
 
 	if cm.Spec.AddOnManagerConfiguration != nil {
-		addonManagerControllerEnabled = helpers.FeatureGateEnabled(cm.Spec.AddOnManagerConfiguration.FeatureGates, ocmfeature.DefaultHubAddonManagerFeatureGates, ocmfeature.AddonManagement)
+		addonManagerControllerEnabled = helpers.FeatureGateEnabled(cm.Spec.AddOnManagerConfiguration.FeatureGates,
+			ocmfeature.DefaultHubAddonManagerFeatureGates, ocmfeature.AddonManagement)
 	}
 
 	if hubWorkControllerEnabled {
@@ -1072,7 +1074,7 @@ func (t *Tester) DeleteManageClusterAndRelatedNamespace(clusterName string) erro
 		return fmt.Errorf("delete managed cluster %q failed: %v", clusterName, err)
 	}
 
-	// delete namespace created by hub automaticly
+	// delete namespace created by hub automatically
 	if err := wait.Poll(1*time.Second, 5*time.Second, func() (bool, error) {
 		err := t.HubKubeClient.CoreV1().Namespaces().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
 		// some managed cluster just created, but the csr is not approved,

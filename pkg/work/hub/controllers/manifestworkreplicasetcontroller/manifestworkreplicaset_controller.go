@@ -201,11 +201,13 @@ func (m *ManifestWorkReplicaSetController) patchPlaceManifestStatus(ctx context.
 		return fmt.Errorf("failed to create patch for work %s: %w", old.Name, err)
 	}
 
-	_, err = m.workClient.WorkV1alpha1().ManifestWorkReplicaSets(old.Namespace).Patch(ctx, old.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	_, err = m.workClient.WorkV1alpha1().ManifestWorkReplicaSets(old.Namespace).Patch(ctx,
+		old.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	return err
 }
 
-func listManifestWorksByManifestWorkReplicaSet(mwrs *workapiv1alpha1.ManifestWorkReplicaSet, manifestWorkLister worklisterv1.ManifestWorkLister) ([]*workapiv1.ManifestWork, error) {
+func listManifestWorksByManifestWorkReplicaSet(mwrs *workapiv1alpha1.ManifestWorkReplicaSet,
+	manifestWorkLister worklisterv1.ManifestWorkLister) ([]*workapiv1.ManifestWork, error) {
 	req, err := labels.NewRequirement(ManifestWorkReplicaSetControllerNameLabelKey, selection.Equals, []string{manifestWorkReplicaSetKey(mwrs)})
 	if err != nil {
 		return nil, err

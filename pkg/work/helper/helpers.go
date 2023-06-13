@@ -432,7 +432,8 @@ func FindManifestConiguration(resourceMeta workapiv1.ManifestResourceMeta, manif
 	return nil
 }
 
-func ApplyOwnerReferences(ctx context.Context, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, existing runtime.Object, requiredOwner metav1.OwnerReference) error {
+func ApplyOwnerReferences(ctx context.Context, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource,
+	existing runtime.Object, requiredOwner metav1.OwnerReference) error {
 	accessor, err := meta.Accessor(existing)
 	if err != nil {
 		return fmt.Errorf("type %t cannot be accessed: %v", existing, err)
@@ -557,7 +558,8 @@ func (pdl PlacementDecisionGetter) List(selector labels.Selector, namespace stri
 }
 
 // Get added and deleted clusters names
-func GetClusters(client clusterlister.PlacementDecisionLister, placement *clusterv1beta1.Placement, existingClusters sets.Set[string]) (sets.Set[string], sets.Set[string], error) {
+func GetClusters(client clusterlister.PlacementDecisionLister, placement *clusterv1beta1.Placement,
+	existingClusters sets.Set[string]) (sets.Set[string], sets.Set[string], error) {
 	pdtracker := clusterv1beta1.NewPlacementDecisionClustersTracker(placement, PlacementDecisionGetter{Client: client}, existingClusters)
 
 	return pdtracker.Get()

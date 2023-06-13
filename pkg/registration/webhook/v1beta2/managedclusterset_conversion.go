@@ -21,7 +21,7 @@ func (src *ManagedClusterSet) ConvertTo(dstRaw conversion.Hub) error {
 
 	dst.ObjectMeta = src.ObjectMeta
 	if len(src.Spec.ClusterSelector.SelectorType) == 0 || src.Spec.ClusterSelector.SelectorType == v1beta2.ExclusiveClusterSetLabel {
-		dst.Spec.ClusterSelector.SelectorType = v1beta1.SelectorType(v1beta1.LegacyClusterSetLabel)
+		dst.Spec.ClusterSelector.SelectorType = v1beta1.LegacyClusterSetLabel
 	} else {
 		dst.Spec.ClusterSelector.SelectorType = v1beta1.SelectorType(src.Spec.ClusterSelector.SelectorType)
 		dst.Spec.ClusterSelector.LabelSelector = src.Spec.ClusterSelector.LabelSelector

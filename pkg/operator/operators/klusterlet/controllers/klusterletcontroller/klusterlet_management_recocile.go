@@ -46,7 +46,8 @@ type managementReconcile struct {
 	cache             resourceapply.ResourceCache
 }
 
-func (r *managementReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+func (r *managementReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
+	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
 	err := ensureNamespace(ctx, r.kubeClient, klusterlet, config.AgentNamespace)
 	if err != nil {
 		return klusterlet, reconcileStop, err
@@ -95,7 +96,8 @@ func (r *managementReconcile) reconcile(ctx context.Context, klusterlet *operato
 	return klusterlet, reconcileContinue, nil
 }
 
-func (r *managementReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+func (r *managementReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
+	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
 	// Remove secrets
 	secrets := []string{config.HubKubeConfigSecret}
 	if config.InstallMode == operatorapiv1.InstallModeHosted {

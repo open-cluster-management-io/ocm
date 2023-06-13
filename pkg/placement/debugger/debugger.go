@@ -68,7 +68,7 @@ func (d *Debugger) Handler(w http.ResponseWriter, r *http.Request) {
 
 	resultByte, _ := json.Marshal(result)
 
-	w.Write(resultByte)
+	_, _ = w.Write(resultByte)
 }
 
 func (d *Debugger) parsePath(path string) (string, string, error) {
@@ -81,5 +81,5 @@ func (d *Debugger) reportErr(w http.ResponseWriter, err error) {
 
 	resultByte, _ := json.Marshal(result)
 
-	w.Write(resultByte)
+	_, _ = w.Write(resultByte)
 }

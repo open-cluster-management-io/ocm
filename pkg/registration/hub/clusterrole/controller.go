@@ -34,7 +34,7 @@ var clusterRoleFiles = []string{
 //go:embed manifests
 var manifestFiles embed.FS
 
-// clusterroleController maintains the necessary clusterroles for registraion and work agent on hub cluster.
+// clusterroleController maintains the necessary clusterroles for registration and work agent on hub cluster.
 type clusterroleController struct {
 	kubeClient    kubernetes.Interface
 	clusterLister clusterv1listers.ManagedClusterLister

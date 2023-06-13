@@ -180,7 +180,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		build(ctx)
 
 	// update klusterletReadyToApply condition at first in hosted mode
-	// this conditions should be updated even when klusterlet is in deleteing state.
+	// this conditions should be updated even when klusterlet is in deleting state.
 	if config.InstallMode == operatorapiv1.InstallModeHosted {
 		cond := metav1.Condition{
 			Type: klusterletReadyToApply, Status: metav1.ConditionTrue, Reason: "KlusterletPrepared",
@@ -225,7 +225,8 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		registrationFeatureGates = klusterlet.Spec.RegistrationConfiguration.FeatureGates
 		config.ClientCertExpirationSeconds = klusterlet.Spec.RegistrationConfiguration.ClientCertExpirationSeconds
 	}
-	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration", registrationFeatureGates, ocmfeature.DefaultSpokeRegistrationFeatureGates)
+	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration",
+		registrationFeatureGates, ocmfeature.DefaultSpokeRegistrationFeatureGates)
 
 	workFeatureGates := []operatorapiv1.FeatureGate{}
 	if klusterlet.Spec.WorkConfiguration != nil {
@@ -324,7 +325,7 @@ func getServersFromKlusterlet(klusterlet *operatorapiv1.Klusterlet) string {
 	return strings.Join(serverString, ",")
 }
 
-// getManagedKubeConfig is a helper func for Hosted mode, it will retrive managed cluster
+// getManagedKubeConfig is a helper func for Hosted mode, it will retrieve managed cluster
 // kubeconfig from "external-managed-kubeconfig" secret.
 func getManagedKubeConfig(ctx context.Context, kubeClient kubernetes.Interface, namespace, secretName string) (*rest.Config, error) {
 	managedKubeconfigSecret, err := kubeClient.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
@@ -353,7 +354,8 @@ func ensureAgentNamespace(ctx context.Context, kubeClient kubernetes.Interface, 
 }
 
 // syncPullSecret will sync pull secret from the sourceClient cluster to the targetClient cluster in desired namespace.
-func syncPullSecret(ctx context.Context, sourceClient, targetClient kubernetes.Interface, klusterlet *operatorapiv1.Klusterlet, operatorNamespace, namespace string, recorder events.Recorder) error {
+func syncPullSecret(ctx context.Context, sourceClient, targetClient kubernetes.Interface,
+	klusterlet *operatorapiv1.Klusterlet, operatorNamespace, namespace string, recorder events.Recorder) error {
 	_, _, err := helpers.SyncSecret(
 		ctx,
 		sourceClient.CoreV1(),

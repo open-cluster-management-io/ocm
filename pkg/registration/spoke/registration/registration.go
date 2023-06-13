@@ -145,7 +145,8 @@ func GenerateBootstrapStatusUpdater() clientcert.StatusUpdateFunc {
 }
 
 // GenerateStatusUpdater generates status update func for the certificate management
-func GenerateStatusUpdater(hubClusterClient clientset.Interface, hubClusterLister clusterv1listers.ManagedClusterLister, clusterName string) clientcert.StatusUpdateFunc {
+func GenerateStatusUpdater(hubClusterClient clientset.Interface,
+	hubClusterLister clusterv1listers.ManagedClusterLister, clusterName string) clientcert.StatusUpdateFunc {
 	return func(ctx context.Context, cond metav1.Condition) error {
 		cluster, err := hubClusterLister.Get(clusterName)
 		if errors.IsNotFound(err) {

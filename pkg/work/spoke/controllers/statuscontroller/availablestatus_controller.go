@@ -169,7 +169,7 @@ func aggregateManifestConditions(generation int64, manifests []workapiv1.Manifes
 	switch {
 	case unavailable > 0:
 		return metav1.Condition{
-			Type:               string(workapiv1.WorkAvailable),
+			Type:               workapiv1.WorkAvailable,
 			Status:             metav1.ConditionFalse,
 			Reason:             "ResourcesNotAvailable",
 			ObservedGeneration: generation,
@@ -177,7 +177,7 @@ func aggregateManifestConditions(generation int64, manifests []workapiv1.Manifes
 		}
 	case unknown > 0:
 		return metav1.Condition{
-			Type:               string(workapiv1.WorkAvailable),
+			Type:               workapiv1.WorkAvailable,
 			Status:             metav1.ConditionUnknown,
 			Reason:             "ResourcesStatusUnknown",
 			ObservedGeneration: generation,
@@ -185,7 +185,7 @@ func aggregateManifestConditions(generation int64, manifests []workapiv1.Manifes
 		}
 	case available == 0:
 		return metav1.Condition{
-			Type:               string(workapiv1.WorkAvailable),
+			Type:               workapiv1.WorkAvailable,
 			Status:             metav1.ConditionUnknown,
 			Reason:             "ResourcesStatusUnknown",
 			ObservedGeneration: generation,
@@ -193,7 +193,7 @@ func aggregateManifestConditions(generation int64, manifests []workapiv1.Manifes
 		}
 	default:
 		return metav1.Condition{
-			Type:               string(workapiv1.WorkAvailable),
+			Type:               workapiv1.WorkAvailable,
 			Status:             metav1.ConditionTrue,
 			Reason:             "ResourcesAvailable",
 			ObservedGeneration: generation,
@@ -203,7 +203,8 @@ func aggregateManifestConditions(generation int64, manifests []workapiv1.Manifes
 }
 
 func (c *AvailableStatusController) getFeedbackValues(
-	resourceMeta workapiv1.ManifestResourceMeta, obj *unstructured.Unstructured, manifestOptions []workapiv1.ManifestConfigOption) ([]workapiv1.FeedbackValue, metav1.Condition) {
+	resourceMeta workapiv1.ManifestResourceMeta, obj *unstructured.Unstructured,
+	manifestOptions []workapiv1.ManifestConfigOption) ([]workapiv1.FeedbackValue, metav1.Condition) {
 	errs := []error{}
 	values := []workapiv1.FeedbackValue{}
 
@@ -246,7 +247,8 @@ func (c *AvailableStatusController) getFeedbackValues(
 }
 
 // buildAvailableStatusCondition returns a StatusCondition with type Available for a given manifest resource
-func buildAvailableStatusCondition(resourceMeta workapiv1.ManifestResourceMeta, dynamicClient dynamic.Interface) (*unstructured.Unstructured, metav1.Condition, error) {
+func buildAvailableStatusCondition(resourceMeta workapiv1.ManifestResourceMeta,
+	dynamicClient dynamic.Interface) (*unstructured.Unstructured, metav1.Condition, error) {
 	conditionType := string(workapiv1.ManifestAvailable)
 
 	if len(resourceMeta.Resource) == 0 || len(resourceMeta.Version) == 0 || len(resourceMeta.Name) == 0 {

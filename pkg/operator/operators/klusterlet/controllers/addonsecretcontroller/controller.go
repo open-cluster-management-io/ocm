@@ -20,7 +20,8 @@ const (
 	addonInstallNamespaceLabelKey = "addon.open-cluster-management.io/namespace"
 )
 
-// AddonPullImageSecretController is used to sync pull image secret from operator namespace to addon namespaces(with label "addon.open-cluster-management.io/namespace":"true")
+// AddonPullImageSecretController is used to sync pull image secret from operator namespace
+// to addon namespaces(with label "addon.open-cluster-management.io/namespace":"true")
 // Note:
 // 1. AddonPullImageSecretController only handles namespace events within the same cluster.
 // 2. If the lable is remove from namespace, controller now would not remove the secret.
@@ -31,7 +32,8 @@ type addonPullImageSecretController struct {
 	recorder          events.Recorder
 }
 
-func NewAddonPullImageSecretController(kubeClient kubernetes.Interface, operatorNamespace string, namespaceInformer coreinformer.NamespaceInformer, recorder events.Recorder) factory.Controller {
+func NewAddonPullImageSecretController(kubeClient kubernetes.Interface, operatorNamespace string,
+	namespaceInformer coreinformer.NamespaceInformer, recorder events.Recorder) factory.Controller {
 	ac := &addonPullImageSecretController{
 		operatorNamespace: operatorNamespace,
 		namespaceInformer: namespaceInformer,
@@ -44,10 +46,7 @@ func NewAddonPullImageSecretController(kubeClient kubernetes.Interface, operator
 	}, func(obj interface{}) bool {
 		// if obj has the label, return true
 		namespace := obj.(*corev1.Namespace)
-		if namespace.Labels[addonInstallNamespaceLabelKey] == "true" {
-			return true
-		}
-		return false
+		return namespace.Labels[addonInstallNamespaceLabelKey] == "true"
 	}, namespaceInformer.Informer()).WithSync(ac.sync).ToController("AddonPullImageSecretController", recorder)
 }
 

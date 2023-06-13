@@ -277,7 +277,7 @@ type CSRHolder struct {
 }
 
 func NewCSR(holder CSRHolder) *certv1.CertificateSigningRequest {
-	insecureRand := rand.New(rand.NewSource(0))
+	insecureRand := rand.New(rand.NewSource(0)) //nolint:gosec
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), insecureRand)
 	if err != nil {
 		panic(err)
@@ -310,7 +310,7 @@ func NewCSR(holder CSRHolder) *certv1.CertificateSigningRequest {
 }
 
 func NewV1beta1CSR(holder CSRHolder) *certv1beta1.CertificateSigningRequest {
-	insecureRand := rand.New(rand.NewSource(0))
+	insecureRand := rand.New(rand.NewSource(0)) //nolint:gosec
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), insecureRand)
 	if err != nil {
 		panic(err)
@@ -499,7 +499,7 @@ func NewTestCert(commonName string, duration time.Duration) *TestCert {
 }
 
 func WriteFile(filename string, data []byte) {
-	if err := ioutil.WriteFile(filename, data, 0644); err != nil {
+	if err := ioutil.WriteFile(filename, data, 0600); err != nil {
 		panic(err)
 	}
 }

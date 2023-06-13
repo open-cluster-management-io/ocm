@@ -368,9 +368,11 @@ func shouldCreateCSR(
 	additionalSecretData map[string][]byte) (bool, error) {
 	switch {
 	case !hasValidClientCertificate(subject, secret):
-		recorder.Eventf("NoValidCertificateFound", "No valid client certificate for %s is found. Bootstrap is required", controllerName)
+		recorder.Eventf("NoValidCertificateFound",
+			"No valid client certificate for %s is found. Bootstrap is required", controllerName)
 	case additionalSecretDataSensitive && !hasAdditionalSecretData(additionalSecretData, secret):
-		recorder.Eventf("AdditonalSecretDataChanged", "The additonal secret data is changed. Re-create the client certificate for %s", controllerName)
+		recorder.Eventf("AdditonalSecretDataChanged",
+			"The additional secret data is changed. Re-create the client certificate for %s", controllerName)
 	default:
 		notBefore, notAfter, err := getCertValidityPeriod(secret)
 		if err != nil {
@@ -379,14 +381,17 @@ func shouldCreateCSR(
 
 		total := notAfter.Sub(*notBefore)
 		remaining := time.Until(*notAfter)
-		klog.V(4).Infof("Client certificate for %s: time total=%v, remaining=%v, remaining/total=%v", controllerName, total, remaining, remaining.Seconds()/total.Seconds())
+		klog.V(4).Infof("Client certificate for %s: time total=%v, remaining=%v, remaining/total=%v",
+			controllerName, total, remaining, remaining.Seconds()/total.Seconds())
 		threshold := jitter(0.2, 0.25)
 		if remaining.Seconds()/total.Seconds() > threshold {
 			// Do nothing if the client certificate is valid and has more than a random percentage range from 20% to 25% of its life remaining
 			klog.V(4).Infof("Client certificate for %s is valid and has more than %.2f%% of its life remaining", controllerName, threshold*100)
 			return false, nil
 		}
-		recorder.Eventf("CertificateRotationStarted", "The current client certificate for %s expires in %v. Start certificate rotation", controllerName, remaining.Round(time.Second))
+		recorder.Eventf("CertificateRotationStarted",
+			"The current client certificate for %s expires in %v. Start certificate rotation",
+			controllerName, remaining.Round(time.Second))
 	}
 	return true, nil
 }

@@ -19,5 +19,6 @@ func (c *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&c.Port, "port", c.Port,
 		"Port is the port that the webhook server serves at.")
 	fs.StringVar(&c.CertDir, "certdir", c.CertDir,
-		"CertDir is the directory that contains the server key and certificate. If not set, webhook server would look up the server key and certificate in {TempDir}/k8s-webhook-server/serving-certs")
+		"CertDir is the directory that contains the server key and certificate. If not set, "+
+			"webhook server would look up the server key and certificate in {TempDir}/k8s-webhook-server/serving-certs")
 }

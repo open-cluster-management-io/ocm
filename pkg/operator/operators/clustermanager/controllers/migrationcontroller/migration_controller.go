@@ -134,7 +134,7 @@ func (c *crdMigrationController) sync(ctx context.Context, controllerContext fac
 			Type:    MigrationSucceeded,
 			Status:  metav1.ConditionFalse,
 			Reason:  "StorageVersionMigrationFailed",
-			Message: fmt.Sprintf("Do not support StorageVersionMigration"),
+			Message: "Do not support StorageVersionMigration",
 		}
 		_, _, err = helpers.UpdateClusterManagerStatus(ctx, c.clusterManagerClient, clusterManagerName,
 			helpers.UpdateClusterManagerConditionFn(migrationCond),
@@ -212,7 +212,8 @@ func removeStorageVersionMigrations(
 	return nil
 }
 
-func applyStorageVersionMigrations(ctx context.Context, migrationClient migrationv1alpha1client.StorageVersionMigrationsGetter, recorder events.Recorder) error {
+func applyStorageVersionMigrations(ctx context.Context,
+	migrationClient migrationv1alpha1client.StorageVersionMigrationsGetter, recorder events.Recorder) error {
 	errs := []error{}
 	for _, file := range migrationRequestFiles {
 		required, err := parseStorageVersionMigrationFile(
@@ -242,7 +243,8 @@ func applyStorageVersionMigrations(ctx context.Context, migrationClient migratio
 // syncStorageVersionMigrationsCondition sync the migration condition based on all the StorageVersionMigrations status
 // 1. migrationSucceeded is true only when all the StorageVersionMigrations resources succeed.
 // 2. migrationSucceeded is false when any of the StorageVersionMigrations resources failed or running
-func syncStorageVersionMigrationsCondition(ctx context.Context, migrationClient migrationv1alpha1client.StorageVersionMigrationsGetter) (metav1.Condition, error) {
+func syncStorageVersionMigrationsCondition(ctx context.Context,
+	migrationClient migrationv1alpha1client.StorageVersionMigrationsGetter) (metav1.Condition, error) {
 	for _, file := range migrationRequestFiles {
 		required, err := parseStorageVersionMigrationFile(
 			func(name string) ([]byte, error) {
@@ -292,7 +294,7 @@ func syncStorageVersionMigrationsCondition(ctx context.Context, migrationClient 
 		Type:    MigrationSucceeded,
 		Status:  metav1.ConditionTrue,
 		Reason:  "StorageVersionMigrationSucceed",
-		Message: fmt.Sprintf("All StorageVersionMigrations Succeed"),
+		Message: "All StorageVersionMigrations Succeed",
 	}, nil
 }
 

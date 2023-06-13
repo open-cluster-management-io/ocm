@@ -75,7 +75,8 @@ func (m *AppliedManifestWorkFinalizeController) sync(ctx context.Context, contro
 // syncAppliedManifestWork ensures that when a appliedmanifestwork has been deleted, everything it created is also deleted.
 // Foreground deletion is implemented, which means all resources created will be deleted and finalized
 // before removing finalizer from appliedmanifestwork
-func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx context.Context, controllerContext factory.SyncContext, originalManifestWork *workapiv1.AppliedManifestWork) error {
+func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx context.Context,
+	controllerContext factory.SyncContext, originalManifestWork *workapiv1.AppliedManifestWork) error {
 	appliedManifestWork := originalManifestWork.DeepCopy()
 
 	// no work to do until we're deleted

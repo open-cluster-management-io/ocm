@@ -554,7 +554,7 @@ func LoadClientConfigFromSecret(secret *corev1.Secret) (*rest.Config, error) {
 	}
 
 	if authInfo, ok := config.AuthInfos[context.AuthInfo]; ok {
-		// use embeded cert/key data instead of references to external cert/key files
+		// use embedded cert/key data instead of references to external cert/key files
 		if certData, ok := secret.Data["tls.crt"]; ok && len(authInfo.ClientCertificateData) == 0 {
 			authInfo.ClientCertificateData = certData
 			authInfo.ClientCertificate = ""
@@ -780,7 +780,8 @@ func AgentNamespace(klusterlet *operatorapiv1.Klusterlet) string {
 	return KlusterletNamespace(klusterlet)
 }
 
-// SyncSecret forked from https://github.com/openshift/library-go/blob/d9cdfbd844ea08465b938c46a16bed2ea23207e4/pkg/operator/resource/resourceapply/core.go#L357,
+// SyncSecret forked from:
+// https://github.com/openshift/library-go/blob/d9cdfbd844ea08465b938c46a16bed2ea23207e4/pkg/operator/resource/resourceapply/core.go#L357,
 // add an addition targetClient parameter to support sync secret to another cluster.
 func SyncSecret(ctx context.Context, client, targetClient coreclientv1.SecretsGetter, recorder events.Recorder,
 	sourceNamespace, sourceName, targetNamespace, targetName string, ownerRefs []metav1.OwnerReference) (*corev1.Secret, bool, error) {
@@ -864,7 +865,7 @@ func BuildFeatureCondition(invalidMsgs ...string) metav1.Condition {
 			Type:    FeatureGatesTypeValid,
 			Status:  metav1.ConditionTrue,
 			Reason:  FeatureGatesReasonAllValid,
-			Message: fmt.Sprintf("Feature gates are all valid"),
+			Message: "Feature gates are all valid",
 		}
 	}
 
@@ -877,7 +878,8 @@ func BuildFeatureCondition(invalidMsgs ...string) metav1.Condition {
 	}
 }
 
-func ConvertToFeatureGateFlags(component string, features []operatorapiv1.FeatureGate, defaultFeatureGates map[featuregate.Feature]featuregate.FeatureSpec) ([]string, string) {
+func ConvertToFeatureGateFlags(component string, features []operatorapiv1.FeatureGate,
+	defaultFeatureGates map[featuregate.Feature]featuregate.FeatureSpec) ([]string, string) {
 	var flags, invalidFeatures []string
 
 	for _, feature := range features {
@@ -904,7 +906,8 @@ func ConvertToFeatureGateFlags(component string, features []operatorapiv1.Featur
 
 // FeatureGateEnabled checks if a feature is enabled or disabled in operator API, or fallback to use the
 // the default setting
-func FeatureGateEnabled(features []operatorapiv1.FeatureGate, defaultFeatures map[featuregate.Feature]featuregate.FeatureSpec, featureName featuregate.Feature) bool {
+func FeatureGateEnabled(features []operatorapiv1.FeatureGate,
+	defaultFeatures map[featuregate.Feature]featuregate.FeatureSpec, featureName featuregate.Feature) bool {
 	for _, feature := range features {
 		if feature.Feature == string(featureName) {
 			return feature.Mode == operatorapiv1.FeatureGateModeTypeEnable

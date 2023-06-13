@@ -25,17 +25,17 @@ func NewClusterInformerFactory(clusterClient clusterclient.Interface, objects ..
 	for _, obj := range objects {
 		switch obj.(type) {
 		case *clusterapiv1.ManagedCluster:
-			clusterStore.Add(obj)
+			_ = clusterStore.Add(obj)
 		case *clusterapiv1beta2.ManagedClusterSet:
-			clusterSetStore.Add(obj)
+			_ = clusterSetStore.Add(obj)
 		case *clusterapiv1beta2.ManagedClusterSetBinding:
-			clusterSetBindingStore.Add(obj)
+			_ = clusterSetBindingStore.Add(obj)
 		case *clusterapiv1beta1.Placement:
-			placementStore.Add(obj)
+			_ = placementStore.Add(obj)
 		case *clusterapiv1beta1.PlacementDecision:
-			placementDecisionStore.Add(obj)
+			_ = placementDecisionStore.Add(obj)
 		case *clusterapiv1alpha1.AddOnPlacementScore:
-			addOnPlacementStore.Add(obj)
+			_ = addOnPlacementStore.Add(obj)
 		}
 	}
 

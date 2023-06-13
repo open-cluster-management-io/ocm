@@ -14,7 +14,8 @@ type addFinalizerReconciler struct {
 	workClient workclientset.Interface
 }
 
-func (a *addFinalizerReconciler) reconcile(ctx context.Context, pw *workapiv1alpha1.ManifestWorkReplicaSet) (*workapiv1alpha1.ManifestWorkReplicaSet, reconcileState, error) {
+func (a *addFinalizerReconciler) reconcile(ctx context.Context, pw *workapiv1alpha1.ManifestWorkReplicaSet,
+) (*workapiv1alpha1.ManifestWorkReplicaSet, reconcileState, error) {
 	// Do not need to add finalizer if it is in delete state already.
 	if !pw.DeletionTimestamp.IsZero() {
 		return pw, reconcileStop, nil

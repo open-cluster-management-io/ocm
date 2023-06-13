@@ -35,7 +35,8 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 	}
 
 	// kubeInformer is for 3 usages: configmapInformer, secretInformer, deploynmentInformer
-	// After we introduced hosted mode, the hub components could be installed in a customized namespace.(Before that, it only inform from "open-cluster-management-hub" namespace)
+	// After we introduced hosted mode, the hub components could be installed in a customized
+	// namespace.(Before that, it only inform from "open-cluster-management-hub" namespace)
 	// It requires us to add filter for each Informer respectively.
 	// TODO: Watch all namespace may cause performance issue.
 	kubeInformer := informers.NewSharedInformerFactoryWithOptions(kubeClient, 5*time.Minute)

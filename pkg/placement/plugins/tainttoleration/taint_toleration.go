@@ -20,7 +20,7 @@ import (
 )
 
 var _ plugins.Filter = &TaintToleration{}
-var TolerationClock = (clock.Clock)(clock.RealClock{})
+var TolerationClock = clock.Clock(clock.RealClock{})
 
 const (
 	placementLabel = "cluster.open-cluster-management.io/placement"
@@ -45,7 +45,8 @@ func (pl *TaintToleration) Description() string {
 	return description
 }
 
-func (pl *TaintToleration) Filter(ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) (plugins.PluginFilterResult, *framework.Status) {
+func (pl *TaintToleration) Filter(ctx context.Context, placement *clusterapiv1beta1.Placement,
+	clusters []*clusterapiv1.ManagedCluster) (plugins.PluginFilterResult, *framework.Status) {
 	status := framework.NewStatus(pl.Name(), framework.Success, "")
 
 	if len(clusters) == 0 {
@@ -113,7 +114,8 @@ func (pl *TaintToleration) RequeueAfter(ctx context.Context, placement *clustera
 }
 
 // isClusterTolerated returns true if a cluster is tolerated by the given toleration array
-func isClusterTolerated(cluster *clusterapiv1.ManagedCluster, tolerations []clusterapiv1beta1.Toleration, inDecision bool) (bool, *plugins.PluginRequeueResult, string) {
+func isClusterTolerated(cluster *clusterapiv1.ManagedCluster, tolerations []clusterapiv1beta1.Toleration,
+	inDecision bool) (bool, *plugins.PluginRequeueResult, string) {
 	var minRequeue *plugins.PluginRequeueResult
 	for _, taint := range cluster.Spec.Taints {
 		tolerated, requeue, message := isTaintTolerated(taint, tolerations, inDecision)

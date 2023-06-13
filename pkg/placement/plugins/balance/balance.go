@@ -42,7 +42,8 @@ func (b *Balance) Description() string {
 	return description
 }
 
-func (b *Balance) Score(ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) (plugins.PluginScoreResult, *framework.Status) {
+func (b *Balance) Score(ctx context.Context, placement *clusterapiv1beta1.Placement,
+	clusters []*clusterapiv1.ManagedCluster) (plugins.PluginScoreResult, *framework.Status) {
 	scores := map[string]int64{}
 	for _, cluster := range clusters {
 		scores[cluster.Name] = plugins.MaxClusterScore
@@ -76,7 +77,7 @@ func (b *Balance) Score(ctx context.Context, placement *clusterapiv1beta1.Placem
 		if count, ok := decisionCount[clusterName]; ok {
 			usage := float64(count) / float64(maxCount)
 
-			// Negate the usage and substracted by 0.5, then we double it and muliply by maxCount,
+			// Negate the usage and subtracted by 0.5, then we double it and muliply by maxCount,
 			// which normalize the score to value between 100 and -100
 			scores[clusterName] = 2 * int64(float64(plugins.MaxClusterScore)*(0.5-usage))
 		}

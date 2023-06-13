@@ -44,7 +44,8 @@ type webhookReconcile struct {
 	recorder events.Recorder
 }
 
-func (c *webhookReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager, config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
+func (c *webhookReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager,
+	config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
 	var appliedErrs []error
 
 	if !meta.IsStatusConditionFalse(cm.Status.Conditions, clusterManagerProgressing) {
@@ -91,7 +92,8 @@ func (c *webhookReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 	return cm, reconcileContinue, nil
 }
 
-func (c *webhookReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterManager, config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
+func (c *webhookReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterManager,
+	config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
 	// Remove All webhook files
 	webhookResources := hubRegistrationWebhookResourceFiles
 	webhookResources = append(webhookResources, hubWorkWebhookResourceFiles...)

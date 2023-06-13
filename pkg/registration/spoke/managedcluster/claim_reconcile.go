@@ -81,7 +81,8 @@ func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.Ma
 	// truncate custom claims if the number exceeds `max-custom-cluster-claims`
 	if n := len(customClaims); n > r.maxCustomClusterClaims {
 		customClaims = customClaims[:r.maxCustomClusterClaims]
-		r.recorder.Eventf("CustomClusterClaimsTruncated", "%d cluster claims are found. It exceeds the max number of custom cluster claims (%d). %d custom cluster claims are not exposed.",
+		r.recorder.Eventf("CustomClusterClaimsTruncated",
+			"%d cluster claims are found. It exceeds the max number of custom cluster claims (%d). %d custom cluster claims are not exposed.",
 			n, r.maxCustomClusterClaims, n-r.maxCustomClusterClaims)
 	}
 

@@ -28,7 +28,8 @@ type deployReconciler struct {
 	placementLister     clusterlister.PlacementLister
 }
 
-func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha1.ManifestWorkReplicaSet) (*workapiv1alpha1.ManifestWorkReplicaSet, reconcileState, error) {
+func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha1.ManifestWorkReplicaSet,
+) (*workapiv1alpha1.ManifestWorkReplicaSet, reconcileState, error) {
 	// Manifestwork create/update/delete logic.
 	var placements []*clusterv1beta1.Placement
 	for _, placementRef := range mwrSet.Spec.PlacementRefs {

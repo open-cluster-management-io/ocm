@@ -110,7 +110,8 @@ func (r *ManagedClusterWebhook) processTaints(managedCluster, oldManagedCluster 
 	return apierrors.NewBadRequest(fmt.Sprintf("It is not allowed to set TimeAdded of Taint %q.", strings.Join(invalidTaints, ",")))
 }
 
-// addDefaultClusterSetLabel add label "cluster.open-cluster-management.io/clusterset:default" for ManagedCluster if the managedCluster has no ManagedClusterSet label
+// addDefaultClusterSetLabel add label "cluster.open-cluster-management.io/clusterset:default" for
+// ManagedCluster if the managedCluster has no ManagedClusterSet label
 func (a *ManagedClusterWebhook) addDefaultClusterSetLabel(managedCluster *clusterv1.ManagedCluster) {
 	if len(managedCluster.Labels) == 0 {
 		managedCluster.Labels = map[string]string{

@@ -91,6 +91,8 @@ func (c *csrApprovingController[T]) sync(ctx context.Context, syncCtx factory.Sy
 	return nil
 }
 
+var _ CSRApprover[*certificatesv1.CertificateSigningRequest] = &CSRV1Approver{}
+
 // CSRV1Approver implement CSRApprover interface
 type CSRV1Approver struct {
 	kubeClient kubernetes.Interface
@@ -100,11 +102,11 @@ func NewCSRV1Approver(client kubernetes.Interface) *CSRV1Approver {
 	return &CSRV1Approver{kubeClient: client}
 }
 
-func (c *CSRV1Approver) isInTerminalState(csr *certificatesv1.CertificateSigningRequest) bool {
+func (c *CSRV1Approver) isInTerminalState(csr *certificatesv1.CertificateSigningRequest) bool { //nolint:unused
 	return helpers.IsCSRInTerminalState(&csr.Status)
 }
 
-func (c *CSRV1Approver) approve(ctx context.Context, csr *certificatesv1.CertificateSigningRequest) approveCSRFunc {
+func (c *CSRV1Approver) approve(ctx context.Context, csr *certificatesv1.CertificateSigningRequest) approveCSRFunc { //nolint:unused
 	return func(kubeClient kubernetes.Interface) error {
 		csrCopy := csr.DeepCopy()
 		// Auto approve the spoke cluster csr
@@ -119,6 +121,8 @@ func (c *CSRV1Approver) approve(ctx context.Context, csr *certificatesv1.Certifi
 	}
 }
 
+var _ CSRApprover[*certificatesv1beta1.CertificateSigningRequest] = &CSRV1beta1Approver{}
+
 type CSRV1beta1Approver struct {
 	kubeClient kubernetes.Interface
 }
@@ -127,11 +131,11 @@ func NewCSRV1beta1Approver(client kubernetes.Interface) *CSRV1beta1Approver {
 	return &CSRV1beta1Approver{kubeClient: client}
 }
 
-func (c *CSRV1beta1Approver) isInTerminalState(csr *certificatesv1beta1.CertificateSigningRequest) bool {
+func (c *CSRV1beta1Approver) isInTerminalState(csr *certificatesv1beta1.CertificateSigningRequest) bool { //nolint:unused
 	return helpers.Isv1beta1CSRInTerminalState(&csr.Status)
 }
 
-func (c *CSRV1beta1Approver) approve(ctx context.Context, csr *certificatesv1beta1.CertificateSigningRequest) approveCSRFunc {
+func (c *CSRV1beta1Approver) approve(ctx context.Context, csr *certificatesv1beta1.CertificateSigningRequest) approveCSRFunc { //nolint:unused
 	return func(kubeClient kubernetes.Interface) error {
 		csrCopy := csr.DeepCopy()
 		// Auto approve the spoke cluster csr

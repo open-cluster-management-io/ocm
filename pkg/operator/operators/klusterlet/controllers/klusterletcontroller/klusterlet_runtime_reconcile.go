@@ -31,13 +31,18 @@ type runtimeReconcile struct {
 	cache                 resourceapply.ResourceCache
 }
 
-func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
+	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
 	if config.InstallMode == operatorapiv1.InstallModeHosted {
 		// Create managed config secret for registration and work.
-		if err := r.createManagedClusterKubeconfig(ctx, klusterlet, config.KlusterletNamespace, config.AgentNamespace, registrationServiceAccountName(klusterlet.Name), config.ExternalManagedKubeConfigRegistrationSecret, r.recorder); err != nil {
+		if err := r.createManagedClusterKubeconfig(ctx, klusterlet, config.KlusterletNamespace, config.AgentNamespace,
+			registrationServiceAccountName(klusterlet.Name), config.ExternalManagedKubeConfigRegistrationSecret,
+			r.recorder); err != nil {
 			return klusterlet, reconcileStop, err
 		}
-		if err := r.createManagedClusterKubeconfig(ctx, klusterlet, config.KlusterletNamespace, config.AgentNamespace, workServiceAccountName(klusterlet.Name), config.ExternalManagedKubeConfigWorkSecret, r.recorder); err != nil {
+		if err := r.createManagedClusterKubeconfig(ctx, klusterlet, config.KlusterletNamespace, config.AgentNamespace,
+			workServiceAccountName(klusterlet.Name), config.ExternalManagedKubeConfigWorkSecret,
+			r.recorder); err != nil {
 			return klusterlet, reconcileStop, err
 		}
 	}
@@ -86,7 +91,8 @@ func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 	hubConnectionDegradedCondition := meta.FindStatusCondition(klusterlet.Status.Conditions, hubConnectionDegraded)
 	if hubConnectionDegradedCondition == nil {
 		workConfig.Replica = 0
-	} else if hubConnectionDegradedCondition.Status == metav1.ConditionTrue && strings.Contains(hubConnectionDegradedCondition.Reason, hubKubeConfigSecretMissing) {
+	} else if hubConnectionDegradedCondition.Status == metav1.ConditionTrue &&
+		strings.Contains(hubConnectionDegradedCondition.Reason, hubKubeConfigSecretMissing) {
 		workConfig.Replica = 0
 	}
 
@@ -126,7 +132,8 @@ func (r *runtimeReconcile) createManagedClusterKubeconfig(
 	klusterletNamespace, agentNamespace, saName, secretName string,
 	recorder events.Recorder) error {
 	tokenGetter := helpers.SATokenGetter(ctx, saName, klusterletNamespace, r.managedClusterClients.kubeClient)
-	err := helpers.SyncKubeConfigSecret(ctx, secretName, agentNamespace, "/spoke/config/kubeconfig", r.managedClusterClients.kubeconfig, r.kubeClient.CoreV1(), tokenGetter, recorder)
+	err := helpers.SyncKubeConfigSecret(ctx, secretName, agentNamespace, "/spoke/config/kubeconfig",
+		r.managedClusterClients.kubeconfig, r.kubeClient.CoreV1(), tokenGetter, recorder)
 	if err != nil {
 		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
 			Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
@@ -157,7 +164,8 @@ func (r *runtimeReconcile) getClusterNameFromHubKubeConfigSecret(ctx context.Con
 	return string(clusterName), nil
 }
 
-func (r *runtimeReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+func (r *runtimeReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
+	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
 	deployments := []string{
 		fmt.Sprintf("%s-registration-agent", config.KlusterletName),
 		fmt.Sprintf("%s-work-agent", config.KlusterletName),

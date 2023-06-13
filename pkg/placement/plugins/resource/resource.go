@@ -79,7 +79,8 @@ func (r *ResourcePrioritizer) Description() string {
 	return description
 }
 
-func (r *ResourcePrioritizer) Score(ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) (plugins.PluginScoreResult, *framework.Status) {
+func (r *ResourcePrioritizer) Score(ctx context.Context, placement *clusterapiv1beta1.Placement,
+	clusters []*clusterapiv1.ManagedCluster) (plugins.PluginScoreResult, *framework.Status) {
 	status := framework.NewStatus(r.Name(), framework.Success, "")
 	if r.algorithm == "Allocatable" {
 		return mostResourceAllocatableScores(r.resource, clusters), status
@@ -114,7 +115,7 @@ func mostResourceAllocatableScores(resourceName clusterapiv1.ResourceName, clust
 
 		// score = ((resource_x_allocatable - min(resource_x_allocatable)) / (max(resource_x_allocatable) - min(resource_x_allocatable)) - 0.5) * 2 * 100
 		if (maxAllocatable - minAllocatable) != 0 {
-			ratio := float64(allocatable-minAllocatable) / float64(maxAllocatable-minAllocatable)
+			ratio := (allocatable - minAllocatable) / (maxAllocatable - minAllocatable)
 			scores[cluster.Name] = int64((ratio - 0.5) * 2.0 * 100.0)
 		} else {
 			scores[cluster.Name] = 100.0
@@ -144,7 +145,8 @@ func getClusterResource(cluster *clusterapiv1.ManagedCluster, resourceName clust
 }
 
 // Go through all the cluster resources and return the min and max allocatable value of the resourceName.
-func getClustersMinMaxAllocatableResource(clusters []*clusterapiv1.ManagedCluster, resourceName clusterapiv1.ResourceName) (minAllocatable, maxAllocatable float64, err error) {
+func getClustersMinMaxAllocatableResource(clusters []*clusterapiv1.ManagedCluster,
+	resourceName clusterapiv1.ResourceName) (minAllocatable, maxAllocatable float64, err error) {
 	allocatable := sort.Float64Slice{}
 
 	// get allocatable resources

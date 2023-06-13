@@ -29,7 +29,7 @@ import (
 
 const (
 	// If a controller queue size is too large (>500), the processing speed of the controller will drop significantly
-	// with one worker, increasing the work numbers can imporve the processing speed.
+	// with one worker, increasing the work numbers can improve the processing speed.
 	// We compared the two situations where the worker is set to 1 and 10, when the worker is 10, the resource
 	// utilization of the kubeapi-server and work agent do not increase significantly.
 	//
@@ -66,7 +66,8 @@ func (o *WorkloadAgentOptions) AddFlags(cmd *cobra.Command) {
 	flags.StringVar(&o.HubKubeconfigFile, "hub-kubeconfig", o.HubKubeconfigFile, "Location of kubeconfig file to connect to hub cluster.")
 	flags.StringVar(&o.AgentID, "agent-id", o.AgentID, "ID of the work agent to identify the work this agent should handle after restart/recovery.")
 	flags.DurationVar(&o.StatusSyncInterval, "status-sync-interval", o.StatusSyncInterval, "Interval to sync resource status to hub.")
-	flags.DurationVar(&o.AppliedManifestWorkEvictionGracePeriod, "appliedmanifestwork-eviction-grace-period", o.AppliedManifestWorkEvictionGracePeriod, "Grace period for appliedmanifestwork eviction")
+	flags.DurationVar(&o.AppliedManifestWorkEvictionGracePeriod, "appliedmanifestwork-eviction-grace-period",
+		o.AppliedManifestWorkEvictionGracePeriod, "Grace period for appliedmanifestwork eviction")
 }
 
 // RunWorkloadAgent starts the controllers on agent to process work from hub.
@@ -88,7 +89,8 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 		return err
 	}
 	// Only watch the cluster namespace on hub
-	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(hubWorkClient, 5*time.Minute, workinformers.WithNamespace(o.AgentOptions.SpokeClusterName))
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(hubWorkClient, 5*time.Minute,
+		workinformers.WithNamespace(o.AgentOptions.SpokeClusterName))
 
 	// load spoke client config and create spoke clients,
 	// the work agent may not running in the spoke/managed cluster.
