@@ -122,7 +122,7 @@ func (t *TestAuthn) Start() error {
 	if err := pem.Encode(&caCertBuffer, &pem.Block{Type: certutil.CertificateBlockType, Bytes: caDERBytes}); err != nil {
 		return err
 	}
-	if err := os.WriteFile(t.caFile, caCertBuffer.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(t.caFile, caCertBuffer.Bytes(), 0600); err != nil {
 		return err
 	}
 
@@ -131,7 +131,7 @@ func (t *TestAuthn) Start() error {
 		&caKeyBuffer, &pem.Block{Type: keyutil.RSAPrivateKeyBlockType, Bytes: x509.MarshalPKCS1PrivateKey(caKey)}); err != nil {
 		return err
 	}
-	if err := os.WriteFile(t.caKeyFile, caKeyBuffer.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(t.caKeyFile, caKeyBuffer.Bytes(), 0600); err != nil {
 		return err
 	}
 
@@ -181,10 +181,10 @@ func (t *TestAuthn) CreateBootstrapKubeConfig(configFileName, serverCertFile, se
 		}
 	}
 
-	if err := os.WriteFile(path.Join(configDir, "bootstrap.crt"), certData, 0644); err != nil {
+	if err := os.WriteFile(path.Join(configDir, "bootstrap.crt"), certData, 0600); err != nil {
 		return err
 	}
-	if err := os.WriteFile(path.Join(configDir, "bootstrap.key"), keyData, 0644); err != nil {
+	if err := os.WriteFile(path.Join(configDir, "bootstrap.key"), keyData, 0600); err != nil {
 		return err
 	}
 
@@ -337,6 +337,7 @@ func FindAddOnCSRs(kubeClient kubernetes.Interface, spokeClusterName, addOnName 
 
 	csrs := []*certificates.CertificateSigningRequest{}
 	for _, csr := range csrList.Items {
+		csr := csr
 		csrs = append(csrs, &csr)
 	}
 
