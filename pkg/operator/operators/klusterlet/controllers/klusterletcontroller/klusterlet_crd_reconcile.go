@@ -43,7 +43,8 @@ type crdReconcile struct {
 	cache                 resourceapply.ResourceCache
 }
 
-func (r *crdReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+func (r *crdReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
+	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
 	var applyErr error
 
 	if cnt, err := r.kubeVersion.Compare("v1.16.0"); err == nil && cnt < 0 {
@@ -96,7 +97,8 @@ func (r *crdReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.
 // no longer remove the CRDs (AppliedManifestWork & ClusterClaim), because they might be shared
 // by multiple klusterlets. Consequently, the CRs of those CRDs will not be deleted as well when deleting a klusterlet.
 // Only clean the version label on crds, so another klusterlet can update crds later.
-func (r *crdReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+func (r *crdReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
+	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
 	var deleteErr error
 	if cnt, err := r.kubeVersion.Compare("v1.16.0"); err == nil && cnt < 0 {
 		crdManager := crdmanager.NewManager[*apiextensionsv1beta1.CustomResourceDefinition](

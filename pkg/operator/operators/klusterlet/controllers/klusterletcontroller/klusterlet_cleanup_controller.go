@@ -137,7 +137,7 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 			withKubeConfigSecret(config.AgentNamespace, config.ExternalManagedKubeConfigSecret).
 			build(ctx)
 		// stop when hosted kubeconfig is not found. the klustelet controller will monitor the secret and retrigger
-		// reconcilation of cleanup controller when secret is created again.
+		// reconciliation of cleanup controller when secret is created again.
 		if errors.IsNotFound(err) {
 			return nil
 		}

@@ -21,7 +21,8 @@ type finalizeReconciler struct {
 	manifestWorkLister worklisterv1.ManifestWorkLister
 }
 
-func (f *finalizeReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha1.ManifestWorkReplicaSet) (*workapiv1alpha1.ManifestWorkReplicaSet, reconcileState, error) {
+func (f *finalizeReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha1.ManifestWorkReplicaSet,
+) (*workapiv1alpha1.ManifestWorkReplicaSet, reconcileState, error) {
 	if mwrSet.DeletionTimestamp.IsZero() {
 		return mwrSet, reconcileContinue, nil
 	}

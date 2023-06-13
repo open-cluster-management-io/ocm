@@ -34,9 +34,7 @@ func CreateTestPlacement(name string, ns string, clusters ...string) (*clusterv1
 	namereq := metav1.LabelSelectorRequirement{}
 	namereq.Key = "name"
 	namereq.Operator = metav1.LabelSelectorOpIn
-	for _, cls := range clusters {
-		namereq.Values = append(namereq.Values, cls)
-	}
+	namereq.Values = append(namereq.Values, clusters...)
 
 	labelSelector := &metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{namereq},

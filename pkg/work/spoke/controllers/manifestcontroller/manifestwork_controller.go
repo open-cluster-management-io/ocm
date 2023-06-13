@@ -282,7 +282,7 @@ func (m *ManifestWorkController) applyManifests(
 			// Apply if there is no result.
 			existingResults[index] = m.applyOneManifest(ctx, index, manifest, workSpec, recorder, owner)
 		case apierrors.IsConflict(existingResults[index].Error):
-			// Apply if there is a resource confilct error.
+			// Apply if there is a resource conflict error.
 			existingResults[index] = m.applyOneManifest(ctx, index, manifest, workSpec, recorder, owner)
 		}
 	}
@@ -364,10 +364,12 @@ func manageOwnerRef(
 // Rules to generate work status conditions from manifest conditions
 // #1: Applied - work status condition (with type Applied) is applied if all manifest conditions (with type Applied) are applied
 // TODO: add rules for other condition types, like Progressing, Available, Degraded
-func (m *ManifestWorkController) generateUpdateStatusFunc(generation int64, newManifestConditions []workapiv1.ManifestCondition) helper.UpdateManifestWorkStatusFunc {
+func (m *ManifestWorkController) generateUpdateStatusFunc(generation int64,
+	newManifestConditions []workapiv1.ManifestCondition) helper.UpdateManifestWorkStatusFunc {
 	return func(oldStatus *workapiv1.ManifestWorkStatus) error {
 		// merge the new manifest conditions with the existing manifest conditions
-		oldStatus.ResourceStatus.Manifests = helper.MergeManifestConditions(oldStatus.ResourceStatus.Manifests, newManifestConditions)
+		oldStatus.ResourceStatus.Manifests = helper.MergeManifestConditions(
+			oldStatus.ResourceStatus.Manifests, newManifestConditions)
 
 		// aggregate manifest condition to generate work condition
 		newConditions := []metav1.Condition{}

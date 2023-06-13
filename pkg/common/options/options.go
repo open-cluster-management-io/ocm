@@ -31,7 +31,7 @@ func (o *AgentOptions) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.SpokeKubeconfigFile, "spoke-kubeconfig", o.SpokeKubeconfigFile,
 		"Location of kubeconfig file to connect to spoke cluster. If this is not set, will use '--kubeconfig' to build client to connect to the managed cluster.")
 	flags.StringVar(&o.SpokeClusterName, "spoke-cluster-name", o.SpokeClusterName, "Name of the spoke cluster.")
-	flags.MarkDeprecated("cluster-name", "use spoke-cluster-name flag")
+	_ = flags.MarkDeprecated("cluster-name", "use spoke-cluster-name flag")
 	flags.StringVar(&o.SpokeClusterName, "cluster-name", o.SpokeClusterName,
 		"Name of the spoke cluster.")
 	flags.Float32Var(&o.QPS, "spoke-kube-api-qps", o.QPS, "QPS to use while talking with apiserver on spoke cluster.")

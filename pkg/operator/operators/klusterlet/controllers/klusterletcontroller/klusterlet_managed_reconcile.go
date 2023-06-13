@@ -55,7 +55,8 @@ type managedReconcile struct {
 	cache                 resourceapply.ResourceCache
 }
 
-func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
+	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
 	// For now, whether in Default or Hosted mode, the addons will be deployed on the managed cluster.
 	// sync image pull secret from management cluster to managed cluster for addon namespace
 	// TODO(zhujian7): In the future, we may consider deploy addons on the management cluster in Hosted mode.
@@ -68,7 +69,8 @@ func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 	// Sync pull secret to the klusterlet addon namespace
 	// The reason we keep syncing secret instead of adding a label to trigger addonsecretcontroller to sync is:
 	// addonsecretcontroller only watch namespaces in the same cluster klusterlet is running on.
-	// And if addons are deployed in default mode on the managed cluster, but klusterlet is deployed in hosted on management cluster, then we still need to sync the secret here in klusterlet-controller using `managedClusterClients.kubeClient`.
+	// And if addons are deployed in default mode on the managed cluster, but klusterlet is deployed in hosted
+	// on management cluster, then we still need to sync the secret here in klusterlet-controller using `managedClusterClients.kubeClient`.
 	err = syncPullSecret(ctx, r.kubeClient, r.managedClusterClients.kubeClient, klusterlet, r.opratorNamespace, addonNamespace, r.recorder)
 	if err != nil {
 		return klusterlet, reconcileStop, err
@@ -127,7 +129,8 @@ func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 	return klusterlet, reconcileContinue, nil
 }
 
-func (r *managedReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+func (r *managedReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
+	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
 	// nothing should be done when deploy mode is hosted and hosted finalizer is not added.
 	if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeHosted && !hasFinalizer(klusterlet, klusterletHostedFinalizer) {
 		return klusterlet, reconcileContinue, nil

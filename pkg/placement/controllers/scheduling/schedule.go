@@ -100,7 +100,11 @@ type schedulerHandler struct {
 }
 
 func NewSchedulerHandler(
-	clusterClient clusterclient.Interface, placementDecisionLister clusterlisterv1beta1.PlacementDecisionLister, scoreLister clusterlisterv1alpha1.AddOnPlacementScoreLister, clusterLister clusterlisterv1.ManagedClusterLister, recorder kevents.EventRecorder) plugins.Handle {
+	clusterClient clusterclient.Interface,
+	placementDecisionLister clusterlisterv1beta1.PlacementDecisionLister,
+	scoreLister clusterlisterv1alpha1.AddOnPlacementScoreLister,
+	clusterLister clusterlisterv1.ManagedClusterLister,
+	recorder kevents.EventRecorder) plugins.Handle {
 
 	return &schedulerHandler{
 		recorder:                recorder,
@@ -325,7 +329,8 @@ func setRequeueAfter(requeueAfter, newRequeueAfter *time.Duration) *time.Duratio
 // Get prioritizer weight for the placement.
 // In Additive and "" mode, will override defaultWeight with what placement has defined and return.
 // In Exact mode, will return the name and weight defined in placement.
-func getWeights(defaultWeight map[clusterapiv1beta1.ScoreCoordinate]int32, placement *clusterapiv1beta1.Placement) (map[clusterapiv1beta1.ScoreCoordinate]int32, *framework.Status) {
+func getWeights(defaultWeight map[clusterapiv1beta1.ScoreCoordinate]int32,
+	placement *clusterapiv1beta1.Placement) (map[clusterapiv1beta1.ScoreCoordinate]int32, *framework.Status) {
 	mode := placement.Spec.PrioritizerPolicy.Mode
 	switch {
 	case mode == clusterapiv1beta1.PrioritizerPolicyModeExact:
@@ -338,7 +343,9 @@ func getWeights(defaultWeight map[clusterapiv1beta1.ScoreCoordinate]int32, place
 	}
 }
 
-func mergeWeights(defaultWeight map[clusterapiv1beta1.ScoreCoordinate]int32, customizedWeight []clusterapiv1beta1.PrioritizerConfig) (map[clusterapiv1beta1.ScoreCoordinate]int32, *framework.Status) {
+func mergeWeights(defaultWeight map[clusterapiv1beta1.ScoreCoordinate]int32,
+	customizedWeight []clusterapiv1beta1.PrioritizerConfig,
+) (map[clusterapiv1beta1.ScoreCoordinate]int32, *framework.Status) {
 	weights := make(map[clusterapiv1beta1.ScoreCoordinate]int32)
 	status := framework.NewStatus("", framework.Success, "")
 	// copy the default weight
@@ -358,7 +365,8 @@ func mergeWeights(defaultWeight map[clusterapiv1beta1.ScoreCoordinate]int32, cus
 }
 
 // Generate prioritizers for the placement.
-func getPrioritizers(weights map[clusterapiv1beta1.ScoreCoordinate]int32, handle plugins.Handle) (map[clusterapiv1beta1.ScoreCoordinate]plugins.Prioritizer, *framework.Status) {
+func getPrioritizers(weights map[clusterapiv1beta1.ScoreCoordinate]int32, handle plugins.Handle,
+) (map[clusterapiv1beta1.ScoreCoordinate]plugins.Prioritizer, *framework.Status) {
 	result := make(map[clusterapiv1beta1.ScoreCoordinate]plugins.Prioritizer)
 	status := framework.NewStatus("", framework.Success, "")
 	for k, v := range weights {

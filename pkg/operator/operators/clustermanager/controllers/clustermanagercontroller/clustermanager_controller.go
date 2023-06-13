@@ -53,9 +53,11 @@ type clusterManagerController struct {
 	recorder             events.Recorder
 	cache                resourceapply.ResourceCache
 	// For testcases which don't need these functions, we could set fake funcs
-	ensureSAKubeconfigs       func(ctx context.Context, clusterManagerName, clusterManagerNamespace string, hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error
-	generateHubClusterClients func(hubConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, migrationclient.StorageVersionMigrationsGetter, error)
-	skipRemoveCRDs            bool
+	ensureSAKubeconfigs func(ctx context.Context, clusterManagerName, clusterManagerNamespace string,
+		hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error
+	generateHubClusterClients func(hubConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface,
+		migrationclient.StorageVersionMigrationsGetter, error)
+	skipRemoveCRDs bool
 }
 
 type clusterManagerReconcile interface {
@@ -156,7 +158,8 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		registrationFeatureGates = clusterManager.Spec.RegistrationConfiguration.FeatureGates
 		config.AutoApproveUsers = strings.Join(clusterManager.Spec.RegistrationConfiguration.AutoApproveUsers, ",")
 	}
-	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration", registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates)
+	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration",
+		registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates)
 
 	workFeatureGates := []operatorapiv1.FeatureGate{}
 	if clusterManager.Spec.WorkConfiguration != nil {
@@ -212,9 +215,11 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 
 	var errs []error
 	reconcilers := []clusterManagerReconcile{
-		&crdReconcile{cache: n.cache, recorder: n.recorder, hubAPIExtensionClient: hubApiExtensionClient, hubMigrationClient: hubMigrationClient, skipRemoveCRDs: n.skipRemoveCRDs},
+		&crdReconcile{cache: n.cache, recorder: n.recorder, hubAPIExtensionClient: hubApiExtensionClient,
+			hubMigrationClient: hubMigrationClient, skipRemoveCRDs: n.skipRemoveCRDs},
 		&hubReoncile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient},
-		&runtimeReconcile{cache: n.cache, recorder: n.recorder, hubKubeConfig: hubKubeConfig, hubKubeClient: hubClient, kubeClient: managementClient, ensureSAKubeconfigs: n.ensureSAKubeconfigs},
+		&runtimeReconcile{cache: n.cache, recorder: n.recorder, hubKubeConfig: hubKubeConfig, hubKubeClient: hubClient,
+			kubeClient: managementClient, ensureSAKubeconfigs: n.ensureSAKubeconfigs},
 		&webhookReconcile{cache: n.cache, recorder: n.recorder, hubKubeClient: hubClient, kubeClient: managementClient},
 	}
 
@@ -314,7 +319,8 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	return utilerrors.NewAggregate(errs)
 }
 
-func removeClusterManagerFinalizer(ctx context.Context, clusterManagerClient operatorv1client.ClusterManagerInterface, deploy *operatorapiv1.ClusterManager) error {
+func removeClusterManagerFinalizer(ctx context.Context,
+	clusterManagerClient operatorv1client.ClusterManagerInterface, deploy *operatorapiv1.ClusterManager) error {
 	copiedFinalizers := []string{}
 	for i := range deploy.Finalizers {
 		if deploy.Finalizers[i] == clusterManagerFinalizer {
@@ -332,7 +338,8 @@ func removeClusterManagerFinalizer(ctx context.Context, clusterManagerClient ope
 	return nil
 }
 
-func generateHubClients(hubKubeConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, migrationclient.StorageVersionMigrationsGetter, error) {
+func generateHubClients(hubKubeConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface,
+	migrationclient.StorageVersionMigrationsGetter, error) {
 	hubClient, err := kubernetes.NewForConfig(hubKubeConfig)
 	if err != nil {
 		return nil, nil, nil, err
@@ -389,7 +396,8 @@ func convertWebhookConfiguration(webhookConfiguration operatorapiv1.WebhookConfi
 }
 
 // clean specified resources
-func cleanResources(ctx context.Context, kubeClient kubernetes.Interface, cm *operatorapiv1.ClusterManager, config manifests.HubConfig, resources ...string) (*operatorapiv1.ClusterManager, reconcileState, error) {
+func cleanResources(ctx context.Context, kubeClient kubernetes.Interface, cm *operatorapiv1.ClusterManager,
+	config manifests.HubConfig, resources ...string) (*operatorapiv1.ClusterManager, reconcileState, error) {
 	for _, file := range resources {
 		err := helpers.CleanUpStaticObject(
 			ctx,

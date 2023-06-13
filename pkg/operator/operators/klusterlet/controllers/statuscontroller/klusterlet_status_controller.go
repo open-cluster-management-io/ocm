@@ -87,7 +87,8 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 	)
 	availableCondition.ObservedGeneration = klusterlet.Generation
 
-	registrationDesiredCondition := checkAgentDeploymentDesired(ctx, k.kubeClient, agentNamespace, registrationDeploymentName, klusterletRegistrationDesiredDegraded)
+	registrationDesiredCondition := checkAgentDeploymentDesired(ctx,
+		k.kubeClient, agentNamespace, registrationDeploymentName, klusterletRegistrationDesiredDegraded)
 	registrationDesiredCondition.ObservedGeneration = klusterlet.Generation
 
 	workDesiredCondition := checkAgentDeploymentDesired(ctx, k.kubeClient, agentNamespace, workDeploymentName, klusterletWorkDesiredDegraded)

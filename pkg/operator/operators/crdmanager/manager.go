@@ -259,7 +259,7 @@ func (m *Manager[T]) shouldUpdate(old, new T) (bool, error) {
 		existingVersion = accessor.GetAnnotations()[versionAnnotationKey]
 	}
 
-	// alwasy update if existing doest not have version annotation
+	// always update if existing doest not have version annotation
 	if len(existingVersion) == 0 {
 		return true, nil
 	}

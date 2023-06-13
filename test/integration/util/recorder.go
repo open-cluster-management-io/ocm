@@ -9,8 +9,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func NewIntegrationTestEventRecorder(componet string) events.Recorder {
-	return &IntegrationTestEventRecorder{component: componet}
+func NewIntegrationTestEventRecorder(component string) events.Recorder {
+	return &IntegrationTestEventRecorder{component: component}
 }
 
 type IntegrationTestEventRecorder struct {
@@ -58,12 +58,11 @@ func HasCondition(
 	expectedType, expectedReason string,
 	expectedStatus metav1.ConditionStatus,
 ) bool {
-	found := false
+
 	for _, condition := range conditions {
 		if condition.Type != expectedType {
 			continue
 		}
-		found = true
 
 		if condition.Status != expectedStatus {
 			return false
@@ -81,5 +80,5 @@ func HasCondition(
 		return true
 	}
 
-	return found
+	return false
 }

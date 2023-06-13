@@ -147,7 +147,8 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	}
 
 	// create a shared informer factory with specific namespace for the management cluster.
-	namespacedManagementKubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(managementKubeClient, 10*time.Minute, informers.WithNamespace(o.ComponentNamespace))
+	namespacedManagementKubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(
+		managementKubeClient, 10*time.Minute, informers.WithNamespace(o.ComponentNamespace))
 
 	// load bootstrap client config and create bootstrap clients
 	bootstrapClientConfig, err := clientcmd.BuildConfigFromFlags("", o.BootstrapKubeconfig)
@@ -197,7 +198,8 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		// create a ClientCertForHubController for spoke agent bootstrap
 		// the bootstrap informers are supposed to be terminated after completing the bootstrap process.
 		bootstrapInformerFactory := informers.NewSharedInformerFactory(bootstrapKubeClient, 10*time.Minute)
-		bootstrapNamespacedManagementKubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(managementKubeClient, 10*time.Minute, informers.WithNamespace(o.ComponentNamespace))
+		bootstrapNamespacedManagementKubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(
+			managementKubeClient, 10*time.Minute, informers.WithNamespace(o.ComponentNamespace))
 
 		// create a kubeconfig with references to the key/cert files in the same secret
 		kubeconfig := clientcert.BuildKubeconfig(bootstrapClientConfig, clientcert.TLSCertFile, clientcert.TLSKeyFile)
@@ -409,7 +411,8 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&o.MaxCustomClusterClaims, "max-custom-cluster-claims", o.MaxCustomClusterClaims,
 		"The max number of custom cluster claims to expose.")
 	fs.Int32Var(&o.ClientCertExpirationSeconds, "client-cert-expiration-seconds", o.ClientCertExpirationSeconds,
-		"The requested duration in seconds of validity of the issued client certificate. If this is not set, the value of --cluster-signing-duration command-line flag of the kube-controller-manager will be used.")
+		"The requested duration in seconds of validity of the issued client certificate. If this is not set, "+
+			"the value of --cluster-signing-duration command-line flag of the kube-controller-manager will be used.")
 }
 
 // Validate verifies the inputs.

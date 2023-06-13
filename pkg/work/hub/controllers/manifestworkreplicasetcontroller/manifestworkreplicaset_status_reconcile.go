@@ -15,7 +15,8 @@ type statusReconciler struct {
 	manifestWorkLister worklisterv1.ManifestWorkLister
 }
 
-func (d *statusReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha1.ManifestWorkReplicaSet) (*workapiv1alpha1.ManifestWorkReplicaSet, reconcileState, error) {
+func (d *statusReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha1.ManifestWorkReplicaSet,
+) (*workapiv1alpha1.ManifestWorkReplicaSet, reconcileState, error) {
 	// The logic for update manifestWorkReplicaSet status
 	if mwrSet.Status.Summary.Total == 0 {
 		condition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified)

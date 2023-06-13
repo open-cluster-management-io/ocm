@@ -32,7 +32,7 @@ func AssertFinalizers(t *testing.T, obj runtime.Object, finalizers []string) {
 }
 
 // AssertManagedClusterClientConfigs asserts the actual managed cluster client configs are the
-// same wiht the expected
+// same with the expected
 func AssertManagedClusterClientConfigs(t *testing.T, actual, expected []clusterv1.ClientConfig) {
 	if len(actual) == 0 && len(expected) == 0 {
 		return
@@ -43,7 +43,7 @@ func AssertManagedClusterClientConfigs(t *testing.T, actual, expected []clusterv
 }
 
 // AssertManagedClusterStatus sserts the actual managed cluster status is the same
-// wiht the expected
+// with the expected
 func AssertManagedClusterStatus(t *testing.T, actual, expected clusterv1.ManagedClusterStatus) {
 	if !reflect.DeepEqual(actual.Version, expected.Version) {
 		t.Errorf("expected version %#v but got: %#v", expected.Version, actual.Version)

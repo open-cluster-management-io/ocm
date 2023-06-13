@@ -94,11 +94,14 @@ func SATokenCreater(ctx context.Context, saName, saNamespace string, saClient ku
 	}
 }
 
-func SyncKubeConfigSecret(ctx context.Context, secretName, secretNamespace, kubeconfigPath string, templateKubeconfig *rest.Config, secretClient coreclientv1.SecretsGetter, tokenGetter TokenGetterFunc, recorder events.Recorder) error {
+func SyncKubeConfigSecret(ctx context.Context, secretName, secretNamespace, kubeconfigPath string,
+	templateKubeconfig *rest.Config, secretClient coreclientv1.SecretsGetter,
+	tokenGetter TokenGetterFunc, recorder events.Recorder) error {
 	secret, err := secretClient.Secrets(secretNamespace).Get(ctx, secretName, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
-		return applyKubeconfigSecret(ctx, templateKubeconfig, secretName, secretNamespace, kubeconfigPath, secretClient, tokenGetter, recorder)
+		return applyKubeconfigSecret(ctx, templateKubeconfig, secretName, secretNamespace,
+			kubeconfigPath, secretClient, tokenGetter, recorder)
 	case err != nil:
 		return err
 	}
@@ -162,7 +165,7 @@ func clusterInfoNotChanged(secret *corev1.Secret, templateKubeconfig *rest.Confi
 		klog.Infof("Cluster host changed from %s to %s", cluster.Server, templateCluster.Server)
 		return false
 	}
-	if bytes.Compare(cluster.CertificateAuthorityData, templateCluster.CertificateAuthorityData) != 0 {
+	if !bytes.Equal(cluster.CertificateAuthorityData, templateCluster.CertificateAuthorityData) {
 		klog.Infof("Cluster certificate authority data changed")
 		return false
 	}
@@ -176,7 +179,9 @@ func clusterInfoNotChanged(secret *corev1.Secret, templateKubeconfig *rest.Confi
 }
 
 // applyKubeconfigSecret would render saToken to a secret.
-func applyKubeconfigSecret(ctx context.Context, templateKubeconfig *rest.Config, secretName, secretNamespace, kubeconfigPath string, secretClient coreclientv1.SecretsGetter, tokenGetter TokenGetterFunc, recorder events.Recorder) error {
+func applyKubeconfigSecret(ctx context.Context, templateKubeconfig *rest.Config, secretName, secretNamespace,
+	kubeconfigPath string, secretClient coreclientv1.SecretsGetter, tokenGetter TokenGetterFunc,
+	recorder events.Recorder) error {
 
 	token, expiration, err := tokenGetter()
 	if err != nil {

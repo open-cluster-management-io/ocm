@@ -42,7 +42,8 @@ func (c CABundleRotation) EnsureConfigMapCABundle(ctx context.Context, signingCe
 	if _, err = manageCABundleConfigMap(caBundleConfigMap, signingCertKeyPair.Config.Certs[0]); err != nil {
 		return nil, err
 	}
-	if originalCABundleConfigMap == nil || originalCABundleConfigMap.Data == nil || !equality.Semantic.DeepEqual(originalCABundleConfigMap.Data, caBundleConfigMap.Data) {
+	if originalCABundleConfigMap == nil || originalCABundleConfigMap.Data == nil ||
+		!equality.Semantic.DeepEqual(originalCABundleConfigMap.Data, caBundleConfigMap.Data) {
 		c.EventRecorder.Eventf("CABundleUpdateRequired", "%q in %q requires update", c.Name, c.Namespace)
 		actualCABundleConfigMap, _, err := resourceapply.ApplyConfigMap(ctx, c.Client, c.EventRecorder, caBundleConfigMap)
 		if err != nil {

@@ -119,7 +119,8 @@ func (c *managedClusterCreatingController) sync(ctx context.Context, syncCtx fac
 	clusterCopy := existingCluster.DeepCopy()
 	clusterCopy.Spec.ManagedClusterClientConfigs = managedClusterClientConfigs
 	_, err = c.hubClusterClient.ClusterV1().ManagedClusters().Update(ctx, clusterCopy, metav1.UpdateOptions{})
-	// ManagedClusterClientConfigs in ManagedCluster is only allowed updated during bootstrap. After bootstrap secret expired, an unauthorized error will be got, skip it
+	// ManagedClusterClientConfigs in ManagedCluster is only allowed updated during bootstrap.
+	// After bootstrap secret expired, an unauthorized error will be got, skip it
 	if skipUnauthorizedError(err) != nil {
 		return fmt.Errorf("unable to update ManagedClusterClientConfigs of managed cluster %q in hub: %w", c.clusterName, err)
 	}

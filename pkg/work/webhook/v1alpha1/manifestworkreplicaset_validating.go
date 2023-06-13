@@ -54,7 +54,9 @@ func (r *ManifestWorkReplicaSetWebhook) ValidateDelete(_ context.Context, obj ru
 	return nil, nil
 }
 
-func (r *ManifestWorkReplicaSetWebhook) validateRequest(newmwrSet *workv1alpha1.ManifestWorkReplicaSet, oldmwrSet *workv1alpha1.ManifestWorkReplicaSet, ctx context.Context) error {
+func (r *ManifestWorkReplicaSetWebhook) validateRequest(
+	newmwrSet *workv1alpha1.ManifestWorkReplicaSet, oldmwrSet *workv1alpha1.ManifestWorkReplicaSet,
+	ctx context.Context) error {
 	if err := checkFeatureEnabled(); err != nil {
 		return err
 	}

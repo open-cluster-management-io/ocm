@@ -60,7 +60,8 @@ type crdReconcile struct {
 	recorder events.Recorder
 }
 
-func (c *crdReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager, config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
+func (c *crdReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager,
+	config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
 	crdManager := crdmanager.NewManager[*apiextensionsv1.CustomResourceDefinition](
 		c.hubAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions(),
 		crdmanager.EqualV1,
@@ -89,7 +90,8 @@ func (c *crdReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterM
 	return cm, reconcileContinue, nil
 }
 
-func (c *crdReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterManager, config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
+func (c *crdReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterManager,
+	config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
 	crdManager := crdmanager.NewManager[*apiextensionsv1.CustomResourceDefinition](
 		c.hubAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions(),
 		crdmanager.EqualV1,

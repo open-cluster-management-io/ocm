@@ -103,7 +103,9 @@ func AssertWorkGeneration(namespace, name string, workClient workclientset.Inter
 }
 
 // AssertWorkDeleted check if work is deleted
-func AssertWorkDeleted(namespace, name, hubhash string, manifests []workapiv1.Manifest, workClient workclientset.Interface, kubeClient kubernetes.Interface, eventuallyTimeout, eventuallyInterval int) {
+func AssertWorkDeleted(namespace, name, hubhash string, manifests []workapiv1.Manifest,
+	workClient workclientset.Interface, kubeClient kubernetes.Interface,
+	eventuallyTimeout, eventuallyInterval int) {
 	// wait for deletion of manifest work
 	gomega.Eventually(func() error {
 		_, err := workClient.WorkV1().ManifestWorks(namespace).Get(context.Background(), name, metav1.GetOptions{})
@@ -193,7 +195,8 @@ func AssertNonexistenceOfConfigMaps(manifests []workapiv1.Manifest, kubeClient k
 }
 
 // AssertExistenceOfResources check the existence of resource with GVR, namespace and name
-func AssertExistenceOfResources(gvrs []schema.GroupVersionResource, namespaces, names []string, dynamicClient dynamic.Interface, eventuallyTimeout, eventuallyInterval int) {
+func AssertExistenceOfResources(gvrs []schema.GroupVersionResource, namespaces, names []string,
+	dynamicClient dynamic.Interface, eventuallyTimeout, eventuallyInterval int) {
 	gomega.Expect(gvrs).To(gomega.HaveLen(len(namespaces)))
 	gomega.Expect(gvrs).To(gomega.HaveLen(len(names)))
 
@@ -210,7 +213,8 @@ func AssertExistenceOfResources(gvrs []schema.GroupVersionResource, namespaces, 
 }
 
 // AssertNonexistenceOfResources check if resource with GVR, namespace and name does not exists
-func AssertNonexistenceOfResources(gvrs []schema.GroupVersionResource, namespaces, names []string, dynamicClient dynamic.Interface, eventuallyTimeout, eventuallyInterval int) {
+func AssertNonexistenceOfResources(gvrs []schema.GroupVersionResource, namespaces, names []string,
+	dynamicClient dynamic.Interface, eventuallyTimeout, eventuallyInterval int) {
 	gomega.Expect(gvrs).To(gomega.HaveLen(len(namespaces)))
 	gomega.Expect(gvrs).To(gomega.HaveLen(len(names)))
 
@@ -227,7 +231,8 @@ func AssertNonexistenceOfResources(gvrs []schema.GroupVersionResource, namespace
 }
 
 // AssertAppliedResources check if applied resources in work status are updated correctly
-func AssertAppliedResources(hubHash, workName string, gvrs []schema.GroupVersionResource, namespaces, names []string, workClient workclientset.Interface, eventuallyTimeout, eventuallyInterval int) {
+func AssertAppliedResources(hubHash, workName string, gvrs []schema.GroupVersionResource, namespaces, names []string,
+	workClient workclientset.Interface, eventuallyTimeout, eventuallyInterval int) {
 	gomega.Expect(gvrs).To(gomega.HaveLen(len(namespaces)))
 	gomega.Expect(gvrs).To(gomega.HaveLen(len(names)))
 

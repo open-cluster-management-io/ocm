@@ -24,7 +24,7 @@ const (
 )
 
 var _ plugins.Prioritizer = &AddOn{}
-var AddOnClock = (clock.Clock)(clock.RealClock{})
+var AddOnClock = clock.Clock(clock.RealClock{})
 
 type AddOn struct {
 	handle          plugins.Handle
@@ -68,7 +68,8 @@ func (c *AddOn) Description() string {
 	return description
 }
 
-func (c *AddOn) Score(ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) (plugins.PluginScoreResult, *framework.Status) {
+func (c *AddOn) Score(ctx context.Context, placement *clusterapiv1beta1.Placement,
+	clusters []*clusterapiv1.ManagedCluster) (plugins.PluginScoreResult, *framework.Status) {
 	scores := map[string]int64{}
 	expiredScores := ""
 	status := framework.NewStatus(c.Name(), framework.Success, "")

@@ -47,13 +47,15 @@ type runtimeReconcile struct {
 	hubKubeClient kubernetes.Interface
 	hubKubeConfig *rest.Config
 
-	ensureSAKubeconfigs func(ctx context.Context, clusterManagerName, clusterManagerNamespace string, hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error
+	ensureSAKubeconfigs func(ctx context.Context, clusterManagerName, clusterManagerNamespace string,
+		hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error
 
 	cache    resourceapply.ResourceCache
 	recorder events.Recorder
 }
 
-func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager, config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
+func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.ClusterManager,
+	config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
 	// If AddOnManager is not enabled, remove related resources
 	if !config.AddOnManagerEnabled {
 		_, _, err := cleanResources(ctx, c.kubeClient, cm, config, addOnManagerDeploymentFiles...)
@@ -180,7 +182,8 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 	return cm, reconcileContinue, nil
 }
 
-func (c *runtimeReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterManager, config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
+func (c *runtimeReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterManager,
+	config manifests.HubConfig) (*operatorapiv1.ClusterManager, reconcileState, error) {
 	// Remove All Static files
 	managementResources := []string{namespaceResource} // because namespace is removed, we don't need to remove deployments explicitly
 	return cleanResources(ctx, c.kubeClient, cm, config, managementResources...)

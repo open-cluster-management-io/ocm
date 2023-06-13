@@ -85,7 +85,8 @@ func (c *globalManagedClusterSetController) sync(ctx context.Context, syncCtx fa
 		if errors.IsNotFound(err) {
 			_, err := c.clusterSetClient.ManagedClusterSets().Create(ctx, GlobalManagedClusterSet, metav1.CreateOptions{})
 			if err == nil {
-				c.eventRecorder.Eventf("GlobalManagedClusterSetCreated", "Set the GlobalManagedClusterSet name to %+v. spec to %+v", GlobalManagedClusterSetName, GlobalManagedClusterSet.Spec)
+				c.eventRecorder.Eventf("GlobalManagedClusterSetCreated",
+					"Set the GlobalManagedClusterSet name to %+v. spec to %+v", GlobalManagedClusterSetName, GlobalManagedClusterSet.Spec)
 			}
 			return err
 		}

@@ -188,7 +188,8 @@ func (t *TestAuthn) CreateBootstrapKubeConfig(configFileName, serverCertFile, se
 		return err
 	}
 
-	config, err := createKubeConfigByClientCert(configFileName, securePort, serverCertFile, path.Join(configDir, "bootstrap.crt"), path.Join(configDir, "bootstrap.key"))
+	config, err := createKubeConfigByClientCert(configFileName, securePort, serverCertFile,
+		path.Join(configDir, "bootstrap.crt"), path.Join(configDir, "bootstrap.key"))
 	if err != nil {
 		return err
 	}
@@ -436,7 +437,8 @@ func (t *TestAuthn) ApproveCSR(kubeClient kubernetes.Interface, csr *certificate
 	return err
 }
 
-func (t *TestAuthn) FillCertificateToApprovedCSR(kubeClient kubernetes.Interface, csr *certificates.CertificateSigningRequest, notBefore, notAfter time.Time) error {
+func (t *TestAuthn) FillCertificateToApprovedCSR(kubeClient kubernetes.Interface,
+	csr *certificates.CertificateSigningRequest, notBefore, notAfter time.Time) error {
 	block, _ := pem.Decode(csr.Spec.Request)
 	cr, err := x509.ParseCertificateRequest(block.Bytes)
 	if err != nil {
