@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,27 +81,30 @@ func TestHealthCheck(t *testing.T) {
 		nodes           []runtime.Object
 		httpStatus      int
 		responseMsg     string
-		validateActions func(t *testing.T, actions []clienttesting.Action)
+		validateActions func(t *testing.T, clusterClient *clusterfake.Clientset)
 		expectedErr     string
 	}{
 		{
-			name:            "there are no managed clusters",
-			clusters:        []runtime.Object{},
-			validateActions: testingcommon.AssertNoActions,
-			expectedErr:     "unable to get managed cluster \"testmanagedcluster\" from hub: managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
+			name:     "there are no managed clusters",
+			clusters: []runtime.Object{},
+			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset) {
+				testingcommon.AssertNoActions(t, clusterClient.Actions())
+			},
+			expectedErr: "unable to get managed cluster \"testmanagedcluster\" from hub: managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
 		},
 		{
 			name:        "kube-apiserver is not health",
 			clusters:    []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			httpStatus:  http.StatusInternalServerError,
 			responseMsg: "internal server error",
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset) {
 				expectedCondition := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionFalse,
 					Reason:  "ManagedClusterKubeAPIServerUnavailable",
 					Message: "The kube-apiserver is not ok, status code: 500, an error on the server (\"internal server error\") has prevented the request from succeeding",
 				}
+				actions := clusterClient.Actions()
 				testingcommon.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &clusterv1.ManagedCluster{}
@@ -120,7 +122,7 @@ func TestHealthCheck(t *testing.T) {
 				testinghelpers.NewNode("testnode1", testinghelpers.NewResourceList(32, 64), testinghelpers.NewResourceList(16, 32)),
 			},
 			httpStatus: http.StatusOK,
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset) {
 				expectedCondition := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionTrue,
@@ -140,6 +142,7 @@ func TestHealthCheck(t *testing.T) {
 						clusterv1.ResourceMemory: *resource.NewQuantity(int64(1024*1024*32), resource.BinarySI),
 					},
 				}
+				actions := clusterClient.Actions()
 				testingcommon.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &clusterv1.ManagedCluster{}
@@ -156,13 +159,14 @@ func TestHealthCheck(t *testing.T) {
 			clusters:   []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			nodes:      []runtime.Object{},
 			httpStatus: http.StatusNotFound,
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset) {
 				expectedCondition := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ManagedClusterAvailable",
 					Message: "Managed cluster is available",
 				}
+				actions := clusterClient.Actions()
 				testingcommon.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &clusterv1.ManagedCluster{}
@@ -178,13 +182,14 @@ func TestHealthCheck(t *testing.T) {
 			clusters:   []runtime.Object{testinghelpers.NewAcceptedManagedCluster()},
 			nodes:      []runtime.Object{},
 			httpStatus: http.StatusForbidden,
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset) {
 				expectedCondition := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionAvailable,
 					Status:  metav1.ConditionTrue,
 					Reason:  "ManagedClusterAvailable",
 					Message: "Managed cluster is available",
 				}
+				actions := clusterClient.Actions()
 				testingcommon.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
 				managedCluster := &clusterv1.ManagedCluster{}
@@ -199,18 +204,22 @@ func TestHealthCheck(t *testing.T) {
 			name: "merge managed cluster status",
 			clusters: []runtime.Object{
 				testinghelpers.NewManagedClusterWithStatus(
-					corev1.ResourceList{
+					clusterv1.ResourceList{
 						"sockets": *resource.NewQuantity(int64(1200), resource.DecimalExponent),
 						"cores":   *resource.NewQuantity(int64(128), resource.DecimalExponent),
 					},
-					testinghelpers.NewResourceList(16, 32)),
+					clusterv1.ResourceList{
+						clusterv1.ResourceCPU:    *resource.NewQuantity(int64(16), resource.DecimalExponent),
+						clusterv1.ResourceMemory: *resource.NewQuantity(int64(1024*1024*32), resource.BinarySI),
+					},
+				),
 			},
 			nodes: []runtime.Object{
 				testinghelpers.NewNode("testnode1", testinghelpers.NewResourceList(32, 64), testinghelpers.NewResourceList(16, 32)),
 				testinghelpers.NewNode("testnode2", testinghelpers.NewResourceList(32, 64), testinghelpers.NewResourceList(16, 32)),
 			},
 			httpStatus: http.StatusOK,
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset) {
 				expectedCondition := metav1.Condition{
 					Type:    clusterv1.ManagedClusterConditionJoined,
 					Status:  metav1.ConditionTrue,
@@ -232,10 +241,11 @@ func TestHealthCheck(t *testing.T) {
 						clusterv1.ResourceMemory: *resource.NewQuantity(int64(1024*1024*64), resource.BinarySI),
 					},
 				}
+				actions := clusterClient.Actions()
 				testingcommon.AssertActions(t, actions, "patch")
-				patch := actions[0].(clienttesting.PatchAction).GetPatch()
-				managedCluster := &clusterv1.ManagedCluster{}
-				err := json.Unmarshal(patch, managedCluster)
+
+				managedCluster, err := clusterClient.ClusterV1().ManagedClusters().Get(
+					context.TODO(), testinghelpers.TestManagedClusterName, metav1.GetOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -279,7 +289,7 @@ func TestHealthCheck(t *testing.T) {
 			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""))
 			testingcommon.AssertError(t, syncErr, c.expectedErr)
 
-			c.validateActions(t, clusterClient.Actions())
+			c.validateActions(t, clusterClient)
 		})
 	}
 }

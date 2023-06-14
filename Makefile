@@ -66,7 +66,7 @@ verify-crds: patch-crd
 
 verify-gocilint:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.2
-	golangci-lint run --timeout=3m --modules-download-mode vendor ./...
+	golangci-lint run --timeout=5m --modules-download-mode vendor ./...
 
 install-golang-gci:
 	go install github.com/daixiang0/gci@v0.10.1

@@ -8,10 +8,10 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"net"
+	"os"
 	"time"
 
 	certv1 "k8s.io/api/certificates/v1"
@@ -118,16 +118,10 @@ func NewJoinedManagedCluster() *clusterv1.ManagedCluster {
 	return managedCluster
 }
 
-func NewManagedClusterWithStatus(capacity, allocatable corev1.ResourceList) *clusterv1.ManagedCluster {
+func NewManagedClusterWithStatus(capacity, allocatable clusterv1.ResourceList) *clusterv1.ManagedCluster {
 	managedCluster := NewJoinedManagedCluster()
-	managedCluster.Status.Capacity = clusterv1.ResourceList{
-		"cpu":    capacity.Cpu().DeepCopy(),
-		"memory": capacity.Memory().DeepCopy(),
-	}
-	managedCluster.Status.Allocatable = clusterv1.ResourceList{
-		"cpu":    allocatable.Cpu().DeepCopy(),
-		"memory": allocatable.Memory().DeepCopy(),
-	}
+	managedCluster.Status.Capacity = capacity
+	managedCluster.Status.Allocatable = allocatable
 	managedCluster.Status.Version = clusterv1.ManagedClusterVersion{
 		Kubernetes: kubeversion.Get().GitVersion,
 	}
@@ -499,7 +493,7 @@ func NewTestCert(commonName string, duration time.Duration) *TestCert {
 }
 
 func WriteFile(filename string, data []byte) {
-	if err := ioutil.WriteFile(filename, data, 0600); err != nil {
+	if err := os.WriteFile(filename, data, 0600); err != nil {
 		panic(err)
 	}
 }

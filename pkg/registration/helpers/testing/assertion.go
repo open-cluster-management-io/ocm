@@ -2,15 +2,14 @@ package testing
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
-	"reflect"
 	"testing"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	certv1 "k8s.io/api/certificates/v1"
 	certv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,7 +25,7 @@ func AssertFinalizers(t *testing.T, obj runtime.Object, finalizers []string) {
 	if len(actual) == 0 && len(finalizers) == 0 {
 		return
 	}
-	if !reflect.DeepEqual(actual, finalizers) {
+	if !equality.Semantic.DeepEqual(actual, finalizers) {
 		t.Fatal(diff.ObjectDiff(actual, finalizers))
 	}
 }
@@ -37,28 +36,24 @@ func AssertManagedClusterClientConfigs(t *testing.T, actual, expected []clusterv
 	if len(actual) == 0 && len(expected) == 0 {
 		return
 	}
-	if !reflect.DeepEqual(actual, expected) {
+	if !equality.Semantic.DeepEqual(actual, expected) {
 		t.Errorf("expected client configs %#v but got: %#v", expected, actual)
 	}
 }
 
-// AssertManagedClusterStatus sserts the actual managed cluster status is the same
+// AssertManagedClusterStatus asserts the actual managed cluster status is the same
 // with the expected
 func AssertManagedClusterStatus(t *testing.T, actual, expected clusterv1.ManagedClusterStatus) {
-	if !reflect.DeepEqual(actual.Version, expected.Version) {
+	if !equality.Semantic.DeepEqual(actual.Version, expected.Version) {
 		t.Errorf("expected version %#v but got: %#v", expected.Version, actual.Version)
 	}
-	if !actual.Capacity["cpu"].Equal(expected.Capacity["cpu"]) {
-		t.Errorf("expected cpu capacity %#v but got: %#v", expected.Capacity["cpu"], actual.Capacity["cpu"])
+
+	if !equality.Semantic.DeepEqual(actual.Capacity, expected.Capacity) {
+		t.Errorf("expected cluster capacity %#v but got: %#v", expected.Capacity, actual.Capacity)
 	}
-	if !actual.Capacity["memory"].Equal(expected.Capacity["memory"]) {
-		t.Errorf("expected memory capacity %#v but got: %#v", expected.Capacity["memory"], actual.Capacity["memory"])
-	}
-	if !actual.Allocatable["cpu"].Equal(expected.Allocatable["cpu"]) {
-		t.Errorf("expected cpu allocatable %#v but got: %#v", expected.Allocatable["cpu"], actual.Allocatable["cpu"])
-	}
-	if !actual.Allocatable["memory"].Equal(expected.Allocatable["memory"]) {
-		t.Errorf("expected memory alocatabel %#v but got: %#v", expected.Allocatable["memory"], actual.Allocatable["memory"])
+
+	if !equality.Semantic.DeepEqual(actual.Allocatable, expected.Allocatable) {
+		t.Errorf("expected cluster allocatable %#v but got: %#v", expected.Allocatable, actual.Allocatable)
 	}
 }
 
@@ -142,7 +137,7 @@ func AssertFileExist(t *testing.T, filePath string) {
 
 // AssertFileContent asserts a given file content
 func AssertFileContent(t *testing.T, filePath string, expectedContent []byte) {
-	content, _ := ioutil.ReadFile(filePath)
+	content, _ := os.ReadFile(filePath)
 	if !bytes.Equal(content, expectedContent) {
 		t.Errorf("expect %v, but got %v", expectedContent, content)
 	}
