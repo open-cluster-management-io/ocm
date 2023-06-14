@@ -36,6 +36,14 @@ func (r *resoureReconcile) reconcile(ctx context.Context, cluster *clusterv1.Man
 			return cluster, reconcileStop, fmt.Errorf("unable to get capacity and allocatable of managed cluster %q: %w", cluster.Name, err)
 		}
 
+		// we allow other components update the cluster capacity, so we need merge the capacity to this updated, if
+		// one current capacity entry does not exist in this updated capacity, we add it back.
+		for key, val := range cluster.Status.Capacity {
+			if _, ok := capacity[key]; !ok {
+				capacity[key] = val
+			}
+		}
+
 		cluster.Status.Capacity = capacity
 		cluster.Status.Allocatable = allocatable
 		cluster.Status.Version = *clusterVersion
