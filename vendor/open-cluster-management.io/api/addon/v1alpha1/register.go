@@ -36,6 +36,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ManagedClusterAddOnList{},
 		&AddOnDeploymentConfig{},
 		&AddOnDeploymentConfigList{},
+		&AddOnTemplate{},
+		&AddOnTemplateList{},
 	)
 	metav1.AddToGroupVersion(scheme, GroupVersion)
 	return nil
