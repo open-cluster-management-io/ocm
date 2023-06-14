@@ -82,6 +82,9 @@ var _ = ginkgo.BeforeSuite(func() {
 		},
 	}
 	cfg, err := testEnv.Start()
+	cfg.QPS = 100
+	cfg.Burst = 200
+
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(cfg).ToNot(gomega.BeNil())
 

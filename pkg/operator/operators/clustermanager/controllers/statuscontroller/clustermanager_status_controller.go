@@ -23,8 +23,11 @@ import (
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
-const registrationDegraded = "HubRegistrationDegraded"
-const placementDegraded = "HubPlacementDegraded"
+const (
+	registrationDegraded  = "HubRegistrationDegraded"
+	placementDegraded     = "HubPlacementDegraded"
+	clusterManagerApplied = "Applied"
+)
 
 type clusterManagerStatusController struct {
 	deploymentLister     appslister.DeploymentLister
@@ -65,17 +68,20 @@ func (s *clusterManagerStatusController) sync(ctx context.Context, controllerCon
 	klog.Infof("Reconciling ClusterManager %q", clusterManagerName)
 
 	clusterManager, err := s.clusterManagerLister.Get(clusterManagerName)
-	newClusterManager := clusterManager.DeepCopy()
 	// ClusterManager not found, could have been deleted, do nothing.
 	if errors.IsNotFound(err) {
 		return nil
 	}
-
-	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManagerName, clusterManager.Spec.DeployOption.Mode)
-
 	if err != nil {
 		return err
 	}
+
+	if meta.FindStatusCondition(clusterManager.Status.Conditions, clusterManagerApplied) == nil {
+		return nil
+	}
+
+	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManagerName, clusterManager.Spec.DeployOption.Mode)
+	newClusterManager := clusterManager.DeepCopy()
 
 	registrationCond := s.updateStatusOfRegistration(ctx, clusterManager.Name, clusterManagerNamespace)
 	registrationCond.ObservedGeneration = clusterManager.Generation

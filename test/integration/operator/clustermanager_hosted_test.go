@@ -532,27 +532,24 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 		})
 		ginkgo.It("Deployment should be reconciled when manually updated", func() {
 			gomega.Eventually(func() error {
-				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{}); err != nil {
+				registrationDeployment, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{})
+				if err != nil {
 					return err
+				}
+				actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(hostedCtx, clusterManagerName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				deploymentGeneration := helpers.NewGenerationStatus(appsv1.SchemeGroupVersion.WithResource("deployments"), registrationDeployment)
+				actualGeneration := helpers.FindGenerationStatus(actual.Status.Generations, deploymentGeneration)
+				if deploymentGeneration.LastGeneration != actualGeneration.LastGeneration {
+					return fmt.Errorf("expected LastGeneration shoud be %d, but get %d", actualGeneration.LastGeneration, deploymentGeneration.LastGeneration)
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 			registrationoDeployment, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			registrationoDeployment.Spec.Template.Spec.Containers[0].Image = "testimage2:latest"
-			_, err = hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Update(hostedCtx, registrationoDeployment, metav1.UpdateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Eventually(func() error {
-				registrationoDeployment, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-				if registrationoDeployment.Spec.Template.Spec.Containers[0].Image != "testimage:latest" {
-					return fmt.Errorf("image should be testimage:latest, but get %s", registrationoDeployment.Spec.Template.Spec.Containers[0].Image)
-				}
-				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
-
 			// Check if generations are correct
 			gomega.Eventually(func() error {
 				actual, err := hostedOperatorClient.OperatorV1().ClusterManagers().Get(hostedCtx, clusterManagerName, metav1.GetOptions{})
@@ -569,6 +566,16 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				actualGeneration := helpers.FindGenerationStatus(actual.Status.Generations, deploymentGeneration)
 				if deploymentGeneration.LastGeneration != actualGeneration.LastGeneration {
 					return fmt.Errorf("expected LastGeneration shoud be %d, but get %d", actualGeneration.LastGeneration, deploymentGeneration.LastGeneration)
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+			gomega.Eventually(func() error {
+				registrationoDeployment, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(hostedCtx, hubRegistrationDeployment, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if registrationoDeployment.Spec.Template.Spec.Containers[0].Image != "testimage:latest" {
+					return fmt.Errorf("image should be testimage:latest, but get %s", registrationoDeployment.Spec.Template.Spec.Containers[0].Image)
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())

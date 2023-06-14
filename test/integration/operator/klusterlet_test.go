@@ -695,8 +695,6 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "HubConnectionDegraded", "BootstrapSecretMissing,HubKubeConfigMissing", metav1.ConditionTrue)
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "RegistrationDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "WorkDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
 
 			// Create a bootstrap secret and make sure the kubeconfig can work
 			bootStrapSecret := &corev1.Secret{
@@ -712,8 +710,6 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "HubConnectionDegraded", "BootstrapSecretFunctional,HubKubeConfigMissing", metav1.ConditionTrue)
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "RegistrationDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "WorkDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
 
 			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.HubKubeConfig, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -726,6 +722,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "HubConnectionDegraded", "HubConnectionFunctional", metav1.ConditionFalse)
+			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "Applied", "KlusterletApplied", metav1.ConditionTrue)
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "RegistrationDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "WorkDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
 

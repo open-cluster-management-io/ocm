@@ -7,6 +7,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeinformers "k8s.io/client-go/informers"
@@ -38,6 +39,14 @@ func newKlusterlet(name, namespace, clustername string) *operatorapiv1.Klusterle
 			ClusterName:               clustername,
 			Namespace:                 namespace,
 			ExternalServerURLs:        []operatorapiv1.ServerURL{},
+		},
+		Status: operatorapiv1.KlusterletStatus{
+			Conditions: []metav1.Condition{
+				{
+					Type:   klusterletApplied,
+					Status: metav1.ConditionTrue,
+				},
+			},
 		},
 	}
 }
@@ -176,6 +185,7 @@ func TestSync(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			meta.SetStatusCondition(&c.expectedConditions, testinghelper.NamedCondition(klusterletApplied, "", metav1.ConditionTrue))
 			testinghelper.AssertOnlyConditions(t, klusterlet, c.expectedConditions...)
 		})
 	}

@@ -33,6 +33,14 @@ func newClusterManager() *operatorapiv1.ClusterManager {
 		Spec: operatorapiv1.ClusterManagerSpec{
 			RegistrationImagePullSpec: "testregistration",
 		},
+		Status: operatorapiv1.ClusterManagerStatus{
+			Conditions: []metav1.Condition{
+				{
+					Type:   clusterManagerApplied,
+					Status: metav1.ConditionTrue,
+				},
+			},
+		},
 	}
 }
 
@@ -67,6 +75,10 @@ func newPlacementDeployment(desiredReplica, availableReplica int32) *appsv1.Depl
 }
 
 func TestSyncStatus(t *testing.T) {
+	appliedCond := metav1.Condition{
+		Type:   clusterManagerApplied,
+		Status: metav1.ConditionTrue,
+	}
 	cases := []struct {
 		name            string
 		queueKey        string
@@ -109,7 +121,7 @@ func TestSyncStatus(t *testing.T) {
 				}
 				expectedCondition1 := testinghelper.NamedCondition(registrationDegraded, "GetRegistrationDeploymentFailed", metav1.ConditionTrue)
 				expectedCondition2 := testinghelper.NamedCondition(placementDegraded, "UnavailablePlacementPod", metav1.ConditionTrue)
-				testinghelper.AssertOnlyConditions(t, klusterlet, expectedCondition1, expectedCondition2)
+				testinghelper.AssertOnlyConditions(t, klusterlet, appliedCond, expectedCondition1, expectedCondition2)
 			},
 		},
 		{
@@ -130,7 +142,7 @@ func TestSyncStatus(t *testing.T) {
 				}
 				expectedCondition1 := testinghelper.NamedCondition(registrationDegraded, "UnavailableRegistrationPod", metav1.ConditionTrue)
 				expectedCondition2 := testinghelper.NamedCondition(placementDegraded, "PlacementFunctional", metav1.ConditionFalse)
-				testinghelper.AssertOnlyConditions(t, klusterlet, expectedCondition1, expectedCondition2)
+				testinghelper.AssertOnlyConditions(t, klusterlet, appliedCond, expectedCondition1, expectedCondition2)
 			},
 		},
 		{
@@ -148,7 +160,7 @@ func TestSyncStatus(t *testing.T) {
 				}
 				expectedCondition1 := testinghelper.NamedCondition(registrationDegraded, "RegistrationFunctional", metav1.ConditionFalse)
 				expectedCondition2 := testinghelper.NamedCondition(placementDegraded, "GetPlacementDeploymentFailed", metav1.ConditionTrue)
-				testinghelper.AssertOnlyConditions(t, klusterlet, expectedCondition1, expectedCondition2)
+				testinghelper.AssertOnlyConditions(t, klusterlet, appliedCond, expectedCondition1, expectedCondition2)
 			},
 		},
 	}

@@ -148,7 +148,7 @@ func (p *patcher[R, Sp, St]) patch(ctx context.Context, object R, newObject, old
 	_, err = p.client.Patch(
 		ctx, accessor.GetName(), types.MergePatchType, patchBytes, metav1.PatchOptions{}, subresources...)
 	if err != nil {
-		klog.V(2).Infof("Object with type %t and name %s is patched with patch %s", object, accessor.GetName(), string(patchBytes))
+		klog.V(2).Infof("Object with type %T and name %s is patched with patch %s", object, accessor.GetName(), string(patchBytes))
 	}
 	return err
 }

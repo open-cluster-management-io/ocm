@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
 	"k8s.io/client-go/kubernetes"
 	appslister "k8s.io/client-go/listers/apps/v1"
@@ -35,6 +36,7 @@ const (
 	klusterletRegistrationDesiredDegraded = "RegistrationDesiredDegraded"
 	klusterletWorkDesiredDegraded         = "WorkDesiredDegraded"
 	klusterletAvailable                   = "Available"
+	klusterletApplied                     = "Applied"
 )
 
 // NewKlusterletStatusController returns a klusterletStatusController
@@ -53,6 +55,10 @@ func NewKlusterletStatusController(
 	}
 	return factory.New().WithSync(controller.sync).
 		WithInformersQueueKeyFunc(helpers.KlusterletDeploymentQueueKeyFunc(controller.klusterletLister), deploymentInformer.Informer()).
+		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
+			accessor, _ := meta.Accessor(obj)
+			return accessor.GetName()
+		}, klusterletInformer.Informer()).
 		ToController("KlusterletStatusController", recorder)
 }
 
@@ -70,6 +76,12 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 	case err != nil:
 		return err
 	}
+
+	// Do nothing when the klusterlet is not applied yet
+	if meta.FindStatusCondition(klusterlet.Status.Conditions, klusterletApplied) == nil {
+		return nil
+	}
+
 	newKlusterlet := klusterlet.DeepCopy()
 
 	agentNamespace := helpers.AgentNamespace(klusterlet)
