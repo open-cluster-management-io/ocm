@@ -64,13 +64,14 @@ type Tester struct {
 	clusterManagerNamespace string
 	operatorNamespace       string
 	klusterletOperator      string
-	imageTag                string
+	registrationImage       string
+	workImage               string
 }
 
 // kubeconfigPath is the path of kubeconfig file, will be get from env "KUBECONFIG" by default.
 // bootstrapHubSecret is the bootstrap hub kubeconfig secret, and the format is "namespace/secretName".
 // Default of bootstrapHubSecret is helpers.KlusterletDefaultNamespace/helpers.BootstrapHubKubeConfig.
-func NewTester(hubKubeConfigPath, spokeKubeConfigPath, imageTag string, timeout time.Duration) *Tester {
+func NewTester(hubKubeConfigPath, spokeKubeConfigPath, registrationImage, workImage string, timeout time.Duration) *Tester {
 	var tester = Tester{
 		hubKubeConfigPath:       hubKubeConfigPath,
 		spokeKubeConfigPath:     spokeKubeConfigPath,
@@ -80,7 +81,8 @@ func NewTester(hubKubeConfigPath, spokeKubeConfigPath, imageTag string, timeout 
 		clusterManagerNamespace: helpers.ClusterManagerDefaultNamespace,
 		operatorNamespace:       "open-cluster-management",
 		klusterletOperator:      "klusterlet",
-		imageTag:                imageTag,
+		registrationImage:       registrationImage,
+		workImage:               workImage,
 	}
 
 	return &tester
@@ -197,8 +199,8 @@ func (t *Tester) CreateKlusterlet(name, clusterName, klusterletNamespace string,
 			Name: name,
 		},
 		Spec: operatorapiv1.KlusterletSpec{
-			RegistrationImagePullSpec: "quay.io/open-cluster-management/registration:" + t.imageTag,
-			WorkImagePullSpec:         "quay.io/open-cluster-management/work:" + t.imageTag,
+			RegistrationImagePullSpec: t.registrationImage,
+			WorkImagePullSpec:         t.workImage,
 			ExternalServerURLs: []operatorapiv1.ServerURL{
 				{
 					URL: "https://localhost",
