@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	coreinformer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
-	corelister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -41,22 +40,25 @@ var BootstrapControllerSyncInterval = 5 * time.Minute
 type bootstrapController struct {
 	kubeClient       kubernetes.Interface
 	klusterletLister operatorlister.KlusterletLister
-	secretLister     corelister.SecretLister
+	secretInformers  map[string]coreinformer.SecretInformer
 }
 
 // NewBootstrapController returns a bootstrapController
 func NewBootstrapController(
 	kubeClient kubernetes.Interface,
 	klusterletInformer operatorinformer.KlusterletInformer,
-	secretInformer coreinformer.SecretInformer,
+	secretInformers map[string]coreinformer.SecretInformer,
 	recorder events.Recorder) factory.Controller {
 	controller := &bootstrapController{
 		kubeClient:       kubeClient,
 		klusterletLister: klusterletInformer.Lister(),
-		secretLister:     secretInformer.Lister(),
+		secretInformers:  secretInformers,
 	}
 	return factory.New().WithSync(controller.sync).
-		WithInformersQueueKeyFunc(bootstrapSecretQueueKeyFunc(controller.klusterletLister), secretInformer.Informer()).
+		WithInformersQueueKeyFunc(bootstrapSecretQueueKeyFunc(controller.klusterletLister),
+			secretInformers[helpers.HubKubeConfig].Informer(),
+			secretInformers[helpers.BootstrapHubKubeConfig].Informer(),
+			secretInformers[helpers.ExternalManagedKubeConfig].Informer()).
 		ResyncEvery(BootstrapControllerSyncInterval).
 		ToController("BootstrapController", recorder)
 }
@@ -91,7 +93,7 @@ func (k *bootstrapController) sync(ctx context.Context, controllerContext factor
 		return nil
 	}
 
-	bootstrapHubKubeconfigSecret, err := k.secretLister.Secrets(agentNamespace).Get(helpers.BootstrapHubKubeConfig)
+	bootstrapHubKubeconfigSecret, err := k.secretInformers[helpers.BootstrapHubKubeConfig].Lister().Secrets(agentNamespace).Get(helpers.BootstrapHubKubeConfig)
 	switch {
 	case errors.IsNotFound(err):
 		// the bootstrap hub kubeconfig secret not found, do nothing
@@ -108,7 +110,7 @@ func (k *bootstrapController) sync(ctx context.Context, controllerContext factor
 		return nil
 	}
 
-	hubKubeconfigSecret, err := k.secretLister.Secrets(agentNamespace).Get(helpers.HubKubeConfig)
+	hubKubeconfigSecret, err := k.secretInformers[helpers.HubKubeConfig].Lister().Secrets(agentNamespace).Get(helpers.HubKubeConfig)
 	switch {
 	case errors.IsNotFound(err):
 		// the hub kubeconfig secret not found, could not have bootstrap yet, do nothing currently
