@@ -281,12 +281,6 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 			Type: klusterletApplied, Status: metav1.ConditionTrue, Reason: "KlusterletApplied",
 			Message: "Klusterlet Component Applied"})
 	} else {
-		if meta.FindStatusCondition(klusterlet.Status.Conditions, klusterletApplied) == nil {
-			meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
-				Type: klusterletApplied, Status: metav1.ConditionFalse, Reason: "KlusterletApplyFailed",
-				Message: "Klusterlet Component Apply failed"})
-		}
-
 		// When appliedCondition is false, we should not update related resources and resource generations
 		klusterlet.Status.RelatedResources = originalKlusterlet.Status.RelatedResources
 		klusterlet.Status.Generations = originalKlusterlet.Status.Generations

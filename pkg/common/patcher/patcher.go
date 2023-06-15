@@ -7,6 +7,7 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -116,6 +117,9 @@ func (p *patcher[R, Sp, St]) RemoveFinalizer(ctx context.Context, object R, fina
 
 		_, err = p.client.Patch(
 			ctx, accessor.GetName(), types.MergePatchType, []byte(patch), metav1.PatchOptions{})
+		if errors.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
 

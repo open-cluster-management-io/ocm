@@ -45,4 +45,4 @@ rules:
 # Allow the registration-operator to update the appliedmanifestworks finalizer.
 - apiGroups: ["work.open-cluster-management.io"]
   resources: ["appliedmanifestworks"]
-  verbs: ["list", "update"]
+  verbs: ["list", "update", "patch"]

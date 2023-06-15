@@ -231,6 +231,7 @@ spec:
           verbs:
           - list
           - update
+          - patch
         serviceAccountName: klusterlet
       deployments:
       - name: klusterlet
