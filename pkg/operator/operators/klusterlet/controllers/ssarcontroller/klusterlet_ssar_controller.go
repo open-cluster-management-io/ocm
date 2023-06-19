@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	coreinformer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
-	corelister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
 
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
@@ -33,7 +32,7 @@ var SSARReSyncTime = 30 * time.Second
 
 type ssarController struct {
 	kubeClient       kubernetes.Interface
-	secretLister     corelister.SecretLister
+	secretInformers  map[string]coreinformer.SecretInformer
 	patcher          patcher.Patcher[*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus]
 	klusterletLister operatorlister.KlusterletLister
 	*klusterletLocker
@@ -52,7 +51,7 @@ func NewKlusterletSSARController(
 	kubeClient kubernetes.Interface,
 	klusterletClient operatorv1client.KlusterletInterface,
 	klusterletInformer operatorinformer.KlusterletInformer,
-	secretInformer coreinformer.SecretInformer,
+	secretInformers map[string]coreinformer.SecretInformer,
 	recorder events.Recorder,
 ) factory.Controller {
 	controller := &ssarController{
@@ -60,14 +59,17 @@ func NewKlusterletSSARController(
 		patcher: patcher.NewPatcher[
 			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](klusterletClient),
 		klusterletLister: klusterletInformer.Lister(),
-		secretLister:     secretInformer.Lister(),
+		secretInformers:  secretInformers,
 		klusterletLocker: &klusterletLocker{
 			klusterletInChecking: make(map[string]struct{}),
 		},
 	}
 
 	return factory.New().WithSync(controller.sync).
-		WithInformersQueueKeyFunc(helpers.KlusterletSecretQueueKeyFunc(controller.klusterletLister), secretInformer.Informer()).
+		WithInformersQueueKeyFunc(helpers.KlusterletSecretQueueKeyFunc(controller.klusterletLister),
+			secretInformers[helpers.HubKubeConfig].Informer(),
+			secretInformers[helpers.BootstrapHubKubeConfig].Informer(),
+			secretInformers[helpers.ExternalManagedKubeConfig].Informer()).
 		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
 			accessor, _ := meta.Accessor(obj)
 			return accessor.GetName()

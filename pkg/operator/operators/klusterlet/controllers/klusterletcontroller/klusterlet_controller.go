@@ -76,7 +76,7 @@ func NewKlusterletController(
 	apiExtensionClient apiextensionsclient.Interface,
 	klusterletClient operatorv1client.KlusterletInterface,
 	klusterletInformer operatorinformer.KlusterletInformer,
-	secretInformer coreinformer.SecretInformer,
+	secretInformers map[string]coreinformer.SecretInformer,
 	deploymentInformer appsinformer.DeploymentInformer,
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
 	kubeVersion *version.Version,
@@ -96,7 +96,10 @@ func NewKlusterletController(
 	}
 
 	return factory.New().WithSync(controller.sync).
-		WithInformersQueueKeyFunc(helpers.KlusterletSecretQueueKeyFunc(controller.klusterletLister), secretInformer.Informer()).
+		WithInformersQueueKeyFunc(helpers.KlusterletSecretQueueKeyFunc(controller.klusterletLister),
+			secretInformers[helpers.HubKubeConfig].Informer(),
+			secretInformers[helpers.BootstrapHubKubeConfig].Informer(),
+			secretInformers[helpers.ExternalManagedKubeConfig].Informer()).
 		WithInformersQueueKeyFunc(helpers.KlusterletDeploymentQueueKeyFunc(controller.klusterletLister), deploymentInformer.Informer()).
 		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
 			accessor, _ := meta.Accessor(obj)

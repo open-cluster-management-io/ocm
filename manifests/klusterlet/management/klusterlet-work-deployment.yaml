@@ -5,6 +5,7 @@ metadata:
   namespace: {{ .AgentNamespace }}
   labels:
     app: klusterlet-manifestwork-agent
+    createdBy: klusterlet
 spec:
   replicas: {{ .Replica }}
   selector:

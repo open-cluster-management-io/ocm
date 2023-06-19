@@ -14,8 +14,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeinformers "k8s.io/client-go/informers"
+	corev1informers "k8s.io/client-go/informers/core/v1"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -27,6 +29,7 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
 func TestSync(t *testing.T) {
@@ -103,16 +106,6 @@ func TestSync(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fakeKubeClient := fakekube.NewSimpleClientset(c.objects...)
-			kubeInformers := kubeinformers.NewSharedInformerFactory(fakeKubeClient, 5*time.Minute)
-			secretStore := kubeInformers.Core().V1().Secrets().Informer().GetStore()
-			for _, object := range c.objects {
-				switch object.(type) {
-				case *corev1.Secret:
-					if err := secretStore.Add(object); err != nil {
-						t.Fatal(err)
-					}
-				}
-			}
 
 			fakeOperatorClient := fakeoperatorclient.NewSimpleClientset()
 			operatorInformers := operatorinformers.NewSharedInformerFactory(fakeOperatorClient, 5*time.Minute)
@@ -121,10 +114,46 @@ func TestSync(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			newOnTermInformer := func(name string) kubeinformers.SharedInformerFactory {
+				return kubeinformers.NewSharedInformerFactoryWithOptions(fakeKubeClient, 5*time.Minute,
+					kubeinformers.WithTweakListOptions(func(options *metav1.ListOptions) {
+						options.FieldSelector = fields.OneTermEqualSelector("metadata.name", name).String()
+					}))
+			}
+
+			secretInformers := map[string]corev1informers.SecretInformer{
+				helpers.HubKubeConfig:             newOnTermInformer(helpers.HubKubeConfig).Core().V1().Secrets(),
+				helpers.BootstrapHubKubeConfig:    newOnTermInformer(helpers.BootstrapHubKubeConfig).Core().V1().Secrets(),
+				helpers.ExternalManagedKubeConfig: newOnTermInformer(helpers.ExternalManagedKubeConfig).Core().V1().Secrets(),
+			}
+
+			for _, o := range c.objects {
+				switch object := o.(type) {
+				case *corev1.Secret:
+					switch object.Name {
+					case helpers.HubKubeConfig:
+						secretStore := secretInformers[helpers.HubKubeConfig].Informer().GetStore()
+						if err := secretStore.Add(object); err != nil {
+							t.Fatal(err)
+						}
+					case helpers.BootstrapHubKubeConfig:
+						secretStore := secretInformers[helpers.BootstrapHubKubeConfig].Informer().GetStore()
+						if err := secretStore.Add(object); err != nil {
+							t.Fatal(err)
+						}
+					case helpers.ExternalManagedKubeConfig:
+						secretStore := secretInformers[helpers.ExternalManagedKubeConfig].Informer().GetStore()
+						if err := secretStore.Add(object); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+			}
+
 			controller := &bootstrapController{
 				kubeClient:       fakeKubeClient,
 				klusterletLister: operatorInformers.Operator().V1().Klusterlets().Lister(),
-				secretLister:     kubeInformers.Core().V1().Secrets().Lister(),
+				secretInformers:  secretInformers,
 			}
 
 			syncContext := testingcommon.NewFakeSyncContext(t, c.queueKey)
