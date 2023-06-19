@@ -7,7 +7,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 
@@ -16,13 +15,13 @@ import (
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
-	"open-cluster-management.io/ocm/pkg/work/helper"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 )
 
 // AddFinalizerController is to add the cluster.open-cluster-management.io/manifest-work-cleanup finalizer to manifestworks.
 type AddFinalizerController struct {
-	manifestWorkClient workv1client.ManifestWorkInterface
+	patcher            patcher.Patcher[*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus]
 	manifestWorkLister worklister.ManifestWorkNamespaceLister
 }
 
@@ -35,7 +34,9 @@ func NewAddFinalizerController(
 ) factory.Controller {
 
 	controller := &AddFinalizerController{
-		manifestWorkClient: manifestWorkClient,
+		patcher: patcher.NewPatcher[
+			*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
+			manifestWorkClient),
 		manifestWorkLister: manifestWorkLister,
 	}
 
@@ -70,13 +71,8 @@ func (m *AddFinalizerController) syncManifestWork(ctx context.Context, originalM
 		return nil
 	}
 
-	// don't add finalizer to instances that already have it
-	if helper.HasFinalizer(manifestWork.Finalizers, controllers.ManifestWorkFinalizer) {
-		return nil
-	}
-
 	// if this conflicts, we'll simply try again later
-	manifestWork.Finalizers = append(manifestWork.Finalizers, controllers.ManifestWorkFinalizer)
-	_, err := m.manifestWorkClient.Update(ctx, manifestWork, metav1.UpdateOptions{})
+	_, err := m.patcher.AddFinalizer(ctx, manifestWork, controllers.ManifestWorkFinalizer)
+
 	return err
 }

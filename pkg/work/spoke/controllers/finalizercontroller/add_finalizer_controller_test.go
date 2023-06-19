@@ -2,6 +2,7 @@ package finalizercontroller
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"testing"
 
@@ -12,6 +13,8 @@ import (
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
@@ -27,10 +30,12 @@ func TestAddFinalizer(t *testing.T) {
 		{
 			name: "add when empty",
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatal(spew.Sdump(actions))
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.ManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
 				}
-				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
 				if !reflect.DeepEqual(work.Finalizers, []string{controllers.ManifestWorkFinalizer}) {
 					t.Fatal(spew.Sdump(actions))
 				}
@@ -40,32 +45,26 @@ func TestAddFinalizer(t *testing.T) {
 			name:               "add when missing",
 			existingFinalizers: []string{"other"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatal(spew.Sdump(actions))
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.ManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
 				}
-				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
 				if !reflect.DeepEqual(work.Finalizers, []string{"other", controllers.ManifestWorkFinalizer}) {
 					t.Fatal(spew.Sdump(actions))
 				}
 			},
 		},
 		{
-			name:       "skip when deleted",
-			terminated: true,
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) > 0 {
-					t.Fatal(spew.Sdump(actions))
-				}
-			},
+			name:            "skip when deleted",
+			terminated:      true,
+			validateActions: testingcommon.AssertNoActions,
 		},
 		{
 			name:               "skip when present",
 			existingFinalizers: []string{controllers.ManifestWorkFinalizer},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) > 0 {
-					t.Fatal(spew.Sdump(actions))
-				}
-			},
+			validateActions:    testingcommon.AssertNoActions,
 		},
 	}
 
@@ -80,7 +79,9 @@ func TestAddFinalizer(t *testing.T) {
 
 			fakeClient := fakeworkclient.NewSimpleClientset(testingWork)
 			controller := AddFinalizerController{
-				manifestWorkClient: fakeClient.WorkV1().ManifestWorks(testingWork.Namespace),
+				patcher: patcher.NewPatcher[
+					*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
+					fakeClient.WorkV1().ManifestWorks(testingWork.Namespace)),
 			}
 
 			err := controller.syncManifestWork(context.TODO(), testingWork)

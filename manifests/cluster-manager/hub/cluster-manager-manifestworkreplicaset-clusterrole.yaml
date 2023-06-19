@@ -24,7 +24,7 @@ rules:
   verbs: ["get", "list", "watch","create", "update", "delete", "deletecollection", "patch", "execute-as"]
 - apiGroups: ["work.open-cluster-management.io"]
   resources: ["manifestworkreplicasets"]
-  verbs: ["get", "list", "watch", "update"]
+  verbs: ["get", "list", "watch", "update", "patch"]
 - apiGroups: ["work.open-cluster-management.io"]
   resources: ["manifestworkreplicasets/status"]
   verbs: ["patch", "update"]

@@ -24,15 +24,15 @@ import (
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 )
 
 // AppliedManifestWorkController is to sync the applied resources of appliedmanifestwork with related
 // manifestwork and delete any resource which is no longer maintained by the manifestwork
 type AppliedManifestWorkController struct {
-	manifestWorkClient        workv1client.ManifestWorkInterface
+	patcher                   patcher.Patcher[*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus]
 	manifestWorkLister        worklister.ManifestWorkNamespaceLister
-	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
 	appliedManifestWorkLister worklister.AppliedManifestWorkLister
 	spokeDynamicClient        dynamic.Interface
 	hubHash                   string
@@ -43,7 +43,6 @@ type AppliedManifestWorkController struct {
 func NewAppliedManifestWorkController(
 	recorder events.Recorder,
 	spokeDynamicClient dynamic.Interface,
-	manifestWorkClient workv1client.ManifestWorkInterface,
 	manifestWorkInformer workinformer.ManifestWorkInformer,
 	manifestWorkLister worklister.ManifestWorkNamespaceLister,
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface,
@@ -51,9 +50,10 @@ func NewAppliedManifestWorkController(
 	hubHash string) factory.Controller {
 
 	controller := &AppliedManifestWorkController{
-		manifestWorkClient:        manifestWorkClient,
+		patcher: patcher.NewPatcher[
+			*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus](
+			appliedManifestWorkClient),
 		manifestWorkLister:        manifestWorkLister,
-		appliedManifestWorkClient: appliedManifestWorkClient,
 		appliedManifestWorkLister: appliedManifestWorkInformer.Lister(),
 		spokeDynamicClient:        spokeDynamicClient,
 		hubHash:                   hubHash,
@@ -211,7 +211,7 @@ func (m *AppliedManifestWorkController) syncManifestWork(
 	// update appliedmanifestwork status with latest applied resources. if this conflicts, we'll try again later
 	// for retrying update without reassessing the status can cause overwriting of valid information.
 	appliedManifestWork.Status.AppliedResources = appliedResources
-	_, err := m.appliedManifestWorkClient.UpdateStatus(ctx, appliedManifestWork, metav1.UpdateOptions{})
+	_, err := m.patcher.PatchStatus(ctx, appliedManifestWork, appliedManifestWork.Status, originalAppliedManifestWork.Status)
 	return err
 }
 

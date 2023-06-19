@@ -2,19 +2,16 @@ package finalizercontroller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
@@ -23,12 +20,14 @@ import (
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 )
 
 type unmanagedAppliedWorkController struct {
 	manifestWorkLister        worklister.ManifestWorkNamespaceLister
 	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
+	patcher                   patcher.Patcher[*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus]
 	appliedManifestWorkLister worklister.AppliedManifestWorkLister
 	hubHash                   string
 	agentID                   string
@@ -57,6 +56,9 @@ func NewUnManagedAppliedWorkController(
 	controller := &unmanagedAppliedWorkController{
 		manifestWorkLister:        manifestWorkLister,
 		appliedManifestWorkClient: appliedManifestWorkClient,
+		patcher: patcher.NewPatcher[
+			*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus](
+			appliedManifestWorkClient),
 		appliedManifestWorkLister: appliedManifestWorkInformer.Lister(),
 		hubHash:                   hubHash,
 		agentID:                   agentID,
@@ -138,33 +140,8 @@ func (m *unmanagedAppliedWorkController) stopToEvictAppliedManifestWork(
 
 func (m *unmanagedAppliedWorkController) patchEvictionStartTime(ctx context.Context,
 	appliedManifestWork *workapiv1.AppliedManifestWork, evictionStartTime *metav1.Time) error {
-	oldData, err := json.Marshal(workapiv1.AppliedManifestWork{
-		Status: workapiv1.AppliedManifestWorkStatus{
-			EvictionStartTime: appliedManifestWork.Status.EvictionStartTime,
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to Marshal old data for appliedmanifestwork status %s: %w", appliedManifestWork.Name, err)
-	}
-
-	newData, err := json.Marshal(workapiv1.AppliedManifestWork{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:             appliedManifestWork.UID,
-			ResourceVersion: appliedManifestWork.ResourceVersion,
-		},
-		Status: workapiv1.AppliedManifestWorkStatus{
-			EvictionStartTime: evictionStartTime,
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to Marshal new data for appliedmanifestwork status %s: %w", appliedManifestWork.Name, err)
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
-	if err != nil {
-		return fmt.Errorf("failed to create patch for cluster %s: %w", appliedManifestWork.Name, err)
-	}
-
-	_, err = m.appliedManifestWorkClient.Patch(ctx, appliedManifestWork.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	newAppliedWork := appliedManifestWork.DeepCopy()
+	newAppliedWork.Status.EvictionStartTime = evictionStartTime
+	_, err := m.patcher.PatchStatus(ctx, newAppliedWork, newAppliedWork.Status, appliedManifestWork.Status)
 	return err
 }

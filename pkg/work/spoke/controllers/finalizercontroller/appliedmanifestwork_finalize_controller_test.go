@@ -2,6 +2,7 @@ package finalizercontroller
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
@@ -18,6 +19,7 @@ import (
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
@@ -42,15 +44,15 @@ func TestFinalize(t *testing.T) {
 		{
 			name:                               "skip when not delete",
 			existingFinalizers:                 []string{controllers.ManifestWorkFinalizer},
-			validateAppliedManifestWorkActions: noAction,
-			validateDynamicActions:             noAction,
+			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
+			validateDynamicActions:             testingcommon.AssertNoActions,
 		},
 		{
 			name:                               "skip when finalizer gone",
 			terminated:                         true,
 			existingFinalizers:                 []string{"other-finalizer"},
-			validateAppliedManifestWorkActions: noAction,
-			validateDynamicActions:             noAction,
+			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
+			validateDynamicActions:             testingcommon.AssertNoActions,
 		},
 		{
 			name:               "get resources and remove finalizer",
@@ -63,17 +65,14 @@ func TestFinalize(t *testing.T) {
 				{Version: "v4", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g4", Resource: "r4", Namespace: "", Name: "n4"}},
 			},
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 2 {
-					t.Fatal(spew.Sdump(actions))
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.AppliedManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
 				}
-
-				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
 				if len(work.Status.AppliedResources) != 0 {
 					t.Fatal(spew.Sdump(actions[0]))
-				}
-				work = actions[1].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
-				if !reflect.DeepEqual(work.Finalizers, []string{"a", "b"}) {
-					t.Fatal(spew.Sdump(actions[1]))
 				}
 			},
 			validateDynamicActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -115,7 +114,7 @@ func TestFinalize(t *testing.T) {
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "ns2-n2"},
 			},
-			validateAppliedManifestWorkActions: noAction,
+			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
 			validateDynamicActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
 					t.Fatal(spew.Sdump(actions))
@@ -146,17 +145,13 @@ func TestFinalize(t *testing.T) {
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "n2"},
 			},
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 2 {
-					t.Fatal(spew.Sdump(actions))
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.AppliedManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
 				}
-
-				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
 				if len(work.Status.AppliedResources) != 0 {
-					t.Fatal(spew.Sdump(actions[0]))
-				}
-
-				work = actions[1].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
-				if !reflect.DeepEqual(work.Finalizers, []string{}) {
 					t.Fatal(spew.Sdump(actions[0]))
 				}
 			},
@@ -193,9 +188,11 @@ func TestFinalize(t *testing.T) {
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), c.existingResources...)
 			fakeClient := fakeworkclient.NewSimpleClientset(testingWork)
 			controller := AppliedManifestWorkFinalizeController{
-				appliedManifestWorkClient: fakeClient.WorkV1().AppliedManifestWorks(),
-				spokeDynamicClient:        fakeDynamicClient,
-				rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(0, 1*time.Second),
+				patcher: patcher.NewPatcher[
+					*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus](
+					fakeClient.WorkV1().AppliedManifestWorks()),
+				spokeDynamicClient: fakeDynamicClient,
+				rateLimiter:        workqueue.NewItemExponentialFailureRateLimiter(0, 1*time.Second),
 			}
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, testingWork.Name)
@@ -211,11 +208,5 @@ func TestFinalize(t *testing.T) {
 				t.Errorf("expected %d, but %d", c.expectedQueueLen, queueLen)
 			}
 		})
-	}
-}
-
-func noAction(t *testing.T, actions []clienttesting.Action) {
-	if len(actions) > 0 {
-		t.Fatal(spew.Sdump(actions))
 	}
 }

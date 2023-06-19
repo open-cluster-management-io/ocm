@@ -2,81 +2,242 @@ package manifestworkreplicasetcontroller
 
 import (
 	"context"
+	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
 
 	fakeclusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
-	"open-cluster-management.io/api/utils/work/v1/workapplier"
+	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	helpertest "open-cluster-management.io/ocm/pkg/work/hub/test"
 )
 
 func TestManifestWorkReplicaSetControllerPatchStatus(t *testing.T) {
-	mwrSetTest := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
-	mwrSetTest.Status.Summary.Total = 1
-	mw, _ := CreateManifestWork(mwrSetTest, "cls1")
-	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSetTest, mw)
-	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
-
-	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw); err != nil {
-		t.Fatal(err)
-	}
-	if err := workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetStore().Add(mwrSetTest); err != nil {
-		t.Fatal(err)
-	}
-
-	placement, placementDecision := helpertest.CreateTestPlacement("place-test", "default", "cls1")
-
-	fClusterClient := fakeclusterclient.NewSimpleClientset(placement, placementDecision)
-	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Second)
-
-	if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement); err != nil {
-		t.Fatal(err)
-	}
-	if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision); err != nil {
-		t.Fatal(err)
-	}
-
-	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
-	placementLister := clusterInformerFactory.Cluster().V1beta1().Placements().Lister()
-	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
-
-	pmwController := &ManifestWorkReplicaSetController{
-		workClient:                    fWorkClient,
-		manifestWorkReplicaSetLister:  workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Lister(),
-		manifestWorkReplicaSetIndexer: workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetIndexer(),
-
-		reconcilers: []ManifestWorkReplicaSetReconcile{
-			&finalizeReconciler{workApplier: workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
-				workClient: fWorkClient, manifestWorkLister: mwLister},
-			&addFinalizerReconciler{workClient: fWorkClient},
-			&deployReconciler{workApplier: workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
-				manifestWorkLister: mwLister, placementLister: placementLister, placeDecisionLister: placementDecisionLister},
-			&statusReconciler{manifestWorkLister: mwLister},
+	cases := []struct {
+		name            string
+		works           []runtime.Object
+		mwrSet          *workapiv1alpha1.ManifestWorkReplicaSet
+		placement       *clusterv1beta1.Placement
+		decision        *clusterv1beta1.PlacementDecision
+		validateActions func(t *testing.T, actions []clienttesting.Action)
+	}{
+		{
+			name:   "add finalizer",
+			mwrSet: helpertest.CreateTestManifestWorkReplicaSet("test", "default", "placement"),
+			works:  []runtime.Object{},
+			placement: func() *clusterv1beta1.Placement {
+				p, _ := helpertest.CreateTestPlacement("default", "placement")
+				return p
+			}(),
+			decision: func() *clusterv1beta1.PlacementDecision {
+				_, d := helpertest.CreateTestPlacement("default", "placement")
+				return d
+			}(),
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				workSet := &workapiv1alpha1.ManifestWorkReplicaSet{}
+				if err := json.Unmarshal(p, workSet); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(workSet.Finalizers, []string{ManifestWorkReplicaSetFinalizer}) {
+					t.Fatal(spew.Sdump(actions))
+				}
+			},
+		},
+		{
+			name: "placement not found",
+			mwrSet: func() *workapiv1alpha1.ManifestWorkReplicaSet {
+				w := helpertest.CreateTestManifestWorkReplicaSet("test", "default", "placement")
+				w.Finalizers = []string{ManifestWorkReplicaSetFinalizer}
+				return w
+			}(),
+			works: []runtime.Object{},
+			placement: func() *clusterv1beta1.Placement {
+				p, _ := helpertest.CreateTestPlacement("placement1", "default")
+				return p
+			}(),
+			decision: func() *clusterv1beta1.PlacementDecision {
+				_, d := helpertest.CreateTestPlacement("placement", "default")
+				return d
+			}(),
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				workSet := &workapiv1alpha1.ManifestWorkReplicaSet{}
+				if err := json.Unmarshal(p, workSet); err != nil {
+					t.Fatal(err)
+				}
+				if !meta.IsStatusConditionFalse(workSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified) {
+					t.Fatal(spew.Sdump(workSet.Status.Conditions))
+				}
+			},
+		},
+		{
+			name: "placement decision not found",
+			mwrSet: func() *workapiv1alpha1.ManifestWorkReplicaSet {
+				w := helpertest.CreateTestManifestWorkReplicaSet("test", "default", "placement")
+				w.Finalizers = []string{ManifestWorkReplicaSetFinalizer}
+				return w
+			}(),
+			works: []runtime.Object{},
+			placement: func() *clusterv1beta1.Placement {
+				p, _ := helpertest.CreateTestPlacement("placement", "default")
+				return p
+			}(),
+			decision: func() *clusterv1beta1.PlacementDecision {
+				_, d := helpertest.CreateTestPlacement("placement1", "default")
+				return d
+			}(),
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				workSet := &workapiv1alpha1.ManifestWorkReplicaSet{}
+				if err := json.Unmarshal(p, workSet); err != nil {
+					t.Fatal(err)
+				}
+				if !meta.IsStatusConditionFalse(workSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionManifestworkApplied) {
+					t.Fatal(spew.Sdump(workSet.Status.Conditions))
+				}
+			},
+		},
+		{
+			name: "apply correctly",
+			mwrSet: func() *workapiv1alpha1.ManifestWorkReplicaSet {
+				w := helpertest.CreateTestManifestWorkReplicaSet("test", "default", "placement")
+				w.Finalizers = []string{ManifestWorkReplicaSetFinalizer}
+				return w
+			}(),
+			works: []runtime.Object{},
+			placement: func() *clusterv1beta1.Placement {
+				p, _ := helpertest.CreateTestPlacement("placement", "default", "cluster1", "cluster2")
+				return p
+			}(),
+			decision: func() *clusterv1beta1.PlacementDecision {
+				_, d := helpertest.CreateTestPlacement("placement", "default", "cluster1", "cluster2")
+				return d
+			}(),
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "create", "create", "patch")
+				p := actions[2].(clienttesting.PatchActionImpl).Patch
+				workSet := &workapiv1alpha1.ManifestWorkReplicaSet{}
+				if err := json.Unmarshal(p, workSet); err != nil {
+					t.Fatal(err)
+				}
+				if workSet.Status.Summary.Total != 2 {
+					t.Error(spew.Sdump(workSet.Status.Summary))
+				}
+				if !meta.IsStatusConditionFalse(workSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionManifestworkApplied) {
+					t.Error(spew.Sdump(workSet.Status.Conditions))
+				}
+			},
+		},
+		{
+			name: "no additonal apply needed",
+			mwrSet: func() *workapiv1alpha1.ManifestWorkReplicaSet {
+				w := helpertest.CreateTestManifestWorkReplicaSet("test", "default", "placement")
+				w.Finalizers = []string{ManifestWorkReplicaSetFinalizer}
+				return w
+			}(),
+			works: helpertest.CreateTestManifestWorks("test", "default", "cluster1", "cluster2"),
+			placement: func() *clusterv1beta1.Placement {
+				p, _ := helpertest.CreateTestPlacement("placement", "default", "cluster1", "cluster2")
+				return p
+			}(),
+			decision: func() *clusterv1beta1.PlacementDecision {
+				_, d := helpertest.CreateTestPlacement("placement", "default", "cluster1", "cluster2")
+				return d
+			}(),
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				workSet := &workapiv1alpha1.ManifestWorkReplicaSet{}
+				if err := json.Unmarshal(p, workSet); err != nil {
+					t.Fatal(err)
+				}
+				if workSet.Status.Summary.Applied != 2 {
+					t.Error(spew.Sdump(workSet.Status.Summary))
+				}
+				if !meta.IsStatusConditionTrue(workSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionManifestworkApplied) {
+					t.Error(spew.Sdump(workSet.Status.Conditions))
+				}
+			},
+		},
+		{
+			name: "add and delete",
+			mwrSet: func() *workapiv1alpha1.ManifestWorkReplicaSet {
+				w := helpertest.CreateTestManifestWorkReplicaSet("test", "default", "placement")
+				w.Finalizers = []string{ManifestWorkReplicaSetFinalizer}
+				return w
+			}(),
+			works: helpertest.CreateTestManifestWorks("test", "default", "cluster1", "cluster2"),
+			placement: func() *clusterv1beta1.Placement {
+				p, _ := helpertest.CreateTestPlacement("placement", "default", "cluster2", "cluster3", "cluster4")
+				return p
+			}(),
+			decision: func() *clusterv1beta1.PlacementDecision {
+				_, d := helpertest.CreateTestPlacement("placement", "default", "cluster2", "cluster3", "cluster4")
+				return d
+			}(),
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "create", "create", "delete", "patch")
+				p := actions[3].(clienttesting.PatchActionImpl).Patch
+				workSet := &workapiv1alpha1.ManifestWorkReplicaSet{}
+				if err := json.Unmarshal(p, workSet); err != nil {
+					t.Fatal(err)
+				}
+				if workSet.Status.Summary.Total != 3 {
+					t.Error(spew.Sdump(workSet.Status.Summary))
+				}
+				if !meta.IsStatusConditionFalse(workSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionManifestworkApplied) {
+					t.Error(spew.Sdump(workSet.Status.Conditions))
+				}
+			},
 		},
 	}
 
-	// create new mwrSetTestNew with status
-	mwrSetTestNew := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test-new", "default", "place-test-new")
-	mwrSetTestNew.Status.Summary.Total = mwrSetTest.Status.Summary.Total + 3
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			workObjects := []runtime.Object{c.mwrSet}
+			workObjects = append(workObjects, c.works...)
+			fakeClient := fakeworkclient.NewSimpleClientset(workObjects...)
+			workInformers := workinformers.NewSharedInformerFactory(fakeClient, 10*time.Minute)
+			workInformers.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetStore().Add(c.mwrSet)
+			for _, o := range c.works {
+				workInformers.Work().V1().ManifestWorks().Informer().GetStore().Add(o)
+			}
 
-	err := pmwController.patchPlaceManifestStatus(context.TODO(), mwrSetTest, mwrSetTestNew)
-	if err != nil {
-		t.Fatal(err)
-	}
+			fakeClusterClient := fakeclusterclient.NewSimpleClientset(c.placement, c.decision)
+			clusterInformers := clusterinformers.NewSharedInformerFactory(fakeClusterClient, 10*time.Minute)
+			clusterInformers.Cluster().V1beta1().Placements().Informer().GetStore().Add(c.placement)
+			clusterInformers.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(c.decision)
 
-	// Check kubeClient has a patch action to apply
-	actions := ([]clienttesting.Action)(fWorkClient.Actions())
-	if len(actions) == 0 {
-		t.Fatal("fWorkClient Should have patch action ")
-	}
-	// Check placeMW patch name
-	if mwrSetTest.Name != actions[0].(clienttesting.PatchAction).GetName() {
-		t.Fatal("PlaceMW patch action not match ", actions[0])
+			ctrl := newController(
+				fakeClient,
+				workInformers.Work().V1alpha1().ManifestWorkReplicaSets(),
+				workInformers.Work().V1().ManifestWorks(),
+				clusterInformers.Cluster().V1beta1().Placements(),
+				clusterInformers.Cluster().V1beta1().PlacementDecisions(),
+			)
+
+			controllerContext := testingcommon.NewFakeSyncContext(t, c.mwrSet.Namespace+"/"+c.mwrSet.Name)
+			err := ctrl.sync(context.TODO(), controllerContext)
+			if err != nil {
+				t.Error(err)
+			}
+
+			c.validateActions(t, fakeClient.Actions())
+		})
 	}
 }

@@ -2,6 +2,7 @@ package appliedmanifestcontroller
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
@@ -58,13 +60,9 @@ func TestSyncManifestWork(t *testing.T) {
 			appliedResources: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
 			},
-			manifests: []workapiv1.ManifestCondition{newManifest("", "v1", "secrets", "ns1", "n1")},
-			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) > 0 {
-					t.Fatal(spew.Sdump(actions))
-				}
-			},
-			expectedDeleteActions: []clienttesting.DeleteActionImpl{},
+			manifests:                          []workapiv1.ManifestCondition{newManifest("", "v1", "secrets", "ns1", "n1")},
+			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
+			expectedDeleteActions:              []clienttesting.DeleteActionImpl{},
 		},
 		{
 			name: "delete untracked resources",
@@ -89,10 +87,12 @@ func TestSyncManifestWork(t *testing.T) {
 				newManifest("", "v1", "secrets", "ns6", "n6"),
 			},
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatal(spew.Sdump(actions))
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.AppliedManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
 				}
-				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
 				if !reflect.DeepEqual(work.Status.AppliedResources, []workapiv1.AppliedManifestResourceMeta{
 					{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
 					{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "", Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "ns2-n2"},
@@ -125,13 +125,9 @@ func TestSyncManifestWork(t *testing.T) {
 				newManifest("", "v1", "secrets", "ns1", "n1"),
 				newManifest("", "v1", "secrets", "ns2", "n2"),
 			},
-			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) > 0 {
-					t.Fatal(spew.Sdump(actions))
-				}
-			},
-			expectedDeleteActions: []clienttesting.DeleteActionImpl{},
-			expectedQueueLen:      1,
+			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
+			expectedDeleteActions:              []clienttesting.DeleteActionImpl{},
+			expectedQueueLen:                   1,
 		},
 		{
 			name: "ignore re-created resource",
@@ -149,10 +145,12 @@ func TestSyncManifestWork(t *testing.T) {
 				newManifest("", "v1", "secrets", "ns5", "n5"),
 			},
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatal(spew.Sdump(actions))
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.AppliedManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
 				}
-				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
 				if !reflect.DeepEqual(work.Status.AppliedResources, []workapiv1.AppliedManifestResourceMeta{
 					{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
 					{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns5", Name: "n5"}, UID: "ns5-n5"},
@@ -177,10 +175,12 @@ func TestSyncManifestWork(t *testing.T) {
 				newManifest("", "v1", "secrets", "ns2", "n2"),
 			},
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatal(spew.Sdump(actions))
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.AppliedManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
 				}
-				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.AppliedManifestWork)
 				if !reflect.DeepEqual(work.Status.AppliedResources, []workapiv1.AppliedManifestResourceMeta{
 					{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns1", Name: "n1"}, UID: "ns1-n1"},
 					{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "secrets", Namespace: "ns2", Name: "n2"}, UID: "ns2-n2-updated"},
@@ -211,9 +211,10 @@ func TestSyncManifestWork(t *testing.T) {
 			}
 
 			controller := AppliedManifestWorkController{
-				manifestWorkClient:        fakeClient.WorkV1().ManifestWorks(testingWork.Namespace),
-				manifestWorkLister:        informerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks("cluster1"),
-				appliedManifestWorkClient: fakeClient.WorkV1().AppliedManifestWorks(),
+				manifestWorkLister: informerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks("cluster1"),
+				patcher: patcher.NewPatcher[
+					*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus](
+					fakeClient.WorkV1().AppliedManifestWorks()),
 				appliedManifestWorkLister: informerFactory.Work().V1().AppliedManifestWorks().Lister(),
 				spokeDynamicClient:        fakeDynamicClient,
 				hubHash:                   "test",

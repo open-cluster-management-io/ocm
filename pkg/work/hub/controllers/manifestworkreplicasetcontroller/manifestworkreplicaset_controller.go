@@ -2,21 +2,16 @@ package manifestworkreplicasetcontroller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -31,6 +26,8 @@ import (
 	"open-cluster-management.io/api/utils/work/v1/workapplier"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
+
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 )
 
 const (
@@ -73,20 +70,8 @@ func NewManifestWorkReplicaSetController(
 	placementInformer clusterinformerv1beta1.PlacementInformer,
 	placeDecisionInformer clusterinformerv1beta1.PlacementDecisionInformer) factory.Controller {
 
-	controller := &ManifestWorkReplicaSetController{
-		workClient:                    workClient,
-		manifestWorkReplicaSetLister:  manifestWorkReplicaSetInformer.Lister(),
-		manifestWorkReplicaSetIndexer: manifestWorkReplicaSetInformer.Informer().GetIndexer(),
-
-		reconcilers: []ManifestWorkReplicaSetReconcile{
-			&finalizeReconciler{workApplier: workapplier.NewWorkApplierWithTypedClient(workClient, manifestWorkInformer.Lister()),
-				workClient: workClient, manifestWorkLister: manifestWorkInformer.Lister()},
-			&addFinalizerReconciler{workClient: workClient},
-			&deployReconciler{workApplier: workapplier.NewWorkApplierWithTypedClient(workClient, manifestWorkInformer.Lister()),
-				manifestWorkLister: manifestWorkInformer.Lister(), placementLister: placementInformer.Lister(), placeDecisionLister: placeDecisionInformer.Lister()},
-			&statusReconciler{manifestWorkLister: manifestWorkInformer.Lister()},
-		},
-	}
+	controller := newController(
+		workClient, manifestWorkReplicaSetInformer, manifestWorkInformer, placementInformer, placeDecisionInformer)
 
 	err := manifestWorkReplicaSetInformer.Informer().AddIndexers(
 		cache.Indexers{
@@ -131,6 +116,27 @@ func NewManifestWorkReplicaSetController(
 		WithSync(controller.sync).ToController("ManifestWorkReplicaSetController", recorder)
 }
 
+func newController(workClient workclientset.Interface,
+	manifestWorkReplicaSetInformer workinformerv1alpha1.ManifestWorkReplicaSetInformer,
+	manifestWorkInformer workinformerv1.ManifestWorkInformer,
+	placementInformer clusterinformerv1beta1.PlacementInformer,
+	placeDecisionInformer clusterinformerv1beta1.PlacementDecisionInformer) *ManifestWorkReplicaSetController {
+	return &ManifestWorkReplicaSetController{
+		workClient:                    workClient,
+		manifestWorkReplicaSetLister:  manifestWorkReplicaSetInformer.Lister(),
+		manifestWorkReplicaSetIndexer: manifestWorkReplicaSetInformer.Informer().GetIndexer(),
+
+		reconcilers: []ManifestWorkReplicaSetReconcile{
+			&finalizeReconciler{workApplier: workapplier.NewWorkApplierWithTypedClient(workClient, manifestWorkInformer.Lister()),
+				workClient: workClient, manifestWorkLister: manifestWorkInformer.Lister()},
+			&addFinalizerReconciler{workClient: workClient},
+			&deployReconciler{workApplier: workapplier.NewWorkApplierWithTypedClient(workClient, manifestWorkInformer.Lister()),
+				manifestWorkLister: manifestWorkInformer.Lister(), placementLister: placementInformer.Lister(), placeDecisionLister: placeDecisionInformer.Lister()},
+			&statusReconciler{manifestWorkLister: manifestWorkInformer.Lister()},
+		},
+	}
+}
+
 // sync is the main reconcile loop for placeManifest work. It is triggered every 15sec
 func (m *ManifestWorkReplicaSetController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	key := controllerContext.QueueKey()
@@ -143,7 +149,7 @@ func (m *ManifestWorkReplicaSetController) sync(ctx context.Context, controllerC
 		return nil
 	}
 
-	manifestWorkReplicaSet, err := m.manifestWorkReplicaSetLister.ManifestWorkReplicaSets(namespace).Get(name)
+	oldManifestWorkReplicaSet, err := m.manifestWorkReplicaSetLister.ManifestWorkReplicaSets(namespace).Get(name)
 	switch {
 	case errors.IsNotFound(err):
 		return nil
@@ -151,8 +157,7 @@ func (m *ManifestWorkReplicaSetController) sync(ctx context.Context, controllerC
 		return err
 	}
 
-	oldManifestWorkReplicaSet := manifestWorkReplicaSet
-	manifestWorkReplicaSet = manifestWorkReplicaSet.DeepCopy()
+	manifestWorkReplicaSet := oldManifestWorkReplicaSet.DeepCopy()
 
 	var state reconcileState
 	var errs []error
@@ -166,44 +171,16 @@ func (m *ManifestWorkReplicaSetController) sync(ctx context.Context, controllerC
 		}
 	}
 
+	workSetPatcher := patcher.NewPatcher[
+		*workapiv1alpha1.ManifestWorkReplicaSet, workapiv1alpha1.ManifestWorkReplicaSetSpec, workapiv1alpha1.ManifestWorkReplicaSetStatus](
+		m.workClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace))
+
 	// Patch status
-	if err := m.patchPlaceManifestStatus(ctx, oldManifestWorkReplicaSet, manifestWorkReplicaSet); err != nil {
+	if _, err := workSetPatcher.PatchStatus(ctx, manifestWorkReplicaSet, manifestWorkReplicaSet.Status, oldManifestWorkReplicaSet.Status); err != nil {
 		errs = append(errs, err)
 	}
 
 	return utilerrors.NewAggregate(errs)
-}
-
-func (m *ManifestWorkReplicaSetController) patchPlaceManifestStatus(ctx context.Context, old, new *workapiv1alpha1.ManifestWorkReplicaSet) error {
-	if apiequality.Semantic.DeepEqual(old.Status, new.Status) {
-		return nil
-	}
-
-	oldData, err := json.Marshal(workapiv1alpha1.ManifestWorkReplicaSet{
-		Status: old.Status,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to Marshal old data for ManifestWorkReplicaSet status %s: %w", old.Name, err)
-	}
-	newData, err := json.Marshal(workapiv1alpha1.ManifestWorkReplicaSet{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:             old.UID,
-			ResourceVersion: old.ResourceVersion,
-		}, // to ensure they appear in the patch as preconditions
-		Status: new.Status,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to Marshal new data for work status %s: %w", old.Name, err)
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
-	if err != nil {
-		return fmt.Errorf("failed to create patch for work %s: %w", old.Name, err)
-	}
-
-	_, err = m.workClient.WorkV1alpha1().ManifestWorkReplicaSets(old.Namespace).Patch(ctx,
-		old.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
-	return err
 }
 
 func listManifestWorksByManifestWorkReplicaSet(mwrs *workapiv1alpha1.ManifestWorkReplicaSet,

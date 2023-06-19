@@ -14,6 +14,7 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
@@ -36,7 +37,7 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 			agentID:                            "test-agent",
 			works:                              []runtime.Object{},
 			appliedWorks:                       []runtime.Object{},
-			validateAppliedManifestWorkActions: noAction,
+			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
 		},
 		{
 			name:                    "evict appliedmanifestwork when its relating manifestwork is missing on the hub",
@@ -183,7 +184,7 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 				},
 			},
 			expectedQueueLen:                   1,
-			validateAppliedManifestWorkActions: noAction,
+			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
 		},
 	}
 
@@ -205,6 +206,9 @@ func TestSyncUnamanagedAppliedWork(t *testing.T) {
 			controller := &unmanagedAppliedWorkController{
 				manifestWorkLister:        informerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks("test"),
 				appliedManifestWorkClient: fakeClient.WorkV1().AppliedManifestWorks(),
+				patcher: patcher.NewPatcher[
+					*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus](
+					fakeClient.WorkV1().AppliedManifestWorks()),
 				appliedManifestWorkLister: informerFactory.Work().V1().AppliedManifestWorks().Lister(),
 				hubHash:                   c.hubHash,
 				agentID:                   c.agentID,

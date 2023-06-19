@@ -15,7 +15,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,11 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 
 	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
-	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
@@ -139,59 +136,6 @@ func MergeStatusConditions(conditions []metav1.Condition, newConditions []metav1
 	}
 
 	return merged
-}
-
-type UpdateManifestWorkStatusFunc func(status *workapiv1.ManifestWorkStatus) error
-
-func UpdateManifestWorkStatus(
-	ctx context.Context,
-	client workv1client.ManifestWorkInterface,
-	manifestWork *workapiv1.ManifestWork,
-	updateFuncs ...UpdateManifestWorkStatusFunc) (*workapiv1.ManifestWorkStatus, bool, error) {
-	// in order to reduce the number of GET requests to hub apiserver, try to update the manifestwork
-	// fetched from informer cache (with lister).
-	updatedWorkStatus, updated, err := updateManifestWorkStatus(ctx, client, manifestWork, updateFuncs...)
-	if err == nil {
-		return updatedWorkStatus, updated, nil
-	}
-
-	// if the update failed, retry with the manifestwork resource fetched with work client.
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		manifestWork, err := client.Get(ctx, manifestWork.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		updatedWorkStatus, updated, err = updateManifestWorkStatus(ctx, client, manifestWork, updateFuncs...)
-		return err
-	})
-
-	return updatedWorkStatus, updated, err
-}
-
-// updateManifestWorkStatus updates the status of the given manifestWork. The manifestWork is mutated.
-func updateManifestWorkStatus(
-	ctx context.Context,
-	client workv1client.ManifestWorkInterface,
-	manifestWork *workapiv1.ManifestWork,
-	updateFuncs ...UpdateManifestWorkStatusFunc) (*workapiv1.ManifestWorkStatus, bool, error) {
-	oldStatus := &manifestWork.Status
-	newStatus := oldStatus.DeepCopy()
-	for _, update := range updateFuncs {
-		if err := update(newStatus); err != nil {
-			return nil, false, err
-		}
-	}
-	if equality.Semantic.DeepEqual(oldStatus, newStatus) {
-		// We return the newStatus which is a deep copy of oldStatus but with all update funcs applied.
-		return newStatus, false, nil
-	}
-
-	manifestWork.Status = *newStatus
-	updatedManifestWork, err := client.UpdateStatus(ctx, manifestWork, metav1.UpdateOptions{})
-	if err != nil {
-		return nil, false, err
-	}
-	return &updatedManifestWork.Status, true, nil
 }
 
 // DeleteAppliedResources deletes all given applied resources and returns those pending for finalization
@@ -325,27 +269,6 @@ func GuessObjectGroupVersionKind(object runtime.Object) (*schema.GroupVersionKin
 	}
 
 	return nil, fmt.Errorf("cannot get gvk of %v", object)
-}
-
-// RemoveFinalizer removes a finalizer from the list.  It mutates its input.
-func RemoveFinalizer(object runtime.Object, finalizerName string) (finalizersUpdated bool) {
-	accessor, err := meta.Accessor(object)
-	if err != nil {
-		return false
-	}
-
-	finalizers := accessor.GetFinalizers()
-	newFinalizers := []string{}
-	for i := range finalizers {
-		if finalizers[i] == finalizerName {
-			finalizersUpdated = true
-			continue
-		}
-		newFinalizers = append(newFinalizers, finalizers[i])
-	}
-	accessor.SetFinalizers(newFinalizers)
-
-	return finalizersUpdated
 }
 
 func HasFinalizer(finalizers []string, finalizer string) bool {

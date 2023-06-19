@@ -9,7 +9,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
@@ -21,6 +20,7 @@ import (
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 )
@@ -28,7 +28,7 @@ import (
 // AppliedManifestWorkFinalizeController handles cleanup of appliedmanifestwork resources before deletion is allowed.
 // It should handle all appliedmanifestworks belonging to this agent identified by the agentID.
 type AppliedManifestWorkFinalizeController struct {
-	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
+	patcher                   patcher.Patcher[*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus]
 	appliedManifestWorkLister worklister.AppliedManifestWorkLister
 	spokeDynamicClient        dynamic.Interface
 	rateLimiter               workqueue.RateLimiter
@@ -43,7 +43,9 @@ func NewAppliedManifestWorkFinalizeController(
 ) factory.Controller {
 
 	controller := &AppliedManifestWorkFinalizeController{
-		appliedManifestWorkClient: appliedManifestWorkClient,
+		patcher: patcher.NewPatcher[
+			*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus](
+			appliedManifestWorkClient),
 		appliedManifestWorkLister: appliedManifestWorkInformer.Lister(),
 		spokeDynamicClient:        spokeDynamicClient,
 		rateLimiter:               workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
@@ -89,8 +91,6 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 		return nil
 	}
 
-	var err error
-
 	owner := helper.NewAppliedManifestWorkOwner(appliedManifestWork)
 
 	// Work is deleting, we remove its related resources on spoke cluster
@@ -99,38 +99,29 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 	reason := fmt.Sprintf("manifestwork %s is terminating", appliedManifestWork.Spec.ManifestWorkName)
 	resourcesPendingFinalization, errs := helper.DeleteAppliedResources(
 		ctx, appliedManifestWork.Status.AppliedResources, reason, m.spokeDynamicClient, controllerContext.Recorder(), *owner)
-
-	updatedAppliedManifestWork := false
-	if len(appliedManifestWork.Status.AppliedResources) != len(resourcesPendingFinalization) {
-		// update the status of the manifest work accordingly
-		appliedManifestWork.Status.AppliedResources = resourcesPendingFinalization
-		appliedManifestWork, err = m.appliedManifestWorkClient.UpdateStatus(ctx, appliedManifestWork, metav1.UpdateOptions{})
-		if err != nil {
-			errs = append(errs, fmt.Errorf(
-				"failed to update status of AppliedManifestWork %s: %w", originalManifestWork.Name, err))
-		} else {
-			updatedAppliedManifestWork = true
-		}
+	appliedManifestWork.Status.AppliedResources = resourcesPendingFinalization
+	updatedAppliedManifestWork, err := m.patcher.PatchStatus(ctx, appliedManifestWork, appliedManifestWork.Status, originalManifestWork.Status)
+	if err != nil {
+		errs = append(errs, fmt.Errorf(
+			"failed to update status of AppliedManifestWork %s: %w", originalManifestWork.Name, err))
 	}
-	if len(errs) != 0 {
+
+	// return quickly when there is update event or err
+	if updatedAppliedManifestWork || len(errs) != 0 {
 		return utilerrors.NewAggregate(errs)
 	}
 
 	// requeue the work until all applied resources are deleted and finalized if the appliedmanifestwork itself is not updated
 	if len(resourcesPendingFinalization) != 0 {
 		klog.V(4).Infof("%d resources pending deletions %v", len(resourcesPendingFinalization))
-		if !updatedAppliedManifestWork {
-			controllerContext.Queue().AddAfter(appliedManifestWork.Name, m.rateLimiter.When(appliedManifestWork.Name))
-		}
+		controllerContext.Queue().AddAfter(appliedManifestWork.Name, m.rateLimiter.When(appliedManifestWork.Name))
 		return nil
 	}
 
 	// reset the rate limiter for the appliedmanifestwork
 	m.rateLimiter.Forget(appliedManifestWork.Name)
 
-	helper.RemoveFinalizer(appliedManifestWork, controllers.AppliedManifestWorkFinalizer)
-	_, err = m.appliedManifestWorkClient.Update(ctx, appliedManifestWork, metav1.UpdateOptions{})
-	if err != nil {
+	if err := m.patcher.RemoveFinalizer(ctx, appliedManifestWork, controllers.AppliedManifestWorkFinalizer); err != nil {
 		return fmt.Errorf("failed to remove finalizer from AppliedManifestWork %s: %w", appliedManifestWork.Name, err)
 	}
 	return nil

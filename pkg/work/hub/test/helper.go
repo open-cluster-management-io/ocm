@@ -1,9 +1,14 @@
 package test
 
 import (
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
@@ -27,6 +32,29 @@ func CreateTestManifestWorkReplicaSet(name string, ns string, placementName stri
 		},
 	}
 	return mwrs
+}
+
+func CreateTestManifestWorks(name, namespace string, clusters ...string) []runtime.Object {
+	obj := spoketesting.NewUnstructured("v1", "kind", "test-ns", "test-name")
+	works := []runtime.Object{}
+	for _, c := range clusters {
+		mw, _ := spoketesting.NewManifestWork(0, obj)
+		mw.Name = name
+		mw.Namespace = c
+		mw.Labels = map[string]string{
+			"work.open-cluster-management.io/manifestworkreplicaset": fmt.Sprintf("%s.%s", namespace, name),
+		}
+		meta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
+			Type:   workapiv1.WorkApplied,
+			Status: metav1.ConditionTrue,
+		})
+		meta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{
+			Type:   workapiv1.WorkAvailable,
+			Status: metav1.ConditionTrue,
+		})
+		works = append(works, mw)
+	}
+	return works
 }
 
 // Return placement with predicate of label cluster name

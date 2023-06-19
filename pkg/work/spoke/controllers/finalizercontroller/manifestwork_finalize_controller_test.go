@@ -2,6 +2,7 @@ package finalizercontroller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 )
@@ -44,12 +46,8 @@ func TestSyncManifestWorkController(t *testing.T) {
 					t.Errorf("Suppose nothing done for appliedmanifestwork")
 				}
 			},
-			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 0 {
-					t.Errorf("Suppose nothing done for manifestwork")
-				}
-			},
-			expectedQueueLen: 0,
+			validateManifestWorkActions: testingcommon.AssertNoActions,
+			expectedQueueLen:            0,
 		},
 		{
 			name:     "delete appliedmanifestworkwork when work has no finalizer on that",
@@ -69,12 +67,8 @@ func TestSyncManifestWorkController(t *testing.T) {
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "delete")
 			},
-			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 0 {
-					t.Errorf("Suppose nothing done for manifestwork")
-				}
-			},
-			expectedQueueLen: 1,
+			validateManifestWorkActions: testingcommon.AssertNoActions,
+			expectedQueueLen:            1,
 		},
 		{
 			name:     "delete applied work when work is deleting",
@@ -95,12 +89,8 @@ func TestSyncManifestWorkController(t *testing.T) {
 			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "delete")
 			},
-			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 0 {
-					t.Errorf("Suppose nothing done for manifestwork")
-				}
-			},
-			expectedQueueLen: 1,
+			validateManifestWorkActions: testingcommon.AssertNoActions,
+			expectedQueueLen:            1,
 		},
 		{
 			name:     "requeue work when applied work is deleting",
@@ -119,17 +109,9 @@ func TestSyncManifestWorkController(t *testing.T) {
 					DeletionTimestamp: &now,
 				},
 			},
-			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 0 {
-					t.Errorf("Expect 0 actions on appliedmanifestwork, but have %d", len(actions))
-				}
-			},
-			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 0 {
-					t.Errorf("Suppose nothing done for manifestwork")
-				}
-			},
-			expectedQueueLen: 1,
+			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
+			validateManifestWorkActions:        testingcommon.AssertNoActions,
+			expectedQueueLen:                   1,
 		},
 		{
 			name:     "remove finalizer when applied work is cleaned",
@@ -147,16 +129,15 @@ func TestSyncManifestWorkController(t *testing.T) {
 					Name: "fake",
 				},
 			},
-			validateAppliedManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 0 {
-					t.Errorf("Expect 0 actions on appliedmanifestwork, but have %d", len(actions))
-				}
-			},
+			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
 			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "update")
-				updateAction := actions[0].(clienttesting.UpdateActionImpl)
-				obj := updateAction.Object.(*workapiv1.ManifestWork)
-				if len(obj.Finalizers) != 0 {
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.ManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
+				}
+				if len(work.Finalizers) != 0 {
 					t.Errorf("Expect finalizer is cleaned")
 				}
 			},
@@ -176,13 +157,9 @@ func TestSyncManifestWorkController(t *testing.T) {
 					Name: fmt.Sprintf("%s-work", hubHash),
 				},
 			},
-			validateAppliedManifestWorkActions: noAction,
-			validateManifestWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 0 {
-					t.Errorf("Suppose nothing done for manifestwork")
-				}
-			},
-			expectedQueueLen: 0,
+			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
+			validateManifestWorkActions:        testingcommon.AssertNoActions,
+			expectedQueueLen:                   0,
 		},
 	}
 
@@ -197,7 +174,9 @@ func TestSyncManifestWorkController(t *testing.T) {
 				t.Fatal(err)
 			}
 			controller := &ManifestWorkFinalizeController{
-				manifestWorkClient:        fakeClient.WorkV1().ManifestWorks("cluster1"),
+				patcher: patcher.NewPatcher[
+					*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
+					fakeClient.WorkV1().ManifestWorks("cluster1")),
 				manifestWorkLister:        informerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks("cluster1"),
 				appliedManifestWorkClient: fakeClient.WorkV1().AppliedManifestWorks(),
 				appliedManifestWorkLister: informerFactory.Work().V1().AppliedManifestWorks().Lister(),

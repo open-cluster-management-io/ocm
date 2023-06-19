@@ -10,7 +10,7 @@ rules:
 # Allow work agent to get/list/watch/update manifestworks
 - apiGroups: ["work.open-cluster-management.io"]
   resources: ["manifestworks"]
-  verbs: ["get", "list", "watch", "update"]
+  verbs: ["get", "list", "watch", "update", "patch"]
 # Allow work agent to update the status of manifestwork
 - apiGroups: ["work.open-cluster-management.io"]
   resources: ["manifestworks/status"]

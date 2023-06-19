@@ -6,13 +6,11 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -20,7 +18,6 @@ import (
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
 
-	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
@@ -37,13 +34,6 @@ func newCondition(name, status, reason, message string, lastTransition *metav1.T
 		ret.LastTransitionTime = *lastTransition
 	}
 	return ret
-}
-
-func updateSpokeClusterConditionFn(cond metav1.Condition) UpdateManifestWorkStatusFunc {
-	return func(oldStatus *workapiv1.ManifestWorkStatus) error {
-		meta.SetStatusCondition(&oldStatus.Conditions, cond)
-		return nil
-	}
 }
 
 func newManifestCondition(ordinal int32, resource string, conds ...metav1.Condition) workapiv1.ManifestCondition {
@@ -75,102 +65,6 @@ func newSecret(namespace, name string, terminated bool, uid string, owner ...met
 	}
 
 	return secret
-}
-
-// TestUpdateStatusCondition tests UpdateManifestWorkStatus function
-func TestUpdateStatusCondition(t *testing.T) {
-	nowish := metav1.Now()
-	beforeish := metav1.Time{Time: nowish.Add(-10 * time.Second)}
-	afterish := metav1.Time{Time: nowish.Add(10 * time.Second)}
-
-	cases := []struct {
-		name               string
-		startingConditions []metav1.Condition
-		newCondition       metav1.Condition
-		expectedUpdated    bool
-		expectedConditions []metav1.Condition
-	}{
-		{
-			name:               "add to empty",
-			startingConditions: []metav1.Condition{},
-			newCondition:       newCondition("test", "True", "my-reason", "my-message", nil),
-			expectedUpdated:    true,
-			expectedConditions: []metav1.Condition{newCondition("test", "True", "my-reason", "my-message", nil)},
-		},
-		{
-			name: "add to non-conflicting",
-			startingConditions: []metav1.Condition{
-				newCondition("two", "True", "my-reason", "my-message", nil),
-			},
-			newCondition:    newCondition("one", "True", "my-reason", "my-message", nil),
-			expectedUpdated: true,
-			expectedConditions: []metav1.Condition{
-				newCondition("two", "True", "my-reason", "my-message", nil),
-				newCondition("one", "True", "my-reason", "my-message", nil),
-			},
-		},
-		{
-			name: "change existing status",
-			startingConditions: []metav1.Condition{
-				newCondition("two", "True", "my-reason", "my-message", nil),
-				newCondition("one", "True", "my-reason", "my-message", nil),
-			},
-			newCondition:    newCondition("one", "False", "my-different-reason", "my-othermessage", nil),
-			expectedUpdated: true,
-			expectedConditions: []metav1.Condition{
-				newCondition("two", "True", "my-reason", "my-message", nil),
-				newCondition("one", "False", "my-different-reason", "my-othermessage", nil),
-			},
-		},
-		{
-			name: "leave existing transition time",
-			startingConditions: []metav1.Condition{
-				newCondition("two", "True", "my-reason", "my-message", nil),
-				newCondition("one", "True", "my-reason", "my-message", &beforeish),
-			},
-			newCondition:    newCondition("one", "True", "my-reason", "my-message", &afterish),
-			expectedUpdated: false,
-			expectedConditions: []metav1.Condition{
-				newCondition("two", "True", "my-reason", "my-message", nil),
-				newCondition("one", "True", "my-reason", "my-message", &beforeish),
-			},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			manifestWork := &workapiv1.ManifestWork{
-				ObjectMeta: metav1.ObjectMeta{Name: "work1", Namespace: "cluster1"},
-				Status: workapiv1.ManifestWorkStatus{
-					Conditions: c.startingConditions,
-				},
-			}
-			fakeWorkClient := fakeworkclient.NewSimpleClientset(manifestWork)
-
-			status, updated, err := UpdateManifestWorkStatus(
-				context.TODO(),
-				fakeWorkClient.WorkV1().ManifestWorks("cluster1"),
-				manifestWork,
-				updateSpokeClusterConditionFn(c.newCondition),
-			)
-			if err != nil {
-				t.Errorf("unexpected err: %v", err)
-			}
-			if updated != c.expectedUpdated {
-				t.Errorf("expected %t, but %t", c.expectedUpdated, updated)
-			}
-			for i := range c.expectedConditions {
-				expected := c.expectedConditions[i]
-				actual := status.Conditions[i]
-				if expected.LastTransitionTime == (metav1.Time{}) {
-					actual.LastTransitionTime = metav1.Time{}
-				}
-				if !equality.Semantic.DeepEqual(expected, actual) {
-					t.Errorf(cmp.Diff(expected, actual))
-				}
-			}
-		})
-	}
 }
 
 // TestSetManifestCondition tests SetManifestCondition function
@@ -451,45 +345,6 @@ func TestDeleteAppliedResourcess(t *testing.T) {
 
 			if !equality.Semantic.DeepEqual(actual, c.expectedResourcesPendingFinalization) {
 				t.Errorf(cmp.Diff(actual, c.expectedResourcesPendingFinalization))
-			}
-		})
-	}
-}
-
-func TestRemoveFinalizer(t *testing.T) {
-	cases := []struct {
-		name               string
-		obj                runtime.Object
-		finalizerToRemove  string
-		expectedFinalizers []string
-	}{
-		{
-			name:               "No finalizers in object",
-			obj:                &workapiv1.ManifestWork{},
-			finalizerToRemove:  "a",
-			expectedFinalizers: []string{},
-		},
-		{
-			name:               "remove finalizer",
-			obj:                &workapiv1.ManifestWork{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"a"}}},
-			finalizerToRemove:  "a",
-			expectedFinalizers: []string{},
-		},
-		{
-			name:               "multiple finalizers",
-			obj:                &workapiv1.ManifestWork{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"b", "a", "c"}}},
-			finalizerToRemove:  "a",
-			expectedFinalizers: []string{"b", "c"},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			RemoveFinalizer(c.obj, c.finalizerToRemove)
-			accessor, _ := meta.Accessor(c.obj)
-			finalizers := accessor.GetFinalizers()
-			if !equality.Semantic.DeepEqual(finalizers, c.expectedFinalizers) {
-				t.Errorf("Expected finalizers are same, but got %v", finalizers)
 			}
 		})
 	}

@@ -24,6 +24,7 @@ import (
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 	"open-cluster-management.io/ocm/pkg/work/spoke/statusfeedback"
@@ -36,7 +37,7 @@ const statusFeedbackConditionType = "StatusFeedbackSynced"
 // are logically disinct, however, they are put in the same control loop to reduce live get call to spoke apiserver
 // and status update call to hub apiserver.
 type AvailableStatusController struct {
-	manifestWorkClient workv1client.ManifestWorkInterface
+	patcher            patcher.Patcher[*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus]
 	manifestWorkLister worklister.ManifestWorkNamespaceLister
 	spokeDynamicClient dynamic.Interface
 	statusReader       *statusfeedback.StatusReader
@@ -52,7 +53,9 @@ func NewAvailableStatusController(
 	syncInterval time.Duration,
 ) factory.Controller {
 	controller := &AvailableStatusController{
-		manifestWorkClient: manifestWorkClient,
+		patcher: patcher.NewPatcher[
+			*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
+			manifestWorkClient),
 		manifestWorkLister: manifestWorkLister,
 		spokeDynamicClient: spokeDynamicClient,
 		statusReader:       statusfeedback.NewStatusReader(),
@@ -141,7 +144,7 @@ func (c *AvailableStatusController) syncManifestWork(ctx context.Context, origin
 	}
 
 	// update status of manifestwork. if this conflicts, try again later
-	_, err := c.manifestWorkClient.UpdateStatus(ctx, manifestWork, metav1.UpdateOptions{})
+	_, err := c.patcher.PatchStatus(ctx, manifestWork, manifestWork.Status, originalManifestWork.Status)
 	return err
 }
 

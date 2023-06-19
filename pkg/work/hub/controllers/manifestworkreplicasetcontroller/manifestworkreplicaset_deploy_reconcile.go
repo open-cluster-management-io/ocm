@@ -34,10 +34,11 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 	var placements []*clusterv1beta1.Placement
 	for _, placementRef := range mwrSet.Spec.PlacementRefs {
 		placement, err := d.placementLister.Placements(mwrSet.Namespace).Get(placementRef.Name)
+		if errors.IsNotFound(err) {
+			apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetPlacementDecisionVerified(workapiv1alpha1.ReasonPlacementDecisionNotFound, ""))
+			return mwrSet, reconcileStop, nil
+		}
 		if err != nil {
-			if errors.IsNotFound(err) {
-				apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetPlacementDecisionVerified(workapiv1alpha1.ReasonPlacementDecisionNotFound, ""))
-			}
 			return mwrSet, reconcileContinue, fmt.Errorf("Failed get placement %w", err)
 		}
 		placements = append(placements, placement)
