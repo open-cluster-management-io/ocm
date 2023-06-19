@@ -22,7 +22,9 @@ import (
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
@@ -32,7 +34,7 @@ var SSARReSyncTime = 30 * time.Second
 type ssarController struct {
 	kubeClient       kubernetes.Interface
 	secretLister     corelister.SecretLister
-	klusterletClient operatorv1client.KlusterletInterface
+	patcher          patcher.Patcher[*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus]
 	klusterletLister operatorlister.KlusterletLister
 	*klusterletLocker
 }
@@ -54,8 +56,9 @@ func NewKlusterletSSARController(
 	recorder events.Recorder,
 ) factory.Controller {
 	controller := &ssarController{
-		kubeClient:       kubeClient,
-		klusterletClient: klusterletClient,
+		kubeClient: kubeClient,
+		patcher: patcher.NewPatcher[
+			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](klusterletClient),
 		klusterletLister: klusterletInformer.Lister(),
 		secretLister:     secretInformer.Lister(),
 		klusterletLocker: &klusterletLocker{
@@ -113,8 +116,10 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 	}
 
 	c.addSSARChecking(klusterletName)
-	go func() {
+	go func(klusterlet *operatorapiv1.Klusterlet) {
 		defer c.deleteSSARChecking(klusterletName)
+
+		newKlusterlet := klusterlet.DeepCopy()
 
 		klog.V(4).Infof("Checking hub kubeconfig for klusterlet %q", klusterletName)
 		agentNamespace := helpers.AgentNamespace(klusterlet)
@@ -133,13 +138,8 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 		// the hub kubeconfig is functional, the bootstrap kubeconfig check is not needed,
 		// ignore it to avoid sending additional sar requests
 		if hubConfigDegradedCondition.Status == metav1.ConditionFalse {
-			_, _, err := helpers.UpdateKlusterletStatus(
-				ctx,
-				c.klusterletClient,
-				klusterletName,
-				helpers.UpdateKlusterletConditionFn(hubConfigDegradedCondition),
-			)
-
+			meta.SetStatusCondition(&newKlusterlet.Status.Conditions, hubConfigDegradedCondition)
+			_, err := c.patcher.PatchStatus(ctx, newKlusterlet, newKlusterlet.Status, klusterlet.Status)
 			if err != nil {
 				klog.Errorf("Update Klusterlet Status Failed: %v", err)
 				controllerContext.Queue().AddAfter(klusterletName, SSARReSyncTime)
@@ -161,23 +161,19 @@ func (c *ssarController) sync(ctx context.Context, controllerContext factory.Syn
 
 		// The status is always true here since the hub kubeconfig check fails. Need to add the additional
 		// message relating to bootstrap kubeconfig check here.
-		_, _, err := helpers.UpdateKlusterletStatus(
-			ctx,
-			c.klusterletClient,
-			klusterletName,
-			helpers.UpdateKlusterletConditionFn(metav1.Condition{
-				Type:               hubConnectionDegraded,
-				Status:             metav1.ConditionTrue,
-				ObservedGeneration: klusterlet.Generation,
-				Reason:             bootstrapDegradedCondition.Reason + "," + hubConfigDegradedCondition.Reason,
-				Message:            bootstrapDegradedCondition.Message + "\n" + hubConfigDegradedCondition.Message,
-			}),
-		)
+		meta.SetStatusCondition(&newKlusterlet.Status.Conditions, metav1.Condition{
+			Type:               hubConnectionDegraded,
+			Status:             metav1.ConditionTrue,
+			ObservedGeneration: klusterlet.Generation,
+			Reason:             bootstrapDegradedCondition.Reason + "," + hubConfigDegradedCondition.Reason,
+			Message:            bootstrapDegradedCondition.Message + "\n" + hubConfigDegradedCondition.Message,
+		})
+		_, err := c.patcher.PatchStatus(ctx, newKlusterlet, newKlusterlet.Status, klusterlet.Status)
 		if err != nil {
 			klog.Errorf("Update Klusterlet Status Failed: %v", err)
 			controllerContext.Queue().AddAfter(klusterletName, SSARReSyncTime)
 		}
-	}()
+	}(klusterlet)
 
 	return nil
 }

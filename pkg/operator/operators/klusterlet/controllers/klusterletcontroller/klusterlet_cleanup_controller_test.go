@@ -51,11 +51,11 @@ func TestSyncDelete(t *testing.T) {
 		t.Errorf("Expected 27 delete actions, but got %d", len(deleteActions))
 	}
 
-	var updateWorkActions []clienttesting.UpdateActionImpl
+	var updateWorkActions []clienttesting.PatchActionImpl
 	workActions := controller.workClient.Actions()
 	for _, action := range workActions {
-		if action.GetVerb() == "update" {
-			updateAction := action.(clienttesting.UpdateActionImpl)
+		if action.GetVerb() == "patch" {
+			updateAction := action.(clienttesting.PatchActionImpl)
 			updateWorkActions = append(updateWorkActions, updateAction)
 			continue
 		}
@@ -124,11 +124,11 @@ func TestSyncDeleteHosted(t *testing.T) {
 		t.Errorf("Expected 13 delete actions, but got %d", len(deleteActionsManaged))
 	}
 
-	var updateWorkActions []clienttesting.UpdateActionImpl
+	var updateWorkActions []clienttesting.PatchActionImpl
 	workActions := controller.managedWorkClient.Actions()
 	for _, action := range workActions {
-		if action.GetVerb() == "update" {
-			updateAction := action.(clienttesting.UpdateActionImpl)
+		if action.GetVerb() == "patch" {
+			updateAction := action.(clienttesting.PatchActionImpl)
 			updateWorkActions = append(updateWorkActions, updateAction)
 			continue
 		}
@@ -196,7 +196,7 @@ func TestSyncAddHostedFinalizerWhenKubeconfigReady(t *testing.T) {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 
-	klusterlet, err = c.cleanupController.klusterletClient.Get(context.TODO(), klusterlet.Name, metav1.GetOptions{})
+	klusterlet, err = c.operatorClient.OperatorV1().Klusterlets().Get(context.TODO(), klusterlet.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Expected non error when get klusterlet, %v", err)
 	}
@@ -216,7 +216,7 @@ func TestSyncAddHostedFinalizerWhenKubeconfigReady(t *testing.T) {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 
-	klusterlet, err = c.cleanupController.klusterletClient.Get(context.TODO(), klusterlet.Name, metav1.GetOptions{})
+	klusterlet, err = c.operatorClient.OperatorV1().Klusterlets().Get(context.TODO(), klusterlet.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Expected non error when get klusterlet, %v", err)
 	}

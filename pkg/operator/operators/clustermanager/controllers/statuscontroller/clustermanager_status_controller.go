@@ -17,16 +17,21 @@ import (
 	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
-const registrationDegraded = "HubRegistrationDegraded"
-const placementDegraded = "HubPlacementDegraded"
+const (
+	registrationDegraded  = "HubRegistrationDegraded"
+	placementDegraded     = "HubPlacementDegraded"
+	clusterManagerApplied = "Applied"
+)
 
 type clusterManagerStatusController struct {
 	deploymentLister     appslister.DeploymentLister
-	clusterManagerClient operatorv1client.ClusterManagerInterface
+	patcher              patcher.Patcher[*operatorapiv1.ClusterManager, operatorapiv1.ClusterManagerSpec, operatorapiv1.ClusterManagerStatus]
 	clusterManagerLister operatorlister.ClusterManagerLister
 }
 
@@ -38,8 +43,10 @@ func NewClusterManagerStatusController(
 	recorder events.Recorder) factory.Controller {
 	controller := &clusterManagerStatusController{
 		deploymentLister:     deploymentInformer.Lister(),
-		clusterManagerClient: clusterManagerClient,
 		clusterManagerLister: clusterManagerInformer.Lister(),
+		patcher: patcher.NewPatcher[
+			*operatorapiv1.ClusterManager, operatorapiv1.ClusterManagerSpec, operatorapiv1.ClusterManagerStatus](
+			clusterManagerClient),
 	}
 
 	return factory.New().WithSync(controller.sync).
@@ -65,22 +72,25 @@ func (s *clusterManagerStatusController) sync(ctx context.Context, controllerCon
 	if errors.IsNotFound(err) {
 		return nil
 	}
-
-	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManagerName, clusterManager.Spec.DeployOption.Mode)
-
 	if err != nil {
 		return err
 	}
 
+	if meta.FindStatusCondition(clusterManager.Status.Conditions, clusterManagerApplied) == nil {
+		return nil
+	}
+
+	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManagerName, clusterManager.Spec.DeployOption.Mode)
+	newClusterManager := clusterManager.DeepCopy()
+
 	registrationCond := s.updateStatusOfRegistration(ctx, clusterManager.Name, clusterManagerNamespace)
 	registrationCond.ObservedGeneration = clusterManager.Generation
+	meta.SetStatusCondition(&newClusterManager.Status.Conditions, registrationCond)
 	placementCond := s.updateStatusOfPlacement(ctx, clusterManager.Name, clusterManagerNamespace)
 	placementCond.ObservedGeneration = clusterManager.Generation
+	meta.SetStatusCondition(&newClusterManager.Status.Conditions, placementCond)
 
-	_, _, err = helpers.UpdateClusterManagerStatus(ctx, s.clusterManagerClient, clusterManagerName,
-		helpers.UpdateClusterManagerConditionFn(registrationCond, placementCond),
-	)
-
+	_, err = s.patcher.PatchStatus(ctx, newClusterManager, newClusterManager.Status, clusterManager.Status)
 	return err
 }
 

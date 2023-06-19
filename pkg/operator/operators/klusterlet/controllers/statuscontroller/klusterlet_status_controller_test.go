@@ -2,10 +2,12 @@ package statuscontroller
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeinformers "k8s.io/client-go/informers"
@@ -16,6 +18,7 @@ import (
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelper "open-cluster-management.io/ocm/pkg/operator/helpers/testing"
 )
@@ -36,6 +39,14 @@ func newKlusterlet(name, namespace, clustername string) *operatorapiv1.Klusterle
 			ClusterName:               clustername,
 			Namespace:                 namespace,
 			ExternalServerURLs:        []operatorapiv1.ServerURL{},
+		},
+		Status: operatorapiv1.KlusterletStatus{
+			Conditions: []metav1.Condition{
+				{
+					Type:   klusterletApplied,
+					Status: metav1.ConditionTrue,
+				},
+			},
 		},
 	}
 }
@@ -62,8 +73,9 @@ func newTestController(t *testing.T, klusterlet *operatorapiv1.Klusterlet, objec
 	kubeInformers := kubeinformers.NewSharedInformerFactory(fakeKubeClient, 5*time.Minute)
 
 	klusterletController := &klusterletStatusController{
-		kubeClient:       fakeKubeClient,
-		klusterletClient: fakeOperatorClient.OperatorV1().Klusterlets(),
+		kubeClient: fakeKubeClient,
+		patcher: patcher.NewPatcher[
+			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](fakeOperatorClient.OperatorV1().Klusterlets()),
 		deploymentLister: kubeInformers.Apps().V1().Deployments().Lister(),
 		klusterletLister: operatorInformers.Operator().V1().Klusterlets().Lister(),
 	}
@@ -166,10 +178,15 @@ func TestSync(t *testing.T) {
 			}
 			operatorActions := controller.operatorClient.Actions()
 
-			testingcommon.AssertEqualNumber(t, len(operatorActions), 2)
-			testingcommon.AssertGet(t, operatorActions[0], "operator.open-cluster-management.io", "v1", "klusterlets")
-			testingcommon.AssertAction(t, operatorActions[1], "update")
-			testinghelper.AssertOnlyConditions(t, operatorActions[1].(clienttesting.UpdateActionImpl).Object, c.expectedConditions...)
+			testingcommon.AssertActions(t, operatorActions, "patch")
+			klusterlet := &operatorapiv1.Klusterlet{}
+			patchData := operatorActions[0].(clienttesting.PatchActionImpl).Patch
+			err = json.Unmarshal(patchData, klusterlet)
+			if err != nil {
+				t.Fatal(err)
+			}
+			meta.SetStatusCondition(&c.expectedConditions, testinghelper.NamedCondition(klusterletApplied, "", metav1.ConditionTrue))
+			testinghelper.AssertOnlyConditions(t, klusterlet, c.expectedConditions...)
 		})
 	}
 }

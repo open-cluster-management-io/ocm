@@ -15,6 +15,8 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 OPERATOR_SDK?=$(PERMANENT_TMP_GOPATH)/bin/operator-sdk
 OPERATOR_SDK_VERSION?=v1.1.0
 operatorsdk_gen_dir:=$(dir $(OPERATOR_SDK))
+# CSV_VERSION is used to generate new CSV manifests
+CSV_VERSION?=0.12.0
 
 OPERATOR_SDK_ARCHOS:=x86_64-linux-gnu
 ifeq ($(GOHOSTOS),darwin)

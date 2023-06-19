@@ -20,13 +20,13 @@ func TestAddFinalizer(t *testing.T) {
 	cases := []struct {
 		name            string
 		obj             *clusterv1.ManagedCluster
-		finalizer       string
+		finalizers      []string
 		validateActions func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
-			name:      "add finalizer",
-			obj:       newManagedClusterWithFinalizer(),
-			finalizer: "test-finalizer",
+			name:       "add finalizer",
+			obj:        newManagedClusterWithFinalizer(),
+			finalizers: []string{"test-finalizer"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
@@ -39,9 +39,24 @@ func TestAddFinalizer(t *testing.T) {
 			},
 		},
 		{
+			name:       "multiple finalizers",
+			obj:        newManagedClusterWithFinalizer("test-finalizer-1"),
+			finalizers: []string{"test-finalizer", "test-finalizer-1"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				testinghelpers.AssertFinalizers(t, managedCluster, []string{"test-finalizer-1", "test-finalizer"})
+			},
+		},
+		{
 			name:            "no action",
 			obj:             newManagedClusterWithFinalizer("test-finalizer-1", "test-finalizer"),
-			finalizer:       "test-finalizer",
+			finalizers:      []string{"test-finalizer"},
 			validateActions: testingcommon.AssertNoActions,
 		},
 	}
@@ -52,7 +67,7 @@ func TestAddFinalizer(t *testing.T) {
 			patcher := NewPatcher[
 				*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
 				clusterClient.ClusterV1().ManagedClusters())
-			if _, err := patcher.AddFinalizer(context.TODO(), c.obj, c.finalizer); err != nil {
+			if _, err := patcher.AddFinalizer(context.TODO(), c.obj, c.finalizers...); err != nil {
 				t.Error(err)
 			}
 			c.validateActions(t, clusterClient.Actions())
@@ -64,13 +79,13 @@ func TestRemoveFinalizer(t *testing.T) {
 	cases := []struct {
 		name            string
 		obj             *clusterv1.ManagedCluster
-		finalizer       string
+		finalizers      []string
 		validateActions func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
-			name:      "remove finalizer",
-			obj:       newManagedClusterWithFinalizer("test-finalizer", "test-finalizer-1"),
-			finalizer: "test-finalizer",
+			name:       "remove finalizer",
+			obj:        newManagedClusterWithFinalizer("test-finalizer", "test-finalizer-1"),
+			finalizers: []string{"test-finalizer"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
@@ -83,9 +98,39 @@ func TestRemoveFinalizer(t *testing.T) {
 			},
 		},
 		{
+			name:       "remove multiple finalizers",
+			obj:        newManagedClusterWithFinalizer("test-finalizer", "test-finalizer-1", "test-finalizer-2"),
+			finalizers: []string{"test-finalizer", "test-finalizer-2"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				testinghelpers.AssertFinalizers(t, managedCluster, []string{"test-finalizer-1"})
+			},
+		},
+		{
+			name:       "remove multiple finalizers, some unmatched",
+			obj:        newManagedClusterWithFinalizer("test-finalizer", "test-finalizer-1", "test-finalizer-2"),
+			finalizers: []string{"test-finalizer", "test-finalizer-3"},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				testinghelpers.AssertFinalizers(t, managedCluster, []string{"test-finalizer-1", "test-finalizer-2"})
+			},
+		},
+		{
 			name:            "no action",
 			obj:             newManagedClusterWithFinalizer("test-finalizer-1"),
-			finalizer:       "test-finalizer",
+			finalizers:      []string{"test-finalizer"},
 			validateActions: testingcommon.AssertNoActions,
 		},
 	}
@@ -96,7 +141,7 @@ func TestRemoveFinalizer(t *testing.T) {
 			patcher := NewPatcher[
 				*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
 				clusterClient.ClusterV1().ManagedClusters())
-			if err := patcher.RemoveFinalizer(context.TODO(), c.obj, c.finalizer); err != nil {
+			if err := patcher.RemoveFinalizer(context.TODO(), c.obj, c.finalizers...); err != nil {
 				t.Error(err)
 			}
 			c.validateActions(t, clusterClient.Actions())
@@ -208,11 +253,107 @@ func TestPatchStatus(t *testing.T) {
 	}
 }
 
+func TestPatchLabelAnnotations(t *testing.T) {
+	cases := []struct {
+		name            string
+		obj             *clusterv1.ManagedCluster
+		newObj          *clusterv1.ManagedCluster
+		validateActions func(t *testing.T, actions []clienttesting.Action)
+	}{
+		{
+			name:            "empty value",
+			obj:             newManagedClusterWithLabelAnnotations(nil, nil),
+			newObj:          newManagedClusterWithLabelAnnotations(nil, nil),
+			validateActions: testingcommon.AssertNoActions,
+		},
+		{
+			name:   "add labels",
+			obj:    newManagedClusterWithLabelAnnotations(nil, nil),
+			newObj: newManagedClusterWithLabelAnnotations(map[string]string{"key": "value"}, nil),
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !equality.Semantic.DeepEqual(managedCluster.Labels, map[string]string{"key": "value"}) {
+					t.Errorf("not patched correctly got %v", managedCluster.Labels)
+				}
+			},
+		},
+		{
+			name:   "add annotation",
+			obj:    newManagedClusterWithLabelAnnotations(nil, nil),
+			newObj: newManagedClusterWithLabelAnnotations(nil, map[string]string{"key": "value"}),
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				managedCluster := &clusterv1.ManagedCluster{}
+				err := json.Unmarshal(patch, managedCluster)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !equality.Semantic.DeepEqual(managedCluster.Annotations, map[string]string{"key": "value"}) {
+					t.Errorf("not patched correctly got %v", managedCluster.Annotations)
+				}
+			},
+		},
+		{
+			name:            "no update",
+			obj:             newManagedClusterWithLabelAnnotations(nil, map[string]string{"key": "value"}),
+			newObj:          newManagedClusterWithLabelAnnotations(nil, map[string]string{"key": "value"}),
+			validateActions: testingcommon.AssertNoActions,
+		},
+		{
+			name:   "remove label",
+			obj:    newManagedClusterWithLabelAnnotations(map[string]string{"key": "value", "key1": "value1"}, nil),
+			newObj: newManagedClusterWithLabelAnnotations(map[string]string{"key": "value"}, nil),
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchAction).GetPatch()
+				labelPatch := map[string]interface{}{}
+				err := json.Unmarshal(patch, &labelPatch)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !equality.Semantic.DeepEqual(labelPatch["metadata"], map[string]interface{}{"UID": "", "resourceVersion": "", "labels": map[string]interface{}{"key1": nil}}) {
+					t.Errorf("not patched correctly got %v", labelPatch)
+				}
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			clusterClient := clusterfake.NewSimpleClientset(c.obj)
+			patcher := NewPatcher[
+				*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
+				clusterClient.ClusterV1().ManagedClusters())
+			if _, err := patcher.PatchLabelAnnotations(context.TODO(), c.obj, c.newObj.ObjectMeta, c.obj.ObjectMeta); err != nil {
+				t.Error(err)
+			}
+			c.validateActions(t, clusterClient.Actions())
+		})
+	}
+}
+
 func newManagedClusterWithFinalizer(finalizers ...string) *clusterv1.ManagedCluster {
 	return &clusterv1.ManagedCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test",
 			Finalizers: finalizers,
+		},
+	}
+}
+
+func newManagedClusterWithLabelAnnotations(labels map[string]string, annotations map[string]string) *clusterv1.ManagedCluster {
+	return &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test",
+			Labels:      labels,
+			Annotations: annotations,
 		},
 	}
 }

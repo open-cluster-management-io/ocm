@@ -67,7 +67,7 @@ rules:
 # Allow the nuclues to manage clustermanager apis.
 - apiGroups: ["operator.open-cluster-management.io"]
   resources: ["clustermanagers"]
-  verbs: ["get", "list", "watch", "update", "delete"]
+  verbs: ["get", "list", "watch", "update", "delete", "patch"]
 - apiGroups: ["operator.open-cluster-management.io"]
   resources: ["clustermanagers/status"]
   verbs: ["update", "patch"]

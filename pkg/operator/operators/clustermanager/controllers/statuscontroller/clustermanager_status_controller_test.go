@@ -2,6 +2,7 @@ package statuscontroller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -17,6 +18,7 @@ import (
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelper "open-cluster-management.io/ocm/pkg/operator/helpers/testing"
 )
@@ -30,6 +32,14 @@ func newClusterManager() *operatorapiv1.ClusterManager {
 		},
 		Spec: operatorapiv1.ClusterManagerSpec{
 			RegistrationImagePullSpec: "testregistration",
+		},
+		Status: operatorapiv1.ClusterManagerStatus{
+			Conditions: []metav1.Condition{
+				{
+					Type:   clusterManagerApplied,
+					Status: metav1.ConditionTrue,
+				},
+			},
 		},
 	}
 }
@@ -65,6 +75,10 @@ func newPlacementDeployment(desiredReplica, availableReplica int32) *appsv1.Depl
 }
 
 func TestSyncStatus(t *testing.T) {
+	appliedCond := metav1.Condition{
+		Type:   clusterManagerApplied,
+		Status: metav1.ConditionTrue,
+	}
 	cases := []struct {
 		name            string
 		queueKey        string
@@ -98,12 +112,16 @@ func TestSyncStatus(t *testing.T) {
 				newPlacementDeployment(3, 0),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertEqualNumber(t, len(actions), 2)
-				testingcommon.AssertGet(t, actions[0], "operator.open-cluster-management.io", "v1", "clustermanagers")
-				testingcommon.AssertAction(t, actions[1], "update")
+				testingcommon.AssertActions(t, actions, "patch")
+				klusterlet := &operatorapiv1.Klusterlet{}
+				patchData := actions[0].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, klusterlet)
+				if err != nil {
+					t.Fatal(err)
+				}
 				expectedCondition1 := testinghelper.NamedCondition(registrationDegraded, "GetRegistrationDeploymentFailed", metav1.ConditionTrue)
 				expectedCondition2 := testinghelper.NamedCondition(placementDegraded, "UnavailablePlacementPod", metav1.ConditionTrue)
-				testinghelper.AssertOnlyConditions(t, actions[1].(clienttesting.UpdateActionImpl).Object, expectedCondition1, expectedCondition2)
+				testinghelper.AssertOnlyConditions(t, klusterlet, appliedCond, expectedCondition1, expectedCondition2)
 			},
 		},
 		{
@@ -115,12 +133,16 @@ func TestSyncStatus(t *testing.T) {
 				newPlacementDeployment(3, 3),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertEqualNumber(t, len(actions), 2)
-				testingcommon.AssertGet(t, actions[0], "operator.open-cluster-management.io", "v1", "clustermanagers")
-				testingcommon.AssertAction(t, actions[1], "update")
+				testingcommon.AssertActions(t, actions, "patch")
+				klusterlet := &operatorapiv1.Klusterlet{}
+				patchData := actions[0].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, klusterlet)
+				if err != nil {
+					t.Fatal(err)
+				}
 				expectedCondition1 := testinghelper.NamedCondition(registrationDegraded, "UnavailableRegistrationPod", metav1.ConditionTrue)
 				expectedCondition2 := testinghelper.NamedCondition(placementDegraded, "PlacementFunctional", metav1.ConditionFalse)
-				testinghelper.AssertOnlyConditions(t, actions[1].(clienttesting.UpdateActionImpl).Object, expectedCondition1, expectedCondition2)
+				testinghelper.AssertOnlyConditions(t, klusterlet, appliedCond, expectedCondition1, expectedCondition2)
 			},
 		},
 		{
@@ -129,12 +151,16 @@ func TestSyncStatus(t *testing.T) {
 			clusterManagers: []runtime.Object{newClusterManager()},
 			deployments:     []runtime.Object{newRegistrationDeployment(3, 3)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertEqualNumber(t, len(actions), 2)
-				testingcommon.AssertGet(t, actions[0], "operator.open-cluster-management.io", "v1", "clustermanagers")
-				testingcommon.AssertAction(t, actions[1], "update")
+				testingcommon.AssertActions(t, actions, "patch")
+				klusterlet := &operatorapiv1.Klusterlet{}
+				patchData := actions[0].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, klusterlet)
+				if err != nil {
+					t.Fatal(err)
+				}
 				expectedCondition1 := testinghelper.NamedCondition(registrationDegraded, "RegistrationFunctional", metav1.ConditionFalse)
 				expectedCondition2 := testinghelper.NamedCondition(placementDegraded, "GetPlacementDeploymentFailed", metav1.ConditionTrue)
-				testinghelper.AssertOnlyConditions(t, actions[1].(clienttesting.UpdateActionImpl).Object, expectedCondition1, expectedCondition2)
+				testinghelper.AssertOnlyConditions(t, klusterlet, appliedCond, expectedCondition1, expectedCondition2)
 			},
 		},
 	}
@@ -161,8 +187,10 @@ func TestSyncStatus(t *testing.T) {
 
 			controller := &clusterManagerStatusController{
 				deploymentLister:     kubeInformers.Apps().V1().Deployments().Lister(),
-				clusterManagerClient: fakeOperatorClient.OperatorV1().ClusterManagers(),
 				clusterManagerLister: operatorInformers.Operator().V1().ClusterManagers().Lister(),
+				patcher: patcher.NewPatcher[
+					*operatorapiv1.ClusterManager, operatorapiv1.ClusterManagerSpec, operatorapiv1.ClusterManagerStatus](
+					fakeOperatorClient.OperatorV1().ClusterManagers()),
 			}
 
 			syncContext := testingcommon.NewFakeSyncContext(t, c.queueKey)

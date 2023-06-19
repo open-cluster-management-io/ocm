@@ -30,6 +30,7 @@ import (
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
@@ -81,7 +82,9 @@ func newTestController(t *testing.T, clustermanager *operatorapiv1.ClusterManage
 	operatorInformers := operatorinformers.NewSharedInformerFactory(fakeOperatorClient, 5*time.Minute)
 
 	clusterManagerController := &clusterManagerController{
-		clusterManagerClient: fakeOperatorClient.OperatorV1().ClusterManagers(),
+		patcher: patcher.NewPatcher[
+			*operatorapiv1.ClusterManager, operatorapiv1.ClusterManagerSpec, operatorapiv1.ClusterManagerStatus](
+			fakeOperatorClient.OperatorV1().ClusterManagers()),
 		clusterManagerLister: operatorInformers.Operator().V1().ClusterManagers().Lister(),
 		configMapLister:      kubeInfomers.Core().V1().ConfigMaps().Lister(),
 		cache:                resourceapply.NewResourceCache(),

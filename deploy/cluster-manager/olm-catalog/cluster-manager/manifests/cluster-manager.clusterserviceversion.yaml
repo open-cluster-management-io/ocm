@@ -292,6 +292,7 @@ spec:
           - watch
           - update
           - delete
+          - patch
         - apiGroups:
           - operator.open-cluster-management.io
           resources:

@@ -2,7 +2,6 @@ package klusterletcontroller
 
 import (
 	"context"
-	"reflect"
 	"strings"
 	"time"
 
@@ -28,11 +27,12 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/manifests"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
 type klusterletCleanupController struct {
-	klusterletClient             operatorv1client.KlusterletInterface
+	patcher                      patcher.Patcher[*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus]
 	klusterletLister             operatorlister.KlusterletLister
 	kubeClient                   kubernetes.Interface
 	kubeVersion                  *version.Version
@@ -53,8 +53,9 @@ func NewKlusterletCleanupController(
 	operatorNamespace string,
 	recorder events.Recorder) factory.Controller {
 	controller := &klusterletCleanupController{
-		kubeClient:                   kubeClient,
-		klusterletClient:             klusterletClient,
+		kubeClient: kubeClient,
+		patcher: patcher.NewPatcher[
+			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](klusterletClient),
 		klusterletLister:             klusterletInformer.Lister(),
 		kubeVersion:                  kubeVersion,
 		operatorNamespace:            operatorNamespace,
@@ -74,7 +75,7 @@ func NewKlusterletCleanupController(
 func (n *klusterletCleanupController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	klusterletName := controllerContext.QueueKey()
 	klog.V(4).Infof("Reconciling Klusterlet %q", klusterletName)
-	klusterlet, err := n.klusterletLister.Get(klusterletName)
+	originalKlusterlet, err := n.klusterletLister.Get(klusterletName)
 	if errors.IsNotFound(err) {
 		// Klusterlet not found, could have been deleted, do nothing.
 		return nil
@@ -82,23 +83,15 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 	if err != nil {
 		return err
 	}
-	klusterlet = klusterlet.DeepCopy()
-
+	klusterlet := originalKlusterlet.DeepCopy()
 	if klusterlet.DeletionTimestamp.IsZero() {
-		if !hasFinalizer(klusterlet, klusterletFinalizer) {
-			return n.addFinalizer(ctx, klusterlet, klusterletFinalizer)
+		desiredFinalizers := []string{klusterletFinalizer}
+		if readyToAddHostedFinalizer(klusterlet, klusterlet.Spec.DeployOption.Mode) {
+			desiredFinalizers = append(desiredFinalizers, klusterletHostedFinalizer)
 		}
-
-		if !hasFinalizer(klusterlet, klusterletHostedFinalizer) && readyToAddHostedFinalizer(klusterlet, klusterlet.Spec.DeployOption.Mode) {
-			// the external managed kubeconfig secret is ready, there will be some resources applied on the managed
-			// cluster, add hosted finalizer here to indicate these resources should be cleaned up when deleting the
-			// klusterlet
-			return n.addFinalizer(ctx, klusterlet, klusterletHostedFinalizer)
-		}
-
-		return nil
+		_, err := n.patcher.AddFinalizer(ctx, klusterlet, desiredFinalizers...)
+		return err
 	}
-
 	// Klusterlet is deleting, we remove its related resources on managed and management cluster
 	config := klusterletConfig{
 		KlusterletName:            klusterlet.Name,
@@ -150,7 +143,7 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 		if err != nil {
 			errs := []error{err}
 			// compare the annotation to check whether the eviction timestamp has changed
-			if err := n.updateKlusterletAnnotation(ctx, klusterlet.Name, klusterlet.Annotations); err != nil {
+			if _, err := n.patcher.PatchLabelAnnotations(ctx, klusterlet, klusterlet.ObjectMeta, originalKlusterlet.ObjectMeta); err != nil {
 				errs = append(errs, err)
 			}
 			return utilerrors.NewAggregate(errs)
@@ -198,7 +191,7 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 		return utilerrors.NewAggregate(errs)
 	}
 
-	return n.removeKlusterletFinalizers(ctx, klusterlet.Name)
+	return n.patcher.RemoveFinalizer(ctx, klusterlet, klusterletFinalizer, klusterletHostedFinalizer)
 }
 
 func (r *klusterletCleanupController) checkConnectivity(ctx context.Context,
@@ -257,51 +250,6 @@ func isTCPNoSuchHostError(err error) bool {
 		strings.Contains(err.Error(), "no such host")
 }
 
-func (n *klusterletCleanupController) updateKlusterletAnnotation(
-	ctx context.Context, klusterletName string, annotations map[string]string) error {
-	// reload klusterlet
-	klusterlet, err := n.klusterletClient.Get(ctx, klusterletName, metav1.GetOptions{})
-	if errors.IsNotFound(err) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-
-	if !reflect.DeepEqual(klusterlet.Annotations, annotations) {
-		klusterlet.Annotations = annotations
-		_, err := n.klusterletClient.Update(ctx, klusterlet, metav1.UpdateOptions{})
-		return err
-	}
-
-	return nil
-}
-
-func (n *klusterletCleanupController) removeKlusterletFinalizers(ctx context.Context, klusterletName string) error {
-	// reload klusterlet
-	klusterlet, err := n.klusterletClient.Get(ctx, klusterletName, metav1.GetOptions{})
-	if errors.IsNotFound(err) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	var copiedFinalizers []string
-	for i := range klusterlet.Finalizers {
-		if klusterlet.Finalizers[i] == klusterletFinalizer || klusterlet.Finalizers[i] == klusterletHostedFinalizer {
-			continue
-		}
-		copiedFinalizers = append(copiedFinalizers, klusterlet.Finalizers[i])
-	}
-	if len(klusterlet.Finalizers) != len(copiedFinalizers) {
-		klusterlet.Finalizers = copiedFinalizers
-		_, err := n.klusterletClient.Update(ctx, klusterlet, metav1.UpdateOptions{})
-		return err
-	}
-
-	return nil
-}
-
 // readyToAddHostedFinalizer checkes whether the hosted finalizer should be added.
 // It is only added when mode is hosted, and some resources have been applied to the managed cluster.
 func readyToAddHostedFinalizer(klusterlet *operatorapiv1.Klusterlet, mode operatorapiv1.InstallMode) bool {
@@ -312,12 +260,6 @@ func readyToAddHostedFinalizer(klusterlet *operatorapiv1.Klusterlet, mode operat
 	return meta.IsStatusConditionTrue(klusterlet.Status.Conditions, klusterletReadyToApply)
 }
 
-func (n *klusterletCleanupController) addFinalizer(ctx context.Context, k *operatorapiv1.Klusterlet, finalizer string) error {
-	k.Finalizers = append(k.Finalizers, finalizer)
-	_, err := n.klusterletClient.Update(ctx, k, metav1.UpdateOptions{})
-	return err
-}
-
 func hasFinalizer(klusterlet *operatorapiv1.Klusterlet, finalizer string) bool {
 	for _, f := range klusterlet.Finalizers {
 		if f == finalizer {
@@ -325,28 +267,6 @@ func hasFinalizer(klusterlet *operatorapiv1.Klusterlet, finalizer string) bool {
 		}
 	}
 	return false
-}
-
-// removeFinalizer removes a finalizer from the list. It mutates its input.
-func removeFinalizer(obj runtime.Object, finalizerName string) bool {
-	if obj == nil || reflect.ValueOf(obj).IsNil() {
-		return false
-	}
-
-	var newFinalizers []string
-	accessor, _ := meta.Accessor(obj)
-	found := false
-	for _, finalizer := range accessor.GetFinalizers() {
-		if finalizer == finalizerName {
-			found = true
-			continue
-		}
-		newFinalizers = append(newFinalizers, finalizer)
-	}
-	if found {
-		accessor.SetFinalizers(newFinalizers)
-	}
-	return found
 }
 
 func removeStaticResources(ctx context.Context,
