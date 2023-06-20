@@ -17,8 +17,6 @@ import (
 
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
-
-	"open-cluster-management.io/ocm/pkg/registration/helpers"
 )
 
 const (
@@ -72,15 +70,22 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return err
 	}
 
+	errs := []error{}
 	// Clean up managedcluser cluserroles if there are no managed clusters
 	if len(managedClusters) == 0 {
-		return helpers.CleanUpManagedClusterManifests(
+		results := resourceapply.DeleteAll(
 			ctx,
-			c.kubeClient,
+			resourceapply.NewKubeClientHolder(c.kubeClient),
 			c.eventRecorder,
 			manifestFiles.ReadFile,
 			clusterRoleFiles...,
 		)
+		for _, result := range results {
+			if result.Error != nil {
+				errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
+			}
+		}
+		return operatorhelpers.NewMultiLineAggregate(errs)
 	}
 
 	// Make sure the managedcluser cluserroles are existed if there are clusters
@@ -93,7 +98,6 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 		clusterRoleFiles...,
 	)
 
-	errs := []error{}
 	for _, result := range results {
 		if result.Error != nil {
 			errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))

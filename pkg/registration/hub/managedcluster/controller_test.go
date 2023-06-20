@@ -3,11 +3,12 @@ package managedcluster
 import (
 	"context"
 	"encoding/json"
+	kubeinformers "k8s.io/client-go/informers"
+	"open-cluster-management.io/ocm/pkg/common/apply"
 	"testing"
 	"time"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
@@ -117,6 +118,7 @@ func TestSyncManagedCluster(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.startingObjects...)
 			kubeClient := kubefake.NewSimpleClientset()
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
+			kubeInformer := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, time.Minute*10)
 			clusterStore := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore()
 			for _, cluster := range c.startingObjects {
 				if err := clusterStore.Add(cluster); err != nil {
@@ -127,8 +129,14 @@ func TestSyncManagedCluster(t *testing.T) {
 			ctrl := managedClusterController{
 				kubeClient,
 				clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
+				apply.NewPermissionApplier(
+					kubeClient,
+					kubeInformer.Rbac().V1().Roles().Lister(),
+					kubeInformer.Rbac().V1().RoleBindings().Lister(),
+					kubeInformer.Rbac().V1().ClusterRoles().Lister(),
+					kubeInformer.Rbac().V1().ClusterRoleBindings().Lister(),
+				),
 				patcher.NewPatcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus](clusterClient.ClusterV1().ManagedClusters()),
-				resourceapply.NewResourceCache(),
 				eventstesting.NewTestingEventRecorder(t)}
 			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, testinghelpers.TestManagedClusterName))
 			if syncErr != nil {

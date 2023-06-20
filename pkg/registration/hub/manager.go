@@ -2,6 +2,9 @@ package hub
 
 import (
 	"context"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -87,15 +90,36 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 		return err
 	}
 
-	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
-	workInformers := workv1informers.NewSharedInformerFactory(workClient, 10*time.Minute)
-	kubeInfomers := kubeinformers.NewSharedInformerFactory(kubeClient, 10*time.Minute)
-	addOnInformers := addoninformers.NewSharedInformerFactory(addOnClient, 10*time.Minute)
+	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 30*time.Minute)
+	workInformers := workv1informers.NewSharedInformerFactory(workClient, 30*time.Minute)
+	kubeInfomers := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, 30*time.Minute, kubeinformers.WithTweakListOptions(
+		func(listOptions *metav1.ListOptions) {
+			// Note all kube resources managed by registration should have the cluster label, and should not have
+			// the addon label.
+			selector := &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      clusterv1.ClusterNameLabelKey,
+						Operator: metav1.LabelSelectorOpExists,
+					},
+					{
+						Key:      addonv1alpha1.AddonLabelKey,
+						Operator: metav1.LabelSelectorOpDoesNotExist,
+					},
+				},
+			}
+			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
+		}))
+	addOnInformers := addoninformers.NewSharedInformerFactory(addOnClient, 30*time.Minute)
 
 	managedClusterController := managedcluster.NewManagedClusterController(
 		kubeClient,
 		clusterClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
+		kubeInfomers.Rbac().V1().Roles(),
+		kubeInfomers.Rbac().V1().ClusterRoles(),
+		kubeInfomers.Rbac().V1().RoleBindings(),
+		kubeInfomers.Rbac().V1().ClusterRoleBindings(),
 		controllerContext.EventRecorder,
 	)
 
