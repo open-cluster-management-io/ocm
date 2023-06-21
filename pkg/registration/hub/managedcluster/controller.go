@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -16,13 +17,13 @@ import (
 	rbacv1informers "k8s.io/client-go/informers/rbac/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	"open-cluster-management.io/ocm/pkg/common/apply"
 
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	informerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	listerv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	v1 "open-cluster-management.io/api/cluster/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/apply"
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 )
@@ -80,8 +81,28 @@ func NewManagedClusterController(
 			accessor, _ := meta.Accessor(obj)
 			return accessor.GetName()
 		}, clusterInformer.Informer()).
+		WithFilteredEventsInformersQueueKeyFunc(
+			permissionQueueKey,
+			permissionFilterKey,
+			roleInformer.Informer(),
+			rolebindingInformer.Informer(),
+			clusterRoleInformer.Informer(),
+			clusterRoleBindingInformer.Informer()).
 		WithSync(c.sync).
 		ToController("ManagedClusterController", recorder)
+}
+
+func permissionFilterKey(obj interface{}) bool {
+	accessor, _ := meta.Accessor(obj)
+	return len(accessor.GetLabels()) > 0 && len(accessor.GetLabels()[v1.ClusterNameLabelKey]) > 0
+}
+
+func permissionQueueKey(obj runtime.Object) string {
+	accessor, _ := meta.Accessor(obj)
+	if len(accessor.GetLabels()) == 0 {
+		return ""
+	}
+	return accessor.GetLabels()[v1.ClusterNameLabelKey]
 }
 
 func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.SyncContext) error {

@@ -3,6 +3,7 @@ package apply
 import (
 	"context"
 	"fmt"
+
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -27,57 +28,52 @@ type Client[T runtime.Object] interface {
 // and whether updated is needed
 type CompareFunc[T runtime.Object] func(required, existing T) (T, bool)
 
-type Applier[T runtime.Object] interface {
-	Apply(ctx context.Context, required T, recorder events.Recorder) (runtime.Object, bool, error)
-}
-
-// applier implements Applier
-type applier[T runtime.Object] struct {
-	getter  Getter[T]
-	client  Client[T]
-	compare CompareFunc[T]
-}
-
-func NewApplier[T runtime.Object](getter Getter[T], client Client[T], compareFunc CompareFunc[T]) Applier[T] {
-	return &applier[T]{
-		getter:  getter,
-		client:  client,
-		compare: compareFunc,
-	}
-}
-
-func (a *applier[T]) Apply(ctx context.Context, required T, recorder events.Recorder) (runtime.Object, bool, error) {
+func Apply[T runtime.Object](
+	ctx context.Context,
+	getter Getter[T],
+	client Client[T],
+	compare CompareFunc[T],
+	required T,
+	recorder events.Recorder) (T, bool, error) {
 	requiredAccessor, err := meta.Accessor(required)
 	if err != nil {
-		return nil, false, err
+		return required, false, err
 	}
 	gvk := resourcehelper.GuessObjectGroupVersionKind(required)
-	existing, err := a.getter.Get(requiredAccessor.GetName())
+	existing, err := getter.Get(requiredAccessor.GetName())
 	if errors.IsNotFound(err) {
-		actual, createErr := a.client.Create(ctx, required, metav1.CreateOptions{})
+		actual, createErr := client.Create(ctx, required, metav1.CreateOptions{})
 		if errors.IsAlreadyExists(createErr) {
 			return required, false, nil
 		}
 		if createErr == nil {
-			recorder.Eventf(fmt.Sprintf("%sCreated", gvk.Kind), "Created %s because it was missing", resourcehelper.FormatResourceForCLIWithNamespace(actual))
+			recorder.Eventf(
+				fmt.Sprintf("%sCreated", gvk.Kind),
+				"Created %s because it was missing", resourcehelper.FormatResourceForCLIWithNamespace(actual))
 		} else {
-			recorder.Warningf(fmt.Sprintf("%sCreateFailed", gvk.Kind), "Failed to create %s: %v", resourcehelper.FormatResourceForCLIWithNamespace(required), createErr)
+			recorder.Warningf(
+				fmt.Sprintf("%sCreateFailed", gvk.Kind),
+				"Failed to create %s: %v", resourcehelper.FormatResourceForCLIWithNamespace(required), createErr)
 		}
 
 		return actual, true, createErr
 	}
 
-	updated, modified := a.compare(required, existing)
+	updated, modified := compare(required, existing)
 	if !modified {
 		return updated, modified, nil
 	}
 
-	updated, err = a.client.Update(ctx, updated, metav1.UpdateOptions{})
+	updated, err = client.Update(ctx, updated, metav1.UpdateOptions{})
 	switch {
 	case err != nil:
-		recorder.Warningf(fmt.Sprintf("%sUpdateFailed", gvk.Kind), "Failed to update %s: %v", resourcehelper.FormatResourceForCLIWithNamespace(required), err)
+		recorder.Warningf(
+			fmt.Sprintf("%sUpdateFailed", gvk.Kind),
+			"Failed to update %s: %v", resourcehelper.FormatResourceForCLIWithNamespace(required), err)
 	default:
-		recorder.Eventf(fmt.Sprintf("%sUpdated", gvk.Kind), "Updated %s:\n%s", resourcehelper.FormatResourceForCLIWithNamespace(updated))
+		recorder.Eventf(
+			fmt.Sprintf("%sUpdated", gvk.Kind),
+			"Updated %s", resourcehelper.FormatResourceForCLIWithNamespace(updated))
 	}
 
 	return updated, modified, err

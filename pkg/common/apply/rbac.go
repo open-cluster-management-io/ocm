@@ -3,6 +3,7 @@ package apply
 import (
 	"context"
 	"fmt"
+
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
@@ -37,7 +38,11 @@ func NewPermissionApplier(
 	}
 }
 
-func (m *PermissionApplier) Apply(ctx context.Context, recorder events.Recorder, manifests resourceapply.AssetFunc, files ...string) []resourceapply.ApplyResult {
+func (m *PermissionApplier) Apply(
+	ctx context.Context,
+	recorder events.Recorder,
+	manifests resourceapply.AssetFunc,
+	files ...string) []resourceapply.ApplyResult {
 	ret := []resourceapply.ApplyResult{}
 	for _, file := range files {
 		result := resourceapply.ApplyResult{File: file}
@@ -56,17 +61,17 @@ func (m *PermissionApplier) Apply(ctx context.Context, recorder events.Recorder,
 		result.Type = fmt.Sprintf("%T", requiredObj)
 		switch t := requiredObj.(type) {
 		case *rbacv1.ClusterRole:
-			applier := NewApplier[*rbacv1.ClusterRole](m.clusterRoleLister, m.client.RbacV1().ClusterRoles(), compareClusterRole)
-			result.Result, result.Changed, result.Error = applier.Apply(ctx, t, recorder)
+			result.Result, result.Changed, result.Error = Apply[*rbacv1.ClusterRole](
+				ctx, m.clusterRoleLister, m.client.RbacV1().ClusterRoles(), compareClusterRole, t, recorder)
 		case *rbacv1.ClusterRoleBinding:
-			applier := NewApplier[*rbacv1.ClusterRoleBinding](m.clusterRoleBindingLister, m.client.RbacV1().ClusterRoleBindings(), compareClusterRoleBinding)
-			result.Result, result.Changed, result.Error = applier.Apply(ctx, t, recorder)
+			result.Result, result.Changed, result.Error = Apply[*rbacv1.ClusterRoleBinding](
+				ctx, m.clusterRoleBindingLister, m.client.RbacV1().ClusterRoleBindings(), compareClusterRoleBinding, t, recorder)
 		case *rbacv1.Role:
-			applier := NewApplier[*rbacv1.Role](m.roleLister.Roles(t.Namespace), m.client.RbacV1().Roles(t.Namespace), compareRole)
-			result.Result, result.Changed, result.Error = applier.Apply(ctx, t, recorder)
+			result.Result, result.Changed, result.Error = Apply[*rbacv1.Role](
+				ctx, m.roleLister.Roles(t.Namespace), m.client.RbacV1().Roles(t.Namespace), compareRole, t, recorder)
 		case *rbacv1.RoleBinding:
-			applier := NewApplier[*rbacv1.RoleBinding](m.roleBindingLister.RoleBindings(t.Namespace), m.client.RbacV1().RoleBindings(t.Namespace), compareRoleBinding)
-			result.Result, result.Changed, result.Error = applier.Apply(ctx, t, recorder)
+			result.Result, result.Changed, result.Error = Apply[*rbacv1.RoleBinding](
+				ctx, m.roleBindingLister.RoleBindings(t.Namespace), m.client.RbacV1().RoleBindings(t.Namespace), compareRoleBinding, t, recorder)
 		default:
 			result.Error = fmt.Errorf("object type is not correct.")
 		}

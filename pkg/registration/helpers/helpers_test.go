@@ -1,24 +1,12 @@
 package helpers
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
 	"reflect"
 	"testing"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
-	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	fakekube "k8s.io/client-go/kubernetes/fake"
-	clienttesting "k8s.io/client-go/testing"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
-	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
 func TestIsValidHTTPSURL(t *testing.T) {
@@ -55,76 +43,6 @@ func TestIsValidHTTPSURL(t *testing.T) {
 			if isValid != c.isValid {
 				t.Errorf("expected %t, but %t", c.isValid, isValid)
 			}
-		})
-	}
-}
-
-func TestCleanUpManagedClusterManifests(t *testing.T) {
-	applyFiles := map[string]runtime.Object{
-		"namespace":          testinghelpers.NewUnstructuredObj("v1", "Namespace", "", "n1"),
-		"clusterrole":        testinghelpers.NewUnstructuredObj("rbac.authorization.k8s.io/v1", "ClusterRole", "", "cr1"),
-		"clusterrolebinding": testinghelpers.NewUnstructuredObj("rbac.authorization.k8s.io/v1", "ClusterRoleBinding", "", "crb1"),
-		"role":               testinghelpers.NewUnstructuredObj("rbac.authorization.k8s.io/v1", "Role", "n1", "r1"),
-		"rolebinding":        testinghelpers.NewUnstructuredObj("rbac.authorization.k8s.io/v1", "RoleBinding", "n1", "rb1"),
-	}
-	expectedActions := []string{}
-	for i := 0; i < len(applyFiles); i++ {
-		expectedActions = append(expectedActions, "delete")
-	}
-	cases := []struct {
-		name            string
-		applyObject     []runtime.Object
-		applyFiles      map[string]runtime.Object
-		validateActions func(t *testing.T, actions []clienttesting.Action)
-		expectedErr     string
-	}{
-		{
-			name: "delete applied objects",
-			applyObject: []runtime.Object{
-				&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "n1"}},
-				&rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: "cr1"}},
-				&rbacv1.ClusterRoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "crb1"}},
-				&rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Name: "r1", Namespace: "n1"}},
-				&rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "rb1", Namespace: "n1"}},
-			},
-			applyFiles: applyFiles,
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, expectedActions...)
-			},
-		},
-		{
-			name:        "there are no applied objects",
-			applyObject: []runtime.Object{},
-			applyFiles:  applyFiles,
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, expectedActions...)
-			},
-		},
-		{
-			name:            "unhandled types",
-			applyObject:     []runtime.Object{},
-			applyFiles:      map[string]runtime.Object{"secret": testinghelpers.NewUnstructuredObj("v1", "Secret", "n1", "s1")},
-			expectedErr:     "unhandled type *v1.Secret",
-			validateActions: testingcommon.AssertNoActions,
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			kubeClient := fakekube.NewSimpleClientset(c.applyObject...)
-			cleanUpErr := CleanUpManagedClusterManifests(
-				context.TODO(),
-				kubeClient,
-				eventstesting.NewTestingEventRecorder(t),
-				func(name string) ([]byte, error) {
-					if c.applyFiles[name] == nil {
-						return nil, fmt.Errorf("Failed to find file")
-					}
-					return json.Marshal(c.applyFiles[name])
-				},
-				getApplyFileNames(c.applyFiles)...,
-			)
-			testingcommon.AssertError(t, cleanUpErr, c.expectedErr)
-			c.validateActions(t, kubeClient.Actions())
 		})
 	}
 }

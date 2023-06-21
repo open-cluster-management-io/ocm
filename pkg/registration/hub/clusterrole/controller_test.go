@@ -10,12 +10,14 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	kubeinformers "k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 
+	"open-cluster-management.io/ocm/pkg/common/apply"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
@@ -32,12 +34,12 @@ func TestSyncManagedClusterClusterRole(t *testing.T) {
 			clusters:     []runtime.Object{testinghelpers.NewManagedCluster()},
 			clusterroles: []runtime.Object{},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "get", "create", "get", "create")
-				registrationClusterRole := (actions[1].(clienttesting.CreateActionImpl).Object).(*rbacv1.ClusterRole)
+				testingcommon.AssertActions(t, actions, "create", "create")
+				registrationClusterRole := (actions[0].(clienttesting.CreateActionImpl).Object).(*rbacv1.ClusterRole)
 				if registrationClusterRole.Name != "open-cluster-management:managedcluster:registration" {
 					t.Errorf("expected registration clusterrole, but failed")
 				}
-				workClusterRole := (actions[3].(clienttesting.CreateActionImpl).Object).(*rbacv1.ClusterRole)
+				workClusterRole := (actions[1].(clienttesting.CreateActionImpl).Object).(*rbacv1.ClusterRole)
 				if workClusterRole.Name != "open-cluster-management:managedcluster:work" {
 					t.Errorf("expected work clusterrole, but failed")
 				}
@@ -65,6 +67,7 @@ func TestSyncManagedClusterClusterRole(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			kubeClient := kubefake.NewSimpleClientset(c.clusterroles...)
+			kubeInformer := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, time.Minute*10)
 
 			clusterClient := clusterfake.NewSimpleClientset(c.clusters...)
 			clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
@@ -76,7 +79,14 @@ func TestSyncManagedClusterClusterRole(t *testing.T) {
 			}
 
 			ctrl := &clusterroleController{
-				kubeClient:    kubeClient,
+				kubeClient: kubeClient,
+				applier: apply.NewPermissionApplier(
+					kubeClient,
+					nil,
+					nil,
+					kubeInformer.Rbac().V1().ClusterRoles().Lister(),
+					nil,
+				),
 				clusterLister: clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
 				cache:         resourceapply.NewResourceCache(),
 				eventRecorder: eventstesting.NewTestingEventRecorder(t),
