@@ -3,10 +3,10 @@ package manifestworkreplicasetcontroller
 import (
 	"context"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
+
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 )
 
 // addFinalizerReconciler is to add finalizer to the manifestworkreplicaset.
@@ -21,14 +21,15 @@ func (a *addFinalizerReconciler) reconcile(ctx context.Context, pw *workapiv1alp
 		return pw, reconcileStop, nil
 	}
 
-	// don't add finalizer to instances that already have it
-	for i := range pw.Finalizers {
-		if pw.Finalizers[i] == ManifestWorkReplicaSetFinalizer {
-			return pw, reconcileContinue, nil
-		}
-	}
+	workSetPatcher := patcher.NewPatcher[
+		*workapiv1alpha1.ManifestWorkReplicaSet, workapiv1alpha1.ManifestWorkReplicaSetSpec, workapiv1alpha1.ManifestWorkReplicaSetStatus](
+		a.workClient.WorkV1alpha1().ManifestWorkReplicaSets(pw.Namespace))
+
+	updated, err := workSetPatcher.AddFinalizer(ctx, pw, ManifestWorkReplicaSetFinalizer)
 	// if this conflicts, we'll simply try again later
-	pw.Finalizers = append(pw.Finalizers, ManifestWorkReplicaSetFinalizer)
-	_, err := a.workClient.WorkV1alpha1().ManifestWorkReplicaSets(pw.Namespace).Update(ctx, pw, metav1.UpdateOptions{})
-	return pw, reconcileStop, err
+	if updated {
+		return pw, reconcileStop, err
+	}
+
+	return pw, reconcileContinue, err
 }

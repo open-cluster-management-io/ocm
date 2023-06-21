@@ -2,6 +2,7 @@ package statuscontroller
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -15,6 +16,8 @@ import (
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 	"open-cluster-management.io/ocm/pkg/work/spoke/statusfeedback"
@@ -39,11 +42,12 @@ func TestSyncManifestWork(t *testing.T) {
 				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatal(spew.Sdump(actions))
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.ManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
 				}
-
-				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
 
 				if !hasStatusCondition(work.Status.Conditions, workapiv1.WorkAvailable, metav1.ConditionUnknown) {
 					t.Fatal(spew.Sdump(work.Status.Conditions))
@@ -58,11 +62,7 @@ func TestSyncManifestWork(t *testing.T) {
 			manifests: []workapiv1.ManifestCondition{
 				newManifestWthCondition("", "v1", "secrets", "ns1", "n1"),
 			},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 0 {
-					t.Fatal(spew.Sdump(actions))
-				}
-			},
+			validateActions: testingcommon.AssertNoActions,
 		},
 		{
 			name: "Do not update if existing conditions are correct",
@@ -83,11 +83,7 @@ func TestSyncManifestWork(t *testing.T) {
 					Message: "All resources are available",
 				},
 			},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 0 {
-					t.Fatal(spew.Sdump(actions))
-				}
-			},
+			validateActions: testingcommon.AssertNoActions,
 		},
 		{
 			name: "build status with existing resource",
@@ -103,11 +99,12 @@ func TestSyncManifestWork(t *testing.T) {
 				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatal(spew.Sdump(actions))
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.ManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
 				}
-
-				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
 				if len(work.Status.ResourceStatus.Manifests) != 1 {
 					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests))
 				}
@@ -135,13 +132,11 @@ func TestSyncManifestWork(t *testing.T) {
 				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatal(spew.Sdump(actions))
-				}
-
-				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
-				if len(work.Status.ResourceStatus.Manifests) != 2 {
-					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests))
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.ManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
 				}
 				if !hasStatusCondition(work.Status.ResourceStatus.Manifests[0].Conditions, string(workapiv1.ManifestAvailable), metav1.ConditionTrue) {
 					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests[0].Conditions))
@@ -170,11 +165,12 @@ func TestSyncManifestWork(t *testing.T) {
 				},
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatal(spew.Sdump(actions))
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.ManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
 				}
-
-				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
 				if len(work.Status.ResourceStatus.Manifests) != 2 {
 					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests))
 				}
@@ -206,8 +202,10 @@ func TestSyncManifestWork(t *testing.T) {
 			fakeClient := fakeworkclient.NewSimpleClientset(testingWork)
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), c.existingResources...)
 			controller := AvailableStatusController{
-				manifestWorkClient: fakeClient.WorkV1().ManifestWorks(testingWork.Namespace),
 				spokeDynamicClient: fakeDynamicClient,
+				patcher: patcher.NewPatcher[
+					*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
+					fakeClient.WorkV1().ManifestWorks(testingWork.Namespace)),
 			}
 
 			err := controller.syncManifestWork(context.TODO(), testingWork)
@@ -241,11 +239,12 @@ func TestStatusFeedback(t *testing.T) {
 				newManifest("", "v1", "secrets", "ns1", "n1"),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatal(spew.Sdump(actions))
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.ManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
 				}
-
-				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
 				if len(work.Status.ResourceStatus.Manifests) != 1 {
 					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests))
 				}
@@ -277,11 +276,12 @@ func TestStatusFeedback(t *testing.T) {
 				newManifest("apps", "v1", "deployments", "ns1", "deploy1"),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatal(spew.Sdump(actions))
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.ManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
 				}
-
-				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
 				if len(work.Status.ResourceStatus.Manifests) != 2 {
 					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests))
 				}
@@ -351,11 +351,12 @@ func TestStatusFeedback(t *testing.T) {
 				newManifest("apps", "v1", "deployments", "ns1", "deploy1"),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 1 {
-					t.Fatal(spew.Sdump(actions))
+				testingcommon.AssertActions(t, actions, "patch")
+				p := actions[0].(clienttesting.PatchActionImpl).Patch
+				work := &workapiv1.ManifestWork{}
+				if err := json.Unmarshal(p, work); err != nil {
+					t.Fatal(err)
 				}
-
-				work := actions[0].(clienttesting.UpdateAction).GetObject().(*workapiv1.ManifestWork)
 				if len(work.Status.ResourceStatus.Manifests) != 1 {
 					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests))
 				}
@@ -396,9 +397,11 @@ func TestStatusFeedback(t *testing.T) {
 			fakeClient := fakeworkclient.NewSimpleClientset(testingWork)
 			fakeDynamicClient := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), c.existingResources...)
 			controller := AvailableStatusController{
-				manifestWorkClient: fakeClient.WorkV1().ManifestWorks(testingWork.Namespace),
 				spokeDynamicClient: fakeDynamicClient,
 				statusReader:       statusfeedback.NewStatusReader(),
+				patcher: patcher.NewPatcher[
+					*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
+					fakeClient.WorkV1().ManifestWorks(testingWork.Namespace)),
 			}
 
 			err := controller.syncManifestWork(context.TODO(), testingWork)

@@ -21,12 +21,17 @@ func TestAddFinalizerReconcile(t *testing.T) {
 		workClient: fakeClient,
 	}
 
-	mwrSetTest, _, err := addFinalizerController.reconcile(context.TODO(), mwrSetTest)
+	_, _, err := addFinalizerController.reconcile(context.TODO(), mwrSetTest)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !slices.Contains(mwrSetTest.Finalizers, ManifestWorkReplicaSetFinalizer) {
+	updatetSet, err := fakeClient.WorkV1alpha1().ManifestWorkReplicaSets(mwrSetTest.Namespace).Get(context.TODO(), mwrSetTest.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !slices.Contains(updatetSet.Finalizers, ManifestWorkReplicaSetFinalizer) {
 		t.Fatal("Finalizer did not added")
 	}
 

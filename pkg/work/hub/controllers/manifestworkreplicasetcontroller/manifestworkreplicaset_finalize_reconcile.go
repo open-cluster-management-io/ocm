@@ -3,7 +3,7 @@ package manifestworkreplicasetcontroller
 import (
 	"context"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
@@ -11,7 +11,7 @@ import (
 	"open-cluster-management.io/api/utils/work/v1/workapplier"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 
-	"open-cluster-management.io/ocm/pkg/work/helper"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 )
 
 // finalizeReconciler is to finalize the manifestWorkReplicaSet by deleting all related manifestWorks.
@@ -27,28 +27,17 @@ func (f *finalizeReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alp
 		return mwrSet, reconcileContinue, nil
 	}
 
-	var found bool
-	for i := range mwrSet.Finalizers {
-		if mwrSet.Finalizers[i] == ManifestWorkReplicaSetFinalizer {
-			found = true
-			break
-		}
-	}
-	// if there is no finalizer, we do not need to reconcile anymore.
-	if !found {
-		return mwrSet, reconcileStop, nil
-	}
-
 	if err := f.finalizeManifestWorkReplicaSet(ctx, mwrSet); err != nil {
 		return mwrSet, reconcileContinue, err
 	}
 
+	workSetPatcher := patcher.NewPatcher[
+		*workapiv1alpha1.ManifestWorkReplicaSet, workapiv1alpha1.ManifestWorkReplicaSetSpec, workapiv1alpha1.ManifestWorkReplicaSetStatus](
+		f.workClient.WorkV1alpha1().ManifestWorkReplicaSets(mwrSet.Namespace))
+
 	// Remove finalizer after delete all created Manifestworks
-	if helper.RemoveFinalizer(mwrSet, ManifestWorkReplicaSetFinalizer) {
-		_, err := f.workClient.WorkV1alpha1().ManifestWorkReplicaSets(mwrSet.Namespace).Update(ctx, mwrSet, metav1.UpdateOptions{})
-		if err != nil {
-			return mwrSet, reconcileContinue, err
-		}
+	if err := workSetPatcher.RemoveFinalizer(ctx, mwrSet, ManifestWorkReplicaSetFinalizer); err != nil {
+		return mwrSet, reconcileContinue, err
 	}
 
 	return mwrSet, reconcileStop, nil
@@ -63,7 +52,7 @@ func (m *finalizeReconciler) finalizeManifestWorkReplicaSet(ctx context.Context,
 	errs := []error{}
 	for _, mw := range manifestWorks {
 		err = m.workApplier.Delete(ctx, mw.Namespace, mw.Name)
-		if err != nil {
+		if err != nil && !errors.IsNotFound(err) {
 			errs = append(errs, err)
 		}
 	}

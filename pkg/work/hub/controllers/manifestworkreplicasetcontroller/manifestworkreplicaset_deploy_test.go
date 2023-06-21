@@ -179,8 +179,8 @@ func TestDeployReconcileAsPlacementNotExist(t *testing.T) {
 	}
 
 	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
-	if err == nil {
-		t.Fatal("Expected Not Found Error ", err)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Check the PlacedManifestWork conditions

@@ -2,16 +2,13 @@ package manifestcontroller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/pkg/errors"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +26,7 @@ import (
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
@@ -44,16 +42,17 @@ var (
 // ManifestWorkController is to reconcile the workload resources
 // fetched from hub cluster on spoke cluster.
 type ManifestWorkController struct {
-	manifestWorkClient        workv1client.ManifestWorkInterface
-	manifestWorkLister        worklister.ManifestWorkNamespaceLister
-	appliedManifestWorkClient workv1client.AppliedManifestWorkInterface
-	appliedManifestWorkLister worklister.AppliedManifestWorkLister
-	spokeDynamicClient        dynamic.Interface
-	hubHash                   string
-	agentID                   string
-	restMapper                meta.RESTMapper
-	appliers                  *apply.Appliers
-	validator                 auth.ExecutorValidator
+	manifestWorkPatcher        patcher.Patcher[*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus]
+	manifestWorkLister         worklister.ManifestWorkNamespaceLister
+	appliedManifestWorkClient  workv1client.AppliedManifestWorkInterface
+	appliedManifestWorkPatcher patcher.Patcher[*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus]
+	appliedManifestWorkLister  worklister.AppliedManifestWorkLister
+	spokeDynamicClient         dynamic.Interface
+	hubHash                    string
+	agentID                    string
+	restMapper                 meta.RESTMapper
+	appliers                   *apply.Appliers
+	validator                  auth.ExecutorValidator
 }
 
 type applyResult struct {
@@ -79,9 +78,14 @@ func NewManifestWorkController(
 	validator auth.ExecutorValidator) factory.Controller {
 
 	controller := &ManifestWorkController{
-		manifestWorkClient:        manifestWorkClient,
+		manifestWorkPatcher: patcher.NewPatcher[
+			*workapiv1.ManifestWork, workapiv1.ManifestWorkSpec, workapiv1.ManifestWorkStatus](
+			manifestWorkClient),
 		manifestWorkLister:        manifestWorkLister,
 		appliedManifestWorkClient: appliedManifestWorkClient,
+		appliedManifestWorkPatcher: patcher.NewPatcher[
+			*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus](
+			appliedManifestWorkClient),
 		appliedManifestWorkLister: appliedManifestWorkInformer.Lister(),
 		spokeDynamicClient:        spokeDynamicClient,
 		hubHash:                   hubHash,
@@ -110,7 +114,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	manifestWorkName := controllerContext.QueueKey()
 	klog.V(4).Infof("Reconciling ManifestWork %q", manifestWorkName)
 
-	manifestWork, err := m.manifestWorkLister.Get(manifestWorkName)
+	oldManifestWork, err := m.manifestWorkLister.Get(manifestWorkName)
 	if apierrors.IsNotFound(err) {
 		// work not found, could have been deleted, do nothing.
 		return nil
@@ -118,7 +122,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	if err != nil {
 		return err
 	}
-	manifestWork = manifestWork.DeepCopy()
+	manifestWork := oldManifestWork.DeepCopy()
 
 	// no work to do if we're deleted
 	if !manifestWork.DeletionTimestamp.IsZero() {
@@ -190,10 +194,28 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 			errs = append(errs, result.Error)
 		}
 	}
+	manifestWork.Status.ResourceStatus.Manifests = helper.MergeManifestConditions(
+		manifestWork.Status.ResourceStatus.Manifests, newManifestConditions)
+	// handle condition type Applied
+	// #1: Applied - work status condition (with type Applied) is applied if all manifest conditions (with type Applied) are applied
+	if inCondition, exists := allInCondition(string(workapiv1.ManifestApplied), newManifestConditions); exists {
+		appliedCondition := metav1.Condition{
+			Type:               workapiv1.WorkApplied,
+			ObservedGeneration: manifestWork.Generation,
+			Status:             metav1.ConditionFalse,
+			Reason:             "AppliedManifestWorkFailed",
+			Message:            "Failed to apply manifest work",
+		}
+		if inCondition {
+			appliedCondition.Status = metav1.ConditionTrue
+			appliedCondition.Reason = "AppliedManifestWorkComplete"
+			appliedCondition.Message = "Apply manifest work complete"
+		}
+		meta.SetStatusCondition(&manifestWork.Status.Conditions, appliedCondition)
+	}
 
 	// Update work status
-	_, updated, err := helper.UpdateManifestWorkStatus(
-		ctx, m.manifestWorkClient, manifestWork, m.generateUpdateStatusFunc(manifestWork.Generation, newManifestConditions))
+	updated, err := m.manifestWorkPatcher.PatchStatus(ctx, manifestWork, manifestWork.Status, oldManifestWork.Status)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("failed to update work status with err %w", err))
 	}
@@ -233,38 +255,7 @@ func (m *ManifestWorkController) applyAppliedManifestWork(ctx context.Context, w
 		return nil, err
 	}
 
-	if equality.Semantic.DeepEqual(appliedManifestWork.Spec, requiredAppliedWork.Spec) {
-		return appliedManifestWork, nil
-	}
-
-	oldData, err := json.Marshal(workapiv1.AppliedManifestWork{
-		ObjectMeta: metav1.ObjectMeta{
-			Finalizers: appliedManifestWork.Finalizers,
-		},
-		Spec: appliedManifestWork.Spec,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to Marshal old data for appliedManifestWork %s: %w", appliedManifestWorkName, err)
-	}
-
-	newData, err := json.Marshal(workapiv1.AppliedManifestWork{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:             appliedManifestWork.UID,
-			ResourceVersion: appliedManifestWork.ResourceVersion,
-			Finalizers:      requiredAppliedWork.Finalizers,
-		}, // to ensure they appear in the patch as preconditions
-		Spec: requiredAppliedWork.Spec,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to Marshal new data for appliedManifestWork %s: %w", appliedManifestWorkName, err)
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create patch for appliedManifestWork %s: %w", appliedManifestWorkName, err)
-	}
-
-	appliedManifestWork, err = m.appliedManifestWorkClient.Patch(ctx, appliedManifestWorkName, types.MergePatchType, patchBytes, metav1.PatchOptions{})
+	_, err = m.appliedManifestWorkPatcher.PatchSpec(ctx, appliedManifestWork, requiredAppliedWork.Spec, appliedManifestWork.Spec)
 	return appliedManifestWork, err
 }
 
@@ -358,43 +349,6 @@ func manageOwnerRef(
 	ownerCopy := myOwner.DeepCopy()
 	ownerCopy.UID = types.UID(removalKey)
 	return *ownerCopy
-}
-
-// generateUpdateStatusFunc returns a function which aggregates manifest conditions and generates work conditions.
-// Rules to generate work status conditions from manifest conditions
-// #1: Applied - work status condition (with type Applied) is applied if all manifest conditions (with type Applied) are applied
-// TODO: add rules for other condition types, like Progressing, Available, Degraded
-func (m *ManifestWorkController) generateUpdateStatusFunc(generation int64,
-	newManifestConditions []workapiv1.ManifestCondition) helper.UpdateManifestWorkStatusFunc {
-	return func(oldStatus *workapiv1.ManifestWorkStatus) error {
-		// merge the new manifest conditions with the existing manifest conditions
-		oldStatus.ResourceStatus.Manifests = helper.MergeManifestConditions(
-			oldStatus.ResourceStatus.Manifests, newManifestConditions)
-
-		// aggregate manifest condition to generate work condition
-		newConditions := []metav1.Condition{}
-
-		// handle condition type Applied
-		if inCondition, exists := allInCondition(string(workapiv1.ManifestApplied), newManifestConditions); exists {
-			appliedCondition := metav1.Condition{
-				Type:               workapiv1.WorkApplied,
-				ObservedGeneration: generation,
-			}
-			if inCondition {
-				appliedCondition.Status = metav1.ConditionTrue
-				appliedCondition.Reason = "AppliedManifestWorkComplete"
-				appliedCondition.Message = "Apply manifest work complete"
-			} else {
-				appliedCondition.Status = metav1.ConditionFalse
-				appliedCondition.Reason = "AppliedManifestWorkFailed"
-				appliedCondition.Message = "Failed to apply manifest work"
-			}
-			newConditions = append(newConditions, appliedCondition)
-		}
-
-		oldStatus.Conditions = helper.MergeStatusConditions(oldStatus.Conditions, newConditions)
-		return nil
-	}
 }
 
 // allInCondition checks status of conditions with a particular type in ManifestCondition array.

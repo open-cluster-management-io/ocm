@@ -183,7 +183,6 @@ func (o *WorkloadAgentOptions) RunWorkloadAgent(ctx context.Context, controllerC
 	appliedManifestWorkController := appliedmanifestcontroller.NewAppliedManifestWorkController(
 		controllerContext.EventRecorder,
 		spokeDynamicClient,
-		hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName),
 		workInformerFactory.Work().V1().ManifestWorks(),
 		workInformerFactory.Work().V1().ManifestWorks().Lister().ManifestWorks(o.AgentOptions.SpokeClusterName),
 		spokeWorkClient.WorkV1().AppliedManifestWorks(),
