@@ -1,0 +1,8 @@
+{{- if .Values.hostingClusterCapabilities.KubeVersion.Version }}
+{{- if semverCompare "> 1.16.0" .Values.hostingClusterCapabilities.KubeVersion.Version }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: "newer-k8s"
+{{- end }}
+{{- end }}

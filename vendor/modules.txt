@@ -1,13 +1,26 @@
 # cloud.google.com/go/compute/metadata v0.2.3
 ## explicit; go 1.19
+# github.com/BurntSushi/toml v1.2.1
+## explicit; go 1.16
+github.com/BurntSushi/toml
+github.com/BurntSushi/toml/internal
+# github.com/Masterminds/goutils v1.1.1
+## explicit
+github.com/Masterminds/goutils
+# github.com/Masterminds/semver/v3 v3.2.0
+## explicit; go 1.18
+github.com/Masterminds/semver/v3
+# github.com/Masterminds/sprig/v3 v3.2.3
+## explicit; go 1.13
+github.com/Masterminds/sprig/v3
 # github.com/NYTimes/gziphandler v1.1.1
 ## explicit; go 1.11
 github.com/NYTimes/gziphandler
 # github.com/antlr/antlr4/runtime/Go/antlr v1.4.10
 ## explicit; go 1.16
 github.com/antlr/antlr4/runtime/Go/antlr
-# github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
-## explicit
+# github.com/asaskevich/govalidator v0.0.0-20200428143746-21a406dcc535
+## explicit; go 1.12
 github.com/asaskevich/govalidator
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
@@ -28,6 +41,9 @@ github.com/coreos/go-semver/semver
 ## explicit; go 1.12
 github.com/coreos/go-systemd/v22/daemon
 github.com/coreos/go-systemd/v22/journal
+# github.com/cyphar/filepath-securejoin v0.2.3
+## explicit; go 1.13
+github.com/cyphar/filepath-securejoin
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
@@ -35,12 +51,15 @@ github.com/davecgh/go-spew/spew
 ## explicit; go 1.13
 github.com/emicklei/go-restful/v3
 github.com/emicklei/go-restful/v3/log
-# github.com/evanphx/json-patch v4.12.0+incompatible
+# github.com/evanphx/json-patch v5.6.0+incompatible
 ## explicit
 github.com/evanphx/json-patch
 # github.com/evanphx/json-patch/v5 v5.6.0
 ## explicit; go 1.12
 github.com/evanphx/json-patch/v5
+# github.com/fatih/structs v1.1.0
+## explicit
+github.com/fatih/structs
 # github.com/felixge/httpsnoop v1.0.3
 ## explicit; go 1.13
 github.com/felixge/httpsnoop
@@ -73,6 +92,16 @@ github.com/go-openapi/swag
 # github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572
 ## explicit; go 1.13
 github.com/go-task/slim-sprig
+# github.com/gobwas/glob v0.2.3
+## explicit
+github.com/gobwas/glob
+github.com/gobwas/glob/compiler
+github.com/gobwas/glob/match
+github.com/gobwas/glob/syntax
+github.com/gobwas/glob/syntax/ast
+github.com/gobwas/glob/syntax/lexer
+github.com/gobwas/glob/util/runes
+github.com/gobwas/glob/util/strings
 # github.com/gogo/protobuf v1.3.2
 ## explicit; go 1.15
 github.com/gogo/protobuf/gogoproto
@@ -142,6 +171,9 @@ github.com/grpc-ecosystem/go-grpc-prometheus
 github.com/grpc-ecosystem/grpc-gateway/v2/internal/httprule
 github.com/grpc-ecosystem/grpc-gateway/v2/runtime
 github.com/grpc-ecosystem/grpc-gateway/v2/utilities
+# github.com/huandu/xstrings v1.3.3
+## explicit; go 1.12
+github.com/huandu/xstrings
 # github.com/imdario/mergo v0.3.12
 ## explicit; go 1.13
 github.com/imdario/mergo
@@ -162,9 +194,15 @@ github.com/mailru/easyjson/jwriter
 # github.com/matttproud/golang_protobuf_extensions v1.0.4
 ## explicit; go 1.9
 github.com/matttproud/golang_protobuf_extensions/pbutil
+# github.com/mitchellh/copystructure v1.2.0
+## explicit; go 1.15
+github.com/mitchellh/copystructure
 # github.com/mitchellh/mapstructure v1.4.1
 ## explicit; go 1.14
 github.com/mitchellh/mapstructure
+# github.com/mitchellh/reflectwalk v1.0.2
+## explicit
+github.com/mitchellh/reflectwalk
 # github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
 ## explicit
 github.com/modern-go/concurrent
@@ -351,9 +389,15 @@ github.com/prometheus/procfs/internal/util
 # github.com/robfig/cron v1.2.0
 ## explicit
 github.com/robfig/cron
+# github.com/shopspring/decimal v1.2.0
+## explicit; go 1.13
+github.com/shopspring/decimal
 # github.com/sirupsen/logrus v1.9.0
 ## explicit; go 1.13
 github.com/sirupsen/logrus
+# github.com/spf13/cast v1.4.1
+## explicit
+github.com/spf13/cast
 # github.com/spf13/cobra v1.6.1
 ## explicit; go 1.15
 github.com/spf13/cobra
@@ -367,6 +411,21 @@ github.com/stoewer/go-strcase
 ## explicit; go 1.13
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
+# github.com/valyala/bytebufferpool v1.0.0
+## explicit
+github.com/valyala/bytebufferpool
+# github.com/valyala/fasttemplate v1.2.2
+## explicit; go 1.12
+github.com/valyala/fasttemplate
+# github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f
+## explicit
+github.com/xeipuuv/gojsonpointer
+# github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415
+## explicit
+github.com/xeipuuv/gojsonreference
+# github.com/xeipuuv/gojsonschema v1.2.0
+## explicit
+github.com/xeipuuv/gojsonschema
 # go.etcd.io/etcd/api/v3 v3.5.7
 ## explicit; go 1.17
 go.etcd.io/etcd/api/v3/authpb
@@ -464,14 +523,18 @@ go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
 go.uber.org/zap/zapgrpc
-# golang.org/x/crypto v0.1.0
+# golang.org/x/crypto v0.5.0
 ## explicit; go 1.17
+golang.org/x/crypto/bcrypt
+golang.org/x/crypto/blowfish
 golang.org/x/crypto/cryptobyte
 golang.org/x/crypto/cryptobyte/asn1
 golang.org/x/crypto/internal/alias
 golang.org/x/crypto/internal/poly1305
 golang.org/x/crypto/nacl/secretbox
+golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/salsa20/salsa
+golang.org/x/crypto/scrypt
 # golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
 ## explicit; go 1.20
 golang.org/x/exp/constraints
@@ -661,6 +724,15 @@ gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
+# helm.sh/helm/v3 v3.11.1
+## explicit; go 1.17
+helm.sh/helm/v3/internal/ignore
+helm.sh/helm/v3/internal/sympath
+helm.sh/helm/v3/internal/version
+helm.sh/helm/v3/pkg/chart
+helm.sh/helm/v3/pkg/chart/loader
+helm.sh/helm/v3/pkg/chartutil
+helm.sh/helm/v3/pkg/engine
 # k8s.io/api v0.27.2
 ## explicit; go 1.20
 k8s.io/api/admission/v1
@@ -1334,6 +1406,27 @@ k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/strings/slices
 k8s.io/utils/trace
+# open-cluster-management.io/addon-framework v0.7.1-0.20230621111818-0056b148e0a0
+## explicit; go 1.19
+open-cluster-management.io/addon-framework/pkg/addonfactory
+open-cluster-management.io/addon-framework/pkg/addonmanager
+open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting
+open-cluster-management.io/addon-framework/pkg/addonmanager/constants
+open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addonconfig
+open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addoninstall
+open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/agentdeploy
+open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/certificate
+open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/managementaddonconfig
+open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/registration
+open-cluster-management.io/addon-framework/pkg/agent
+open-cluster-management.io/addon-framework/pkg/assets
+open-cluster-management.io/addon-framework/pkg/basecontroller/events
+open-cluster-management.io/addon-framework/pkg/basecontroller/factory
+open-cluster-management.io/addon-framework/pkg/cmd/factory
+open-cluster-management.io/addon-framework/pkg/index
+open-cluster-management.io/addon-framework/pkg/manager/controllers/addonconfiguration
+open-cluster-management.io/addon-framework/pkg/manager/controllers/addonowner
+open-cluster-management.io/addon-framework/pkg/utils
 # open-cluster-management.io/api v0.11.1-0.20230609103311-088e8fe86139
 ## explicit; go 1.19
 open-cluster-management.io/api/addon/v1alpha1
@@ -1401,6 +1494,7 @@ open-cluster-management.io/api/crdsv1beta1
 open-cluster-management.io/api/feature
 open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/utils/work/v1/workapplier
+open-cluster-management.io/api/utils/work/v1/workbuilder
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.1.2
