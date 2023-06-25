@@ -40,6 +40,7 @@ jobs:
           kind load docker-image --name=kind quay.io/open-cluster-management/registration:e2e
           kind load docker-image --name=kind quay.io/open-cluster-management/work:e2e
           kind load docker-image --name=kind quay.io/open-cluster-management/placement:e2e
+          kind load docker-image --name=kind quay.io/open-cluster-management/addon-manager:e2e
       - name: Test E2E
         run: |
           IMAGE_TAG=e2e make test-e2e
