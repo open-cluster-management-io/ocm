@@ -18,7 +18,7 @@ import (
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 
-	"open-cluster-management.io/ocm/pkg/registration/helpers"
+	"open-cluster-management.io/ocm/pkg/common/apply"
 )
 
 const (
@@ -38,6 +38,7 @@ var manifestFiles embed.FS
 type clusterroleController struct {
 	kubeClient    kubernetes.Interface
 	clusterLister clusterv1listers.ManagedClusterLister
+	applier       *apply.PermissionApplier
 	cache         resourceapply.ResourceCache
 	eventRecorder events.Recorder
 }
@@ -52,6 +53,13 @@ func NewManagedClusterClusterroleController(
 		kubeClient:    kubeClient,
 		clusterLister: clusterInformer.Lister(),
 		cache:         resourceapply.NewResourceCache(),
+		applier: apply.NewPermissionApplier(
+			kubeClient,
+			nil,
+			nil,
+			clusterRoleInformer.Lister(),
+			nil,
+		),
 		eventRecorder: recorder.WithComponentSuffix("managed-cluster-clusterrole-controller"),
 	}
 	return factory.New().
@@ -72,28 +80,32 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return err
 	}
 
+	errs := []error{}
 	// Clean up managedcluser cluserroles if there are no managed clusters
 	if len(managedClusters) == 0 {
-		return helpers.CleanUpManagedClusterManifests(
+		results := resourceapply.DeleteAll(
 			ctx,
-			c.kubeClient,
+			resourceapply.NewKubeClientHolder(c.kubeClient),
 			c.eventRecorder,
 			manifestFiles.ReadFile,
 			clusterRoleFiles...,
 		)
+		for _, result := range results {
+			if result.Error != nil {
+				errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
+			}
+		}
+		return operatorhelpers.NewMultiLineAggregate(errs)
 	}
 
 	// Make sure the managedcluser cluserroles are existed if there are clusters
-	results := resourceapply.ApplyDirectly(
+	results := c.applier.Apply(
 		ctx,
-		resourceapply.NewKubeClientHolder(c.kubeClient),
 		syncCtx.Recorder(),
-		c.cache,
 		manifestFiles.ReadFile,
 		clusterRoleFiles...,
 	)
 
-	errs := []error{}
 	for _, result := range results {
 		if result.Error != nil {
 			errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))

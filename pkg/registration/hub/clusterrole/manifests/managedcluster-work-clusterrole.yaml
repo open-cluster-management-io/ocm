@@ -2,6 +2,8 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: open-cluster-management:managedcluster:work
+  labels:
+    open-cluster-management.io/cluster-name: ""
 rules:
 # Allow work agent to send event to hub
 - apiGroups: ["", "events.k8s.io"]

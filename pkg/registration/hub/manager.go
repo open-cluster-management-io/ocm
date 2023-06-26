@@ -10,17 +10,20 @@ import (
 	"github.com/spf13/pflag"
 	certv1 "k8s.io/api/certificates/v1"
 	certv1beta1 "k8s.io/api/certificates/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 
 	"open-cluster-management.io/ocm/pkg/features"
@@ -87,15 +90,36 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 		return err
 	}
 
-	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
-	workInformers := workv1informers.NewSharedInformerFactory(workClient, 10*time.Minute)
-	kubeInfomers := kubeinformers.NewSharedInformerFactory(kubeClient, 10*time.Minute)
-	addOnInformers := addoninformers.NewSharedInformerFactory(addOnClient, 10*time.Minute)
+	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 30*time.Minute)
+	workInformers := workv1informers.NewSharedInformerFactory(workClient, 30*time.Minute)
+	kubeInfomers := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, 30*time.Minute, kubeinformers.WithTweakListOptions(
+		func(listOptions *metav1.ListOptions) {
+			// Note all kube resources managed by registration should have the cluster label, and should not have
+			// the addon label.
+			selector := &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      clusterv1.ClusterNameLabelKey,
+						Operator: metav1.LabelSelectorOpExists,
+					},
+					{
+						Key:      addonv1alpha1.AddonLabelKey,
+						Operator: metav1.LabelSelectorOpDoesNotExist,
+					},
+				},
+			}
+			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
+		}))
+	addOnInformers := addoninformers.NewSharedInformerFactory(addOnClient, 30*time.Minute)
 
 	managedClusterController := managedcluster.NewManagedClusterController(
 		kubeClient,
 		clusterClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
+		kubeInfomers.Rbac().V1().Roles(),
+		kubeInfomers.Rbac().V1().ClusterRoles(),
+		kubeInfomers.Rbac().V1().RoleBindings(),
+		kubeInfomers.Rbac().V1().ClusterRoleBindings(),
 		controllerContext.EventRecorder,
 	)
 

@@ -3,6 +3,8 @@ kind: RoleBinding
 metadata:
   name: open-cluster-management:managedcluster:{{ .ManagedClusterName }}:registration
   namespace: "{{ .ManagedClusterName }}"
+  labels:
+    open-cluster-management.io/cluster-name: {{ .ManagedClusterName }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole

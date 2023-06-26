@@ -49,7 +49,6 @@ func NewPatcher[R runtime.Object, Sp any, St any](client PatchClient[R]) *patche
 }
 
 func (p *patcher[R, Sp, St]) AddFinalizer(ctx context.Context, object R, finalizers ...string) (bool, error) {
-
 	accessor, err := meta.Accessor(object)
 	if err != nil {
 		return false, err
@@ -72,14 +71,20 @@ func (p *patcher[R, Sp, St]) AddFinalizer(ctx context.Context, object R, finaliz
 	}
 
 	if len(finalizersToAdd) > 0 {
-		finalizerBytes, err := json.Marshal(append(existingFinalizers, finalizersToAdd...))
+		patch := map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"UID":             accessor.GetUID(),
+				"resourceVersion": accessor.GetResourceVersion(),
+				"finalizers":      append(existingFinalizers, finalizersToAdd...),
+			},
+		}
+		patchBytes, err := json.Marshal(patch)
 		if err != nil {
 			return false, err
 		}
-		patch := fmt.Sprintf("{\"metadata\": {\"finalizers\": %s}}", string(finalizerBytes))
 
 		_, err = p.client.Patch(
-			ctx, accessor.GetName(), types.MergePatchType, []byte(patch), metav1.PatchOptions{})
+			ctx, accessor.GetName(), types.MergePatchType, patchBytes, metav1.PatchOptions{})
 		return true, err
 	}
 
@@ -109,14 +114,20 @@ func (p *patcher[R, Sp, St]) RemoveFinalizer(ctx context.Context, object R, fina
 	}
 
 	if len(existingFinalizers) != len(copiedFinalizers) {
-		finalizerBytes, err := json.Marshal(copiedFinalizers)
+		patch := map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"UID":             accessor.GetUID(),
+				"resourceVersion": accessor.GetResourceVersion(),
+				"finalizers":      copiedFinalizers,
+			},
+		}
+		patchBytes, err := json.Marshal(patch)
 		if err != nil {
 			return err
 		}
-		patch := fmt.Sprintf("{\"metadata\": {\"finalizers\": %s}}", string(finalizerBytes))
 
 		_, err = p.client.Patch(
-			ctx, accessor.GetName(), types.MergePatchType, []byte(patch), metav1.PatchOptions{})
+			ctx, accessor.GetName(), types.MergePatchType, patchBytes, metav1.PatchOptions{})
 		if errors.IsNotFound(err) {
 			return nil
 		}

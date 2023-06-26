@@ -9,10 +9,12 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	rbacv1informers "k8s.io/client-go/informers/rbac/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
@@ -21,6 +23,7 @@ import (
 	listerv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	v1 "open-cluster-management.io/api/cluster/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/apply"
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 )
@@ -43,8 +46,8 @@ var staticFiles = []string{
 type managedClusterController struct {
 	kubeClient    kubernetes.Interface
 	clusterLister listerv1.ManagedClusterLister
+	applier       *apply.PermissionApplier
 	patcher       patcher.Patcher[*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus]
-	cache         resourceapply.ResourceCache
 	eventRecorder events.Recorder
 }
 
@@ -53,14 +56,24 @@ func NewManagedClusterController(
 	kubeClient kubernetes.Interface,
 	clusterClient clientset.Interface,
 	clusterInformer informerv1.ManagedClusterInformer,
+	roleInformer rbacv1informers.RoleInformer,
+	clusterRoleInformer rbacv1informers.ClusterRoleInformer,
+	rolebindingInformer rbacv1informers.RoleBindingInformer,
+	clusterRoleBindingInformer rbacv1informers.ClusterRoleBindingInformer,
 	recorder events.Recorder) factory.Controller {
 	c := &managedClusterController{
 		kubeClient:    kubeClient,
 		clusterLister: clusterInformer.Lister(),
+		applier: apply.NewPermissionApplier(
+			kubeClient,
+			roleInformer.Lister(),
+			rolebindingInformer.Lister(),
+			clusterRoleInformer.Lister(),
+			clusterRoleBindingInformer.Lister(),
+		),
 		patcher: patcher.NewPatcher[
 			*v1.ManagedCluster, v1.ManagedClusterSpec, v1.ManagedClusterStatus](
 			clusterClient.ClusterV1().ManagedClusters()),
-		cache:         resourceapply.NewResourceCache(),
 		eventRecorder: recorder.WithComponentSuffix("managed-cluster-controller"),
 	}
 	return factory.New().
@@ -68,8 +81,28 @@ func NewManagedClusterController(
 			accessor, _ := meta.Accessor(obj)
 			return accessor.GetName()
 		}, clusterInformer.Informer()).
+		WithFilteredEventsInformersQueueKeyFunc(
+			permissionQueueKey,
+			permissionFilterKey,
+			roleInformer.Informer(),
+			rolebindingInformer.Informer(),
+			clusterRoleInformer.Informer(),
+			clusterRoleBindingInformer.Informer()).
 		WithSync(c.sync).
 		ToController("ManagedClusterController", recorder)
+}
+
+func permissionFilterKey(obj interface{}) bool {
+	accessor, _ := meta.Accessor(obj)
+	return len(accessor.GetLabels()) > 0 && len(accessor.GetLabels()[v1.ClusterNameLabelKey]) > 0
+}
+
+func permissionQueueKey(obj runtime.Object) string {
+	accessor, _ := meta.Accessor(obj)
+	if len(accessor.GetLabels()) == 0 {
+		return ""
+	}
+	return accessor.GetLabels()[v1.ClusterNameLabelKey]
 }
 
 func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
@@ -128,22 +161,32 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 
 	// TODO consider to add the managedcluster-namespace.yaml back to staticFiles,
 	// currently, we keep the namespace after the managed cluster is deleted.
-	applyFiles := []string{"manifests/managedcluster-namespace.yaml"}
-	applyFiles = append(applyFiles, staticFiles...)
+	// apply namespace at first
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: managedClusterName,
+			Labels: map[string]string{
+				v1.ClusterNameLabelKey: managedClusterName,
+			},
+		},
+	}
+
+	errs := []error{}
+	_, _, err = resourceapply.ApplyNamespace(ctx, c.kubeClient.CoreV1(), syncCtx.Recorder(), namespace)
+	if err != nil {
+		errs = append(errs, err)
+	}
 
 	// Hub cluster-admin accepts the spoke cluster, we apply
 	// 1. clusterrole and clusterrolebinding for this spoke cluster.
 	// 2. namespace for this spoke cluster.
 	// 3. role and rolebinding for this spoke cluster on its namespace.
-	resourceResults := resourceapply.ApplyDirectly(
+	resourceResults := c.applier.Apply(
 		ctx,
-		resourceapply.NewKubeClientHolder(c.kubeClient),
 		syncCtx.Recorder(),
-		c.cache,
 		helpers.ManagedClusterAssetFn(manifestFiles, managedClusterName),
-		applyFiles...,
+		staticFiles...,
 	)
-	errs := []error{}
 	for _, result := range resourceResults {
 		if result.Error != nil {
 			errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
@@ -179,8 +222,11 @@ func (c *managedClusterController) removeManagedClusterResources(ctx context.Con
 	errs := []error{}
 	// Clean up managed cluster manifests
 	assetFn := helpers.ManagedClusterAssetFn(manifestFiles, managedClusterName)
-	if err := helpers.CleanUpManagedClusterManifests(ctx, c.kubeClient, c.eventRecorder, assetFn, staticFiles...); err != nil {
-		errs = append(errs, err)
+	resourceResults := resourceapply.DeleteAll(ctx, resourceapply.NewKubeClientHolder(c.kubeClient), c.eventRecorder, assetFn, staticFiles...)
+	for _, result := range resourceResults {
+		if result.Error != nil {
+			errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
+		}
 	}
 	return operatorhelpers.NewMultiLineAggregate(errs)
 }

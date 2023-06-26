@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -14,9 +13,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
@@ -24,6 +20,9 @@ import (
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1informer "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 )
 
 const (
@@ -36,7 +35,7 @@ const (
 // addOnFeatureDiscoveryController monitors ManagedCluster and its ManagedClusterAddOns on hub and
 // create/update/delete labels of the ManagedCluster to reflect the status of addons.
 type addOnFeatureDiscoveryController struct {
-	clusterClient clientset.Interface
+	patcher       patcher.Patcher[*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus]
 	clusterLister clusterv1listers.ManagedClusterLister
 	addOnLister   addonlisterv1alpha1.ManagedClusterAddOnLister
 	recorder      events.Recorder
@@ -50,7 +49,9 @@ func NewAddOnFeatureDiscoveryController(
 	recorder events.Recorder,
 ) factory.Controller {
 	c := &addOnFeatureDiscoveryController{
-		clusterClient: clusterClient,
+		patcher: patcher.NewPatcher[
+			*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
+			clusterClient.ClusterV1().ManagedClusters()),
 		clusterLister: clusterInformer.Lister(),
 		addOnLister:   addOnInformers.Lister(),
 		recorder:      recorder,
@@ -65,94 +66,25 @@ func NewAddOnFeatureDiscoveryController(
 			clusterInformer.Informer()).
 		WithInformersQueueKeyFunc(
 			func(obj runtime.Object) string {
-				key, _ := cache.MetaNamespaceKeyFunc(obj)
-				return key
+				accessor, _ := meta.Accessor(obj)
+				return accessor.GetNamespace()
 			},
 			addOnInformers.Informer()).
 		WithSync(c.sync).
-		ResyncEvery(10*time.Minute).
 		ToController("AddOnFeatureDiscoveryController", recorder)
 }
 
 func (c *addOnFeatureDiscoveryController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	// The value of queueKey might be
-	// 1) equal to the default queuekey. It is triggered by resync every 10 minutes;
-	// 2) in format: namespace/name. It indicates the event source is a ManagedClusterAddOn;
-	// 3) in format: name. It indicates the event source is a ManagedCluster;
 	queueKey := syncCtx.QueueKey()
-	namespace, name, err := cache.SplitMetaNamespaceKey(queueKey)
-	if err != nil {
-		utilruntime.HandleError(err)
-		return nil
-	}
 
 	switch {
 	case queueKey == factory.DefaultQueueKey:
-		// handle resync
-		clusters, err := c.clusterLister.List(labels.Everything())
-		if err != nil {
-			return err
-		}
-
-		for _, cluster := range clusters {
-			syncCtx.Queue().Add(cluster.Name)
-		}
+		// no need to resync
 		return nil
-	case len(namespace) > 0:
-		// sync a particular addon
-		return c.syncAddOn(ctx, namespace, name)
 	default:
 		// sync the cluster
-		return c.syncCluster(ctx, name)
+		return c.syncCluster(ctx, queueKey)
 	}
-}
-
-func (c *addOnFeatureDiscoveryController) syncAddOn(ctx context.Context, clusterName, addOnName string) error {
-	klog.V(4).Infof("Reconciling addOn %q", addOnName)
-
-	labels := map[string]string{}
-	addOn, err := c.addOnLister.ManagedClusterAddOns(clusterName).Get(addOnName)
-	switch {
-	case errors.IsNotFound(err):
-		// addon is deleted
-		key := fmt.Sprintf("%s%s-", addOnFeaturePrefix, addOnName)
-		labels[key] = ""
-	case err != nil:
-		return err
-	case !addOn.DeletionTimestamp.IsZero():
-		key := fmt.Sprintf("%s%s-", addOnFeaturePrefix, addOnName)
-		labels[key] = ""
-	default:
-		key := fmt.Sprintf("%s%s", addOnFeaturePrefix, addOn.Name)
-		labels[key] = getAddOnLabelValue(addOn)
-	}
-
-	cluster, err := c.clusterLister.Get(clusterName)
-	if errors.IsNotFound(err) {
-		// no cluster, it could be deleted
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("unable to find cluster with name %q: %w", clusterName, err)
-	}
-	// no work if cluster is deleting
-	if !cluster.DeletionTimestamp.IsZero() {
-		return nil
-	}
-
-	// merge labels
-	modified := false
-	cluster = cluster.DeepCopy()
-	resourcemerge.MergeMap(&modified, &cluster.Labels, labels)
-
-	// no work if the cluster labels have no change
-	if !modified {
-		return nil
-	}
-
-	// otherwise, update cluster
-	_, err = c.clusterClient.ClusterV1().ManagedClusters().Update(ctx, cluster, metav1.UpdateOptions{})
-	return err
 }
 
 func (c *addOnFeatureDiscoveryController) syncCluster(ctx context.Context, clusterName string) error {
@@ -168,6 +100,11 @@ func (c *addOnFeatureDiscoveryController) syncCluster(ctx context.Context, clust
 
 	// Do not update addon label if cluster is deleting
 	if !cluster.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
+	// Do not update if cluster has no available condition yet.
+	if meta.FindStatusCondition(cluster.Status.Conditions, clusterv1.ManagedClusterConditionAvailable) == nil {
 		return nil
 	}
 
@@ -199,8 +136,8 @@ func (c *addOnFeatureDiscoveryController) syncCluster(ctx context.Context, clust
 
 	// merge labels
 	modified := false
-	cluster = cluster.DeepCopy()
-	resourcemerge.MergeMap(&modified, &cluster.Labels, addOnLabels)
+	newCluster := cluster.DeepCopy()
+	resourcemerge.MergeMap(&modified, &newCluster.Labels, addOnLabels)
 
 	// no work if the cluster labels have no change
 	if !modified {
@@ -208,7 +145,7 @@ func (c *addOnFeatureDiscoveryController) syncCluster(ctx context.Context, clust
 	}
 
 	// otherwise, update cluster
-	_, err = c.clusterClient.ClusterV1().ManagedClusters().Update(ctx, cluster, metav1.UpdateOptions{})
+	_, err = c.patcher.PatchLabelAnnotations(ctx, newCluster, newCluster.ObjectMeta, cluster.ObjectMeta)
 	return err
 }
 
