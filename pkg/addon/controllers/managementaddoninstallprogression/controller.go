@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -14,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 
-	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
@@ -35,6 +36,7 @@ func NewManagementAddonInstallProgressionController(
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	addonFilterFunc factory.EventFilterFunc,
+	recorder events.Recorder,
 ) factory.Controller {
 	c := &managementAddonInstallProgressionController{
 		addonClient:                  addonClient,
@@ -49,11 +51,12 @@ func NewManagementAddonInstallProgressionController(
 			return []string{accessor.GetName()}
 		},
 		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
-		WithSync(c.sync).ToController("management-addon-status-controller")
+		WithSync(c.sync).ToController("management-addon-status-controller", recorder)
 
 }
 
-func (c *managementAddonInstallProgressionController) sync(ctx context.Context, syncCtx factory.SyncContext, addonName string) error {
+func (c *managementAddonInstallProgressionController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	addonName := syncCtx.QueueKey()
 	klog.V(4).Infof("Reconciling addon %q", addonName)
 
 	mgmtAddon, err := c.clusterManagementAddonLister.Get(addonName)

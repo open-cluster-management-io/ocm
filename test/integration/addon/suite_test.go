@@ -7,6 +7,7 @@ import (
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -23,6 +24,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/ocm/pkg/addon"
+	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 const (
@@ -107,7 +109,10 @@ var _ = ginkgo.BeforeSuite(func() {
 		err = addonManager.Start(mgrContext)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		err = addon.RunManager(mgrContext, cfg)
+		err = addon.RunManager(mgrContext, &controllercmd.ControllerContext{
+			KubeConfig:    cfg,
+			EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
+		})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	}()
 

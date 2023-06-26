@@ -3,13 +3,14 @@ package addonowner
 import (
 	"context"
 
+	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
-	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -33,6 +34,7 @@ func NewAddonOwnerController(
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	addonFilterFunc factory.EventFilterFunc,
+	recorder events.Recorder,
 ) factory.Controller {
 	c := &addonOwnerController{
 		addonClient:                  addonClient,
@@ -41,21 +43,25 @@ func NewAddonOwnerController(
 		addonFilterFunc:              addonFilterFunc,
 	}
 
-	return factory.New().WithFilteredEventsInformersQueueKeysFunc(
-		func(obj runtime.Object) []string {
-			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			return []string{key}
-		},
-		c.addonFilterFunc, clusterManagementAddonInformers.Informer()).
+	return factory.New().
+		WithFilteredEventsInformersQueueKeysFunc(
+			func(obj runtime.Object) []string {
+				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+				return []string{key}
+			},
+			c.addonFilterFunc, clusterManagementAddonInformers.Informer()).
 		WithInformersQueueKeysFunc(
 			func(obj runtime.Object) []string {
 				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 				return []string{key}
 			},
-			addonInformers.Informer()).WithSync(c.sync).ToController("addon-owner-controller")
+			addonInformers.Informer()).
+		WithSync(c.sync).
+		ToController("addon-owner-controller", recorder)
 }
 
-func (c *addonOwnerController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
+func (c *addonOwnerController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	key := syncCtx.QueueKey()
 	klog.V(4).Infof("Reconciling addon %q", key)
 
 	namespace, addonName, err := cache.SplitMetaNamespaceKey(key)

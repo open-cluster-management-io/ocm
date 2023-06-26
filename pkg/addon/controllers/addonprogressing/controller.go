@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -20,7 +22,6 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/agentdeploy"
-	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
@@ -52,6 +53,7 @@ func NewAddonProgressingController(
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	workInformers workinformers.ManifestWorkInformer,
 	addonFilterFunc factory.EventFilterFunc,
+	recorder events.Recorder,
 ) factory.Controller {
 	c := &addonProgressingController{
 		addonClient:                  addonClient,
@@ -74,10 +76,11 @@ func NewAddonProgressingController(
 				return []string{fmt.Sprintf("%s/%s", accessor.GetNamespace(), accessor.GetLabels()[addonapiv1alpha1.AddonLabelKey])}
 			},
 			workInformers.Informer()).
-		WithSync(c.sync).ToController("addon-progressing-controller")
+		WithSync(c.sync).ToController("addon-progressing-controller", recorder)
 }
 
-func (c *addonProgressingController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
+func (c *addonProgressingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	key := syncCtx.QueueKey()
 	klog.V(4).Infof("Reconciling addon %q", key)
 
 	namespace, addonName, err := cache.SplitMetaNamespaceKey(key)

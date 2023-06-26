@@ -21,6 +21,8 @@ import (
 	fakework "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 func newClusterManagementOwner(name string) metav1.OwnerReference {
@@ -595,16 +597,19 @@ func TestReconcile(t *testing.T) {
 				}
 			}
 
-			controller := addonProgressingController{
-				addonClient:                  fakeAddonClient,
-				managedClusterAddonLister:    addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
-				workLister:                   workInformers.Work().V1().ManifestWorks().Lister(),
-				addonFilterFunc:              utils.ManagedBySelf(map[string]agent.AgentAddon{"test": nil}),
-			}
+			syncContext := testingcommon.NewFakeSyncContext(t, c.syncKey)
+			recorder := syncContext.Recorder()
 
-			syncContext := addontesting.NewFakeSyncContext(t)
-			err := controller.sync(context.TODO(), syncContext, c.syncKey)
+			controller := NewAddonProgressingController(
+				fakeAddonClient,
+				addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+				addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
+				workInformers.Work().V1().ManifestWorks(),
+				utils.ManagedBySelf(map[string]agent.AgentAddon{"test": nil}),
+				recorder,
+			)
+
+			err := controller.Sync(context.TODO(), syncContext)
 			if err != nil {
 				t.Errorf("expected no error when sync: %v", err)
 			}

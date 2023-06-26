@@ -12,10 +12,11 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	"open-cluster-management.io/api/addon/v1alpha1"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
+
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 func TestReconcile(t *testing.T) {
@@ -45,12 +46,12 @@ func TestReconcile(t *testing.T) {
 			syncKey:             "test",
 			managedClusteraddon: []runtime.Object{},
 			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").WithSupportedConfigs(
-				v1alpha1.ConfigMeta{
-					ConfigGroupResource: v1alpha1.ConfigGroupResource{
+				addonapiv1alpha1.ConfigMeta{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addonhubconfigs",
 					},
-					DefaultConfig: &v1alpha1.ConfigReferent{
+					DefaultConfig: &addonapiv1alpha1.ConfigReferent{
 						Name:      "test",
 						Namespace: "test",
 					},
@@ -77,8 +78,8 @@ func TestReconcile(t *testing.T) {
 			syncKey:             "test",
 			managedClusteraddon: []runtime.Object{},
 			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").WithSupportedConfigs(
-				v1alpha1.ConfigMeta{
-					ConfigGroupResource: v1alpha1.ConfigGroupResource{
+				addonapiv1alpha1.ConfigMeta{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addonhubconfigs",
 					},
@@ -102,12 +103,12 @@ func TestReconcile(t *testing.T) {
 						Namespace: "test",
 					},
 					Configs: []addonapiv1alpha1.AddOnConfig{
-						v1alpha1.AddOnConfig{
-							ConfigGroupResource: v1alpha1.ConfigGroupResource{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							ConfigReferent: v1alpha1.ConfigReferent{
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
 								Name:      "test",
 								Namespace: "test",
 							},
@@ -150,12 +151,12 @@ func TestReconcile(t *testing.T) {
 						Namespace: "test",
 					},
 					Configs: []addonapiv1alpha1.AddOnConfig{
-						v1alpha1.AddOnConfig{
-							ConfigGroupResource: v1alpha1.ConfigGroupResource{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addonhubconfigs",
 							},
-							ConfigReferent: v1alpha1.ConfigReferent{
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
 								Name:      "test1",
 								Namespace: "test",
 							},
@@ -168,12 +169,12 @@ func TestReconcile(t *testing.T) {
 						Namespace: "test",
 					},
 					Configs: []addonapiv1alpha1.AddOnConfig{
-						v1alpha1.AddOnConfig{
-							ConfigGroupResource: v1alpha1.ConfigGroupResource{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							ConfigReferent: v1alpha1.ConfigReferent{
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
 								Name:      "test",
 								Namespace: "test",
 							},
@@ -181,12 +182,12 @@ func TestReconcile(t *testing.T) {
 					},
 				},
 			).WithSupportedConfigs(
-				v1alpha1.ConfigMeta{
-					ConfigGroupResource: v1alpha1.ConfigGroupResource{
+				addonapiv1alpha1.ConfigMeta{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addonhubconfigs",
 					},
-					DefaultConfig: &v1alpha1.ConfigReferent{
+					DefaultConfig: &addonapiv1alpha1.ConfigReferent{
 						Name:      "test",
 						Namespace: "test",
 					},
@@ -237,15 +238,18 @@ func TestReconcile(t *testing.T) {
 				}
 			}
 
-			controller := managementAddonInstallProgressionController{
-				addonClient:                  fakeAddonClient,
-				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
-				managedClusterAddonLister:    addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				addonFilterFunc:              utils.ManagedBySelf(map[string]agent.AgentAddon{"test": nil}),
-			}
+			syncContext := testingcommon.NewFakeSyncContext(t, c.syncKey)
+			recorder := syncContext.Recorder()
 
-			syncContext := addontesting.NewFakeSyncContext(t)
-			err := controller.sync(context.TODO(), syncContext, c.syncKey)
+			controller := NewManagementAddonInstallProgressionController(
+				fakeAddonClient,
+				addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+				addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
+				utils.ManagedBySelf(map[string]agent.AgentAddon{"test": nil}),
+				recorder,
+			)
+
+			err := controller.Sync(context.TODO(), syncContext)
 			if err != nil {
 				t.Errorf("expected no error when sync: %v", err)
 			}

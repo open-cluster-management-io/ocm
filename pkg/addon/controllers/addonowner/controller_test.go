@@ -14,6 +14,8 @@ import (
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
+
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 func newClusterManagementOwner(name string) metav1.OwnerReference {
@@ -72,15 +74,17 @@ func TestReconcile(t *testing.T) {
 				}
 			}
 
-			controller := addonOwnerController{
-				addonClient:                  fakeAddonClient,
-				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
-				managedClusterAddonLister:    addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				addonFilterFunc:              utils.ManagedByAddonManager,
-			}
+			syncContext := testingcommon.NewFakeSyncContext(t, c.syncKey)
+			recorder := syncContext.Recorder()
 
-			syncContext := addontesting.NewFakeSyncContext(t)
-			err := controller.sync(context.TODO(), syncContext, c.syncKey)
+			controller := NewAddonOwnerController(
+				fakeAddonClient,
+				addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+				addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
+				utils.ManagedByAddonManager,
+				recorder)
+
+			err := controller.Sync(context.TODO(), syncContext)
 			if err != nil {
 				t.Errorf("expected no error when sync: %v", err)
 			}

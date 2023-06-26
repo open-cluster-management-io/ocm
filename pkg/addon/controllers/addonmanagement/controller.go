@@ -3,13 +3,14 @@ package addonmanagement
 import (
 	"context"
 
+	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
-	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	"open-cluster-management.io/addon-framework/pkg/index"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -45,6 +46,7 @@ func NewAddonManagementController(
 	placementInformer clusterinformersv1beta1.PlacementInformer,
 	placementDecisionInformer clusterinformersv1beta1.PlacementDecisionInformer,
 	addonFilterFunc factory.EventFilterFunc,
+	recorder events.Recorder,
 ) factory.Controller {
 	c := &addonManagementController{
 		addonClient:                   addonClient,
@@ -68,12 +70,19 @@ func NewAddonManagementController(
 			return []string{key}
 		},
 		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
-		WithInformersQueueKeysFunc(index.ClusterManagementAddonByPlacementDecisionQueueKey(clusterManagementAddonInformers), placementDecisionInformer.Informer()).
-		WithInformersQueueKeysFunc(index.ClusterManagementAddonByPlacementQueueKey(clusterManagementAddonInformers), placementInformer.Informer()).
-		WithSync(c.sync).ToController("addon-management-controller")
+		WithInformersQueueKeysFunc(
+			index.ClusterManagementAddonByPlacementDecisionQueueKey(
+				clusterManagementAddonInformers),
+			placementDecisionInformer.Informer()).
+		WithInformersQueueKeysFunc(
+			index.ClusterManagementAddonByPlacementQueueKey(
+				clusterManagementAddonInformers),
+			placementInformer.Informer()).
+		WithSync(c.sync).ToController("addon-management-controller", recorder)
 }
 
-func (c *addonManagementController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
+func (c *addonManagementController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	key := syncCtx.QueueKey()
 	_, addonName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		// ignore addon whose key is invalid

@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
 	"open-cluster-management.io/addon-framework/pkg/index"
@@ -29,7 +29,8 @@ import (
 	"open-cluster-management.io/ocm/pkg/addon/controllers/managementaddoninstallprogression"
 )
 
-func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
+func RunManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+	kubeConfig := controllerContext.KubeConfig
 	hubKubeClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
@@ -122,6 +123,7 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 		clusterInformerFactory.Cluster().V1beta1().Placements(),
 		clusterInformerFactory.Cluster().V1beta1().PlacementDecisions(),
 		utils.ManagedByAddonManager,
+		controllerContext.EventRecorder,
 	)
 
 	addonConfigurationController := addonconfiguration.NewAddonConfigurationController(
@@ -131,6 +133,7 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 		clusterInformerFactory.Cluster().V1beta1().Placements(),
 		clusterInformerFactory.Cluster().V1beta1().PlacementDecisions(),
 		utils.ManagedByAddonManager,
+		controllerContext.EventRecorder,
 	)
 
 	addonOwnerController := addonowner.NewAddonOwnerController(
@@ -138,6 +141,7 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
 		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
 		utils.ManagedByAddonManager,
+		controllerContext.EventRecorder,
 	)
 
 	addonProgressingController := addonprogressing.NewAddonProgressingController(
@@ -146,6 +150,7 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
 		workInformers.Work().V1().ManifestWorks(),
 		utils.ManagedByAddonManager,
+		controllerContext.EventRecorder,
 	)
 
 	mgmtAddonInstallProgressionController := managementaddoninstallprogression.NewManagementAddonInstallProgressionController(
@@ -153,17 +158,18 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
 		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
 		utils.ManagedByAddonManager,
+		controllerContext.EventRecorder,
 	)
 
 	addonTemplateController := addontemplate.NewAddonTemplateController(
 		kubeConfig,
 		hubKubeClient,
 		addonClient,
-		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
 		addonInformerFactory,
 		clusterInformerFactory,
 		dynamicInformers,
 		workInformers,
+		controllerContext.EventRecorder,
 	)
 
 	go addonManagementController.Run(ctx, 2)

@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -18,11 +20,9 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
-	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
@@ -55,17 +55,18 @@ func NewAddonTemplateController(
 	hubKubeconfig *rest.Config,
 	hubKubeClient kubernetes.Interface,
 	addonClient addonv1alpha1client.Interface,
-	cmaInformer addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	addonInformers addoninformers.SharedInformerFactory,
 	clusterInformers clusterv1informers.SharedInformerFactory,
 	dynamicInformers dynamicinformer.DynamicSharedInformerFactory,
 	workInformers workv1informers.SharedInformerFactory,
+	recorder events.Recorder,
+	runController ...runController,
 ) factory.Controller {
 	c := &addonTemplateController{
 		kubeConfig:       hubKubeconfig,
 		kubeClient:       hubKubeClient,
 		addonClient:      addonClient,
-		cmaLister:        cmaInformer.Lister(),
+		cmaLister:        addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
 		addonManagers:    make(map[string]context.CancelFunc),
 		addonInformers:   addonInformers,
 		clusterInformers: clusterInformers,
@@ -73,16 +74,20 @@ func NewAddonTemplateController(
 		workInformers:    workInformers,
 	}
 
-	// easy to mock in unit tests
-	c.runControllerFunc = c.runController
+	if len(runController) > 0 {
+		c.runControllerFunc = runController[0]
+	} else {
+		// easy to mock in unit tests
+		c.runControllerFunc = c.runController
+	}
 	return factory.New().WithInformersQueueKeysFunc(
 		func(obj runtime.Object) []string {
 			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			return []string{key}
 		},
-		cmaInformer.Informer()).
+		addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer()).
 		WithSync(c.sync).
-		ToController("addon-template-controller")
+		ToController("addon-template-controller", recorder)
 }
 
 func (c *addonTemplateController) stopUnusedManagers(
@@ -95,7 +100,8 @@ func (c *addonTemplateController) stopUnusedManagers(
 	}
 }
 
-func (c *addonTemplateController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
+func (c *addonTemplateController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	key := syncCtx.QueueKey()
 	_, addonName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		// ignore addon whose key is not in format: namespace/name

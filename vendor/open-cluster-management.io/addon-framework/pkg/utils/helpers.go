@@ -24,7 +24,6 @@ import (
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 )
 
 func MergeRelatedObjects(modified *bool, objs *[]addonapiv1alpha1.ObjectReference, obj addonapiv1alpha1.ObjectReference) {
@@ -307,7 +306,7 @@ func ManagedByAddonManager(obj interface{}) bool {
 	return value == addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue
 }
 
-func ManagedBySelf(agentAddons map[string]agent.AgentAddon) factory.EventFilterFunc {
+func ManagedBySelf(agentAddons map[string]agent.AgentAddon) func(obj interface{}) bool {
 	return func(obj interface{}) bool {
 		accessor, _ := meta.Accessor(obj)
 		if _, ok := agentAddons[accessor.GetName()]; !ok {
@@ -329,7 +328,7 @@ func ManagedBySelf(agentAddons map[string]agent.AgentAddon) factory.EventFilterF
 	}
 }
 
-func FilterByAddonName(agentAddons map[string]agent.AgentAddon) factory.EventFilterFunc {
+func FilterByAddonName(agentAddons map[string]agent.AgentAddon) func(obj interface{}) bool {
 	return func(obj interface{}) bool {
 		accessor, _ := meta.Accessor(obj)
 		_, ok := agentAddons[accessor.GetName()]

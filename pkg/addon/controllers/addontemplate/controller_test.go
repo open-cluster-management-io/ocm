@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
@@ -20,6 +21,8 @@ import (
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	fakework "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
+
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 func TestReconcile(t *testing.T) {
@@ -166,21 +169,22 @@ func TestReconcile(t *testing.T) {
 		workInformers := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
 
 		hubKubeClient := fakekube.NewSimpleClientset()
-		controller := addonTemplateController{
-			addonManagers:     make(map[string]context.CancelFunc),
-			addonClient:       fakeAddonClient,
-			kubeClient:        hubKubeClient,
-			cmaLister:         addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
-			addonInformers:    addonInformers,
-			clusterInformers:  clusterInformers,
-			dynamicInformers:  dynamicInformerFactory,
-			workInformers:     workInformers,
-			runControllerFunc: runController,
-		}
-		syncContext := addontesting.NewFakeSyncContext(t)
+
+		controller := NewAddonTemplateController(
+			nil,
+			hubKubeClient,
+			fakeAddonClient,
+			addonInformers,
+			clusterInformers,
+			dynamicInformerFactory,
+			workInformers,
+			eventstesting.NewTestingEventRecorder(t),
+			runController,
+		)
 		ctx := context.TODO()
 		for _, syncKey := range c.syncKeys {
-			err := controller.sync(ctx, syncContext, syncKey)
+			syncContext := testingcommon.NewFakeSyncContext(t, syncKey)
+			err := controller.Sync(ctx, syncContext)
 			if err != nil {
 				t.Errorf("expected no error when sync: %v", err)
 			}
