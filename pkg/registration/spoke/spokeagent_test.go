@@ -8,141 +8,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
-	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
-
-func TestComplete(t *testing.T) {
-	// get component namespace
-	var componentNamespace string
-	nsBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-	if err != nil {
-		componentNamespace = defaultSpokeComponentNamespace
-	} else {
-		componentNamespace = string(nsBytes)
-	}
-
-	cases := []struct {
-		name                string
-		clusterName         string
-		secret              *corev1.Secret
-		expectedClusterName string
-		expectedAgentName   string
-	}{
-		{
-			name: "generate random cluster/agent name",
-		},
-		{
-			name:                "specify cluster name",
-			clusterName:         "cluster1",
-			expectedClusterName: "cluster1",
-		},
-		{
-			name:        "override cluster name in secret with specified value",
-			clusterName: "cluster1",
-			secret: testinghelpers.NewHubKubeconfigSecret(componentNamespace, "hub-kubeconfig-secret", "", nil, map[string][]byte{
-				"cluster-name": []byte("cluster2"),
-				"agent-name":   []byte("agent2"),
-			}),
-			expectedClusterName: "cluster1",
-			expectedAgentName:   "agent2",
-		},
-		{
-			name:        "override cluster name in cert with specified value",
-			clusterName: "cluster1",
-			secret: testinghelpers.NewHubKubeconfigSecret(componentNamespace, "hub-kubeconfig-secret", "", testinghelpers.NewTestCert("system:open-cluster-management:cluster2:agent2", 60*time.Second), map[string][]byte{
-				"kubeconfig":   testinghelpers.NewKubeconfig(nil, nil),
-				"cluster-name": []byte("cluster3"),
-				"agent-name":   []byte("agent3"),
-			}),
-			expectedClusterName: "cluster1",
-			expectedAgentName:   "agent2",
-		},
-		{
-			name: "take cluster/agent name from secret",
-			secret: testinghelpers.NewHubKubeconfigSecret(componentNamespace, "hub-kubeconfig-secret", "", nil, map[string][]byte{
-				"cluster-name": []byte("cluster1"),
-				"agent-name":   []byte("agent1"),
-			}),
-			expectedClusterName: "cluster1",
-			expectedAgentName:   "agent1",
-		},
-		{
-			name:                "take cluster/agent name from cert",
-			secret:              testinghelpers.NewHubKubeconfigSecret(componentNamespace, "hub-kubeconfig-secret", "", testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second), map[string][]byte{}),
-			expectedClusterName: "cluster1",
-			expectedAgentName:   "agent1",
-		},
-		{
-			name: "override cluster name in secret with value from cert",
-			secret: testinghelpers.NewHubKubeconfigSecret(componentNamespace, "hub-kubeconfig-secret", "", testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second), map[string][]byte{
-				"cluster-name": []byte("cluster2"),
-				"agent-name":   []byte("agent2"),
-			}),
-			expectedClusterName: "cluster1",
-			expectedAgentName:   "agent1",
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			// setup kube client
-			objects := []runtime.Object{}
-			if c.secret != nil {
-				objects = append(objects, c.secret)
-			}
-			kubeClient := kubefake.NewSimpleClientset(objects...)
-
-			// create a tmp dir to dump hub kubeconfig
-			dir, err := os.MkdirTemp("", "hub-kubeconfig")
-			if err != nil {
-				t.Error("unable to create a tmp dir")
-			}
-			defer os.RemoveAll(dir)
-
-			options := &SpokeAgentOptions{
-				AgentOptions: &commonoptions.AgentOptions{
-					SpokeClusterName: c.clusterName,
-				},
-				HubKubeconfigSecret: "hub-kubeconfig-secret",
-				HubKubeconfigDir:    dir,
-			}
-
-			if err := options.Complete(kubeClient.CoreV1(), context.TODO(), eventstesting.NewTestingEventRecorder(t)); err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if options.ComponentNamespace == "" {
-				t.Error("component namespace should not be empty")
-			}
-			if options.AgentOptions.SpokeClusterName == "" {
-				t.Error("cluster name should not be empty")
-			}
-			if options.AgentName == "" {
-				t.Error("agent name should not be empty")
-			}
-			if len(c.expectedClusterName) > 0 && options.AgentOptions.SpokeClusterName != c.expectedClusterName {
-				t.Errorf("expect cluster name %q but got %q", c.expectedClusterName, options.AgentOptions.SpokeClusterName)
-			}
-			if len(c.expectedAgentName) > 0 && options.AgentName != c.expectedAgentName {
-				t.Errorf("expect agent name %q but got %q", c.expectedAgentName, options.AgentName)
-			}
-		})
-	}
-}
 
 func TestValidate(t *testing.T) {
 	defaultCompletedOptions := NewSpokeAgentOptions()
 	defaultCompletedOptions.BootstrapKubeconfig = "/spoke/bootstrap/kubeconfig"
-	defaultCompletedOptions.AgentOptions.SpokeClusterName = "testcluster"
-	defaultCompletedOptions.AgentName = "testagent"
 
 	cases := []struct {
 		name        string
@@ -155,23 +30,9 @@ func TestValidate(t *testing.T) {
 			expectedErr: "bootstrap-kubeconfig is required",
 		},
 		{
-			name:        "no cluster name",
-			options:     &SpokeAgentOptions{BootstrapKubeconfig: "/spoke/bootstrap/kubeconfig", AgentOptions: &commonoptions.AgentOptions{}},
-			expectedErr: "cluster name is empty",
-		},
-		{
-			name:        "no agent name",
-			options:     &SpokeAgentOptions{BootstrapKubeconfig: "/spoke/bootstrap/kubeconfig", AgentOptions: &commonoptions.AgentOptions{SpokeClusterName: "testcluster"}},
-			expectedErr: "agent name is empty",
-		},
-		{
 			name: "invalid external server URLs",
 			options: &SpokeAgentOptions{
-				BootstrapKubeconfig: "/spoke/bootstrap/kubeconfig",
-				AgentOptions: &commonoptions.AgentOptions{
-					SpokeClusterName: "testcluster",
-				},
-				AgentName:               "testagent",
+				BootstrapKubeconfig:     "/spoke/bootstrap/kubeconfig",
 				SpokeExternalServerURLs: []string{"https://127.0.0.1:64433", "http://127.0.0.1:8080"},
 			},
 			expectedErr: "\"http://127.0.0.1:8080\" is invalid",
@@ -179,11 +40,7 @@ func TestValidate(t *testing.T) {
 		{
 			name: "invalid cluster healthcheck period",
 			options: &SpokeAgentOptions{
-				BootstrapKubeconfig: "/spoke/bootstrap/kubeconfig",
-				AgentOptions: &commonoptions.AgentOptions{
-					SpokeClusterName: "testcluster",
-				},
-				AgentName:                "testagent",
+				BootstrapKubeconfig:      "/spoke/bootstrap/kubeconfig",
 				ClusterHealthCheckPeriod: 0,
 			},
 			expectedErr: "cluster healthcheck period must greater than zero",
@@ -196,15 +53,10 @@ func TestValidate(t *testing.T) {
 		{
 			name: "default completed options",
 			options: &SpokeAgentOptions{
-				HubKubeconfigSecret:      "hub-kubeconfig-secret",
-				HubKubeconfigDir:         "/spoke/hub-kubeconfig",
-				ClusterHealthCheckPeriod: 1 * time.Minute,
-				MaxCustomClusterClaims:   20,
-				BootstrapKubeconfig:      "/spoke/bootstrap/kubeconfig",
-				AgentOptions: &commonoptions.AgentOptions{
-					SpokeClusterName: "testcluster",
-				},
-				AgentName:                   "testagent",
+				HubKubeconfigSecret:         "hub-kubeconfig-secret",
+				ClusterHealthCheckPeriod:    1 * time.Minute,
+				MaxCustomClusterClaims:      20,
+				BootstrapKubeconfig:         "/spoke/bootstrap/kubeconfig",
 				ClientCertExpirationSeconds: 3599,
 			},
 			expectedErr: "client certificate expiration seconds must greater or qual to 3600",
@@ -212,15 +64,10 @@ func TestValidate(t *testing.T) {
 		{
 			name: "default completed options",
 			options: &SpokeAgentOptions{
-				HubKubeconfigSecret:      "hub-kubeconfig-secret",
-				HubKubeconfigDir:         "/spoke/hub-kubeconfig",
-				ClusterHealthCheckPeriod: 1 * time.Minute,
-				MaxCustomClusterClaims:   20,
-				BootstrapKubeconfig:      "/spoke/bootstrap/kubeconfig",
-				AgentOptions: &commonoptions.AgentOptions{
-					SpokeClusterName: "testcluster",
-				},
-				AgentName:                   "testagent",
+				HubKubeconfigSecret:         "hub-kubeconfig-secret",
+				ClusterHealthCheckPeriod:    1 * time.Minute,
+				MaxCustomClusterClaims:      20,
+				BootstrapKubeconfig:         "/spoke/bootstrap/kubeconfig",
 				ClientCertExpirationSeconds: 3600,
 			},
 			expectedErr: "",
@@ -301,67 +148,21 @@ func TestHasValidHubClientConfig(t *testing.T) {
 				testinghelpers.WriteFile(path.Join(tempDir, "tls.crt"), c.tlsCert)
 			}
 
-			options := &SpokeAgentOptions{
-				AgentOptions: &commonoptions.AgentOptions{
-					SpokeClusterName: c.clusterName,
-				},
-				AgentName:        c.agentName,
+			agentOpts := &commonoptions.AgentOptions{
+				SpokeClusterName: c.clusterName,
+				AgentID:          c.agentName,
 				HubKubeconfigDir: tempDir,
 			}
-			valid, err := options.hasValidHubClientConfig(context.TODO())
+			cfg := NewSpokeAgentConfig(agentOpts, NewSpokeAgentOptions())
+			if err := agentOpts.Complete(); err != nil {
+				t.Fatal(err)
+			}
+			valid, err := cfg.HasValidHubClientConfig(context.TODO())
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 			if c.isValid != valid {
 				t.Errorf("expect %t, but %t", c.isValid, valid)
-			}
-		})
-	}
-}
-
-func TestGetOrGenerateClusterAgentNames(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "testgetorgenerateclusteragentnames")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	cases := []struct {
-		name                string
-		options             *SpokeAgentOptions
-		expectedClusterName string
-		expectedAgentName   string
-	}{
-		{
-			name:                "cluster name is specified",
-			options:             &SpokeAgentOptions{AgentOptions: &commonoptions.AgentOptions{SpokeClusterName: "cluster0"}},
-			expectedClusterName: "cluster0",
-		},
-		{
-			name:                "cluster name and agent name are in file",
-			options:             &SpokeAgentOptions{HubKubeconfigDir: tempDir, AgentOptions: &commonoptions.AgentOptions{}},
-			expectedClusterName: "cluster1",
-			expectedAgentName:   "agent1",
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			if c.options.HubKubeconfigDir != "" {
-				testinghelpers.WriteFile(path.Join(tempDir, clientcert.ClusterNameFile), []byte(c.expectedClusterName))
-				testinghelpers.WriteFile(path.Join(tempDir, clientcert.AgentNameFile), []byte(c.expectedAgentName))
-			}
-			clusterName, agentName := c.options.getOrGenerateClusterAgentNames()
-			if clusterName != c.expectedClusterName {
-				t.Errorf("expect cluster name %q but got %q", c.expectedClusterName, clusterName)
-			}
-
-			// agent name cannot be empty, it is either generated or from file
-			if agentName == "" {
-				t.Error("agent name should not be empty")
-			}
-
-			if c.expectedAgentName != "" && c.expectedAgentName != agentName {
-				t.Errorf("expect agent name %q but got %q", c.expectedAgentName, agentName)
 			}
 		})
 	}
@@ -418,7 +219,8 @@ func TestGetSpokeClusterCABundle(t *testing.T) {
 				restConig.CAData = nil
 				restConig.CAFile = path.Join(tempDir, c.caFile)
 			}
-			caData, err := c.options.getSpokeClusterCABundle(restConig)
+			cfg := NewSpokeAgentConfig(commonoptions.NewAgentOptions(), c.options)
+			caData, err := cfg.getSpokeClusterCABundle(restConig)
 			testingcommon.AssertError(t, err, c.expectedErr)
 			if c.expectedCAData == nil && caData == nil {
 				return
