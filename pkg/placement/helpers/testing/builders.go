@@ -52,6 +52,11 @@ func (b *placementBuilder) WithNOC(noc int32) *placementBuilder {
 	return b
 }
 
+func (b *placementBuilder) WithGroupStrategy(groupStrategy clusterapiv1beta1.GroupStrategy) *placementBuilder {
+	b.placement.Spec.DecisionStrategy.GroupStrategy = groupStrategy
+	return b
+}
+
 func (b *placementBuilder) WithPrioritizerPolicy(mode clusterapiv1beta1.PrioritizerPolicyModeType) *placementBuilder {
 	b.placement.Spec.PrioritizerPolicy = clusterapiv1beta1.PrioritizerPolicy{
 		Mode: mode,
@@ -118,8 +123,16 @@ func (b *placementBuilder) AddToleration(toleration *clusterapiv1beta1.Toleratio
 	return b
 }
 
-func (b *placementBuilder) WithNumOfSelectedClusters(nosc int) *placementBuilder {
+func (b *placementBuilder) WithNumOfSelectedClusters(nosc int, placementName string) *placementBuilder {
 	b.placement.Status.NumberOfSelectedClusters = int32(nosc)
+	b.placement.Status.DecisionGroups = []clusterapiv1beta1.DecisionGroupStatus{
+		{
+			DecisionGroupIndex: 0,
+			DecisionGroupName:  "",
+			ClustersCount:      int32(nosc),
+			Decisions:          []string{fmt.Sprintf("%s-decision-%d", placementName, 0)},
+		},
+	}
 	return b
 }
 

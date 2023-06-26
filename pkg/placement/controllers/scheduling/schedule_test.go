@@ -10,6 +10,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
@@ -31,10 +32,9 @@ func TestSchedule(t *testing.T) {
 		placement            *clusterlisterv1beta1.Placement
 		initObjs             []runtime.Object
 		clusters             []*clusterapiv1.ManagedCluster
-		decisions            []runtime.Object
 		expectedFilterResult []FilterResult
 		expectedScoreResult  []PrioritizerResult
-		expectedDecisions    []clusterapiv1beta1.ClusterDecision
+		expectedDecisions    ScheduleDecisionGroups
 		expectedUnScheduled  int
 		expectedStatus       framework.Status
 	}{
@@ -45,10 +45,14 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 			},
-			decisions: []runtime.Object{},
-			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
-				{ClusterName: "cluster1"},
+			clusters: []*clusterapiv1.ManagedCluster{
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(
+					clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 			},
+			expectedDecisions: []ScheduleDecisionGroup{{
+				ClusterDecisions: []clusterapiv1beta1.ClusterDecision{
+					{ClusterName: "cluster1"},
+				}}},
 			expectedFilterResult: []FilterResult{
 				{
 					Name:             "Predicate",
@@ -71,10 +75,6 @@ func TestSchedule(t *testing.T) {
 					Scores: PrioritizerScore{"cluster1": 0},
 				},
 			},
-			clusters: []*clusterapiv1.ManagedCluster{
-				testinghelpers.NewManagedCluster("cluster1").WithLabel(
-					clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
-			},
 			expectedUnScheduled: 0,
 			expectedStatus:      *framework.NewStatus("", framework.Success, ""),
 		},
@@ -85,13 +85,11 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 			},
-			decisions: []runtime.Object{},
 			clusters: []*clusterapiv1.ManagedCluster{
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 			},
-			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
-				{ClusterName: "cluster1"},
-			},
+			expectedDecisions: []ScheduleDecisionGroup{{
+				ClusterDecisions: []clusterapiv1beta1.ClusterDecision{{ClusterName: "cluster1"}}}},
 			expectedFilterResult: []FilterResult{
 				{
 					Name:             "Predicate",
@@ -128,11 +126,10 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 			},
-			decisions: []runtime.Object{},
 			clusters: []*clusterapiv1.ManagedCluster{
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 			},
-			expectedDecisions: []clusterapiv1beta1.ClusterDecision{},
+			expectedDecisions: []ScheduleDecisionGroup{},
 			expectedFilterResult: []FilterResult{
 				{
 					Name:             "Predicate",
@@ -157,20 +154,16 @@ func TestSchedule(t *testing.T) {
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithDecisions("cluster1", "cluster2").Build(),
 			},
-			decisions: []runtime.Object{
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
-					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
-					WithDecisions("cluster1", "cluster2").Build(),
-			},
 			clusters: []*clusterapiv1.ManagedCluster{
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 			},
-			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
-				{ClusterName: "cluster1"},
-				{ClusterName: "cluster2"},
-			},
+			expectedDecisions: []ScheduleDecisionGroup{{
+				ClusterDecisions: []clusterapiv1beta1.ClusterDecision{
+					{ClusterName: "cluster1"},
+					{ClusterName: "cluster2"},
+				}}},
 			expectedFilterResult: []FilterResult{
 				{
 					Name:             "Predicate",
@@ -203,10 +196,10 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 			},
-			decisions: []runtime.Object{},
-			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
-				{ClusterName: "cluster1"},
-			},
+			expectedDecisions: []ScheduleDecisionGroup{{
+				ClusterDecisions: []clusterapiv1beta1.ClusterDecision{
+					{ClusterName: "cluster1"},
+				}}},
 			expectedFilterResult: []FilterResult{
 				{
 					Name:             "Predicate",
@@ -267,11 +260,11 @@ func TestSchedule(t *testing.T) {
 					}).Build(),
 				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 			},
-			decisions: []runtime.Object{},
-			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
-				{ClusterName: "cluster1"},
-				{ClusterName: "cluster3"},
-			},
+			expectedDecisions: []ScheduleDecisionGroup{{
+				ClusterDecisions: []clusterapiv1beta1.ClusterDecision{
+					{ClusterName: "cluster1"},
+					{ClusterName: "cluster3"},
+				}}},
 			expectedFilterResult: []FilterResult{
 				{
 					Name:             "Predicate",
@@ -312,11 +305,11 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "50", "100").Build(),
 				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "0", "100").Build(),
 			},
-			decisions: []runtime.Object{},
-			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
-				{ClusterName: "cluster1"},
-				{ClusterName: "cluster2"},
-			},
+			expectedDecisions: []ScheduleDecisionGroup{{
+				ClusterDecisions: []clusterapiv1beta1.ClusterDecision{
+					{ClusterName: "cluster1"},
+					{ClusterName: "cluster2"},
+				}}},
 			expectedFilterResult: []FilterResult{
 				{
 					Name:             "Predicate",
@@ -364,11 +357,11 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "50", "100").Build(),
 				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "0", "100").Build(),
 			},
-			decisions: []runtime.Object{},
-			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
-				{ClusterName: "cluster1"},
-				{ClusterName: "cluster2"},
-			},
+			expectedDecisions: []ScheduleDecisionGroup{{
+				ClusterDecisions: []clusterapiv1beta1.ClusterDecision{
+					{ClusterName: "cluster1"},
+					{ClusterName: "cluster2"},
+				}}},
 			expectedFilterResult: []FilterResult{
 				{
 					Name:             "Predicate",
@@ -408,15 +401,11 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 			},
-			decisions: []runtime.Object{
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
-					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
-					WithDecisions("cluster1").Build(),
-			},
-			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
-				{ClusterName: "cluster1"},
-				{ClusterName: "cluster2"},
-			},
+			expectedDecisions: []ScheduleDecisionGroup{{
+				ClusterDecisions: []clusterapiv1beta1.ClusterDecision{
+					{ClusterName: "cluster1"},
+					{ClusterName: "cluster2"},
+				}}},
 			expectedFilterResult: []FilterResult{
 				{
 					Name:             "Predicate",
@@ -451,18 +440,15 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName("others", 1)).
 					WithDecisions("cluster1", "cluster2").Build(),
 			},
-			decisions: []runtime.Object{
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName("others", 1)).
-					WithDecisions("cluster1", "cluster2").Build(),
-			},
 			clusters: []*clusterapiv1.ManagedCluster{
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 			},
-			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
-				{ClusterName: "cluster3"},
-			},
+			expectedDecisions: []ScheduleDecisionGroup{{
+				ClusterDecisions: []clusterapiv1beta1.ClusterDecision{
+					{ClusterName: "cluster3"},
+				}}},
 			expectedFilterResult: []FilterResult{
 				{
 					Name:             "Predicate",
@@ -502,23 +488,15 @@ func TestSchedule(t *testing.T) {
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithDecisions("cluster3").Build(),
 			},
-			decisions: []runtime.Object{
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName("others", 1)).
-					WithDecisions("cluster2", "cluster3").Build(),
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName("others", 2)).
-					WithDecisions("cluster1", "cluster2").Build(),
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
-					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
-					WithDecisions("cluster3").Build(),
-			},
 			clusters: []*clusterapiv1.ManagedCluster{
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 			},
-			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
-				{ClusterName: "cluster3"},
-			},
+			expectedDecisions: []ScheduleDecisionGroup{{
+				ClusterDecisions: []clusterapiv1beta1.ClusterDecision{
+					{ClusterName: "cluster3"},
+				}}},
 			expectedFilterResult: []FilterResult{
 				{
 					Name:             "Predicate",
@@ -539,6 +517,200 @@ func TestSchedule(t *testing.T) {
 					Name:   "Steady",
 					Weight: 1,
 					Scores: PrioritizerScore{"cluster1": 0, "cluster2": 0, "cluster3": 100},
+				},
+			},
+			expectedUnScheduled: 0,
+			expectedStatus:      *framework.NewStatus("", framework.Success, ""),
+		},
+		{
+			name: "placement with canary group strategy",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithGroupStrategy(clusterapiv1beta1.GroupStrategy{
+				ClustersPerDecisionGroup: intstr.FromInt(2),
+				DecisionGroups: []clusterapiv1beta1.DecisionGroup{
+					{
+						GroupName: "canary",
+						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
+						},
+					},
+				}}).Build(),
+			initObjs: []runtime.Object{
+				testinghelpers.NewClusterSet(clusterSetName).Build(),
+				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
+			},
+			clusters: []*clusterapiv1.ManagedCluster{
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithLabel("cloud", "Amazon").Build(),
+				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithLabel("cloud", "Amazon").Build(),
+				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithLabel("cloud", "Amazon").Build(),
+				testinghelpers.NewManagedCluster("cluster4").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithLabel("cloud", "Azure").Build(),
+			},
+			expectedDecisions: []ScheduleDecisionGroup{
+				{
+					DecisionGroupName: "canary",
+					ClusterDecisions: []clusterapiv1beta1.ClusterDecision{
+						{ClusterName: "cluster4"},
+					},
+				},
+				{
+					ClusterDecisions: []clusterapiv1beta1.ClusterDecision{
+						{ClusterName: "cluster1"},
+						{ClusterName: "cluster2"},
+					},
+				},
+				{
+					ClusterDecisions: []clusterapiv1beta1.ClusterDecision{
+						{ClusterName: "cluster3"},
+					},
+				},
+			},
+			expectedFilterResult: []FilterResult{
+				{
+					Name:             "Predicate",
+					FilteredClusters: []string{"cluster1", "cluster2", "cluster3", "cluster4"},
+				},
+				{
+					Name:             "Predicate,TaintToleration",
+					FilteredClusters: []string{"cluster1", "cluster2", "cluster3", "cluster4"},
+				},
+			},
+			expectedScoreResult: []PrioritizerResult{
+				{
+					Name:   "Balance",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 100, "cluster2": 100, "cluster3": 100, "cluster4": 100},
+				},
+				{
+					Name:   "Steady",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 0, "cluster2": 0, "cluster3": 0, "cluster4": 0},
+				},
+			},
+			expectedUnScheduled: 0,
+			expectedStatus:      *framework.NewStatus("", framework.Success, ""),
+		},
+		{
+			name: "placement with multiple group strategy",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithGroupStrategy(clusterapiv1beta1.GroupStrategy{
+				ClustersPerDecisionGroup: intstr.FromString("25%"),
+				DecisionGroups: []clusterapiv1beta1.DecisionGroup{
+					{
+						GroupName: "group1",
+						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Amazon"}},
+						},
+					},
+					{
+						GroupName: "group2",
+						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
+						},
+					},
+				}}).Build(),
+			initObjs: []runtime.Object{
+				testinghelpers.NewClusterSet(clusterSetName).Build(),
+				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
+			},
+			clusters: []*clusterapiv1.ManagedCluster{
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithLabel("cloud", "Amazon").Build(),
+				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithLabel("cloud", "Amazon").Build(),
+				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithLabel("cloud", "Azure").Build(),
+			},
+			expectedDecisions: []ScheduleDecisionGroup{
+				{
+					DecisionGroupName: "group1",
+					ClusterDecisions: []clusterapiv1beta1.ClusterDecision{
+						{ClusterName: "cluster1"},
+					},
+				},
+				{
+					DecisionGroupName: "group1",
+					ClusterDecisions: []clusterapiv1beta1.ClusterDecision{
+						{ClusterName: "cluster2"},
+					},
+				},
+				{
+					DecisionGroupName: "group2",
+					ClusterDecisions: []clusterapiv1beta1.ClusterDecision{
+						{ClusterName: "cluster3"},
+					},
+				},
+			},
+			expectedFilterResult: []FilterResult{
+				{
+					Name:             "Predicate",
+					FilteredClusters: []string{"cluster1", "cluster2", "cluster3"},
+				},
+				{
+					Name:             "Predicate,TaintToleration",
+					FilteredClusters: []string{"cluster1", "cluster2", "cluster3"},
+				},
+			},
+			expectedScoreResult: []PrioritizerResult{
+				{
+					Name:   "Balance",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 100, "cluster2": 100, "cluster3": 100},
+				},
+				{
+					Name:   "Steady",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 0, "cluster2": 0, "cluster3": 0},
+				},
+			},
+			expectedUnScheduled: 0,
+			expectedStatus:      *framework.NewStatus("", framework.Success, ""),
+		},
+		{
+			name: "placement with only cluster per decision group",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithGroupStrategy(clusterapiv1beta1.GroupStrategy{
+				ClustersPerDecisionGroup: intstr.FromString("25%"),
+			}).Build(),
+			initObjs: []runtime.Object{
+				testinghelpers.NewClusterSet(clusterSetName).Build(),
+				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
+			},
+			clusters: []*clusterapiv1.ManagedCluster{
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithLabel("cloud", "Amazon").Build(),
+				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithLabel("cloud", "Amazon").Build(),
+				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithLabel("cloud", "Azure").Build(),
+			},
+			expectedDecisions: []ScheduleDecisionGroup{
+				{
+					ClusterDecisions: []clusterapiv1beta1.ClusterDecision{
+						{ClusterName: "cluster1"},
+					},
+				},
+				{
+					ClusterDecisions: []clusterapiv1beta1.ClusterDecision{
+						{ClusterName: "cluster2"},
+					},
+				},
+				{
+					ClusterDecisions: []clusterapiv1beta1.ClusterDecision{
+						{ClusterName: "cluster3"},
+					},
+				},
+			},
+			expectedFilterResult: []FilterResult{
+				{
+					Name:             "Predicate",
+					FilteredClusters: []string{"cluster1", "cluster2", "cluster3"},
+				},
+				{
+					Name:             "Predicate,TaintToleration",
+					FilteredClusters: []string{"cluster1", "cluster2", "cluster3"},
+				},
+			},
+			expectedScoreResult: []PrioritizerResult{
+				{
+					Name:   "Balance",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 100, "cluster2": 100, "cluster3": 100},
+				},
+				{
+					Name:   "Steady",
+					Weight: 1,
+					Scores: PrioritizerScore{"cluster1": 0, "cluster2": 0, "cluster3": 0},
 				},
 			},
 			expectedUnScheduled: 0,

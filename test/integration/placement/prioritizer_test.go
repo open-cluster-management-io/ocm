@@ -79,7 +79,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			}
 
 			//Checking the result of the placement
-			assertCreatingPlacementWithDecision(placementName, namespace, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, namespace, noc(2), 2, 1, prioritizerPolicy, []clusterapiv1beta1.Toleration{}, clusterapiv1beta1.GroupStrategy{})
 			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[0], clusterNames[1]})
 		})
 
@@ -119,7 +119,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			}
 
 			//Checking the result of the placement
-			assertCreatingPlacementWithDecision(placementName, namespace, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, namespace, noc(2), 2, 1, prioritizerPolicy, []clusterapiv1beta1.Toleration{}, clusterapiv1beta1.GroupStrategy{})
 			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[0], clusterNames[2]})
 
 		})
@@ -166,7 +166,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			}
 
 			//Checking the result of the placement
-			assertCreatingPlacementWithDecision(placementName, namespace, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, namespace, noc(2), 2, 1, prioritizerPolicy, []clusterapiv1beta1.Toleration{}, clusterapiv1beta1.GroupStrategy{})
 			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[0], clusterNames[2]})
 
 			ginkgo.By("Adding fake placement decisions")
@@ -219,7 +219,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			assertCreatingPlacementDecision("fake-1", namespace, []string{clusterNames[0]})
 
 			//Checking the result of the placement
-			assertCreatingPlacementWithDecision(placementName, namespace, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, namespace, noc(2), 2, 1, prioritizerPolicy, []clusterapiv1beta1.Toleration{}, clusterapiv1beta1.GroupStrategy{})
 			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[1], clusterNames[2]})
 		})
 
@@ -259,7 +259,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			}
 
 			//Checking the result of the placement
-			assertCreatingPlacementWithDecision(placementName, namespace, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, namespace, noc(2), 2, 1, prioritizerPolicy, []clusterapiv1beta1.Toleration{}, clusterapiv1beta1.GroupStrategy{})
 			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[0], clusterNames[2]})
 
 			ginkgo.By("Adding a new cluster with resources")
@@ -308,7 +308,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			assertCreatingAddOnPlacementScores(clusterNames[2], "demo", "demo", 100)
 
 			//Checking the result of the placement
-			assertCreatingPlacementWithDecision(placementName, namespace, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, namespace, noc(2), 2, 1, prioritizerPolicy, []clusterapiv1beta1.Toleration{}, clusterapiv1beta1.GroupStrategy{})
 			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[1], clusterNames[2]})
 		})
 
@@ -335,7 +335,7 @@ var _ = ginkgo.Describe("Prioritizers", func() {
 			clusterNames := assertCreatingClusters(clusterSet1Name, 3)
 
 			//Creating the placement
-			assertCreatingPlacementWithDecision(placementName, namespace, noc(2), 2, prioritizerPolicy, []clusterapiv1beta1.Toleration{})
+			assertCreatingPlacementWithDecision(placementName, namespace, noc(2), 2, 1, prioritizerPolicy, []clusterapiv1beta1.Toleration{}, clusterapiv1beta1.GroupStrategy{})
 
 			//Checking the result of the placement when no AddOnPlacementScores
 			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[0], clusterNames[1]})
