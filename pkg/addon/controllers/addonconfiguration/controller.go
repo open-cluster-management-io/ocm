@@ -20,6 +20,8 @@ import (
 	clusterinformersv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 )
 
 // addonConfigurationController is a controller to update configuration of mca with the following order
@@ -70,7 +72,9 @@ func NewAddonConfigurationController(
 			addonClient: addonClient,
 		},
 		&clusterManagementAddonProgressingReconciler{
-			addonClient: addonClient,
+			patcher: patcher.NewPatcher[
+				*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus](
+				addonClient.AddonV1alpha1().ClusterManagementAddOns()),
 		},
 	}
 
