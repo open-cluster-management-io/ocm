@@ -58,7 +58,7 @@ rules:
   verbs: ["approve", "sign"]
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["rolebindings"]
-  verbs: ["get", "create", "delete"]
+  verbs: ["get", "list", "watch", "create", "delete"]
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["get"]

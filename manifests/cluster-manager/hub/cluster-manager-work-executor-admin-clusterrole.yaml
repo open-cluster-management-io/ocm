@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: open-cluster-management:{{ .ClusterManagerName }}-work-executor-admin:webhook
+rules:
+- apiGroups:
+  - work.open-cluster-management.io
+  resources:
+  - manifestworks
+  verbs:
+  - execute-as
+  resourceNames:
+  - system:serviceaccount::klusterlet-work-sa

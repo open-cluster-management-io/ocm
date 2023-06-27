@@ -39,6 +39,8 @@ var (
 		"cluster-manager/hub/cluster-manager-work-webhook-clusterrole.yaml",
 		"cluster-manager/hub/cluster-manager-work-webhook-clusterrolebinding.yaml",
 		"cluster-manager/hub/cluster-manager-work-webhook-serviceaccount.yaml",
+		// work executor admin
+		"cluster-manager/hub/cluster-manager-work-executor-admin-clusterrole.yaml",
 		// placement
 		"cluster-manager/hub/cluster-manager-placement-clusterrole.yaml",
 		"cluster-manager/hub/cluster-manager-placement-clusterrolebinding.yaml",
@@ -56,6 +58,7 @@ var (
 		// addon-manager
 		"cluster-manager/hub/cluster-manager-addon-manager-clusterrole.yaml",
 		"cluster-manager/hub/cluster-manager-addon-manager-clusterrolebinding.yaml",
+		"cluster-manager/hub/cluster-manager-addon-manager-work-executor-admin-clusterrolebinding.yaml",
 		"cluster-manager/hub/cluster-manager-addon-manager-serviceaccount.yaml",
 	}
 
