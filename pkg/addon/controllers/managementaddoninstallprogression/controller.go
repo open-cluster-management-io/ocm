@@ -6,8 +6,6 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -16,6 +14,7 @@ import (
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 
 	"open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 // managementAddonInstallProgressionController reconciles instances of clustermanagementaddon the hub
@@ -45,10 +44,7 @@ func NewManagementAddonInstallProgressionController(
 	}
 
 	return factory.New().WithInformersQueueKeysFunc(
-		func(obj runtime.Object) []string {
-			accessor, _ := meta.Accessor(obj)
-			return []string{accessor.GetName()}
-		},
+		queue.QueueKeyByMetaName,
 		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
 		WithSync(c.sync).ToController("management-addon-status-controller", recorder)
 

@@ -12,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/version"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
@@ -28,6 +27,7 @@ import (
 
 	"open-cluster-management.io/ocm/manifests"
 	"open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
@@ -68,10 +68,7 @@ func NewKlusterletCleanupController(
 			secretInformers[helpers.BootstrapHubKubeConfig].Informer(),
 			secretInformers[helpers.ExternalManagedKubeConfig].Informer()).
 		WithInformersQueueKeyFunc(helpers.KlusterletDeploymentQueueKeyFunc(controller.klusterletLister), deploymentInformer.Informer()).
-		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
-			accessor, _ := meta.Accessor(obj)
-			return accessor.GetName()
-		}, klusterletInformer.Informer()).
+		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, klusterletInformer.Informer()).
 		ToController("KlusterletCleanupController", recorder)
 }
 

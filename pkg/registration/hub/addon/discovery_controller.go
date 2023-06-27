@@ -12,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
@@ -23,6 +22,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 const (
@@ -58,17 +58,11 @@ func NewAddOnFeatureDiscoveryController(
 	}
 
 	return factory.New().
-		WithInformersQueueKeyFunc(
-			func(obj runtime.Object) string {
-				accessor, _ := meta.Accessor(obj)
-				return accessor.GetName()
-			},
+		WithInformersQueueKeysFunc(
+			queue.QueueKeyByMetaName,
 			clusterInformer.Informer()).
-		WithInformersQueueKeyFunc(
-			func(obj runtime.Object) string {
-				accessor, _ := meta.Accessor(obj)
-				return accessor.GetNamespace()
-			},
+		WithInformersQueueKeysFunc(
+			queue.QueueKeyByMetaNamespace,
 			addOnInformers.Informer()).
 		WithSync(c.sync).
 		ToController("AddOnFeatureDiscoveryController", recorder)

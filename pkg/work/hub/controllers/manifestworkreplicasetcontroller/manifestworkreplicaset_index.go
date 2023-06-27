@@ -2,6 +2,7 @@ package manifestworkreplicasetcontroller
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -71,7 +72,11 @@ func (m *ManifestWorkReplicaSetController) manifestWorkQueueKeyFunc(obj runtime.
 	if !ok {
 		return ""
 	}
-	return key
+	keys := strings.Split(key, ".")
+	if len(keys) != 2 {
+		return ""
+	}
+	return fmt.Sprintf("%s/%s", keys[0], keys[1])
 }
 
 func indexManifestWorkReplicaSetByPlacement(obj interface{}) ([]string, error) {

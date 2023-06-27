@@ -9,15 +9,15 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 
 	clustersetv1beta2 "open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta2"
 	clusterinformerv1beta2 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta2"
 	clusterlisterv1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 const (
@@ -54,19 +54,9 @@ func NewDefaultManagedClusterSetController(
 	}
 
 	return factory.New().
-		WithFilteredEventsInformersQueueKeyFunc(
-			func(obj runtime.Object) string {
-				accessor, _ := meta.Accessor(obj)
-				return accessor.GetName()
-			},
-			func(obj interface{}) bool {
-				metaObj, ok := obj.(metav1.ObjectMetaAccessor)
-				if !ok {
-					return false
-				}
-				// filter clustersets except defaultManagedClusterSet.
-				return DefaultManagedClusterSetName != metaObj.GetObjectMeta().GetName()
-			},
+		WithFilteredEventsInformersQueueKeysFunc(
+			queue.QueueKeyByMetaName,
+			queue.FilterByNames(DefaultManagedClusterSetName),
 			clusterSetInformer.Informer(),
 		).
 		WithSync(c.sync).

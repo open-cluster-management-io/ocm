@@ -8,9 +8,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
@@ -20,6 +18,7 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 )
@@ -56,10 +55,7 @@ func NewManifestWorkFinalizeController(
 	}
 
 	return factory.New().
-		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
-			accessor, _ := meta.Accessor(obj)
-			return accessor.GetName()
-		}, manifestWorkInformer.Informer()).
+		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, manifestWorkInformer.Informer()).
 		WithFilteredEventsInformersQueueKeyFunc(
 			helper.AppliedManifestworkQueueKeyFunc(hubHash),
 			helper.AppliedManifestworkHubHashFilter(hubHash),

@@ -10,10 +10,8 @@ import (
 	errorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -22,6 +20,7 @@ import (
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/operator/certrotation"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
@@ -79,10 +78,7 @@ func NewCertRotationController(
 	return factory.New().
 		ResyncEvery(ResyncInterval).
 		WithSync(c.sync).
-		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
-			accessor, _ := meta.Accessor(obj)
-			return accessor.GetName()
-		}, clusterManagerInformer.Informer()).
+		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterManagerInformer.Informer()).
 		WithInformersQueueKeyFunc(helpers.ClusterManagerQueueKeyFunc(c.clusterManagerLister),
 			configMapInformer.Informer(),
 			secretInformers[helpers.SignerSecret].Informer(),

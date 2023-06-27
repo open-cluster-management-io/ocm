@@ -7,7 +7,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -22,6 +21,7 @@ import (
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
 	"open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 // addonConfigurationController is a controller to update configuration of mca with the following order
@@ -64,6 +64,8 @@ func NewAddonConfigurationController(
 		addonClient:                  addonClient,
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
 		managedClusterAddonIndexer:   addonInformers.Informer().GetIndexer(),
+		placementLister:              placementInformer.Lister(),
+		placementDecisionLister:      placementDecisionInformer.Lister(),
 		addonFilterFunc:              addonFilterFunc,
 	}
 
@@ -79,27 +81,14 @@ func NewAddonConfigurationController(
 	}
 
 	controllerFactory := factory.New().WithFilteredEventsInformersQueueKeysFunc(
-		func(obj runtime.Object) []string {
-			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			return []string{key}
-		},
+		queue.QueueKeyByMetaNamespaceName,
 		c.addonFilterFunc,
-		clusterManagementAddonInformers.Informer()).WithInformersQueueKeysFunc(
-		func(obj runtime.Object) []string {
-			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			return []string{key}
-		},
-		addonInformers.Informer())
-
-	// This is to handle the case the self managed addon-manager does not have placementInformer/placementDecisionInformer.
-	// we will not consider installStrategy related placement for self managed addon-manager.
-	if placementInformer != nil && placementDecisionInformer != nil {
-		controllerFactory = controllerFactory.WithInformersQueueKeysFunc(
+		clusterManagementAddonInformers.Informer()).
+		WithInformersQueueKeysFunc(queue.QueueKeyByMetaNamespaceName, addonInformers.Informer()).
+		WithInformersQueueKeysFunc(
 			index.ClusterManagementAddonByPlacementDecisionQueueKey(clusterManagementAddonInformers), placementDecisionInformer.Informer()).
-			WithInformersQueueKeysFunc(index.ClusterManagementAddonByPlacementQueueKey(clusterManagementAddonInformers), placementInformer.Informer())
-		c.placementLister = placementInformer.Lister()
-		c.placementDecisionLister = placementDecisionInformer.Lister()
-	}
+		WithInformersQueueKeysFunc(
+			index.ClusterManagementAddonByPlacementQueueKey(clusterManagementAddonInformers), placementInformer.Informer())
 
 	return controllerFactory.WithSync(c.sync).ToController("addon-configuration-controller", recorder)
 }

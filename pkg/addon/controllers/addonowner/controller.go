@@ -7,7 +7,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
@@ -16,6 +15,8 @@ import (
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 const UnsupportedConfigurationType = "UnsupportedConfiguration"
@@ -45,16 +46,10 @@ func NewAddonOwnerController(
 
 	return factory.New().
 		WithFilteredEventsInformersQueueKeysFunc(
-			func(obj runtime.Object) []string {
-				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-				return []string{key}
-			},
+			queue.QueueKeyByMetaNamespaceName,
 			c.addonFilterFunc, clusterManagementAddonInformers.Informer()).
 		WithInformersQueueKeysFunc(
-			func(obj runtime.Object) []string {
-				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-				return []string{key}
-			},
+			queue.QueueKeyByMetaNamespaceName,
 			addonInformers.Informer()).
 		WithSync(c.sync).
 		ToController("addon-owner-controller", recorder)

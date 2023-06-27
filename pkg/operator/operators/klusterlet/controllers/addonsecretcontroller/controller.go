@@ -5,13 +5,12 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	coreinformer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 
+	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
@@ -40,14 +39,10 @@ func NewAddonPullImageSecretController(kubeClient kubernetes.Interface, operator
 		kubeClient:        kubeClient,
 		recorder:          recorder,
 	}
-	return factory.New().WithFilteredEventsInformersQueueKeyFunc(func(o runtime.Object) string {
-		namespace := o.(*corev1.Namespace)
-		return namespace.GetName()
-	}, func(obj interface{}) bool {
-		// if obj has the label, return true
-		namespace := obj.(*corev1.Namespace)
-		return namespace.Labels[addonInstallNamespaceLabelKey] == "true"
-	}, namespaceInformer.Informer()).WithSync(ac.sync).ToController("AddonPullImageSecretController", recorder)
+	return factory.New().WithFilteredEventsInformersQueueKeysFunc(
+		queue.QueueKeyByMetaName,
+		queue.FileterByLabelKeyValue(addonInstallNamespaceLabelKey, "true"),
+		namespaceInformer.Informer()).WithSync(ac.sync).ToController("AddonPullImageSecretController", recorder)
 }
 
 func (c *addonPullImageSecretController) sync(ctx context.Context, controllerContext factory.SyncContext) error {

@@ -37,16 +37,14 @@ import (
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 
+	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
 )
 
 const (
-	clusterSetLabel                = "cluster.open-cluster-management.io/clusterset"
-	placementLabel                 = "cluster.open-cluster-management.io/placement"
-	schedulingControllerName       = "SchedulingController"
-	schedulingControllerResyncName = "SchedulingControllerResync"
-	maxNumOfClusterDecisions       = 100
-	maxEventMessageLength          = 1000 //the event message can have at most 1024 characters, use 1000 as limitation here to keep some buffer
+	schedulingControllerName = "SchedulingController"
+	maxNumOfClusterDecisions = 100
+	maxEventMessageLength    = 1000 //the event message can have at most 1024 characters, use 1000 as limitation here to keep some buffer
 )
 
 var ResyncInterval = time.Minute * 5
@@ -152,26 +150,17 @@ func NewSchedulingController(
 
 	return factory.New().
 		WithSyncContext(syncCtx).
-		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
-			key, _ := cache.MetaNamespaceKeyFunc(obj)
-			return key
-		}, placementInformer.Informer()).
+		WithInformersQueueKeysFunc(
+			queue.QueueKeyByMetaNamespaceName,
+			placementInformer.Informer()).
 		WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
 			accessor, _ := meta.Accessor(obj)
 			labels := accessor.GetLabels()
-			placementName := labels[placementLabel]
+			placementName := labels[clusterapiv1beta1.PlacementLabel]
 			return fmt.Sprintf("%s/%s", accessor.GetNamespace(), placementName)
-		}, func(obj interface{}) bool {
-			accessor, err := meta.Accessor(obj)
-			if err != nil {
-				return false
-			}
-			labels := accessor.GetLabels()
-			if _, ok := labels[placementLabel]; ok {
-				return true
-			}
-			return false
-		}, placementDecisionInformer.Informer()).
+		},
+			queue.FileterByLabel(clusterapiv1beta1.PlacementLabel),
+			placementDecisionInformer.Informer()).
 		WithBareInformers(clusterInformer.Informer(), clusterSetInformer.Informer(), clusterSetBindingInformer.Informer(), placementScoreInformer.Informer()).
 		WithSync(c.sync).
 		ToController(schedulingControllerName, recorder)
@@ -493,7 +482,7 @@ func (c *schedulingController) bind(
 	}
 
 	// query all placementdecisions of the placement
-	requirement, err := labels.NewRequirement(placementLabel, selection.Equals, []string{placement.Name})
+	requirement, err := labels.NewRequirement(clusterapiv1beta1.PlacementLabel, selection.Equals, []string{placement.Name})
 	if err != nil {
 		return err
 	}
@@ -549,7 +538,7 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 				Name:      placementDecisionName,
 				Namespace: placement.Namespace,
 				Labels: map[string]string{
-					placementLabel: placement.Name,
+					clusterapiv1beta1.PlacementLabel: placement.Name,
 				},
 				OwnerReferences: []metav1.OwnerReference{*owner},
 			},

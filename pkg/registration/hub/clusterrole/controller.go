@@ -9,9 +9,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/sets"
 	rbacv1informers "k8s.io/client-go/informers/rbac/v1"
 	"k8s.io/client-go/kubernetes"
 
@@ -19,6 +17,7 @@ import (
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 
 	"open-cluster-management.io/ocm/pkg/common/apply"
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 const (
@@ -64,11 +63,8 @@ func NewManagedClusterClusterroleController(
 	}
 	return factory.New().
 		WithFilteredEventsInformers(
-			func(obj interface{}) bool {
-				clusterRoles := sets.NewString(registrationClusterRole, workClusterRole)
-				metaObj := obj.(metav1.Object)
-				return clusterRoles.Has(metaObj.GetName())
-			}, clusterRoleInformer.Informer()).
+			queue.FilterByNames(registrationClusterRole, workClusterRole),
+			clusterRoleInformer.Informer()).
 		WithInformers(clusterInformer.Informer()).
 		WithSync(c.sync).
 		ToController("ManagedClusterClusterRoleController", recorder)

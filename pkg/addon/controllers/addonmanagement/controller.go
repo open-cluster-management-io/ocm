@@ -6,7 +6,6 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -17,6 +16,8 @@ import (
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	clusterinformersv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
+
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 type addonManagementController struct {
@@ -65,10 +66,7 @@ func NewAddonManagementController(
 	}
 
 	return factory.New().WithInformersQueueKeysFunc(
-		func(obj runtime.Object) []string {
-			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			return []string{key}
-		},
+		queue.QueueKeyByMetaNamespaceName,
 		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
 		WithInformersQueueKeysFunc(
 			index.ClusterManagementAddonByPlacementDecisionQueueKey(

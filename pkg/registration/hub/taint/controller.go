@@ -8,7 +8,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
@@ -17,6 +16,7 @@ import (
 	v1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 )
 
@@ -52,10 +52,7 @@ func NewTaintController(
 		eventRecorder: recorder.WithComponentSuffix("taint-controller"),
 	}
 	return factory.New().
-		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
-			accessor, _ := meta.Accessor(obj)
-			return accessor.GetName()
-		}, clusterInformer.Informer()).
+		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterInformer.Informer()).
 		WithSync(c.sync).
 		ToController("taintController", recorder)
 }

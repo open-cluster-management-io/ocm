@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	appsinformer "k8s.io/client-go/informers/apps/v1"
 	appslister "k8s.io/client-go/listers/apps/v1"
 	"k8s.io/klog/v2"
@@ -20,6 +19,7 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
@@ -52,10 +52,7 @@ func NewClusterManagerStatusController(
 	return factory.New().WithSync(controller.sync).
 		WithInformersQueueKeyFunc(
 			helpers.ClusterManagerDeploymentQueueKeyFunc(controller.clusterManagerLister), deploymentInformer.Informer()).
-		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
-			accessor, _ := meta.Accessor(obj)
-			return accessor.GetName()
-		}, clusterManagerInformer.Informer()).
+		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterManagerInformer.Informer()).
 		ToController("ClusterManagerStatusController", recorder)
 }
 
