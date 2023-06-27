@@ -46,5 +46,10 @@ test-registration-operator-integration: ensure-kubebuilder-tools
 	./registration-operator-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast
 .PHONY: test-registration-operator-integration
 
-test-integration: test-registration-operator-integration test-registration-integration test-placement-integration test-work-integration
+test-addon-integration: ensure-kubebuilder-tools
+	go test -c ./test/integration/addon -o ./addon-integration.test
+	./addon-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast
+.PHONY: test-addon-integration
+
+test-integration: test-registration-operator-integration test-registration-integration test-placement-integration test-work-integration test-addon-integration
 .PHONY: test-integration

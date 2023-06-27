@@ -3,6 +3,7 @@
 /registration
 /work
 /registration-operator
+/addon
 
 *.exe
 *.dll
