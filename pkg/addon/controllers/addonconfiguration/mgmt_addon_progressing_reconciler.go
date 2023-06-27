@@ -2,23 +2,21 @@ package addonconfiguration
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/klog/v2"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 )
 
 type clusterManagementAddonProgressingReconciler struct {
-	addonClient addonv1alpha1client.Interface
+	patcher patcher.Patcher[
+		*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus]
 }
 
 func (d *clusterManagementAddonProgressingReconciler) reconcile(
@@ -51,49 +49,11 @@ func (d *clusterManagementAddonProgressingReconciler) reconcile(
 		)
 	}
 
-	err := d.patchMgmtAddonStatus(ctx, cmaCopy, cma)
+	_, err := d.patcher.PatchStatus(ctx, cmaCopy, cmaCopy.Status, cma.Status)
 	if err != nil {
 		errs = append(errs, err)
 	}
 	return cmaCopy, reconcileContinue, utilerrors.NewAggregate(errs)
-}
-
-func (d *clusterManagementAddonProgressingReconciler) patchMgmtAddonStatus(ctx context.Context, new, old *addonv1alpha1.ClusterManagementAddOn) error {
-	if equality.Semantic.DeepEqual(new.Status, old.Status) {
-		return nil
-	}
-
-	oldData, err := json.Marshal(&addonv1alpha1.ClusterManagementAddOn{
-		Status: addonv1alpha1.ClusterManagementAddOnStatus{
-			InstallProgressions: old.Status.InstallProgressions,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	newData, err := json.Marshal(&addonv1alpha1.ClusterManagementAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:             new.UID,
-			ResourceVersion: new.ResourceVersion,
-		},
-		Status: addonv1alpha1.ClusterManagementAddOnStatus{
-			InstallProgressions: new.Status.InstallProgressions,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
-	if err != nil {
-		return fmt.Errorf("failed to create patch for addon %s: %w", new.Name, err)
-	}
-
-	klog.V(2).Infof("Patching clustermanagementaddon %s status with %s", new.Name, string(patchBytes))
-	_, err = d.addonClient.AddonV1alpha1().ClusterManagementAddOns().Patch(
-		ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
-	return err
 }
 
 func setAddOnInstallProgressionsAndLastApplied(installProgression *addonv1alpha1.InstallProgression, isUpgrade bool, progressing, done, total int) {

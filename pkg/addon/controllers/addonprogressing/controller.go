@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -16,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
@@ -29,6 +27,8 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 )
 
 const (
@@ -111,10 +111,15 @@ func (c *addonProgressingController) sync(ctx context.Context, syncCtx factory.S
 	}
 
 	// update progressing condition and last applied config
-	return c.updateAddonProgressingAndLastApplied(ctx, addon.DeepCopy(), addon)
+	_, err = c.updateAddonProgressingAndLastApplied(ctx, addon.DeepCopy(), addon)
+	return err
 }
 
-func (c *addonProgressingController) updateAddonProgressingAndLastApplied(ctx context.Context, newaddon, oldaddon *addonapiv1alpha1.ManagedClusterAddOn) error {
+func (c *addonProgressingController) updateAddonProgressingAndLastApplied(
+	ctx context.Context, newaddon, oldaddon *addonapiv1alpha1.ManagedClusterAddOn) (bool, error) {
+	patcher := patcher.NewPatcher[
+		*addonapiv1alpha1.ManagedClusterAddOn, addonapiv1alpha1.ManagedClusterAddOnSpec, addonapiv1alpha1.ManagedClusterAddOnStatus](
+		c.addonClient.AddonV1alpha1().ManagedClusterAddOns(newaddon.Namespace))
 	// check config references
 	if supported, config := isConfigurationSupported(newaddon); !supported {
 		meta.SetStatusCondition(&newaddon.Status.Conditions, metav1.Condition{
@@ -123,7 +128,8 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(ctx co
 			Reason:  addonapiv1alpha1.ProgressingReasonConfigurationUnsupported,
 			Message: fmt.Sprintf("Configuration with gvr %s/%s is not supported for this addon", config.Group, config.Resource),
 		})
-		return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
+
+		return patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
 	}
 
 	// wait until addon has ManifestApplied condition
@@ -134,7 +140,7 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(ctx co
 			Reason:  "WaitingForManifestApplied",
 			Message: "Waiting for ManagedClusterAddOn ManifestApplied condition",
 		})
-		return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
+		return patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
 	}
 
 	// set upgrade flag
@@ -153,12 +159,12 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(ctx co
 	addonWorks, err := c.workLister.ManifestWorks(newaddon.Namespace).List(selector)
 	if err != nil {
 		setAddOnProgressingAndLastApplied(isUpgrade, ProgressingFailed, err.Error(), newaddon)
-		return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
+		return patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
 	}
 
 	if len(addonWorks) == 0 {
 		setAddOnProgressingAndLastApplied(isUpgrade, ProgressingDoing, "no addon works", newaddon)
-		return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
+		return patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
 	}
 
 	// check addon manifestworks
@@ -171,60 +177,19 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(ctx co
 		// check if work configs matches addon configs
 		if !workConfigsMatchesAddon(work, newaddon) {
 			setAddOnProgressingAndLastApplied(isUpgrade, ProgressingDoing, "configs mismatch", newaddon)
-			return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
+			return patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
 		}
 
 		// check if work is ready
 		if !workIsReady(work) {
 			setAddOnProgressingAndLastApplied(isUpgrade, ProgressingDoing, "work is not ready", newaddon)
-			return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
+			return patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
 		}
 	}
 
 	// set lastAppliedConfig when all the work matches addon and are ready.
 	setAddOnProgressingAndLastApplied(isUpgrade, ProgressingSucceed, "", newaddon)
-	return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
-}
-
-func (c *addonProgressingController) patchAddOnProgressingAndLastApplied(ctx context.Context, new, old *addonapiv1alpha1.ManagedClusterAddOn) error {
-	if equality.Semantic.DeepEqual(new.Status, old.Status) {
-		return nil
-	}
-
-	oldData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
-		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-			ConfigReferences: old.Status.ConfigReferences,
-			Conditions:       old.Status.Conditions,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	newData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:             new.UID,
-			ResourceVersion: new.ResourceVersion,
-		},
-		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-			ConfigReferences: new.Status.ConfigReferences,
-			Conditions:       new.Status.Conditions,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
-	if err != nil {
-		return fmt.Errorf("failed to create patch for addon %s: %w", new.Name, err)
-	}
-
-	klog.V(2).Infof("Patching addon %s/%s condition and last applied config with %s", new.Namespace, new.Name, string(patchBytes))
-	addon, err := c.addonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Patch(
-		ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
-	fmt.Printf("%v", addon)
-	return err
+	return patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
 }
 
 func isConfigurationSupported(addon *addonapiv1alpha1.ManagedClusterAddOn) (bool, addonapiv1alpha1.ConfigGroupResource) {

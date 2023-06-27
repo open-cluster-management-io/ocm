@@ -2,30 +2,27 @@ package managementaddoninstallprogression
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 )
 
 // managementAddonInstallProgressionController reconciles instances of clustermanagementaddon the hub
 // based to update related object and status condition.
 type managementAddonInstallProgressionController struct {
-	addonClient                  addonv1alpha1client.Interface
+	patcher patcher.Patcher[
+		*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus]
 	managedClusterAddonLister    addonlisterv1alpha1.ManagedClusterAddOnLister
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
 	addonFilterFunc              factory.EventFilterFunc
@@ -39,7 +36,9 @@ func NewManagementAddonInstallProgressionController(
 	recorder events.Recorder,
 ) factory.Controller {
 	c := &managementAddonInstallProgressionController{
-		addonClient:                  addonClient,
+		patcher: patcher.NewPatcher[
+			*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus](
+			addonClient.AddonV1alpha1().ClusterManagementAddOns()),
 		managedClusterAddonLister:    addonInformers.Lister(),
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
 		addonFilterFunc:              addonFilterFunc,
@@ -84,12 +83,14 @@ func (c *managementAddonInstallProgressionController) sync(ctx context.Context, 
 	// update default config reference when type is manual
 	if mgmtAddonCopy.Spec.InstallStrategy.Type == "" || mgmtAddonCopy.Spec.InstallStrategy.Type == addonv1alpha1.AddonInstallStrategyManual {
 		mgmtAddonCopy.Status.InstallProgressions = []addonv1alpha1.InstallProgression{}
-		return c.patchMgmtAddonStatus(ctx, mgmtAddonCopy, mgmtAddon)
+		_, err = c.patcher.PatchStatus(ctx, mgmtAddonCopy, mgmtAddonCopy.Status, mgmtAddon.Status)
+		return err
 	}
 
 	// only update default config references and skip updating install progression for self-managed addon
 	if !c.addonFilterFunc(clusterManagementAddon) {
-		return c.patchMgmtAddonStatus(ctx, mgmtAddonCopy, mgmtAddon)
+		_, err = c.patcher.PatchStatus(ctx, mgmtAddonCopy, mgmtAddonCopy.Status, mgmtAddon.Status)
+		return err
 	}
 
 	// set install progression
@@ -97,46 +98,7 @@ func (c *managementAddonInstallProgressionController) sync(ctx context.Context, 
 		mgmtAddonCopy.Spec.InstallStrategy.Placements, mgmtAddonCopy.Status.InstallProgressions)
 
 	// update cma status
-	return c.patchMgmtAddonStatus(ctx, mgmtAddonCopy, mgmtAddon)
-}
-
-func (c *managementAddonInstallProgressionController) patchMgmtAddonStatus(ctx context.Context, new, old *addonv1alpha1.ClusterManagementAddOn) error {
-	if equality.Semantic.DeepEqual(new.Status, old.Status) {
-		return nil
-	}
-
-	oldData, err := json.Marshal(&addonv1alpha1.ClusterManagementAddOn{
-		Status: addonv1alpha1.ClusterManagementAddOnStatus{
-			DefaultConfigReferences: old.Status.DefaultConfigReferences,
-			InstallProgressions:     old.Status.InstallProgressions,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	newData, err := json.Marshal(&addonv1alpha1.ClusterManagementAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:             new.UID,
-			ResourceVersion: new.ResourceVersion,
-		},
-		Status: addonv1alpha1.ClusterManagementAddOnStatus{
-			DefaultConfigReferences: new.Status.DefaultConfigReferences,
-			InstallProgressions:     new.Status.InstallProgressions,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
-	if err != nil {
-		return fmt.Errorf("failed to create patch for addon %s: %w", new.Name, err)
-	}
-
-	klog.V(2).Infof("Patching clustermanagementaddon %s status with %s", new.Name, string(patchBytes))
-	_, err = c.addonClient.AddonV1alpha1().ClusterManagementAddOns().Patch(
-		ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	_, err = c.patcher.PatchStatus(ctx, mgmtAddonCopy, mgmtAddonCopy.Status, mgmtAddon.Status)
 	return err
 }
 

@@ -20,6 +20,8 @@ import (
 	fakecluster "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 )
 
 func TestMgmtAddonProgressingReconcile(t *testing.T) {
@@ -605,7 +607,9 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 			}
 
 			reconcile := &clusterManagementAddonProgressingReconciler{
-				addonClient: fakeAddonClient,
+				patcher.NewPatcher[
+					*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus](
+					fakeAddonClient.AddonV1alpha1().ClusterManagementAddOns()),
 			}
 
 			for _, obj := range c.clusterManagementAddon {
