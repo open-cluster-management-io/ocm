@@ -29,6 +29,7 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 const (
@@ -64,10 +65,7 @@ func NewAddonProgressingController(
 	}
 
 	return factory.New().WithInformersQueueKeysFunc(
-		func(obj runtime.Object) []string {
-			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			return []string{key}
-		},
+		queue.QueueKeyByMetaNamespaceName,
 		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
 		// TODO: consider hosted manifestwork
 		WithInformersQueueKeysFunc(

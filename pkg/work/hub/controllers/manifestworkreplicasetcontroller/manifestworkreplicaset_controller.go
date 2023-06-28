@@ -28,6 +28,7 @@ import (
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 
 	"open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 const (
@@ -82,14 +83,7 @@ func NewManifestWorkReplicaSetController(
 	}
 
 	return factory.New().
-		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
-			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			if err != nil {
-				utilruntime.HandleError(err)
-				return ""
-			}
-			return key
-		}, manifestWorkReplicaSetInformer.Informer()).
+		WithInformersQueueKeysFunc(queue.QueueKeyByMetaNamespaceName, manifestWorkReplicaSetInformer.Informer()).
 		WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
 			accessor, _ := meta.Accessor(obj)
 			labelValue, ok := accessor.GetLabels()[ManifestWorkReplicaSetControllerNameLabelKey]
@@ -101,16 +95,9 @@ func NewManifestWorkReplicaSetController(
 				return ""
 			}
 			return fmt.Sprintf("%s/%s", keys[0], keys[1])
-		}, func(obj interface{}) bool {
-			accessor, err := meta.Accessor(obj)
-			if err != nil {
-				return false
-			}
-			if _, ok := accessor.GetLabels()[ManifestWorkReplicaSetControllerNameLabelKey]; ok {
-				return true
-			}
-			return false
-		}, manifestWorkInformer.Informer()).
+		},
+			queue.FileterByLabel(ManifestWorkReplicaSetControllerNameLabelKey),
+			manifestWorkInformer.Informer()).
 		WithInformersQueueKeysFunc(controller.placementDecisionQueueKeysFunc, placeDecisionInformer.Informer()).
 		WithInformersQueueKeysFunc(controller.placementQueueKeysFunc, placementInformer.Informer()).
 		WithSync(controller.sync).ToController("ManifestWorkReplicaSetController", recorder)

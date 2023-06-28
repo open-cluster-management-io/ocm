@@ -15,10 +15,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/klog/v2"
+
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 // hubKubeconfigSecretController watches the HubKubeconfig secret, if the secret is changed, this controller creates/updates the
@@ -44,11 +45,8 @@ func NewHubKubeconfigSecretController(
 	}
 
 	return factory.New().
-		WithFilteredEventsInformersQueueKeyFunc(
-			func(obj runtime.Object) string {
-				accessor, _ := meta.Accessor(obj)
-				return accessor.GetName()
-			},
+		WithFilteredEventsInformersQueueKeysFunc(
+			queue.QueueKeyByMetaName,
 			func(obj interface{}) bool {
 				accessor, err := meta.Accessor(obj)
 				if err != nil {

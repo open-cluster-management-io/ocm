@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -21,6 +20,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	patcher "open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 // managedClusterAddonHealthCheckController udpates managed cluster addons status through watching the managed cluster status on
@@ -43,10 +43,7 @@ func NewManagedClusterAddOnHealthCheckController(addOnClient addonclient.Interfa
 	}
 
 	return factory.New().
-		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
-			accessor, _ := meta.Accessor(obj)
-			return accessor.GetName()
-		}, clusterInformer.Informer()).
+		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterInformer.Informer()).
 		WithSync(c.sync).
 		ToController("ManagedClusterAddonHealthCheckController", recorder)
 }

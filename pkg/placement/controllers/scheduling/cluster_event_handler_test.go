@@ -34,7 +34,8 @@ func TestOnClusterChange(t *testing.T) {
 		},
 		{
 			name: "clusterset does not exist",
-			obj:  testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset1").Build(),
+			obj: testinghelpers.NewManagedCluster("cluster1").WithLabel(
+				clusterapiv1beta2.ClusterSetLabel, "clusterset1").Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
 				testinghelpers.NewPlacement("ns1", "placement1").Build(),
@@ -43,7 +44,8 @@ func TestOnClusterChange(t *testing.T) {
 		},
 		{
 			name: "clusterset exists",
-			obj:  testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset1").Build(),
+			obj: testinghelpers.NewManagedCluster("cluster1").WithLabel(
+				clusterapiv1beta2.ClusterSetLabel, "clusterset1").Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet("clusterset1").Build(),
 				testinghelpers.NewClusterSet("clusterset2").Build(),
@@ -61,7 +63,8 @@ func TestOnClusterChange(t *testing.T) {
 		},
 		{
 			name: "cluster blongs to multiple clusterset",
-			obj:  testinghelpers.NewManagedCluster("cluster1").WithLabel("cloud", "Amazon").WithLabel(clusterSetLabel, "clusterset2").Build(),
+			obj: testinghelpers.NewManagedCluster("cluster1").WithLabel("cloud", "Amazon").WithLabel(
+				clusterapiv1beta2.ClusterSetLabel, "clusterset2").Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet("global").WithClusterSelector(clusterapiv1beta2.ManagedClusterSelector{
 					SelectorType:  clusterapiv1beta2.LabelSelector,
@@ -139,9 +142,11 @@ func TestOnClusterUpdate(t *testing.T) {
 			},
 		},
 		{
-			name:   "cluster blongs to multiple clusterset",
-			newObj: testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset2").WithLabel("cloud", "Google").Build(),
-			oldObj: testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset2").WithLabel("cloud", "Amazon").Build(),
+			name: "cluster blongs to multiple clusterset",
+			newObj: testinghelpers.NewManagedCluster("cluster1").WithLabel(
+				clusterapiv1beta2.ClusterSetLabel, "clusterset2").WithLabel("cloud", "Google").Build(),
+			oldObj: testinghelpers.NewManagedCluster("cluster1").WithLabel(
+				clusterapiv1beta2.ClusterSetLabel, "clusterset2").WithLabel("cloud", "Amazon").Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet("global").WithClusterSelector(clusterapiv1beta2.ManagedClusterSelector{
 					SelectorType:  clusterapiv1beta2.LabelSelector,
@@ -172,7 +177,7 @@ func TestOnClusterUpdate(t *testing.T) {
 		{
 			name: "assign a cluster to a clusterset",
 			newObj: testinghelpers.NewManagedCluster("cluster1").
-				WithLabel(clusterSetLabel, "clusterset1").WithLabel("cloud", "Amazon").Build(),
+				WithLabel(clusterapiv1beta2.ClusterSetLabel, "clusterset1").WithLabel("cloud", "Amazon").Build(),
 			oldObj: testinghelpers.NewManagedCluster("cluster1").WithLabel("cloud", "Amazon").Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet("clusterset1").Build(),
@@ -186,7 +191,8 @@ func TestOnClusterUpdate(t *testing.T) {
 		{
 			name:   "remove cluster from a clusterset",
 			newObj: testinghelpers.NewManagedCluster("cluster1").Build(),
-			oldObj: testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset2").WithLabel("cloud", "Amazon").Build(),
+			oldObj: testinghelpers.NewManagedCluster("cluster1").WithLabel(
+				clusterapiv1beta2.ClusterSetLabel, "clusterset2").WithLabel("cloud", "Amazon").Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet("global").WithClusterSelector(clusterapiv1beta2.ManagedClusterSelector{
 					SelectorType:  clusterapiv1beta2.LabelSelector,
@@ -217,9 +223,9 @@ func TestOnClusterUpdate(t *testing.T) {
 		{
 			name: "label change only",
 			newObj: testinghelpers.NewManagedCluster("cluster1").
-				WithLabel(clusterSetLabel, "clusterset1").WithLabel("cloud", "Amazon").Build(),
+				WithLabel(clusterapiv1beta2.ClusterSetLabel, "clusterset1").WithLabel("cloud", "Amazon").Build(),
 			oldObj: testinghelpers.NewManagedCluster("cluster1").
-				WithLabel(clusterSetLabel, "clusterset1").WithLabel("cloud", "google").Build(),
+				WithLabel(clusterapiv1beta2.ClusterSetLabel, "clusterset1").WithLabel("cloud", "google").Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet("clusterset1").Build(),
 				testinghelpers.NewClusterSetBinding("ns1", "clusterset1"),
@@ -232,9 +238,9 @@ func TestOnClusterUpdate(t *testing.T) {
 		{
 			name: "move cluster from one clusterset to another",
 			newObj: testinghelpers.NewManagedCluster("cluster1").
-				WithLabel(clusterSetLabel, "clusterset2").WithLabel("cloud", "Amazon").Build(),
+				WithLabel(clusterapiv1beta2.ClusterSetLabel, "clusterset2").WithLabel("cloud", "Amazon").Build(),
 			oldObj: testinghelpers.NewManagedCluster("cluster1").
-				WithLabel(clusterSetLabel, "clusterset1").WithLabel("cloud", "Amazon").Build(),
+				WithLabel(clusterapiv1beta2.ClusterSetLabel, "clusterset1").WithLabel("cloud", "Amazon").Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet("clusterset1").Build(),
 				testinghelpers.NewClusterSet("clusterset2").Build(),
@@ -295,7 +301,8 @@ func TestOnClusterDelete(t *testing.T) {
 		},
 		{
 			name: "cluster",
-			obj:  testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset2").WithLabel("cloud", "Amazon").Build(),
+			obj: testinghelpers.NewManagedCluster("cluster1").WithLabel(
+				clusterapiv1beta2.ClusterSetLabel, "clusterset2").WithLabel("cloud", "Amazon").Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet("global").WithClusterSelector(clusterapiv1beta2.ManagedClusterSelector{
 					SelectorType:  clusterapiv1beta2.LabelSelector,
@@ -326,7 +333,8 @@ func TestOnClusterDelete(t *testing.T) {
 		{
 			name: "tombstone",
 			obj: cache.DeletedFinalStateUnknown{
-				Obj: testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, "clusterset1").Build(),
+				Obj: testinghelpers.NewManagedCluster("cluster1").WithLabel(
+					clusterapiv1beta2.ClusterSetLabel, "clusterset1").Build(),
 			},
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet("clusterset1").Build(),

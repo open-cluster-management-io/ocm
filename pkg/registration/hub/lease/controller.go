@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	coordinformers "k8s.io/client-go/informers/coordination/v1"
 	"k8s.io/client-go/kubernetes"
 	coordlisters "k8s.io/client-go/listers/coordination/v1"
@@ -22,6 +21,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 const leaseDurationTimes = 5
@@ -58,32 +58,12 @@ func NewClusterLeaseController(
 		eventRecorder: recorder.WithComponentSuffix("managed-cluster-lease-controller"),
 	}
 	return factory.New().
-		WithFilteredEventsInformersQueueKeyFunc(
-			func(obj runtime.Object) string {
-				accessor, _ := meta.Accessor(obj)
-				return accessor.GetLabels()[clusterv1.ClusterNameLabelKey]
-			},
-			func(obj interface{}) bool {
-				metaObj, ok := obj.(metav1.ObjectMetaAccessor)
-				if !ok {
-					return false
-				}
-
-				// only handle the managed cluster lease
-				// TODO instead of this by adding label filter in the SharedInformerFactory
-				// see https://github.com/open-cluster-management-io/registration/issues/225
-				if _, ok := metaObj.GetObjectMeta().GetLabels()[clusterv1.ClusterNameLabelKey]; !ok {
-					return false
-				}
-
-				return metaObj.GetObjectMeta().GetName() == leaseName
-			},
+		WithFilteredEventsInformersQueueKeysFunc(
+			queue.QueueKeyByLabel(clusterv1.ClusterNameLabelKey),
+			queue.UnionFilter(queue.FileterByLabel(clusterv1.ClusterNameLabelKey), queue.FilterByNames(leaseName)),
 			leaseInformer.Informer(),
 		).
-		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
-			accessor, _ := meta.Accessor(obj)
-			return accessor.GetName()
-		}, clusterInformer.Informer()).
+		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterInformer.Informer()).
 		WithSync(c.sync).
 		ToController("ManagedClusterLeaseController", recorder)
 }

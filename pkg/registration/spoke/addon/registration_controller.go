@@ -12,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -26,6 +25,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 )
 
@@ -98,11 +98,8 @@ func NewAddOnRegistrationController(
 	c.startRegistrationFunc = c.startRegistration
 
 	return factory.New().
-		WithInformersQueueKeyFunc(
-			func(obj runtime.Object) string {
-				accessor, _ := meta.Accessor(obj)
-				return accessor.GetName()
-			},
+		WithInformersQueueKeysFunc(
+			queue.QueueKeyByMetaName,
 			hubAddOnInformers.Informer()).
 		WithSync(c.sync).
 		ResyncEvery(10*time.Minute).

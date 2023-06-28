@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	"reflect"
 	"sort"
 	"testing"
@@ -71,7 +72,8 @@ func TestSchedule(t *testing.T) {
 				},
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
-				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(
+					clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 			},
 			expectedUnScheduled: 0,
 			expectedStatus:      *framework.NewStatus("", framework.Success, ""),
@@ -85,7 +87,7 @@ func TestSchedule(t *testing.T) {
 			},
 			decisions: []runtime.Object{},
 			clusters: []*clusterapiv1.ManagedCluster{
-				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 			},
 			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
 				{ClusterName: "cluster1"},
@@ -128,7 +130,7 @@ func TestSchedule(t *testing.T) {
 			},
 			decisions: []runtime.Object{},
 			clusters: []*clusterapiv1.ManagedCluster{
-				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 			},
 			expectedDecisions: []clusterapiv1beta1.ClusterDecision{},
 			expectedFilterResult: []FilterResult{
@@ -152,18 +154,18 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
-					WithLabel(placementLabel, placementName).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithDecisions("cluster1", "cluster2").Build(),
 			},
 			decisions: []runtime.Object{
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
-					WithLabel(placementLabel, placementName).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithDecisions("cluster1", "cluster2").Build(),
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
-				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
-				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterSetLabel, clusterSetName).Build(),
-				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterSetLabel, clusterSetName).Build(),
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
+				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
+				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 			},
 			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
 				{ClusterName: "cluster1"},
@@ -228,7 +230,7 @@ func TestSchedule(t *testing.T) {
 				},
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
-				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 			},
 			expectedUnScheduled: 0,
 			expectedStatus:      *framework.NewStatus("", framework.Success, ""),
@@ -249,21 +251,21 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewAddOnPlacementScore("cluster3", "demo").WithScore("demo", 50).Build(),
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
-				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).WithTaint(
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithTaint(
 					&clusterapiv1.Taint{
 						Key:       "key1",
 						Value:     "value1",
 						Effect:    clusterapiv1.TaintEffectNoSelect,
 						TimeAdded: metav1.Time{},
 					}).Build(),
-				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterSetLabel, clusterSetName).WithTaint(
+				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithTaint(
 					&clusterapiv1.Taint{
 						Key:       "key2",
 						Value:     "value2",
 						Effect:    clusterapiv1.TaintEffectNoSelect,
 						TimeAdded: metav1.Time{},
 					}).Build(),
-				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterSetLabel, clusterSetName).Build(),
+				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 			},
 			decisions: []runtime.Object{},
 			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
@@ -306,9 +308,9 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewAddOnPlacementScore("cluster3", "demo").WithScore("demo", 50).Build(),
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
-				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "100", "100").Build(),
-				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "50", "100").Build(),
-				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "0", "100").Build(),
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "100", "100").Build(),
+				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "50", "100").Build(),
+				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "0", "100").Build(),
 			},
 			decisions: []runtime.Object{},
 			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
@@ -358,9 +360,9 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
-				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "100", "100").Build(),
-				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "50", "100").Build(),
-				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "0", "100").Build(),
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "100", "100").Build(),
+				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "50", "100").Build(),
+				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).WithResource(clusterapiv1.ResourceMemory, "0", "100").Build(),
 			},
 			decisions: []runtime.Object{},
 			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
@@ -399,16 +401,16 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
-					WithLabel(placementLabel, placementName).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithDecisions("cluster1").Build(),
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
-				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
-				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterSetLabel, clusterSetName).Build(),
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
+				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 			},
 			decisions: []runtime.Object{
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
-					WithLabel(placementLabel, placementName).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithDecisions("cluster1").Build(),
 			},
 			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
@@ -454,9 +456,9 @@ func TestSchedule(t *testing.T) {
 					WithDecisions("cluster1", "cluster2").Build(),
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
-				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
-				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterSetLabel, clusterSetName).Build(),
-				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterSetLabel, clusterSetName).Build(),
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
+				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
+				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 			},
 			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
 				{ClusterName: "cluster3"},
@@ -497,7 +499,7 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName("others", 2)).
 					WithDecisions("cluster1", "cluster2").Build(),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
-					WithLabel(placementLabel, placementName).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithDecisions("cluster3").Build(),
 			},
 			decisions: []runtime.Object{
@@ -506,13 +508,13 @@ func TestSchedule(t *testing.T) {
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName("others", 2)).
 					WithDecisions("cluster1", "cluster2").Build(),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
-					WithLabel(placementLabel, placementName).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithDecisions("cluster3").Build(),
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
-				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterSetLabel, clusterSetName).Build(),
-				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterSetLabel, clusterSetName).Build(),
-				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterSetLabel, clusterSetName).Build(),
+				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
+				testinghelpers.NewManagedCluster("cluster2").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
+				testinghelpers.NewManagedCluster("cluster3").WithLabel(clusterapiv1beta2.ClusterSetLabel, clusterSetName).Build(),
 			},
 			expectedDecisions: []clusterapiv1beta1.ClusterDecision{
 				{ClusterName: "cluster3"},

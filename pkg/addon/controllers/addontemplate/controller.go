@@ -8,7 +8,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -28,6 +27,7 @@ import (
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
 
 	"open-cluster-management.io/ocm/pkg/addon/templateagent"
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 // addonTemplateController monitors ManagedClusterAddOns on hub to get all the in-used addon templates,
@@ -81,10 +81,7 @@ func NewAddonTemplateController(
 		c.runControllerFunc = c.runController
 	}
 	return factory.New().WithInformersQueueKeysFunc(
-		func(obj runtime.Object) []string {
-			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			return []string{key}
-		},
+		queue.QueueKeyByMetaNamespaceName,
 		addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer()).
 		WithSync(c.sync).
 		ToController("addon-template-controller", recorder)

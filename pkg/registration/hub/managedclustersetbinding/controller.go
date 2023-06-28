@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -21,6 +20,7 @@ import (
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 
 	"open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
 const (
@@ -78,10 +78,7 @@ func NewManagedClusterSetBindingController(
 
 	return factory.New().
 		WithSyncContext(syncCtx).
-		WithInformersQueueKeyFunc(func(obj runtime.Object) string {
-			key, _ := cache.MetaNamespaceKeyFunc(obj)
-			return key
-		}, clusterSetBindingInformer.Informer()).
+		WithInformersQueueKeysFunc(queue.QueueKeyByMetaNamespaceName, clusterSetBindingInformer.Informer()).
 		WithBareInformers(clusterSetInformer.Informer()).
 		WithSync(c.sync).
 		ToController("ManagedClusterSetController", recorder)

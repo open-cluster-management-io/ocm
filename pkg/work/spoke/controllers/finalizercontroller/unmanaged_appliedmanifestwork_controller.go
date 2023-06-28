@@ -21,6 +21,7 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 )
 
@@ -71,11 +72,9 @@ func NewUnManagedAppliedWorkController(
 			accessor, _ := meta.Accessor(obj)
 			return fmt.Sprintf("%s-%s", hubHash, accessor.GetName())
 		}, manifestWorkInformer.Informer()).
-		WithFilteredEventsInformersQueueKeyFunc(
-			func(obj runtime.Object) string {
-				accessor, _ := meta.Accessor(obj)
-				return accessor.GetName()
-			}, helper.AppliedManifestworkAgentIDFilter(agentID), appliedManifestWorkInformer.Informer()).
+		WithFilteredEventsInformersQueueKeysFunc(
+			queue.QueueKeyByMetaName,
+			helper.AppliedManifestworkAgentIDFilter(agentID), appliedManifestWorkInformer.Informer()).
 		WithSync(controller.sync).ToController("UnManagedAppliedManifestWork", recorder)
 }
 
