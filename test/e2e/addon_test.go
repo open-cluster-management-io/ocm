@@ -29,7 +29,7 @@ var _ = Describe("Manage the managed cluster addons", func() {
 
 	It("Create one managed cluster addon and make sure it is available", func() {
 		By(fmt.Sprintf("create the addon %v on the managed cluster namespace %v", addOnName, clusterName))
-		err := t.CreateManagedClusterAddOn(clusterName, addOnName)
+		err := t.CreateManagedClusterAddOn(clusterName, addOnName, addOnName)
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("create the addon lease %v on addon install namespace %v", addOnName, addOnName))
@@ -44,7 +44,7 @@ var _ = Describe("Manage the managed cluster addons", func() {
 
 	It("Create one managed cluster addon and make sure it is available in Hosted mode", func() {
 		By(fmt.Sprintf("create the addon %v on the managed cluster namespace %v", addOnName, clusterName))
-		err := t.CreateManagedClusterAddOn(clusterName, addOnName)
+		err := t.CreateManagedClusterAddOn(clusterName, addOnName, addOnName)
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("create the addon lease %v on addon install namespace %v", addOnName, addOnName))

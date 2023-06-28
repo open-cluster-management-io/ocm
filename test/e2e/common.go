@@ -3,6 +3,7 @@ package e2e
 import (
 	"bytes"
 	"context"
+	"embed"
 	"fmt"
 	"io"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
+	"github.com/valyala/fasttemplate"
 	authv1 "k8s.io/api/authentication/v1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	coordv1 "k8s.io/api/coordination/v1"
@@ -19,7 +21,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/apis/meta/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -28,6 +34,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -56,6 +63,8 @@ type Tester struct {
 	HubWorkClient           workv1client.Interface
 	SpokeWorkClient         workv1client.Interface
 	AddOnClinet             addonclient.Interface
+	hubRestMapper           meta.RESTMapper
+	HubDynamicClient        dynamic.Interface
 	SpokeDynamicClient      dynamic.Interface
 	bootstrapHubSecret      *corev1.Secret
 	EventuallyTimeout       time.Duration
@@ -113,6 +122,20 @@ func (t *Tester) Init() error {
 	}
 	if t.SpokeKubeClient, err = kubernetes.NewForConfig(t.SpokeClusterCfg); err != nil {
 		klog.Errorf("failed to get KubeClient. %v", err)
+		return err
+	}
+
+	hubHttpClient, err := rest.HTTPClientFor(t.HubClusterCfg)
+	if err != nil {
+		return err
+	}
+	t.hubRestMapper, err = apiutil.NewDynamicRESTMapper(t.HubClusterCfg, hubHttpClient)
+	if err != nil {
+		return err
+	}
+
+	if t.HubDynamicClient, err = dynamic.NewForConfig(t.HubClusterCfg); err != nil {
+		klog.Errorf("failed to get DynamicClient. %v", err)
 		return err
 	}
 
@@ -271,7 +294,7 @@ func (t *Tester) CreateKlusterlet(name, clusterName, klusterletNamespace string,
 	// create klusterlet CR
 	realKlusterlet, err := t.OperatorClient.OperatorV1().Klusterlets().Create(context.TODO(),
 		klusterlet, metav1.CreateOptions{})
-	if err != nil {
+	if err != nil && !errors.IsAlreadyExists(err) {
 		klog.Errorf("failed to create klusterlet %v . %v", klusterlet.Name, err)
 		return nil, err
 	}
@@ -373,7 +396,7 @@ func (t *Tester) ApproveCSR(clusterName string) error {
 		}
 
 		if isCSRInTerminalState(&csr.Status) {
-			return nil
+			continue
 		}
 
 		csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
@@ -815,7 +838,7 @@ func (t *Tester) SpokePodLog(podName, nameSpace string, lines int64) (string, er
 	return buf.String(), nil
 }
 
-func (t *Tester) CreateManagedClusterAddOn(managedClusterNamespace, addOnName string) error {
+func (t *Tester) CreateManagedClusterAddOn(managedClusterNamespace, addOnName, installNamespace string) error {
 	_, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(managedClusterNamespace).Create(
 		context.TODO(),
 		&addonv1alpha1.ManagedClusterAddOn{
@@ -824,7 +847,7 @@ func (t *Tester) CreateManagedClusterAddOn(managedClusterNamespace, addOnName st
 				Name:      addOnName,
 			},
 			Spec: addonv1alpha1.ManagedClusterAddOnSpec{
-				InstallNamespace: addOnName,
+				InstallNamespace: installNamespace,
 			},
 		},
 		metav1.CreateOptions{},
@@ -1127,4 +1150,105 @@ func changeHostOfKubeconfigSecret(secret corev1.Secret, apiServerURL string) (*c
 
 	klog.Info("Set the cluster server URL in %v secret", "apiServerURL", secret.Name, apiServerURL)
 	return &secret, nil
+}
+
+func createResourcesFromYamlFiles(
+	ctx context.Context,
+	dynamicClient dynamic.Interface,
+	restMapper meta.RESTMapper,
+	scheme *runtime.Scheme,
+	manifests func(name string) ([]byte, error),
+	resourceFiles []string) error {
+
+	var appliedErrs []error
+
+	decoder := serializer.NewCodecFactory(scheme).UniversalDeserializer()
+	for _, fileName := range resourceFiles {
+		objData, err := manifests(fileName)
+		if err != nil {
+			return err
+		}
+		required := unstructured.Unstructured{}
+		_, gvk, err := decoder.Decode(objData, nil, &required)
+		if err != nil {
+			return err
+		}
+
+		mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return err
+		}
+
+		_, err = dynamicClient.Resource(mapping.Resource).Namespace(required.GetNamespace()).Create(
+			ctx, &required, metav1.CreateOptions{})
+		if errors.IsAlreadyExists(err) {
+			continue
+		}
+		if err != nil {
+			fmt.Printf("Error creating %q (%T): %v\n", fileName, mapping.Resource, err)
+			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", fileName, mapping.Resource, err))
+		}
+	}
+
+	return utilerrors.NewAggregate(appliedErrs)
+}
+
+func deleteResourcesFromYamlFiles(
+	ctx context.Context,
+	dynamicClient dynamic.Interface,
+	restMapper meta.RESTMapper,
+	scheme *runtime.Scheme,
+	manifests func(name string) ([]byte, error),
+	resourceFiles []string) error {
+
+	var appliedErrs []error
+
+	decoder := serializer.NewCodecFactory(scheme).UniversalDeserializer()
+	for _, fileName := range resourceFiles {
+		objData, err := manifests(fileName)
+		if err != nil {
+			return err
+		}
+		required := unstructured.Unstructured{}
+		_, gvk, err := decoder.Decode(objData, nil, &required)
+		if err != nil {
+			return err
+		}
+
+		mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return err
+		}
+
+		err = dynamicClient.Resource(mapping.Resource).Namespace(required.GetNamespace()).Delete(
+			ctx, required.GetName(), metav1.DeleteOptions{})
+		if errors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			fmt.Printf("Error deleting %q (%T): %v\n", fileName, mapping.Resource, err)
+			appliedErrs = append(appliedErrs, fmt.Errorf("%q (%T): %v", fileName, mapping.Resource, err))
+		}
+	}
+
+	return utilerrors.NewAggregate(appliedErrs)
+}
+
+// defaultAddonTemplateReaderManifestsFunc returns a function that reads the addon template from the embed.FS,
+// and replaces the placeholder in format of "<< placeholder >>" with the value in configValues.
+func defaultAddonTemplateReaderManifestsFunc(
+	fs embed.FS,
+	configValues map[string]interface{},
+) func(string) ([]byte, error) {
+
+	return func(fileName string) ([]byte, error) {
+		template, err := fs.ReadFile(fileName)
+		if err != nil {
+			return nil, err
+		}
+
+		t := fasttemplate.New(string(template), "<< ", " >>")
+		objData := t.ExecuteString(configValues)
+		return []byte(objData), nil
+	}
 }

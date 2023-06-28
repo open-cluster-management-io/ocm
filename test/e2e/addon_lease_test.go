@@ -39,7 +39,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 			// create an addon on created managed cluster
 			addOnName = fmt.Sprintf("addon-%s", rand.String(6))
 			ginkgo.By(fmt.Sprintf("Creating managed cluster addon %q", addOnName))
-			err := t.CreateManagedClusterAddOn(clusterName, addOnName)
+			err := t.CreateManagedClusterAddOn(clusterName, addOnName, addOnName)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// create addon installation namespace
@@ -272,7 +272,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 			// create an addon on created managed cluster
 			addOnName = fmt.Sprintf("addon-%s", rand.String(6))
 			ginkgo.By(fmt.Sprintf("Creating managed cluster addon %q", addOnName))
-			err := t.CreateManagedClusterAddOn(clusterName, addOnName)
+			err := t.CreateManagedClusterAddOn(clusterName, addOnName, addOnName)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// create addon installation namespace
