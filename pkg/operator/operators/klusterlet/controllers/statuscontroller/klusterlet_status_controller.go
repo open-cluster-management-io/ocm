@@ -54,7 +54,7 @@ func NewKlusterletStatusController(
 		klusterletLister: klusterletInformer.Lister(),
 	}
 	return factory.New().WithSync(controller.sync).
-		WithInformersQueueKeyFunc(helpers.KlusterletDeploymentQueueKeyFunc(controller.klusterletLister), deploymentInformer.Informer()).
+		WithInformersQueueKeysFunc(helpers.KlusterletDeploymentQueueKeyFunc(controller.klusterletLister), deploymentInformer.Informer()).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, klusterletInformer.Informer()).
 		ToController("KlusterletStatusController", recorder)
 }

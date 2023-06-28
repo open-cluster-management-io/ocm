@@ -165,20 +165,20 @@ var _ = ginkgo.Describe("Addon Lease Resync", func() {
 		hubKubeconfigDir = path.Join(util.TestDir, fmt.Sprintf("addontest-%s", suffix), "hub-kubeconfig")
 		addOnName = fmt.Sprintf("addon-%s", suffix)
 
-		err := features.DefaultSpokeRegistrationMutableFeatureGate.Set("AddonManagement=true")
+		err := features.SpokeMutableFeatureGate.Set("AddonManagement=true")
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		agentOptions := spoke.SpokeAgentOptions{
-			AgentOptions:             commonoptions.NewAgentOptions(),
+		agentOptions := &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
-			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
 
-		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
+		commOptions := commonoptions.NewAgentOptions()
+		commOptions.HubKubeconfigDir = hubKubeconfigDir
+		commOptions.SpokeClusterName = managedClusterName
 
-		cancel = runAgent("addontest", agentOptions, spokeCfg)
+		cancel = runAgent("addontest", agentOptions, commOptions, spokeCfg)
 	})
 
 	ginkgo.AfterEach(func() {

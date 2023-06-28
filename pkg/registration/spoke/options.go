@@ -2,11 +2,12 @@ package spoke
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
-	"open-cluster-management.io/ocm/pkg/features"
+
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
-	"time"
 )
 
 // SpokeAgentOptions holds configuration for spoke cluster agent
@@ -29,7 +30,6 @@ func NewSpokeAgentOptions() *SpokeAgentOptions {
 
 // AddFlags registers flags for Agent
 func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
-	features.DefaultSpokeRegistrationMutableFeatureGate.AddFlag(fs)
 	fs.StringVar(&o.BootstrapKubeconfig, "bootstrap-kubeconfig", o.BootstrapKubeconfig,
 		"The path of the kubeconfig file for agent bootstrap.")
 	fs.StringVar(&o.HubKubeconfigSecret, "hub-kubeconfig-secret", o.HubKubeconfigSecret,

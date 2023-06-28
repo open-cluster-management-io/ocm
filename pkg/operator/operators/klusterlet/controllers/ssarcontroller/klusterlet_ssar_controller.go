@@ -66,7 +66,7 @@ func NewKlusterletSSARController(
 	}
 
 	return factory.New().WithSync(controller.sync).
-		WithInformersQueueKeyFunc(helpers.KlusterletSecretQueueKeyFunc(controller.klusterletLister),
+		WithInformersQueueKeysFunc(helpers.KlusterletSecretQueueKeyFunc(controller.klusterletLister),
 			secretInformers[helpers.HubKubeConfig].Informer(),
 			secretInformers[helpers.BootstrapHubKubeConfig].Informer(),
 			secretInformers[helpers.ExternalManagedKubeConfig].Informer()).

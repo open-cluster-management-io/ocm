@@ -50,7 +50,7 @@ func NewClusterManagerStatusController(
 	}
 
 	return factory.New().WithSync(controller.sync).
-		WithInformersQueueKeyFunc(
+		WithInformersQueueKeysFunc(
 			helpers.ClusterManagerDeploymentQueueKeyFunc(controller.clusterManagerLister), deploymentInformer.Informer()).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterManagerInformer.Informer()).
 		ToController("ClusterManagerStatusController", recorder)

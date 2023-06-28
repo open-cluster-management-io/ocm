@@ -2,7 +2,6 @@ package spoke
 
 import (
 	"context"
-	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -17,6 +16,7 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	ocmfeature "open-cluster-management.io/api/feature"
 
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
@@ -114,7 +114,7 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		o.agentOptions.SpokeClusterName,
 		controllerContext.EventRecorder,
 		restMapper,
-	).NewExecutorValidator(ctx, features.DefaultSpokeWorkMutableFeatureGate.Enabled(ocmfeature.ExecutorValidatingCaches))
+	).NewExecutorValidator(ctx, features.SpokeMutableFeatureGate.Enabled(ocmfeature.ExecutorValidatingCaches))
 
 	manifestWorkController := manifestcontroller.NewManifestWorkController(
 		controllerContext.EventRecorder,

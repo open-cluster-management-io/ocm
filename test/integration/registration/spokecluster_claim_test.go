@@ -49,16 +49,16 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 		}
 
 		// run registration agent
-		agentOptions := spoke.SpokeAgentOptions{
-			AgentOptions:             commonoptions.NewAgentOptions(),
+		agentOptions := &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
-			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 			MaxCustomClusterClaims:   maxCustomClusterClaims,
 		}
-		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
-		cancel = runAgent("claimtest", agentOptions, spokeCfg)
+		commOptions := commonoptions.NewAgentOptions()
+		commOptions.HubKubeconfigDir = hubKubeconfigDir
+		commOptions.SpokeClusterName = managedClusterName
+		cancel = runAgent("claimtest", agentOptions, commOptions, spokeCfg)
 	})
 
 	ginkgo.AfterEach(

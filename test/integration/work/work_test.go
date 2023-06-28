@@ -24,8 +24,9 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-func startWorkAgent(ctx context.Context, o *spoke.WorkloadAgentOptions) {
-	err := o.RunWorkloadAgent(ctx, &controllercmd.ControllerContext{
+func startWorkAgent(ctx context.Context, o *spoke.WorkloadAgentOptions, commOption *commonoptions.AgentOptions) {
+	agentConfig := spoke.NewWorkAgentConfig(commOption, o)
+	err := agentConfig.RunWorkloadAgent(ctx, &controllercmd.ControllerContext{
 		KubeConfig:    spokeRestConfig,
 		EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
 	})
@@ -34,6 +35,7 @@ func startWorkAgent(ctx context.Context, o *spoke.WorkloadAgentOptions) {
 
 var _ = ginkgo.Describe("ManifestWork", func() {
 	var o *spoke.WorkloadAgentOptions
+	var commOptions *commonoptions.AgentOptions
 	var cancel context.CancelFunc
 
 	var work *workapiv1.ManifestWork
@@ -44,50 +46,51 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 
 	ginkgo.BeforeEach(func() {
 		o = spoke.NewWorkloadAgentOptions()
-		o.HubKubeconfigFile = hubKubeconfigFileName
-		o.AgentOptions = commonoptions.NewAgentOptions()
-		o.AgentOptions.SpokeClusterName = utilrand.String(5)
 		o.StatusSyncInterval = 3 * time.Second
 		o.AppliedManifestWorkEvictionGracePeriod = 5 * time.Second
 
+		commOptions = commonoptions.NewAgentOptions()
+		commOptions.HubKubeconfigFile = hubKubeconfigFileName
+		commOptions.SpokeClusterName = utilrand.String(5)
+
 		ns := &corev1.Namespace{}
-		ns.Name = o.AgentOptions.SpokeClusterName
+		ns.Name = commOptions.SpokeClusterName
 		_, err := spokeKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		var ctx context.Context
 		ctx, cancel = context.WithCancel(context.Background())
-		go startWorkAgent(ctx, o)
+		go startWorkAgent(ctx, o, commOptions)
 
 		// reset manifests
 		manifests = nil
 	})
 
 	ginkgo.JustBeforeEach(func() {
-		work = util.NewManifestWork(o.AgentOptions.SpokeClusterName, "", manifests)
-		work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
+		work = util.NewManifestWork(commOptions.SpokeClusterName, "", manifests)
+		work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
 		appliedManifestWorkName = fmt.Sprintf("%s-%s", hubHash, work.Name)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.AfterEach(func() {
-		err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+		err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
 		if !errors.IsNotFound(err) {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		}
 
 		gomega.Eventually(func() error {
-			_, err := hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			_, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 			if errors.IsNotFound(err) {
 				return nil
 			}
 			if err != nil {
 				return err
 			}
-			return fmt.Errorf("work %s in namespace %s still exists", work.Name, o.AgentOptions.SpokeClusterName)
+			return fmt.Errorf("work %s in namespace %s still exists", work.Name, commOptions.SpokeClusterName)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
-		err := spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), o.AgentOptions.SpokeClusterName, metav1.DeleteOptions{})
+		err := spokeKubeClient.CoreV1().Namespaces().Delete(context.Background(), commOptions.SpokeClusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		if cancel != nil {
@@ -98,33 +101,33 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 	ginkgo.Context("With a single manifest", func() {
 		ginkgo.BeforeEach(func() {
 			manifests = []workapiv1.Manifest{
-				util.ToManifest(util.NewConfigmap(o.AgentOptions.SpokeClusterName, "cm1", map[string]string{"a": "b"}, nil)),
+				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, "cm1", map[string]string{"a": "b"}, nil)),
 			}
 		})
 
 		ginkgo.It("should create work and then apply it successfully", func() {
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 		})
 
 		ginkgo.It("should update work and then apply it successfully", func() {
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			newManifests := []workapiv1.Manifest{
-				util.ToManifest(util.NewConfigmap(o.AgentOptions.SpokeClusterName, "cm2", map[string]string{"x": "y"}, nil)),
+				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, "cm2", map[string]string{"x": "y"}, nil)),
 			}
-			work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			work.Spec.Workload.Manifests = newManifests
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertExistenceOfConfigMaps(newManifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
@@ -146,14 +149,14 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(o.AgentOptions.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
 			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
 		})
 
 		ginkgo.It("should delete work successfully", func() {
 			util.AssertFinalizerAdded(work.Namespace, work.Name, hubWorkClient, eventuallyTimeout, eventuallyInterval)
 
-			err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkDeleted(work.Namespace, work.Name, hubHash, manifests, hubWorkClient, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
@@ -164,44 +167,44 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		ginkgo.BeforeEach(func() {
 			manifests = []workapiv1.Manifest{
 				util.ToManifest(util.NewConfigmap("non-existent-namespace", "cm1", map[string]string{"a": "b"}, nil)),
-				util.ToManifest(util.NewConfigmap(o.AgentOptions.SpokeClusterName, "cm2", map[string]string{"c": "d"}, nil)),
-				util.ToManifest(util.NewConfigmap(o.AgentOptions.SpokeClusterName, "cm3", map[string]string{"e": "f"}, nil)),
+				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, "cm2", map[string]string{"c": "d"}, nil)),
+				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, "cm3", map[string]string{"e": "f"}, nil)),
 			}
 		})
 
 		ginkgo.It("should create work and then apply it successfully", func() {
 			util.AssertExistenceOfConfigMaps(manifests[1:], spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionFalse,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionFalse,
 				[]metav1.ConditionStatus{metav1.ConditionFalse, metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionFalse,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionFalse,
 				[]metav1.ConditionStatus{metav1.ConditionFalse, metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 		})
 
 		ginkgo.It("should update work and then apply it successfully", func() {
 			util.AssertExistenceOfConfigMaps(manifests[1:], spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionFalse,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionFalse,
 				[]metav1.ConditionStatus{metav1.ConditionFalse, metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionFalse,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionFalse,
 				[]metav1.ConditionStatus{metav1.ConditionFalse, metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			newManifests := []workapiv1.Manifest{
-				util.ToManifest(util.NewConfigmap(o.AgentOptions.SpokeClusterName, "cm1", map[string]string{"a": "b"}, nil)),
-				util.ToManifest(util.NewConfigmap(o.AgentOptions.SpokeClusterName, "cm2", map[string]string{"x": "y"}, nil)),
-				util.ToManifest(util.NewConfigmap(o.AgentOptions.SpokeClusterName, "cm4", map[string]string{"e": "f"}, nil)),
+				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, "cm1", map[string]string{"a": "b"}, nil)),
+				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, "cm2", map[string]string{"x": "y"}, nil)),
+				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, "cm4", map[string]string{"e": "f"}, nil)),
 			}
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			work.Spec.Workload.Manifests = newManifests
-			work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertExistenceOfConfigMaps(newManifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
 			// check if Available status is updated or not
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			// check if resource created by stale manifest is deleted once it is removed from applied resource list
@@ -220,14 +223,14 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(o.AgentOptions.SpokeClusterName).Get(context.Background(), "cm3", metav1.GetOptions{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm3", metav1.GetOptions{})
 			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
 		})
 
 		ginkgo.It("should delete work successfully", func() {
 			util.AssertFinalizerAdded(work.Namespace, work.Name, hubWorkClient, eventuallyTimeout, eventuallyInterval)
 
-			err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertWorkDeleted(work.Namespace, work.Name, hubHash, manifests, hubWorkClient, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
@@ -251,7 +254,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			objects = append(objects, obj)
 
 			// cr
-			obj, gvr, err = util.GuestbookCr(o.AgentOptions.SpokeClusterName, "guestbook1")
+			obj, gvr, err = util.GuestbookCr(commOptions.SpokeClusterName, "guestbook1")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gvrs = append(gvrs, gvr)
 			objects = append(objects, obj)
@@ -262,9 +265,9 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		})
 
 		ginkgo.It("should create CRD and CR successfully", func() {
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			var namespaces, names []string
@@ -278,9 +281,9 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		})
 
 		ginkgo.It("should merge annotation of existing CR", func() {
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			var namespaces, names []string
@@ -293,7 +296,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			util.AssertAppliedResources(hubHash, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
 
 			// update object label
-			obj, gvr, err := util.GuestbookCr(o.AgentOptions.SpokeClusterName, "guestbook1")
+			obj, gvr, err := util.GuestbookCr(commOptions.SpokeClusterName, "guestbook1")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			cr, err := util.GetResource(obj.GetNamespace(), obj.GetName(), gvr, spokeDynamicClient)
@@ -328,9 +331,9 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		})
 
 		ginkgo.It("should keep the finalizer unchanged of existing CR", func() {
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			var namespaces, names []string
@@ -343,7 +346,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			util.AssertAppliedResources(hubHash, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
 
 			// update object finalizer
-			obj, gvr, err := util.GuestbookCr(o.AgentOptions.SpokeClusterName, "guestbook1")
+			obj, gvr, err := util.GuestbookCr(commOptions.SpokeClusterName, "guestbook1")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			cr, err := util.GetResource(obj.GetNamespace(), obj.GetName(), gvr, spokeDynamicClient)
@@ -392,9 +395,9 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		})
 
 		ginkgo.It("should delete CRD and CR successfully", func() {
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			var namespaces, names []string
@@ -407,17 +410,17 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			util.AssertAppliedResources(hubHash, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
 
 			// delete manifest work
-			err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
+			err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// wait for deletion of manifest work
 			gomega.Eventually(func() bool {
-				_, err := hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				_, err := hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				return errors.IsNotFound(err)
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// Once manifest work is not found, its relating appliedmanifestwork will be evicted, and finally,
-			// all CRs/CRD should been deleted too
+			// all CRs/CRD should be deleted too
 			gomega.Eventually(func() error {
 				for i := range gvrs {
 					_, err := util.GetResource(namespaces[i], names[i], gvrs[i], spokeDynamicClient)
@@ -446,19 +449,19 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			gvrs = nil
 			objects = nil
 
-			u, gvr := util.NewServiceAccount(o.AgentOptions.SpokeClusterName, "sa")
+			u, gvr := util.NewServiceAccount(commOptions.SpokeClusterName, "sa")
 			gvrs = append(gvrs, gvr)
 			objects = append(objects, u)
 
-			u, gvr = util.NewRole(o.AgentOptions.SpokeClusterName, "role1")
+			u, gvr = util.NewRole(commOptions.SpokeClusterName, "role1")
 			gvrs = append(gvrs, gvr)
 			objects = append(objects, u)
 
-			u, gvr = util.NewRoleBinding(o.AgentOptions.SpokeClusterName, "rolebinding1", "sa", "role1")
+			u, gvr = util.NewRoleBinding(commOptions.SpokeClusterName, "rolebinding1", "sa", "role1")
 			gvrs = append(gvrs, gvr)
 			objects = append(objects, u)
 
-			u, gvr, err = util.NewDeployment(o.AgentOptions.SpokeClusterName, "deploy1", "sa")
+			u, gvr, err = util.NewDeployment(commOptions.SpokeClusterName, "deploy1", "sa")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gvrs = append(gvrs, gvr)
 			objects = append(objects, u)
@@ -469,10 +472,10 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		})
 
 		ginkgo.It("should create Service Account, Role, RoleBinding and Deployment successfully", func() {
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue},
 				eventuallyTimeout, eventuallyInterval)
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue},
 				eventuallyTimeout, eventuallyInterval)
 
@@ -488,15 +491,15 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 
 		ginkgo.It("should update Service Account and Deployment successfully", func() {
 			ginkgo.By("check condition status in work status")
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue},
 				eventuallyTimeout, eventuallyInterval)
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue},
 				eventuallyTimeout, eventuallyInterval)
 
-			util.AssertWorkGeneration(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), eventuallyTimeout, eventuallyInterval)
-			util.AssertWorkGeneration(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkGeneration(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkGeneration(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, eventuallyTimeout, eventuallyInterval)
 
 			ginkgo.By("check existence of all maintained resources")
 			var namespaces, names []string
@@ -513,13 +516,13 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			ginkgo.By("update manifests in work")
 			oldServiceAccount := objects[0]
 			gvrs[0], gvrs[3] = gvrs[3], gvrs[0]
-			u, _ := util.NewServiceAccount(o.AgentOptions.SpokeClusterName, "admin")
+			u, _ := util.NewServiceAccount(commOptions.SpokeClusterName, "admin")
 			objects[3] = u
-			u, _, err = util.NewDeployment(o.AgentOptions.SpokeClusterName, "deploy1", "admin")
+			u, _, err = util.NewDeployment(commOptions.SpokeClusterName, "deploy1", "admin")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			objects[0] = u
 
-			newManifests := []workapiv1.Manifest{}
+			var newManifests []workapiv1.Manifest
 			for _, obj := range objects {
 				newManifests = append(newManifests, util.ToManifest(obj))
 			}
@@ -529,10 +532,10 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			updateTime := metav1.Now()
 			time.Sleep(1 * time.Second)
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			work.Spec.Workload.Manifests = newManifests
-			work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			ginkgo.By("check existence of all maintained resources")
@@ -546,7 +549,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 
 			ginkgo.By("check if deployment is updated")
 			gomega.Eventually(func() error {
-				u, err := util.GetResource(o.AgentOptions.SpokeClusterName, objects[0].GetName(), gvrs[0], spokeDynamicClient)
+				u, err := util.GetResource(commOptions.SpokeClusterName, objects[0].GetName(), gvrs[0], spokeDynamicClient)
 				if err != nil {
 					return err
 				}
@@ -560,7 +563,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 
 			ginkgo.By("check if LastTransitionTime is updated")
 			gomega.Eventually(func() error {
-				work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+				work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -589,8 +592,8 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
-			util.AssertWorkGeneration(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), eventuallyTimeout, eventuallyInterval)
-			util.AssertWorkGeneration(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkGeneration(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkGeneration(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, eventuallyTimeout, eventuallyInterval)
 
 			ginkgo.By("check if applied resources in status are updated")
 			util.AssertAppliedResources(hubHash, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
@@ -604,29 +607,29 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		var finalizer = "cluster.open-cluster-management.io/testing"
 		ginkgo.BeforeEach(func() {
 			manifests = []workapiv1.Manifest{
-				util.ToManifest(util.NewConfigmap(o.AgentOptions.SpokeClusterName, "cm1", map[string]string{"a": "b"}, []string{finalizer})),
-				util.ToManifest(util.NewConfigmap(o.AgentOptions.SpokeClusterName, "cm2", map[string]string{"c": "d"}, []string{finalizer})),
-				util.ToManifest(util.NewConfigmap(o.AgentOptions.SpokeClusterName, "cm3", map[string]string{"e": "f"}, []string{finalizer})),
+				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, "cm1", map[string]string{"a": "b"}, []string{finalizer})),
+				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, "cm2", map[string]string{"c": "d"}, []string{finalizer})),
+				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, "cm3", map[string]string{"e": "f"}, []string{finalizer})),
 			}
 		})
 
 		ginkgo.AfterEach(func() {
-			err = util.RemoveConfigmapFinalizers(spokeKubeClient, o.AgentOptions.SpokeClusterName, "cm1", "cm2", "cm3")
+			err = util.RemoveConfigmapFinalizers(spokeKubeClient, commOptions.SpokeClusterName, "cm1", "cm2", "cm3")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 
 		ginkgo.It("should remove applied resource for stale manifest from list once the resource is gone", func() {
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
-			work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Get(context.Background(), work.Name, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			work.Spec.Workload.Manifests = manifests[1:]
-			work, err = hubWorkClient.WorkV1().ManifestWorks(o.AgentOptions.SpokeClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
+			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertExistenceOfConfigMaps(manifests[1:], spokeKubeClient, eventuallyTimeout, eventuallyInterval)
@@ -638,7 +641,7 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			go func() {
 				time.Sleep(2 * time.Second)
 				// remove finalizers of cm1
-				_ = util.RemoveConfigmapFinalizers(spokeKubeClient, o.AgentOptions.SpokeClusterName, "cm1")
+				_ = util.RemoveConfigmapFinalizers(spokeKubeClient, commOptions.SpokeClusterName, "cm1")
 			}()
 
 			// check if resource created by stale manifest is deleted once it is removed from applied resource list
@@ -657,16 +660,16 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(o.AgentOptions.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
 			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
 		})
 
 		ginkgo.It("should delete manifest work eventually after all applied resources are gone", func() {
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkApplied), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
-			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, string(workapiv1.WorkAvailable), metav1.ConditionTrue,
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 
 			err := hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Delete(context.Background(), work.Name, metav1.DeleteOptions{})

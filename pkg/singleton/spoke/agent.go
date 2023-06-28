@@ -2,13 +2,15 @@ package spoke
 
 import (
 	"context"
+	"time"
+
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	registration "open-cluster-management.io/ocm/pkg/registration/spoke"
 	work "open-cluster-management.io/ocm/pkg/work/spoke"
-	"time"
 )
 
 type AgentConfig struct {

@@ -89,18 +89,18 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 	}
 
 	startRegistrationAgent := func(managedClusterName, bootstrapKubeConfigFile, hubKubeconfigSecret, hubKubeconfigDir string) context.CancelFunc {
-		err := features.DefaultSpokeRegistrationMutableFeatureGate.Set("AddonManagement=true")
+		err := features.SpokeMutableFeatureGate.Set("AddonManagement=true")
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		agentOptions := spoke.SpokeAgentOptions{
-			AgentOptions:             commonoptions.NewAgentOptions(),
+		agentOptions := &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
-			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
-		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
-		return runAgent("addontest", agentOptions, spokeCfg)
+		commOptions := commonoptions.NewAgentOptions()
+		commOptions.HubKubeconfigDir = hubKubeconfigDir
+		commOptions.SpokeClusterName = managedClusterName
+		return runAgent("addontest", agentOptions, commOptions, spokeCfg)
 	}
 
 	assertSuccessClusterBootstrap := func(testNamespace, managedClusterName, hubKubeconfigSecret string, hubKubeClient, spokeKubeClient kubernetes.Interface, hubClusterClient clusterclientset.Interface, auth *util.TestAuthn) {

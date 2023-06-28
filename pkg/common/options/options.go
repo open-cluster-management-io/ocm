@@ -2,19 +2,20 @@ package options
 
 import (
 	"fmt"
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/klog/v2"
-	"open-cluster-management.io/ocm/pkg/registration/clientcert"
-	"open-cluster-management.io/ocm/pkg/registration/spoke/registration"
 	"os"
 	"path"
 	"strings"
 
 	"github.com/spf13/pflag"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
+
+	"open-cluster-management.io/ocm/pkg/registration/clientcert"
+	"open-cluster-management.io/ocm/pkg/registration/spoke/registration"
 )
 
 const (
@@ -166,7 +167,7 @@ func (o *AgentOptions) getOrGenerateClusterAgentID() (string, string) {
 			if agentNameInCert != agentID {
 				klog.Warningf(
 					"Use agent name %q in certification instead of %q in the mounted secret",
-					agentNameInCert, string(agentID))
+					agentNameInCert, agentID)
 			}
 		case err == nil:
 			// use agent name loaded from the mounted secret

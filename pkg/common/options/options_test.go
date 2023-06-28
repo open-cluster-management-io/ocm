@@ -2,17 +2,19 @@ package options
 
 import (
 	"context"
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	kubefake "k8s.io/client-go/kubernetes/fake"
-	"open-cluster-management.io/ocm/pkg/registration/clientcert"
-	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
-	"open-cluster-management.io/ocm/pkg/registration/spoke/registration"
 	"os"
 	"path"
 	"testing"
 	"time"
+
+	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	kubefake "k8s.io/client-go/kubernetes/fake"
+
+	"open-cluster-management.io/ocm/pkg/registration/clientcert"
+	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
+	"open-cluster-management.io/ocm/pkg/registration/spoke/registration"
 )
 
 func TestComplete(t *testing.T) {

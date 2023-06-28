@@ -34,16 +34,16 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ginkgo.By("run registration agent")
-		agentOptions := spoke.SpokeAgentOptions{
-			AgentOptions:             commonoptions.NewAgentOptions(),
+		agentOptions := &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
-			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
-		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
+		commOptions := commonoptions.NewAgentOptions()
+		commOptions.HubKubeconfigDir = hubKubeconfigDir
+		commOptions.SpokeClusterName = managedClusterName
 
-		stopAgent := runAgent("restart-test", agentOptions, spokeCfg)
+		stopAgent := runAgent("restart-test", agentOptions, commOptions, spokeCfg)
 
 		ginkgo.By("Check existence of csr and ManagedCluster")
 		// the csr should be created
@@ -111,15 +111,15 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ginkgo.By("Restart registration agent")
-		agentOptions = spoke.SpokeAgentOptions{
-			AgentOptions:             commonoptions.NewAgentOptions(),
+		agentOptions = &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
-			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
-		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
-		stopAgent = runAgent("restart-test", agentOptions, spokeCfg)
+		commOptions = commonoptions.NewAgentOptions()
+		commOptions.HubKubeconfigDir = hubKubeconfigDir
+		commOptions.SpokeClusterName = managedClusterName
+		stopAgent = runAgent("restart-test", agentOptions, commOptions, spokeCfg)
 		defer stopAgent()
 
 		ginkgo.By("Check if ManagedCluster joins the hub")
@@ -164,15 +164,15 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ginkgo.By("run registration agent")
-		agentOptions := spoke.SpokeAgentOptions{
-			AgentOptions:             commonoptions.NewAgentOptions(),
+		agentOptions := &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
-			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
-		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
-		stopAgent := runAgent("restart-test", agentOptions, spokeCfg)
+		commOptions := commonoptions.NewAgentOptions()
+		commOptions.HubKubeconfigDir = hubKubeconfigDir
+		commOptions.SpokeClusterName = managedClusterName
+		stopAgent := runAgent("restart-test", agentOptions, commOptions, spokeCfg)
 
 		ginkgo.By("Check existence of csr and ManagedCluster")
 		// the csr should be created
@@ -226,15 +226,15 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 
 		ginkgo.By("Restart registration agent with a new cluster name")
 		managedClusterName = "restart-test-cluster3"
-		agentOptions = spoke.SpokeAgentOptions{
-			AgentOptions:             commonoptions.NewAgentOptions(),
+		agentOptions = &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
-			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
-		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
-		stopAgent = runAgent("restart-test", agentOptions, spokeCfg)
+		commOptions = commonoptions.NewAgentOptions()
+		commOptions.HubKubeconfigDir = hubKubeconfigDir
+		commOptions.SpokeClusterName = managedClusterName
+		stopAgent = runAgent("restart-test", agentOptions, commOptions, spokeCfg)
 		defer stopAgent()
 
 		ginkgo.By("Check the existence of csr and the new ManagedCluster")

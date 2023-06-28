@@ -37,15 +37,17 @@ var _ = ginkgo.Describe("ManagedCluster Taints Update", func() {
 		ctx, stop := context.WithCancel(context.Background())
 		// run registration agent
 		go func() {
-			agentOptions := spoke.SpokeAgentOptions{
-				AgentOptions:             commonoptions.NewAgentOptions(),
+			agentOptions := &spoke.SpokeAgentOptions{
 				BootstrapKubeconfig:      bootstrapKubeConfigFile,
 				HubKubeconfigSecret:      hubKubeconfigSecret,
-				HubKubeconfigDir:         hubKubeconfigDir,
 				ClusterHealthCheckPeriod: 1 * time.Minute,
 			}
-			agentOptions.AgentOptions.SpokeClusterName = managedClusterName
-			err := agentOptions.RunSpokeAgent(ctx, &controllercmd.ControllerContext{
+			commOptions := commonoptions.NewAgentOptions()
+			commOptions.HubKubeconfigDir = hubKubeconfigDir
+			commOptions.SpokeClusterName = managedClusterName
+
+			agentCfg := spoke.NewSpokeAgentConfig(commOptions, agentOptions)
+			err := agentCfg.RunSpokeAgent(ctx, &controllercmd.ControllerContext{
 				KubeConfig:    spokeCfg,
 				EventRecorder: util.NewIntegrationTestEventRecorder("cluster-tainttest"),
 			})

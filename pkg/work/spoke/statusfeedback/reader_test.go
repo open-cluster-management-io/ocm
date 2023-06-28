@@ -338,7 +338,7 @@ func TestStatusReader(t *testing.T) {
 	reader := NewStatusReader()
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			err := features.DefaultSpokeWorkMutableFeatureGate.Set(fmt.Sprintf("%s=%t", ocmfeature.RawFeedbackJsonString, c.enableRaw))
+			err := features.SpokeMutableFeatureGate.Set(fmt.Sprintf("%s=%t", ocmfeature.RawFeedbackJsonString, c.enableRaw))
 			if err != nil {
 				t.Fatal(err)
 			}

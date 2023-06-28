@@ -352,7 +352,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 	var addOnLeaseController factory.Controller
 	var addOnRegistrationController factory.Controller
-	if features.DefaultSpokeRegistrationMutableFeatureGate.Enabled(ocmfeature.AddonManagement) {
+	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.AddonManagement) {
 		addOnLeaseController = addon.NewManagedClusterAddOnLeaseController(
 			o.agentOptions.SpokeClusterName,
 			addOnClient,
@@ -383,14 +383,14 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	go addOnInformerFactory.Start(ctx.Done())
 
 	go spokeKubeInformerFactory.Start(ctx.Done())
-	if features.DefaultSpokeRegistrationMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
+	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
 		go spokeClusterInformerFactory.Start(ctx.Done())
 	}
 
 	go clientCertForHubController.Run(ctx, 1)
 	go managedClusterLeaseController.Run(ctx, 1)
 	go managedClusterHealthCheckController.Run(ctx, 1)
-	if features.DefaultSpokeRegistrationMutableFeatureGate.Enabled(ocmfeature.AddonManagement) {
+	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.AddonManagement) {
 		go addOnLeaseController.Run(ctx, 1)
 		go addOnRegistrationController.Run(ctx, 1)
 	}

@@ -25,16 +25,16 @@ var _ = ginkgo.Describe("Joining Process", func() {
 		hubKubeconfigDir := path.Join(util.TestDir, "joiningtest", "hub-kubeconfig")
 
 		// run registration agent
-		agentOptions := spoke.SpokeAgentOptions{
-			AgentOptions:             commonoptions.NewAgentOptions(),
+		agentOptions := &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
-			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
-		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
+		commOptions := commonoptions.NewAgentOptions()
+		commOptions.HubKubeconfigDir = hubKubeconfigDir
+		commOptions.SpokeClusterName = managedClusterName
 
-		cancel := runAgent("joiningtest", agentOptions, spokeCfg)
+		cancel := runAgent("joiningtest", agentOptions, commOptions, spokeCfg)
 		defer cancel()
 
 		// the spoke cluster and csr should be created after bootstrap

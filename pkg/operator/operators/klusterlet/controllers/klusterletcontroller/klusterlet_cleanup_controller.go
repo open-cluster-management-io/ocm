@@ -63,11 +63,11 @@ func NewKlusterletCleanupController(
 	}
 
 	return factory.New().WithSync(controller.sync).
-		WithInformersQueueKeyFunc(helpers.KlusterletSecretQueueKeyFunc(controller.klusterletLister),
+		WithInformersQueueKeysFunc(helpers.KlusterletSecretQueueKeyFunc(controller.klusterletLister),
 			secretInformers[helpers.HubKubeConfig].Informer(),
 			secretInformers[helpers.BootstrapHubKubeConfig].Informer(),
 			secretInformers[helpers.ExternalManagedKubeConfig].Informer()).
-		WithInformersQueueKeyFunc(helpers.KlusterletDeploymentQueueKeyFunc(controller.klusterletLister), deploymentInformer.Informer()).
+		WithInformersQueueKeysFunc(helpers.KlusterletDeploymentQueueKeyFunc(controller.klusterletLister), deploymentInformer.Informer()).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, klusterletInformer.Informer()).
 		ToController("KlusterletCleanupController", recorder)
 }

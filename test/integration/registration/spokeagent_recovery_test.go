@@ -35,16 +35,16 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// run registration agent with an invalid bootstrap kubeconfig
-		agentOptions := spoke.SpokeAgentOptions{
-			AgentOptions:             commonoptions.NewAgentOptions(),
+		agentOptions := &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
-			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
-		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
+		commOptions := commonoptions.NewAgentOptions()
+		commOptions.HubKubeconfigDir = hubKubeconfigDir
+		commOptions.SpokeClusterName = managedClusterName
 
-		cancel := runAgent("bootstrap-recoverytest", agentOptions, spokeCfg)
+		cancel := runAgent("bootstrap-recoverytest", agentOptions, commOptions, spokeCfg)
 		defer cancel()
 
 		// the managedcluster should not be created
@@ -123,16 +123,16 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 		hubKubeconfigDir := path.Join(util.TestDir, "hubkubeconfig-recoverytest", "hub-kubeconfig")
 
 		// run registration agent
-		agentOptions := spoke.SpokeAgentOptions{
-			AgentOptions:             commonoptions.NewAgentOptions(),
+		agentOptions := &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
-			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
-		agentOptions.AgentOptions.SpokeClusterName = spokeClusterName
+		commOptions := commonoptions.NewAgentOptions()
+		commOptions.HubKubeconfigDir = hubKubeconfigDir
+		commOptions.SpokeClusterName = spokeClusterName
 
-		cancel := runAgent("hubkubeconfig-recoverytest", agentOptions, spokeCfg)
+		cancel := runAgent("hubkubeconfig-recoverytest", agentOptions, commOptions, spokeCfg)
 		defer cancel()
 
 		// after bootstrap the spokecluster and csr should be created

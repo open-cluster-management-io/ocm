@@ -101,8 +101,8 @@ func NewClusterManagerController(
 
 	return factory.New().WithSync(controller.sync).
 		ResyncEvery(3*time.Minute).
-		WithInformersQueueKeyFunc(helpers.ClusterManagerDeploymentQueueKeyFunc(controller.clusterManagerLister), deploymentInformer.Informer()).
-		WithFilteredEventsInformersQueueKeyFunc(
+		WithInformersQueueKeysFunc(helpers.ClusterManagerDeploymentQueueKeyFunc(controller.clusterManagerLister), deploymentInformer.Informer()).
+		WithFilteredEventsInformersQueueKeysFunc(
 			helpers.ClusterManagerConfigmapQueueKeyFunc(controller.clusterManagerLister),
 			queue.FilterByNames(helpers.CaBundleConfigmap),
 			configMapInformer.Informer()).

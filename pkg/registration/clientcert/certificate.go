@@ -259,7 +259,7 @@ func (v *v1CSRControl) get(name string) (metav1.Object, error) {
 }
 
 func NewCSRControl(hubCSRInformer certificatesinformers.Interface, hubKubeClient kubernetes.Interface) (CSRControl, error) {
-	if features.DefaultSpokeRegistrationMutableFeatureGate.Enabled(ocmfeature.V1beta1CSRAPICompatibility) {
+	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.V1beta1CSRAPICompatibility) {
 		v1CSRSupported, v1beta1CSRSupported, err := helpers.IsCSRSupported(hubKubeClient)
 		if err != nil {
 			return nil, err

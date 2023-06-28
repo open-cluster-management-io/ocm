@@ -18,8 +18,10 @@ import (
 
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/hub"
 	"open-cluster-management.io/ocm/test/integration/util"
@@ -79,8 +81,10 @@ var _ = ginkgo.BeforeSuite(func() {
 	err = util.CreateKubeconfigFile(cfg, hubKubeconfigFileName)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-	err = workapiv1.AddToScheme(scheme.Scheme)
+	err = workapiv1.Install(scheme.Scheme)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeWorkFeatureGates)
 
 	spokeRestConfig = cfg
 	hubHash = helper.HubHash(spokeRestConfig.Host)
