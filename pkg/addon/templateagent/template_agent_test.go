@@ -167,6 +167,10 @@ func TestAddonTemplateAgent_Manifests(t *testing.T) {
 	if !ok {
 		t.Errorf("expected object to be *appsv1.Deployment, but got %T", objects[0])
 	}
+	image := object.Spec.Template.Spec.Containers[0].Image
+	if image != "quay.io/ocm/addon-examples:v1" {
+		t.Errorf("unexpected image %v", image)
+	}
 
 	nodeSelector := object.Spec.Template.Spec.NodeSelector
 	expectedNodeSelector := map[string]string{"host": "ssd"}

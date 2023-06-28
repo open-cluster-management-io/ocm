@@ -11,9 +11,8 @@ spec:
             apiVersion: apps/v1
             metadata:
               name: hello-template-agent
+              # the placeholder in format of "<< placeholder >>" will be replaced before applying these manifests
               namespace: << AddonInstallNamespace >>
-              annotations:
-                "addon.open-cluster-management.io/deletion-orphan": ""
               labels:
                 app: hello-template-agent
             spec:

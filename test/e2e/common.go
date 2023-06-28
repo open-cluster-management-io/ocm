@@ -1234,6 +1234,8 @@ func deleteResourcesFromYamlFiles(
 	return utilerrors.NewAggregate(appliedErrs)
 }
 
+// defaultAddonTemplateReaderManifestsFunc returns a function that reads the addon template from the embed.FS,
+// and replaces the placeholder in format of "<< placeholder >>" with the value in configValues.
 func defaultAddonTemplateReaderManifestsFunc(
 	fs embed.FS,
 	configValues map[string]interface{},
