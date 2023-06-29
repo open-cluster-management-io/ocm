@@ -1,6 +1,8 @@
 package spoke
 
 import (
+	"context"
+
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/cobra"
 
@@ -14,7 +16,7 @@ func NewKlusterletOperatorCmd() *cobra.Command {
 	options := klusterlet.Options{}
 	cmdConfig := controllercmd.
 		NewControllerCommandConfig("klusterlet", version.Get(), options.RunKlusterletOperator)
-	cmd := cmdConfig.NewCommand()
+	cmd := cmdConfig.NewCommandWithContext(context.TODO())
 	cmd.Use = "klusterlet"
 	cmd.Short = "Start the klusterlet operator"
 

@@ -34,6 +34,33 @@ const (
 		}
 	}
 	`
+	deploymentJsonMultiCondition = `
+	{
+		"apiVersion":"apps/v1",
+		"kind":"Deployment",
+		"metadata":{
+			"name":"test"
+		},
+		"status":{
+			"readyReplicas":1,
+			"replicas":2,
+			"conditions":[
+				{
+					"type":"Cond1",
+					"status":"true"
+				},
+                {
+					"type":"Cond2",
+					"status":"false"
+				},
+                {
+					"type":"Cond3",
+					"status":"true"
+				}
+			]
+		}
+	}
+	`
 	deploymentJsonUknownGroup = `
 	{
 		"apiVersion":"extensions/v1",
@@ -278,6 +305,30 @@ func TestStatusReader(t *testing.T) {
 					Value: workapiv1.FieldValue{
 						Type:    workapiv1.JsonRaw,
 						JsonRaw: pointer.String(`[{"status":"False","type":"Ready"}]`),
+					},
+				},
+			},
+		},
+		{
+			name:      "filtered rawjson value format",
+			object:    unstrctureObject(deploymentJsonMultiCondition),
+			enableRaw: true,
+			rule: workapiv1.FeedbackRule{
+				Type: workapiv1.JSONPathsType,
+				JsonPaths: []workapiv1.JsonPath{
+					{
+						Name: "conditions",
+						Path: ".status.conditions[?(@.status==\"true\")].type",
+					},
+				},
+			},
+			expectError: false,
+			expectedValue: []workapiv1.FeedbackValue{
+				{
+					Name: "conditions",
+					Value: workapiv1.FieldValue{
+						Type:    workapiv1.JsonRaw,
+						JsonRaw: pointer.String(`["Cond1","Cond3"]`),
 					},
 				},
 			},

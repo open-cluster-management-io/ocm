@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	"reflect"
 	"sort"
 	"testing"
@@ -16,6 +15,7 @@ import (
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterlisterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
 	testinghelpers "open-cluster-management.io/ocm/pkg/placement/helpers/testing"

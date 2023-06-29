@@ -1,6 +1,8 @@
 package spoke
 
 import (
+	"context"
+
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/cobra"
 
@@ -13,7 +15,7 @@ func NewWorkAgent() *cobra.Command {
 	o := spoke.NewWorkloadAgentOptions()
 	cmdConfig := controllercmd.
 		NewControllerCommandConfig("work-agent", version.Get(), o.RunWorkloadAgent)
-	cmd := cmdConfig.NewCommand()
+	cmd := cmdConfig.NewCommandWithContext(context.TODO())
 	cmd.Use = "agent"
 	cmd.Short = "Start the Work Agent"
 
