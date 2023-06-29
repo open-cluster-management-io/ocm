@@ -11,6 +11,7 @@ import (
 	openshiftcrypto "github.com/openshift/library-go/pkg/crypto"
 	"github.com/pkg/errors"
 	certificatesv1 "k8s.io/api/certificates/v1"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,8 +26,7 @@ import (
 )
 
 const (
-	TLSCACert = "ca.crt"
-	TLSCAKey  = "ca.key"
+	CustomSignerSecretName = "custom-signer-secret"
 	// AddonTemplateLabelKey is the label key to set addon template name. It is to set the resources on the hub relating
 	// to an addon template
 	AddonTemplateLabelKey = "open-cluster-management.io/addon-template-name"
@@ -244,17 +244,17 @@ func CustomSignerWithExpiry(
 			return nil
 		}
 		caSecret, err := kubeclient.CoreV1().Secrets(customSignerConfig.SigningCA.Namespace).Get(
-			context.TODO(), customSignerConfig.SigningCA.Name, metav1.GetOptions{})
+			context.TODO(), CustomSignerSecretName, metav1.GetOptions{})
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("get custome signer ca %s/%s failed, %v",
-				customSignerConfig.SigningCA.Namespace, customSignerConfig.SigningCA.Name, err))
+				customSignerConfig.SigningCA.Namespace, CustomSignerSecretName, err))
 			return nil
 		}
 
-		caData, caKey, err := extractCAdata(caSecret.Data[TLSCACert], caSecret.Data[TLSCAKey])
+		caData, caKey, err := extractCAdata(caSecret.Data[corev1.TLSCertKey], caSecret.Data[corev1.TLSPrivateKeyKey])
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("get ca %s/%s data failed, %v",
-				customSignerConfig.SigningCA.Namespace, customSignerConfig.SigningCA.Name, err))
+				customSignerConfig.SigningCA.Namespace, CustomSignerSecretName, err))
 			return nil
 		}
 		return utils.DefaultSignerWithExpiry(caKey, caData, duration)(csr)
@@ -274,9 +274,14 @@ func extractCAdata(caCertData, caKeyData []byte) ([]byte, []byte, error) {
 	if keyBlock == nil {
 		return nil, nil, errors.New("failed to decode ca key")
 	}
-	caKey, err := x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
-	if err != nil {
-		return nil, nil, errors.Wrapf(err, "failed to parse ca key")
+	var errPkcs8, errPkcs1 error
+	var caKey any
+	caKey, errPkcs8 = x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
+	if errPkcs8 != nil {
+		caKey, errPkcs1 = x509.ParsePKCS1PrivateKey(keyBlock.Bytes)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to parse ca key with pkcs8: %v and pkcs1: %v", errPkcs8, errPkcs1)
+		}
 	}
 
 	caConfig := &openshiftcrypto.TLSCertificateConfig{

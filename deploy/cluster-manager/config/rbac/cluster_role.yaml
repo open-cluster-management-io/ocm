@@ -9,7 +9,7 @@ rules:
   verbs: ["create", "get", "list", "update", "watch", "patch", "delete", "deletecollection"]
 - apiGroups: [""]
   resources: ["secrets"]
-  verbs: ["list", "watch", "update", "patch", "delete"]
+  verbs: ["get", "list", "watch", "update", "patch", "delete"]
   resourceNames:
     - "signer-secret"
     - "registration-webhook-serving-cert"
@@ -20,10 +20,10 @@ rules:
     - "placement-controller-sa-kubeconfig"
     - "work-controller-sa-kubeconfig"
     - "external-hub-kubeconfig"
-# addon manager needs this to sign the customized type csr
+    - "custom-signer-secret" # addon manager needs this to sign the customized type csr
 - apiGroups: [""]
   resources: ["secrets"]
-  verbs: ["create", "get"]
+  verbs: ["create"]
 - apiGroups: ["coordination.k8s.io"]
   resources: ["leases"]
   verbs: ["create", "get", "list", "update", "watch", "patch", "delete"]
