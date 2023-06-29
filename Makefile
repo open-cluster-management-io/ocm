@@ -87,7 +87,7 @@ verify-fmt-imports: install-golang-gci
 	    echo "Diff output is empty"; \
 	fi
 
-verify: verify-crds verify-gocilint
+verify: verify-fmt-imports verify-crds verify-gocilint
 
 ensure-operator-sdk:
 ifeq "" "$(wildcard $(OPERATOR_SDK))"
