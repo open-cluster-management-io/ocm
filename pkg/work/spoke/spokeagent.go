@@ -53,7 +53,7 @@ func NewWorkloadAgentOptions() *WorkloadAgentOptions {
 	return &WorkloadAgentOptions{
 		AgentOptions:                           commonoptions.NewAgentOptions(),
 		StatusSyncInterval:                     10 * time.Second,
-		AppliedManifestWorkEvictionGracePeriod: 10 * time.Minute,
+		AppliedManifestWorkEvictionGracePeriod: 60 * time.Minute,
 	}
 }
 
