@@ -1158,8 +1158,8 @@ k8s.io/utils v0.0.0-20230313181309-38a27ef9d749 h1:xMMXJlJbsU8w3V5N2FLDQ8YgU8s1E
 k8s.io/utils v0.0.0-20230313181309-38a27ef9d749/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 open-cluster-management.io/addon-framework v0.7.1-0.20230626092851-963716af4eed h1:fOOKf8kzVNizc5fYvMwkPy9TT/vOpojd4IIxpzh/vhw=
 open-cluster-management.io/addon-framework v0.7.1-0.20230626092851-963716af4eed/go.mod h1:Cyt5knxR+sXaKvOfUKseZDAGulS2AJz6o7a9J0WXbak=
-open-cluster-management.io/api v0.11.1-0.20230609103311-088e8fe86139 h1:nw/XSv4eDGqmg0ks2PHzrE2uosvjw+D314843G56xGY=
-open-cluster-management.io/api v0.11.1-0.20230609103311-088e8fe86139/go.mod h1:WgKUCJ7+Bf40DsOmH1Gdkpyj3joco+QLzrlM6Ak39zE=
+open-cluster-management.io/api v0.11.1-0.20230630074331-1a4cb6c264f8 h1:sjQN6dAhQ+wn63tWqZbfORVASgiw4T+lWJKbkC1D0kc=
+open-cluster-management.io/api v0.11.1-0.20230630074331-1a4cb6c264f8/go.mod h1:WgKUCJ7+Bf40DsOmH1Gdkpyj3joco+QLzrlM6Ak39zE=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
 rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=

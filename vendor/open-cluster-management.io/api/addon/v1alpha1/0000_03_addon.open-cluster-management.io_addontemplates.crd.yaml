@@ -329,17 +329,15 @@ spec:
                           type: string
                         signingCA:
                           description: SigningCA represents the reference of the secret
-                            on the hub cluster to sign the CSR
+                            on the hub cluster to sign the CSR the secret namespace
+                            must be "open-cluster-management-hub", and the secret
+                            type must be "kubernetes.io/tls"
                           properties:
                             name:
                               description: Name of the signing CA secret
                               type: string
-                            namespace:
-                              description: Namespace of the signing CA secret
-                              type: string
                           required:
                           - name
-                          - namespace
                           type: object
                         subject:
                           description: 'Subject is the user subject of the addon agent

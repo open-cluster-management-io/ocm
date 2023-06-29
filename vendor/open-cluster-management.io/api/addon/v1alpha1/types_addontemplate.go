@@ -155,16 +155,14 @@ type CustomSignerRegistrationConfig struct {
 	Subject *Subject `json:"subject,omitempty"`
 
 	// SigningCA represents the reference of the secret on the hub cluster to sign the CSR
+	// the secret namespace must be "open-cluster-management-hub", and the secret type must be "kubernetes.io/tls"
 	// +kubebuilder:validation:Required
 	SigningCA SigningCARef `json:"signingCA"`
 }
 
-// SigningCARef is the reference to the signing CA secret that must contain the
-// certificate authority data with key "ca.crt" and the private key data with key "ca.key"
+// SigningCARef is the reference to the signing CA secret which type must be "kubernetes.io/tls" and
+// the namespace must be "open-cluster-management-hub"
 type SigningCARef struct {
-	// Namespace of the signing CA secret
-	// +kubebuilder:validation:Required
-	Namespace string `json:"namespace"`
 	// Name of the signing CA secret
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`

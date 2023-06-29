@@ -2,6 +2,7 @@ package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	v1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -94,6 +95,49 @@ type PlacementSpec struct {
 	// certain taints to be selected by placements with matching tolerations.
 	// +optional
 	Tolerations []Toleration `json:"tolerations,omitempty"`
+
+	// DecisionStrategy divide the created placement decision to groups and define number of clusters per decision group.
+	// +optional
+	DecisionStrategy DecisionStrategy `json:"decisionStrategy,omitempty"`
+}
+
+// DecisionGroup define a subset of clusters that will be added to placementDecisions with groupName label.
+type DecisionGroup struct {
+	// Group name to be added as label value to the created placement Decisions labels with label key cluster.open-cluster-management.io/decision-group-name
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9][-A-Za-z0-9_.]{0,61}[a-zA-Z0-9]$"
+	// +required
+	GroupName string `json:"groupName,omitempty"`
+
+	// LabelSelector to select clusters subset by label.
+	// +kubebuilder:validation:Required
+	// +required
+	ClusterSelector ClusterSelector `json:"groupClusterSelector,omitempty"`
+}
+
+// Group the created placementDecision into decision groups based on the number of clusters per decision group.
+type GroupStrategy struct {
+	// DecisionGroups represents a list of predefined groups to put decision results.
+	// +optional
+	DecisionGroups []DecisionGroup `json:"decisionGroups,omitempty"`
+
+	// ClustersPerDecisionGroup is a specific number or percentage of the total selected clusters.
+	// The specific number will divide the placementDecisions to decisionGroups each group has max number of clusters equal to that specific number.
+	// The percentage will divide the placementDecisions to decisionGroups each group has max number of clusters based on the total num of selected clusters and percentage.
+	// ex; for a total 100 clusters selected, ClustersPerDecisionGroup equal to 20% will divide the placement decision to 5 groups each group should have 20 clusters.
+	// Default is having all clusters in a single group.
+	// If the DecisionGroups field defined, it will be considered first to create the decisionGroups then the ClustersPerDecisionGroup will be used to determine the rest of decisionGroups.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default:="100%"
+	// +optional
+	ClustersPerDecisionGroup intstr.IntOrString `json:"clustersPerDecisionGroup,omitempty"`
+}
+
+// DecisionStrategy divide the created placement decision to groups and define number of clusters per decision group.
+type DecisionStrategy struct {
+	// GroupStrategy define strategies to divide selected clusters to decision groups.
+	// +optional
+	GroupStrategy GroupStrategy `json:"groupStrategy,omitempty"`
 }
 
 // ClusterPredicate represents a predicate to select ManagedClusters.
@@ -329,10 +373,34 @@ const (
 	TolerationOpEqual  TolerationOperator = "Equal"
 )
 
+// Present decision groups status based on the DecisionStrategy definition.
+type DecisionGroupStatus struct {
+	// Present the decision group index. If there is no decision strategy defined all placement decisions will be in group index 0
+	// +optional
+	DecisionGroupIndex int32 `json:"decisionGroupIndex"`
+
+	// Decision group name that is defined in the DecisionStrategy's DecisionGroup.
+	// +optional
+	DecisionGroupName string `json:"decisionGroupName"`
+
+	// List of placement decisions names associated with the decision group
+	// +optional
+	Decisions []string `json:"decisions"`
+
+	// Total number of clusters in the decision group. Clusters count is equal or less than the clusterPerDecisionGroups defined in the decision strategy.
+	// +kubebuilder:default:=0
+	// +optional
+	ClustersCount int32 `json:"clusterCount"`
+}
+
 type PlacementStatus struct {
 	// NumberOfSelectedClusters represents the number of selected ManagedClusters
 	// +optional
 	NumberOfSelectedClusters int32 `json:"numberOfSelectedClusters"`
+
+	// List of decision groups determined by the placement and DecisionStrategy.
+	// +optional
+	DecisionGroups []DecisionGroupStatus `json:"decisionGroups"`
 
 	// Conditions contains the different condition status for this Placement.
 	// +optional
