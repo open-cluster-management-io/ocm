@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -57,31 +58,31 @@ func TestKlusterletSecretQueueKeyFunc(t *testing.T) {
 		name        string
 		object      runtime.Object
 		klusterlet  *operatorapiv1.Klusterlet
-		expectedKey string
+		expectedKey []string
 	}{
 		{
 			name:        "key by hub config secret",
 			object:      newSecret(HubKubeConfig, "test"),
 			klusterlet:  newKlusterlet("testklusterlet", "test", ""),
-			expectedKey: "testklusterlet",
+			expectedKey: []string{"testklusterlet"},
 		},
 		{
 			name:        "key by bootstrap secret",
 			object:      newSecret(BootstrapHubKubeConfig, "test"),
 			klusterlet:  newKlusterlet("testklusterlet", "test", ""),
-			expectedKey: "testklusterlet",
+			expectedKey: []string{"testklusterlet"},
 		},
 		{
 			name:        "key by wrong secret",
 			object:      newSecret("dummy", "test"),
 			klusterlet:  newKlusterlet("testklusterlet", "test", ""),
-			expectedKey: "",
+			expectedKey: []string{},
 		},
 		{
 			name:        "key by klusterlet with empty namespace",
 			object:      newSecret(BootstrapHubKubeConfig, KlusterletDefaultNamespace),
 			klusterlet:  newKlusterlet("testklusterlet", "", ""),
-			expectedKey: "testklusterlet",
+			expectedKey: []string{"testklusterlet"},
 		},
 	}
 
@@ -95,8 +96,8 @@ func TestKlusterletSecretQueueKeyFunc(t *testing.T) {
 			}
 			keyFunc := KlusterletSecretQueueKeyFunc(operatorInformers.Operator().V1().Klusterlets().Lister())
 			actualKey := keyFunc(c.object)
-			if actualKey != c.expectedKey {
-				t.Errorf("Queued key is not correct: actual %s, expected %s", actualKey, c.expectedKey)
+			if reflect.DeepEqual(actualKey, c.expectedKey) {
+				t.Errorf("Queued key is not correct: actual %v, expected %v", actualKey, c.expectedKey)
 			}
 		})
 	}
@@ -107,31 +108,31 @@ func TestKlusterletDeploymentQueueKeyFunc(t *testing.T) {
 		name        string
 		object      runtime.Object
 		klusterlet  *operatorapiv1.Klusterlet
-		expectedKey string
+		expectedKey []string
 	}{
 		{
 			name:        "key by work agent",
 			object:      newDeployment("testklusterlet-work-agent", "test", 0),
 			klusterlet:  newKlusterlet("testklusterlet", "test", ""),
-			expectedKey: "testklusterlet",
+			expectedKey: []string{"testklusterlet"},
 		},
 		{
 			name:        "key by registrartion agent",
 			object:      newDeployment("testklusterlet-registration-agent", "test", 0),
 			klusterlet:  newKlusterlet("testklusterlet", "test", ""),
-			expectedKey: "testklusterlet",
+			expectedKey: []string{"testklusterlet"},
 		},
 		{
 			name:        "key by wrong deployment",
 			object:      newDeployment("dummy", "test", 0),
 			klusterlet:  newKlusterlet("testklusterlet", "test", ""),
-			expectedKey: "",
+			expectedKey: []string{},
 		},
 		{
 			name:        "key by klusterlet with empty namespace",
 			object:      newDeployment("testklusterlet-work-agent", KlusterletDefaultNamespace, 0),
 			klusterlet:  newKlusterlet("testklusterlet", "", ""),
-			expectedKey: "testklusterlet",
+			expectedKey: []string{"testklusterlet"},
 		},
 	}
 
@@ -145,8 +146,8 @@ func TestKlusterletDeploymentQueueKeyFunc(t *testing.T) {
 			}
 			keyFunc := KlusterletDeploymentQueueKeyFunc(operatorInformers.Operator().V1().Klusterlets().Lister())
 			actualKey := keyFunc(c.object)
-			if actualKey != c.expectedKey {
-				t.Errorf("Queued key is not correct: actual %s, expected %s", actualKey, c.expectedKey)
+			if reflect.DeepEqual(actualKey, c.expectedKey) {
+				t.Errorf("Queued key is not correct: actual %v, expected %v", actualKey, c.expectedKey)
 			}
 		})
 	}
@@ -157,49 +158,49 @@ func TestClusterManagerDeploymentQueueKeyFunc(t *testing.T) {
 		name           string
 		object         runtime.Object
 		clusterManager *operatorapiv1.ClusterManager
-		expectedKey    string
+		expectedKey    []string
 	}{
 		{
 			name:           "key by registrartion controller",
 			object:         newDeployment("testhub-registration-controller", ClusterManagerDefaultNamespace, 0),
 			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeDefault),
-			expectedKey:    "testhub",
+			expectedKey:    []string{"testhub"},
 		},
 		{
 			name:           "key by registrartion webhook",
 			object:         newDeployment("testhub-registration-webhook", ClusterManagerDefaultNamespace, 0),
 			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeDefault),
-			expectedKey:    "testhub",
+			expectedKey:    []string{"testhub"},
 		},
 		{
 			name:           "key by work webhook",
 			object:         newDeployment("testhub-work-webhook", ClusterManagerDefaultNamespace, 0),
 			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeDefault),
-			expectedKey:    "testhub",
+			expectedKey:    []string{"testhub"},
 		},
 		{
 			name:           "key by placement controller",
 			object:         newDeployment("testhub-placement-controller", ClusterManagerDefaultNamespace, 0),
 			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeDefault),
-			expectedKey:    "testhub",
+			expectedKey:    []string{"testhub"},
 		},
 		{
 			name:           "key by wrong deployment",
 			object:         newDeployment("dummy", "test", 0),
 			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeDefault),
-			expectedKey:    "",
+			expectedKey:    []string{},
 		},
 		{
 			name:           "key by registrartion controller in hosted mode, namespace not match",
 			object:         newDeployment("testhub-registration-controller", ClusterManagerDefaultNamespace, 0),
 			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeHosted),
-			expectedKey:    "",
+			expectedKey:    []string{},
 		},
 		{
 			name:           "key by registrartion controller in hosted mode, namespace match",
 			object:         newDeployment("testhub-registration-controller", "testhub", 0),
 			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeHosted),
-			expectedKey:    "testhub",
+			expectedKey:    []string{"testhub"},
 		},
 	}
 
@@ -213,8 +214,8 @@ func TestClusterManagerDeploymentQueueKeyFunc(t *testing.T) {
 			}
 			keyFunc := ClusterManagerDeploymentQueueKeyFunc(operatorInformers.Operator().V1().ClusterManagers().Lister())
 			actualKey := keyFunc(c.object)
-			if actualKey != c.expectedKey {
-				t.Errorf("Queued key is not correct: actual %s, expected %s; test name:%s", actualKey, c.expectedKey, c.name)
+			if reflect.DeepEqual(actualKey, c.expectedKey) {
+				t.Errorf("Queued key is not correct: actual %v, expected %v; test name:%s", actualKey, c.expectedKey, c.name)
 			}
 		})
 	}

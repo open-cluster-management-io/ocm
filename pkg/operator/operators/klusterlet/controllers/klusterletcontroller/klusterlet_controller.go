@@ -100,7 +100,8 @@ func NewKlusterletController(
 			secretInformers[helpers.HubKubeConfig].Informer(),
 			secretInformers[helpers.BootstrapHubKubeConfig].Informer(),
 			secretInformers[helpers.ExternalManagedKubeConfig].Informer()).
-		WithInformersQueueKeysFunc(helpers.KlusterletDeploymentQueueKeyFunc(controller.klusterletLister), deploymentInformer.Informer()).
+		WithInformersQueueKeysFunc(helpers.KlusterletDeploymentQueueKeyFunc(
+			controller.klusterletLister), deploymentInformer.Informer()).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, klusterletInformer.Informer()).
 		ToController("KlusterletController", recorder)
 }
@@ -123,6 +124,9 @@ type klusterletConfig struct {
 	AgentID                     string
 	RegistrationImage           string
 	WorkImage                   string
+	SingletonImage              string
+	RegistrationServiceAccount  string
+	WorkServiceAccount          string
 	ClusterName                 string
 	ExternalServerURL           string
 	HubKubeConfigSecret         string
@@ -174,6 +178,9 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		ExternalManagedKubeConfigWorkSecret:         helpers.ExternalManagedKubeConfigWork,
 		InstallMode:                                 klusterlet.Spec.DeployOption.Mode,
 		HubApiServerHostAlias:                       klusterlet.Spec.HubApiServerHostAlias,
+
+		RegistrationServiceAccount: serviceAccountName("registration-sa", klusterlet),
+		WorkServiceAccount:         serviceAccountName("work-sa", klusterlet),
 	}
 
 	managedClusterClients, err := n.managedClusterClientsBuilder.
@@ -383,4 +390,13 @@ func ensureNamespace(ctx context.Context, kubeClient kubernetes.Interface, klust
 	}
 
 	return nil
+}
+
+func serviceAccountName(suffix string, klusterlet *operatorapiv1.Klusterlet) string {
+	// in single ton mode, we only need one sa, so the name of work and registration sa are
+	// the same.
+	if klusterlet.Spec.DeployOption.Mode == "Singleton" {
+		return "klusterlet-agent-sa"
+	}
+	return fmt.Sprintf("%s-%s", klusterlet.Name, suffix)
 }

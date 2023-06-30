@@ -13,5 +13,5 @@ roleRef:
   name: open-cluster-management:{{ .KlusterletName }}-registration:addon-management
 subjects:
   - kind: ServiceAccount
-    name: {{ .KlusterletName }}-registration-sa
+    name: {{ .RegistrationServiceAccount }}
     namespace: {{ .KlusterletNamespace }}

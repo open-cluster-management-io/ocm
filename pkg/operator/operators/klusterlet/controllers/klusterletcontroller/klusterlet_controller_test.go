@@ -206,8 +206,8 @@ func newTestControllerHosted(t *testing.T, klusterlet *operatorapiv1.Klusterlet,
 	kubeVersion, _ := version.ParseGeneric("v1.18.0")
 
 	klusterletNamespace := helpers.KlusterletNamespace(klusterlet)
-	saRegistrationSecret := newServiceAccountSecret(fmt.Sprintf("%s-token", registrationServiceAccountName(klusterlet.Name)), klusterlet.Name)
-	saWorkSecret := newServiceAccountSecret(fmt.Sprintf("%s-token", workServiceAccountName(klusterlet.Name)), klusterlet.Name)
+	saRegistrationSecret := newServiceAccountSecret(fmt.Sprintf("%s-token", serviceAccountName("registration-sa", klusterlet)), klusterlet.Name)
+	saWorkSecret := newServiceAccountSecret(fmt.Sprintf("%s-token", serviceAccountName("work-sa", klusterlet)), klusterlet.Name)
 	fakeManagedKubeClient := fakekube.NewSimpleClientset()
 	getRegistrationServiceAccountCount := 0
 	getWorkServiceAccountCount := 0
@@ -218,7 +218,7 @@ func newTestControllerHosted(t *testing.T, klusterlet *operatorapiv1.Klusterlet,
 	fakeManagedKubeClient.PrependReactor("get", "serviceaccounts", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 		name := action.(clienttesting.GetAction).GetName()
 		namespace := action.(clienttesting.GetAction).GetNamespace()
-		if namespace == klusterletNamespace && name == registrationServiceAccountName(klusterlet.Name) {
+		if namespace == klusterletNamespace && name == serviceAccountName("registration-sa", klusterlet) {
 			getRegistrationServiceAccountCount++
 			if getRegistrationServiceAccountCount > 1 {
 				sa := newServiceAccount(name, klusterletNamespace, saRegistrationSecret.Name)
@@ -227,7 +227,7 @@ func newTestControllerHosted(t *testing.T, klusterlet *operatorapiv1.Klusterlet,
 			}
 		}
 
-		if namespace == klusterletNamespace && name == workServiceAccountName(klusterlet.Name) {
+		if namespace == klusterletNamespace && name == serviceAccountName("work-sa", klusterlet) {
 			getWorkServiceAccountCount++
 			if getWorkServiceAccountCount > 1 {
 				sa := newServiceAccount(name, klusterletNamespace, saWorkSecret.Name)

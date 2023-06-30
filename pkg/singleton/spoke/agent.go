@@ -53,5 +53,6 @@ func (a *AgentConfig) RunSpokeAgent(ctx context.Context, controllerContext *cont
 		}
 	}()
 
+	<-ctx.Done()
 	return nil
 }

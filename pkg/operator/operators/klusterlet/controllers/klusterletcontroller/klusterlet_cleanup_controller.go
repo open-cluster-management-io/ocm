@@ -111,6 +111,9 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 		ExternalManagedKubeConfigWorkSecret:         helpers.ExternalManagedKubeConfigWork,
 		InstallMode:                                 klusterlet.Spec.DeployOption.Mode,
 		HubApiServerHostAlias:                       klusterlet.Spec.HubApiServerHostAlias,
+
+		RegistrationServiceAccount: serviceAccountName("registration-sa", klusterlet),
+		WorkServiceAccount:         serviceAccountName("work-sa", klusterlet),
 	}
 
 	reconcilers := []klusterletReconcile{
