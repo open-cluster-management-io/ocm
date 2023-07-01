@@ -102,7 +102,7 @@ spec:
     - customSigner:
         signerName: << CustomSignerName >>
         signingCA:
-          namespace: open-cluster-management-hub
+          name: << CustomSignerSecretName >>
         subject:
           groups:
           - g1

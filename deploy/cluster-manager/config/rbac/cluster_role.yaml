@@ -20,7 +20,6 @@ rules:
     - "placement-controller-sa-kubeconfig"
     - "work-controller-sa-kubeconfig"
     - "external-hub-kubeconfig"
-    - "custom-signer-secret" # addon manager needs this to sign the customized type csr
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["create"]

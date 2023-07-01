@@ -98,7 +98,7 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 							OrganizationUnits: []string{},
 						},
 						SigningCA: addonapiv1alpha1.SigningCARef{
-							Namespace: "ns1",
+							Name: "name1",
 						},
 					},
 				},
@@ -211,7 +211,7 @@ func TestTemplateCSRApproveCheckFunc(t *testing.T) {
 							OrganizationUnits: []string{},
 						},
 						SigningCA: addonapiv1alpha1.SigningCARef{
-							Namespace: "ns1",
+							Name: "name1",
 						},
 					},
 				},
@@ -312,7 +312,7 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 							OrganizationUnits: []string{},
 						},
 						SigningCA: addonapiv1alpha1.SigningCARef{
-							Namespace: "ns1",
+							Name: "name1",
 						},
 					},
 				},
@@ -564,7 +564,7 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 							OrganizationUnits: []string{},
 						},
 						SigningCA: addonapiv1alpha1.SigningCARef{
-							Namespace: "ns1",
+							Name: "name1",
 						},
 					},
 				},

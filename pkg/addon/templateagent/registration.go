@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -26,11 +27,28 @@ import (
 )
 
 const (
-	CustomSignerSecretName = "custom-signer-secret"
 	// AddonTemplateLabelKey is the label key to set addon template name. It is to set the resources on the hub relating
 	// to an addon template
 	AddonTemplateLabelKey = "open-cluster-management.io/addon-template-name"
 )
+
+var (
+	podNamespace = ""
+)
+
+func AddonManagerNamespace() string {
+	if len(podNamespace) != 0 {
+		return podNamespace
+	}
+
+	namespace := os.Getenv("POD_NAMESPACE")
+	if len(namespace) != 0 {
+		podNamespace = namespace
+	} else {
+		podNamespace = "open-cluster-management-hub"
+	}
+	return podNamespace
+}
 
 func (a *CRDTemplateAgentAddon) GetDesiredAddOnTemplate(addon *addonapiv1alpha1.ManagedClusterAddOn,
 	clusterName, addonName string) (*addonapiv1alpha1.AddOnTemplate, error) {
@@ -243,18 +261,18 @@ func CustomSignerWithExpiry(
 		if csr.Spec.SignerName != customSignerConfig.SignerName {
 			return nil
 		}
-		caSecret, err := kubeclient.CoreV1().Secrets(customSignerConfig.SigningCA.Namespace).Get(
-			context.TODO(), CustomSignerSecretName, metav1.GetOptions{})
+		caSecret, err := kubeclient.CoreV1().Secrets(AddonManagerNamespace()).Get(
+			context.TODO(), customSignerConfig.SigningCA.Name, metav1.GetOptions{})
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("get custome signer ca %s/%s failed, %v",
-				customSignerConfig.SigningCA.Namespace, CustomSignerSecretName, err))
+				AddonManagerNamespace(), customSignerConfig.SigningCA.Name, err))
 			return nil
 		}
 
 		caData, caKey, err := extractCAdata(caSecret.Data[corev1.TLSCertKey], caSecret.Data[corev1.TLSPrivateKeyKey])
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("get ca %s/%s data failed, %v",
-				customSignerConfig.SigningCA.Namespace, CustomSignerSecretName, err))
+				AddonManagerNamespace(), customSignerConfig.SigningCA.Name, err))
 			return nil
 		}
 		return utils.DefaultSignerWithExpiry(caKey, caData, duration)(csr)

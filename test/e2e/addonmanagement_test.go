@@ -30,6 +30,7 @@ const (
 	originalImageValue                = "quay.io/open-cluster-management/addon-examples:latest"
 	overrideImageValue                = "quay.io/ocm/addon-examples:latest"
 	customSignerName                  = "example.com/signer-name"
+	customSignerSecretName            = "addon-signer-secret"
 )
 
 var (
@@ -57,6 +58,8 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Label("ad
 		"addon/addon_template.yaml",
 		"addon/cluster_management_addon.yaml",
 		"addon/cluster_role.yaml",
+		"addon/signca_secret_role.yaml",
+		"addon/signca_secret_rolebinding.yaml",
 	}
 
 	ginkgo.BeforeEach(func() {
@@ -68,7 +71,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Label("ad
 
 		ginkgo.By("create addon custom sign secret")
 		err := copySignerSecret(context.TODO(), t.HubKubeClient, "open-cluster-management-hub",
-			"signer-secret", templateagent.CustomSignerSecretName)
+			"signer-secret", templateagent.AddonManagerNamespace(), customSignerSecretName)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		// enable addon management feature gate
 		gomega.Eventually(func() error {
@@ -98,9 +101,11 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Label("ad
 		ginkgo.By(fmt.Sprintf("create addon template resources for cluster %v", clusterName))
 		err = createResourcesFromYamlFiles(context.Background(), t.HubDynamicClient, t.hubRestMapper, s,
 			defaultAddonTemplateReaderManifestsFunc(manifests.AddonManifestFiles, map[string]interface{}{
-				"Namespace":             clusterName,
-				"AddonInstallNamespace": addonInstallNamespace,
-				"CustomSignerName":      customSignerName,
+				"Namespace":              clusterName,
+				"AddonInstallNamespace":  addonInstallNamespace,
+				"CustomSignerName":       customSignerName,
+				"AddonManagerNamespace":  templateagent.AddonManagerNamespace(),
+				"CustomSignerSecretName": customSignerSecretName,
 			}),
 			templateResources,
 		)
@@ -123,8 +128,8 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Label("ad
 		ginkgo.By(fmt.Sprintf("delete the addon %v on the managed cluster namespace %v", addOnName, clusterName))
 		err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Delete(
 			context.TODO(), addOnName, metav1.DeleteOptions{})
-		if err != nil {
-			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+		if err != nil && !errors.IsNotFound(err) {
+			ginkgo.Fail(fmt.Sprintf("failed to delete managed cluster addon %v on cluster %v: %v", addOnName, clusterName, err))
 		}
 
 		gomega.Eventually(func() error {
@@ -140,23 +145,26 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Label("ad
 			return fmt.Errorf("the managedClusterAddon should be deleted")
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
-		ginkgo.By("delete addon custom sign secret")
-		err = t.HubKubeClient.CoreV1().Secrets("open-cluster-management-hub").Delete(context.TODO(),
-			templateagent.CustomSignerSecretName, metav1.DeleteOptions{})
-		if err != nil {
-			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
-		}
-
 		ginkgo.By(fmt.Sprintf("delete addon template resources for cluster %v", clusterName))
 		err = deleteResourcesFromYamlFiles(context.Background(), t.HubDynamicClient, t.hubRestMapper, s,
 			defaultAddonTemplateReaderManifestsFunc(manifests.AddonManifestFiles, map[string]interface{}{
-				"Namespace":             clusterName,
-				"AddonInstallNamespace": addonInstallNamespace,
-				"CustomSignerName":      customSignerName,
+				"Namespace":              clusterName,
+				"AddonInstallNamespace":  addonInstallNamespace,
+				"CustomSignerName":       customSignerName,
+				"AddonManagerNamespace":  templateagent.AddonManagerNamespace(),
+				"CustomSignerSecretName": customSignerSecretName,
 			}),
 			templateResources,
 		)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ginkgo.By("delete addon custom sign secret")
+		err = t.HubKubeClient.CoreV1().Secrets(templateagent.AddonManagerNamespace()).Delete(context.TODO(),
+			customSignerSecretName, metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			ginkgo.Fail(fmt.Sprintf("failed to delete custom signer secret %v/%v: %v",
+				templateagent.AddonManagerNamespace(), customSignerSecretName, err))
+		}
 
 		ginkgo.By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
 		gomega.Expect(t.cleanKlusterletResources(klusterletName, clusterName)).To(gomega.BeNil())
@@ -479,23 +487,22 @@ func prepareNodePlacementAddOnDeploymentConfig(namespace string) error {
 	return nil
 }
 
-func copySignerSecret(ctx context.Context, kubeClient kubernetes.Interface, ns, oriName, destName string) error {
-	ori, err := kubeClient.CoreV1().Secrets(ns).Get(context.Background(), oriName, metav1.GetOptions{})
+func copySignerSecret(ctx context.Context, kubeClient kubernetes.Interface, srcNs, srcName, dstNs, dstName string) error {
+	src, err := kubeClient.CoreV1().Secrets(srcNs).Get(context.Background(), srcName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	dest := &corev1.Secret{
+	dst := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      destName,
-			Namespace: ns,
+			Name:      dstName,
+			Namespace: dstNs,
 		},
-		Data:       ori.Data,
-		StringData: ori.StringData,
-		Type:       ori.Type,
+		Data:       src.Data,
+		StringData: src.StringData,
+		Type:       src.Type,
 	}
-	dest.ObjectMeta.Name = destName
-	dest.ObjectMeta.Namespace = ns
-	_, err = kubeClient.CoreV1().Secrets(ns).Create(ctx, dest, metav1.CreateOptions{})
+
+	_, err = kubeClient.CoreV1().Secrets(dstNs).Create(ctx, dst, metav1.CreateOptions{})
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return err
 	}
