@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"flag"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"testing"
 	"time"
 
@@ -20,6 +21,7 @@ var (
 	eventuallyTimeout     time.Duration
 	registrationImage     string
 	workImage             string
+	klusterletDeployMode  string
 )
 
 func init() {
@@ -31,6 +33,7 @@ func init() {
 	flag.DurationVar(&eventuallyTimeout, "eventually-timeout", 60*time.Second, "The timeout of Gomega's Eventually (default 60 seconds)")
 	flag.StringVar(&registrationImage, "registration-image", "", "The image of the registration")
 	flag.StringVar(&workImage, "work-image", "", "The image of the work")
+	flag.StringVar(&klusterletDeployMode, "klusterlet-deploy-mode", string(operatorapiv1.InstallModeDefault), "The image of the work")
 }
 
 func TestE2E(tt *testing.T) {

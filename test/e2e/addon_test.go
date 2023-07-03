@@ -19,7 +19,8 @@ var _ = Describe("Manage the managed cluster addons", func() {
 		agentNamespace = fmt.Sprintf("open-cluster-management-agent-%s", rand.String(6))
 		addOnName = fmt.Sprintf("e2e-addon-%s", rand.String(6))
 
-		_, err := t.CreateApprovedKlusterlet(klusterletName, clusterName, agentNamespace, operatorapiv1.InstallModeDefault)
+		_, err := t.CreateApprovedKlusterlet(
+			klusterletName, clusterName, agentNamespace, operatorapiv1.InstallMode(klusterletDeployMode))
 		Expect(err).ToNot(HaveOccurred())
 	})
 	AfterEach(func() {
