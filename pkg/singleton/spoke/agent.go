@@ -46,7 +46,7 @@ func (a *AgentConfig) RunSpokeAgent(ctx context.Context, controllerContext *cont
 	}
 
 	workCfg := work.NewWorkAgentConfig(a.agentOption, a.workOption)
-	// start work agent at first
+	// start work agent
 	go func() {
 		if err := workCfg.RunWorkloadAgent(ctx, controllerContext); err != nil {
 			klog.Fatal(err)

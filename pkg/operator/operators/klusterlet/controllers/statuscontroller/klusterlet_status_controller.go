@@ -85,6 +85,11 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 	registrationDeploymentName := fmt.Sprintf("%s-registration-agent", klusterlet.Name)
 	workDeploymentName := fmt.Sprintf("%s-work-agent", klusterlet.Name)
 
+	if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingleton {
+		registrationDeploymentName = fmt.Sprintf("%s-agent", klusterlet.Name)
+		workDeploymentName = registrationDeploymentName
+	}
+
 	availableCondition := checkAgentsDeploymentAvailable(
 		ctx, k.kubeClient,
 		[]klusterletAgent{

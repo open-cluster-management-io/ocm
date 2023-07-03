@@ -5,12 +5,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openshift/library-go/pkg/controller/factory"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	fakeoperatorclient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
+	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
 
@@ -96,7 +98,7 @@ func TestKlusterletSecretQueueKeyFunc(t *testing.T) {
 			}
 			keyFunc := KlusterletSecretQueueKeyFunc(operatorInformers.Operator().V1().Klusterlets().Lister())
 			actualKey := keyFunc(c.object)
-			if reflect.DeepEqual(actualKey, c.expectedKey) {
+			if !reflect.DeepEqual(actualKey, c.expectedKey) {
 				t.Errorf("Queued key is not correct: actual %v, expected %v", actualKey, c.expectedKey)
 			}
 		})
@@ -146,17 +148,18 @@ func TestKlusterletDeploymentQueueKeyFunc(t *testing.T) {
 			}
 			keyFunc := KlusterletDeploymentQueueKeyFunc(operatorInformers.Operator().V1().Klusterlets().Lister())
 			actualKey := keyFunc(c.object)
-			if reflect.DeepEqual(actualKey, c.expectedKey) {
+			if !reflect.DeepEqual(actualKey, c.expectedKey) {
 				t.Errorf("Queued key is not correct: actual %v, expected %v", actualKey, c.expectedKey)
 			}
 		})
 	}
 }
 
-func TestClusterManagerDeploymentQueueKeyFunc(t *testing.T) {
+func TestClusterManagerQueueKeyFunc(t *testing.T) {
 	cases := []struct {
 		name           string
 		object         runtime.Object
+		queueFunc      func(clusterManagerLister operatorlister.ClusterManagerLister) factory.ObjectQueueKeysFunc
 		clusterManager *operatorapiv1.ClusterManager
 		expectedKey    []string
 	}{
@@ -164,43 +167,78 @@ func TestClusterManagerDeploymentQueueKeyFunc(t *testing.T) {
 			name:           "key by registrartion controller",
 			object:         newDeployment("testhub-registration-controller", ClusterManagerDefaultNamespace, 0),
 			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeDefault),
+			queueFunc:      ClusterManagerDeploymentQueueKeyFunc,
 			expectedKey:    []string{"testhub"},
 		},
 		{
 			name:           "key by registrartion webhook",
 			object:         newDeployment("testhub-registration-webhook", ClusterManagerDefaultNamespace, 0),
 			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeDefault),
+			queueFunc:      ClusterManagerDeploymentQueueKeyFunc,
 			expectedKey:    []string{"testhub"},
 		},
 		{
 			name:           "key by work webhook",
 			object:         newDeployment("testhub-work-webhook", ClusterManagerDefaultNamespace, 0),
 			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeDefault),
+			queueFunc:      ClusterManagerDeploymentQueueKeyFunc,
 			expectedKey:    []string{"testhub"},
 		},
 		{
 			name:           "key by placement controller",
 			object:         newDeployment("testhub-placement-controller", ClusterManagerDefaultNamespace, 0),
 			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeDefault),
+			queueFunc:      ClusterManagerDeploymentQueueKeyFunc,
 			expectedKey:    []string{"testhub"},
 		},
 		{
 			name:           "key by wrong deployment",
 			object:         newDeployment("dummy", "test", 0),
 			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeDefault),
+			queueFunc:      ClusterManagerDeploymentQueueKeyFunc,
 			expectedKey:    []string{},
 		},
 		{
 			name:           "key by registrartion controller in hosted mode, namespace not match",
 			object:         newDeployment("testhub-registration-controller", ClusterManagerDefaultNamespace, 0),
 			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeHosted),
+			queueFunc:      ClusterManagerDeploymentQueueKeyFunc,
 			expectedKey:    []string{},
 		},
 		{
 			name:           "key by registrartion controller in hosted mode, namespace match",
 			object:         newDeployment("testhub-registration-controller", "testhub", 0),
 			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeHosted),
+			queueFunc:      ClusterManagerDeploymentQueueKeyFunc,
 			expectedKey:    []string{"testhub"},
+		},
+		{
+			name:           "key by namespace in default mode",
+			object:         newSecret("test", ClusterManagerDefaultNamespace),
+			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeDefault),
+			queueFunc:      ClusterManagerQueueKeyFunc,
+			expectedKey:    []string{"testhub"},
+		},
+		{
+			name:           "key by unmatchged namespace in default mode",
+			object:         newSecret("test", "test"),
+			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeDefault),
+			queueFunc:      ClusterManagerQueueKeyFunc,
+			expectedKey:    []string{},
+		},
+		{
+			name:           "key by namespace in hosted mode",
+			object:         newSecret("test", "testhub"),
+			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeHosted),
+			queueFunc:      ClusterManagerQueueKeyFunc,
+			expectedKey:    []string{"testhub"},
+		},
+		{
+			name:           "key by unmatchged namespace in default mode",
+			object:         newSecret("test", "test"),
+			clusterManager: newClusterManager("testhub", operatorapiv1.InstallModeHosted),
+			queueFunc:      ClusterManagerQueueKeyFunc,
+			expectedKey:    []string{},
 		},
 	}
 
@@ -212,9 +250,9 @@ func TestClusterManagerDeploymentQueueKeyFunc(t *testing.T) {
 			if err := store.Add(c.clusterManager); err != nil {
 				t.Fatal(err)
 			}
-			keyFunc := ClusterManagerDeploymentQueueKeyFunc(operatorInformers.Operator().V1().ClusterManagers().Lister())
+			keyFunc := c.queueFunc(operatorInformers.Operator().V1().ClusterManagers().Lister())
 			actualKey := keyFunc(c.object)
-			if reflect.DeepEqual(actualKey, c.expectedKey) {
+			if !reflect.DeepEqual(actualKey, c.expectedKey) {
 				t.Errorf("Queued key is not correct: actual %v, expected %v; test name:%s", actualKey, c.expectedKey, c.name)
 			}
 		})

@@ -6,6 +6,7 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/utils/pointer"
 
 	ocmfeature "open-cluster-management.io/api/feature"
@@ -126,6 +127,7 @@ func unstrctureObject(data string) *unstructured.Unstructured {
 }
 
 func TestStatusReader(t *testing.T) {
+	utilruntime.Must(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeWorkFeatureGates))
 	cases := []struct {
 		name          string
 		object        *unstructured.Unstructured

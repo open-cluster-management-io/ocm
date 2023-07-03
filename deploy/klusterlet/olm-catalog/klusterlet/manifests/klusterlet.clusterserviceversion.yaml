@@ -20,6 +20,7 @@ metadata:
                 "url": "https://localhost"
               }
             ],
+            "imagePullSpec": "quay.io/open-cluster-management/registration-operator",
             "namespace": "open-cluster-management-agent",
             "registrationConfiguration": {
               "featureGates": [

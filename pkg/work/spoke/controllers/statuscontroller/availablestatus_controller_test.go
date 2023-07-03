@@ -9,15 +9,18 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/utils/pointer"
 
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
+	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 	"open-cluster-management.io/ocm/pkg/work/spoke/statusfeedback"
@@ -218,6 +221,7 @@ func TestSyncManifestWork(t *testing.T) {
 }
 
 func TestStatusFeedback(t *testing.T) {
+	utilruntime.Must(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeWorkFeatureGates))
 	cases := []struct {
 		name              string
 		existingResources []runtime.Object

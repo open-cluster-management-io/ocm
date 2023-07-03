@@ -33,7 +33,7 @@ type runtimeReconcile struct {
 
 func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
-	if config.InstallMode == "Singleton" {
+	if config.InstallMode == operatorapiv1.InstallModeSingleton {
 		return r.installSingletonAgent(ctx, klusterlet, config)
 	}
 
@@ -132,7 +132,7 @@ func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 
 func (r *runtimeReconcile) installSingletonAgent(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
-	// Deploy registration agent
+	// Deploy singleton agent
 	_, generationStatus, err := helpers.ApplyDeployment(
 		ctx,
 		r.kubeClient,
@@ -203,7 +203,7 @@ func (r *runtimeReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.
 		fmt.Sprintf("%s-registration-agent", config.KlusterletName),
 		fmt.Sprintf("%s-work-agent", config.KlusterletName),
 	}
-	if klusterlet.Spec.DeployOption.Mode == "Singleton" {
+	if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingleton {
 		deployments = []string{fmt.Sprintf("%s-agent", config.KlusterletName)}
 	}
 	for _, deployment := range deployments {

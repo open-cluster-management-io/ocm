@@ -341,6 +341,15 @@ spec:
           verbs:
           - update
         - apiGroups:
+          - addon.open-cluster-management.io
+          resources:
+          - addondeploymentconfigs
+          - addontemplates
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
           - authentication.k8s.io
           resources:
           - tokenreviews
@@ -364,12 +373,11 @@ spec:
           - update
         - apiGroups:
           - certificates.k8s.io
-          resourceNames:
-          - kubernetes.io/kube-apiserver-client
           resources:
           - signers
           verbs:
           - approve
+          - sign
         - apiGroups:
           - cluster.open-cluster-management.io
           resources:

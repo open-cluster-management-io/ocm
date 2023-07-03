@@ -247,7 +247,7 @@ func checkBootstrapSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 }
 
 func getBootstrapSSARs() []authorizationv1.SelfSubjectAccessReview {
-	reviews := []authorizationv1.SelfSubjectAccessReview{}
+	var reviews []authorizationv1.SelfSubjectAccessReview
 	clusterResource := authorizationv1.ResourceAttributes{
 		Group:    "cluster.open-cluster-management.io",
 		Resource: "managedclusters",
@@ -335,7 +335,7 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 }
 
 func getHubConfigSSARs(clusterName string) []authorizationv1.SelfSubjectAccessReview {
-	reviews := []authorizationv1.SelfSubjectAccessReview{}
+	var reviews []authorizationv1.SelfSubjectAccessReview
 
 	// registration resources
 	certResource := authorizationv1.ResourceAttributes{
@@ -435,7 +435,7 @@ func buildKubeClientWithSecret(secret *corev1.Secret) (kubernetes.Interface, str
 }
 
 func generateSelfSubjectAccessReviews(resource authorizationv1.ResourceAttributes, verbs ...string) []authorizationv1.SelfSubjectAccessReview {
-	reviews := []authorizationv1.SelfSubjectAccessReview{}
+	var reviews []authorizationv1.SelfSubjectAccessReview
 	for _, verb := range verbs {
 		reviews = append(reviews, authorizationv1.SelfSubjectAccessReview{
 			Spec: authorizationv1.SelfSubjectAccessReviewSpec{

@@ -167,6 +167,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		RegistrationImage:         klusterlet.Spec.RegistrationImagePullSpec,
 		WorkImage:                 klusterlet.Spec.WorkImagePullSpec,
 		ClusterName:               klusterlet.Spec.ClusterName,
+		SingletonImage:            klusterlet.Spec.ImagePullSpec,
 		BootStrapKubeConfigSecret: helpers.BootstrapHubKubeConfig,
 		HubKubeConfigSecret:       helpers.HubKubeConfig,
 		ExternalServerURL:         getServersFromKlusterlet(klusterlet),
@@ -393,10 +394,10 @@ func ensureNamespace(ctx context.Context, kubeClient kubernetes.Interface, klust
 }
 
 func serviceAccountName(suffix string, klusterlet *operatorapiv1.Klusterlet) string {
-	// in single ton mode, we only need one sa, so the name of work and registration sa are
+	// in singleton mode, we only need one sa, so the name of work and registration sa are
 	// the same.
-	if klusterlet.Spec.DeployOption.Mode == "Singleton" {
-		return "klusterlet-agent-sa"
+	if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingleton {
+		return fmt.Sprintf("%s-agent-sa", klusterlet.Name)
 	}
 	return fmt.Sprintf("%s-%s", klusterlet.Name, suffix)
 }

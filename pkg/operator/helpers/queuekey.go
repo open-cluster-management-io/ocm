@@ -137,10 +137,6 @@ func ClusterManagerQueueKeyFunc(clusterManagerLister operatorlister.ClusterManag
 	return clusterManagerByNamespaceQueueKeyFunc(clusterManagerLister)
 }
 
-func ClusterManagerConfigmapQueueKeyFunc(clusterManagerLister operatorlister.ClusterManagerLister) factory.ObjectQueueKeysFunc {
-	return clusterManagerByNamespaceQueueKeyFunc(clusterManagerLister)
-}
-
 func clusterManagerByNamespaceQueueKeyFunc(clusterManagerLister operatorlister.ClusterManagerLister) factory.ObjectQueueKeysFunc {
 	return func(obj runtime.Object) []string {
 		accessor, _ := meta.Accessor(obj)

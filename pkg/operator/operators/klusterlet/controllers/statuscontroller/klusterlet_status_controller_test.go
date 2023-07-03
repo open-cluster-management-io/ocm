@@ -165,6 +165,22 @@ func TestSync(t *testing.T) {
 				testinghelper.NamedCondition(klusterletWorkDesiredDegraded, "DeploymentsFunctional", metav1.ConditionFalse),
 			},
 		},
+		{
+			name: "Available & Desired with singleton",
+			object: []runtime.Object{
+				newDeployment("testklusterlet-agent", "test", 3, 3),
+			},
+			klusterlet: func() *operatorapiv1.Klusterlet {
+				k := newKlusterlet("testklusterlet", "test", "cluster1")
+				k.Spec.DeployOption.Mode = operatorapiv1.InstallModeSingleton
+				return k
+			}(),
+			expectedConditions: []metav1.Condition{
+				testinghelper.NamedCondition(klusterletAvailable, "klusterletAvailable", metav1.ConditionTrue),
+				testinghelper.NamedCondition(klusterletRegistrationDesiredDegraded, "DeploymentsFunctional", metav1.ConditionFalse),
+				testinghelper.NamedCondition(klusterletWorkDesiredDegraded, "DeploymentsFunctional", metav1.ConditionFalse),
+			},
+		},
 	}
 
 	for _, c := range cases {

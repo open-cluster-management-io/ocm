@@ -135,6 +135,43 @@ func TestComplete(t *testing.T) {
 	}
 }
 
+func TestValidate(t *testing.T) {
+	cases := []struct {
+		name        string
+		clusterName string
+		expectedErr bool
+	}{
+		{
+			name:        "empty cluster name",
+			expectedErr: true,
+		},
+		{
+			name:        "invalid cluster name format",
+			clusterName: "test.cluster",
+			expectedErr: true,
+		},
+		{
+			name:        "valid passed",
+			clusterName: "cluster-1",
+			expectedErr: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			options := NewAgentOptions()
+			options.SpokeClusterName = c.clusterName
+			err := options.Validate()
+			if err == nil && c.expectedErr {
+				t.Errorf("expect to get err")
+			}
+			if err != nil && !c.expectedErr {
+				t.Errorf("expect not error but got %v", err)
+			}
+		})
+	}
+}
+
 func TestGetOrGenerateClusterAgentNames(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "testgetorgenerateclusteragentnames")
 	if err != nil {

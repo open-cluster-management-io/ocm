@@ -10,6 +10,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	kubeinformers "k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
@@ -18,12 +19,15 @@ import (
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	ocmfeature "open-cluster-management.io/api/feature"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	"open-cluster-management.io/ocm/pkg/features"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
 func TestSync(t *testing.T) {
+	utilruntime.Must(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeRegistrationFeatureGates))
 	cases := []struct {
 		name            string
 		cluster         runtime.Object
