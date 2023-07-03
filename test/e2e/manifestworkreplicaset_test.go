@@ -54,7 +54,8 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", func() {
 				klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
 				clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
 				agentNamespace := fmt.Sprintf("open-cluster-management-agent-%s", rand.String(6))
-				_, err := t.CreateApprovedKlusterlet(klusterletName, clusterName, agentNamespace, operatorapiv1.InstallModeDefault)
+				_, err := t.CreateApprovedKlusterlet(
+					klusterletName, clusterName, agentNamespace, operatorapiv1.InstallMode(klusterletDeployMode))
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			}
 		})

@@ -303,7 +303,7 @@ func (t *Tester) CreateKlusterlet(name, clusterName, klusterletNamespace string,
 }
 
 func (t *Tester) CreateApprovedKlusterlet(name, clusterName, klusterletNamespace string, mode operatorapiv1.InstallMode) (*operatorapiv1.Klusterlet, error) {
-	klusterlet, err := t.CreateKlusterlet(name, clusterName, klusterletNamespace, operatorapiv1.InstallModeDefault)
+	klusterlet, err := t.CreateKlusterlet(name, clusterName, klusterletNamespace, mode)
 	if err != nil {
 		return nil, err
 	}
