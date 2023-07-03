@@ -81,7 +81,7 @@ verify-fmt-imports: install-golang-gci
 	@output=$$(gci diff --skip-generated -s standard -s default -s "prefix(open-cluster-management.io)" -s "prefix(open-cluster-management.io/ocm)" cmd pkg test dependencymagnet); \
 	if [ -n "$$output" ]; then \
 	    echo "Diff output is not empty: $$output"; \
-	    echo "Please run 'make fmt-imports' to format the golang files imports automatically." \
+	    echo "Please run 'make fmt-imports' to format the golang files imports automatically."; \
 	    exit 1; \
 	else \
 	    echo "Diff output is empty"; \

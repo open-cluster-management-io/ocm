@@ -94,7 +94,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Label("ad
 		// the addon manager deployment should be running
 		gomega.Eventually(t.CheckHubReady, t.EventuallyTimeout, t.EventuallyInterval).Should(gomega.Succeed())
 
-		_, err := t.CreateApprovedKlusterlet(
+		_, err = t.CreateApprovedKlusterlet(
 			klusterletName, clusterName, agentNamespace, operatorapiv1.InstallMode(klusterletDeployMode))
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
