@@ -65,6 +65,10 @@ func (c *managedClusterCreatingController) sync(ctx context.Context, syncCtx fac
 		managedCluster := &clusterv1.ManagedCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: c.clusterName,
+				Annotations: map[string]string{
+					// TODO: the const key and value should be defined in th api repo. Right now, it's just for testing and feedback collecting.
+					"cluster.open-cluster-management.io/created-by": "spoke-bootstrap",
+				},
 			},
 		}
 
