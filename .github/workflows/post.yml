@@ -38,7 +38,6 @@ jobs:
           name: unit
           verbose: true
           fail_ci_if_error: true
-
   images:
     name: images
     runs-on: ubuntu-latest
@@ -133,3 +132,14 @@ jobs:
           docker manifest push quay.io/open-cluster-management/work:latest
           docker manifest push quay.io/open-cluster-management/placement:latest
           docker manifest push quay.io/open-cluster-management/addon-manager:latest
+  trigger-clusteradm-e2e:
+    needs: [ images, image-manifest ]
+    name: trigger clusteradm e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.OCM_BOT_PAT }}
+          repository: open-cluster-management-io/clusteradm
+          event-type: ocm_changes
+          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
