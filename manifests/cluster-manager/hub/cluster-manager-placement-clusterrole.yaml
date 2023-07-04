@@ -10,6 +10,10 @@ rules:
 - apiGroups: ["apps"]
   resources: ["replicasets"]
   verbs: ["get"] 
+# Allow create subjectaccessreviews to access debug path
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["create"]
 # Allow controller to create/patch/update events
 - apiGroups: ["", "events.k8s.io"]
   resources: ["events"]
@@ -42,3 +46,4 @@ rules:
 - apiGroups: ["config.openshift.io"]
   resources: ["infrastructures"]
   verbs: ["get"]
+
