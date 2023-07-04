@@ -3,14 +3,10 @@ package scheduling
 import (
 	"context"
 	"fmt"
-	"math"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
 	kevents "k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 
@@ -22,7 +18,6 @@ import (
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
-	"open-cluster-management.io/ocm/pkg/placement/helpers"
 	"open-cluster-management.io/ocm/pkg/placement/plugins"
 	"open-cluster-management.io/ocm/pkg/placement/plugins/addon"
 	"open-cluster-management.io/ocm/pkg/placement/plugins/balance"
@@ -62,7 +57,7 @@ type ScheduleResult interface {
 	PrioritizerScores() PrioritizerScore
 
 	// Decision returns the decision groups of the schedule
-	Decisions() ScheduleDecisionGroups
+	Decisions() []*clusterapiv1.ManagedCluster
 
 	// NumOfUnscheduled returns the number of unscheduled.
 	NumOfUnscheduled() int
@@ -84,26 +79,10 @@ type PrioritizerResult struct {
 	Scores PrioritizerScore `json:"scores"`
 }
 
-// ScheduleDecisionGroups groups the cluster decisions by group strategy
-type ScheduleDecisionGroups []ScheduleDecisionGroup
-
-type ScheduleDecisionGroup struct {
-	DecisionGroupName string
-	ClusterDecisions  []clusterapiv1beta1.ClusterDecision
-}
-
-func (g *ScheduleDecisionGroups) Total() int {
-	num := 0
-	for _, group := range *g {
-		num += len(group.ClusterDecisions)
-	}
-	return num
-}
-
 // ScheduleResult is the result for a certain schedule.
 type scheduleResult struct {
 	feasibleClusters     []*clusterapiv1.ManagedCluster
-	scheduledDecisions   ScheduleDecisionGroups
+	scheduledDecisions   []*clusterapiv1.ManagedCluster
 	unscheduledDecisions int
 
 	filteredRecords map[string][]*clusterapiv1.ManagedCluster
@@ -286,15 +265,12 @@ func (s *pluginScheduler) Schedule(
 	results.scoreSum = scoreSum
 
 	// select clusters and generate cluster decisions
-	decisiongroups, status := selectClustersByGroupStrategy(placement, filtered)
-	if status.IsError() {
-		return results, status
-	}
-	scheduled, unscheduled := decisiongroups.Total(), 0
+	decisions := selectClusters(placement, filtered)
+	scheduled, unscheduled := len(decisions), 0
 	if placement.Spec.NumberOfClusters != nil {
 		unscheduled = int(*placement.Spec.NumberOfClusters) - scheduled
 	}
-	results.scheduledDecisions = decisiongroups
+	results.scheduledDecisions = decisions
 	results.unscheduledDecisions = unscheduled
 
 	// set placement requeue time
@@ -314,110 +290,20 @@ func (s *pluginScheduler) Schedule(
 	return results, finalStatus
 }
 
-// selectClusters selects clusters based on the given cluster slice and creates cluster decisions.
-func selectClustersByGroupStrategy(
-	placement *clusterapiv1beta1.Placement,
-	clusters []*clusterapiv1.ManagedCluster,
-) (ScheduleDecisionGroups, *framework.Status) {
-	groups := []ScheduleDecisionGroup{}
+// selects clusters based on given cluster slice and number of clusters
+func selectClusters(placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) []*clusterapiv1.ManagedCluster {
 	numOfDecisions := len(clusters)
-
 	if placement.Spec.NumberOfClusters != nil {
 		numOfDecisions = int(*placement.Spec.NumberOfClusters)
 	}
 
-	// Truncate the cluster slice if the desired number of decisions is less than the number of candidate clusters.
+	// truncate the cluster slice if the desired number of decisions is less than
+	// the number of the candidate clusters
 	if numOfDecisions < len(clusters) {
 		clusters = clusters[:numOfDecisions]
 	}
 
-	// Record the cluster names
-	clusterNames := sets.NewString()
-	for _, cluster := range clusters {
-		clusterNames.Insert(cluster.Name)
-	}
-
-	// Calculate the group length
-	length, status := calculateLength(&placement.Spec.DecisionStrategy.GroupStrategy.ClustersPerDecisionGroup, numOfDecisions)
-	if status.IsError() {
-		return groups, status
-	}
-
-	decisionStrategy := placement.Spec.DecisionStrategy.GroupStrategy.DeepCopy()
-	decisionGroups := decisionStrategy.DecisionGroups
-	// If no decision group defined in placement, all the clusters will be put into a group with empty name.
-	decisionGroups = append(decisionGroups, clusterapiv1beta1.DecisionGroup{})
-
-	// Groups the clusters by decision groups.
-	for _, decisionGroup := range decisionGroups {
-		clusterSelector, err := helpers.NewClusterSelector(decisionGroup.ClusterSelector)
-		if err != nil {
-			return groups, framework.NewStatus("", framework.Misconfigured, err.Error())
-		}
-
-		groupName := decisionGroup.GroupName
-		matched := []clusterapiv1beta1.ClusterDecision{}
-
-		for _, cluster := range clusters {
-			if ok := clusterSelector.Matches(cluster.Labels, helpers.GetClusterClaims(cluster)); !ok {
-				continue
-			}
-			if !clusterNames.Has(cluster.Name) {
-				continue
-			}
-
-			matched = append(matched, clusterapiv1beta1.ClusterDecision{
-				ClusterName: cluster.Name,
-			})
-			clusterNames.Delete(cluster.Name)
-
-			// clusters number in each group should be less than ClustersPerDecisionGroup
-			if len(matched) == length {
-				decisionGroup := ScheduleDecisionGroup{
-					DecisionGroupName: groupName,
-					ClusterDecisions:  matched,
-				}
-				groups = append(groups, decisionGroup)
-				matched = []clusterapiv1beta1.ClusterDecision{}
-			}
-		}
-
-		if len(matched) > 0 {
-			decisionGroup := ScheduleDecisionGroup{
-				DecisionGroupName: groupName,
-				ClusterDecisions:  matched,
-			}
-			groups = append(groups, decisionGroup)
-		}
-	}
-
-	return groups, framework.NewStatus("", framework.Success, "")
-}
-
-func calculateLength(intOrStr *intstr.IntOrString, total int) (int, *framework.Status) {
-	var length int
-	switch intOrStr.Type {
-	case intstr.Int:
-		length = intOrStr.IntValue()
-	case intstr.String:
-		str := intOrStr.StrVal
-		if strings.HasSuffix(str, "%") {
-			f, err := strconv.ParseFloat(str[:len(str)-1], 64)
-			if err != nil {
-				msg := fmt.Sprintf("%v invalid type: string is not a percentage", intOrStr)
-				return length, framework.NewStatus("", framework.Misconfigured, msg)
-			}
-			length = int(math.Ceil(f / 100 * float64(total)))
-		} else {
-			msg := fmt.Sprintf("%v invalid type: string is not a percentage", intOrStr)
-			return length, framework.NewStatus("", framework.Misconfigured, msg)
-		}
-	}
-
-	if length > total {
-		length = total
-	}
-	return length, framework.NewStatus("", framework.Success, "")
+	return clusters
 }
 
 // setRequeueAfter selects minimal time.Duration as requeue time
@@ -534,7 +420,7 @@ func (r *scheduleResult) PrioritizerScores() PrioritizerScore {
 	return r.scoreSum
 }
 
-func (r *scheduleResult) Decisions() ScheduleDecisionGroups {
+func (r *scheduleResult) Decisions() []*clusterapiv1.ManagedCluster {
 	return r.scheduledDecisions
 }
 

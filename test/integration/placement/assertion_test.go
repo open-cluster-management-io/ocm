@@ -132,6 +132,7 @@ func assertPlacementDecisionGroupStatus(placementName, namespace string, decisio
 		if err != nil {
 			return false
 		}
+		ginkgo.By(fmt.Sprintf("actual decision groups %v", placement.Status.DecisionGroups))
 		return reflect.DeepEqual(placement.Status.DecisionGroups, decisionGroupStatus)
 	}, eventuallyTimeout*2, eventuallyInterval).Should(gomega.BeTrue())
 }
@@ -390,7 +391,7 @@ func assertDeletingClusters(clusterNames ...string) {
 				return false
 			}
 			return errors.IsNotFound(err)
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout*2, eventuallyInterval).Should(gomega.BeTrue())
 	}
 }
 
@@ -414,12 +415,12 @@ func assertCreatingPlacement(name, namespace string, noc *int32, prioritizerPoli
 	return placement
 }
 
-func assertCreatingPlacementWithDecision(name, namespace string, noc *int32, nod, nopd int, prioritizerPolicy clusterapiv1beta1.PrioritizerPolicy, tolerations []clusterapiv1beta1.Toleration, groupStrategy clusterapiv1beta1.GroupStrategy) {
-	placement := assertCreatingPlacement(name, namespace, noc, prioritizerPolicy, tolerations, groupStrategy)
+func assertCreatingPlacementWithDecision(name, namespace string, numberOfClusters *int32, numberOfDecisionClusters, numberOfPlacementDecisions int, prioritizerPolicy clusterapiv1beta1.PrioritizerPolicy, tolerations []clusterapiv1beta1.Toleration, groupStrategy clusterapiv1beta1.GroupStrategy) {
+	placement := assertCreatingPlacement(name, namespace, numberOfClusters, prioritizerPolicy, tolerations, groupStrategy)
 	assertPlacementDecisionCreated(placement)
-	assertNumberOfDecisions(name, namespace, nod, nopd)
-	if noc != nil {
-		assertPlacementConditionSatisfied(name, namespace, nod, nod == int(*noc))
+	assertNumberOfDecisions(name, namespace, numberOfDecisionClusters, numberOfPlacementDecisions)
+	if numberOfClusters != nil {
+		assertPlacementConditionSatisfied(name, namespace, numberOfDecisionClusters, numberOfDecisionClusters == int(*numberOfClusters))
 	}
 }
 

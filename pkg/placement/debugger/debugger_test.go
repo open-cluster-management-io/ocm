@@ -44,8 +44,8 @@ func (r *testResult) PrioritizerScores() scheduling.PrioritizerScore {
 	return r.scoreSum
 }
 
-func (r *testResult) Decisions() scheduling.ScheduleDecisionGroups {
-	return []scheduling.ScheduleDecisionGroup{}
+func (r *testResult) Decisions() []*clusterapiv1.ManagedCluster {
+	return []*clusterapiv1.ManagedCluster{}
 }
 
 func (r *testResult) NumOfUnscheduled() int {
