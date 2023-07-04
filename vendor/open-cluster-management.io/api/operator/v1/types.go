@@ -187,11 +187,12 @@ type WebhookConfiguration struct {
 
 // KlusterletDeployOption describes the deploy options for klusterlet
 type KlusterletDeployOption struct {
-	// Mode can be Default or Hosted. It is Default mode if not specified
+	// Mode can be Default, Hosted or Singleton. It is Default mode if not specified
 	// In Default mode, all klusterlet related resources are deployed on the managed cluster.
 	// In Hosted mode, only crd and configurations are installed on the spoke/managed cluster. Controllers run in another
 	// cluster (defined as management-cluster) and connect to the mangaged cluster with the kubeconfig in secret of
 	// "external-managed-kubeconfig"(a kubeconfig of managed-cluster with cluster-admin permission).
+	// In Singleton mode, registration/work agent is started as a single deployment.
 	// Note: Do not modify the Mode field once it's applied.
 	// +optional
 	Mode InstallMode `json:"mode"`
@@ -228,6 +229,9 @@ const (
 	// InstallModeHosted means deploying components outside.
 	// The cluster-manager will be deployed outside of the hub-cluster, the klusterlet will be deployed outside of the managed-cluster.
 	InstallModeHosted InstallMode = "Hosted"
+
+	// InstallModeSingleton means deploying compoenents as a single controller.
+	InstallModeSingleton InstallMode = "Singleton"
 )
 
 // ClusterManagerStatus represents the current status of the registration and work distribution controllers running on the hub.
@@ -364,6 +368,12 @@ type KlusterletSpec struct {
 	// quay.io/open-cluster-management.io/work:latest will be used if unspecified.
 	// +optional
 	WorkImagePullSpec string `json:"workImagePullSpec,omitempty"`
+
+	// ImagePullSpec represents the desired image configuration of agent, it takes effect only when
+	// singleton mode is set. quay.io/open-cluster-management.io/registration-operator:latest will
+	// be used if unspecified
+	// +optional
+	ImagePullSpec string `json:"imagePullSpec,omitempty"`
 
 	// ClusterName is the name of the managed cluster to be created on hub.
 	// The Klusterlet agent generates a random name if it is not set, or discovers the appropriate cluster name on OpenShift.

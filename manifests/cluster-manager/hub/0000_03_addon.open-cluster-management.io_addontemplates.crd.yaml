@@ -328,10 +328,14 @@ spec:
                           minLength: 5
                           type: string
                         signingCA:
-                          description: SigningCA represents the reference of the secret
-                            on the hub cluster to sign the CSR the secret namespace
-                            must be "open-cluster-management-hub", and the secret
-                            type must be "kubernetes.io/tls"
+                          description: 'SigningCA represents the reference of the
+                            secret on the hub cluster to sign the CSR the secret must
+                            be in the namespace where the addon-manager is located,
+                            and the secret type must be "kubernetes.io/tls" Note:
+                            The addon manager will not have permission to access the
+                            secret by default, so the user must grant the permission
+                            to the addon manager(by creating rolebinding for the addon-manager
+                            serviceaccount "addon-manager-controller-sa").'
                           properties:
                             name:
                               description: Name of the signing CA secret
