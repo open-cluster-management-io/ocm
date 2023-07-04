@@ -5,12 +5,14 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	openshiftcrypto "github.com/openshift/library-go/pkg/crypto"
 	"github.com/pkg/errors"
 	certificatesv1 "k8s.io/api/certificates/v1"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,12 +27,28 @@ import (
 )
 
 const (
-	TLSCACert = "ca.crt"
-	TLSCAKey  = "ca.key"
 	// AddonTemplateLabelKey is the label key to set addon template name. It is to set the resources on the hub relating
 	// to an addon template
 	AddonTemplateLabelKey = "open-cluster-management.io/addon-template-name"
 )
+
+var (
+	podNamespace = ""
+)
+
+func AddonManagerNamespace() string {
+	if len(podNamespace) != 0 {
+		return podNamespace
+	}
+
+	namespace := os.Getenv("POD_NAMESPACE")
+	if len(namespace) != 0 {
+		podNamespace = namespace
+	} else {
+		podNamespace = "open-cluster-management-hub"
+	}
+	return podNamespace
+}
 
 func (a *CRDTemplateAgentAddon) GetDesiredAddOnTemplate(addon *addonapiv1alpha1.ManagedClusterAddOn,
 	clusterName, addonName string) (*addonapiv1alpha1.AddOnTemplate, error) {
@@ -243,18 +261,18 @@ func CustomSignerWithExpiry(
 		if csr.Spec.SignerName != customSignerConfig.SignerName {
 			return nil
 		}
-		caSecret, err := kubeclient.CoreV1().Secrets(customSignerConfig.SigningCA.Namespace).Get(
+		caSecret, err := kubeclient.CoreV1().Secrets(AddonManagerNamespace()).Get(
 			context.TODO(), customSignerConfig.SigningCA.Name, metav1.GetOptions{})
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("get custome signer ca %s/%s failed, %v",
-				customSignerConfig.SigningCA.Namespace, customSignerConfig.SigningCA.Name, err))
+				AddonManagerNamespace(), customSignerConfig.SigningCA.Name, err))
 			return nil
 		}
 
-		caData, caKey, err := extractCAdata(caSecret.Data[TLSCACert], caSecret.Data[TLSCAKey])
+		caData, caKey, err := extractCAdata(caSecret.Data[corev1.TLSCertKey], caSecret.Data[corev1.TLSPrivateKeyKey])
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("get ca %s/%s data failed, %v",
-				customSignerConfig.SigningCA.Namespace, customSignerConfig.SigningCA.Name, err))
+				AddonManagerNamespace(), customSignerConfig.SigningCA.Name, err))
 			return nil
 		}
 		return utils.DefaultSignerWithExpiry(caKey, caData, duration)(csr)
@@ -274,9 +292,14 @@ func extractCAdata(caCertData, caKeyData []byte) ([]byte, []byte, error) {
 	if keyBlock == nil {
 		return nil, nil, errors.New("failed to decode ca key")
 	}
-	caKey, err := x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
-	if err != nil {
-		return nil, nil, errors.Wrapf(err, "failed to parse ca key")
+	var errPkcs8, errPkcs1 error
+	var caKey any
+	caKey, errPkcs8 = x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
+	if errPkcs8 != nil {
+		caKey, errPkcs1 = x509.ParsePKCS1PrivateKey(keyBlock.Bytes)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to parse ca key with pkcs8: %v and pkcs1: %v", errPkcs8, errPkcs1)
+		}
 	}
 
 	caConfig := &openshiftcrypto.TLSCertificateConfig{

@@ -70,7 +70,7 @@ func (d *volumeDecorator) decorate(deployment *appsv1.Deployment) error {
 				Name: "hub-kubeconfig",
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
-						SecretName: hubKubeconfigSecretName(d.addonName),
+						SecretName: HubKubeconfigSecretName(d.addonName),
 					},
 				},
 			})
@@ -91,7 +91,7 @@ func (d *volumeDecorator) decorate(deployment *appsv1.Deployment) error {
 				Name: name,
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
-						SecretName: getCustomSignedSecretName(d.addonName, registration.CustomSigner.SignerName),
+						SecretName: CustomSignedSecretName(d.addonName, registration.CustomSigner.SignerName),
 					},
 				},
 			})
@@ -177,11 +177,11 @@ func hubKubeconfigSecretMountPath() string {
 	return "/managed/hub-kubeconfig"
 }
 
-func hubKubeconfigSecretName(addonName string) string {
+func HubKubeconfigSecretName(addonName string) string {
 	return fmt.Sprintf("%s-hub-kubeconfig", addonName)
 }
 
-func getCustomSignedSecretName(addonName, signerName string) string {
+func CustomSignedSecretName(addonName, signerName string) string {
 	return fmt.Sprintf("%s-%s-client-cert", addonName, strings.ReplaceAll(signerName, "/", "-"))
 }
 

@@ -135,6 +135,47 @@ func (ClusterSelector) SwaggerDoc() map[string]string {
 	return map_ClusterSelector
 }
 
+var map_DecisionGroup = map[string]string{
+	"":                     "DecisionGroup define a subset of clusters that will be added to placementDecisions with groupName label.",
+	"groupName":            "Group name to be added as label value to the created placement Decisions labels with label key cluster.open-cluster-management.io/decision-group-name",
+	"groupClusterSelector": "LabelSelector to select clusters subset by label.",
+}
+
+func (DecisionGroup) SwaggerDoc() map[string]string {
+	return map_DecisionGroup
+}
+
+var map_DecisionGroupStatus = map[string]string{
+	"":                   "Present decision groups status based on the DecisionStrategy definition.",
+	"decisionGroupIndex": "Present the decision group index. If there is no decision strategy defined all placement decisions will be in group index 0",
+	"decisionGroupName":  "Decision group name that is defined in the DecisionStrategy's DecisionGroup.",
+	"decisions":          "List of placement decisions names associated with the decision group",
+	"clusterCount":       "Total number of clusters in the decision group. Clusters count is equal or less than the clusterPerDecisionGroups defined in the decision strategy.",
+}
+
+func (DecisionGroupStatus) SwaggerDoc() map[string]string {
+	return map_DecisionGroupStatus
+}
+
+var map_DecisionStrategy = map[string]string{
+	"":              "DecisionStrategy divide the created placement decision to groups and define number of clusters per decision group.",
+	"groupStrategy": "GroupStrategy define strategies to divide selected clusters to decision groups.",
+}
+
+func (DecisionStrategy) SwaggerDoc() map[string]string {
+	return map_DecisionStrategy
+}
+
+var map_GroupStrategy = map[string]string{
+	"":                         "Group the created placementDecision into decision groups based on the number of clusters per decision group.",
+	"decisionGroups":           "DecisionGroups represents a list of predefined groups to put decision results.",
+	"clustersPerDecisionGroup": "ClustersPerDecisionGroup is a specific number or percentage of the total selected clusters. The specific number will divide the placementDecisions to decisionGroups each group has max number of clusters equal to that specific number. The percentage will divide the placementDecisions to decisionGroups each group has max number of clusters based on the total num of selected clusters and percentage. ex; for a total 100 clusters selected, ClustersPerDecisionGroup equal to 20% will divide the placement decision to 5 groups each group should have 20 clusters. Default is having all clusters in a single group. If the DecisionGroups field defined, it will be considered first to create the decisionGroups then the ClustersPerDecisionGroup will be used to determine the rest of decisionGroups.",
+}
+
+func (GroupStrategy) SwaggerDoc() map[string]string {
+	return map_GroupStrategy
+}
+
 var map_Placement = map[string]string{
 	"":       "Placement defines a rule to select a set of ManagedClusters from the ManagedClusterSets bound to the placement namespace.\n\nHere is how the placement policy combines with other selection methods to determine a matching list of ManagedClusters:\n 1. Kubernetes clusters are registered with hub as cluster-scoped ManagedClusters;\n 2. ManagedClusters are organized into cluster-scoped ManagedClusterSets;\n 3. ManagedClusterSets are bound to workload namespaces;\n 4. Namespace-scoped Placements specify a slice of ManagedClusterSets which select a working set\n    of potential ManagedClusters;\n 5. Then Placements subselect from that working set using label/claim selection.\n\nNo ManagedCluster will be selected if no ManagedClusterSet is bound to the placement namespace. User is able to bind a ManagedClusterSet to a namespace by creating a ManagedClusterSetBinding in that namespace if they have a RBAC rule to CREATE on the virtual subresource of `managedclustersets/bind`.\n\nA slice of PlacementDecisions with label cluster.open-cluster-management.io/placement={placement name} will be created to represent the ManagedClusters selected by this placement.\n\nIf a ManagedCluster is selected and added into the PlacementDecisions, other components may apply workload on it; once it is removed from the PlacementDecisions, the workload applied on this ManagedCluster should be evicted accordingly.",
 	"spec":   "Spec defines the attributes of Placement.",
@@ -163,6 +204,7 @@ var map_PlacementSpec = map[string]string{
 	"prioritizerPolicy": "PrioritizerPolicy defines the policy of the prioritizers. If this field is unset, then default prioritizer mode and configurations are used. Referring to PrioritizerPolicy to see more description about Mode and Configurations.",
 	"spreadPolicy":      "SpreadPolicy defines how placement decisions should be distributed among a set of ManagedClusters.",
 	"tolerations":       "Tolerations are applied to placements, and allow (but do not require) the managed clusters with certain taints to be selected by placements with matching tolerations.",
+	"decisionStrategy":  "DecisionStrategy divide the created placement decision to groups and define number of clusters per decision group.",
 }
 
 func (PlacementSpec) SwaggerDoc() map[string]string {
@@ -171,6 +213,7 @@ func (PlacementSpec) SwaggerDoc() map[string]string {
 
 var map_PlacementStatus = map[string]string{
 	"numberOfSelectedClusters": "NumberOfSelectedClusters represents the number of selected ManagedClusters",
+	"decisionGroups":           "List of decision groups determined by the placement and DecisionStrategy.",
 	"conditions":               "Conditions contains the different condition status for this Placement.",
 }
 

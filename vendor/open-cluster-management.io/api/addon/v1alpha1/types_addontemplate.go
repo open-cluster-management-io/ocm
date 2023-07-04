@@ -155,16 +155,18 @@ type CustomSignerRegistrationConfig struct {
 	Subject *Subject `json:"subject,omitempty"`
 
 	// SigningCA represents the reference of the secret on the hub cluster to sign the CSR
+	// the secret must be in the namespace where the addon-manager is located, and the secret
+	// type must be "kubernetes.io/tls"
+	// Note: The addon manager will not have permission to access the secret by default, so
+	// the user must grant the permission to the addon manager(by creating rolebinding for
+	// the addon-manager serviceaccount "addon-manager-controller-sa").
 	// +kubebuilder:validation:Required
 	SigningCA SigningCARef `json:"signingCA"`
 }
 
-// SigningCARef is the reference to the signing CA secret that must contain the
-// certificate authority data with key "ca.crt" and the private key data with key "ca.key"
+// SigningCARef is the reference to the signing CA secret which type must be "kubernetes.io/tls" and
+// which namespace must be the same as the addon-manager.
 type SigningCARef struct {
-	// Namespace of the signing CA secret
-	// +kubebuilder:validation:Required
-	Namespace string `json:"namespace"`
 	// Name of the signing CA secret
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`

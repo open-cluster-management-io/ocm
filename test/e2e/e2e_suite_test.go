@@ -2,12 +2,13 @@ package e2e
 
 import (
 	"flag"
-	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
 
 var t *Tester
