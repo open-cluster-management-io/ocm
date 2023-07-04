@@ -14,7 +14,6 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
-	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/ocm/test/integration/util"
@@ -24,34 +23,21 @@ import (
 // and well configured as sanity check. Resource leftovers should be cleaned up on both hub and managed cluster.
 var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validating-webhook", "sanity-check"), func() {
 	var nameSuffix string
-	var workName, klusterletName, clusterName string
+	var workName string
 
 	ginkgo.BeforeEach(func() {
 		nameSuffix = rand.String(5)
 		workName = fmt.Sprintf("w1-%s", nameSuffix)
-
-		if deployKlusterlet {
-			klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
-			clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
-			agentNamespace := fmt.Sprintf("open-cluster-management-agent-%s", rand.String(6))
-			_, err := t.CreateApprovedKlusterlet(
-				klusterletName, clusterName, agentNamespace, operatorapiv1.InstallMode(klusterletDeployMode))
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		}
 	})
 
 	ginkgo.AfterEach(func() {
 		ginkgo.By(fmt.Sprintf("delete manifestwork %v/%v", clusterName, workName))
 		gomega.Expect(t.cleanManifestWorks(clusterName, workName)).To(gomega.BeNil())
-		if deployKlusterlet {
-			ginkgo.By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
-			gomega.Expect(t.cleanKlusterletResources(klusterletName, clusterName)).To(gomega.BeNil())
-		}
 	})
 
 	ginkgo.Context("Creating a manifestwork", func() {
 		ginkgo.It("Should respond bad request when creating a manifestwork with no manifests", func() {
-			work := newManifestWork(clusterName, workName, []runtime.Object{}...)
+			work := newManifestWork(clusterName, workName)
 			_, err := t.HubWorkClient.WorkV1().ManifestWorks(clusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(errors.IsBadRequest(err)).Should(gomega.BeTrue())
