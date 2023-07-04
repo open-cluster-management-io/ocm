@@ -177,10 +177,9 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 	)
 
 	rbacFinalizerController := rbacfinalizerdeletion.NewFinalizeController(
-		kubeInfomers.Rbac().V1().Roles(),
-		kubeInfomers.Rbac().V1().RoleBindings(),
-		kubeInfomers.Core().V1().Namespaces().Lister(),
-		clusterInformers.Cluster().V1().ManagedClusters().Lister(),
+		kubeInfomers.Rbac().V1().RoleBindings().Lister(),
+		kubeInfomers.Core().V1().Namespaces(),
+		clusterInformers.Cluster().V1().ManagedClusters(),
 		workInformers.Work().V1().ManifestWorks().Lister(),
 		kubeClient.RbacV1(),
 		controllerContext.EventRecorder,

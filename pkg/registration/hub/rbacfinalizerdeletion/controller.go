@@ -2,25 +2,26 @@ package rbacfinalizerdeletion
 
 import (
 	"context"
-	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	rbacv1informers "k8s.io/client-go/informers/rbac/v1"
+	"k8s.io/apimachinery/pkg/selection"
+	corev1informers "k8s.io/client-go/informers/core/v1"
 	rbacv1client "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	rbacv1listers "k8s.io/client-go/listers/rbac/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
+	informerv1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -33,7 +34,6 @@ const (
 )
 
 type finalizeController struct {
-	roleLister         rbacv1listers.RoleLister
 	roleBindingLister  rbacv1listers.RoleBindingLister
 	rbacClient         rbacv1client.RbacV1Interface
 	clusterLister      clusterv1listers.ManagedClusterLister
@@ -42,128 +42,98 @@ type finalizeController struct {
 	eventRecorder      events.Recorder
 }
 
-// NewFinalizeController ensures all manifestworks are deleted before role/rolebinding for work
+// NewFinalizeController ensures all manifestworks are deleted before rolebinding for work
 // agent are deleted in a terminating cluster namespace.
 func NewFinalizeController(
-	roleInformer rbacv1informers.RoleInformer,
-	roleBindingInformer rbacv1informers.RoleBindingInformer,
-	namespaceLister corelisters.NamespaceLister,
-	clusterLister clusterv1listers.ManagedClusterLister,
+	roleBindingLister rbacv1listers.RoleBindingLister,
+	namespaceInformer corev1informers.NamespaceInformer,
+	clusterInformer informerv1.ManagedClusterInformer,
 	manifestWorkLister worklister.ManifestWorkLister,
 	rbacClient rbacv1client.RbacV1Interface,
 	eventRecorder events.Recorder,
 ) factory.Controller {
 
 	controller := &finalizeController{
-		roleLister:         roleInformer.Lister(),
-		roleBindingLister:  roleBindingInformer.Lister(),
-		namespaceLister:    namespaceLister,
-		clusterLister:      clusterLister,
+		roleBindingLister:  roleBindingLister,
+		namespaceLister:    namespaceInformer.Lister(),
+		clusterLister:      clusterInformer.Lister(),
 		manifestWorkLister: manifestWorkLister,
 		rbacClient:         rbacClient,
 		eventRecorder:      eventRecorder,
 	}
 
 	return factory.New().
-		WithInformersQueueKeysFunc(queue.QueueKeyByMetaNamespaceName, roleInformer.Informer(), roleBindingInformer.Informer()).
+		WithInformersQueueKeysFunc(queue.QueueKeyByMetaNamespaceName, clusterInformer.Informer(), namespaceInformer.Informer()).
 		WithSync(controller.sync).ToController("FinalizeController", eventRecorder)
 }
 
 func (m *finalizeController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	key := controllerContext.QueueKey()
-	namespace, name, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		// ignore role/rolebinding whose key is not in format: namespace/name
+	if key == "" {
 		return nil
 	}
 
-	cluster, err := m.clusterLister.Get(namespace)
+	_, clusterName, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return nil
+	}
+
+	cluster, err := m.clusterLister.Get(clusterName)
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
-	ns, err := m.namespaceLister.Get(namespace)
-	if err != nil {
-		return err
-	}
 
-	// cluster is deleted or being deleted
-	role, rolebinding, err := m.getRoleAndRoleBinding(namespace, name)
-	if err != nil {
-		return err
-	}
-
-	err = m.syncRoleAndRoleBinding(ctx, controllerContext, role, rolebinding, ns, cluster)
-
-	if err != nil {
-		klog.Errorf("Reconcile role/rolebinding %s fails with err: %v", key, err)
-	}
-	return err
-}
-
-func (m *finalizeController) syncRoleAndRoleBinding(ctx context.Context, controllerContext factory.SyncContext,
-	role *rbacv1.Role, rolebinding *rbacv1.RoleBinding, ns *corev1.Namespace, cluster *clusterv1.ManagedCluster) error {
-	// Skip if neither role nor rolebinding has the finalizer
-	if !hasFinalizer(role, manifestWorkFinalizer) && !hasFinalizer(rolebinding, manifestWorkFinalizer) {
+	ns, err := m.namespaceLister.Get(clusterName)
+	if errors.IsNotFound(err) {
 		return nil
 	}
+	if err != nil {
+		return err
+	}
 
-	// There are two possible cases that we need to remove finalizers on role/rolebindings based on
+	// There are two possible cases that we need to remove finalizers on rolebindings based on
 	// clean of manifestworks.
 	// 1. The namespace is finalizing.
-	// 2. The cluster is finalizing but namespace fails to be deleted.
-	if !ns.DeletionTimestamp.IsZero() || (cluster != nil && !cluster.DeletionTimestamp.IsZero()) {
+	// 2. The cluster is finalizing or not found.
+	if !ns.DeletionTimestamp.IsZero() || cluster == nil ||
+		(cluster != nil && !cluster.DeletionTimestamp.IsZero()) {
 		works, err := m.manifestWorkLister.ManifestWorks(ns.Name).List(labels.Everything())
 		if err != nil {
 			return err
 		}
 
 		if len(works) != 0 {
-			return fmt.Errorf("still having %d works in the cluster namespace %s", len(works), ns.Name)
+			controllerContext.Queue().AddAfter(clusterName, 10*time.Second)
+			klog.Warningf("still having %d works in the cluster namespace %s", len(works), ns.Name)
+			return nil
 		}
-	}
-
-	// remove finalizer from role/rolebinding
-	if pendingFinalization(role) {
-		if err := m.removeFinalizerFromRole(ctx, role, manifestWorkFinalizer); err != nil {
-			return err
-		}
-	}
-
-	if pendingFinalization(rolebinding) {
-		if err := m.removeFinalizerFromRoleBinding(ctx, rolebinding, manifestWorkFinalizer); err != nil {
-			return err
-		}
+		return m.syncRoleBindings(ctx, controllerContext, clusterName)
 	}
 	return nil
 }
 
-func (m *finalizeController) getRoleAndRoleBinding(namespace, name string) (*rbacv1.Role, *rbacv1.RoleBinding, error) {
-	role, err := m.roleLister.Roles(namespace).Get(name)
+func (m *finalizeController) syncRoleBindings(ctx context.Context, controllerContext factory.SyncContext,
+	namespace string) error {
+	requirement, _ := labels.NewRequirement(clusterv1.ClusterNameLabelKey, selection.Exists, []string{})
+	selector := labels.NewSelector().Add(*requirement)
+	roleBindings, err := m.roleBindingLister.RoleBindings(namespace).List(selector)
 	if err != nil && !errors.IsNotFound(err) {
-		return nil, nil, err
+		return err
 	}
 
-	rolebinding, err := m.roleBindingLister.RoleBindings(namespace).Get(name)
-	if err != nil && !errors.IsNotFound(err) {
-		return nil, nil, err
+	for _, roleBinding := range roleBindings {
+		// Skip if roleBinding has no the finalizer
+		if !hasFinalizer(roleBinding, manifestWorkFinalizer) {
+			continue
+		}
+		// remove finalizer from roleBinding
+		if pendingFinalization(roleBinding) {
+			if err := m.removeFinalizerFromRoleBinding(ctx, roleBinding, manifestWorkFinalizer); err != nil {
+				return err
+			}
+		}
 	}
-
-	return role, rolebinding, nil
-}
-
-// removeFinalizerFromRole removes the particular finalizer from role
-func (m *finalizeController) removeFinalizerFromRole(ctx context.Context, role *rbacv1.Role, finalizer string) error {
-	if role == nil {
-		return nil
-	}
-
-	role = role.DeepCopy()
-	if changed := removeFinalizer(role, finalizer); !changed {
-		return nil
-	}
-
-	_, err := m.rbacClient.Roles(role.Namespace).Update(ctx, role, metav1.UpdateOptions{})
-	return err
+	return nil
 }
 
 // removeFinalizerFromRoleBinding removes the particular finalizer from rolebinding

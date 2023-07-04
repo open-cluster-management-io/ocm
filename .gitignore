@@ -24,6 +24,7 @@ munge-csv
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 _output/
+.idea/
 
 .kubeconfig
 .hub-kubeconfig
