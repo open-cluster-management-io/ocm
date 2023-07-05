@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/valyala/fasttemplate"
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -105,9 +104,11 @@ func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 		supportedConfigGVRs = append(supportedConfigGVRs, gvr)
 	}
 	return agent.AgentAddonOptions{
-		AddonName:           a.addonName,
-		InstallStrategy:     nil,
-		HealthProber:        nil,
+		AddonName:       a.addonName,
+		InstallStrategy: nil,
+		HealthProber: &agent.HealthProber{
+			Type: agent.HealthProberTypeDeploymentAvailability,
+		},
 		SupportedConfigGVRs: supportedConfigGVRs,
 		Registration: &agent.RegistrationOption{
 			CSRConfigurations: a.TemplateCSRConfigurationsFunc(),
@@ -159,7 +160,7 @@ func (a *CRDTemplateAgentAddon) decorateObjects(
 		newImageDecorator(privateValues),
 	}
 	for index, obj := range objects {
-		deployment, err := a.convertToDeployment(obj)
+		deployment, err := utils.ConvertToDeployment(obj)
 		if err != nil {
 			continue
 		}
@@ -174,26 +175,6 @@ func (a *CRDTemplateAgentAddon) decorateObjects(
 	}
 
 	return objects, nil
-}
-
-func (a *CRDTemplateAgentAddon) convertToDeployment(obj runtime.Object) (*appsv1.Deployment, error) {
-	if obj.GetObjectKind().GroupVersionKind().Group != "apps" ||
-		obj.GetObjectKind().GroupVersionKind().Kind != "Deployment" {
-		return nil, fmt.Errorf("not deployment object, %v", obj.GetObjectKind())
-	}
-
-	deployment := &appsv1.Deployment{}
-	uobj, ok := obj.(*unstructured.Unstructured)
-	if !ok {
-		return deployment, fmt.Errorf("not unstructured object, %v", obj.GetObjectKind())
-	}
-
-	err := runtime.DefaultUnstructuredConverter.
-		FromUnstructured(uobj.Object, deployment)
-	if err != nil {
-		return nil, err
-	}
-	return deployment, nil
 }
 
 // GetDesiredAddOnTemplateByAddon returns the desired template of the addon

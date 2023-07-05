@@ -169,6 +169,10 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Label("ad
 		ginkgo.By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
 		gomega.Expect(t.cleanKlusterletResources(klusterletName, clusterName)).To(gomega.BeNil())
 
+		ginkgo.By(fmt.Sprintf("Cleaning managed cluster namespace %s", clusterName))
+		err = t.HubKubeClient.CoreV1().Namespaces().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 		// disable addon management feature gate
 		gomega.Eventually(func() error {
 			clusterManager, err := t.OperatorClient.OperatorV1().ClusterManagers().Get(context.TODO(), "cluster-manager", metav1.GetOptions{})

@@ -7,10 +7,12 @@ import (
 	"time"
 
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	fakekube "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/utils"
@@ -213,5 +215,54 @@ func TestReconcile(t *testing.T) {
 					c.name, c.expectedCount, actualCount)
 			}
 		}
+	}
+}
+
+func TestRunController(t *testing.T) {
+	cases := []struct {
+		name        string
+		addonName   string
+		expectedErr string
+	}{
+		{
+			name:        "addon name empty",
+			addonName:   "",
+			expectedErr: "addon name should be set",
+		},
+		{
+			name:        "fake kubeconfig",
+			addonName:   "test",
+			expectedErr: `Get "http://localhost/api": dial tcp [::1]:80: connect: connection refused`,
+		},
+	}
+
+	for _, c := range cases {
+		fakeAddonClient := fakeaddon.NewSimpleClientset()
+		addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
+		fakeDynamicClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+		dynamicInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(fakeDynamicClient, 0)
+		fakeClusterClient := fakecluster.NewSimpleClientset()
+		clusterInformers := clusterv1informers.NewSharedInformerFactory(fakeClusterClient, 10*time.Minute)
+		fakeWorkClient := fakework.NewSimpleClientset()
+		workInformers := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
+		hubKubeClient := fakekube.NewSimpleClientset()
+		controller := &addonTemplateController{
+			kubeConfig:       &rest.Config{},
+			kubeClient:       hubKubeClient,
+			addonClient:      fakeAddonClient,
+			cmaLister:        addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+			addonManagers:    make(map[string]context.CancelFunc),
+			addonInformers:   addonInformers,
+			clusterInformers: clusterInformers,
+			dynamicInformers: dynamicInformerFactory,
+			workInformers:    workInformers,
+		}
+		ctx := context.TODO()
+
+		err := controller.runController(ctx, c.addonName)
+		if len(c.expectedErr) == 0 {
+			assert.NoError(t, err)
+		}
+		assert.EqualErrorf(t, err, c.expectedErr, "name : %s, expected error %v, but got %v", c.name, c.expectedErr, err)
 	}
 }

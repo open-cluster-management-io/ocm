@@ -346,7 +346,7 @@ func (c *addonDeployController) buildDeployManifestWorks(installMode, workNamesp
 		return nil, nil, nil
 	}
 
-	manifestOptions := getManifestConfigOption(agentAddon)
+	manifestOptions := getManifestConfigOption(agentAddon, cluster, addon)
 	existingWorksCopy := []workapiv1.ManifestWork{}
 	for _, work := range existingWorks {
 		existingWorksCopy = append(existingWorksCopy, *work)
