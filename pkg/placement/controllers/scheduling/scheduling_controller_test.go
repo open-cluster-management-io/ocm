@@ -493,6 +493,8 @@ func TestSchedulingController_sync(t *testing.T) {
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, "clusterset1").Build(),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 0)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
 					WithDecisions("cluster1", "cluster2", "cluster3").Build(),
 			},
 			scheduleResult: &scheduleResult{
@@ -1092,6 +1094,40 @@ func TestBind(t *testing.T) {
 			},
 		},
 		{
+			name: "create placementdecision when no cluster selected by canary group strategy",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithGroupStrategy(clusterapiv1beta1.GroupStrategy{
+				ClustersPerDecisionGroup: intstr.FromInt(2),
+				DecisionGroups: []clusterapiv1beta1.DecisionGroup{
+					{
+						GroupName: "canary",
+						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
+						},
+					},
+				}}).Build(),
+			clusters: []*clusterapiv1.ManagedCluster{
+				testinghelpers.NewManagedCluster("cluster1").WithLabel("cloud", "Amazon").Build(),
+				testinghelpers.NewManagedCluster("cluster2").WithLabel("cloud", "Amazon").Build(),
+				testinghelpers.NewManagedCluster("cluster3").WithLabel("cloud", "Amazon").Build(),
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "create", "create")
+				selectedClusters := newSelectedClusters(2)
+				actual := actions[0].(clienttesting.CreateActionImpl).Object
+				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
+				if !ok {
+					t.Errorf("expected PlacementDecision was created")
+				}
+				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters...)
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "0" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+			},
+		},
+		{
 			name: "create placementdecision with multiple group strategy",
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithGroupStrategy(clusterapiv1beta1.GroupStrategy{
 				ClustersPerDecisionGroup: intstr.FromString("25%"),
@@ -1217,9 +1253,13 @@ func TestBind(t *testing.T) {
 			initObjs: []runtime.Object{
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 0)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
 					WithDecisions(newSelectedClusters(128)[:100]...).Build(),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
 					WithDecisions(newSelectedClusters(128)[100:]...).Build(),
 			},
 			validateActions: testingcommon.AssertNoActions,
@@ -1231,13 +1271,25 @@ func TestBind(t *testing.T) {
 			initObjs: []runtime.Object{
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 0)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "fakegroup").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
 					WithDecisions(newSelectedClusters(128)[:100]...).Build(),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "create")
+				testingcommon.AssertActions(t, actions, "update", "create")
 				selectedClusters := newSelectedClusters(128)
-				actual := actions[0].(clienttesting.CreateActionImpl).Object
+				actual := actions[0].(clienttesting.UpdateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
+				if !ok {
+					t.Errorf("expected PlacementDecision was updated")
+				}
+				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[:100]...)
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+
+				actual = actions[1].(clienttesting.CreateActionImpl).Object
+				placementDecision, ok = actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
 					t.Errorf("expected PlacementDecision was updated")
 				}
@@ -1251,9 +1303,13 @@ func TestBind(t *testing.T) {
 			initObjs: []runtime.Object{
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 0)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
 					WithDecisions(newSelectedClusters(128)[:100]...).Build(),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
 					WithDecisions(newSelectedClusters(128)[100:]...).Build(),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -1273,9 +1329,13 @@ func TestBind(t *testing.T) {
 			initObjs: []runtime.Object{
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 0)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
 					WithDecisions(newSelectedClusters(128)[:100]...).Build(),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
 					WithDecisions(newSelectedClusters(128)[100:]...).Build(),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {

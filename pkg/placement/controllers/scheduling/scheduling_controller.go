@@ -709,18 +709,30 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 		return err
 	}
 
-	// update the status of the placementdecision if decisions change
-	if apiequality.Semantic.DeepEqual(existPlacementDecision.Status.Decisions, clusterDecisions) {
+	// update the status and labels of the placementdecision if decisions change
+	decisionsequal := apiequality.Semantic.DeepEqual(existPlacementDecision.Status.Decisions, clusterDecisions)
+	labelsequal := apiequality.Semantic.DeepEqual(existPlacementDecision.Labels, placementDecision.Labels)
+
+	if decisionsequal && labelsequal {
 		return nil
 	}
 
 	newPlacementDecision := existPlacementDecision.DeepCopy()
-	newPlacementDecision.Status.Decisions = clusterDecisions
-	_, err = c.clusterClient.ClusterV1beta1().PlacementDecisions(newPlacementDecision.Namespace).
-		UpdateStatus(ctx, newPlacementDecision, metav1.UpdateOptions{})
-
-	if err != nil {
-		return err
+	if !labelsequal {
+		newPlacementDecision.Labels = placementDecision.Labels
+		_, err = c.clusterClient.ClusterV1beta1().PlacementDecisions(newPlacementDecision.Namespace).
+			Update(ctx, newPlacementDecision, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+	}
+	if !decisionsequal {
+		newPlacementDecision.Status.Decisions = clusterDecisions
+		_, err = c.clusterClient.ClusterV1beta1().PlacementDecisions(newPlacementDecision.Namespace).
+			UpdateStatus(ctx, newPlacementDecision, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
 	}
 
 	// update the event with warning
