@@ -1,6 +1,8 @@
 package spoke
 
 import (
+	"context"
+
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/cobra"
 
@@ -13,7 +15,7 @@ func NewRegistrationAgent() *cobra.Command {
 	cmdConfig := controllercmd.
 		NewControllerCommandConfig("registration-agent", version.Get(), agentOptions.RunSpokeAgent)
 
-	cmd := cmdConfig.NewCommand()
+	cmd := cmdConfig.NewCommandWithContext(context.TODO())
 	cmd.Use = "agent"
 	cmd.Short = "Start the Cluster Registration Agent"
 

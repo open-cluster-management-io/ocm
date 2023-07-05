@@ -92,8 +92,20 @@ func getValueByJsonPath(name, path string, obj *unstructured.Unstructured) (*wor
 		return nil, nil
 	}
 
-	// as we only support simple JSON path, we can assume to have only one result (or none, filtered out above)
-	value := results[0][0].Interface()
+	var value any
+	switch {
+	case len(results) == 0 || len(results[0]) == 0:
+		return nil, nil
+	case len(results) == 1 && len(results[0]) == 1:
+		value = results[0][0].Interface()
+	default:
+		var resultList []any
+		// only take care the first item in the results list.
+		for _, r := range results[0] {
+			resultList = append(resultList, r.Interface())
+		}
+		value = resultList
+	}
 
 	if value == nil {
 		// ignore the result if it is nil
