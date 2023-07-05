@@ -192,6 +192,10 @@ const (
 	// clusters. The addon framework will check if the work is Available on the spoke. In addition
 	// user can define a prober to check more detailed status based on status feedback from work.
 	HealthProberTypeWork HealthProberType = "Work"
+	// HealthProberTypeDeploymentAvailability indicates the healthiness of the addon is connected
+	// with the availability of the corresponding agent deployment resources on the managed cluster.
+	// It's a special case of HealthProberTypeWork.
+	HealthProberTypeDeploymentAvailability HealthProberType = "DeploymentAvailability"
 )
 
 func KubeClientSignerConfigurations(addonName, agentName string) func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {

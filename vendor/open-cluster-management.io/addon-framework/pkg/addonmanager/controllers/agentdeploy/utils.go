@@ -10,11 +10,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/api/utils/work/v1/workbuilder"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 func addonHasFinalizer(addon *addonapiv1alpha1.ManagedClusterAddOn, finalizer string) bool {
@@ -473,7 +475,9 @@ func newAddonWorkObjectMeta(namePrefix, addonName, addonNamespace, workNamespace
 	}
 }
 
-func getManifestConfigOption(agentAddon agent.AgentAddon) []workapiv1.ManifestConfigOption {
+func getManifestConfigOption(agentAddon agent.AgentAddon,
+	cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1alpha1.ManagedClusterAddOn) []workapiv1.ManifestConfigOption {
 	manifestConfigs := []workapiv1.ManifestConfigOption{}
 
 	if agentAddon.GetAgentAddonOptions().HealthProber != nil &&
@@ -485,6 +489,21 @@ func getManifestConfigOption(agentAddon agent.AgentAddon) []workapiv1.ManifestCo
 				ResourceIdentifier: rule.ResourceIdentifier,
 				FeedbackRules:      rule.ProbeRules,
 			})
+		}
+	}
+
+	if agentAddon.GetAgentAddonOptions().HealthProber != nil &&
+		agentAddon.GetAgentAddonOptions().HealthProber.Type == agent.HealthProberTypeDeploymentAvailability {
+
+		manifests, err := agentAddon.Manifests(cluster, addon)
+		if err != nil {
+			return manifestConfigs
+		}
+
+		deployments := utils.FilterDeployments(manifests)
+		for _, deployment := range deployments {
+			manifestConfig := utils.DeploymentWellKnowManifestConfig(deployment.Namespace, deployment.Name)
+			manifestConfigs = append(manifestConfigs, manifestConfig)
 		}
 	}
 
