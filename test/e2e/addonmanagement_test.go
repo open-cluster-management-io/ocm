@@ -44,9 +44,9 @@ var (
 	}
 )
 
-var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Label("addon-manager"), func() {
+var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, ginkgo.Label("addon-manager"), func() {
 	addOnName := "hello-template"
-	var klusterletName, clusterName, agentNamespace, addonInstallNamespace string
+	var addonInstallNamespace string
 
 	s := runtime.NewScheme()
 	_ = scheme.AddToScheme(s)
@@ -62,17 +62,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Label("ad
 		"addon/signca_secret_rolebinding.yaml",
 	}
 
-	ginkgo.BeforeEach(func() {
-		surfix := rand.String(6)
-		klusterletName = fmt.Sprintf("e2e-klusterlet-%s", surfix)
-		clusterName = fmt.Sprintf("e2e-managedcluster-%s", surfix)
-		agentNamespace = fmt.Sprintf("open-cluster-management-agent-%s", surfix)
-		addonInstallNamespace = fmt.Sprintf("%s-addon", agentNamespace)
-
-		ginkgo.By("create addon custom sign secret")
-		err := copySignerSecret(context.TODO(), t.HubKubeClient, "open-cluster-management-hub",
-			"signer-secret", templateagent.AddonManagerNamespace(), customSignerSecretName)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	ginkgo.BeforeAll(func() {
 		// enable addon management feature gate
 		gomega.Eventually(func() error {
 			clusterManager, err := t.OperatorClient.OperatorV1().ClusterManagers().Get(context.TODO(), "cluster-manager", metav1.GetOptions{})
@@ -90,13 +80,30 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Label("ad
 			_, err = t.OperatorClient.OperatorV1().ClusterManagers().Update(context.TODO(), clusterManager, metav1.UpdateOptions{})
 			return err
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+	})
+
+	ginkgo.AfterAll(func() {
+		// disable addon management feature gate
+		gomega.Eventually(func() error {
+			clusterManager, err := t.OperatorClient.OperatorV1().ClusterManagers().Get(context.TODO(), "cluster-manager", metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			clusterManager.Spec.AddOnManagerConfiguration = &operatorapiv1.AddOnManagerConfiguration{}
+			_, err = t.OperatorClient.OperatorV1().ClusterManagers().Update(context.TODO(), clusterManager, metav1.UpdateOptions{})
+			return err
+		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
+	})
+
+	ginkgo.BeforeEach(func() {
+		addonInstallNamespace = fmt.Sprintf("%s-addon", agentNamespace)
+		ginkgo.By("create addon custom sign secret")
+		err := copySignerSecret(context.TODO(), t.HubKubeClient, "open-cluster-management-hub",
+			"signer-secret", templateagent.AddonManagerNamespace(), customSignerSecretName)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		// the addon manager deployment should be running
 		gomega.Eventually(t.CheckHubReady, t.EventuallyTimeout, t.EventuallyInterval).Should(gomega.Succeed())
-
-		_, err = t.CreateApprovedKlusterlet(
-			klusterletName, clusterName, agentNamespace, operatorapiv1.InstallMode(klusterletDeployMode))
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By(fmt.Sprintf("create addon template resources for cluster %v", clusterName))
 		err = createResourcesFromYamlFiles(context.Background(), t.HubDynamicClient, t.hubRestMapper, s,
@@ -165,25 +172,6 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Label("ad
 			ginkgo.Fail(fmt.Sprintf("failed to delete custom signer secret %v/%v: %v",
 				templateagent.AddonManagerNamespace(), customSignerSecretName, err))
 		}
-
-		ginkgo.By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
-		gomega.Expect(t.cleanKlusterletResources(klusterletName, clusterName)).To(gomega.BeNil())
-
-		ginkgo.By(fmt.Sprintf("Cleaning managed cluster namespace %s", clusterName))
-		err = t.HubKubeClient.CoreV1().Namespaces().Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		// disable addon management feature gate
-		gomega.Eventually(func() error {
-			clusterManager, err := t.OperatorClient.OperatorV1().ClusterManagers().Get(context.TODO(), "cluster-manager", metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			clusterManager.Spec.AddOnManagerConfiguration = &operatorapiv1.AddOnManagerConfiguration{}
-			_, err = t.OperatorClient.OperatorV1().ClusterManagers().Update(context.TODO(), clusterManager, metav1.UpdateOptions{})
-			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
-
 	})
 
 	ginkgo.It("Template type addon should be functioning", func() {

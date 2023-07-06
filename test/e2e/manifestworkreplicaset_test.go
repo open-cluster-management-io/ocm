@@ -14,7 +14,6 @@ import (
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
-	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 
@@ -30,6 +29,7 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", func() {
 	var nameSuffix string
 
 	ginkgo.BeforeEach(func() {
+		nameSuffix = rand.String(6)
 		// Enable manifestWorkReplicaSet feature if not enabled
 		gomega.Eventually(func() error {
 			return t.EnableWorkFeature("ManifestWorkReplicaSet")
@@ -46,27 +46,6 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", func() {
 	})
 
 	ginkgo.Context("Creating a ManifestWorkReplicaSet and check created resources", func() {
-		var klusterletName, clusterName string
-		ginkgo.JustBeforeEach(func() {
-			nameSuffix = rand.String(5)
-
-			if deployKlusterlet {
-				klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
-				clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
-				agentNamespace := fmt.Sprintf("open-cluster-management-agent-%s", rand.String(6))
-				_, err := t.CreateApprovedKlusterlet(
-					klusterletName, clusterName, agentNamespace, operatorapiv1.InstallMode(klusterletDeployMode))
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			}
-		})
-
-		ginkgo.JustAfterEach(func() {
-			if deployKlusterlet {
-				ginkgo.By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
-				gomega.Expect(t.cleanKlusterletResources(klusterletName, clusterName)).To(gomega.BeNil())
-			}
-		})
-
 		ginkgo.It("Should create ManifestWorkReplicaSet successfullt", func() {
 			ginkgo.By("create manifestworkreplicaset")
 			ns1 := fmt.Sprintf("ns1-%s", nameSuffix)

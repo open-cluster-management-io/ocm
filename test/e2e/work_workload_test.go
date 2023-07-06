@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/utils/pointer"
 
-	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/ocm/test/integration/util"
@@ -149,31 +148,18 @@ const (
 // Test cases with lable "sanity-check" could be ran on an existing enviroment with work agent installed
 // and well configured as sanity check. Resource leftovers should be cleaned up on both hub and managed cluster.
 var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check"), func() {
-	var workName, klusterletName string
+	var workName string
 	var err error
 	var nameSuffix string
 
 	ginkgo.BeforeEach(func() {
 		nameSuffix = rand.String(5)
 		workName = fmt.Sprintf("work-%s", nameSuffix)
-
-		if deployKlusterlet {
-			klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
-			clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
-			agentNamespace := fmt.Sprintf("open-cluster-management-agent-%s", rand.String(6))
-			_, err := t.CreateApprovedKlusterlet(
-				klusterletName, clusterName, agentNamespace, operatorapiv1.InstallMode(klusterletDeployMode))
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		}
 	})
 
 	ginkgo.AfterEach(func() {
 		ginkgo.By(fmt.Sprintf("delete manifestwork %v/%v", clusterName, workName))
 		gomega.Expect(t.cleanManifestWorks(clusterName, workName)).To(gomega.BeNil())
-		if deployKlusterlet {
-			ginkgo.By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
-			gomega.Expect(t.cleanKlusterletResources(klusterletName, clusterName)).To(gomega.BeNil())
-		}
 	})
 
 	ginkgo.Context("Work CRUD", func() {

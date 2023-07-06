@@ -20,7 +20,6 @@ import (
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
-	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
@@ -61,21 +60,11 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 
 	ginkgo.It("Should register the hub as a managed cluster", func() {
 		var (
-			err            error
-			klusterletName string
-			suffix         = rand.String(6)
-			nsName         = fmt.Sprintf("loopback-spoke-%v", suffix)
+			err    error
+			suffix = rand.String(6)
+			nsName = fmt.Sprintf("loopback-spoke-%v", suffix)
 		)
 		ginkgo.By(fmt.Sprintf("Deploying the agent using suffix=%q ns=%q", suffix, nsName))
-		clusterName := fmt.Sprintf("loopback-e2e-%v", suffix)
-		if deployKlusterlet {
-			klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
-			clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
-			agentNamespace := fmt.Sprintf("open-cluster-management-agent-%s", rand.String(6))
-			_, err := t.CreateApprovedKlusterlet(
-				klusterletName, clusterName, agentNamespace, operatorapiv1.InstallMode(klusterletDeployMode))
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		}
 		var (
 			managedCluster  *clusterv1.ManagedCluster
 			managedClusters = t.ClusterClient.ClusterV1().ManagedClusters()
@@ -351,11 +340,6 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 			_, err = t.SpokeKubeClient.CoreV1().Secrets(addOnName).Get(context.TODO(), secretName, metav1.GetOptions{})
 			return errors.IsNotFound(err)
 		}, 90*time.Second, 1*time.Second).Should(gomega.BeTrue())
-
-		if deployKlusterlet {
-			ginkgo.By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
-			gomega.Expect(t.cleanKlusterletResources(klusterletName, clusterName)).To(gomega.BeNil())
-		}
 
 		ginkgo.By(fmt.Sprintf("Cleaning managed cluster addon installation namespace %q", addOnName))
 		err = t.SpokeKubeClient.CoreV1().Namespaces().Delete(context.TODO(), addOnName, metav1.DeleteOptions{})

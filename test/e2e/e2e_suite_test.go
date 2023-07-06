@@ -2,11 +2,13 @@ package e2e
 
 import (
 	"flag"
+	"fmt"
 	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/util/rand"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
@@ -15,6 +17,8 @@ var t *Tester
 
 var (
 	clusterName           string
+	klusterletName        string
+	agentNamespace        string
 	hubKubeconfig         string
 	nilExecutorValidating bool
 	deployKlusterlet      bool
@@ -69,4 +73,20 @@ var _ = BeforeSuite(func() {
 		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
 	}
 	Expect(err).ToNot(HaveOccurred())
+
+	if deployKlusterlet {
+		klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
+		clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
+		agentNamespace = fmt.Sprintf("open-cluster-management-agent-%s", rand.String(6))
+		_, err := t.CreateApprovedKlusterlet(
+			klusterletName, clusterName, agentNamespace, operatorapiv1.InstallMode(klusterletDeployMode))
+		Expect(err).ToNot(HaveOccurred())
+	}
+})
+
+var _ = AfterSuite(func() {
+	if deployKlusterlet {
+		By(fmt.Sprintf("clean klusterlet %v resources after the test case", klusterletName))
+		Expect(t.cleanKlusterletResources(klusterletName, clusterName)).To(BeNil())
+	}
 })
