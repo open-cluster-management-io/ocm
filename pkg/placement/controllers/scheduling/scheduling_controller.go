@@ -465,11 +465,6 @@ func (c *schedulingController) generatePlacementDecisionsAndStatus(
 	// generate decision group
 	decisionGroups, status := c.generateDecisionGroups(placement, clusters)
 
-	// generate at least on empty decisionGroup, this is to ensure there's an empty placement decision if no cluster selected.
-	if len(decisionGroups) == 0 {
-		decisionGroups = append(decisionGroups, clusterDecisionGroup{})
-	}
-
 	// generate placement decision for each decision group
 	for decisionGroupIndex, decisionGroup := range decisionGroups {
 		// sort clusterdecisions by cluster name
@@ -495,11 +490,6 @@ func (c *schedulingController) generateDecisionGroups(
 	clusters []*clusterapiv1.ManagedCluster,
 ) (clusterDecisionGroups, *framework.Status) {
 	groups := []clusterDecisionGroup{}
-	// Record the cluster names
-	clusterNames := sets.NewString()
-	for _, cluster := range clusters {
-		clusterNames.Insert(cluster.Name)
-	}
 
 	// Calculate the group length
 	length, status := calculateLength(&placement.Spec.DecisionStrategy.GroupStrategy.ClustersPerDecisionGroup, len(clusters))
@@ -507,22 +497,24 @@ func (c *schedulingController) generateDecisionGroups(
 		return groups, status
 	}
 
-	// If no decision group defined in placement, all the clusters will be put into a group with empty name.
-	decisionStrategy := placement.Spec.DecisionStrategy.GroupStrategy.DeepCopy()
-	decisionGroups := decisionStrategy.DecisionGroups
-	decisionGroups = append(decisionGroups, clusterapiv1beta1.DecisionGroup{})
+	// Record the cluster names
+	clusterNames := sets.NewString()
+	for _, cluster := range clusters {
+		clusterNames.Insert(cluster.Name)
+	}
 
 	// Groups the clusters by decision groups.
-	for _, d := range decisionGroups {
+	for _, d := range placement.Spec.DecisionStrategy.GroupStrategy.DecisionGroups {
+		// create cluster label selector
 		clusterSelector, err := helpers.NewClusterSelector(d.ClusterSelector)
 		if err != nil {
 			status = framework.NewStatus("", framework.Misconfigured, err.Error())
 			return groups, status
 		}
 
+		// filter clusters by label selector
 		groupName := d.GroupName
 		matched := []clusterapiv1beta1.ClusterDecision{}
-
 		for _, cluster := range clusters {
 			if ok := clusterSelector.Matches(cluster.Labels, helpers.GetClusterClaims(cluster)); !ok {
 				continue
@@ -535,16 +527,6 @@ func (c *schedulingController) generateDecisionGroups(
 				ClusterName: cluster.Name,
 			})
 			clusterNames.Delete(cluster.Name)
-
-			// clusters number in each group should be less than ClustersPerDecisionGroup
-			if len(matched) == length {
-				decisionGroup := clusterDecisionGroup{
-					decisionGroupName: groupName,
-					clusterDecisions:  matched,
-				}
-				groups = append(groups, decisionGroup)
-				matched = []clusterapiv1beta1.ClusterDecision{}
-			}
 		}
 
 		if len(matched) > 0 {
@@ -554,6 +536,41 @@ func (c *schedulingController) generateDecisionGroups(
 			}
 			groups = append(groups, decisionGroup)
 		}
+	}
+
+	// The clusters not belong to any decision group will be put into group with empty name.
+	// The group length depends on ClustersPerDecisionGroup.
+	if len(clusterNames) > 0 {
+		matched := []clusterapiv1beta1.ClusterDecision{}
+		for _, cluster := range clusters {
+			if !clusterNames.Has(cluster.Name) {
+				continue
+			}
+			matched = append(matched, clusterapiv1beta1.ClusterDecision{
+				ClusterName: cluster.Name,
+			})
+			if len(matched) == length {
+				decisionGroup := clusterDecisionGroup{
+					decisionGroupName: "",
+					clusterDecisions:  matched,
+				}
+				groups = append(groups, decisionGroup)
+				matched = []clusterapiv1beta1.ClusterDecision{}
+			}
+		}
+
+		if len(matched) > 0 {
+			decisionGroup := clusterDecisionGroup{
+				decisionGroupName: "",
+				clusterDecisions:  matched,
+			}
+			groups = append(groups, decisionGroup)
+		}
+	}
+
+	// generate at least on empty decisionGroup, this is to ensure there's an empty placement decision if no cluster selected.
+	if len(groups) == 0 {
+		groups = append(groups, clusterDecisionGroup{})
 	}
 
 	return groups, framework.NewStatus("", framework.Success, "")
@@ -771,7 +788,8 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 }
 
 func calculateLength(intOrStr *intstr.IntOrString, total int) (int, *framework.Status) {
-	var length int
+	length := total
+
 	switch intOrStr.Type {
 	case intstr.Int:
 		length = intOrStr.IntValue()
@@ -790,7 +808,7 @@ func calculateLength(intOrStr *intstr.IntOrString, total int) (int, *framework.S
 		}
 	}
 
-	if length > total {
+	if length < 0 || length > total {
 		length = total
 	}
 	return length, framework.NewStatus("", framework.Success, "")
