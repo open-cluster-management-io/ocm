@@ -2,6 +2,7 @@ package scheduling
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -67,12 +68,13 @@ func TestSchedulingController_sync(t *testing.T) {
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
-				testingcommon.AssertActions(t, actions, "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "patch")
 				// check if Placement has been updated
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				placement, ok := actual.(*clusterapiv1beta1.Placement)
-				if !ok {
-					t.Errorf("expected Placement was updated")
+				placement := &clusterapiv1beta1.Placement{}
+				patchData := actions[1].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placement)
+				if err != nil {
+					t.Fatal(err)
 				}
 
 				if placement.Status.NumberOfSelectedClusters != int32(3) {
@@ -122,12 +124,13 @@ func TestSchedulingController_sync(t *testing.T) {
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
-				testingcommon.AssertActions(t, actions, "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "patch")
 				// check if Placement has been updated
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
-				placement, ok := actual.(*clusterapiv1beta1.Placement)
-				if !ok {
-					t.Errorf("expected Placement was updated")
+				placement := &clusterapiv1beta1.Placement{}
+				patchData := actions[1].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placement)
+				if err != nil {
+					t.Fatal(err)
 				}
 
 				if placement.Status.NumberOfSelectedClusters != int32(3) {
@@ -172,12 +175,13 @@ func TestSchedulingController_sync(t *testing.T) {
 				unscheduledDecisions: 0,
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "create", "create", "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "create", "create", "patch")
 				// check if Placement has been updated
-				actual := actions[3].(clienttesting.UpdateActionImpl).Object
-				placement, ok := actual.(*clusterapiv1beta1.Placement)
-				if !ok {
-					t.Errorf("expected Placement was updated")
+				placement := &clusterapiv1beta1.Placement{}
+				patchData := actions[3].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placement)
+				if err != nil {
+					t.Fatal(err)
 				}
 
 				if placement.Status.NumberOfSelectedClusters != int32(4) {
@@ -247,12 +251,13 @@ func TestSchedulingController_sync(t *testing.T) {
 				unscheduledDecisions: 0,
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "create", "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "create", "patch")
 				// check if Placement has been updated
-				actual := actions[2].(clienttesting.UpdateActionImpl).Object
-				placement, ok := actual.(*clusterapiv1beta1.Placement)
-				if !ok {
-					t.Errorf("expected Placement was updated")
+				placement := &clusterapiv1beta1.Placement{}
+				patchData := actions[2].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placement)
+				if err != nil {
+					t.Fatal(err)
 				}
 
 				if placement.Status.NumberOfSelectedClusters != int32(3) {
@@ -304,12 +309,13 @@ func TestSchedulingController_sync(t *testing.T) {
 				unscheduledDecisions: 0,
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "create", "create", "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "create", "create", "patch")
 				// check if Placement has been updated
-				actual := actions[3].(clienttesting.UpdateActionImpl).Object
-				placement, ok := actual.(*clusterapiv1beta1.Placement)
-				if !ok {
-					t.Errorf("expected Placement was updated")
+				placement := &clusterapiv1beta1.Placement{}
+				patchData := actions[3].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placement)
+				if err != nil {
+					t.Fatal(err)
 				}
 
 				if placement.Status.NumberOfSelectedClusters != int32(3) {
@@ -358,7 +364,7 @@ func TestSchedulingController_sync(t *testing.T) {
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
-				testingcommon.AssertActions(t, actions, "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "patch")
 				// check if emtpy PlacementDecision has been created
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
@@ -370,10 +376,11 @@ func TestSchedulingController_sync(t *testing.T) {
 					t.Errorf("expecte %d cluster selected, but got %d", 0, len(placementDecision.Status.Decisions))
 				}
 				// check if Placement has been updated
-				actual = actions[1].(clienttesting.UpdateActionImpl).Object
-				placement, ok := actual.(*clusterapiv1beta1.Placement)
-				if !ok {
-					t.Errorf("expected Placement was updated")
+				placement := &clusterapiv1beta1.Placement{}
+				patchData := actions[1].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placement)
+				if err != nil {
+					t.Fatal(err)
 				}
 
 				if placement.Status.NumberOfSelectedClusters != int32(0) {
@@ -404,7 +411,7 @@ func TestSchedulingController_sync(t *testing.T) {
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
-				testingcommon.AssertActions(t, actions, "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "patch")
 				// check if emtpy PlacementDecision has been created
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
@@ -416,10 +423,11 @@ func TestSchedulingController_sync(t *testing.T) {
 					t.Errorf("expecte %d cluster selected, but got %d", 0, len(placementDecision.Status.Decisions))
 				}
 				// check if Placement has been updated
-				actual = actions[1].(clienttesting.UpdateActionImpl).Object
-				placement, ok := actual.(*clusterapiv1beta1.Placement)
-				if !ok {
-					t.Errorf("expected Placement was updated")
+				placement := &clusterapiv1beta1.Placement{}
+				patchData := actions[1].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placement)
+				if err != nil {
+					t.Fatal(err)
 				}
 
 				if placement.Status.NumberOfSelectedClusters != int32(0) {
@@ -453,7 +461,7 @@ func TestSchedulingController_sync(t *testing.T) {
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
-				testingcommon.AssertActions(t, actions, "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "patch")
 				// check if emtpy PlacementDecision has been created
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
@@ -465,10 +473,11 @@ func TestSchedulingController_sync(t *testing.T) {
 					t.Errorf("expecte %d cluster selected, but got %d", 0, len(placementDecision.Status.Decisions))
 				}
 				// check if Placement has been updated
-				actual = actions[1].(clienttesting.UpdateActionImpl).Object
-				placement, ok := actual.(*clusterapiv1beta1.Placement)
-				if !ok {
-					t.Errorf("expected Placement was updated")
+				placement := &clusterapiv1beta1.Placement{}
+				patchData := actions[1].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placement)
+				if err != nil {
+					t.Fatal(err)
 				}
 
 				if placement.Status.NumberOfSelectedClusters != int32(0) {
@@ -1263,20 +1272,22 @@ func TestBind(t *testing.T) {
 					WithDecisions(newSelectedClusters(128)[:100]...).Build(),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "update", "create")
+				testingcommon.AssertActions(t, actions, "patch", "create")
 				selectedClusters := newSelectedClusters(128)
-				actual := actions[0].(clienttesting.UpdateActionImpl).Object
-				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
-				if !ok {
-					t.Errorf("expected PlacementDecision was updated")
+				placementDecision := &clusterapiv1beta1.PlacementDecision{}
+				patchData := actions[0].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placementDecision)
+				if err != nil {
+					t.Fatal(err)
 				}
-				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[:100]...)
+				// only update labels
+				assertClustersSelected(t, placementDecision.Status.Decisions)
 				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "" {
 					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
 				}
 
-				actual = actions[1].(clienttesting.CreateActionImpl).Object
-				placementDecision, ok = actual.(*clusterapiv1beta1.PlacementDecision)
+				actual := actions[1].(clienttesting.CreateActionImpl).Object
+				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
 					t.Errorf("expected PlacementDecision was updated")
 				}
@@ -1300,11 +1311,12 @@ func TestBind(t *testing.T) {
 					WithDecisions(newSelectedClusters(128)[100:]...).Build(),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "update", "delete")
-				actual := actions[0].(clienttesting.UpdateActionImpl).Object
-				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
-				if !ok {
-					t.Errorf("expected PlacementDecision was updated")
+				testingcommon.AssertActions(t, actions, "patch", "delete")
+				placementDecision := &clusterapiv1beta1.PlacementDecision{}
+				patchData := actions[0].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placementDecision)
+				if err != nil {
+					t.Fatal(err)
 				}
 				assertClustersSelected(t, placementDecision.Status.Decisions, newSelectedClusters(10)...)
 			},
@@ -1326,11 +1338,12 @@ func TestBind(t *testing.T) {
 					WithDecisions(newSelectedClusters(128)[100:]...).Build(),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "update", "delete")
-				actual := actions[0].(clienttesting.UpdateActionImpl).Object
-				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
-				if !ok {
-					t.Errorf("expected PlacementDecision was updated")
+				testingcommon.AssertActions(t, actions, "patch", "delete")
+				placementDecision := &clusterapiv1beta1.PlacementDecision{}
+				patchData := actions[0].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placementDecision)
+				if err != nil {
+					t.Fatal(err)
 				}
 				if len(placementDecision.Status.Decisions) != 0 {
 					t.Errorf("expecte %d cluster selected, but got %d", 0, len(placementDecision.Status.Decisions))

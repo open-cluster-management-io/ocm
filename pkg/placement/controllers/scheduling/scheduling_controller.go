@@ -14,7 +14,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	errorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	corev1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +39,7 @@ import (
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
 	"open-cluster-management.io/ocm/pkg/placement/helpers"
@@ -383,9 +383,11 @@ func (c *schedulingController) updateStatus(
 		return nil
 	}
 
-	_, err := c.clusterClient.ClusterV1beta1().
-		Placements(newPlacement.Namespace).
-		UpdateStatus(ctx, newPlacement, metav1.UpdateOptions{})
+	placementPatcher := patcher.NewPatcher[
+		*clusterapiv1beta1.Placement, clusterapiv1beta1.PlacementSpec, clusterapiv1beta1.PlacementStatus](
+		c.clusterClient.ClusterV1beta1().Placements(newPlacement.Namespace))
+
+	_, err := placementPatcher.PatchStatus(ctx, newPlacement, newPlacement.Status, placement.Status)
 	return err
 }
 
@@ -709,7 +711,7 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 		return fmt.Errorf("the number of clusterdecisions %q exceeds the max limitation %q", len(clusterDecisions), maxNumOfClusterDecisions)
 	}
 
-	existPlacementDecision, err := c.placementDecisionLister.PlacementDecisions(placement.Namespace).Get(placementDecisionName)
+	existPlacementDecision, err := c.placementDecisionLister.PlacementDecisions(placementDecision.Namespace).Get(placementDecisionName)
 	switch {
 	case errors.IsNotFound(err):
 		var err error
@@ -727,29 +729,20 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 	}
 
 	// update the status and labels of the placementdecision if decisions change
-	decisionsequal := apiequality.Semantic.DeepEqual(existPlacementDecision.Status.Decisions, clusterDecisions)
-	labelsequal := apiequality.Semantic.DeepEqual(existPlacementDecision.Labels, placementDecision.Labels)
-
-	if decisionsequal && labelsequal {
-		return nil
-	}
+	placementDecisionPatcher := patcher.NewPatcher[
+		*clusterapiv1beta1.PlacementDecision, interface{}, clusterapiv1beta1.PlacementDecisionStatus](
+		c.clusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace))
 
 	newPlacementDecision := existPlacementDecision.DeepCopy()
-	if !labelsequal {
-		newPlacementDecision.Labels = placementDecision.Labels
-		_, err = c.clusterClient.ClusterV1beta1().PlacementDecisions(newPlacementDecision.Namespace).
-			Update(ctx, newPlacementDecision, metav1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
+	newPlacementDecision.Labels = placementDecision.Labels
+	newPlacementDecision.Status.Decisions = clusterDecisions
+	_, err = placementDecisionPatcher.PatchLabelAnnotations(ctx, newPlacementDecision, newPlacementDecision.ObjectMeta, existPlacementDecision.ObjectMeta)
+	if err != nil {
+		return err
 	}
-	if !decisionsequal {
-		newPlacementDecision.Status.Decisions = clusterDecisions
-		_, err = c.clusterClient.ClusterV1beta1().PlacementDecisions(newPlacementDecision.Namespace).
-			UpdateStatus(ctx, newPlacementDecision, metav1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
+	_, err = placementDecisionPatcher.PatchStatus(ctx, newPlacementDecision, newPlacementDecision.Status, existPlacementDecision.Status)
+	if err != nil {
+		return err
 	}
 
 	// update the event with warning
