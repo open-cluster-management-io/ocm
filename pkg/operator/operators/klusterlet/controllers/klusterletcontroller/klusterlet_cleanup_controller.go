@@ -191,7 +191,7 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 		return utilerrors.NewAggregate(errs)
 	}
 
-	return n.patcher.RemoveFinalizer(ctx, klusterlet, klusterletFinalizer, klusterletHostedFinalizer)
+	return n.patcher.RemoveFinalizerForcely(ctx, klusterlet, klusterletFinalizer, klusterletHostedFinalizer)
 }
 
 func (r *klusterletCleanupController) checkConnectivity(ctx context.Context,

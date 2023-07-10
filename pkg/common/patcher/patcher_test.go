@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	clienttesting "k8s.io/client-go/testing"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -147,6 +149,30 @@ func TestRemoveFinalizer(t *testing.T) {
 			c.validateActions(t, clusterClient.Actions())
 		})
 	}
+}
+
+func TestRemoveFinalizerForcely(t *testing.T) {
+	obj := newManagedClusterWithFinalizer("test-finalizer", "test-finalizer-1")
+	clusterClient := clusterfake.NewSimpleClientset(obj)
+	patcher := NewPatcher[
+		*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
+		clusterClient.ClusterV1().ManagedClusters())
+	if err := patcher.RemoveFinalizerForcely(context.TODO(), obj, "test-finalizer"); err != nil {
+		t.Error(err)
+	}
+	actions := clusterClient.Actions()
+	testingcommon.AssertActions(t, actions, "patch")
+	patchAction := actions[0].(clienttesting.PatchAction)
+	patchAction.GetPatchType()
+	assert.Equal(t, types.MergePatchType, patchAction.GetPatchType())
+	patch := patchAction.GetPatch()
+	managedCluster := &clusterv1.ManagedCluster{}
+	err := json.Unmarshal(patch, managedCluster)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testinghelpers.AssertFinalizers(t, managedCluster, []string{"test-finalizer-1"})
 }
 
 func TestPatchSpec(t *testing.T) {
@@ -318,7 +344,7 @@ func TestPatchLabelAnnotations(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !equality.Semantic.DeepEqual(labelPatch["metadata"], map[string]interface{}{"UID": "", "resourceVersion": "", "labels": map[string]interface{}{"key1": nil}}) {
+				if !equality.Semantic.DeepEqual(labelPatch["metadata"], map[string]interface{}{"uid": "", "resourceVersion": "", "labels": map[string]interface{}{"key1": nil}}) {
 					t.Errorf("not patched correctly got %v", labelPatch)
 				}
 			},
