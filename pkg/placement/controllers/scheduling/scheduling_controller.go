@@ -494,7 +494,7 @@ func (c *schedulingController) generateDecisionGroups(
 	groups := []clusterDecisionGroup{}
 
 	// Calculate the group length
-	length, status := calculateLength(&placement.Spec.DecisionStrategy.GroupStrategy.ClustersPerDecisionGroup, len(clusters))
+	groupLength, status := calculateLength(&placement.Spec.DecisionStrategy.GroupStrategy.ClustersPerDecisionGroup, len(clusters))
 	if status.IsError() {
 		return groups, status
 	}
@@ -505,7 +505,7 @@ func (c *schedulingController) generateDecisionGroups(
 		clusterNames.Insert(cluster.Name)
 	}
 
-	// Groups the clusters by decision groups.
+	// First groups the clusters by ClusterSelector defined in spec.DecisionStrategy.GroupStrategy.DecisionGroups.
 	for _, d := range placement.Spec.DecisionStrategy.GroupStrategy.DecisionGroups {
 		// create cluster label selector
 		clusterSelector, err := helpers.NewClusterSelector(d.ClusterSelector)
@@ -540,34 +540,28 @@ func (c *schedulingController) generateDecisionGroups(
 		}
 	}
 
-	// The clusters not belong to any decision group will be put into group with empty name.
-	// The group length depends on ClustersPerDecisionGroup.
-	if len(clusterNames) > 0 {
-		matched := []clusterapiv1beta1.ClusterDecision{}
-		for _, cluster := range clusters {
-			if !clusterNames.Has(cluster.Name) {
-				continue
-			}
-			matched = append(matched, clusterapiv1beta1.ClusterDecision{
-				ClusterName: cluster.Name,
-			})
-			if len(matched) == length {
-				decisionGroup := clusterDecisionGroup{
-					decisionGroupName: "",
-					clusterDecisions:  matched,
-				}
-				groups = append(groups, decisionGroup)
-				matched = []clusterapiv1beta1.ClusterDecision{}
-			}
+	// The rest of the clusters will also be put into decision groups.
+	// The number of items in each group is determined by the specific number or
+	// percentage defined in spec.DecisionStrategy.GroupStrategy.ClustersPerDecisionGroup.
+	for len(clusterNames) > 0 {
+		clusterList := clusterNames.List()
+		resultNumber := len(clusterList)
+		if groupLength < resultNumber {
+			resultNumber = groupLength
 		}
 
-		if len(matched) > 0 {
-			decisionGroup := clusterDecisionGroup{
-				decisionGroupName: "",
-				clusterDecisions:  matched,
-			}
-			groups = append(groups, decisionGroup)
+		matched := []clusterapiv1beta1.ClusterDecision{}
+		for i := 0; i < resultNumber; i++ {
+			matched = append(matched, clusterapiv1beta1.ClusterDecision{
+				ClusterName: clusterList[i],
+			})
+			delete(clusterNames, clusterList[i])
 		}
+		decisionGroup := clusterDecisionGroup{
+			decisionGroupName: "",
+			clusterDecisions:  matched,
+		}
+		groups = append(groups, decisionGroup)
 	}
 
 	// generate at least on empty decisionGroup, this is to ensure there's an empty placement decision if no cluster selected.
@@ -736,11 +730,13 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 	newPlacementDecision := existPlacementDecision.DeepCopy()
 	newPlacementDecision.Labels = placementDecision.Labels
 	newPlacementDecision.Status.Decisions = clusterDecisions
-	_, err = placementDecisionPatcher.PatchLabelAnnotations(ctx, newPlacementDecision, newPlacementDecision.ObjectMeta, existPlacementDecision.ObjectMeta)
-	if err != nil {
+	updated, err := placementDecisionPatcher.PatchStatus(ctx, newPlacementDecision, newPlacementDecision.Status, existPlacementDecision.Status)
+	// If status has been updated, just return, this is to avoid conflict when updating the label later.
+	// Labels and annotations will still be updated in next reconcile.
+	if updated {
 		return err
 	}
-	_, err = placementDecisionPatcher.PatchStatus(ctx, newPlacementDecision, newPlacementDecision.Status, existPlacementDecision.Status)
+	_, err = placementDecisionPatcher.PatchLabelAnnotations(ctx, newPlacementDecision, newPlacementDecision.ObjectMeta, existPlacementDecision.ObjectMeta)
 	if err != nil {
 		return err
 	}
@@ -801,7 +797,7 @@ func calculateLength(intOrStr *intstr.IntOrString, total int) (int, *framework.S
 		}
 	}
 
-	if length < 0 || length > total {
+	if length <= 0 || length > total {
 		length = total
 	}
 	return length, framework.NewStatus("", framework.Success, "")
