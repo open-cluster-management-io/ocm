@@ -5,10 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	clienttesting "k8s.io/client-go/testing"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -82,6 +80,7 @@ func TestRemoveFinalizer(t *testing.T) {
 		name            string
 		obj             *clusterv1.ManagedCluster
 		finalizers      []string
+		opts            PatchOptions
 		validateActions func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
@@ -103,6 +102,7 @@ func TestRemoveFinalizer(t *testing.T) {
 			name:       "remove multiple finalizers",
 			obj:        newManagedClusterWithFinalizer("test-finalizer", "test-finalizer-1", "test-finalizer-2"),
 			finalizers: []string{"test-finalizer", "test-finalizer-2"},
+			opts:       PatchOptions{IgnoreResourceVersion: true},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
@@ -143,36 +143,12 @@ func TestRemoveFinalizer(t *testing.T) {
 			patcher := NewPatcher[
 				*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
 				clusterClient.ClusterV1().ManagedClusters())
-			if err := patcher.RemoveFinalizer(context.TODO(), c.obj, c.finalizers...); err != nil {
+			if err := patcher.RemoveFinalizer(context.TODO(), c.obj, c.opts, c.finalizers...); err != nil {
 				t.Error(err)
 			}
 			c.validateActions(t, clusterClient.Actions())
 		})
 	}
-}
-
-func TestRemoveFinalizerForcely(t *testing.T) {
-	obj := newManagedClusterWithFinalizer("test-finalizer", "test-finalizer-1")
-	clusterClient := clusterfake.NewSimpleClientset(obj)
-	patcher := NewPatcher[
-		*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
-		clusterClient.ClusterV1().ManagedClusters())
-	if err := patcher.RemoveFinalizerForcely(context.TODO(), obj, "test-finalizer"); err != nil {
-		t.Error(err)
-	}
-	actions := clusterClient.Actions()
-	testingcommon.AssertActions(t, actions, "patch")
-	patchAction := actions[0].(clienttesting.PatchAction)
-	patchAction.GetPatchType()
-	assert.Equal(t, types.MergePatchType, patchAction.GetPatchType())
-	patch := patchAction.GetPatch()
-	managedCluster := &clusterv1.ManagedCluster{}
-	err := json.Unmarshal(patch, managedCluster)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testinghelpers.AssertFinalizers(t, managedCluster, []string{"test-finalizer-1"})
 }
 
 func TestPatchSpec(t *testing.T) {

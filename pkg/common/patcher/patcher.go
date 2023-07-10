@@ -24,12 +24,15 @@ type PatchClient[R runtime.Object] interface {
 
 type Patcher[R runtime.Object, Sp any, St any] interface {
 	AddFinalizer(context.Context, R, ...string) (bool, error)
-	RemoveFinalizer(context.Context, R, ...string) error
-	// RemoveFinalizerForcely removes finalizers forcely without checking resource version.
-	RemoveFinalizerForcely(context.Context, R, ...string) error
+	RemoveFinalizer(context.Context, R, PatchOptions, ...string) error
 	PatchStatus(context.Context, R, St, St) (bool, error)
 	PatchSpec(context.Context, R, Sp, Sp) (bool, error)
 	PatchLabelAnnotations(context.Context, R, metav1.ObjectMeta, metav1.ObjectMeta) (bool, error)
+}
+
+type PatchOptions struct {
+	// IgnoreResourceVersion will ignore the resource version matching when patching.
+	IgnoreResourceVersion bool
 }
 
 // Resource is a generic wrapper around resources so we can generate patches.
@@ -93,16 +96,7 @@ func (p *patcher[R, Sp, St]) AddFinalizer(ctx context.Context, object R, finaliz
 	return false, nil
 }
 
-func (p *patcher[R, Sp, St]) RemoveFinalizer(ctx context.Context, object R, finalizers ...string) error {
-	return p.removeFinalizerByPatch(ctx, object, true, finalizers...)
-}
-
-func (p *patcher[R, Sp, St]) RemoveFinalizerForcely(ctx context.Context, object R, finalizers ...string) error {
-	return p.removeFinalizerByPatch(ctx, object, false, finalizers...)
-}
-
-func (p *patcher[R, Sp, St]) removeFinalizerByPatch(ctx context.Context,
-	object R, withResourceVersion bool, finalizers ...string) error {
+func (p *patcher[R, Sp, St]) RemoveFinalizer(ctx context.Context, object R, opts PatchOptions, finalizers ...string) error {
 	accessor, err := meta.Accessor(object)
 	if err != nil {
 		return err
@@ -129,19 +123,19 @@ func (p *patcher[R, Sp, St]) removeFinalizerByPatch(ctx context.Context,
 	}
 
 	var patch map[string]interface{}
-	if withResourceVersion {
+	if opts.IgnoreResourceVersion {
 		patch = map[string]interface{}{
 			"metadata": map[string]interface{}{
-				"uid":             accessor.GetUID(),
-				"resourceVersion": accessor.GetResourceVersion(),
-				"finalizers":      copiedFinalizers,
+				"uid":        accessor.GetUID(),
+				"finalizers": copiedFinalizers,
 			},
 		}
 	} else {
 		patch = map[string]interface{}{
 			"metadata": map[string]interface{}{
-				"uid":        accessor.GetUID(),
-				"finalizers": copiedFinalizers,
+				"uid":             accessor.GetUID(),
+				"resourceVersion": accessor.GetResourceVersion(),
+				"finalizers":      copiedFinalizers,
 			},
 		}
 	}

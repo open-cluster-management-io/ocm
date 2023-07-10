@@ -118,7 +118,7 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 	// reset the rate limiter for the appliedmanifestwork
 	m.rateLimiter.Forget(appliedManifestWork.Name)
 
-	if err := m.patcher.RemoveFinalizer(ctx, appliedManifestWork, controllers.AppliedManifestWorkFinalizer); err != nil {
+	if err := m.patcher.RemoveFinalizer(ctx, appliedManifestWork, patcher.PatchOptions{}, controllers.AppliedManifestWorkFinalizer); err != nil {
 		return fmt.Errorf("failed to remove finalizer from AppliedManifestWork %s: %w", appliedManifestWork.Name, err)
 	}
 	return nil

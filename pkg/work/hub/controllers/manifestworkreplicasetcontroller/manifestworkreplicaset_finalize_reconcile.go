@@ -36,7 +36,7 @@ func (f *finalizeReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alp
 		f.workClient.WorkV1alpha1().ManifestWorkReplicaSets(mwrSet.Namespace))
 
 	// Remove finalizer after delete all created Manifestworks
-	if err := workSetPatcher.RemoveFinalizer(ctx, mwrSet, ManifestWorkReplicaSetFinalizer); err != nil {
+	if err := workSetPatcher.RemoveFinalizer(ctx, mwrSet, patcher.PatchOptions{}, ManifestWorkReplicaSetFinalizer); err != nil {
 		return mwrSet, reconcileContinue, err
 	}
 

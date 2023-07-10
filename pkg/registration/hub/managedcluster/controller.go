@@ -114,7 +114,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		if err := c.removeManagedClusterResources(ctx, managedClusterName); err != nil {
 			return err
 		}
-		return c.patcher.RemoveFinalizer(ctx, managedCluster, managedClusterFinalizer)
+		return c.patcher.RemoveFinalizer(ctx, managedCluster, patcher.PatchOptions{}, managedClusterFinalizer)
 	}
 
 	if !managedCluster.Spec.HubAcceptsClient {

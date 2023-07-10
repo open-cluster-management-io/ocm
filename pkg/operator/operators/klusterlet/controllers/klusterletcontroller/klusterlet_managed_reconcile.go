@@ -183,7 +183,7 @@ func (r *managedReconcile) cleanUpAppliedManifestWorks(ctx context.Context, klus
 		return nil
 	}
 
-	patcher := patcher.NewPatcher[
+	mwpatcher := patcher.NewPatcher[
 		*workapiv1.AppliedManifestWork, workapiv1.AppliedManifestWorkSpec, workapiv1.AppliedManifestWorkStatus](
 		r.managedClusterClients.appliedManifestWorkClient)
 
@@ -195,7 +195,7 @@ func (r *managedReconcile) cleanUpAppliedManifestWorks(ctx context.Context, klus
 		}
 
 		// remove finalizer if exists
-		if err := patcher.RemoveFinalizer(ctx, &appliedManifestWorks.Items[index], appliedManifestWorkFinalizer); err != nil {
+		if err := mwpatcher.RemoveFinalizer(ctx, &appliedManifestWorks.Items[index], patcher.PatchOptions{}, appliedManifestWorkFinalizer); err != nil {
 			errs = append(errs, fmt.Errorf("unable to remove finalizer from AppliedManifestWork %q: %w", appliedManifestWorks.Items[index].Name, err))
 		}
 	}

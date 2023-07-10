@@ -218,7 +218,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 				return err
 			}
 		}
-		return n.patcher.RemoveFinalizer(ctx, clusterManager, clusterManagerFinalizer)
+		return n.patcher.RemoveFinalizer(ctx, clusterManager, patcher.PatchOptions{}, clusterManagerFinalizer)
 	}
 
 	// get caBundle
