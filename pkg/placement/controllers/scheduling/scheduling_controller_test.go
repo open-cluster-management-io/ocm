@@ -2,13 +2,16 @@ package scheduling
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clienttesting "k8s.io/client-go/testing"
@@ -56,26 +59,39 @@ func TestSchedulingController_sync(t *testing.T) {
 					testinghelpers.NewManagedCluster("cluster2").Build(),
 					testinghelpers.NewManagedCluster("cluster3").Build(),
 				},
-				scheduledDecisions: []clusterapiv1beta1.ClusterDecision{
-					{ClusterName: "cluster1"},
-					{ClusterName: "cluster2"},
-					{ClusterName: "cluster3"},
+				scheduledDecisions: []*clusterapiv1.ManagedCluster{
+					testinghelpers.NewManagedCluster("cluster1").Build(),
+					testinghelpers.NewManagedCluster("cluster2").Build(),
+					testinghelpers.NewManagedCluster("cluster3").Build(),
 				},
 				unscheduledDecisions: 0,
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
-				testingcommon.AssertActions(t, actions, "create", "update", "update")
+				testingcommon.AssertActions(t, actions, "create", "patch")
 				// check if Placement has been updated
-				actual := actions[2].(clienttesting.UpdateActionImpl).Object
-				placement, ok := actual.(*clusterapiv1beta1.Placement)
-				if !ok {
-					t.Errorf("expected Placement was updated")
+				placement := &clusterapiv1beta1.Placement{}
+				patchData := actions[1].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placement)
+				if err != nil {
+					t.Fatal(err)
 				}
 
 				if placement.Status.NumberOfSelectedClusters != int32(3) {
 					t.Errorf("expecte %d cluster selected, but got %d", 3, placement.Status.NumberOfSelectedClusters)
 				}
+				expectDecisionGroups := []clusterapiv1beta1.DecisionGroupStatus{
+					{
+						DecisionGroupIndex: 0,
+						DecisionGroupName:  "",
+						Decisions:          []string{"placement1-decision-0"},
+						ClustersCount:      3,
+					},
+				}
+				if !reflect.DeepEqual(placement.Status.DecisionGroups, expectDecisionGroups) {
+					t.Errorf("expect %v cluster decision gorups, but got %v", expectDecisionGroups, placement.Status.DecisionGroups)
+				}
+
 				util.HasCondition(
 					placement.Status.Conditions,
 					clusterapiv1beta1.PlacementConditionSatisfied,
@@ -99,25 +115,29 @@ func TestSchedulingController_sync(t *testing.T) {
 					testinghelpers.NewManagedCluster("cluster2").Build(),
 					testinghelpers.NewManagedCluster("cluster3").Build(),
 				},
-				scheduledDecisions: []clusterapiv1beta1.ClusterDecision{
-					{ClusterName: "cluster1"},
-					{ClusterName: "cluster2"},
-					{ClusterName: "cluster3"},
+				scheduledDecisions: []*clusterapiv1.ManagedCluster{
+					testinghelpers.NewManagedCluster("cluster1").Build(),
+					testinghelpers.NewManagedCluster("cluster2").Build(),
+					testinghelpers.NewManagedCluster("cluster3").Build(),
 				},
 				unscheduledDecisions: 1,
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
-				testingcommon.AssertActions(t, actions, "create", "update", "update")
+				testingcommon.AssertActions(t, actions, "create", "patch")
 				// check if Placement has been updated
-				actual := actions[2].(clienttesting.UpdateActionImpl).Object
-				placement, ok := actual.(*clusterapiv1beta1.Placement)
-				if !ok {
-					t.Errorf("expected Placement was updated")
+				placement := &clusterapiv1beta1.Placement{}
+				patchData := actions[1].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placement)
+				if err != nil {
+					t.Fatal(err)
 				}
 
 				if placement.Status.NumberOfSelectedClusters != int32(3) {
 					t.Errorf("expecte %d cluster selected, but got %d", 3, placement.Status.NumberOfSelectedClusters)
+				}
+				if len(placement.Status.DecisionGroups) != 1 || placement.Status.DecisionGroups[0].ClustersCount != 3 {
+					t.Errorf("expecte %d cluster decision gorups, but got %d", 1, len(placement.Status.DecisionGroups))
 				}
 				util.HasCondition(
 					placement.Status.Conditions,
@@ -128,16 +148,223 @@ func TestSchedulingController_sync(t *testing.T) {
 			},
 		},
 		{
+			name: "placement with canary group strategy",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithGroupStrategy(clusterapiv1beta1.GroupStrategy{
+				ClustersPerDecisionGroup: intstr.FromInt(1),
+				DecisionGroups: []clusterapiv1beta1.DecisionGroup{
+					{
+						GroupName: "canary",
+						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
+						},
+					},
+				}}).Build(),
+			scheduleResult: &scheduleResult{
+				feasibleClusters: []*clusterapiv1.ManagedCluster{
+					testinghelpers.NewManagedCluster("cluster1").Build(),
+					testinghelpers.NewManagedCluster("cluster2").Build(),
+					testinghelpers.NewManagedCluster("cluster3").Build(),
+					testinghelpers.NewManagedCluster("cluster4").Build(),
+				},
+				scheduledDecisions: []*clusterapiv1.ManagedCluster{
+					testinghelpers.NewManagedCluster("cluster1").WithLabel("cloud", "Amazon").Build(),
+					testinghelpers.NewManagedCluster("cluster2").WithLabel("cloud", "Amazon").Build(),
+					testinghelpers.NewManagedCluster("cluster3").WithLabel("cloud", "Azure").Build(),
+					testinghelpers.NewManagedCluster("cluster4").WithLabel("cloud", "Azure").Build(),
+				},
+				unscheduledDecisions: 0,
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "create", "create", "create", "patch")
+				// check if Placement has been updated
+				placement := &clusterapiv1beta1.Placement{}
+				patchData := actions[3].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placement)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if placement.Status.NumberOfSelectedClusters != int32(4) {
+					t.Errorf("expecte %d cluster selected, but got %d", 4, placement.Status.NumberOfSelectedClusters)
+				}
+
+				expectDecisionGroups := []clusterapiv1beta1.DecisionGroupStatus{
+					{
+						DecisionGroupIndex: 0,
+						DecisionGroupName:  "canary",
+						Decisions:          []string{"placement1-decision-0"},
+						ClustersCount:      2,
+					},
+					{
+						DecisionGroupIndex: 1,
+						DecisionGroupName:  "",
+						Decisions:          []string{"placement1-decision-1"},
+						ClustersCount:      1,
+					},
+					{
+						DecisionGroupIndex: 2,
+						DecisionGroupName:  "",
+						Decisions:          []string{"placement1-decision-2"},
+						ClustersCount:      1,
+					},
+				}
+				if !reflect.DeepEqual(placement.Status.DecisionGroups, expectDecisionGroups) {
+					t.Errorf("expect %v cluster decision gorups, but got %v", expectDecisionGroups, placement.Status.DecisionGroups)
+				}
+
+				util.HasCondition(
+					placement.Status.Conditions,
+					clusterapiv1beta1.PlacementConditionSatisfied,
+					"AllDecisionsScheduled",
+					metav1.ConditionTrue,
+				)
+			},
+		},
+		{
+			name: "placement with multiple group strategy",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithGroupStrategy(clusterapiv1beta1.GroupStrategy{
+				DecisionGroups: []clusterapiv1beta1.DecisionGroup{
+					{
+						GroupName: "group1",
+						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Amazon"}},
+						},
+					},
+					{
+						GroupName: "group2",
+						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
+						},
+					},
+				}}).Build(),
+			scheduleResult: &scheduleResult{
+				feasibleClusters: []*clusterapiv1.ManagedCluster{
+					testinghelpers.NewManagedCluster("cluster1").Build(),
+					testinghelpers.NewManagedCluster("cluster2").Build(),
+					testinghelpers.NewManagedCluster("cluster3").Build(),
+				},
+				scheduledDecisions: []*clusterapiv1.ManagedCluster{
+					testinghelpers.NewManagedCluster("cluster1").WithLabel("cloud", "Amazon").Build(),
+					testinghelpers.NewManagedCluster("cluster2").WithLabel("cloud", "Amazon").Build(),
+					testinghelpers.NewManagedCluster("cluster3").WithLabel("cloud", "Azure").Build(),
+				},
+				unscheduledDecisions: 0,
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "create", "create", "patch")
+				// check if Placement has been updated
+				placement := &clusterapiv1beta1.Placement{}
+				patchData := actions[2].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placement)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if placement.Status.NumberOfSelectedClusters != int32(3) {
+					t.Errorf("expecte %d cluster selected, but got %d", 3, placement.Status.NumberOfSelectedClusters)
+				}
+
+				expectDecisionGroups := []clusterapiv1beta1.DecisionGroupStatus{
+					{
+						DecisionGroupIndex: 0,
+						DecisionGroupName:  "group1",
+						Decisions:          []string{"placement1-decision-0"},
+						ClustersCount:      2,
+					},
+					{
+						DecisionGroupIndex: 1,
+						DecisionGroupName:  "group2",
+						Decisions:          []string{"placement1-decision-1"},
+						ClustersCount:      1,
+					},
+				}
+				if !reflect.DeepEqual(placement.Status.DecisionGroups, expectDecisionGroups) {
+					t.Errorf("expect %v cluster decision gorups, but got %v", expectDecisionGroups, placement.Status.DecisionGroups)
+				}
+
+				util.HasCondition(
+					placement.Status.Conditions,
+					clusterapiv1beta1.PlacementConditionSatisfied,
+					"AllDecisionsScheduled",
+					metav1.ConditionTrue,
+				)
+			},
+		},
+		{
+			name: "placement with only cluster per decision group",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithGroupStrategy(clusterapiv1beta1.GroupStrategy{
+				ClustersPerDecisionGroup: intstr.FromString("25%"),
+			}).Build(),
+			scheduleResult: &scheduleResult{
+				feasibleClusters: []*clusterapiv1.ManagedCluster{
+					testinghelpers.NewManagedCluster("cluster1").Build(),
+					testinghelpers.NewManagedCluster("cluster2").Build(),
+					testinghelpers.NewManagedCluster("cluster3").Build(),
+				},
+				scheduledDecisions: []*clusterapiv1.ManagedCluster{
+					testinghelpers.NewManagedCluster("cluster1").WithLabel("cloud", "Amazon").Build(),
+					testinghelpers.NewManagedCluster("cluster2").WithLabel("cloud", "Amazon").Build(),
+					testinghelpers.NewManagedCluster("cluster3").WithLabel("cloud", "Azure").Build(),
+				},
+				unscheduledDecisions: 0,
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "create", "create", "create", "patch")
+				// check if Placement has been updated
+				placement := &clusterapiv1beta1.Placement{}
+				patchData := actions[3].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placement)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if placement.Status.NumberOfSelectedClusters != int32(3) {
+					t.Errorf("expecte %d cluster selected, but got %d", 3, placement.Status.NumberOfSelectedClusters)
+				}
+
+				expectDecisionGroups := []clusterapiv1beta1.DecisionGroupStatus{
+					{
+						DecisionGroupIndex: 0,
+						DecisionGroupName:  "",
+						Decisions:          []string{"placement1-decision-0"},
+						ClustersCount:      1,
+					},
+					{
+						DecisionGroupIndex: 1,
+						DecisionGroupName:  "",
+						Decisions:          []string{"placement1-decision-1"},
+						ClustersCount:      1,
+					},
+					{
+						DecisionGroupIndex: 2,
+						DecisionGroupName:  "",
+						Decisions:          []string{"placement1-decision-2"},
+						ClustersCount:      1,
+					},
+				}
+				if !reflect.DeepEqual(placement.Status.DecisionGroups, expectDecisionGroups) {
+					t.Errorf("expect %v cluster decision gorups, but got %v", expectDecisionGroups, placement.Status.DecisionGroups)
+				}
+
+				util.HasCondition(
+					placement.Status.Conditions,
+					clusterapiv1beta1.PlacementConditionSatisfied,
+					"AllDecisionsScheduled",
+					metav1.ConditionTrue,
+				)
+			},
+		},
+		{
 			name:      "placement missing managedclustersetbindings",
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
 			scheduleResult: &scheduleResult{
 				feasibleClusters:     []*clusterapiv1.ManagedCluster{},
-				scheduledDecisions:   []clusterapiv1beta1.ClusterDecision{},
+				scheduledDecisions:   []*clusterapiv1.ManagedCluster{},
 				unscheduledDecisions: 0,
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
-				testingcommon.AssertActions(t, actions, "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "patch")
 				// check if emtpy PlacementDecision has been created
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
@@ -149,14 +376,18 @@ func TestSchedulingController_sync(t *testing.T) {
 					t.Errorf("expecte %d cluster selected, but got %d", 0, len(placementDecision.Status.Decisions))
 				}
 				// check if Placement has been updated
-				actual = actions[1].(clienttesting.UpdateActionImpl).Object
-				placement, ok := actual.(*clusterapiv1beta1.Placement)
-				if !ok {
-					t.Errorf("expected Placement was updated")
+				placement := &clusterapiv1beta1.Placement{}
+				patchData := actions[1].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placement)
+				if err != nil {
+					t.Fatal(err)
 				}
 
 				if placement.Status.NumberOfSelectedClusters != int32(0) {
 					t.Errorf("expecte %d cluster selected, but got %d", 0, placement.Status.NumberOfSelectedClusters)
+				}
+				if len(placement.Status.DecisionGroups) != 1 || placement.Status.DecisionGroups[0].ClustersCount != 0 {
+					t.Errorf("expecte %d cluster decision gorups, but got %d", 1, len(placement.Status.DecisionGroups))
 				}
 				util.HasCondition(
 					placement.Status.Conditions,
@@ -175,12 +406,12 @@ func TestSchedulingController_sync(t *testing.T) {
 			},
 			scheduleResult: &scheduleResult{
 				feasibleClusters:     []*clusterapiv1.ManagedCluster{},
-				scheduledDecisions:   []clusterapiv1beta1.ClusterDecision{},
+				scheduledDecisions:   []*clusterapiv1.ManagedCluster{},
 				unscheduledDecisions: 0,
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
-				testingcommon.AssertActions(t, actions, "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "patch")
 				// check if emtpy PlacementDecision has been created
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
@@ -192,14 +423,18 @@ func TestSchedulingController_sync(t *testing.T) {
 					t.Errorf("expecte %d cluster selected, but got %d", 0, len(placementDecision.Status.Decisions))
 				}
 				// check if Placement has been updated
-				actual = actions[1].(clienttesting.UpdateActionImpl).Object
-				placement, ok := actual.(*clusterapiv1beta1.Placement)
-				if !ok {
-					t.Errorf("expected Placement was updated")
+				placement := &clusterapiv1beta1.Placement{}
+				patchData := actions[1].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placement)
+				if err != nil {
+					t.Fatal(err)
 				}
 
 				if placement.Status.NumberOfSelectedClusters != int32(0) {
 					t.Errorf("expecte %d cluster selected, but got %d", 0, placement.Status.NumberOfSelectedClusters)
+				}
+				if len(placement.Status.DecisionGroups) != 1 || placement.Status.DecisionGroups[0].ClustersCount != 0 {
+					t.Errorf("expecte %d cluster decision gorups, but got %d", 1, len(placement.Status.DecisionGroups))
 				}
 				util.HasCondition(
 					placement.Status.Conditions,
@@ -221,12 +456,12 @@ func TestSchedulingController_sync(t *testing.T) {
 				feasibleClusters: []*clusterapiv1.ManagedCluster{
 					testinghelpers.NewManagedCluster("cluster1").Build(),
 				},
-				scheduledDecisions:   []clusterapiv1beta1.ClusterDecision{},
+				scheduledDecisions:   []*clusterapiv1.ManagedCluster{},
 				unscheduledDecisions: 0,
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
-				testingcommon.AssertActions(t, actions, "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "patch")
 				// check if emtpy PlacementDecision has been created
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
@@ -238,14 +473,18 @@ func TestSchedulingController_sync(t *testing.T) {
 					t.Errorf("expecte %d cluster selected, but got %d", 0, len(placementDecision.Status.Decisions))
 				}
 				// check if Placement has been updated
-				actual = actions[1].(clienttesting.UpdateActionImpl).Object
-				placement, ok := actual.(*clusterapiv1beta1.Placement)
-				if !ok {
-					t.Errorf("expected Placement was updated")
+				placement := &clusterapiv1beta1.Placement{}
+				patchData := actions[1].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placement)
+				if err != nil {
+					t.Fatal(err)
 				}
 
 				if placement.Status.NumberOfSelectedClusters != int32(0) {
 					t.Errorf("expecte %d cluster selected, but got %d", 0, placement.Status.NumberOfSelectedClusters)
+				}
+				if len(placement.Status.DecisionGroups) != 1 || placement.Status.DecisionGroups[0].ClustersCount != 0 {
+					t.Errorf("expecte %d cluster decision gorups, but got %d", 1, len(placement.Status.DecisionGroups))
 				}
 				util.HasCondition(
 					placement.Status.Conditions,
@@ -258,13 +497,15 @@ func TestSchedulingController_sync(t *testing.T) {
 		{
 			name: "placement status not changed",
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).
-				WithNumOfSelectedClusters(3).WithSatisfiedCondition(3, 0).WithMisconfiguredCondition(metav1.ConditionFalse).Build(),
+				WithNumOfSelectedClusters(3, placementName).WithSatisfiedCondition(3, 0).WithMisconfiguredCondition(metav1.ConditionFalse).Build(),
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet("clusterset1").Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, "clusterset1"),
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, "clusterset1").Build(),
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
+				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 0)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
 					WithDecisions("cluster1", "cluster2", "cluster3").Build(),
 			},
 			scheduleResult: &scheduleResult{
@@ -273,10 +514,10 @@ func TestSchedulingController_sync(t *testing.T) {
 					testinghelpers.NewManagedCluster("cluster2").Build(),
 					testinghelpers.NewManagedCluster("cluster3").Build(),
 				},
-				scheduledDecisions: []clusterapiv1beta1.ClusterDecision{
-					{ClusterName: "cluster1"},
-					{ClusterName: "cluster2"},
-					{ClusterName: "cluster3"},
+				scheduledDecisions: []*clusterapiv1.ManagedCluster{
+					testinghelpers.NewManagedCluster("cluster1").Build(),
+					testinghelpers.NewManagedCluster("cluster2").Build(),
+					testinghelpers.NewManagedCluster("cluster3").Build(),
 				},
 				unscheduledDecisions: 0,
 			},
@@ -294,7 +535,7 @@ func TestSchedulingController_sync(t *testing.T) {
 					testinghelpers.NewManagedCluster("cluster2").Build(),
 					testinghelpers.NewManagedCluster("cluster3").Build(),
 				},
-				scheduledDecisions: []clusterapiv1beta1.ClusterDecision{},
+				scheduledDecisions: []*clusterapiv1.ManagedCluster{},
 			},
 			validateActions: testingcommon.AssertNoActions,
 		},
@@ -732,48 +973,64 @@ func TestBind(t *testing.T) {
 	placementName := "placement1"
 
 	cases := []struct {
-		name             string
-		initObjs         []runtime.Object
-		clusterDecisions []clusterapiv1beta1.ClusterDecision
-		validateActions  func(t *testing.T, actions []clienttesting.Action)
+		name            string
+		initObjs        []runtime.Object
+		placement       *clusterapiv1beta1.Placement
+		clusters        []*clusterapiv1.ManagedCluster
+		validateActions func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
-			name:             "create single placementdecision",
-			clusterDecisions: newClusterDecisions(10),
+			name:      "create single placementdecision",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
+			clusters:  newClusters(10),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "create", "update")
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
+				testingcommon.AssertActions(t, actions, "create")
+				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
 					t.Errorf("expected PlacementDecision was updated")
 				}
 				assertClustersSelected(t, placementDecision.Status.Decisions, newSelectedClusters(10)...)
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "0" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
 			},
 		},
 		{
-			name:             "create multiple placementdecisions",
-			clusterDecisions: newClusterDecisions(101),
+			name:      "create multiple placementdecisions",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
+			clusters:  newClusters(101),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "create", "update", "create", "update")
+				testingcommon.AssertActions(t, actions, "create", "create")
 				selectedClusters := newSelectedClusters(101)
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
+				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
 					t.Errorf("expected PlacementDecision was updated")
 				}
 				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[0:100]...)
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "0" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
 
-				actual = actions[3].(clienttesting.UpdateActionImpl).Object
+				actual = actions[1].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok = actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
 					t.Errorf("expected PlacementDecision was updated")
 				}
 				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[100:]...)
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "0" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
 			},
 		},
 		{
-			name:             "create empty placementdecision",
-			clusterDecisions: newClusterDecisions(0),
+			name:      "create empty placementdecision",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
+			clusters:  newClusters(0),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "create")
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
@@ -787,30 +1044,249 @@ func TestBind(t *testing.T) {
 			},
 		},
 		{
-			name:             "no change",
-			clusterDecisions: newClusterDecisions(128),
+			name: "create placementdecision with canary group strategy",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithGroupStrategy(clusterapiv1beta1.GroupStrategy{
+				ClustersPerDecisionGroup: intstr.FromString("25%"),
+				DecisionGroups: []clusterapiv1beta1.DecisionGroup{
+					{
+						GroupName: "canary",
+						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
+						},
+					},
+				}}).Build(),
+			clusters: []*clusterapiv1.ManagedCluster{
+				testinghelpers.NewManagedCluster("cluster1").WithLabel("cloud", "Amazon").Build(),
+				testinghelpers.NewManagedCluster("cluster2").WithLabel("cloud", "Amazon").Build(),
+				testinghelpers.NewManagedCluster("cluster3").WithLabel("cloud", "Azure").Build(),
+				testinghelpers.NewManagedCluster("cluster4").WithLabel("cloud", "Azure").Build(),
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "create", "create", "create")
+				selectedClusters := newSelectedClusters(4)
+				actual := actions[0].(clienttesting.CreateActionImpl).Object
+				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
+				if !ok {
+					t.Errorf("expected PlacementDecision was created")
+				}
+				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[2:]...)
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "0" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "canary" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+
+				actual = actions[1].(clienttesting.CreateActionImpl).Object
+				placementDecision, ok = actual.(*clusterapiv1beta1.PlacementDecision)
+				if !ok {
+					t.Errorf("expected PlacementDecision was created")
+				}
+				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[0:1]...)
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "1" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+
+				actual = actions[2].(clienttesting.CreateActionImpl).Object
+				placementDecision, ok = actual.(*clusterapiv1beta1.PlacementDecision)
+				if !ok {
+					t.Errorf("expected PlacementDecision was created")
+				}
+				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[1:2]...)
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "2" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+			},
+		},
+		{
+			name: "create placementdecision when no cluster selected by canary group strategy",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithGroupStrategy(clusterapiv1beta1.GroupStrategy{
+				DecisionGroups: []clusterapiv1beta1.DecisionGroup{
+					{
+						GroupName: "canary",
+						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
+						},
+					},
+				}}).Build(),
+			clusters: []*clusterapiv1.ManagedCluster{
+				testinghelpers.NewManagedCluster("cluster1").WithLabel("cloud", "Amazon").Build(),
+				testinghelpers.NewManagedCluster("cluster2").WithLabel("cloud", "Amazon").Build(),
+				testinghelpers.NewManagedCluster("cluster3").WithLabel("cloud", "Amazon").Build(),
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "create")
+				selectedClusters := newSelectedClusters(3)
+				actual := actions[0].(clienttesting.CreateActionImpl).Object
+				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
+				if !ok {
+					t.Errorf("expected PlacementDecision was created")
+				}
+				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters...)
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "0" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+			},
+		},
+		{
+			name: "create placementdecision with multiple group strategy",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithGroupStrategy(clusterapiv1beta1.GroupStrategy{
+				DecisionGroups: []clusterapiv1beta1.DecisionGroup{
+					{
+						GroupName: "group1",
+						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Amazon"}},
+						},
+					},
+					{
+						GroupName: "group2",
+						ClusterSelector: clusterapiv1beta1.ClusterSelector{
+							LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"cloud": "Azure"}},
+						},
+					},
+				}}).Build(),
+			clusters: []*clusterapiv1.ManagedCluster{
+				testinghelpers.NewManagedCluster("cluster1").WithLabel("cloud", "Amazon").Build(),
+				testinghelpers.NewManagedCluster("cluster2").WithLabel("cloud", "Amazon").Build(),
+				testinghelpers.NewManagedCluster("cluster3").WithLabel("cloud", "Azure").Build(),
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "create", "create")
+				selectedClusters := newSelectedClusters(4)
+				actual := actions[0].(clienttesting.CreateActionImpl).Object
+				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
+				if !ok {
+					t.Errorf("expected PlacementDecision was created")
+				}
+				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[0:2]...)
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "0" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "group1" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+
+				actual = actions[1].(clienttesting.CreateActionImpl).Object
+				placementDecision, ok = actual.(*clusterapiv1beta1.PlacementDecision)
+				if !ok {
+					t.Errorf("expected PlacementDecision was created")
+				}
+				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[2:3]...)
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "1" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "group2" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+			},
+		},
+		{
+			name: "create placementdecision with only cluster per decision group",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).WithGroupStrategy(clusterapiv1beta1.GroupStrategy{
+				ClustersPerDecisionGroup: intstr.FromString("25%"),
+			}).Build(),
+			clusters: []*clusterapiv1.ManagedCluster{
+				testinghelpers.NewManagedCluster("cluster1").WithLabel("cloud", "Amazon").Build(),
+				testinghelpers.NewManagedCluster("cluster2").WithLabel("cloud", "Amazon").Build(),
+				testinghelpers.NewManagedCluster("cluster3").WithLabel("cloud", "Azure").Build(),
+			},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "create", "create", "create")
+				selectedClusters := newSelectedClusters(4)
+				actual := actions[0].(clienttesting.CreateActionImpl).Object
+				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
+				if !ok {
+					t.Errorf("expected PlacementDecision was created")
+				}
+				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[0:1]...)
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "0" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+
+				actual = actions[1].(clienttesting.CreateActionImpl).Object
+				placementDecision, ok = actual.(*clusterapiv1beta1.PlacementDecision)
+				if !ok {
+					t.Errorf("expected PlacementDecision was created")
+				}
+				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[1:2]...)
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "1" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+
+				actual = actions[2].(clienttesting.CreateActionImpl).Object
+				placementDecision, ok = actual.(*clusterapiv1beta1.PlacementDecision)
+				if !ok {
+					t.Errorf("expected PlacementDecision was created")
+				}
+				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[2:3]...)
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "2" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+			},
+		},
+		{
+			name:      "no change",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
+			clusters:  newClusters(128),
 			initObjs: []runtime.Object{
+				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 0)).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
+					WithDecisions(newSelectedClusters(128)[:100]...).Build(),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
-					WithDecisions(newSelectedClusters(128)[:100]...).Build(),
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 2)).
-					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
 					WithDecisions(newSelectedClusters(128)[100:]...).Build(),
 			},
 			validateActions: testingcommon.AssertNoActions,
 		},
 		{
-			name:             "update one of placementdecisions",
-			clusterDecisions: newClusterDecisions(128),
+			name:      "update one of placementdecisions",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
+			clusters:  newClusters(128),
 			initObjs: []runtime.Object{
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
+				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 0)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "fakegroup").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
 					WithDecisions(newSelectedClusters(128)[:100]...).Build(),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "create", "update")
+				testingcommon.AssertActions(t, actions, "patch", "create")
 				selectedClusters := newSelectedClusters(128)
-				actual := actions[1].(clienttesting.UpdateActionImpl).Object
+				placementDecision := &clusterapiv1beta1.PlacementDecision{}
+				patchData := actions[0].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placementDecision)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// only update labels
+				assertClustersSelected(t, placementDecision.Status.Decisions)
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+
+				actual := actions[1].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
 					t.Errorf("expected PlacementDecision was updated")
@@ -819,43 +1295,55 @@ func TestBind(t *testing.T) {
 			},
 		},
 		{
-			name:             "delete redundant placementdecisions",
-			clusterDecisions: newClusterDecisions(10),
+			name:      "delete redundant placementdecisions",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
+			clusters:  newClusters(10),
 			initObjs: []runtime.Object{
+				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 0)).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
+					WithDecisions(newSelectedClusters(128)[:100]...).Build(),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
-					WithDecisions(newSelectedClusters(128)[:100]...).Build(),
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 2)).
-					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
 					WithDecisions(newSelectedClusters(128)[100:]...).Build(),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "update", "delete")
-				actual := actions[0].(clienttesting.UpdateActionImpl).Object
-				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
-				if !ok {
-					t.Errorf("expected PlacementDecision was updated")
+				testingcommon.AssertActions(t, actions, "patch", "delete")
+				placementDecision := &clusterapiv1beta1.PlacementDecision{}
+				patchData := actions[0].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placementDecision)
+				if err != nil {
+					t.Fatal(err)
 				}
 				assertClustersSelected(t, placementDecision.Status.Decisions, newSelectedClusters(10)...)
 			},
 		},
 		{
-			name:             "delete all placementdecisions and leave one empty placementdecision",
-			clusterDecisions: newClusterDecisions(0),
+			name:      "delete all placementdecisions and leave one empty placementdecision",
+			placement: testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
+			clusters:  newClusters(0),
 			initObjs: []runtime.Object{
+				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 0)).
+					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
+					WithDecisions(newSelectedClusters(128)[:100]...).Build(),
 				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
-					WithDecisions(newSelectedClusters(128)[:100]...).Build(),
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 2)).
-					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
+					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
+					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
 					WithDecisions(newSelectedClusters(128)[100:]...).Build(),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "update", "delete")
-				actual := actions[0].(clienttesting.UpdateActionImpl).Object
-				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
-				if !ok {
-					t.Errorf("expected PlacementDecision was updated")
+				testingcommon.AssertActions(t, actions, "patch", "delete")
+				placementDecision := &clusterapiv1beta1.PlacementDecision{}
+				patchData := actions[0].(clienttesting.PatchActionImpl).Patch
+				err := json.Unmarshal(patchData, placementDecision)
+				if err != nil {
+					t.Fatal(err)
 				}
 				if len(placementDecision.Status.Decisions) != 0 {
 					t.Errorf("expecte %d cluster selected, but got %d", 0, len(placementDecision.Status.Decisions))
@@ -895,10 +1383,11 @@ func TestBind(t *testing.T) {
 				recorder:                kevents.NewFakeRecorder(100),
 			}
 
+			decisions, _, _ := ctrl.generatePlacementDecisionsAndStatus(c.placement, c.clusters)
 			err := ctrl.bind(
 				context.TODO(),
-				testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
-				c.clusterDecisions,
+				c.placement,
+				decisions,
 				nil,
 				nil,
 			)
@@ -923,13 +1412,13 @@ func assertClustersSelected(t *testing.T, decisons []clusterapiv1beta1.ClusterDe
 	}
 }
 
-func newClusterDecisions(num int) (decisions []clusterapiv1beta1.ClusterDecision) {
+func newClusters(num int) (clusters []*clusterapiv1.ManagedCluster) {
 	for i := 0; i < num; i++ {
-		decisions = append(decisions, clusterapiv1beta1.ClusterDecision{
-			ClusterName: fmt.Sprintf("cluster%d", i+1),
-		})
+		ClusterName := fmt.Sprintf("cluster%d", i+1)
+		c := testinghelpers.NewManagedCluster(ClusterName).Build()
+		clusters = append(clusters, c)
 	}
-	return decisions
+	return clusters
 }
 
 func newSelectedClusters(num int) (clusters []string) {

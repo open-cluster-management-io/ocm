@@ -56,8 +56,8 @@ type ScheduleResult interface {
 	// PrioritizerScores returns total score for each cluster
 	PrioritizerScores() PrioritizerScore
 
-	// Decisions returns the decisions of the schedule
-	Decisions() []clusterapiv1beta1.ClusterDecision
+	// Decision returns the decision groups of the schedule
+	Decisions() []*clusterapiv1.ManagedCluster
 
 	// NumOfUnscheduled returns the number of unscheduled.
 	NumOfUnscheduled() int
@@ -82,7 +82,7 @@ type PrioritizerResult struct {
 // ScheduleResult is the result for a certain schedule.
 type scheduleResult struct {
 	feasibleClusters     []*clusterapiv1.ManagedCluster
-	scheduledDecisions   []clusterapiv1beta1.ClusterDecision
+	scheduledDecisions   []*clusterapiv1.ManagedCluster
 	unscheduledDecisions int
 
 	filteredRecords map[string][]*clusterapiv1.ManagedCluster
@@ -290,9 +290,8 @@ func (s *pluginScheduler) Schedule(
 	return results, finalStatus
 }
 
-// makeClusterDecisions selects clusters based on given cluster slice and then creates
-// cluster decisions.
-func selectClusters(placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) []clusterapiv1beta1.ClusterDecision {
+// selects clusters based on given cluster slice and number of clusters
+func selectClusters(placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) []*clusterapiv1.ManagedCluster {
 	numOfDecisions := len(clusters)
 	if placement.Spec.NumberOfClusters != nil {
 		numOfDecisions = int(*placement.Spec.NumberOfClusters)
@@ -304,13 +303,7 @@ func selectClusters(placement *clusterapiv1beta1.Placement, clusters []*clustera
 		clusters = clusters[:numOfDecisions]
 	}
 
-	decisions := []clusterapiv1beta1.ClusterDecision{}
-	for _, cluster := range clusters {
-		decisions = append(decisions, clusterapiv1beta1.ClusterDecision{
-			ClusterName: cluster.Name,
-		})
-	}
-	return decisions
+	return clusters
 }
 
 // setRequeueAfter selects minimal time.Duration as requeue time
@@ -427,7 +420,7 @@ func (r *scheduleResult) PrioritizerScores() PrioritizerScore {
 	return r.scoreSum
 }
 
-func (r *scheduleResult) Decisions() []clusterapiv1beta1.ClusterDecision {
+func (r *scheduleResult) Decisions() []*clusterapiv1.ManagedCluster {
 	return r.scheduledDecisions
 }
 

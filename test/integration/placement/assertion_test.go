@@ -3,6 +3,7 @@ package placement
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sort"
 	"time"
 
@@ -79,10 +80,8 @@ func assertPlacementDeleted(placementName, namespace string) {
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }
 
-func assertNumberOfDecisions(placementName, namespace string, desiredNOD int) {
+func assertNumberOfDecisions(placementName, namespace string, desiredNOD, desiredNOPD int) {
 	ginkgo.By("Check the number of decisions in placementdecisions")
-	// at least one decision for each placement
-	desiredNOPD := desiredNOD/maxNumOfClusterDecisions + 1
 	gomega.Eventually(func() bool {
 		pdl, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
 			LabelSelector: placementLabel + "=" + placementName,
@@ -123,6 +122,18 @@ func assertClusterNamesOfDecisions(placementName, namespace string, desiredClust
 		}
 		ginkgo.By(fmt.Sprintf("Expect %v, but got %v", desiredClusters.List(), actualClusters.List()))
 		return false
+	}, eventuallyTimeout*2, eventuallyInterval).Should(gomega.BeTrue())
+}
+
+func assertPlacementDecisionGroupStatus(placementName, namespace string, decisionGroupStatus []clusterapiv1beta1.DecisionGroupStatus) {
+	ginkgo.By("Check the group status of placement")
+	gomega.Eventually(func() bool {
+		placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
+		if err != nil {
+			return false
+		}
+		ginkgo.By(fmt.Sprintf("actual decision groups %v", placement.Status.DecisionGroups))
+		return reflect.DeepEqual(placement.Status.DecisionGroups, decisionGroupStatus)
 	}, eventuallyTimeout*2, eventuallyInterval).Should(gomega.BeTrue())
 }
 
@@ -380,11 +391,11 @@ func assertDeletingClusters(clusterNames ...string) {
 				return false
 			}
 			return errors.IsNotFound(err)
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		}, eventuallyTimeout*2, eventuallyInterval).Should(gomega.BeTrue())
 	}
 }
 
-func assertCreatingPlacement(name, namespace string, noc *int32, prioritizerPolicy clusterapiv1beta1.PrioritizerPolicy, tolerations []clusterapiv1beta1.Toleration) *clusterapiv1beta1.Placement {
+func assertCreatingPlacement(name, namespace string, noc *int32, prioritizerPolicy clusterapiv1beta1.PrioritizerPolicy, tolerations []clusterapiv1beta1.Toleration, groupStrategy clusterapiv1beta1.GroupStrategy) *clusterapiv1beta1.Placement {
 	ginkgo.By("Create placement")
 	placement := &clusterapiv1beta1.Placement{
 		ObjectMeta: metav1.ObjectMeta{
@@ -395,6 +406,7 @@ func assertCreatingPlacement(name, namespace string, noc *int32, prioritizerPoli
 			NumberOfClusters:  noc,
 			PrioritizerPolicy: prioritizerPolicy,
 			Tolerations:       tolerations,
+			DecisionStrategy:  clusterapiv1beta1.DecisionStrategy{GroupStrategy: groupStrategy},
 		},
 	}
 	placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Create(context.Background(), placement, metav1.CreateOptions{})
@@ -403,12 +415,12 @@ func assertCreatingPlacement(name, namespace string, noc *int32, prioritizerPoli
 	return placement
 }
 
-func assertCreatingPlacementWithDecision(name, namespace string, noc *int32, nod int, prioritizerPolicy clusterapiv1beta1.PrioritizerPolicy, tolerations []clusterapiv1beta1.Toleration) {
-	placement := assertCreatingPlacement(name, namespace, noc, prioritizerPolicy, tolerations)
+func assertCreatingPlacementWithDecision(name, namespace string, numberOfClusters *int32, numberOfDecisionClusters, numberOfPlacementDecisions int, prioritizerPolicy clusterapiv1beta1.PrioritizerPolicy, tolerations []clusterapiv1beta1.Toleration, groupStrategy clusterapiv1beta1.GroupStrategy) {
+	placement := assertCreatingPlacement(name, namespace, numberOfClusters, prioritizerPolicy, tolerations, groupStrategy)
 	assertPlacementDecisionCreated(placement)
-	assertNumberOfDecisions(name, namespace, nod)
-	if noc != nil {
-		assertPlacementConditionSatisfied(name, namespace, nod, nod == int(*noc))
+	assertNumberOfDecisions(name, namespace, numberOfDecisionClusters, numberOfPlacementDecisions)
+	if numberOfClusters != nil {
+		assertPlacementConditionSatisfied(name, namespace, numberOfDecisionClusters, numberOfDecisionClusters == int(*numberOfClusters))
 	}
 }
 

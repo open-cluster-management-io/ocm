@@ -83,7 +83,7 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 			})
 
 			//Checking the result of the placement
-			assertCreatingPlacementWithDecision(placementName, namespace, noc(3), 2, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{
+			assertCreatingPlacementWithDecision(placementName, namespace, noc(3), 2, 1, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{
 				{
 					Key:      "key1",
 					Operator: clusterapiv1beta1.TolerationOpExists,
@@ -93,7 +93,7 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 					Operator: clusterapiv1beta1.TolerationOpEqual,
 					Value:    "value2",
 				},
-			})
+			}, clusterapiv1beta1.GroupStrategy{})
 			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[0], clusterNames[1]})
 		})
 
@@ -119,7 +119,7 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 			})
 
 			//Taint/toleration matches, effect not match
-			assertCreatingPlacementWithDecision(placementName, namespace, noc(4), 2, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{
+			assertCreatingPlacementWithDecision(placementName, namespace, noc(4), 2, 1, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{
 				{
 					Key:      "key1",
 					Operator: clusterapiv1beta1.TolerationOpExists,
@@ -140,7 +140,7 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 					Operator: clusterapiv1beta1.TolerationOpExists,
 					Effect:   clusterapiv1.TaintEffectNoSelect,
 				},
-			})
+			}, clusterapiv1beta1.GroupStrategy{})
 			//Checking the result of the placement
 			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[2], clusterNames[3]})
 
@@ -183,7 +183,7 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 			})
 
 			//Checking the result of the placement
-			assertCreatingPlacementWithDecision(placementName, namespace, noc(4), 3, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{
+			assertCreatingPlacementWithDecision(placementName, namespace, noc(4), 3, 1, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{
 				{
 					Key:               "key1",
 					Operator:          clusterapiv1beta1.TolerationOpExists,
@@ -194,7 +194,7 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 					Operator:          clusterapiv1beta1.TolerationOpExists,
 					TolerationSeconds: &tolerationSeconds_20,
 				},
-			})
+			}, clusterapiv1beta1.GroupStrategy{})
 			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[0], clusterNames[1], clusterNames[3]})
 
 			//Check placement requeue, clusterNames[0] should be removed when TolerationSeconds expired.

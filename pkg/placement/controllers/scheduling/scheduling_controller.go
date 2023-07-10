@@ -3,8 +3,10 @@ package scheduling
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,13 +14,13 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	errorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	corev1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cache "k8s.io/client-go/tools/cache"
@@ -37,8 +39,10 @@ import (
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
+	"open-cluster-management.io/ocm/pkg/placement/helpers"
 )
 
 const (
@@ -46,6 +50,14 @@ const (
 	maxNumOfClusterDecisions = 100
 	maxEventMessageLength    = 1000 //the event message can have at most 1024 characters, use 1000 as limitation here to keep some buffer
 )
+
+// decisionGroups groups the cluster decisions by group strategy
+type clusterDecisionGroups []clusterDecisionGroup
+
+type clusterDecisionGroup struct {
+	decisionGroupName string
+	clusterDecisions  []clusterapiv1beta1.ClusterDecision
+}
 
 var ResyncInterval = time.Minute * 5
 
@@ -226,6 +238,11 @@ func (c *schedulingController) syncPlacement(ctx context.Context, syncCtx factor
 
 	// schedule placement with scheduler
 	scheduleResult, status := c.scheduler.Schedule(ctx, placement, clusters)
+	// generate placement decision and status
+	decisions, groupStatus, s := c.generatePlacementDecisionsAndStatus(placement, scheduleResult.Decisions())
+	if s.IsError() {
+		status = s
+	}
 	misconfiguredCondition := newMisconfiguredCondition(status)
 	satisfiedCondition := newSatisfiedCondition(
 		placement.Spec.ClusterSets,
@@ -245,12 +262,14 @@ func (c *schedulingController) syncPlacement(ctx context.Context, syncCtx factor
 		syncCtx.Queue().AddAfter(key, *t)
 	}
 
-	if err := c.bind(ctx, placement, scheduleResult.Decisions(), scheduleResult.PrioritizerScores(), status); err != nil {
+	// create/update placement decisions
+	err = c.bind(ctx, placement, decisions, scheduleResult.PrioritizerScores(), status)
+	if err != nil {
 		return err
 	}
 
 	// update placement status if necessary to signal no bindings
-	if err := c.updateStatus(ctx, placement, int32(len(scheduleResult.Decisions())), misconfiguredCondition, satisfiedCondition); err != nil {
+	if err := c.updateStatus(ctx, placement, groupStatus, int32(len(scheduleResult.Decisions())), misconfiguredCondition, satisfiedCondition); err != nil {
 		return err
 	}
 
@@ -345,11 +364,17 @@ func (c *schedulingController) getAvailableClusters(clusterSetNames []string) ([
 func (c *schedulingController) updateStatus(
 	ctx context.Context,
 	placement *clusterapiv1beta1.Placement,
+	decisionGroupStatus []*clusterapiv1beta1.DecisionGroupStatus,
 	numberOfSelectedClusters int32,
 	conditions ...metav1.Condition,
 ) error {
 	newPlacement := placement.DeepCopy()
 	newPlacement.Status.NumberOfSelectedClusters = numberOfSelectedClusters
+	newPlacement.Status.DecisionGroups = []clusterapiv1beta1.DecisionGroupStatus{}
+
+	for _, status := range decisionGroupStatus {
+		newPlacement.Status.DecisionGroups = append(newPlacement.Status.DecisionGroups, *status)
+	}
 
 	for _, c := range conditions {
 		meta.SetStatusCondition(&newPlacement.Status.Conditions, c)
@@ -358,9 +383,11 @@ func (c *schedulingController) updateStatus(
 		return nil
 	}
 
-	_, err := c.clusterClient.ClusterV1beta1().
-		Placements(newPlacement.Namespace).
-		UpdateStatus(ctx, newPlacement, metav1.UpdateOptions{})
+	placementPatcher := patcher.NewPatcher[
+		*clusterapiv1beta1.Placement, clusterapiv1beta1.PlacementSpec, clusterapiv1beta1.PlacementStatus](
+		c.clusterClient.ClusterV1beta1().Placements(newPlacement.Namespace))
+
+	_, err := placementPatcher.PatchStatus(ctx, newPlacement, newPlacement.Status, placement.Status)
 	return err
 }
 
@@ -428,24 +455,132 @@ func newMisconfiguredCondition(status *framework.Status) metav1.Condition {
 	}
 }
 
-// bind updates the cluster decisions in the status of the placementdecisions with the given
-// cluster decision slice. New placementdecisions will be created if no one exists.
-func (c *schedulingController) bind(
-	ctx context.Context,
+// generate placement decision and decision group status of placement
+func (c *schedulingController) generatePlacementDecisionsAndStatus(
 	placement *clusterapiv1beta1.Placement,
-	clusterDecisions []clusterapiv1beta1.ClusterDecision,
-	clusterScores PrioritizerScore,
-	status *framework.Status,
-) error {
-	// sort clusterdecisions by cluster name
-	sort.SliceStable(clusterDecisions, func(i, j int) bool {
-		return clusterDecisions[i].ClusterName < clusterDecisions[j].ClusterName
-	})
+	clusters []*clusterapiv1.ManagedCluster,
+) ([]*clusterapiv1beta1.PlacementDecision, []*clusterapiv1beta1.DecisionGroupStatus, *framework.Status) {
+	placementDecisionIndex := 0
+	placementDecisions := []*clusterapiv1beta1.PlacementDecision{}
+	decisionGroupStatus := []*clusterapiv1beta1.DecisionGroupStatus{}
 
+	// generate decision group
+	decisionGroups, status := c.generateDecisionGroups(placement, clusters)
+
+	// generate placement decision for each decision group
+	for decisionGroupIndex, decisionGroup := range decisionGroups {
+		// sort clusterdecisions by cluster name
+		clusterDecisions := decisionGroup.clusterDecisions
+		sort.SliceStable(clusterDecisions, func(i, j int) bool {
+			return clusterDecisions[i].ClusterName < clusterDecisions[j].ClusterName
+		})
+
+		// generate placement decisions and status, group and placement name index starts from 0.
+		pds, groupStatus := c.generateDecision(placement, decisionGroup, decisionGroupIndex, placementDecisionIndex)
+
+		placementDecisions = append(placementDecisions, pds...)
+		decisionGroupStatus = append(decisionGroupStatus, groupStatus)
+		placementDecisionIndex += len(pds)
+	}
+
+	return placementDecisions, decisionGroupStatus, status
+}
+
+// generateDecisionGroups group clusters based on the placement decision strategy.
+func (c *schedulingController) generateDecisionGroups(
+	placement *clusterapiv1beta1.Placement,
+	clusters []*clusterapiv1.ManagedCluster,
+) (clusterDecisionGroups, *framework.Status) {
+	groups := []clusterDecisionGroup{}
+
+	// Calculate the group length
+	groupLength, status := calculateLength(&placement.Spec.DecisionStrategy.GroupStrategy.ClustersPerDecisionGroup, len(clusters))
+	if status.IsError() {
+		return groups, status
+	}
+
+	// Record the cluster names
+	clusterNames := sets.NewString()
+	for _, cluster := range clusters {
+		clusterNames.Insert(cluster.Name)
+	}
+
+	// First groups the clusters by ClusterSelector defined in spec.DecisionStrategy.GroupStrategy.DecisionGroups.
+	for _, d := range placement.Spec.DecisionStrategy.GroupStrategy.DecisionGroups {
+		// create cluster label selector
+		clusterSelector, err := helpers.NewClusterSelector(d.ClusterSelector)
+		if err != nil {
+			status = framework.NewStatus("", framework.Misconfigured, err.Error())
+			return groups, status
+		}
+
+		// filter clusters by label selector
+		groupName := d.GroupName
+		matched := []clusterapiv1beta1.ClusterDecision{}
+		for _, cluster := range clusters {
+			if ok := clusterSelector.Matches(cluster.Labels, helpers.GetClusterClaims(cluster)); !ok {
+				continue
+			}
+			if !clusterNames.Has(cluster.Name) {
+				continue
+			}
+
+			matched = append(matched, clusterapiv1beta1.ClusterDecision{
+				ClusterName: cluster.Name,
+			})
+			clusterNames.Delete(cluster.Name)
+		}
+
+		if len(matched) > 0 {
+			decisionGroup := clusterDecisionGroup{
+				decisionGroupName: groupName,
+				clusterDecisions:  matched,
+			}
+			groups = append(groups, decisionGroup)
+		}
+	}
+
+	// The rest of the clusters will also be put into decision groups.
+	// The number of items in each group is determined by the specific number or
+	// percentage defined in spec.DecisionStrategy.GroupStrategy.ClustersPerDecisionGroup.
+	for len(clusterNames) > 0 {
+		clusterList := clusterNames.List()
+		resultNumber := len(clusterList)
+		if groupLength < resultNumber {
+			resultNumber = groupLength
+		}
+
+		matched := []clusterapiv1beta1.ClusterDecision{}
+		for i := 0; i < resultNumber; i++ {
+			matched = append(matched, clusterapiv1beta1.ClusterDecision{
+				ClusterName: clusterList[i],
+			})
+			delete(clusterNames, clusterList[i])
+		}
+		decisionGroup := clusterDecisionGroup{
+			decisionGroupName: "",
+			clusterDecisions:  matched,
+		}
+		groups = append(groups, decisionGroup)
+	}
+
+	// generate at least on empty decisionGroup, this is to ensure there's an empty placement decision if no cluster selected.
+	if len(groups) == 0 {
+		groups = append(groups, clusterDecisionGroup{})
+	}
+
+	return groups, framework.NewStatus("", framework.Success, "")
+}
+
+func (c *schedulingController) generateDecision(
+	placement *clusterapiv1beta1.Placement,
+	clusterDecisionGroup clusterDecisionGroup,
+	decisionGroupIndex, placementDecisionIndex int,
+) ([]*clusterapiv1beta1.PlacementDecision, *clusterapiv1beta1.DecisionGroupStatus) {
 	// split the cluster decisions into slices, the size of each slice cannot exceed
 	// maxNumOfClusterDecisions.
 	decisionSlices := [][]clusterapiv1beta1.ClusterDecision{}
-	remainingDecisions := clusterDecisions
+	remainingDecisions := clusterDecisionGroup.clusterDecisions
 	for index := 0; len(remainingDecisions) > 0; index++ {
 		var decisionSlice []clusterapiv1beta1.ClusterDecision
 		switch {
@@ -458,27 +593,67 @@ func (c *schedulingController) bind(
 		}
 		decisionSlices = append(decisionSlices, decisionSlice)
 	}
+
 	// if decisionSlices is empty, append one empty slice.
 	// so that can create a PlacementDecision with empty decisions in status.
 	if len(decisionSlices) == 0 {
 		decisionSlices = append(decisionSlices, []clusterapiv1beta1.ClusterDecision{})
 	}
 
-	// bind cluster decision slices to placementdecisions.
-	errs := []error{}
-
-	placementDecisionNames := sets.NewString()
+	placementDecisionNames := []string{}
+	placementDecisions := []*clusterapiv1beta1.PlacementDecision{}
 	for index, decisionSlice := range decisionSlices {
-		placementDecisionName := fmt.Sprintf("%s-decision-%d", placement.Name, index+1)
-		placementDecisionNames.Insert(placementDecisionName)
-		err := c.createOrUpdatePlacementDecision(
-			ctx, placement, placementDecisionName, decisionSlice, clusterScores, status)
+		placementDecisionName := fmt.Sprintf("%s-decision-%d", placement.Name, placementDecisionIndex+index)
+		owner := metav1.NewControllerRef(placement, clusterapiv1beta1.GroupVersion.WithKind("Placement"))
+		placementDecision := &clusterapiv1beta1.PlacementDecision{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      placementDecisionName,
+				Namespace: placement.Namespace,
+				Labels: map[string]string{
+					clusterapiv1beta1.PlacementLabel:          placement.Name,
+					clusterapiv1beta1.DecisionGroupNameLabel:  clusterDecisionGroup.decisionGroupName,
+					clusterapiv1beta1.DecisionGroupIndexLabel: fmt.Sprint(decisionGroupIndex),
+				},
+				OwnerReferences: []metav1.OwnerReference{*owner},
+			},
+			Status: clusterapiv1beta1.PlacementDecisionStatus{
+				Decisions: decisionSlice,
+			},
+		}
+		placementDecisions = append(placementDecisions, placementDecision)
+		placementDecisionNames = append(placementDecisionNames, placementDecisionName)
+	}
+
+	decisionGroupStatus := &clusterapiv1beta1.DecisionGroupStatus{
+		DecisionGroupIndex: int32(decisionGroupIndex),
+		DecisionGroupName:  clusterDecisionGroup.decisionGroupName,
+		Decisions:          placementDecisionNames,
+		ClustersCount:      int32(len(clusterDecisionGroup.clusterDecisions)),
+	}
+
+	return placementDecisions, decisionGroupStatus
+}
+
+// bind updates the cluster decisions in the status of the placementdecisions with the given
+// cluster decision slice. New placementdecisions will be created if no one exists.
+// bind will also return the decision groups for placement status.
+func (c *schedulingController) bind(
+	ctx context.Context,
+	placement *clusterapiv1beta1.Placement,
+	placementdecisions []*clusterapiv1beta1.PlacementDecision,
+	clusterScores PrioritizerScore,
+	status *framework.Status,
+) error {
+	errs := []error{}
+	placementDecisionNames := sets.NewString()
+
+	// create/update placement decisions
+	for _, pd := range placementdecisions {
+		placementDecisionNames.Insert(pd.Name)
+		err := c.createOrUpdatePlacementDecision(ctx, placement, pd, clusterScores, status)
 		if err != nil {
 			errs = append(errs, err)
 		}
-	}
-	if len(errs) != 0 {
-		return errorhelpers.NewMultiLineAggregate(errs)
 	}
 
 	// query all placementdecisions of the placement
@@ -487,19 +662,19 @@ func (c *schedulingController) bind(
 		return err
 	}
 	labelSelector := labels.NewSelector().Add(*requirement)
-	placementDecisions, err := c.placementDecisionLister.PlacementDecisions(placement.Namespace).List(labelSelector)
+	pds, err := c.placementDecisionLister.PlacementDecisions(placement.Namespace).List(labelSelector)
 	if err != nil {
 		return err
 	}
 
 	// delete redundant placementdecisions
 	errs = []error{}
-	for _, placementDecision := range placementDecisions {
-		if placementDecisionNames.Has(placementDecision.Name) {
+	for _, pd := range pds {
+		if placementDecisionNames.Has(pd.Name) {
 			continue
 		}
 		err := c.clusterClient.ClusterV1beta1().PlacementDecisions(
-			placementDecision.Namespace).Delete(ctx, placementDecision.Name, metav1.DeleteOptions{})
+			pd.Namespace).Delete(ctx, pd.Name, metav1.DeleteOptions{})
 		if errors.IsNotFound(err) {
 			continue
 		}
@@ -507,9 +682,9 @@ func (c *schedulingController) bind(
 			errs = append(errs, err)
 		}
 		c.recorder.Eventf(
-			placement, placementDecision, corev1.EventTypeNormal,
+			placement, pd, corev1.EventTypeNormal,
 			"DecisionDelete", "DecisionDeleted",
-			"Decision %s is deleted with placement %s in namespace %s", placementDecision.Name, placement.Name, placement.Namespace)
+			"Decision %s is deleted with placement %s in namespace %s", pd.Name, placement.Name, placement.Namespace)
 	}
 	return errorhelpers.NewMultiLineAggregate(errs)
 }
@@ -519,54 +694,49 @@ func (c *schedulingController) bind(
 func (c *schedulingController) createOrUpdatePlacementDecision(
 	ctx context.Context,
 	placement *clusterapiv1beta1.Placement,
-	placementDecisionName string,
-	clusterDecisions []clusterapiv1beta1.ClusterDecision,
+	placementDecision *clusterapiv1beta1.PlacementDecision,
 	clusterScores PrioritizerScore,
 	status *framework.Status,
 ) error {
+	placementDecisionName := placementDecision.Name
+	clusterDecisions := placementDecision.Status.Decisions
+
 	if len(clusterDecisions) > maxNumOfClusterDecisions {
 		return fmt.Errorf("the number of clusterdecisions %q exceeds the max limitation %q", len(clusterDecisions), maxNumOfClusterDecisions)
 	}
 
-	placementDecision, err := c.placementDecisionLister.PlacementDecisions(placement.Namespace).Get(placementDecisionName)
+	existPlacementDecision, err := c.placementDecisionLister.PlacementDecisions(placementDecision.Namespace).Get(placementDecisionName)
 	switch {
 	case errors.IsNotFound(err):
-		// create the placementdecision if not exists
-		owner := metav1.NewControllerRef(placement, clusterapiv1beta1.GroupVersion.WithKind("Placement"))
-		placementDecision = &clusterapiv1beta1.PlacementDecision{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      placementDecisionName,
-				Namespace: placement.Namespace,
-				Labels: map[string]string{
-					clusterapiv1beta1.PlacementLabel: placement.Name,
-				},
-				OwnerReferences: []metav1.OwnerReference{*owner},
-			},
-		}
 		var err error
-		placementDecision, err = c.clusterClient.ClusterV1beta1().PlacementDecisions(
+		existPlacementDecision, err = c.clusterClient.ClusterV1beta1().PlacementDecisions(
 			placement.Namespace).Create(ctx, placementDecision, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
 		c.recorder.Eventf(
-			placement, placementDecision, corev1.EventTypeNormal,
+			placement, existPlacementDecision, corev1.EventTypeNormal,
 			"DecisionCreate", "DecisionCreated",
-			"Decision %s is created with placement %s in namespace %s", placementDecision.Name, placement.Name, placement.Namespace)
+			"Decision %s is created with placement %s in namespace %s", existPlacementDecision.Name, placement.Name, placement.Namespace)
 	case err != nil:
 		return err
 	}
 
-	// update the status of the placementdecision if decisions change
-	if apiequality.Semantic.DeepEqual(placementDecision.Status.Decisions, clusterDecisions) {
-		return nil
-	}
+	// update the status and labels of the placementdecision if decisions change
+	placementDecisionPatcher := patcher.NewPatcher[
+		*clusterapiv1beta1.PlacementDecision, interface{}, clusterapiv1beta1.PlacementDecisionStatus](
+		c.clusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace))
 
-	newPlacementDecision := placementDecision.DeepCopy()
+	newPlacementDecision := existPlacementDecision.DeepCopy()
+	newPlacementDecision.Labels = placementDecision.Labels
 	newPlacementDecision.Status.Decisions = clusterDecisions
-	newPlacementDecision, err = c.clusterClient.ClusterV1beta1().PlacementDecisions(newPlacementDecision.Namespace).
-		UpdateStatus(ctx, newPlacementDecision, metav1.UpdateOptions{})
-
+	updated, err := placementDecisionPatcher.PatchStatus(ctx, newPlacementDecision, newPlacementDecision.Status, existPlacementDecision.Status)
+	// If status has been updated, just return, this is to avoid conflict when updating the label later.
+	// Labels and annotations will still be updated in next reconcile.
+	if updated {
+		return err
+	}
+	_, err = placementDecisionPatcher.PatchLabelAnnotations(ctx, newPlacementDecision, newPlacementDecision.ObjectMeta, existPlacementDecision.ObjectMeta)
 	if err != nil {
 		return err
 	}
@@ -574,16 +744,16 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 	// update the event with warning
 	if status.Code() == framework.Warning {
 		c.recorder.Eventf(
-			placement, placementDecision, corev1.EventTypeWarning,
+			placement, existPlacementDecision, corev1.EventTypeWarning,
 			"DecisionUpdate", "DecisionUpdated",
-			"Decision %s is updated with placement %s in namespace %s: %s in plugin %s", placementDecision.Name, placement.Name, placement.Namespace,
+			"Decision %s is updated with placement %s in namespace %s: %s in plugin %s", existPlacementDecision.Name, placement.Name, placement.Namespace,
 			status.Message(),
 			status.Plugin())
 	} else {
 		c.recorder.Eventf(
-			placement, placementDecision, corev1.EventTypeNormal,
+			placement, existPlacementDecision, corev1.EventTypeNormal,
 			"DecisionUpdate", "DecisionUpdated",
-			"Decision %s is updated with placement %s in namespace %s", placementDecision.Name, placement.Name, placement.Namespace)
+			"Decision %s is updated with placement %s in namespace %s", existPlacementDecision.Name, placement.Name, placement.Namespace)
 	}
 
 	// update the event with prioritizer score.
@@ -599,9 +769,36 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 	}
 
 	c.recorder.Eventf(
-		placement, placementDecision, corev1.EventTypeNormal,
+		placement, existPlacementDecision, corev1.EventTypeNormal,
 		"ScoreUpdate", "ScoreUpdated",
 		scoreStr)
 
 	return nil
+}
+
+func calculateLength(intOrStr *intstr.IntOrString, total int) (int, *framework.Status) {
+	length := total
+
+	switch intOrStr.Type {
+	case intstr.Int:
+		length = intOrStr.IntValue()
+	case intstr.String:
+		str := intOrStr.StrVal
+		if strings.HasSuffix(str, "%") {
+			f, err := strconv.ParseFloat(str[:len(str)-1], 64)
+			if err != nil {
+				msg := fmt.Sprintf("%v invalid type: string is not a percentage", intOrStr)
+				return length, framework.NewStatus("", framework.Misconfigured, msg)
+			}
+			length = int(math.Ceil(f / 100 * float64(total)))
+		} else {
+			msg := fmt.Sprintf("%v invalid type: string is not a percentage", intOrStr)
+			return length, framework.NewStatus("", framework.Misconfigured, msg)
+		}
+	}
+
+	if length <= 0 || length > total {
+		length = total
+	}
+	return length, framework.NewStatus("", framework.Success, "")
 }
