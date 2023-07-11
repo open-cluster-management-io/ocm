@@ -21,6 +21,7 @@ func TestAddFinalizer(t *testing.T) {
 		name            string
 		obj             *clusterv1.ManagedCluster
 		finalizers      []string
+		opts            PatchOptions
 		validateActions func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
@@ -42,6 +43,7 @@ func TestAddFinalizer(t *testing.T) {
 			name:       "multiple finalizers",
 			obj:        newManagedClusterWithFinalizer("test-finalizer-1"),
 			finalizers: []string{"test-finalizer", "test-finalizer-1"},
+			opts:       PatchOptions{IgnoreResourceVersion: true},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
@@ -66,7 +68,7 @@ func TestAddFinalizer(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.obj)
 			patcher := NewPatcher[
 				*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
-				clusterClient.ClusterV1().ManagedClusters())
+				clusterClient.ClusterV1().ManagedClusters()).WithOptions(c.opts)
 			if _, err := patcher.AddFinalizer(context.TODO(), c.obj, c.finalizers...); err != nil {
 				t.Error(err)
 			}
@@ -142,8 +144,8 @@ func TestRemoveFinalizer(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.obj)
 			patcher := NewPatcher[
 				*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
-				clusterClient.ClusterV1().ManagedClusters())
-			if err := patcher.RemoveFinalizer(context.TODO(), c.obj, c.opts, c.finalizers...); err != nil {
+				clusterClient.ClusterV1().ManagedClusters()).WithOptions(c.opts)
+			if err := patcher.RemoveFinalizer(context.TODO(), c.obj, c.finalizers...); err != nil {
 				t.Error(err)
 			}
 			c.validateActions(t, clusterClient.Actions())
@@ -156,12 +158,14 @@ func TestPatchSpec(t *testing.T) {
 		name            string
 		obj             *clusterv1.ManagedCluster
 		newObj          *clusterv1.ManagedCluster
+		opts            PatchOptions
 		validateActions func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
 			name:   "patch spec",
 			obj:    newManagedClusterWithTaint(clusterv1.Taint{Key: "key1"}),
 			newObj: newManagedClusterWithTaint(clusterv1.Taint{Key: "key2"}),
+			opts:   PatchOptions{IgnoreResourceVersion: true},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
@@ -194,7 +198,7 @@ func TestPatchSpec(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.obj)
 			patcher := NewPatcher[
 				*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
-				clusterClient.ClusterV1().ManagedClusters())
+				clusterClient.ClusterV1().ManagedClusters()).WithOptions(c.opts)
 			if _, err := patcher.PatchSpec(context.TODO(), c.obj, c.newObj.Spec, c.obj.Spec); err != nil {
 				t.Error(err)
 			}
@@ -208,12 +212,14 @@ func TestPatchStatus(t *testing.T) {
 		name            string
 		obj             *clusterv1.ManagedCluster
 		newObj          *clusterv1.ManagedCluster
+		opts            PatchOptions
 		validateActions func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
 			name:   "patch status",
 			obj:    newManagedClusterWithConditions(metav1.Condition{Type: "Type1"}),
 			newObj: newManagedClusterWithConditions(metav1.Condition{Type: "Type2"}),
+			opts:   PatchOptions{IgnoreResourceVersion: true},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
@@ -246,7 +252,7 @@ func TestPatchStatus(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.obj)
 			patcher := NewPatcher[
 				*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
-				clusterClient.ClusterV1().ManagedClusters())
+				clusterClient.ClusterV1().ManagedClusters()).WithOptions(c.opts)
 			if _, err := patcher.PatchStatus(context.TODO(), c.obj, c.newObj.Status, c.obj.Status); err != nil {
 				t.Error(err)
 			}
@@ -260,6 +266,7 @@ func TestPatchLabelAnnotations(t *testing.T) {
 		name            string
 		obj             *clusterv1.ManagedCluster
 		newObj          *clusterv1.ManagedCluster
+		opts            PatchOptions
 		validateActions func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
@@ -272,6 +279,7 @@ func TestPatchLabelAnnotations(t *testing.T) {
 			name:   "add labels",
 			obj:    newManagedClusterWithLabelAnnotations(nil, nil),
 			newObj: newManagedClusterWithLabelAnnotations(map[string]string{"key": "value"}, nil),
+			opts:   PatchOptions{IgnoreResourceVersion: true},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
@@ -332,7 +340,7 @@ func TestPatchLabelAnnotations(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.obj)
 			patcher := NewPatcher[
 				*clusterv1.ManagedCluster, clusterv1.ManagedClusterSpec, clusterv1.ManagedClusterStatus](
-				clusterClient.ClusterV1().ManagedClusters())
+				clusterClient.ClusterV1().ManagedClusters()).WithOptions(c.opts)
 			if _, err := patcher.PatchLabelAnnotations(context.TODO(), c.obj, c.newObj.ObjectMeta, c.obj.ObjectMeta); err != nil {
 				t.Error(err)
 			}

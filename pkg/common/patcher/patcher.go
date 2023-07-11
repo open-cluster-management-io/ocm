@@ -24,7 +24,7 @@ type PatchClient[R runtime.Object] interface {
 
 type Patcher[R runtime.Object, Sp any, St any] interface {
 	AddFinalizer(context.Context, R, ...string) (bool, error)
-	RemoveFinalizer(context.Context, R, PatchOptions, ...string) error
+	RemoveFinalizer(context.Context, R, ...string) error
 	PatchStatus(context.Context, R, St, St) (bool, error)
 	PatchSpec(context.Context, R, Sp, Sp) (bool, error)
 	PatchLabelAnnotations(context.Context, R, metav1.ObjectMeta, metav1.ObjectMeta) (bool, error)
@@ -44,12 +44,18 @@ type Resource[Sp any, St any] struct {
 
 type patcher[R runtime.Object, Sp any, St any] struct {
 	client PatchClient[R]
+	opts   PatchOptions
 }
 
 func NewPatcher[R runtime.Object, Sp any, St any](client PatchClient[R]) *patcher[R, Sp, St] {
 	p := &patcher[R, Sp, St]{
 		client: client,
 	}
+	return p
+}
+
+func (p *patcher[R, Sp, St]) WithOptions(options PatchOptions) *patcher[R, Sp, St] {
+	p.opts = options
 	return p
 }
 
@@ -75,28 +81,40 @@ func (p *patcher[R, Sp, St]) AddFinalizer(ctx context.Context, object R, finaliz
 		}
 	}
 
-	if len(finalizersToAdd) > 0 {
-		patch := map[string]interface{}{
+	if len(finalizersToAdd) == 0 {
+		return false, nil
+	}
+
+	var patch map[string]interface{}
+	if p.opts.IgnoreResourceVersion {
+		patch = map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"uid":        accessor.GetUID(),
+				"finalizers": append(existingFinalizers, finalizersToAdd...),
+			},
+		}
+	} else {
+		patch = map[string]interface{}{
 			"metadata": map[string]interface{}{
 				"uid":             accessor.GetUID(),
 				"resourceVersion": accessor.GetResourceVersion(),
 				"finalizers":      append(existingFinalizers, finalizersToAdd...),
 			},
 		}
-		patchBytes, err := json.Marshal(patch)
-		if err != nil {
-			return false, err
-		}
-
-		_, err = p.client.Patch(
-			ctx, accessor.GetName(), types.MergePatchType, patchBytes, metav1.PatchOptions{})
-		return true, err
 	}
 
-	return false, nil
+	patchBytes, err := json.Marshal(patch)
+	if err != nil {
+		return false, err
+	}
+
+	_, err = p.client.Patch(
+		ctx, accessor.GetName(), types.MergePatchType, patchBytes, metav1.PatchOptions{})
+	return true, err
+
 }
 
-func (p *patcher[R, Sp, St]) RemoveFinalizer(ctx context.Context, object R, opts PatchOptions, finalizers ...string) error {
+func (p *patcher[R, Sp, St]) RemoveFinalizer(ctx context.Context, object R, finalizers ...string) error {
 	accessor, err := meta.Accessor(object)
 	if err != nil {
 		return err
@@ -123,7 +141,7 @@ func (p *patcher[R, Sp, St]) RemoveFinalizer(ctx context.Context, object R, opts
 	}
 
 	var patch map[string]interface{}
-	if opts.IgnoreResourceVersion {
+	if p.opts.IgnoreResourceVersion {
 		patch = map[string]interface{}{
 			"metadata": map[string]interface{}{
 				"uid":        accessor.GetUID(),
@@ -165,7 +183,12 @@ func (p *patcher[R, Sp, St]) patch(ctx context.Context, object R, newObject, old
 	}
 
 	newObject.UID = accessor.GetUID()
-	newObject.ResourceVersion = accessor.GetResourceVersion()
+	if p.opts.IgnoreResourceVersion {
+		newObject.ResourceVersion = ""
+	} else {
+		newObject.ResourceVersion = accessor.GetResourceVersion()
+	}
+
 	newData, err := json.Marshal(newObject)
 	if err != nil {
 		return fmt.Errorf("failed to Marshal new data for %s: %w", accessor.GetName(), err)
@@ -219,11 +242,20 @@ func (p *patcher[R, Sp, St]) PatchLabelAnnotations(ctx context.Context, object R
 		return false, err
 	}
 
-	patch := map[string]interface{}{
-		"metadata": map[string]interface{}{
-			"uid":             accessor.GetUID(),
-			"resourceVersion": accessor.GetResourceVersion(),
-		},
+	var patch map[string]interface{}
+	if p.opts.IgnoreResourceVersion {
+		patch = map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"uid": accessor.GetUID(),
+			},
+		}
+	} else {
+		patch = map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"uid":             accessor.GetUID(),
+				"resourceVersion": accessor.GetResourceVersion(),
+			},
+		}
 	}
 
 	if len(annotationPatch) > 0 {

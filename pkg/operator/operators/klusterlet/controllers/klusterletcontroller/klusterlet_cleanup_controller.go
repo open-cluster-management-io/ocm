@@ -55,7 +55,8 @@ func NewKlusterletCleanupController(
 	controller := &klusterletCleanupController{
 		kubeClient: kubeClient,
 		patcher: patcher.NewPatcher[
-			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](klusterletClient),
+			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](klusterletClient).
+			WithOptions(patcher.PatchOptions{IgnoreResourceVersion: true}),
 		klusterletLister:             klusterletInformer.Lister(),
 		kubeVersion:                  kubeVersion,
 		operatorNamespace:            operatorNamespace,
@@ -191,7 +192,7 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 		return utilerrors.NewAggregate(errs)
 	}
 
-	return n.patcher.RemoveFinalizer(ctx, klusterlet, patcher.PatchOptions{IgnoreResourceVersion: true}, klusterletFinalizer, klusterletHostedFinalizer)
+	return n.patcher.RemoveFinalizer(ctx, klusterlet, klusterletFinalizer, klusterletHostedFinalizer)
 }
 
 func (r *klusterletCleanupController) checkConnectivity(ctx context.Context,

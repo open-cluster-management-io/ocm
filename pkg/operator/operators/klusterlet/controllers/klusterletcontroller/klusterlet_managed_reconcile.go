@@ -195,7 +195,7 @@ func (r *managedReconcile) cleanUpAppliedManifestWorks(ctx context.Context, klus
 		}
 
 		// remove finalizer if exists
-		if err := mwpatcher.RemoveFinalizer(ctx, &appliedManifestWorks.Items[index], patcher.PatchOptions{}, appliedManifestWorkFinalizer); err != nil {
+		if err := mwpatcher.RemoveFinalizer(ctx, &appliedManifestWorks.Items[index], appliedManifestWorkFinalizer); err != nil {
 			errs = append(errs, fmt.Errorf("unable to remove finalizer from AppliedManifestWork %q: %w", appliedManifestWorks.Items[index].Name, err))
 		}
 	}

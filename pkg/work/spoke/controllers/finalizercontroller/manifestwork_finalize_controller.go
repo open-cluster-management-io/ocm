@@ -107,7 +107,7 @@ func (m *ManifestWorkFinalizeController) sync(ctx context.Context, controllerCon
 
 	m.rateLimiter.Forget(manifestWorkName)
 	manifestWork = manifestWork.DeepCopy()
-	if err := m.patcher.RemoveFinalizer(ctx, manifestWork, patcher.PatchOptions{}, controllers.ManifestWorkFinalizer); err != nil {
+	if err := m.patcher.RemoveFinalizer(ctx, manifestWork, controllers.ManifestWorkFinalizer); err != nil {
 		return fmt.Errorf("failed to remove finalizer from ManifestWork %s/%s: %w", manifestWork.Namespace, manifestWork.Name, err)
 	}
 
