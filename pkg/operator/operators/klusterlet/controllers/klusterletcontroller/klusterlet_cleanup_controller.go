@@ -55,7 +55,8 @@ func NewKlusterletCleanupController(
 	controller := &klusterletCleanupController{
 		kubeClient: kubeClient,
 		patcher: patcher.NewPatcher[
-			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](klusterletClient),
+			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](klusterletClient).
+			WithOptions(patcher.PatchOptions{IgnoreResourceVersion: true}),
 		klusterletLister:             klusterletInformer.Lister(),
 		kubeVersion:                  kubeVersion,
 		operatorNamespace:            operatorNamespace,
