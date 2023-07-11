@@ -20,53 +20,41 @@ import (
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-func assertPlacementDecisionCreated(placement *clusterapiv1beta1.Placement) {
-	ginkgo.By("Check if placementdecision is created")
-	gomega.Eventually(func() bool {
-		pdl, err := clusterClient.ClusterV1beta1().PlacementDecisions(placement.Namespace).List(context.Background(), metav1.ListOptions{
-			LabelSelector: placementLabel + "=" + placement.Name,
-		})
-		if err != nil {
-			return false
-		}
-		if len(pdl.Items) == 0 {
-			return false
-		}
-		for _, pd := range pdl.Items {
-			if controlled := metav1.IsControlledBy(&pd.ObjectMeta, placement); !controlled {
-				return false
-			}
-		}
-		return true
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+// assert placement
+func assertCreatingPlacement(placement *clusterapiv1beta1.Placement) *clusterapiv1beta1.Placement {
+	ginkgo.By("Create placement")
+	newplacement, err := clusterClient.ClusterV1beta1().Placements(placement.Namespace).Create(context.Background(), placement, metav1.CreateOptions{})
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	return newplacement
 }
 
-func assertCreatingPlacementDecision(name, namespace string, clusterNames []string) {
-	ginkgo.By(fmt.Sprintf("Create placementdecision %s", name))
-	placementDecision := &clusterapiv1beta1.PlacementDecision{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
-			Labels: map[string]string{
-				placementLabel: name,
-			},
-		},
+func assertCreatingPlacementWithDecision(placement *clusterapiv1beta1.Placement, numberOfDecisionClusters, numberOfPlacementDecisions int) {
+	newplacement := assertCreatingPlacement(placement)
+	assertPlacementDecisionCreated(newplacement)
+	assertPlacementDecisionNumbers(newplacement.Name, newplacement.Namespace, numberOfDecisionClusters, numberOfPlacementDecisions)
+	if placement.Spec.NumberOfClusters != nil {
+		assertPlacementConditionSatisfied(newplacement.Name, newplacement.Namespace, numberOfDecisionClusters, numberOfDecisionClusters == int(*placement.Spec.NumberOfClusters))
 	}
-	placementDecision, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).Create(context.Background(), placementDecision, metav1.CreateOptions{})
+}
 
-	var clusterDecisions []clusterapiv1beta1.ClusterDecision
-	for _, clusterName := range clusterNames {
-		clusterDecisions = append(clusterDecisions, clusterapiv1beta1.ClusterDecision{
-			ClusterName: clusterName,
-		})
-	}
+func assertPatchingPlacementSpec(newPlacement *clusterapiv1beta1.Placement) {
+	ginkgo.By("Patching placement spec")
+	placementPatcher := patcher.NewPatcher[
+		*clusterapiv1beta1.Placement, clusterapiv1beta1.PlacementSpec, clusterapiv1beta1.PlacementStatus](
+		clusterClient.ClusterV1beta1().Placements(newPlacement.Namespace))
 
-	placementDecision.Status.Decisions = clusterDecisions
-	placementDecision, err = clusterClient.ClusterV1beta1().PlacementDecisions(namespace).UpdateStatus(context.Background(), placementDecision, metav1.UpdateOptions{})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	gomega.Eventually(func() error {
+		oldPlacement, err := clusterClient.ClusterV1beta1().Placements(newPlacement.Namespace).Get(context.Background(), newPlacement.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		_, err = placementPatcher.PatchSpec(context.Background(), newPlacement, newPlacement.Spec, oldPlacement.Spec)
+		return err
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
 func assertPlacementDeleted(placementName, namespace string) {
@@ -80,52 +68,7 @@ func assertPlacementDeleted(placementName, namespace string) {
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }
 
-func assertNumberOfDecisions(placementName, namespace string, desiredNOD, desiredNOPD int) {
-	ginkgo.By("Check the number of decisions in placementdecisions")
-	gomega.Eventually(func() bool {
-		pdl, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
-			LabelSelector: placementLabel + "=" + placementName,
-		})
-		if err != nil {
-			return false
-		}
-		if len(pdl.Items) != desiredNOPD {
-			return false
-		}
-		actualNOD := 0
-		for _, pd := range pdl.Items {
-			actualNOD += len(pd.Status.Decisions)
-		}
-		return actualNOD == desiredNOD
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-}
-
-func assertClusterNamesOfDecisions(placementName, namespace string, desiredClusters []string) {
-	ginkgo.By(fmt.Sprintf("Check the cluster names of placementdecisions %s", placementName))
-	gomega.Eventually(func() bool {
-		pdl, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
-			LabelSelector: placementLabel + "=" + placementName,
-		})
-		if err != nil {
-			return false
-		}
-		actualClusters := sets.NewString()
-		desiredClusters := sets.NewString(desiredClusters...)
-		for _, pd := range pdl.Items {
-			for _, d := range pd.Status.Decisions {
-				actualClusters.Insert(d.ClusterName)
-			}
-		}
-
-		if actualClusters.Equal(desiredClusters) {
-			return true
-		}
-		ginkgo.By(fmt.Sprintf("Expect %v, but got %v", desiredClusters.List(), actualClusters.List()))
-		return false
-	}, eventuallyTimeout*2, eventuallyInterval).Should(gomega.BeTrue())
-}
-
-func assertPlacementDecisionGroupStatus(placementName, namespace string, decisionGroupStatus []clusterapiv1beta1.DecisionGroupStatus) {
+func assertPlacementStatusDecisionGroups(placementName, namespace string, decisionGroupStatus []clusterapiv1beta1.DecisionGroupStatus) {
 	ginkgo.By("Check the group status of placement")
 	gomega.Eventually(func() bool {
 		placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), placementName, metav1.GetOptions{})
@@ -191,29 +134,99 @@ func assertPlacementConditionMisconfigured(placementName, namespace string, misC
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }
 
-func assertBindingClusterSet(clusterSetName, namespace string) {
-	ginkgo.By("Create clusterset/clustersetbinding")
-	clusterset := &clusterapiv1beta2.ManagedClusterSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: clusterSetName,
-		},
-	}
-	_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-	csb := &clusterapiv1beta2.ManagedClusterSetBinding{
+// assert placement decision
+func assertCreatingPlacementDecision(name, namespace string, clusterNames []string) {
+	ginkgo.By(fmt.Sprintf("Create placementdecision %s", name))
+	placementDecision := &clusterapiv1beta1.PlacementDecision{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
-			Name:      clusterSetName,
-		},
-		Spec: clusterapiv1beta2.ManagedClusterSetBindingSpec{
-			ClusterSet: clusterSetName,
+			Name:      name,
+			Labels: map[string]string{
+				placementLabel: name,
+			},
 		},
 	}
-	_, err = clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
+	placementDecision, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).Create(context.Background(), placementDecision, metav1.CreateOptions{})
+
+	var clusterDecisions []clusterapiv1beta1.ClusterDecision
+	for _, clusterName := range clusterNames {
+		clusterDecisions = append(clusterDecisions, clusterapiv1beta1.ClusterDecision{
+			ClusterName: clusterName,
+		})
+	}
+
+	placementDecision.Status.Decisions = clusterDecisions
+	placementDecision, err = clusterClient.ClusterV1beta1().PlacementDecisions(namespace).UpdateStatus(context.Background(), placementDecision, metav1.UpdateOptions{})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 }
 
+func assertPlacementDecisionCreated(placement *clusterapiv1beta1.Placement) {
+	ginkgo.By("Check if placementdecision is created")
+	gomega.Eventually(func() bool {
+		pdl, err := clusterClient.ClusterV1beta1().PlacementDecisions(placement.Namespace).List(context.Background(), metav1.ListOptions{
+			LabelSelector: placementLabel + "=" + placement.Name,
+		})
+		if err != nil {
+			return false
+		}
+		if len(pdl.Items) == 0 {
+			return false
+		}
+		for _, pd := range pdl.Items {
+			if controlled := metav1.IsControlledBy(&pd.ObjectMeta, placement); !controlled {
+				return false
+			}
+		}
+		return true
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+}
+
+func assertPlacementDecisionNumbers(placementName, namespace string, desiredNumOfDecisionClusters, desiredNumOfDecisions int) {
+	ginkgo.By("Check the number of decisions in placementdecisions")
+	gomega.Eventually(func() bool {
+		pdl, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
+			LabelSelector: placementLabel + "=" + placementName,
+		})
+		if err != nil {
+			return false
+		}
+		if len(pdl.Items) != desiredNumOfDecisions {
+			return false
+		}
+		actualNumOfDecisionClusters := 0
+		for _, pd := range pdl.Items {
+			actualNumOfDecisionClusters += len(pd.Status.Decisions)
+		}
+		return actualNumOfDecisionClusters == desiredNumOfDecisionClusters
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+}
+
+func assertPlacementDecisionClusterNames(placementName, namespace string, desiredClusters []string) {
+	ginkgo.By(fmt.Sprintf("Check the cluster names of placementdecisions %s", placementName))
+	gomega.Eventually(func() bool {
+		pdl, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).List(context.Background(), metav1.ListOptions{
+			LabelSelector: placementLabel + "=" + placementName,
+		})
+		if err != nil {
+			return false
+		}
+		actualClusters := sets.NewString()
+		desiredClusters := sets.NewString(desiredClusters...)
+		for _, pd := range pdl.Items {
+			for _, d := range pd.Status.Decisions {
+				actualClusters.Insert(d.ClusterName)
+			}
+		}
+
+		if actualClusters.Equal(desiredClusters) {
+			return true
+		}
+		ginkgo.By(fmt.Sprintf("Expect %v, but got %v", desiredClusters.List(), actualClusters.List()))
+		return false
+	}, eventuallyTimeout*2, eventuallyInterval).Should(gomega.BeTrue())
+}
+
+// assert clusterset
 func assertCreatingClusterSet(clusterSetName string, labels ...string) {
 	ginkgo.By(fmt.Sprintf("Create clusterset %s", clusterSetName))
 	clusterset := &clusterapiv1beta2.ManagedClusterSet{
@@ -238,6 +251,29 @@ func assertCreatingClusterSet(clusterSetName string, labels ...string) {
 	}
 
 	_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+}
+
+func assertBindingClusterSet(clusterSetName, namespace string) {
+	ginkgo.By("Create clusterset/clustersetbinding")
+	clusterset := &clusterapiv1beta2.ManagedClusterSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: clusterSetName,
+		},
+	}
+	_, err := clusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(), clusterset, metav1.CreateOptions{})
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	csb := &clusterapiv1beta2.ManagedClusterSetBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      clusterSetName,
+		},
+		Spec: clusterapiv1beta2.ManagedClusterSetBindingSpec{
+			ClusterSet: clusterSetName,
+		},
+	}
+	_, err = clusterClient.ClusterV1beta2().ManagedClusterSetBindings(namespace).Create(context.Background(), csb, metav1.CreateOptions{})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 }
 
@@ -286,6 +322,7 @@ func assertDeletingClusterSetBinding(clusterSetName, namespace string) {
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }
 
+// assert clusters
 func assertCreatingClusters(clusterSetName string, num int, labels ...string) []string {
 	ginkgo.By(fmt.Sprintf("Create %d clusters", num))
 
@@ -336,10 +373,10 @@ func assertCleanupClusters() []string {
 	return clusterNames
 }
 
-func assertUpdatingClusterWithClusterResources(managedClusterName string, res []string) {
+func assertPatchingClusterStatusWithResources(managedClusterName string, res []string) {
 	ginkgo.By(fmt.Sprintf("Updating ManagedClusters %s cluster resources", managedClusterName))
 
-	mc, err := clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedClusterName, metav1.GetOptions{})
+	oldmc, err := clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedClusterName, metav1.GetOptions{})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	allocatable := map[clusterapiv1.ResourceName]resource.Quantity{}
@@ -354,27 +391,35 @@ func assertUpdatingClusterWithClusterResources(managedClusterName string, res []
 	capacity[clusterapiv1.ResourceMemory], err = resource.ParseQuantity(res[3])
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-	mc.Status = clusterapiv1.ManagedClusterStatus{
-		Allocatable: allocatable,
-		Capacity:    capacity,
-		Conditions:  []metav1.Condition{},
-	}
-	_, err = clusterClient.ClusterV1().ManagedClusters().UpdateStatus(context.Background(), mc, metav1.UpdateOptions{})
+	newmc := oldmc.DeepCopy()
+	newmc.Status.Allocatable = allocatable
+	newmc.Status.Capacity = capacity
+
+	managedClusterPatcher := patcher.NewPatcher[
+		*clusterapiv1.ManagedCluster, clusterapiv1.ManagedClusterSpec, clusterapiv1.ManagedClusterStatus](
+		clusterClient.ClusterV1().ManagedClusters())
+
+	_, err = managedClusterPatcher.PatchStatus(context.Background(), newmc, newmc.Status, oldmc.Status)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 }
 
-func assertUpdatingClusterWithClusterTaint(managedClusterName string, taint *clusterapiv1.Taint) {
+func assertPatchingClusterSpecWithTaint(managedClusterName string, taint *clusterapiv1.Taint) {
 	ginkgo.By(fmt.Sprintf("Updating ManagedClusters %s taint", managedClusterName))
 	if taint == nil {
 		return
 	}
 
-	mc, err := clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedClusterName, metav1.GetOptions{})
+	oldmc, err := clusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedClusterName, metav1.GetOptions{})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-	mc.Spec.Taints = append(mc.Spec.Taints, *taint)
+	newmc := oldmc.DeepCopy()
+	newmc.Spec.Taints = append(newmc.Spec.Taints, *taint)
 
-	_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.Background(), mc, metav1.UpdateOptions{})
+	managedClusterPatcher := patcher.NewPatcher[
+		*clusterapiv1.ManagedCluster, clusterapiv1.ManagedClusterSpec, clusterapiv1.ManagedClusterStatus](
+		clusterClient.ClusterV1().ManagedClusters())
+
+	_, err = managedClusterPatcher.PatchSpec(context.Background(), newmc, newmc.Spec, oldmc.Spec)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 }
 
@@ -393,54 +438,6 @@ func assertDeletingClusters(clusterNames ...string) {
 			return errors.IsNotFound(err)
 		}, eventuallyTimeout*2, eventuallyInterval).Should(gomega.BeTrue())
 	}
-}
-
-func assertCreatingPlacement(name, namespace string, noc *int32, prioritizerPolicy clusterapiv1beta1.PrioritizerPolicy, tolerations []clusterapiv1beta1.Toleration, groupStrategy clusterapiv1beta1.GroupStrategy) *clusterapiv1beta1.Placement {
-	ginkgo.By("Create placement")
-	placement := &clusterapiv1beta1.Placement{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
-		},
-		Spec: clusterapiv1beta1.PlacementSpec{
-			NumberOfClusters:  noc,
-			PrioritizerPolicy: prioritizerPolicy,
-			Tolerations:       tolerations,
-			DecisionStrategy:  clusterapiv1beta1.DecisionStrategy{GroupStrategy: groupStrategy},
-		},
-	}
-	placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Create(context.Background(), placement, metav1.CreateOptions{})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-	return placement
-}
-
-func assertCreatingPlacementWithDecision(name, namespace string, numberOfClusters *int32, numberOfDecisionClusters, numberOfPlacementDecisions int, prioritizerPolicy clusterapiv1beta1.PrioritizerPolicy, tolerations []clusterapiv1beta1.Toleration, groupStrategy clusterapiv1beta1.GroupStrategy) {
-	placement := assertCreatingPlacement(name, namespace, numberOfClusters, prioritizerPolicy, tolerations, groupStrategy)
-	assertPlacementDecisionCreated(placement)
-	assertNumberOfDecisions(name, namespace, numberOfDecisionClusters, numberOfPlacementDecisions)
-	if numberOfClusters != nil {
-		assertPlacementConditionSatisfied(name, namespace, numberOfDecisionClusters, numberOfDecisionClusters == int(*numberOfClusters))
-	}
-}
-
-func assertUpdatingPlacement(name, namespace string, noc *int32, clusterSet []string, predicate []clusterapiv1beta1.ClusterPredicate, prioritizerPolicy clusterapiv1beta1.PrioritizerPolicy, tolerations []clusterapiv1beta1.Toleration) {
-	ginkgo.By("Updating placement")
-	gomega.Eventually(func() error {
-		placement, err := clusterClient.ClusterV1beta1().Placements(namespace).Get(context.Background(), name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		placement.Spec.NumberOfClusters = noc
-		placement.Spec.ClusterSets = clusterSet
-		placement.Spec.Predicates = predicate
-		placement.Spec.PrioritizerPolicy = prioritizerPolicy
-		placement.Spec.Tolerations = tolerations
-
-		_, err = clusterClient.ClusterV1beta1().Placements(namespace).Update(context.Background(), placement, metav1.UpdateOptions{})
-		return err
-	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
 func assertCreatingAddOnPlacementScores(clusternamespace, crname, scorename string, score int32) {

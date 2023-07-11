@@ -17,6 +17,7 @@ import (
 
 	controllers "open-cluster-management.io/ocm/pkg/placement/controllers"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/scheduling"
+	testinghelpers "open-cluster-management.io/ocm/pkg/placement/helpers/testing"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
@@ -66,35 +67,33 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			clusterNames := assertCreatingClusters(clusterSet1Name, 3)
 
-			assertUpdatingClusterWithClusterTaint(clusterNames[0], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(clusterNames[0], &clusterapiv1.Taint{
 				Key:    "key1",
 				Value:  "value1",
 				Effect: clusterapiv1.TaintEffectNoSelect,
 			})
-			assertUpdatingClusterWithClusterTaint(clusterNames[1], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(clusterNames[1], &clusterapiv1.Taint{
 				Key:    "key2",
 				Value:  "value2",
 				Effect: clusterapiv1.TaintEffectNoSelect,
 			})
-			assertUpdatingClusterWithClusterTaint(clusterNames[2], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(clusterNames[2], &clusterapiv1.Taint{
 				Key:    "key2",
 				Value:  "value3",
 				Effect: clusterapiv1.TaintEffectNoSelect,
 			})
 
 			//Checking the result of the placement
-			assertCreatingPlacementWithDecision(placementName, namespace, noc(3), 2, 1, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{
-				{
-					Key:      "key1",
-					Operator: clusterapiv1beta1.TolerationOpExists,
-				},
-				{
-					Key:      "key2",
-					Operator: clusterapiv1beta1.TolerationOpEqual,
-					Value:    "value2",
-				},
-			}, clusterapiv1beta1.GroupStrategy{})
-			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[0], clusterNames[1]})
+			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(3).AddToleration(&clusterapiv1beta1.Toleration{
+				Key:      "key1",
+				Operator: clusterapiv1beta1.TolerationOpExists,
+			}).AddToleration(&clusterapiv1beta1.Toleration{
+				Key:      "key2",
+				Operator: clusterapiv1beta1.TolerationOpEqual,
+				Value:    "value2",
+			}).Build()
+			assertCreatingPlacementWithDecision(placement, 2, 1)
+			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[0], clusterNames[1]})
 		})
 
 		ginkgo.It("Should schedule when taint/toleration effect matches", func() {
@@ -102,55 +101,51 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			clusterNames := assertCreatingClusters(clusterSet1Name, 4)
 
-			assertUpdatingClusterWithClusterTaint(clusterNames[0], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(clusterNames[0], &clusterapiv1.Taint{
 				Key:    "key1",
 				Value:  "value1",
 				Effect: clusterapiv1.TaintEffectNoSelect,
 			})
-			assertUpdatingClusterWithClusterTaint(clusterNames[1], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(clusterNames[1], &clusterapiv1.Taint{
 				Key:    "key2",
 				Value:  "value2",
 				Effect: clusterapiv1.TaintEffectNoSelectIfNew,
 			})
-			assertUpdatingClusterWithClusterTaint(clusterNames[2], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(clusterNames[2], &clusterapiv1.Taint{
 				Key:    "key3",
 				Value:  "value3",
 				Effect: clusterapiv1.TaintEffectPreferNoSelect,
 			})
 
 			//Taint/toleration matches, effect not match
-			assertCreatingPlacementWithDecision(placementName, namespace, noc(4), 2, 1, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{
-				{
-					Key:      "key1",
-					Operator: clusterapiv1beta1.TolerationOpExists,
-					Effect:   clusterapiv1.TaintEffectPreferNoSelect,
-				},
-				{
-					Key:      "key2",
-					Operator: clusterapiv1beta1.TolerationOpExists,
-					Effect:   clusterapiv1.TaintEffectNoSelect,
-				},
-				{
-					Key:      "key3",
-					Operator: clusterapiv1beta1.TolerationOpExists,
-					Effect:   clusterapiv1.TaintEffectNoSelect,
-				},
-				{
-					Key:      "key4",
-					Operator: clusterapiv1beta1.TolerationOpExists,
-					Effect:   clusterapiv1.TaintEffectNoSelect,
-				},
-			}, clusterapiv1beta1.GroupStrategy{})
+			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(4).AddToleration(&clusterapiv1beta1.Toleration{
+				Key:      "key1",
+				Operator: clusterapiv1beta1.TolerationOpExists,
+				Effect:   clusterapiv1.TaintEffectPreferNoSelect,
+			}).AddToleration(&clusterapiv1beta1.Toleration{
+				Key:      "key2",
+				Operator: clusterapiv1beta1.TolerationOpExists,
+				Effect:   clusterapiv1.TaintEffectNoSelect,
+			}).AddToleration(&clusterapiv1beta1.Toleration{
+				Key:      "key3",
+				Operator: clusterapiv1beta1.TolerationOpExists,
+				Effect:   clusterapiv1.TaintEffectNoSelect,
+			}).AddToleration(&clusterapiv1beta1.Toleration{
+				Key:      "key4",
+				Operator: clusterapiv1beta1.TolerationOpExists,
+				Effect:   clusterapiv1.TaintEffectNoSelect,
+			}).Build()
+			assertCreatingPlacementWithDecision(placement, 2, 1)
 			//Checking the result of the placement
-			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[2], clusterNames[3]})
+			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[2], clusterNames[3]})
 
 			//Taint effect is NoSelectIfNew, tolerations doesn't match, cluster is in decision
-			assertUpdatingClusterWithClusterTaint(clusterNames[3], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(clusterNames[3], &clusterapiv1.Taint{
 				Key:    "key4",
 				Value:  "value4",
 				Effect: clusterapiv1.TaintEffectNoSelectIfNew,
 			})
-			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[2], clusterNames[3]})
+			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[2], clusterNames[3]})
 		})
 
 		ginkgo.It("Should reschedule when expire TolerationSeconds", func() {
@@ -163,19 +158,19 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 			assertBindingClusterSet(clusterSet1Name, namespace)
 			clusterNames := assertCreatingClusters(clusterSet1Name, 4)
 
-			assertUpdatingClusterWithClusterTaint(clusterNames[0], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(clusterNames[0], &clusterapiv1.Taint{
 				Key:       "key1",
 				Value:     "value1",
 				Effect:    clusterapiv1.TaintEffectNoSelect,
 				TimeAdded: addedTime,
 			})
-			assertUpdatingClusterWithClusterTaint(clusterNames[1], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(clusterNames[1], &clusterapiv1.Taint{
 				Key:       "key2",
 				Value:     "value2",
 				Effect:    clusterapiv1.TaintEffectNoSelect,
 				TimeAdded: addedTime,
 			})
-			assertUpdatingClusterWithClusterTaint(clusterNames[2], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(clusterNames[2], &clusterapiv1.Taint{
 				Key:       "key2",
 				Value:     "value2",
 				Effect:    clusterapiv1.TaintEffectNoSelect,
@@ -183,32 +178,30 @@ var _ = ginkgo.Describe("TaintToleration", func() {
 			})
 
 			//Checking the result of the placement
-			assertCreatingPlacementWithDecision(placementName, namespace, noc(4), 3, 1, clusterapiv1beta1.PrioritizerPolicy{}, []clusterapiv1beta1.Toleration{
-				{
-					Key:               "key1",
-					Operator:          clusterapiv1beta1.TolerationOpExists,
-					TolerationSeconds: &tolerationSeconds_10,
-				},
-				{
-					Key:               "key2",
-					Operator:          clusterapiv1beta1.TolerationOpExists,
-					TolerationSeconds: &tolerationSeconds_20,
-				},
-			}, clusterapiv1beta1.GroupStrategy{})
-			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[0], clusterNames[1], clusterNames[3]})
+			placement := testinghelpers.NewPlacement(namespace, placementName).WithNOC(4).AddToleration(&clusterapiv1beta1.Toleration{
+				Key:               "key1",
+				Operator:          clusterapiv1beta1.TolerationOpExists,
+				TolerationSeconds: &tolerationSeconds_10,
+			}).AddToleration(&clusterapiv1beta1.Toleration{
+				Key:               "key2",
+				Operator:          clusterapiv1beta1.TolerationOpExists,
+				TolerationSeconds: &tolerationSeconds_20,
+			}).Build()
+			assertCreatingPlacementWithDecision(placement, 3, 1)
+			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[0], clusterNames[1], clusterNames[3]})
 
 			//Check placement requeue, clusterNames[0] should be removed when TolerationSeconds expired.
-			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[1], clusterNames[3]})
+			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[1], clusterNames[3]})
 			//Check placement requeue, clusterNames[1] should be removed when TolerationSeconds expired.
-			assertClusterNamesOfDecisions(placementName, namespace, []string{clusterNames[3]})
+			assertPlacementDecisionClusterNames(placementName, namespace, []string{clusterNames[3]})
 			//Check placement update, clusterNames[3] should be removed when new taint added.
-			assertUpdatingClusterWithClusterTaint(clusterNames[3], &clusterapiv1.Taint{
+			assertPatchingClusterSpecWithTaint(clusterNames[3], &clusterapiv1.Taint{
 				Key:       "key3",
 				Value:     "value3",
 				Effect:    clusterapiv1.TaintEffectNoSelect,
 				TimeAdded: metav1.NewTime(addedTime_60),
 			})
-			assertClusterNamesOfDecisions(placementName, namespace, []string{})
+			assertPlacementDecisionClusterNames(placementName, namespace, []string{})
 		})
 	})
 })
