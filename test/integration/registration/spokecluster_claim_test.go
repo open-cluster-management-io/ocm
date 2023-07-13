@@ -165,7 +165,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 			assertSuccessBootstrap()
 
 			ginkgo.By("Sync existing claims")
-			clusterClaims := []clusterv1.ManagedClusterClaim{}
+			var clusterClaims []clusterv1.ManagedClusterClaim
 			for _, claim := range claims {
 				clusterClaims = append(clusterClaims, clusterv1.ManagedClusterClaim{
 					Name:  claim.Name,
@@ -193,7 +193,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 			newClaim, err = clusterClient.ClusterV1alpha1().ClusterClaims().Create(context.TODO(), newClaim, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			newClusterClaims := []clusterv1.ManagedClusterClaim{}
+			var newClusterClaims []clusterv1.ManagedClusterClaim
 			newClusterClaims = append(newClusterClaims, clusterClaims...)
 			newClusterClaims = append(newClusterClaims, clusterv1.ManagedClusterClaim{
 				Name:  newClaim.Name,
@@ -213,7 +213,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 			_, err := clusterClient.ClusterV1alpha1().ClusterClaims().Update(context.TODO(), newClaim, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			updatedClusterClaims := []clusterv1.ManagedClusterClaim{}
+			var updatedClusterClaims []clusterv1.ManagedClusterClaim
 			updatedClusterClaims = append(updatedClusterClaims, clusterClaims...)
 			updatedClusterClaims = append(updatedClusterClaims, clusterv1.ManagedClusterClaim{
 				Name:  newClaim.Name,

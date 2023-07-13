@@ -213,15 +213,27 @@ func TestManifestWorkReplicaSetControllerPatchStatus(t *testing.T) {
 			workObjects = append(workObjects, c.works...)
 			fakeClient := fakeworkclient.NewSimpleClientset(workObjects...)
 			workInformers := workinformers.NewSharedInformerFactory(fakeClient, 10*time.Minute)
-			workInformers.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetStore().Add(c.mwrSet)
+			err := workInformers.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetStore().Add(c.mwrSet)
+			if err != nil {
+				t.Fatal(err)
+			}
 			for _, o := range c.works {
-				workInformers.Work().V1().ManifestWorks().Informer().GetStore().Add(o)
+				err = workInformers.Work().V1().ManifestWorks().Informer().GetStore().Add(o)
+				if err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			fakeClusterClient := fakeclusterclient.NewSimpleClientset(c.placement, c.decision)
 			clusterInformers := clusterinformers.NewSharedInformerFactory(fakeClusterClient, 10*time.Minute)
-			clusterInformers.Cluster().V1beta1().Placements().Informer().GetStore().Add(c.placement)
-			clusterInformers.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(c.decision)
+			err = clusterInformers.Cluster().V1beta1().Placements().Informer().GetStore().Add(c.placement)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = clusterInformers.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(c.decision)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			ctrl := newController(
 				fakeClient,
@@ -232,7 +244,7 @@ func TestManifestWorkReplicaSetControllerPatchStatus(t *testing.T) {
 			)
 
 			controllerContext := testingcommon.NewFakeSyncContext(t, c.mwrSet.Namespace+"/"+c.mwrSet.Name)
-			err := ctrl.sync(context.TODO(), controllerContext)
+			err = ctrl.sync(context.TODO(), controllerContext)
 			if err != nil {
 				t.Error(err)
 			}

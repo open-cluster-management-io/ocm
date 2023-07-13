@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -91,11 +90,11 @@ func DumpSecret(
 	// create/update files from the secret
 	for key, data := range secret.Data {
 		filename := path.Clean(path.Join(outputDir, key))
-		lastData, err := ioutil.ReadFile(filepath.Clean(filename))
+		lastData, err := os.ReadFile(filepath.Clean(filename))
 		switch {
 		case os.IsNotExist(err):
 			// create file
-			if err := ioutil.WriteFile(filename, data, 0600); err != nil {
+			if err := os.WriteFile(filename, data, 0600); err != nil {
 				return fmt.Errorf("unable to write file %q: %w", filename, err)
 			}
 			recorder.Event("FileCreated", fmt.Sprintf("File %q is created from secret %s/%s", filename, secretNamespace, secretName))
@@ -106,7 +105,7 @@ func DumpSecret(
 			continue
 		default:
 			// update file
-			if err := ioutil.WriteFile(path.Clean(filename), data, 0600); err != nil {
+			if err := os.WriteFile(path.Clean(filename), data, 0600); err != nil {
 				return fmt.Errorf("unable to write file %q: %w", filename, err)
 			}
 			recorder.Event("FileUpdated", fmt.Sprintf("File %q is updated from secret %s/%s", filename, secretNamespace, secretName))

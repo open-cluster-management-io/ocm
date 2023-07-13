@@ -39,7 +39,7 @@ func (c *ServerSideApply) Apply(
 	ctx context.Context,
 	gvr schema.GroupVersionResource,
 	required *unstructured.Unstructured,
-	owner metav1.OwnerReference,
+	_ metav1.OwnerReference,
 	applyOption *workapiv1.ManifestConfigOption,
 	recorder events.Recorder) (runtime.Object, error) {
 

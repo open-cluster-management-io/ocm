@@ -42,7 +42,7 @@ type crdStatusController struct {
 	generateHubClusterClients func(hubConfig *rest.Config) (apiextensionsclient.Interface, error)
 }
 
-// NewClusterManagerController construct cluster manager hub controller
+// NewCRDStatusController construct crd status controller
 func NewCRDStatusController(
 	kubeconfig *rest.Config,
 	kubeClient kubernetes.Interface,

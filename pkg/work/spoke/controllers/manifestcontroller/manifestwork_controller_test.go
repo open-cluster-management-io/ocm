@@ -280,14 +280,14 @@ func TestSync(t *testing.T) {
 			withAppliedWorkAction("create").
 			withExpectedKubeAction("get", "create").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
-			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
+			withExpectedWorkCondition(expectedCondition{workapiv1.WorkApplied, metav1.ConditionTrue}),
 		newTestCase("create single deployment resource").
 			withWorkManifest(spoketesting.NewUnstructured("apps/v1", "Deployment", "ns1", "test")).
 			withExpectedWorkAction("patch").
 			withAppliedWorkAction("create").
 			withExpectedDynamicAction("get", "create").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
-			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
+			withExpectedWorkCondition(expectedCondition{workapiv1.WorkApplied, metav1.ConditionTrue}),
 		newTestCase("update single resource").
 			withWorkManifest(spoketesting.NewUnstructured("v1", "Secret", "ns1", "test")).
 			withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
@@ -295,14 +295,14 @@ func TestSync(t *testing.T) {
 			withAppliedWorkAction("create").
 			withExpectedKubeAction("get", "delete", "create").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
-			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
+			withExpectedWorkCondition(expectedCondition{workapiv1.WorkApplied, metav1.ConditionTrue}),
 		newTestCase("create single unstructured resource").
 			withWorkManifest(spoketesting.NewUnstructured("v1", "NewObject", "ns1", "test")).
 			withExpectedWorkAction("patch").
 			withAppliedWorkAction("create").
 			withExpectedDynamicAction("get", "create").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
-			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
+			withExpectedWorkCondition(expectedCondition{workapiv1.WorkApplied, metav1.ConditionTrue}),
 		newTestCase("update single unstructured resource").
 			withWorkManifest(spoketesting.NewUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}})).
 			withSpokeDynamicObject(spoketesting.NewUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val2"}})).
@@ -310,7 +310,7 @@ func TestSync(t *testing.T) {
 			withAppliedWorkAction("create").
 			withExpectedDynamicAction("get", "update").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
-			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
+			withExpectedWorkCondition(expectedCondition{workapiv1.WorkApplied, metav1.ConditionTrue}),
 		newTestCase("multiple create&update resource").
 			withWorkManifest(spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"), spoketesting.NewUnstructured("v1", "Secret", "ns2", "test")).
 			withSpokeObject(spoketesting.NewSecret("test", "ns1", "value2")).
@@ -318,7 +318,7 @@ func TestSync(t *testing.T) {
 			withAppliedWorkAction("create").
 			withExpectedKubeAction("get", "delete", "create", "get", "create").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}, expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
-			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
+			withExpectedWorkCondition(expectedCondition{workapiv1.WorkApplied, metav1.ConditionTrue}),
 	}
 
 	for _, c := range cases {
@@ -348,7 +348,7 @@ func TestFailedToApplyResource(t *testing.T) {
 		withAppliedWorkAction("create").
 		withExpectedKubeAction("get", "delete", "create", "get", "create").
 		withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}, expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionFalse}).
-		withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionFalse})
+		withExpectedWorkCondition(expectedCondition{workapiv1.WorkApplied, metav1.ConditionFalse})
 
 	work, workKey := spoketesting.NewManifestWork(0, tc.workManifest...)
 	work.Finalizers = []string{controllers.ManifestWorkFinalizer}
@@ -387,7 +387,7 @@ func TestUpdateStrategy(t *testing.T) {
 			withAppliedWorkAction("create").
 			withExpectedDynamicAction("get", "update").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
-			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
+			withExpectedWorkCondition(expectedCondition{workapiv1.WorkApplied, metav1.ConditionTrue}),
 		newTestCase("update single resource with update updateStrategy").
 			withWorkManifest(spoketesting.NewUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}})).
 			withSpokeDynamicObject(spoketesting.NewUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val2"}})).
@@ -396,7 +396,7 @@ func TestUpdateStrategy(t *testing.T) {
 			withAppliedWorkAction("create").
 			withExpectedDynamicAction("get", "update").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
-			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
+			withExpectedWorkCondition(expectedCondition{workapiv1.WorkApplied, metav1.ConditionTrue}),
 		newTestCase("create single resource with updateStrategy not found").
 			withWorkManifest(spoketesting.NewUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}})).
 			withSpokeDynamicObject(spoketesting.NewUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val2"}})).
@@ -405,7 +405,7 @@ func TestUpdateStrategy(t *testing.T) {
 			withAppliedWorkAction("create").
 			withExpectedDynamicAction("get", "update").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
-			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
+			withExpectedWorkCondition(expectedCondition{workapiv1.WorkApplied, metav1.ConditionTrue}),
 		newTestCase("create single resource with server side apply updateStrategy").
 			withWorkManifest(spoketesting.NewUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}})).
 			withManifestConfig(newManifestConfigOption("", "newobjects", "ns1", "n1", &workapiv1.UpdateStrategy{Type: workapiv1.UpdateStrategyTypeServerSideApply})).
@@ -413,7 +413,7 @@ func TestUpdateStrategy(t *testing.T) {
 			withAppliedWorkAction("create").
 			withExpectedDynamicAction("patch", "patch").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
-			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
+			withExpectedWorkCondition(expectedCondition{workapiv1.WorkApplied, metav1.ConditionTrue}),
 		newTestCase("update single resource with server side apply updateStrategy").
 			withWorkManifest(spoketesting.NewUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}})).
 			withSpokeDynamicObject(spoketesting.NewUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val2"}})).
@@ -422,7 +422,7 @@ func TestUpdateStrategy(t *testing.T) {
 			withAppliedWorkAction("create").
 			withExpectedDynamicAction("patch", "patch").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
-			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
+			withExpectedWorkCondition(expectedCondition{workapiv1.WorkApplied, metav1.ConditionTrue}),
 		newTestCase("update single resource with create only updateStrategy").
 			withWorkManifest(spoketesting.NewUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}})).
 			withSpokeDynamicObject(spoketesting.NewUnstructuredWithContent("v1", "NewObject", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val2"}})).
@@ -431,7 +431,7 @@ func TestUpdateStrategy(t *testing.T) {
 			withAppliedWorkAction("create").
 			withExpectedDynamicAction("get", "patch").
 			withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionTrue}).
-			withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionTrue}),
+			withExpectedWorkCondition(expectedCondition{workapiv1.WorkApplied, metav1.ConditionTrue}),
 	}
 
 	for _, c := range cases {
@@ -467,7 +467,7 @@ func TestServerSideApplyConflict(t *testing.T) {
 		withAppliedWorkAction("create").
 		withExpectedDynamicAction("patch").
 		withExpectedManifestCondition(expectedCondition{string(workapiv1.ManifestApplied), metav1.ConditionFalse}).
-		withExpectedWorkCondition(expectedCondition{string(workapiv1.WorkApplied), metav1.ConditionFalse})
+		withExpectedWorkCondition(expectedCondition{workapiv1.WorkApplied, metav1.ConditionFalse})
 
 	work, workKey := spoketesting.NewManifestWork(0, testCase.workManifest...)
 	work.Spec.ManifestConfigs = testCase.workManifestConfig

@@ -155,7 +155,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		},
 	}
 
-	errs := []error{}
+	var errs []error
 	_, _, err = resourceapply.ApplyNamespace(ctx, c.kubeClient.CoreV1(), syncCtx.Recorder(), namespace)
 	if err != nil {
 		errs = append(errs, err)
@@ -203,7 +203,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 }
 
 func (c *managedClusterController) removeManagedClusterResources(ctx context.Context, managedClusterName string) error {
-	errs := []error{}
+	var errs []error
 	// Clean up managed cluster manifests
 	assetFn := helpers.ManagedClusterAssetFn(manifestFiles, managedClusterName)
 	resourceResults := resourceapply.DeleteAll(ctx, resourceapply.NewKubeClientHolder(c.kubeClient), c.eventRecorder, assetFn, staticFiles...)

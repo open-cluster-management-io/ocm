@@ -170,7 +170,7 @@ func TestSyncRoleAndRoleBinding(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			objects := []runtime.Object{}
+			var objects []runtime.Object
 			if c.roleBinding != nil {
 				objects = append(objects, c.roleBinding)
 			}

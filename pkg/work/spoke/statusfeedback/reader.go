@@ -30,8 +30,8 @@ func NewStatusReader() *StatusReader {
 }
 
 func (s *StatusReader) GetValuesByRule(obj *unstructured.Unstructured, rule workapiv1.FeedbackRule) ([]workapiv1.FeedbackValue, error) {
-	errs := []error{}
-	values := []workapiv1.FeedbackValue{}
+	var errs []error
+	var values []workapiv1.FeedbackValue
 
 	switch rule.Type {
 	case workapiv1.WellKnownStatusType:

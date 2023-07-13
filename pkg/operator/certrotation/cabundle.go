@@ -71,7 +71,7 @@ func manageCABundleConfigMap(caBundleConfigMap *corev1.ConfigMap, currentSigner 
 		caBundleConfigMap.Data = map[string]string{}
 	}
 
-	certificates := []*x509.Certificate{}
+	var certificates []*x509.Certificate
 	caBundle := caBundleConfigMap.Data["ca-bundle.crt"]
 	if len(caBundle) > 0 {
 		var err error
@@ -83,7 +83,7 @@ func manageCABundleConfigMap(caBundleConfigMap *corev1.ConfigMap, currentSigner 
 	certificates = append([]*x509.Certificate{currentSigner}, certificates...)
 	certificates = crypto.FilterExpiredCerts(certificates...)
 
-	finalCertificates := []*x509.Certificate{}
+	var finalCertificates []*x509.Certificate
 	// now check for duplicates. n^2, but super simple
 	for i := range certificates {
 		found := false

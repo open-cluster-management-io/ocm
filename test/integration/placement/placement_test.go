@@ -3,7 +3,6 @@ package placement
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -16,15 +15,13 @@ import (
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
 	controllers "open-cluster-management.io/ocm/pkg/placement/controllers"
-	"open-cluster-management.io/ocm/pkg/placement/controllers/scheduling"
 	testinghelpers "open-cluster-management.io/ocm/pkg/placement/helpers/testing"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
 const (
-	clusterSetLabel          = "cluster.open-cluster-management.io/clusterset"
-	placementLabel           = "cluster.open-cluster-management.io/placement"
-	maxNumOfClusterDecisions = 100
+	clusterSetLabel = "cluster.open-cluster-management.io/clusterset"
+	placementLabel  = "cluster.open-cluster-management.io/placement"
 )
 
 var _ = ginkgo.Describe("Placement", func() {
@@ -56,7 +53,6 @@ var _ = ginkgo.Describe("Placement", func() {
 		// start controller manager
 		var ctx context.Context
 		ctx, cancel = context.WithCancel(context.Background())
-		scheduling.ResyncInterval = time.Second * 5
 		go controllers.RunControllerManager(ctx, &controllercmd.ControllerContext{
 			KubeConfig:    restConfig,
 			EventRecorder: util.NewIntegrationTestEventRecorder("integration"),
@@ -555,8 +551,3 @@ var _ = ginkgo.Describe("Placement", func() {
 
 	})
 })
-
-func noc(n int) *int32 {
-	noc := int32(n)
-	return &noc
-}

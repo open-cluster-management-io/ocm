@@ -55,7 +55,7 @@ func NewBootstrapController(
 		secretInformers:  secretInformers,
 	}
 	return factory.New().WithSync(controller.sync).
-		WithInformersQueueKeyFunc(bootstrapSecretQueueKeyFunc(controller.klusterletLister),
+		WithInformersQueueKeysFunc(bootstrapSecretQueueKeyFunc(controller.klusterletLister),
 			secretInformers[helpers.HubKubeConfig].Informer(),
 			secretInformers[helpers.BootstrapHubKubeConfig].Informer(),
 			secretInformers[helpers.ExternalManagedKubeConfig].Informer()).
@@ -203,28 +203,28 @@ func (k *bootstrapController) loadKubeConfig(secret *corev1.Secret) (*clientcmda
 	return cluster, nil
 }
 
-func bootstrapSecretQueueKeyFunc(klusterletLister operatorlister.KlusterletLister) factory.ObjectQueueKeyFunc {
-	return func(obj runtime.Object) string {
+func bootstrapSecretQueueKeyFunc(klusterletLister operatorlister.KlusterletLister) factory.ObjectQueueKeysFunc {
+	return func(obj runtime.Object) []string {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
-			return ""
+			return []string{}
 		}
 		name := accessor.GetName()
 		if name != helpers.BootstrapHubKubeConfig {
-			return ""
+			return []string{}
 		}
 
 		namespace := accessor.GetNamespace()
 		klusterlets, err := klusterletLister.List(labels.Everything())
 		if err != nil {
-			return ""
+			return []string{}
 		}
 
 		if klusterlet := helpers.FindKlusterletByNamespace(klusterlets, namespace); klusterlet != nil {
-			return namespace + "/" + klusterlet.Name
+			return []string{namespace + "/" + klusterlet.Name}
 		}
 
-		return ""
+		return []string{}
 	}
 }
 

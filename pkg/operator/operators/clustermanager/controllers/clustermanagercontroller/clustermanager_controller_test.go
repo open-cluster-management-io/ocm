@@ -308,7 +308,7 @@ func TestSyncDeploy(t *testing.T) {
 		t.Fatalf("Expected no error when sync, %v", err)
 	}
 
-	createKubeObjects := []runtime.Object{}
+	var createKubeObjects []runtime.Object
 	kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...) // record objects from both hub and management cluster
 	for _, action := range kubeActions {
 		if action.GetVerb() == "create" {
@@ -324,7 +324,7 @@ func TestSyncDeploy(t *testing.T) {
 		ensureObject(t, object, clusterManager)
 	}
 
-	createCRDObjects := []runtime.Object{}
+	var createCRDObjects []runtime.Object
 	crdActions := tc.apiExtensionClient.Actions()
 	for _, action := range crdActions {
 		if action.GetVerb() == "create" {
@@ -348,7 +348,7 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 		t.Fatalf("Expected no error when sync, %v", err)
 	}
 
-	createKubeObjects := []runtime.Object{}
+	var createKubeObjects []runtime.Object
 	kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...) // record objects from both hub and management cluster
 	for _, action := range kubeActions {
 		if action.GetVerb() == "create" {
@@ -364,7 +364,7 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 		ensureObject(t, object, clusterManager)
 	}
 
-	createCRDObjects := []runtime.Object{}
+	var createCRDObjects []runtime.Object
 	crdActions := tc.apiExtensionClient.Actions()
 	for _, action := range crdActions {
 		if action.GetVerb() == "create" {
@@ -393,7 +393,7 @@ func TestSyncDelete(t *testing.T) {
 		t.Fatalf("Expected non error when sync, %v", err)
 	}
 
-	deleteKubeActions := []clienttesting.DeleteActionImpl{}
+	var deleteKubeActions []clienttesting.DeleteActionImpl
 	kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...)
 	for _, action := range kubeActions {
 		if action.GetVerb() == "delete" {
@@ -403,7 +403,7 @@ func TestSyncDelete(t *testing.T) {
 	}
 	testingcommon.AssertEqualNumber(t, len(deleteKubeActions), 29) // delete namespace both from the hub cluster and the mangement cluster
 
-	deleteCRDActions := []clienttesting.DeleteActionImpl{}
+	var deleteCRDActions []clienttesting.DeleteActionImpl
 	crdActions := tc.apiExtensionClient.Actions()
 	for _, action := range crdActions {
 		if action.GetVerb() == "delete" {

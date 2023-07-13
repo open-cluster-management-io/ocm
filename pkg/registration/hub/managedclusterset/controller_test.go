@@ -206,7 +206,7 @@ func TestSyncClusterSet(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			objects := []runtime.Object{}
+			var objects []runtime.Object
 			for _, cluster := range c.existingClusters {
 				objects = append(objects, cluster)
 			}
@@ -266,7 +266,7 @@ func TestGetDiffClustersets(t *testing.T) {
 		name          string
 		oldSets       []*clusterv1beta2.ManagedClusterSet
 		newSets       []*clusterv1beta2.ManagedClusterSet
-		expectDiffSet sets.String
+		expectDiffSet sets.Set[string]
 	}{
 		{
 			name: "update a set",
@@ -276,7 +276,7 @@ func TestGetDiffClustersets(t *testing.T) {
 			newSets: []*clusterv1beta2.ManagedClusterSet{
 				newManagedClusterSet("s1"), newManagedClusterSet("s3"),
 			},
-			expectDiffSet: sets.NewString("s2", "s3"),
+			expectDiffSet: sets.New[string]("s2", "s3"),
 		},
 		{
 			name: "add a set",
@@ -286,7 +286,7 @@ func TestGetDiffClustersets(t *testing.T) {
 			newSets: []*clusterv1beta2.ManagedClusterSet{
 				newManagedClusterSet("s1"), newManagedClusterSet("s2"),
 			},
-			expectDiffSet: sets.NewString("s2"),
+			expectDiffSet: sets.New[string]("s2"),
 		},
 		{
 			name: "delete a set",
@@ -296,7 +296,7 @@ func TestGetDiffClustersets(t *testing.T) {
 			newSets: []*clusterv1beta2.ManagedClusterSet{
 				newManagedClusterSet("s1"),
 			},
-			expectDiffSet: sets.NewString("s2"),
+			expectDiffSet: sets.New[string]("s2"),
 		},
 		{
 			name:    "old set is nil",
@@ -304,7 +304,7 @@ func TestGetDiffClustersets(t *testing.T) {
 			newSets: []*clusterv1beta2.ManagedClusterSet{
 				newManagedClusterSet("s1"),
 			},
-			expectDiffSet: sets.NewString("s1"),
+			expectDiffSet: sets.New[string]("s1"),
 		},
 		{
 			name: "new set is nil",
@@ -312,7 +312,7 @@ func TestGetDiffClustersets(t *testing.T) {
 				newManagedClusterSet("s1"),
 			},
 			newSets:       []*clusterv1beta2.ManagedClusterSet{},
-			expectDiffSet: sets.NewString("s1"),
+			expectDiffSet: sets.New[string]("s1"),
 		},
 	}
 
@@ -368,7 +368,7 @@ func TestEnqueueUpdateClusterClusterSet(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			objects := []runtime.Object{}
+			var objects []runtime.Object
 
 			for _, clusterset := range c.existingClusterSets {
 				objects = append(objects, clusterset)

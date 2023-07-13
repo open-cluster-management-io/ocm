@@ -73,7 +73,7 @@ func TestDeployReconcileAsExpected(t *testing.T) {
 	}
 
 	// Check the PlacedManifestWork conditions
-	placeCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, string(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified))
+	placeCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified)
 
 	if placeCondition == nil {
 		t.Fatal("Placement condition not found ", mwrSet.Status.Conditions)
@@ -137,7 +137,7 @@ func TestDeployReconcileAsPlacementDecisionEmpty(t *testing.T) {
 	}
 
 	// Check the PlacedManifestWork conditions
-	placeCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, string(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified))
+	placeCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified)
 
 	if placeCondition == nil {
 		t.Fatal("Placement condition not found ", mwrSet.Status.Conditions)
@@ -184,7 +184,7 @@ func TestDeployReconcileAsPlacementNotExist(t *testing.T) {
 	}
 
 	// Check the PlacedManifestWork conditions
-	placeCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, string(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified))
+	placeCondition := apimeta.FindStatusCondition(mwrSet.Status.Conditions, workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified)
 
 	if placeCondition == nil {
 		t.Fatal("Placement condition not found ", mwrSet.Status.Conditions)

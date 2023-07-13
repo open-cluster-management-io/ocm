@@ -207,9 +207,9 @@ func (c *managedClusterSetController) enqueueUpdateClusterClusterSet(oldCluster,
 }
 
 // getDiffClusterSetsNames return the diff clustersets names
-func getDiffClusterSetsNames(oldSets, newSets []*clusterv1beta2.ManagedClusterSet) sets.String {
-	oldSetsMap := sets.NewString()
-	newSetsMap := sets.NewString()
+func getDiffClusterSetsNames(oldSets, newSets []*clusterv1beta2.ManagedClusterSet) sets.Set[string] {
+	oldSetsMap := sets.New[string]()
+	newSetsMap := sets.New[string]()
 
 	for _, oldSet := range oldSets {
 		oldSetsMap.Insert(oldSet.Name)

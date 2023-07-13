@@ -1,6 +1,8 @@
 package webhook
 
 import (
+	"crypto/tls"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -30,10 +32,16 @@ func init() {
 func (c *Options) RunWebhookServer() error {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
-		Port:                   c.Port,
 		HealthProbeBindAddress: ":8000",
-		CertDir:                c.CertDir,
-		WebhookServer:          webhook.NewServer(webhook.Options{TLSMinVersion: "1.3"}),
+		WebhookServer: webhook.NewServer(webhook.Options{
+			TLSOpts: []func(config *tls.Config){
+				func(config *tls.Config) {
+					config.MinVersion = tls.VersionTLS13
+				},
+			},
+			Port:    c.Port,
+			CertDir: c.CertDir,
+		}),
 	})
 
 	if err != nil {

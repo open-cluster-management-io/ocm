@@ -238,7 +238,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration",
 		registrationFeatureGates, ocmfeature.DefaultSpokeRegistrationFeatureGates)
 
-	workFeatureGates := []operatorapiv1.FeatureGate{}
+	var workFeatureGates []operatorapiv1.FeatureGate
 	if klusterlet.Spec.WorkConfiguration != nil {
 		workFeatureGates = klusterlet.Spec.WorkConfiguration.FeatureGates
 	}

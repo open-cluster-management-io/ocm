@@ -3,7 +3,6 @@ package registration
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -24,11 +23,16 @@ const (
 )
 
 func TestDumpSecret(t *testing.T) {
-	testDir, err := ioutil.TempDir("", "dumpsecret")
+	testDir, err := os.MkdirTemp("", "dumpsecret")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	defer os.RemoveAll(testDir)
+	defer func() {
+		err := os.RemoveAll(testDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	kubeConfigFile := testinghelpers.NewKubeconfig(nil, nil)
 
@@ -44,7 +48,7 @@ func TestDumpSecret(t *testing.T) {
 			queueKey: "",
 			secret:   testinghelpers.NewHubKubeconfigSecret("irrelevant", "irrelevant", "", nil, map[string][]byte{}),
 			validateFiles: func(t *testing.T, hubKubeconfigDir string) {
-				files, err := ioutil.ReadDir(hubKubeconfigDir)
+				files, err := os.ReadDir(hubKubeconfigDir)
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}

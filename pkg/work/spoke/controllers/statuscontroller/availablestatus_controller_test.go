@@ -115,7 +115,7 @@ func TestSyncManifestWork(t *testing.T) {
 					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests[0].Conditions))
 				}
 
-				if !hasStatusCondition(work.Status.Conditions, string(workapiv1.WorkAvailable), metav1.ConditionTrue) {
+				if !hasStatusCondition(work.Status.Conditions, workapiv1.WorkAvailable, metav1.ConditionTrue) {
 					t.Fatal(spew.Sdump(work.Status.Conditions))
 				}
 			},
@@ -184,7 +184,7 @@ func TestSyncManifestWork(t *testing.T) {
 					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests[1].Conditions))
 				}
 
-				if !hasStatusCondition(work.Status.Conditions, string(workapiv1.WorkAvailable), metav1.ConditionUnknown) {
+				if !hasStatusCondition(work.Status.Conditions, workapiv1.WorkAvailable, metav1.ConditionUnknown) {
 					t.Fatal(spew.Sdump(work.Status.Conditions))
 				}
 			},

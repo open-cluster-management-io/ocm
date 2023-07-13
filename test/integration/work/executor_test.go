@@ -821,6 +821,7 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 
 			createRBAC(commOptions.SpokeClusterName, executorName)
 			addConfigMapToManifestWork(hubWorkClient, work.Name, commOptions.SpokeClusterName, "cm2")
+
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
 				metav1.ConditionTrue, []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue},
 				eventuallyTimeout, eventuallyInterval)
@@ -833,6 +834,7 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 
 			deleteRBAC(commOptions.SpokeClusterName, executorName)
 			addConfigMapToManifestWork(hubWorkClient, work.Name, commOptions.SpokeClusterName, "cm3")
+
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,
 				metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionFalse, metav1.ConditionFalse,
 					metav1.ConditionFalse}, eventuallyTimeout, eventuallyInterval)

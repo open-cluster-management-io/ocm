@@ -264,9 +264,9 @@ func ApplyDirectly(
 	cache resourceapply.ResourceCache,
 	manifests resourceapply.AssetFunc,
 	files ...string) []resourceapply.ApplyResult {
-	ret := []resourceapply.ApplyResult{}
+	var ret []resourceapply.ApplyResult
 
-	genericApplyFiles := []string{}
+	var genericApplyFiles []string
 	for _, file := range files {
 		result := resourceapply.ApplyResult{File: file}
 		objBytes, err := manifests(file)

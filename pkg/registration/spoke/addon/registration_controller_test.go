@@ -360,7 +360,7 @@ func TestRegistrationSync(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			kubeClient := kubefake.NewSimpleClientset()
 			managementClient := kubefake.NewSimpleClientset()
-			addons := []runtime.Object{}
+			var addons []runtime.Object
 			if c.addOn != nil {
 				addons = append(addons, c.addOn)
 			}

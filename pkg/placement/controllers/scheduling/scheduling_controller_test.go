@@ -551,7 +551,7 @@ func TestSchedulingController_sync(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			c.initObjs = append(c.initObjs, c.placement)
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 			s := &testScheduler{result: c.scheduleResult}
 
 			ctrl := schedulingController{
@@ -608,7 +608,7 @@ func TestGetValidManagedClusterSetBindings(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
 			ctrl := &schedulingController{
 				clusterSetLister:        clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
@@ -683,7 +683,7 @@ func TestGetValidManagedClusterSets(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
 			ctrl := &schedulingController{
 				clusterSetLister:        clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
@@ -811,7 +811,7 @@ func TestGetAvailableClusters(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
 			ctrl := &schedulingController{
 				clusterLister:    clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
@@ -1387,7 +1387,7 @@ func TestBind(t *testing.T) {
 				},
 			)
 
-			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
 			s := &testScheduler{}
 

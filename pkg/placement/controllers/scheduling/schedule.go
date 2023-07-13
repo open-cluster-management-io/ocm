@@ -56,7 +56,7 @@ type ScheduleResult interface {
 	// PrioritizerScores returns total score for each cluster
 	PrioritizerScores() PrioritizerScore
 
-	// Decision returns the decision groups of the schedule
+	// Decisions returns the decision groups of the schedule
 	Decisions() []*clusterapiv1.ManagedCluster
 
 	// NumOfUnscheduled returns the number of unscheduled.
@@ -180,7 +180,7 @@ func (s *pluginScheduler) Schedule(
 	}
 
 	// filter clusters
-	filterPipline := []string{}
+	var filterPipline []string
 
 	for _, f := range s.filters {
 		filterResult, status := f.Filter(ctx, placement, filtered)
@@ -389,10 +389,10 @@ func getPrioritizers(weights map[clusterapiv1beta1.ScoreCoordinate]int32, handle
 }
 
 func (r *scheduleResult) FilterResults() []FilterResult {
-	results := []FilterResult{}
+	var results []FilterResult
 
 	// order the FilterResults by key length
-	filteredRecordsKey := []string{}
+	var filteredRecordsKey []string
 	for name := range r.filteredRecords {
 		filteredRecordsKey = append(filteredRecordsKey, name)
 	}

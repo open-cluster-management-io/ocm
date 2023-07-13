@@ -167,9 +167,9 @@ func TestNeedNewTargetCertKeyPair(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			caBundleCerts := []*x509.Certificate{}
+			var caBundleCerts []*x509.Certificate
 			if len(c.caBundle) > 0 {
-				caBundleCerts, err = cert.ParseCertsPEM([]byte(c.caBundle))
+				caBundleCerts, err = cert.ParseCertsPEM(c.caBundle)
 				if err != nil {
 					t.Fatalf("Expected no error, but got: %v", err)
 				}

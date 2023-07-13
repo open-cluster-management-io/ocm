@@ -113,7 +113,8 @@ var _ = ginkgo.Describe("Unmanaged ApplieManifestWork", func() {
 			err := newHub.Stop()
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			if newHubTempDir != "" {
-				os.RemoveAll(newHubTempDir)
+				err := os.RemoveAll(newHubTempDir)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			}
 		})
 

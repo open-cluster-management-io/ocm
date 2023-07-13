@@ -22,7 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/version"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
@@ -238,7 +237,7 @@ func TestApplyDirectly(t *testing.T) {
 			fakeExtensionClient := fakeapiextensions.NewSimpleClientset()
 			fakeApplyFunc := func(name string) ([]byte, error) {
 				if c.applyFiles[name] == nil {
-					return nil, fmt.Errorf("Failed to find file")
+					return nil, fmt.Errorf("failed to find file")
 				}
 
 				return json.Marshal(c.applyFiles[name])
@@ -267,7 +266,7 @@ func TestApplyDirectly(t *testing.T) {
 				)
 			}
 
-			aggregatedErr := []error{}
+			var aggregatedErr []error
 			for _, r := range results {
 				if r.Error != nil {
 					aggregatedErr = append(aggregatedErr, r.Error)
@@ -338,7 +337,7 @@ func TestDeleteStaticObject(t *testing.T) {
 			fakeExtensionClient := fakeapiextensions.NewSimpleClientset()
 			fakeAssetFunc := func(name string) ([]byte, error) {
 				if applyFiles[name] == nil {
-					return nil, fmt.Errorf("Failed to find file")
+					return nil, fmt.Errorf("failed to find file")
 				}
 
 				return json.Marshal(applyFiles[name])
@@ -870,10 +869,10 @@ func TestGetRelatedResource(t *testing.T) {
 
 			relatedResource, err := GenerateRelatedResource(objData)
 			if !errors.Is(err, c.expectedErr) {
-				t.Errorf(diff.ObjectDiff(err, c.expectedErr))
+				t.Errorf(cmp.Diff(err, c.expectedErr))
 			}
 			if !reflect.DeepEqual(relatedResource, c.expectedRelatedResource) {
-				t.Errorf(diff.ObjectDiff(err, c.expectedErr))
+				t.Errorf(cmp.Diff(err, c.expectedErr))
 			}
 		})
 

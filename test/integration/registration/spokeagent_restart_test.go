@@ -99,7 +99,7 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 		// is restarted successfully
 		spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		conditions := []metav1.Condition{}
+		var conditions []metav1.Condition
 		for _, condition := range spokeCluster.Status.Conditions {
 			if condition.Type == clusterv1.ManagedClusterConditionJoined {
 				continue

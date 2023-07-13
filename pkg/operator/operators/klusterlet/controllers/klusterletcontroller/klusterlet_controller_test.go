@@ -316,7 +316,7 @@ func (c *testController) setDefaultManagedClusterClientsBuilder() *testControlle
 
 func getDeployments(actions []clienttesting.Action, verb, suffix string) *appsv1.Deployment {
 
-	deployments := []*appsv1.Deployment{}
+	var deployments []*appsv1.Deployment
 	for _, action := range actions {
 		if action.GetVerb() != verb || action.GetResource().Resource != "deployments" {
 			continue
@@ -477,7 +477,7 @@ func TestSyncDeploy(t *testing.T) {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 
-	createObjects := []runtime.Object{}
+	var createObjects []runtime.Object
 	kubeActions := controller.kubeClient.Actions()
 	for _, action := range kubeActions {
 		if action.GetVerb() == "create" {
@@ -497,7 +497,7 @@ func TestSyncDeploy(t *testing.T) {
 	}
 
 	apiExtenstionAction := controller.apiExtensionClient.Actions()
-	createCRDObjects := []runtime.Object{}
+	var createCRDObjects []runtime.Object
 	for _, action := range apiExtenstionAction {
 		if action.GetVerb() == "create" && action.GetResource().Resource == "customresourcedefinitions" {
 			object := action.(clienttesting.CreateActionImpl).Object
@@ -608,7 +608,7 @@ func TestSyncDeployHosted(t *testing.T) {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 
-	createObjectsManagement := []runtime.Object{}
+	var createObjectsManagement []runtime.Object
 	kubeActions := controller.kubeClient.Actions()
 	for _, action := range kubeActions {
 		if action.GetVerb() == "create" {
@@ -626,7 +626,7 @@ func TestSyncDeployHosted(t *testing.T) {
 		ensureObject(t, object, klusterlet)
 	}
 
-	createObjectsManaged := []runtime.Object{}
+	var createObjectsManaged []runtime.Object
 	for _, action := range controller.managedKubeClient.Actions() {
 		if action.GetVerb() == "create" {
 
@@ -645,7 +645,7 @@ func TestSyncDeployHosted(t *testing.T) {
 	}
 
 	apiExtenstionAction := controller.apiExtensionClient.Actions()
-	createCRDObjects := []runtime.Object{}
+	var createCRDObjects []runtime.Object
 	for _, action := range apiExtenstionAction {
 		if action.GetVerb() == "create" && action.GetResource().Resource == "customresourcedefinitions" {
 			object := action.(clienttesting.CreateActionImpl).Object
@@ -656,7 +656,7 @@ func TestSyncDeployHosted(t *testing.T) {
 		t.Errorf("Expect 0 objects created in the sync loop, actual %d", len(createCRDObjects))
 	}
 
-	createCRDObjectsManaged := []runtime.Object{}
+	var createCRDObjectsManaged []runtime.Object
 	for _, action := range controller.managedApiExtensionClient.Actions() {
 		if action.GetVerb() == "create" && action.GetResource().Resource == "customresourcedefinitions" {
 			object := action.(clienttesting.CreateActionImpl).Object
@@ -958,7 +958,7 @@ func TestDeployOnKube111(t *testing.T) {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 
-	createObjects := []runtime.Object{}
+	var createObjects []runtime.Object
 	kubeActions := controller.kubeClient.Actions()
 	for _, action := range kubeActions {
 		if action.GetVerb() == "create" {
@@ -1003,7 +1003,7 @@ func TestDeployOnKube111(t *testing.T) {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 
-	deleteActions := []clienttesting.DeleteActionImpl{}
+	var deleteActions []clienttesting.DeleteActionImpl
 	kubeActions = controller.kubeClient.Actions()
 	for _, action := range kubeActions {
 		if action.GetVerb() == "delete" {
@@ -1054,19 +1054,19 @@ type fakeManagedClusterBuilder struct {
 	fakeWorkClient         *fakeworkclient.Clientset
 }
 
-func (f *fakeManagedClusterBuilder) withMode(mode operatorapiv1.InstallMode) managedClusterClientsBuilderInterface {
+func (f *fakeManagedClusterBuilder) withMode(_ operatorapiv1.InstallMode) managedClusterClientsBuilderInterface {
 	return f
 }
 
-func (f *fakeManagedClusterBuilder) withKubeConfigSecret(namespace, name string) managedClusterClientsBuilderInterface {
+func (f *fakeManagedClusterBuilder) withKubeConfigSecret(_, _ string) managedClusterClientsBuilderInterface {
 	return f
 }
 
-func (m *fakeManagedClusterBuilder) build(ctx context.Context) (*managedClusterClients, error) {
+func (f *fakeManagedClusterBuilder) build(_ context.Context) (*managedClusterClients, error) {
 	return &managedClusterClients{
-		kubeClient:                m.fakeKubeClient,
-		apiExtensionClient:        m.fakeAPIExtensionClient,
-		appliedManifestWorkClient: m.fakeWorkClient.WorkV1().AppliedManifestWorks(),
+		kubeClient:                f.fakeKubeClient,
+		apiExtensionClient:        f.fakeAPIExtensionClient,
+		appliedManifestWorkClient: f.fakeWorkClient.WorkV1().AppliedManifestWorks(),
 		kubeconfig: &rest.Config{
 			Host: "testhost",
 			TLSClientConfig: rest.TLSClientConfig{
