@@ -48,7 +48,8 @@ type runtimeReconcile struct {
 	hubKubeConfig *rest.Config
 
 	ensureSAKubeconfigs func(ctx context.Context, clusterManagerName, clusterManagerNamespace string,
-		hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error
+		hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder,
+		mwctrEnabled, addonManagerEnabled bool) error
 
 	cache    resourceapply.ResourceCache
 	recorder events.Recorder
@@ -77,7 +78,9 @@ func (c *runtimeReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 	// Before this step, the serviceaccounts in the hub cluster and the namespace in the management cluster should be applied first.
 	if cm.Spec.DeployOption.Mode == operatorapiv1.InstallModeHosted {
 		clusterManagerNamespace := helpers.ClusterManagerNamespace(cm.Name, cm.Spec.DeployOption.Mode)
-		err := c.ensureSAKubeconfigs(ctx, cm.Name, clusterManagerNamespace, c.hubKubeConfig, c.hubKubeClient, c.kubeClient, c.recorder)
+		err := c.ensureSAKubeconfigs(ctx, cm.Name, clusterManagerNamespace,
+			c.hubKubeConfig, c.hubKubeClient, c.kubeClient, c.recorder,
+			config.MWReplicaSetEnabled, config.AddOnManagerEnabled)
 		if err != nil {
 			meta.SetStatusCondition(&cm.Status.Conditions, metav1.Condition{
 				Type:    clusterManagerApplied,
@@ -190,12 +193,18 @@ func (c *runtimeReconcile) clean(ctx context.Context, cm *operatorapiv1.ClusterM
 }
 
 // getSAs return serviceaccount names of all hub components
-func getSAs() []string {
-	return []string{
+func getSAs(mwctrEnabled, addonManagerEnabled bool) []string {
+	sas := []string{
 		"registration-controller-sa",
 		"registration-webhook-sa",
 		"work-webhook-sa",
 		"placement-controller-sa",
-		"work-controller-sa",
 	}
+	if mwctrEnabled {
+		sas = append(sas, "work-controller-sa")
+	}
+	if addonManagerEnabled {
+		sas = append(sas, "addon-manager-controller-sa")
+	}
+	return sas
 }

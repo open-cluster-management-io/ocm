@@ -263,7 +263,10 @@ func setup(t *testing.T, tc *testController, cd []runtime.Object, crds ...runtim
 	tc.clusterManagerController.generateHubClusterClients = func(hubKubeConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, migrationclient.StorageVersionMigrationsGetter, error) {
 		return fakeHubKubeClient, fakeAPIExtensionClient, fakeMigrationClient.MigrationV1alpha1(), nil
 	}
-	tc.clusterManagerController.ensureSAKubeconfigs = func(ctx context.Context, clusterManagerName, clusterManagerNamespace string, hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error {
+	tc.clusterManagerController.ensureSAKubeconfigs = func(ctx context.Context,
+		clusterManagerName, clusterManagerNamespace string, hubConfig *rest.Config,
+		hubClient, managementClient kubernetes.Interface, recorder events.Recorder,
+		mwctrEnabled, addonManagerEnabled bool) error {
 		return nil
 	}
 }
