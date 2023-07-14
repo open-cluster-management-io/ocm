@@ -1489,7 +1489,7 @@ func TestConvertToFeatureGateFlags(t *testing.T) {
 				{Feature: "ClusterClaim", Mode: operatorapiv1.FeatureGateModeTypeEnable},
 				{Feature: "AddonManagement", Mode: operatorapiv1.FeatureGateModeTypeEnable},
 			},
-			desiredFlags: []string{"--feature-gates=AddonManagement=true"},
+			desiredFlags: []string{},
 		},
 		{
 			name: "disable feature",
@@ -1497,7 +1497,7 @@ func TestConvertToFeatureGateFlags(t *testing.T) {
 				{Feature: "ClusterClaim", Mode: operatorapiv1.FeatureGateModeTypeDisable},
 				{Feature: "AddonManagement", Mode: operatorapiv1.FeatureGateModeTypeDisable},
 			},
-			desiredFlags: []string{"--feature-gates=ClusterClaim=false"},
+			desiredFlags: []string{"--feature-gates=ClusterClaim=false", "--feature-gates=AddonManagement=false"},
 		},
 		{
 			name: "invalid feature",
@@ -1514,10 +1514,10 @@ func TestConvertToFeatureGateFlags(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			flags, msg := ConvertToFeatureGateFlags("test", tc.features, ocmfeature.DefaultSpokeRegistrationFeatureGates)
 			if msg != tc.desiredMsg {
-				t.Errorf("unexpected message, got: %s, desired %s", msg, tc.desiredMsg)
+				t.Errorf("Name: %s, unexpected message, got: %s, desired %s", tc.name, msg, tc.desiredMsg)
 			}
 			if !equality.Semantic.DeepEqual(flags, tc.desiredFlags) {
-				t.Errorf("Unexpected flags, got %v, desired %v", flags, tc.desiredFlags)
+				t.Errorf("Name: %s, unexpected flags, got %v, desired %v", tc.name, flags, tc.desiredFlags)
 			}
 		})
 	}
@@ -1559,7 +1559,7 @@ func TestFeatureGateEnabled(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			enabled := FeatureGateEnabled(tc.features, ocmfeature.DefaultSpokeRegistrationFeatureGates, tc.featureName)
 			if enabled != tc.desiredResult {
-				t.Errorf("Expect feature enabled is %v, but got %v", tc.desiredResult, enabled)
+				t.Errorf("Name: %s, expect feature enabled is %v, but got %v", tc.name, tc.desiredResult, enabled)
 			}
 		})
 	}

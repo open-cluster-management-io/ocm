@@ -18,7 +18,6 @@ import (
 
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1apha1 "open-cluster-management.io/api/cluster/v1alpha1"
-	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/pkg/addon/templateagent"
 	"open-cluster-management.io/ocm/test/e2e/manifests"
@@ -61,39 +60,6 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		"addon/signca_secret_role.yaml",
 		"addon/signca_secret_rolebinding.yaml",
 	}
-
-	ginkgo.BeforeAll(func() {
-		// enable addon management feature gate
-		gomega.Eventually(func() error {
-			clusterManager, err := t.OperatorClient.OperatorV1().ClusterManagers().Get(context.TODO(), "cluster-manager", metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			clusterManager.Spec.AddOnManagerConfiguration = &operatorapiv1.AddOnManagerConfiguration{
-				FeatureGates: []operatorapiv1.FeatureGate{
-					{
-						Feature: "AddonManagement",
-						Mode:    operatorapiv1.FeatureGateModeTypeEnable,
-					},
-				},
-			}
-			_, err = t.OperatorClient.OperatorV1().ClusterManagers().Update(context.TODO(), clusterManager, metav1.UpdateOptions{})
-			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
-	})
-
-	ginkgo.AfterAll(func() {
-		// disable addon management feature gate
-		gomega.Eventually(func() error {
-			clusterManager, err := t.OperatorClient.OperatorV1().ClusterManagers().Get(context.TODO(), "cluster-manager", metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			clusterManager.Spec.AddOnManagerConfiguration = &operatorapiv1.AddOnManagerConfiguration{}
-			_, err = t.OperatorClient.OperatorV1().ClusterManagers().Update(context.TODO(), clusterManager, metav1.UpdateOptions{})
-			return err
-		}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
-	})
 
 	ginkgo.BeforeEach(func() {
 		addonInstallNamespace = fmt.Sprintf("%s-addon", agentNamespace)

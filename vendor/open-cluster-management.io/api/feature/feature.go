@@ -74,7 +74,7 @@ const (
 // add it here.
 var DefaultSpokeRegistrationFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	ClusterClaim:               {Default: true, PreRelease: featuregate.Beta},
-	AddonManagement:            {Default: false, PreRelease: featuregate.Alpha},
+	AddonManagement:            {Default: true, PreRelease: featuregate.Alpha},
 	V1beta1CSRAPICompatibility: {Default: false, PreRelease: featuregate.Alpha},
 }
 
@@ -88,7 +88,7 @@ var DefaultHubRegistrationFeatureGates = map[featuregate.Feature]featuregate.Fea
 }
 
 var DefaultHubAddonManagerFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	AddonManagement: {Default: false, PreRelease: featuregate.Alpha},
+	AddonManagement: {Default: true, PreRelease: featuregate.Alpha},
 }
 
 // DefaultHubWorkFeatureGates consists of all known acm work wehbook feature keys.

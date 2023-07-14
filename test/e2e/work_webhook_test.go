@@ -127,7 +127,10 @@ var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validati
 				_, err = impersonatedHubWorkClient.WorkV1().ManifestWorks(clusterName).Create(
 					context.Background(), work, metav1.CreateOptions{})
 				gomega.Expect(err).To(gomega.HaveOccurred())
-				gomega.Expect(errors.IsBadRequest(err)).Should(gomega.BeTrue())
+				if !errors.IsBadRequest(err) {
+					// not bad request, assert true=false to show the error message
+					gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				}
 			})
 		})
 	})
