@@ -359,7 +359,6 @@ func assertRegistrationDeployment(t *testing.T, actions []clienttesting.Action, 
 		"agent",
 		fmt.Sprintf("--spoke-cluster-name=%s", clusterName),
 		"--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig",
-		"--feature-gates=AddonManagement=true",
 	}
 
 	if serverURL != "" {

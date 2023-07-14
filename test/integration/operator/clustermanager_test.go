@@ -52,6 +52,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 	var hubWorkWebhookDeployment = fmt.Sprintf("%s-work-webhook", clusterManagerName)
 	var hubAddOnManagerDeployment = fmt.Sprintf("%s-addon-manager-controller", clusterManagerName)
 	var hubWorkControllerDeployment = fmt.Sprintf("%s-work-controller", clusterManagerName)
+	var hubAddonManagerDeployment = fmt.Sprintf("%s-addon-manager-controller", clusterManagerName)
 	var hubRegistrationClusterRole = fmt.Sprintf("open-cluster-management:%s-registration:controller", clusterManagerName)
 	var hubRegistrationWebhookClusterRole = fmt.Sprintf("open-cluster-management:%s-registration:webhook", clusterManagerName)
 	var hubWorkWebhookClusterRole = fmt.Sprintf("open-cluster-management:%s-work:webhook", clusterManagerName)
@@ -197,6 +198,14 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			gomega.Eventually(func() error {
+				if _, err := kubeClient.AppsV1().Deployments(hubNamespace).Get(context.Background(), hubAddonManagerDeployment, metav1.GetOptions{}); err != nil {
+					return err
+				}
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
 			// Check service
 			gomega.Eventually(func() error {
 				if _, err := kubeClient.CoreV1().Services(hubNamespace).Get(context.Background(), "cluster-manager-registration-webhook", metav1.GetOptions{}); err != nil {
@@ -249,53 +258,36 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 			registrationValidtingWebhook := "managedclustervalidators.admission.cluster.open-cluster-management.io"
 
 			// Should not apply the webhook config if the replica and observed is not set
-			_, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(context.Background(), registrationValidtingWebhook, metav1.GetOptions{})
+			_, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
+				context.Background(), registrationValidtingWebhook, metav1.GetOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			workValidtingWebhook := "manifestworkvalidators.admission.work.open-cluster-management.io"
 			// Should not apply the webhook config if the replica and observed is not set
-			_, err = kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(context.Background(), workValidtingWebhook, metav1.GetOptions{})
+			_, err = kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
+				context.Background(), workValidtingWebhook, metav1.GetOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 
 			// Update readyreplica of deployment
-
 			updateDeploymentStatus(kubeClient, hubNamespace, hubRegistrationWebhookDeployment)
 			updateDeploymentStatus(kubeClient, hubNamespace, hubWorkWebhookDeployment)
 			updateDeploymentStatus(kubeClient, hubNamespace, hubWorkControllerDeployment)
+			updateDeploymentStatus(kubeClient, hubNamespace, hubAddonManagerDeployment)
 
 			gomega.Eventually(func() error {
-				if _, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(context.Background(), registrationValidtingWebhook, metav1.GetOptions{}); err != nil {
-					return err
-				}
-				return nil
+				_, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
+					context.Background(), registrationValidtingWebhook, metav1.GetOptions{})
+				return err
 			}, eventuallyTimeout*10, eventuallyInterval).Should(gomega.BeNil())
 
 			gomega.Eventually(func() error {
-				if _, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(context.Background(), workValidtingWebhook, metav1.GetOptions{}); err != nil {
-					return err
-				}
-				return nil
+				_, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
+					context.Background(), workValidtingWebhook, metav1.GetOptions{})
+				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 			util.AssertClusterManagerCondition(clusterManagerName, operatorClient, "Applied", "ClusterManagerApplied", metav1.ConditionTrue)
 		})
 
 		ginkgo.It("should have expected resource created/deleted successfully when feature gates AddOnManager enabled/disabled", func() {
-			// Check addon manager default mode
-			gomega.Eventually(func() error {
-				clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-
-				// Check addon manager enabled mode
-				clusterManager.Spec.AddOnManagerConfiguration = &operatorapiv1.AddOnManagerConfiguration{
-					FeatureGates: []operatorapiv1.FeatureGate{
-						{Feature: "AddonManagement", Mode: operatorapiv1.FeatureGateModeTypeEnable},
-					},
-				}
-				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
-				return err
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
-
 			// Check clusterrole/clusterrolebinding
 			gomega.Eventually(func() error {
 				if _, err := kubeClient.RbacV1().ClusterRoles().Get(context.Background(), hubAddOnManagerClusterRole, metav1.GetOptions{}); err != nil {
@@ -345,8 +337,15 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 					return err
 				}
 
-				clusterManager.Spec.AddOnManagerConfiguration.FeatureGates = []operatorapiv1.FeatureGate{}
-				clusterManager, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
+				clusterManager.Spec.AddOnManagerConfiguration = &operatorapiv1.AddOnManagerConfiguration{
+					FeatureGates: []operatorapiv1.FeatureGate{
+						{
+							Feature: "AddonManagement",
+							Mode:    operatorapiv1.FeatureGateModeTypeDisable,
+						},
+					},
+				}
+				_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 

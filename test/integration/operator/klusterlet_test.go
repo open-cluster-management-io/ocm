@@ -73,12 +73,6 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				},
 				ClusterName: "testcluster",
 				Namespace:   klusterletNamespace,
-				RegistrationConfiguration: &operatorapiv1.RegistrationConfiguration{FeatureGates: []operatorapiv1.FeatureGate{
-					{
-						Feature: "AddonManagement",
-						Mode:    "Enable",
-					},
-				}},
 			},
 		}
 
@@ -506,7 +500,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 					return false
 				}
 				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
-				gomega.Expect(len(actual.Spec.Template.Spec.Containers[0].Args)).Should(gomega.Equal(8))
+				gomega.Expect(len(actual.Spec.Template.Spec.Containers[0].Args)).Should(gomega.Equal(7))
 				return actual.Spec.Template.Spec.Containers[0].Args[2] == "--spoke-cluster-name=cluster2"
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
@@ -1003,7 +997,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			registrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
 				context.Background(), registrationDeploymentName, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(registrationDeployment.Spec.Template.Spec.Containers[0].Args).Should(
+			gomega.Expect(registrationDeployment.Spec.Template.Spec.Containers[0].Args).ShouldNot(
 				gomega.ContainElement("--feature-gates=AddonManagement=true"))
 
 			ginkgo.By("Check the work-agent has the expected feature gates")
