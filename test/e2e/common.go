@@ -75,12 +75,13 @@ type Tester struct {
 	klusterletOperator      string
 	registrationImage       string
 	workImage               string
+	singletonImage          string
 }
 
 // kubeconfigPath is the path of kubeconfig file, will be get from env "KUBECONFIG" by default.
 // bootstrapHubSecret is the bootstrap hub kubeconfig secret, and the format is "namespace/secretName".
 // Default of bootstrapHubSecret is helpers.KlusterletDefaultNamespace/helpers.BootstrapHubKubeConfig.
-func NewTester(hubKubeConfigPath, spokeKubeConfigPath, registrationImage, workImage string, timeout time.Duration) *Tester {
+func NewTester(hubKubeConfigPath, spokeKubeConfigPath, registrationImage, workImage, singletonImage string, timeout time.Duration) *Tester {
 	var tester = Tester{
 		hubKubeConfigPath:       hubKubeConfigPath,
 		spokeKubeConfigPath:     spokeKubeConfigPath,
@@ -92,6 +93,7 @@ func NewTester(hubKubeConfigPath, spokeKubeConfigPath, registrationImage, workIm
 		klusterletOperator:      "klusterlet",
 		registrationImage:       registrationImage,
 		workImage:               workImage,
+		singletonImage:          singletonImage,
 	}
 
 	return &tester
@@ -224,6 +226,7 @@ func (t *Tester) CreateKlusterlet(name, clusterName, klusterletNamespace string,
 		Spec: operatorapiv1.KlusterletSpec{
 			RegistrationImagePullSpec: t.registrationImage,
 			WorkImagePullSpec:         t.workImage,
+			ImagePullSpec:             t.singletonImage,
 			ExternalServerURLs: []operatorapiv1.ServerURL{
 				{
 					URL: "https://localhost",

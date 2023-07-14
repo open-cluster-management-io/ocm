@@ -29,17 +29,17 @@ var _ = ginkgo.Describe("Cluster Auto Approval", func() {
 		err = authn.CreateBootstrapKubeConfigWithUser(bootstrapFile, serverCertFile, securePort, util.AutoApprovalBootstrapUser)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		agentOptions := spoke.SpokeAgentOptions{
-			AgentOptions:             commonoptions.NewAgentOptions(),
+		agentOptions := &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
-			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
-		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
+		commOptions := commonoptions.NewAgentOptions()
+		commOptions.HubKubeconfigDir = hubKubeconfigDir
+		commOptions.SpokeClusterName = managedClusterName
 
 		// run registration agent
-		cancel := runAgent("autoapprovaltest", agentOptions, spokeCfg)
+		cancel := runAgent("autoapprovaltest", agentOptions, commOptions, spokeCfg)
 		defer cancel()
 
 		// after bootstrap the spokecluster should be accepted and its csr should be auto approved

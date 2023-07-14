@@ -33,7 +33,7 @@ test-e2e: deploy-hub deploy-spoke-operator run-e2e
 
 run-e2e: cluster-ip bootstrap-secret
 	go test -c ./test/e2e
-	./e2e.test -test.v -ginkgo.v -deploy-klusterlet=true -nil-executor-validating=true -registration-image=$(REGISTRATION_IMAGE) -work-image=$(WORK_IMAGE) -klusterlet-deploy-mode=$(KLUSTERLET_DEPLOY_MODE)
+	./e2e.test -test.v -ginkgo.v -deploy-klusterlet=true -nil-executor-validating=true -registration-image=$(REGISTRATION_IMAGE) -work-image=$(WORK_IMAGE) -singleton-image=$(OPERATOR_IMAGE_NAME) -klusterlet-deploy-mode=$(KLUSTERLET_DEPLOY_MODE)
 
 clean-hub: clean-hub-cr clean-hub-operator
 
@@ -60,7 +60,7 @@ deploy-spoke-operator: ensure-kustomize
 
 apply-spoke-cr: bootstrap-secret
 	$(KUSTOMIZE) build deploy/klusterlet/config/samples \
-	| $(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,cluster1,$(MANAGED_CLUSTER_NAME)," \
+	| $(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/registration-operator,$(OPERATOR_IMAGE_NAME)," -e "s,cluster1,$(MANAGED_CLUSTER_NAME)," \
 	| $(KUBECTL) apply -f -
 
 clean-hub-cr:

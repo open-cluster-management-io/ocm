@@ -79,7 +79,7 @@ func NewCertRotationController(
 		ResyncEvery(ResyncInterval).
 		WithSync(c.sync).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, clusterManagerInformer.Informer()).
-		WithInformersQueueKeyFunc(helpers.ClusterManagerQueueKeyFunc(c.clusterManagerLister),
+		WithInformersQueueKeysFunc(helpers.ClusterManagerQueueKeyFunc(c.clusterManagerLister),
 			configMapInformer.Informer(),
 			secretInformers[helpers.SignerSecret].Informer(),
 			secretInformers[helpers.RegistrationWebhookSecret].Informer(),

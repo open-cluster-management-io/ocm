@@ -33,15 +33,19 @@ type runtimeReconcile struct {
 
 func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+	if config.InstallMode == operatorapiv1.InstallModeSingleton {
+		return r.installSingletonAgent(ctx, klusterlet, config)
+	}
+
 	if config.InstallMode == operatorapiv1.InstallModeHosted {
 		// Create managed config secret for registration and work.
 		if err := r.createManagedClusterKubeconfig(ctx, klusterlet, config.KlusterletNamespace, config.AgentNamespace,
-			registrationServiceAccountName(klusterlet.Name), config.ExternalManagedKubeConfigRegistrationSecret,
+			config.RegistrationServiceAccount, config.ExternalManagedKubeConfigRegistrationSecret,
 			r.recorder); err != nil {
 			return klusterlet, reconcileStop, err
 		}
 		if err := r.createManagedClusterKubeconfig(ctx, klusterlet, config.KlusterletNamespace, config.AgentNamespace,
-			workServiceAccountName(klusterlet.Name), config.ExternalManagedKubeConfigWorkSecret,
+			config.WorkServiceAccount, config.ExternalManagedKubeConfigWorkSecret,
 			r.recorder); err != nil {
 			return klusterlet, reconcileStop, err
 		}
@@ -126,6 +130,35 @@ func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 	return klusterlet, reconcileContinue, nil
 }
 
+func (r *runtimeReconcile) installSingletonAgent(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
+	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+	// Deploy singleton agent
+	_, generationStatus, err := helpers.ApplyDeployment(
+		ctx,
+		r.kubeClient,
+		klusterlet.Status.Generations,
+		klusterlet.Spec.NodePlacement,
+		func(name string) ([]byte, error) {
+			template, err := manifests.KlusterletManifestFiles.ReadFile(name)
+			if err != nil {
+				return nil, err
+			}
+			objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
+			helpers.SetRelatedResourcesStatusesWithObj(&klusterlet.Status.RelatedResources, objData)
+			return objData, nil
+		},
+		r.recorder,
+		"klusterlet/management/klusterlet-agent-deployment.yaml")
+
+	if err != nil {
+		// TODO update condition
+		return klusterlet, reconcileStop, err
+	}
+
+	helpers.SetGenerationStatuses(&klusterlet.Status.Generations, generationStatus)
+	return klusterlet, reconcileContinue, nil
+}
+
 func (r *runtimeReconcile) createManagedClusterKubeconfig(
 	ctx context.Context,
 	klusterlet *operatorapiv1.Klusterlet,
@@ -170,6 +203,9 @@ func (r *runtimeReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.
 		fmt.Sprintf("%s-registration-agent", config.KlusterletName),
 		fmt.Sprintf("%s-work-agent", config.KlusterletName),
 	}
+	if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingleton {
+		deployments = []string{fmt.Sprintf("%s-agent", config.KlusterletName)}
+	}
 	for _, deployment := range deployments {
 		err := r.kubeClient.AppsV1().Deployments(config.AgentNamespace).Delete(ctx, deployment, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
@@ -179,14 +215,4 @@ func (r *runtimeReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.
 	}
 
 	return klusterlet, reconcileContinue, nil
-}
-
-// registrationServiceAccountName splices the name of registration service account
-func registrationServiceAccountName(klusterletName string) string {
-	return fmt.Sprintf("%s-registration-sa", klusterletName)
-}
-
-// workServiceAccountName splices the name of work service account
-func workServiceAccountName(klusterletName string) string {
-	return fmt.Sprintf("%s-work-sa", klusterletName)
 }

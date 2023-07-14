@@ -10,5 +10,5 @@ roleRef:
   name: open-cluster-management:management:{{ .KlusterletName }}-work:agent
 subjects:
   - kind: ServiceAccount
-    name: {{ .KlusterletName }}-work-sa
+    name: {{ .WorkServiceAccount }}
     namespace: {{ .AgentNamespace }}

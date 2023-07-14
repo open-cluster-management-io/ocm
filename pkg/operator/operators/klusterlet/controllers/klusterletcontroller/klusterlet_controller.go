@@ -96,11 +96,12 @@ func NewKlusterletController(
 	}
 
 	return factory.New().WithSync(controller.sync).
-		WithInformersQueueKeyFunc(helpers.KlusterletSecretQueueKeyFunc(controller.klusterletLister),
+		WithInformersQueueKeysFunc(helpers.KlusterletSecretQueueKeyFunc(controller.klusterletLister),
 			secretInformers[helpers.HubKubeConfig].Informer(),
 			secretInformers[helpers.BootstrapHubKubeConfig].Informer(),
 			secretInformers[helpers.ExternalManagedKubeConfig].Informer()).
-		WithInformersQueueKeyFunc(helpers.KlusterletDeploymentQueueKeyFunc(controller.klusterletLister), deploymentInformer.Informer()).
+		WithInformersQueueKeysFunc(helpers.KlusterletDeploymentQueueKeyFunc(
+			controller.klusterletLister), deploymentInformer.Informer()).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, klusterletInformer.Informer()).
 		ToController("KlusterletController", recorder)
 }
@@ -123,6 +124,9 @@ type klusterletConfig struct {
 	AgentID                     string
 	RegistrationImage           string
 	WorkImage                   string
+	SingletonImage              string
+	RegistrationServiceAccount  string
+	WorkServiceAccount          string
 	ClusterName                 string
 	ExternalServerURL           string
 	HubKubeConfigSecret         string
@@ -163,6 +167,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		RegistrationImage:         klusterlet.Spec.RegistrationImagePullSpec,
 		WorkImage:                 klusterlet.Spec.WorkImagePullSpec,
 		ClusterName:               klusterlet.Spec.ClusterName,
+		SingletonImage:            klusterlet.Spec.ImagePullSpec,
 		BootStrapKubeConfigSecret: helpers.BootstrapHubKubeConfig,
 		HubKubeConfigSecret:       helpers.HubKubeConfig,
 		ExternalServerURL:         getServersFromKlusterlet(klusterlet),
@@ -174,6 +179,9 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		ExternalManagedKubeConfigWorkSecret:         helpers.ExternalManagedKubeConfigWork,
 		InstallMode:                                 klusterlet.Spec.DeployOption.Mode,
 		HubApiServerHostAlias:                       klusterlet.Spec.HubApiServerHostAlias,
+
+		RegistrationServiceAccount: serviceAccountName("registration-sa", klusterlet),
+		WorkServiceAccount:         serviceAccountName("work-sa", klusterlet),
 	}
 
 	managedClusterClients, err := n.managedClusterClientsBuilder.
@@ -383,4 +391,13 @@ func ensureNamespace(ctx context.Context, kubeClient kubernetes.Interface, klust
 	}
 
 	return nil
+}
+
+func serviceAccountName(suffix string, klusterlet *operatorapiv1.Klusterlet) string {
+	// in singleton mode, we only need one sa, so the name of work and registration sa are
+	// the same.
+	if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingleton {
+		return fmt.Sprintf("%s-agent-sa", klusterlet.Name)
+	}
+	return fmt.Sprintf("%s-%s", klusterlet.Name, suffix)
 }

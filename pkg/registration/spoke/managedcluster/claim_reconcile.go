@@ -28,7 +28,7 @@ type claimReconcile struct {
 }
 
 func (r *claimReconcile) reconcile(ctx context.Context, cluster *clusterv1.ManagedCluster) (*clusterv1.ManagedCluster, reconcileState, error) {
-	if !features.DefaultSpokeRegistrationMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
+	if !features.SpokeMutableFeatureGate.Enabled(ocmfeature.ClusterClaim) {
 		return cluster, reconcileContinue, nil
 	}
 	// current managed cluster has not joined the hub yet, do nothing.

@@ -92,6 +92,7 @@ func newKlusterlet(name, namespace, clustername string) *operatorapiv1.Klusterle
 		Spec: operatorapiv1.KlusterletSpec{
 			RegistrationImagePullSpec: "testregistration",
 			WorkImagePullSpec:         "testwork",
+			ImagePullSpec:             "testagent",
 			ClusterName:               clustername,
 			Namespace:                 namespace,
 			ExternalServerURLs:        []operatorapiv1.ServerURL{},
@@ -206,8 +207,8 @@ func newTestControllerHosted(t *testing.T, klusterlet *operatorapiv1.Klusterlet,
 	kubeVersion, _ := version.ParseGeneric("v1.18.0")
 
 	klusterletNamespace := helpers.KlusterletNamespace(klusterlet)
-	saRegistrationSecret := newServiceAccountSecret(fmt.Sprintf("%s-token", registrationServiceAccountName(klusterlet.Name)), klusterlet.Name)
-	saWorkSecret := newServiceAccountSecret(fmt.Sprintf("%s-token", workServiceAccountName(klusterlet.Name)), klusterlet.Name)
+	saRegistrationSecret := newServiceAccountSecret(fmt.Sprintf("%s-token", serviceAccountName("registration-sa", klusterlet)), klusterlet.Name)
+	saWorkSecret := newServiceAccountSecret(fmt.Sprintf("%s-token", serviceAccountName("work-sa", klusterlet)), klusterlet.Name)
 	fakeManagedKubeClient := fakekube.NewSimpleClientset()
 	getRegistrationServiceAccountCount := 0
 	getWorkServiceAccountCount := 0
@@ -218,7 +219,7 @@ func newTestControllerHosted(t *testing.T, klusterlet *operatorapiv1.Klusterlet,
 	fakeManagedKubeClient.PrependReactor("get", "serviceaccounts", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 		name := action.(clienttesting.GetAction).GetName()
 		namespace := action.(clienttesting.GetAction).GetNamespace()
-		if namespace == klusterletNamespace && name == registrationServiceAccountName(klusterlet.Name) {
+		if namespace == klusterletNamespace && name == serviceAccountName("registration-sa", klusterlet) {
 			getRegistrationServiceAccountCount++
 			if getRegistrationServiceAccountCount > 1 {
 				sa := newServiceAccount(name, klusterletNamespace, saRegistrationSecret.Name)
@@ -227,7 +228,7 @@ func newTestControllerHosted(t *testing.T, klusterlet *operatorapiv1.Klusterlet,
 			}
 		}
 
-		if namespace == klusterletNamespace && name == workServiceAccountName(klusterlet.Name) {
+		if namespace == klusterletNamespace && name == serviceAccountName("work-sa", klusterlet) {
 			getWorkServiceAccountCount++
 			if getWorkServiceAccountCount > 1 {
 				sa := newServiceAccount(name, klusterletNamespace, saWorkSecret.Name)
@@ -447,8 +448,16 @@ func ensureObject(t *testing.T, object runtime.Object, klusterlet *operatorapiv1
 				t.Errorf("Image does not match to the expected.")
 				return
 			}
+		} else if strings.Contains(access.GetName(), "agent") {
+			testingcommon.AssertEqualNameNamespace(
+				t, access.GetName(), access.GetNamespace(),
+				fmt.Sprintf("%s-agent", klusterlet.Name), namespace)
+			if klusterlet.Spec.ImagePullSpec != o.Spec.Template.Spec.Containers[0].Image {
+				t.Errorf("Image does not match to the expected.")
+				return
+			}
 		} else {
-			t.Errorf("Unexpected deployment")
+			t.Errorf("unexpected deployment")
 			return
 		}
 	}
@@ -483,6 +492,67 @@ func TestSyncDeploy(t *testing.T) {
 	// 11 managed static manifests + 11 management static manifests - 2 duplicated service account manifests + 1 addon namespace + 2 deployments
 	if len(createObjects) != 23 {
 		t.Errorf("Expect 23 objects created in the sync loop, actual %d", len(createObjects))
+	}
+	for _, object := range createObjects {
+		ensureObject(t, object, klusterlet)
+	}
+
+	apiExtenstionAction := controller.apiExtensionClient.Actions()
+	createCRDObjects := []runtime.Object{}
+	for _, action := range apiExtenstionAction {
+		if action.GetVerb() == "create" && action.GetResource().Resource == "customresourcedefinitions" {
+			object := action.(clienttesting.CreateActionImpl).Object
+			createCRDObjects = append(createCRDObjects, object)
+		}
+	}
+	if len(createCRDObjects) != 2 {
+		t.Errorf("Expect 2 objects created in the sync loop, actual %d", len(createCRDObjects))
+	}
+
+	operatorAction := controller.operatorClient.Actions()
+	testingcommon.AssertActions(t, operatorAction, "patch")
+	klusterlet = &operatorapiv1.Klusterlet{}
+	patchData := operatorAction[0].(clienttesting.PatchActionImpl).Patch
+	err = json.Unmarshal(patchData, klusterlet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testinghelper.AssertOnlyConditions(
+		t, klusterlet,
+		testinghelper.NamedCondition(klusterletApplied, "KlusterletApplied", metav1.ConditionTrue),
+		testinghelper.NamedCondition(helpers.FeatureGatesTypeValid, helpers.FeatureGatesReasonAllValid, metav1.ConditionTrue),
+	)
+}
+
+func TestSyncDeploySingleton(t *testing.T) {
+	klusterlet := newKlusterlet("klusterlet", "testns", "cluster1")
+	klusterlet.Spec.DeployOption.Mode = operatorapiv1.InstallModeSingleton
+	bootStrapSecret := newSecret(helpers.BootstrapHubKubeConfig, "testns")
+	hubKubeConfigSecret := newSecret(helpers.HubKubeConfig, "testns")
+	hubKubeConfigSecret.Data["kubeconfig"] = []byte("dummuykubeconnfig")
+	namespace := newNamespace("testns")
+	controller := newTestController(t, klusterlet, nil, bootStrapSecret, hubKubeConfigSecret, namespace)
+	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+
+	err := controller.controller.sync(context.TODO(), syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	createObjects := []runtime.Object{}
+	kubeActions := controller.kubeClient.Actions()
+	for _, action := range kubeActions {
+		if action.GetVerb() == "create" {
+			object := action.(clienttesting.CreateActionImpl).Object
+			createObjects = append(createObjects, object)
+
+		}
+	}
+
+	// Check if resources are created as expected
+	// 10 managed static manifests + 10 management static manifests - 1 service account manifests + 1 addon namespace + 1 deployments
+	if len(createObjects) != 21 {
+		t.Errorf("Expect 21 objects created in the sync loop, actual %d", len(createObjects))
 	}
 	for _, object := range createObjects {
 		ensureObject(t, object, klusterlet)

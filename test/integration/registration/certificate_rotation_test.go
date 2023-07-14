@@ -20,18 +20,18 @@ var _ = ginkgo.Describe("Certificate Rotation", func() {
 		hubKubeconfigSecret := "rotationtest-hub-kubeconfig-secret"
 		hubKubeconfigDir := path.Join(util.TestDir, "rotationtest", "hub-kubeconfig")
 
-		agentOptions := spoke.SpokeAgentOptions{
-			AgentOptions:             commonoptions.NewAgentOptions(),
+		agentOptions := &spoke.SpokeAgentOptions{
 			BootstrapKubeconfig:      bootstrapKubeConfigFile,
 			HubKubeconfigSecret:      hubKubeconfigSecret,
-			HubKubeconfigDir:         hubKubeconfigDir,
 			ClusterHealthCheckPeriod: 1 * time.Minute,
 		}
 
-		agentOptions.AgentOptions.SpokeClusterName = managedClusterName
+		commOptions := commonoptions.NewAgentOptions()
+		commOptions.HubKubeconfigDir = hubKubeconfigDir
+		commOptions.SpokeClusterName = managedClusterName
 
 		// run registration agent
-		cancel := runAgent("rotationtest", agentOptions, spokeCfg)
+		cancel := runAgent("rotationtest", agentOptions, commOptions, spokeCfg)
 		defer cancel()
 
 		// after bootstrap the spokecluster and csr should be created

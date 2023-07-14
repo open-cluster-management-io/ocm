@@ -142,7 +142,7 @@ func getValueByJsonPath(name, path string, obj *unstructured.Unstructured) (*wor
 			Value: fieldValue,
 		}, nil
 	default:
-		if features.DefaultSpokeWorkMutableFeatureGate.Enabled(ocmfeature.RawFeedbackJsonString) {
+		if features.SpokeMutableFeatureGate.Enabled(ocmfeature.RawFeedbackJsonString) {
 			jsonRaw, err := json.Marshal(&t)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse the resource to json string for name %s: %v", name, err)

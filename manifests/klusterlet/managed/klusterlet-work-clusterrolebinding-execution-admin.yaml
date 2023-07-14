@@ -12,5 +12,5 @@ roleRef:
   name: admin
 subjects:
   - kind: ServiceAccount
-    name: {{ .KlusterletName }}-work-sa
+    name: {{ .WorkServiceAccount }}
     namespace: {{ .KlusterletNamespace }}

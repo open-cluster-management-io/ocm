@@ -54,7 +54,7 @@ func NewKlusterletStatusController(
 		klusterletLister: klusterletInformer.Lister(),
 	}
 	return factory.New().WithSync(controller.sync).
-		WithInformersQueueKeyFunc(helpers.KlusterletDeploymentQueueKeyFunc(controller.klusterletLister), deploymentInformer.Informer()).
+		WithInformersQueueKeysFunc(helpers.KlusterletDeploymentQueueKeyFunc(controller.klusterletLister), deploymentInformer.Informer()).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, klusterletInformer.Informer()).
 		ToController("KlusterletStatusController", recorder)
 }
@@ -84,6 +84,11 @@ func (k *klusterletStatusController) sync(ctx context.Context, controllerContext
 	agentNamespace := helpers.AgentNamespace(klusterlet)
 	registrationDeploymentName := fmt.Sprintf("%s-registration-agent", klusterlet.Name)
 	workDeploymentName := fmt.Sprintf("%s-work-agent", klusterlet.Name)
+
+	if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingleton {
+		registrationDeploymentName = fmt.Sprintf("%s-agent", klusterlet.Name)
+		workDeploymentName = registrationDeploymentName
+	}
 
 	availableCondition := checkAgentsDeploymentAvailable(
 		ctx, k.kubeClient,

@@ -50,8 +50,8 @@ func ClusterManagerNamespace(clustermanagername string, mode operatorapiv1.Insta
 	return ClusterManagerDefaultNamespace
 }
 
-func KlusterletSecretQueueKeyFunc(klusterletLister operatorlister.KlusterletLister) factory.ObjectQueueKeyFunc {
-	return func(obj runtime.Object) string {
+func KlusterletSecretQueueKeyFunc(klusterletLister operatorlister.KlusterletLister) factory.ObjectQueueKeysFunc {
+	return func(obj runtime.Object) []string {
 		accessor, _ := meta.Accessor(obj)
 		namespace := accessor.GetNamespace()
 		name := accessor.GetName()
@@ -60,24 +60,24 @@ func KlusterletSecretQueueKeyFunc(klusterletLister operatorlister.KlusterletList
 			interestedObjectFound = true
 		}
 		if !interestedObjectFound {
-			return ""
+			return []string{}
 		}
 
 		klusterlets, err := klusterletLister.List(labels.Everything())
 		if err != nil {
-			return ""
+			return []string{}
 		}
 
 		if klusterlet := FindKlusterletByNamespace(klusterlets, namespace); klusterlet != nil {
-			return klusterlet.Name
+			return []string{klusterlet.Name}
 		}
 
-		return ""
+		return []string{}
 	}
 }
 
-func KlusterletDeploymentQueueKeyFunc(klusterletLister operatorlister.KlusterletLister) factory.ObjectQueueKeyFunc {
-	return func(obj runtime.Object) string {
+func KlusterletDeploymentQueueKeyFunc(klusterletLister operatorlister.KlusterletLister) factory.ObjectQueueKeysFunc {
+	return func(obj runtime.Object) []string {
 		accessor, _ := meta.Accessor(obj)
 		namespace := accessor.GetNamespace()
 		name := accessor.GetName()
@@ -86,24 +86,24 @@ func KlusterletDeploymentQueueKeyFunc(klusterletLister operatorlister.Klusterlet
 			interestedObjectFound = true
 		}
 		if !interestedObjectFound {
-			return ""
+			return []string{}
 		}
 
 		klusterlets, err := klusterletLister.List(labels.Everything())
 		if err != nil {
-			return ""
+			return []string{}
 		}
 
 		if klusterlet := FindKlusterletByNamespace(klusterlets, namespace); klusterlet != nil {
-			return klusterlet.Name
+			return []string{klusterlet.Name}
 		}
 
-		return ""
+		return []string{}
 	}
 }
 
-func ClusterManagerDeploymentQueueKeyFunc(clusterManagerLister operatorlister.ClusterManagerLister) factory.ObjectQueueKeyFunc {
-	return func(obj runtime.Object) string {
+func ClusterManagerDeploymentQueueKeyFunc(clusterManagerLister operatorlister.ClusterManagerLister) factory.ObjectQueueKeysFunc {
+	return func(obj runtime.Object) []string {
 		accessor, _ := meta.Accessor(obj)
 		name := accessor.GetName()
 		namespace := accessor.GetNamespace()
@@ -116,47 +116,43 @@ func ClusterManagerDeploymentQueueKeyFunc(clusterManagerLister operatorlister.Cl
 			interestedObjectFound = true
 		}
 		if !interestedObjectFound {
-			return ""
+			return []string{}
 		}
 
 		clustermanagers, err := clusterManagerLister.List(labels.Everything())
 		if err != nil {
-			return ""
+			return []string{}
 		}
 
 		clustermanager, err := FindClusterManagerByNamespace(namespace, clustermanagers)
 		if err != nil {
-			return ""
+			return []string{}
 		}
 
-		return clustermanager.Name
+		return []string{clustermanager.Name}
 	}
 }
 
-func ClusterManagerQueueKeyFunc(clusterManagerLister operatorlister.ClusterManagerLister) factory.ObjectQueueKeyFunc {
+func ClusterManagerQueueKeyFunc(clusterManagerLister operatorlister.ClusterManagerLister) factory.ObjectQueueKeysFunc {
 	return clusterManagerByNamespaceQueueKeyFunc(clusterManagerLister)
 }
 
-func ClusterManagerConfigmapQueueKeyFunc(clusterManagerLister operatorlister.ClusterManagerLister) factory.ObjectQueueKeyFunc {
-	return clusterManagerByNamespaceQueueKeyFunc(clusterManagerLister)
-}
-
-func clusterManagerByNamespaceQueueKeyFunc(clusterManagerLister operatorlister.ClusterManagerLister) factory.ObjectQueueKeyFunc {
-	return func(obj runtime.Object) string {
+func clusterManagerByNamespaceQueueKeyFunc(clusterManagerLister operatorlister.ClusterManagerLister) factory.ObjectQueueKeysFunc {
+	return func(obj runtime.Object) []string {
 		accessor, _ := meta.Accessor(obj)
 		namespace := accessor.GetNamespace()
 
 		clustermanagers, err := clusterManagerLister.List(labels.Everything())
 		if err != nil {
-			return ""
+			return []string{}
 		}
 
 		clustermanager, err := FindClusterManagerByNamespace(namespace, clustermanagers)
 		if err != nil {
-			return ""
+			return []string{}
 		}
 
-		return clustermanager.Name
+		return []string{clustermanager.Name}
 	}
 }
 

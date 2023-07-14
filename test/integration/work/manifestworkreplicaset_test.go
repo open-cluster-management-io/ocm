@@ -213,7 +213,7 @@ func assertWorksByReplicaSet(clusterNames sets.Set[string], mwrs *workapiv1alpha
 		}
 
 		if len(works.Items) != clusterNames.Len() {
-			return fmt.Errorf("The number of applied works should equal to %d, but got %d", clusterNames.Len(), len(works.Items))
+			return fmt.Errorf("the number of applied works should equal to %d, but got %d", clusterNames.Len(), len(works.Items))
 		}
 
 		for _, work := range works.Items {

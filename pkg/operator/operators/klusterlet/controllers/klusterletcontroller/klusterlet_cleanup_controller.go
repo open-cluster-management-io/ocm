@@ -64,11 +64,11 @@ func NewKlusterletCleanupController(
 	}
 
 	return factory.New().WithSync(controller.sync).
-		WithInformersQueueKeyFunc(helpers.KlusterletSecretQueueKeyFunc(controller.klusterletLister),
+		WithInformersQueueKeysFunc(helpers.KlusterletSecretQueueKeyFunc(controller.klusterletLister),
 			secretInformers[helpers.HubKubeConfig].Informer(),
 			secretInformers[helpers.BootstrapHubKubeConfig].Informer(),
 			secretInformers[helpers.ExternalManagedKubeConfig].Informer()).
-		WithInformersQueueKeyFunc(helpers.KlusterletDeploymentQueueKeyFunc(controller.klusterletLister), deploymentInformer.Informer()).
+		WithInformersQueueKeysFunc(helpers.KlusterletDeploymentQueueKeyFunc(controller.klusterletLister), deploymentInformer.Informer()).
 		WithInformersQueueKeysFunc(queue.QueueKeyByMetaName, klusterletInformer.Informer()).
 		ToController("KlusterletCleanupController", recorder)
 }
@@ -112,6 +112,9 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 		ExternalManagedKubeConfigWorkSecret:         helpers.ExternalManagedKubeConfigWork,
 		InstallMode:                                 klusterlet.Spec.DeployOption.Mode,
 		HubApiServerHostAlias:                       klusterlet.Spec.HubApiServerHostAlias,
+
+		RegistrationServiceAccount: serviceAccountName("registration-sa", klusterlet),
+		WorkServiceAccount:         serviceAccountName("work-sa", klusterlet),
 	}
 
 	reconcilers := []klusterletReconcile{

@@ -23,7 +23,9 @@ import (
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	ocmfeature "open-cluster-management.io/api/feature"
 
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 	"open-cluster-management.io/ocm/pkg/registration/hub"
@@ -68,10 +70,11 @@ var CRDPaths = []string{
 	"./vendor/open-cluster-management.io/api/cluster/v1alpha1/0000_02_clusters.open-cluster-management.io_clusterclaims.crd.yaml",
 }
 
-func runAgent(name string, opt spoke.SpokeAgentOptions, cfg *rest.Config) context.CancelFunc {
+func runAgent(name string, opt *spoke.SpokeAgentOptions, commOption *commonoptions.AgentOptions, cfg *rest.Config) context.CancelFunc {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		err := opt.RunSpokeAgent(ctx, &controllercmd.ControllerContext{
+		config := spoke.NewSpokeAgentConfig(commOption, opt)
+		err := config.RunSpokeAgent(ctx, &controllercmd.ControllerContext{
 			KubeConfig:    cfg,
 			EventRecorder: util.NewIntegrationTestEventRecorder(name),
 		})
@@ -126,7 +129,9 @@ var _ = ginkgo.BeforeSuite(func() {
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(cfg).ToNot(gomega.BeNil())
 
-	err = clusterv1.AddToScheme(scheme.Scheme)
+	features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeRegistrationFeatureGates)
+
+	err = clusterv1.Install(scheme.Scheme)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	// prepare configs
