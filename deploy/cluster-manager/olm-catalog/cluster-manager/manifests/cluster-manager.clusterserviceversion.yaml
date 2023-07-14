@@ -137,6 +137,7 @@ spec:
           - work-webhook-sa-kubeconfig
           - placement-controller-sa-kubeconfig
           - work-controller-sa-kubeconfig
+          - addon-manager-controller-sa-kubeconfig
           - external-hub-kubeconfig
           resources:
           - secrets
