@@ -123,11 +123,12 @@ func NewManagedClusterSetController(
 }
 
 func (c *managedClusterSetController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	logger := klog.FromContext(ctx)
 	clusterSetName := syncCtx.QueueKey()
 	if len(clusterSetName) == 0 {
 		return nil
 	}
-	klog.V(4).Infof("Reconciling ManagedClusterSet %s", clusterSetName)
+	logger.V(4).Info("Reconciling ManagedClusterSet", "clusterSetName", clusterSetName)
 	clusterSet, err := c.clusterSetLister.Get(clusterSetName)
 	if errors.IsNotFound(err) {
 		// cluster set not found, could have been deleted, do nothing.

@@ -62,10 +62,11 @@ func NewCSRRenewalReconciler(kubeClient kubernetes.Interface, recorder events.Re
 }
 
 func (r *csrRenewalReconciler) Reconcile(ctx context.Context, csr csrInfo, approveCSR approveCSRFunc) (reconcileState, error) {
+	logger := klog.FromContext(ctx)
 	// Check whether current csr is a valid spoker cluster csr.
-	valid, _, commonName := validateCSR(csr)
+	valid, _, commonName := validateCSR(logger, csr)
 	if !valid {
-		klog.V(4).Infof("CSR %q was not recognized", csr.name)
+		logger.V(4).Info("CSR was not recognized", "csrName", csr.name)
 		return reconcileStop, nil
 	}
 
@@ -80,7 +81,7 @@ func (r *csrRenewalReconciler) Reconcile(ctx context.Context, csr csrInfo, appro
 		return reconcileContinue, err
 	}
 	if !allowed {
-		klog.V(4).Infof("Managed cluster csr %q cannont be auto approved due to subject access review was not approved", csr.name)
+		logger.V(4).Info("Managed cluster csr cannot be auto approved due to subject access review not approved", "csrName", csr.name)
 		return reconcileStop, nil
 	}
 
@@ -115,10 +116,11 @@ func NewCSRBootstrapReconciler(kubeClient kubernetes.Interface,
 }
 
 func (b *csrBootstrapReconciler) Reconcile(ctx context.Context, csr csrInfo, approveCSR approveCSRFunc) (reconcileState, error) {
+	logger := klog.FromContext(ctx)
 	// Check whether current csr is a valid spoker cluster csr.
-	valid, clusterName, _ := validateCSR(csr)
+	valid, clusterName, _ := validateCSR(logger, csr)
 	if !valid {
-		klog.V(4).Infof("CSR %q was not recognized", csr.name)
+		logger.V(4).Info("CSR was not recognized", "csrName", csr.name)
 		return reconcileStop, nil
 	}
 
@@ -163,7 +165,7 @@ func (b *csrBootstrapReconciler) accpetCluster(ctx context.Context, managedClust
 // To validate a managed cluster csr, we check
 // 1. if the signer name in csr request is valid.
 // 2. if organization field and commonName field in csr request is valid.
-func validateCSR(csr csrInfo) (bool, string, string) {
+func validateCSR(logger klog.Logger, csr csrInfo) (bool, string, string) {
 	spokeClusterName, existed := csr.labels[clusterv1.ClusterNameLabelKey]
 	if !existed {
 		return false, "", ""
@@ -175,13 +177,13 @@ func validateCSR(csr csrInfo) (bool, string, string) {
 
 	block, _ := pem.Decode(csr.request)
 	if block == nil || block.Type != "CERTIFICATE REQUEST" {
-		klog.V(4).Infof("csr %q was not recognized: PEM block type is not CERTIFICATE REQUEST", csr.name)
+		logger.V(4).Info("CSR was not recognized: PEM block type is not CERTIFICATE REQUEST", "csrName", csr.name)
 		return false, "", ""
 	}
 
 	x509cr, err := x509.ParseCertificateRequest(block.Bytes)
 	if err != nil {
-		klog.V(4).Infof("csr %q was not recognized: %v", csr.name, err)
+		logger.Error(err, "CSR was not recognized", "csrName", csr.name)
 		return false, "", ""
 	}
 
@@ -231,7 +233,7 @@ func authorize(ctx context.Context, kubeClient kubernetes.Interface, csr csrInfo
 }
 
 // newCSRInfo creates csrInfo from CertificateSigningRequest by api version(v1/v1beta1).
-func newCSRInfo(csr any) csrInfo {
+func newCSRInfo(logger klog.Logger, csr any) csrInfo {
 	extra := make(map[string]authorizationv1.ExtraValue)
 	switch v := csr.(type) {
 	case *certificatesv1.CertificateSigningRequest:
@@ -263,7 +265,7 @@ func newCSRInfo(csr any) csrInfo {
 			request:    v.Spec.Request,
 		}
 	default:
-		klog.Errorf("Unsupported type %T", v)
+		logger.Error(nil, "Unsupported Type", "valueType", v)
 		return csrInfo{}
 	}
 }

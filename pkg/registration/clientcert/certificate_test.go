@@ -12,6 +12,7 @@ import (
 	v1 "k8s.io/client-go/listers/certificates/v1"
 	"k8s.io/client-go/tools/cache"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/kubernetes/test/utils/ktesting"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
@@ -124,7 +125,8 @@ func TestHasValidHubKubeconfig(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			isValid := HasValidHubKubeconfig(c.secret, c.subject)
+			logger, _ := ktesting.NewTestContext(t)
+			isValid := HasValidHubKubeconfig(logger, c.secret, c.subject)
 			if isValid != c.isValid {
 				t.Errorf("expected %t, but got %t", c.isValid, isValid)
 			}
@@ -171,7 +173,8 @@ func TestIsCertificateValid(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			isValid, _ := IsCertificateValid(c.testCert.Cert, c.subject)
+			logger, _ := ktesting.NewTestContext(t)
+			isValid, _ := IsCertificateValid(logger, c.testCert.Cert, c.subject)
 			if isValid != c.isValid {
 				t.Errorf("expected %t, but got %t", c.isValid, isValid)
 			}
