@@ -55,7 +55,8 @@ type clusterManagerController struct {
 	cache                resourceapply.ResourceCache
 	// For testcases which don't need these functions, we could set fake funcs
 	ensureSAKubeconfigs func(ctx context.Context, clusterManagerName, clusterManagerNamespace string,
-		hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error
+		hubConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder,
+		mwctrEnabled, addonManagerEnabled bool) error
 	generateHubClusterClients func(hubConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface,
 		migrationclient.StorageVersionMigrationsGetter, error)
 	skipRemoveCRDs bool
@@ -298,8 +299,9 @@ func generateHubClients(hubKubeConfig *rest.Config) (kubernetes.Interface, apiex
 // We create a ServiceAccount with a rolebinding on the hub cluster, and then use the token of the ServiceAccount as the user of the kubeconfig.
 // Finally, a deployment on the management cluster would use the kubeconfig to access resources on the hub cluster.
 func ensureSAKubeconfigs(ctx context.Context, clusterManagerName, clusterManagerNamespace string,
-	hubKubeConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder) error {
-	for _, sa := range getSAs() {
+	hubKubeConfig *rest.Config, hubClient, managementClient kubernetes.Interface, recorder events.Recorder,
+	mwctrEnabled, addonManagerEnabled bool) error {
+	for _, sa := range getSAs(mwctrEnabled, addonManagerEnabled) {
 		tokenGetter := helpers.SATokenCreater(ctx, sa, clusterManagerNamespace, hubClient)
 		err := helpers.SyncKubeConfigSecret(ctx, sa+"-kubeconfig", clusterManagerNamespace, "/var/run/secrets/hub/kubeconfig", &rest.Config{
 			Host: hubKubeConfig.Host,

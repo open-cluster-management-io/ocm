@@ -22,6 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	operatorclient "open-cluster-management.io/api/client/operator/clientset/versioned"
+	"open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/bootstrapcontroller"
@@ -142,12 +143,12 @@ var _ = ginkgo.BeforeSuite(func() {
 			WorkConfiguration: &operatorapiv1.WorkConfiguration{
 				FeatureGates: []operatorapiv1.FeatureGate{
 					{
-						Feature: "NilExecutorValidating",
-						Mode:    "Enable",
+						Feature: string(feature.NilExecutorValidating),
+						Mode:    operatorapiv1.FeatureGateModeTypeEnable,
 					},
 					{
-						Feature: "ManifestWorkReplicaSet",
-						Mode:    "Enable",
+						Feature: string(feature.ManifestWorkReplicaSet),
+						Mode:    operatorapiv1.FeatureGateModeTypeEnable,
 					},
 				},
 			},
