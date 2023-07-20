@@ -13,6 +13,7 @@ import (
 
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
@@ -151,13 +152,13 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 							},
 						},
 					},
-					RolloutStrategy: addonapiv1alpha1.RolloutStrategy{
-						Type: addonapiv1alpha1.AddonRolloutStrategyUpdateAll,
+					RolloutStrategy: clusterv1alpha1.RolloutStrategy{
+						Type: clusterv1alpha1.All,
 					},
 				},
 			},
 		}
-		updateClusterManagementAddOn(context.Background(), cma)
+		patchClusterManagementAddOn(context.Background(), cma)
 
 		placement := &clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: configDefaultNamespace}}
 		_, err = hubClusterClient.ClusterV1beta1().Placements(configDefaultNamespace).Create(context.Background(), placement, metav1.CreateOptions{})
@@ -167,7 +168,10 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-placement",
 				Namespace: configDefaultNamespace,
-				Labels:    map[string]string{clusterv1beta1.PlacementLabel: "test-placement"},
+				Labels: map[string]string{
+					clusterv1beta1.PlacementLabel:          "test-placement",
+					clusterv1beta1.DecisionGroupIndexLabel: "0",
+				},
 			},
 		}
 		decision, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(configDefaultNamespace).Create(context.Background(), decision, metav1.CreateOptions{})

@@ -17,7 +17,7 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 
-	"open-cluster-management.io/ocm/pkg/work/helper"
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 )
 
 // deployReconciler is to manage ManifestWork based on the placement.
@@ -56,7 +56,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 	}
 
 	for _, placement := range placements {
-		added, deleted, err := helper.GetClusters(d.placeDecisionLister, placement, existingClusters)
+		added, deleted, err := helpers.GetClusterChanges(d.placeDecisionLister, placement, existingClusters)
 		if err != nil {
 			apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetPlacementDecisionVerified(workapiv1alpha1.ReasonNotAsExpected, ""))
 

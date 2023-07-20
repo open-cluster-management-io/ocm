@@ -14,6 +14,7 @@ import (
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	clusterinformersv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
+	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
@@ -32,6 +33,7 @@ type addonConfigurationController struct {
 	addonFilterFunc              factory.EventFilterFunc
 	placementLister              clusterlisterv1beta1.PlacementLister
 	placementDecisionLister      clusterlisterv1beta1.PlacementDecisionLister
+	placementDecisionGetter      PlacementDecisionGetter
 
 	reconcilers []addonConfigurationReconcile
 }
@@ -93,6 +95,7 @@ func NewAddonConfigurationController(
 			WithInformersQueueKeysFunc(index.ClusterManagementAddonByPlacementQueueKey(clusterManagementAddonInformers), placementInformer.Informer())
 		c.placementLister = placementInformer.Lister()
 		c.placementDecisionLister = placementDecisionInformer.Lister()
+		c.placementDecisionGetter = PlacementDecisionGetter{Client: placementDecisionInformer.Lister()}
 	}
 
 	return controllerFactory.WithSync(c.sync).ToController("addon-configuration-controller")
@@ -121,6 +124,13 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 
 	cma = cma.DeepCopy()
 	graph, err := c.buildConfigurationGraph(cma)
+	if err != nil {
+		return err
+	}
+
+	// generate the rollout result before calling reconcile()
+	// so that all the reconcilers are using the same rollout result
+	err = graph.generateRolloutResult()
 	if err != nil {
 		return err
 	}
@@ -160,20 +170,16 @@ func (c *addonConfigurationController) buildConfigurationGraph(cma *addonv1alpha
 	// check each install strategy in status
 	var errs []error
 	for _, installProgression := range cma.Status.InstallProgressions {
-		clusters, err := c.getClustersByPlacement(installProgression.PlacementRef.Name, installProgression.PlacementRef.Namespace)
-		if errors.IsNotFound(err) {
-			klog.V(2).Infof("placement %s/%s is not found for addon %s", installProgression.PlacementRef.Namespace, installProgression.PlacementRef.Name, cma.Name)
-			continue
-		}
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
 		for _, installStrategy := range cma.Spec.InstallStrategy.Placements {
-			if installStrategy.PlacementRef == installProgression.PlacementRef {
-				graph.addPlacementNode(installStrategy, installProgression, clusters)
+			if installStrategy.PlacementRef != installProgression.PlacementRef {
+				continue
+			}
 
+			// add placement node
+			err = graph.addPlacementNode(installStrategy, installProgression, c.placementLister, c.placementDecisionGetter)
+			if err != nil {
+				errs = append(errs, err)
+				continue
 			}
 		}
 	}
@@ -181,29 +187,10 @@ func (c *addonConfigurationController) buildConfigurationGraph(cma *addonv1alpha
 	return graph, utilerrors.NewAggregate(errs)
 }
 
-func (c *addonConfigurationController) getClustersByPlacement(name, namespace string) ([]string, error) {
-	var clusters []string
-	if c.placementLister == nil || c.placementDecisionLister == nil {
-		return clusters, nil
-	}
-	_, err := c.placementLister.Placements(namespace).Get(name)
-	if err != nil {
-		return clusters, err
-	}
+type PlacementDecisionGetter struct {
+	Client clusterlister.PlacementDecisionLister
+}
 
-	decisionSelector := labels.SelectorFromSet(labels.Set{
-		clusterv1beta1.PlacementLabel: name,
-	})
-	decisions, err := c.placementDecisionLister.PlacementDecisions(namespace).List(decisionSelector)
-	if err != nil {
-		return clusters, err
-	}
-
-	for _, d := range decisions {
-		for _, sd := range d.Status.Decisions {
-			clusters = append(clusters, sd.ClusterName)
-		}
-	}
-
-	return clusters, nil
+func (pdl PlacementDecisionGetter) List(selector labels.Selector, namespace string) ([]*clusterv1beta1.PlacementDecision, error) {
+	return pdl.Client.PlacementDecisions(namespace).List(selector)
 }

@@ -59,13 +59,13 @@ func NewPlacementDecisionClustersTrackerWithGroups(placement *Placement, pdl Pla
 	return pdct
 }
 
-// Get updates the tracker's decisionClusters and returns added and deleted cluster names.
-func (pdct *PlacementDecisionClustersTracker) Get() (sets.Set[string], sets.Set[string], error) {
+// Refresh refreshes the tracker's decisionClusters.
+func (pdct *PlacementDecisionClustersTracker) Refresh() error {
 	pdct.lock.Lock()
 	defer pdct.lock.Unlock()
 
 	if pdct.placement == nil || pdct.placementDecisionGetter == nil {
-		return nil, nil, nil
+		return nil
 	}
 
 	// Get the generated PlacementDecisions
@@ -74,16 +74,15 @@ func (pdct *PlacementDecisionClustersTracker) Get() (sets.Set[string], sets.Set[
 	})
 	decisions, err := pdct.placementDecisionGetter.List(decisionSelector, pdct.placement.Namespace)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to list PlacementDecisions: %w", err)
+		return fmt.Errorf("failed to list PlacementDecisions: %w", err)
 	}
 
 	// Get the decision cluster names and groups
-	newScheduledClusters := sets.New[string]()
 	newScheduledClusterGroups := map[GroupKey]sets.Set[string]{}
 	for _, d := range decisions {
 		groupKey, err := parseGroupKeyFromDecision(d)
 		if err != nil {
-			return nil, nil, err
+			return err
 		}
 
 		if _, exist := newScheduledClusterGroups[groupKey]; !exist {
@@ -91,19 +90,32 @@ func (pdct *PlacementDecisionClustersTracker) Get() (sets.Set[string], sets.Set[
 		}
 
 		for _, sd := range d.Status.Decisions {
-			newScheduledClusters.Insert(sd.ClusterName)
 			newScheduledClusterGroups[groupKey].Insert(sd.ClusterName)
 		}
 	}
 
-	// Compare the difference
-	existingScheduledClusters := pdct.existingScheduledClusterGroups.GetClusters()
-	added := newScheduledClusters.Difference(existingScheduledClusters)
-	deleted := existingScheduledClusters.Difference(newScheduledClusters)
-
 	// Update the existing decision cluster groups
 	pdct.existingScheduledClusterGroups = newScheduledClusterGroups
 	pdct.generateGroupsNameIndex()
+
+	return nil
+}
+
+// GetClusterChanges updates the tracker's decisionClusters and returns added and deleted cluster names.
+func (pdct *PlacementDecisionClustersTracker) GetClusterChanges() (sets.Set[string], sets.Set[string], error) {
+	// Get existing clusters
+	existingScheduledClusters := pdct.existingScheduledClusterGroups.GetClusters()
+
+	// Refresh clusters
+	err := pdct.Refresh()
+	if err != nil {
+		return nil, nil, err
+	}
+	newScheduledClusters := pdct.existingScheduledClusterGroups.GetClusters()
+
+	// Compare the difference
+	added := newScheduledClusters.Difference(existingScheduledClusters)
+	deleted := existingScheduledClusters.Difference(newScheduledClusters)
 
 	return added, deleted, nil
 }
