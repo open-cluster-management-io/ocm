@@ -326,7 +326,7 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertCreatingClusterSet("global")
 			assertCreatingClusterSetBinding("global", namespace)
 
-			canary := assertCreatingClusters(clusterSet1Name, 3, "vendor", "openShift")
+			canary := assertCreatingClusters(clusterSet1Name, 2, "vendor", "openShift")
 			noncanary := assertCreatingClusters(clusterSet1Name, 3)
 
 			placement := testinghelpers.NewPlacement(namespace, placementName).WithGroupStrategy(clusterapiv1beta1.GroupStrategy{
@@ -340,16 +340,16 @@ var _ = ginkgo.Describe("Placement", func() {
 					},
 				},
 			}).Build()
-			assertCreatingPlacementWithDecision(placement, 6, 3)
+			assertCreatingPlacementWithDecision(placement, 5, 3)
 
-			assertPlacementDecisionNumbers(placementName, namespace, 6, 3)
-			assertPlacementConditionSatisfied(placementName, namespace, 6, true)
+			assertPlacementDecisionNumbers(placementName, namespace, 5, 3)
+			assertPlacementConditionSatisfied(placementName, namespace, 5, true)
 			assertPlacementStatusDecisionGroups(placementName, namespace, []clusterapiv1beta1.DecisionGroupStatus{
 				{
 					DecisionGroupIndex: 0,
 					DecisionGroupName:  "canary",
 					Decisions:          []string{placementName + "-decision-0"},
-					ClustersCount:      3,
+					ClustersCount:      2,
 				},
 				{
 					DecisionGroupIndex: 1,
@@ -370,7 +370,7 @@ var _ = ginkgo.Describe("Placement", func() {
 					DecisionGroupIndex: 0,
 					DecisionGroupName:  "canary",
 					Decisions:          []string{placementName + "-decision-0"},
-					ClustersCount:      2,
+					ClustersCount:      1,
 				},
 				{
 					DecisionGroupIndex: 1,
@@ -382,13 +382,13 @@ var _ = ginkgo.Describe("Placement", func() {
 			ginkgo.By("Add the canary cluster")
 			c := assertCreatingClusters(clusterSet1Name, 1, "vendor", "openShift")
 			canary = append(canary, c...)
-			assertPlacementDecisionNumbers(placementName, namespace, 5, 2)
+			assertPlacementDecisionNumbers(placementName, namespace, 4, 2)
 			assertPlacementStatusDecisionGroups(placementName, namespace, []clusterapiv1beta1.DecisionGroupStatus{
 				{
 					DecisionGroupIndex: 0,
 					DecisionGroupName:  "canary",
 					Decisions:          []string{placementName + "-decision-0"},
-					ClustersCount:      3,
+					ClustersCount:      2,
 				},
 				{
 					DecisionGroupIndex: 1,
@@ -399,13 +399,13 @@ var _ = ginkgo.Describe("Placement", func() {
 			ginkgo.By("Add the non canary cluster")
 			c = assertCreatingClusters(clusterSet1Name, 1)
 			noncanary = append(noncanary, c...)
-			assertPlacementDecisionNumbers(placementName, namespace, 6, 3)
+			assertPlacementDecisionNumbers(placementName, namespace, 5, 3)
 			assertPlacementStatusDecisionGroups(placementName, namespace, []clusterapiv1beta1.DecisionGroupStatus{
 				{
 					DecisionGroupIndex: 0,
 					DecisionGroupName:  "canary",
 					Decisions:          []string{placementName + "-decision-0"},
-					ClustersCount:      3,
+					ClustersCount:      2,
 				},
 				{
 					DecisionGroupIndex: 1,

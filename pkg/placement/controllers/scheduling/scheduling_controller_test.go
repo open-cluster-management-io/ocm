@@ -175,10 +175,10 @@ func TestSchedulingController_sync(t *testing.T) {
 				unscheduledDecisions: 0,
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "create", "create", "create", "patch")
+				testingcommon.AssertActions(t, actions, "create", "create", "create", "create", "patch")
 				// check if Placement has been updated
 				placement := &clusterapiv1beta1.Placement{}
-				patchData := actions[3].(clienttesting.PatchActionImpl).Patch
+				patchData := actions[4].(clienttesting.PatchActionImpl).Patch
 				err := json.Unmarshal(patchData, placement)
 				if err != nil {
 					t.Fatal(err)
@@ -193,11 +193,11 @@ func TestSchedulingController_sync(t *testing.T) {
 						DecisionGroupIndex: 0,
 						DecisionGroupName:  "canary",
 						Decisions:          []string{"placement1-decision-0"},
-						ClustersCount:      2,
+						ClustersCount:      1,
 					},
 					{
 						DecisionGroupIndex: 1,
-						DecisionGroupName:  "",
+						DecisionGroupName:  "canary",
 						Decisions:          []string{"placement1-decision-1"},
 						ClustersCount:      1,
 					},
@@ -205,6 +205,12 @@ func TestSchedulingController_sync(t *testing.T) {
 						DecisionGroupIndex: 2,
 						DecisionGroupName:  "",
 						Decisions:          []string{"placement1-decision-2"},
+						ClustersCount:      1,
+					},
+					{
+						DecisionGroupIndex: 3,
+						DecisionGroupName:  "",
+						Decisions:          []string{"placement1-decision-3"},
 						ClustersCount:      1,
 					},
 				}
@@ -1062,14 +1068,14 @@ func TestBind(t *testing.T) {
 				testinghelpers.NewManagedCluster("cluster4").WithLabel("cloud", "Azure").Build(),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "create", "create", "create")
+				testingcommon.AssertActions(t, actions, "create", "create", "create", "create")
 				selectedClusters := newSelectedClusters(4)
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
 					t.Errorf("expected PlacementDecision was created")
 				}
-				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[2:]...)
+				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[2:3]...)
 				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "0" {
 					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
 				}
@@ -1082,11 +1088,11 @@ func TestBind(t *testing.T) {
 				if !ok {
 					t.Errorf("expected PlacementDecision was created")
 				}
-				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[0:1]...)
+				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[3:]...)
 				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "1" {
 					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
 				}
-				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "" {
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "canary" {
 					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
 				}
 
@@ -1095,8 +1101,21 @@ func TestBind(t *testing.T) {
 				if !ok {
 					t.Errorf("expected PlacementDecision was created")
 				}
-				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[1:2]...)
+				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[0:1]...)
 				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "2" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "" {
+					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
+				}
+
+				actual = actions[3].(clienttesting.CreateActionImpl).Object
+				placementDecision, ok = actual.(*clusterapiv1beta1.PlacementDecision)
+				if !ok {
+					t.Errorf("expected PlacementDecision was created")
+				}
+				assertClustersSelected(t, placementDecision.Status.Decisions, selectedClusters[1:2]...)
+				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupIndexLabel] != "3" {
 					t.Errorf("unexpected PlacementDecision labels %v", placementDecision.Labels)
 				}
 				if placementDecision.Labels[clusterapiv1beta1.DecisionGroupNameLabel] != "" {
