@@ -118,16 +118,28 @@ type DecisionGroup struct {
 // Group the created placementDecision into decision groups based on the number of clusters per decision group.
 type GroupStrategy struct {
 	// DecisionGroups represents a list of predefined groups to put decision results.
+	// Decision groups will be constructed based on the DecisionGroups field at first. The clusters not included in the
+	// DecisionGroups will be divided to other decision groups afterwards. Each decision group should not have the number
+	// of clusters larger than the ClustersPerDecisionGroup.
 	// +optional
 	DecisionGroups []DecisionGroup `json:"decisionGroups,omitempty"`
 
 	// ClustersPerDecisionGroup is a specific number or percentage of the total selected clusters.
-	// The specific number will divide the placementDecisions to decisionGroups each group has max number of clusters equal to that specific number.
-	// The percentage will divide the placementDecisions to decisionGroups each group has max number of clusters based on the total num of selected clusters and percentage.
-	// ex; for a total 100 clusters selected, ClustersPerDecisionGroup equal to 20% will divide the placement decision to 5 groups each group should have 20 clusters.
+	// The specific number will divide the placementDecisions to decisionGroups each group has max number of clusters
+	// equal to that specific number.
+	// The percentage will divide the placementDecisions to decisionGroups each group has max number of clusters based
+	// on the total num of selected clusters and percentage.
+	// ex; for a total 100 clusters selected, ClustersPerDecisionGroup equal to 20% will divide the placement decision
+	// to 5 groups each group should have 20 clusters.
 	// Default is having all clusters in a single group.
-	// If the DecisionGroups field defined, it will be considered first to create the decisionGroups then the ClustersPerDecisionGroup will be used to determine the rest of decisionGroups.
+	//
+	// The predefined decisionGroups is expected to be a subset of the selected clusters and the number of items in each
+	// group SHOULD be less than ClustersPerDecisionGroup. Once the number of items exceeds the ClustersPerDecisionGroup,
+	// the decisionGroups will also be be divided into multiple decisionGroups with same GroupName but different GroupIndex.
+	//
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:XIntOrString
+	// +kubebuilder:validation:Pattern=`^((100|[1-9][0-9]{0,1})%|[1-9][0-9]*)$`
 	// +kubebuilder:default:="100%"
 	// +optional
 	ClustersPerDecisionGroup intstr.IntOrString `json:"clustersPerDecisionGroup,omitempty"`
