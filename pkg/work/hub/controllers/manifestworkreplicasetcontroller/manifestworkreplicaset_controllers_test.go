@@ -144,7 +144,7 @@ func TestManifestWorkReplicaSetControllerPatchStatus(t *testing.T) {
 			},
 		},
 		{
-			name: "no additonal apply needed",
+			name: "no additional apply needed",
 			mwrSet: func() *workapiv1alpha1.ManifestWorkReplicaSet {
 				w := helpertest.CreateTestManifestWorkReplicaSet("test", "default", "placement")
 				w.Finalizers = []string{ManifestWorkReplicaSetFinalizer}

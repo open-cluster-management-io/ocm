@@ -43,7 +43,7 @@ func TestSyncClusterSet(t *testing.T) {
 			expectCondition: metav1.Condition{
 				Type:    clusterv1beta2.ManagedClusterSetConditionEmpty,
 				Status:  metav1.ConditionFalse,
-				Reason:  "ClustersSelected",
+				Reason:  ReasonClusterSelected,
 				Message: "1 ManagedClusters selected",
 			},
 		},
@@ -67,7 +67,7 @@ func TestSyncClusterSet(t *testing.T) {
 			expectCondition: metav1.Condition{
 				Type:    clusterv1beta2.ManagedClusterSetConditionEmpty,
 				Status:  metav1.ConditionFalse,
-				Reason:  "ClustersSelected",
+				Reason:  ReasonClusterSelected,
 				Message: "1 ManagedClusters selected",
 			},
 		},
@@ -91,7 +91,7 @@ func TestSyncClusterSet(t *testing.T) {
 			expectCondition: metav1.Condition{
 				Type:    clusterv1beta2.ManagedClusterSetConditionEmpty,
 				Status:  metav1.ConditionTrue,
-				Reason:  "NoClusterMatched",
+				Reason:  ReasonNoClusterMatchced,
 				Message: "No ManagedCluster selected",
 			},
 		},
@@ -125,7 +125,7 @@ func TestSyncClusterSet(t *testing.T) {
 			expectCondition: metav1.Condition{
 				Type:    clusterv1beta2.ManagedClusterSetConditionEmpty,
 				Status:  metav1.ConditionFalse,
-				Reason:  "ClustersSelected",
+				Reason:  ReasonClusterSelected,
 				Message: "2 ManagedClusters selected",
 			},
 		},
@@ -155,7 +155,7 @@ func TestSyncClusterSet(t *testing.T) {
 			expectCondition: metav1.Condition{
 				Type:    clusterv1beta2.ManagedClusterSetConditionEmpty,
 				Status:  metav1.ConditionFalse,
-				Reason:  "ClustersSelected",
+				Reason:  ReasonClusterSelected,
 				Message: "2 ManagedClusters selected",
 			},
 		},
@@ -184,7 +184,7 @@ func TestSyncClusterSet(t *testing.T) {
 			expectCondition: metav1.Condition{
 				Type:    clusterv1beta2.ManagedClusterSetConditionEmpty,
 				Status:  metav1.ConditionTrue,
-				Reason:  "NoClusterMatched",
+				Reason:  ReasonNoClusterMatchced,
 				Message: "No ManagedCluster selected",
 			},
 		},
@@ -255,7 +255,7 @@ func TestSyncClusterSet(t *testing.T) {
 				t.Errorf("Failed to get clusterset: %v, error: %v", c.existingClusterSet.Name, err)
 			}
 			if !hasCondition(updatedSet.Status.Conditions, c.expectCondition) {
-				t.Errorf("expected conditon:%v. is not found: %v", c.expectCondition, updatedSet.Status.Conditions)
+				t.Errorf("expected condition:%v. is not found: %v", c.expectCondition, updatedSet.Status.Conditions)
 			}
 		})
 	}

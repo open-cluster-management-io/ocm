@@ -99,13 +99,17 @@ var _ = ginkgo.Describe("Placement", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			assertPlacementDecisionCreated(placement)
 			assertPlacementDecisionNumbers(placementName, namespace, 5, 1)
-			assertPlacementStatusDecisionGroups(placementName, namespace, []clusterapiv1beta1.DecisionGroupStatus{{Decisions: []string{placementName + "-decision-0"}, ClustersCount: 5}})
+			assertPlacementStatusDecisionGroups(
+				placementName, namespace,
+				[]clusterapiv1beta1.DecisionGroupStatus{{Decisions: []string{placementName + "-decision-0"}, ClustersCount: 5}})
 		})
 
 		ginkgo.It("Should create empty placementdecision when no cluster selected", func() {
 			placement := testinghelpers.NewPlacement(namespace, placementName).Build()
 			assertCreatingPlacementWithDecision(placement, 0, 1)
-			assertPlacementStatusDecisionGroups(placementName, namespace, []clusterapiv1beta1.DecisionGroupStatus{{Decisions: []string{placementName + "-decision-0"}, ClustersCount: 0}})
+			assertPlacementStatusDecisionGroups(
+				placementName, namespace,
+				[]clusterapiv1beta1.DecisionGroupStatus{{Decisions: []string{placementName + "-decision-0"}, ClustersCount: 0}})
 		})
 
 		ginkgo.It("Should create multiple placementdecisions once scheduled", func() {
@@ -116,7 +120,9 @@ var _ = ginkgo.Describe("Placement", func() {
 
 			nod := 101
 			assertPlacementDecisionNumbers(placementName, namespace, nod, 2)
-			assertPlacementStatusDecisionGroups(placementName, namespace, []clusterapiv1beta1.DecisionGroupStatus{{Decisions: []string{placementName + "-decision-0", placementName + "-decision-1"}, ClustersCount: 101}})
+			assertPlacementStatusDecisionGroups(
+				placementName, namespace,
+				[]clusterapiv1beta1.DecisionGroupStatus{{Decisions: []string{placementName + "-decision-0", placementName + "-decision-1"}, ClustersCount: 101}})
 			assertPlacementConditionSatisfied(placementName, namespace, nod, true)
 		})
 
@@ -157,7 +163,9 @@ var _ = ginkgo.Describe("Placement", func() {
 			placement.Spec.Predicates = predicates
 			assertPatchingPlacementSpec(placement)
 			assertPlacementDecisionNumbers(placementName, namespace, 3, 1)
-			assertPlacementStatusDecisionGroups(placementName, namespace, []clusterapiv1beta1.DecisionGroupStatus{{Decisions: []string{placementName + "-decision-0"}, ClustersCount: 3}})
+			assertPlacementStatusDecisionGroups(
+				placementName, namespace,
+				[]clusterapiv1beta1.DecisionGroupStatus{{Decisions: []string{placementName + "-decision-0"}, ClustersCount: 3}})
 
 			ginkgo.By("change the predicates")
 			// change the predicates
@@ -420,8 +428,9 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertDeletingClusters(noncanary[1:]...)
 			assertDeletingClusterSet("global")
 			assertPlacementDecisionNumbers(placementName, namespace, 0, 1)
-			assertPlacementStatusDecisionGroups(placementName, namespace, []clusterapiv1beta1.DecisionGroupStatus{{Decisions: []string{placementName + "-decision-0"}, ClustersCount: 0}})
-
+			assertPlacementStatusDecisionGroups(
+				placementName, namespace,
+				[]clusterapiv1beta1.DecisionGroupStatus{{Decisions: []string{placementName + "-decision-0"}, ClustersCount: 0}})
 		})
 
 		ginkgo.It("Should schedule successfully once clusters belong to global(empty labelselector) clusterset are added/deleted)", func() {
@@ -548,6 +557,5 @@ var _ = ginkgo.Describe("Placement", func() {
 			assertPlacementDecisionNumbers(placementName, namespace, 5, 1)
 			assertPlacementConditionSatisfied(placementName, namespace, 5, false)
 		})
-
 	})
 })

@@ -23,7 +23,6 @@ run:
   skip-files:
     - ".*\\.pb\\.go"
     - ".*\\.gen\\.go"
-    - ".*_test\\.go"
 
 linters:
   # please, do not use `enable-all`: it's deprecated and will be removed soon.
@@ -220,6 +219,7 @@ issues:
       linters:
         - errcheck
         - maligned
+        - goconst
 
   # Independently from option `exclude` we use default exclude patterns,
   # it can be disabled by this option. To list all

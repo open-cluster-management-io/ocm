@@ -32,6 +32,11 @@ type testScheduler struct {
 	result ScheduleResult
 }
 
+const (
+	placementNamespace = "ns1"
+	placementName      = "placement1"
+)
+
 func (s *testScheduler) Schedule(ctx context.Context,
 	placement *clusterapiv1beta1.Placement,
 	clusters []*clusterapiv1.ManagedCluster,
@@ -40,9 +45,6 @@ func (s *testScheduler) Schedule(ctx context.Context,
 }
 
 func TestSchedulingController_sync(t *testing.T) {
-	placementNamespace := "ns1"
-	placementName := "placement1"
-
 	cases := []struct {
 		name            string
 		placement       *clusterapiv1beta1.Placement
@@ -371,7 +373,7 @@ func TestSchedulingController_sync(t *testing.T) {
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
 				testingcommon.AssertActions(t, actions, "create", "patch")
-				// check if emtpy PlacementDecision has been created
+				// check if empty PlacementDecision has been created
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
@@ -418,7 +420,7 @@ func TestSchedulingController_sync(t *testing.T) {
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
 				testingcommon.AssertActions(t, actions, "create", "patch")
-				// check if emtpy PlacementDecision has been created
+				// check if empty PlacementDecision has been created
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
@@ -468,7 +470,7 @@ func TestSchedulingController_sync(t *testing.T) {
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
 				testingcommon.AssertActions(t, actions, "create", "patch")
-				// check if emtpy PlacementDecision has been created
+				// check if empty PlacementDecision has been created
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
@@ -975,9 +977,6 @@ func TestNewMisconfiguredCondition(t *testing.T) {
 }
 
 func TestBind(t *testing.T) {
-	placementNamespace := "ns1"
-	placementName := "placement1"
-
 	cases := []struct {
 		name            string
 		initObjs        []runtime.Object

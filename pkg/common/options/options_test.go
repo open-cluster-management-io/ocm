@@ -58,35 +58,42 @@ func TestComplete(t *testing.T) {
 		{
 			name:        "override cluster name in cert with specified value",
 			clusterName: "cluster1",
-			secret: testinghelpers.NewHubKubeconfigSecret(componentNamespace, "hub-kubeconfig-secret", "", testinghelpers.NewTestCert("system:open-cluster-management:cluster2:agent2", 60*time.Second), map[string][]byte{
-				"kubeconfig":   testinghelpers.NewKubeconfig(nil, nil),
-				"cluster-name": []byte("cluster3"),
-				"agent-name":   []byte("agent3"),
-			}),
+			secret: testinghelpers.NewHubKubeconfigSecret(
+				componentNamespace, "hub-kubeconfig-secret", "",
+				testinghelpers.NewTestCert("system:open-cluster-management:cluster2:agent2", 60*time.Second), map[string][]byte{
+					"kubeconfig":   testinghelpers.NewKubeconfig(nil, nil),
+					"cluster-name": []byte("cluster3"),
+					"agent-name":   []byte("agent3"),
+				}),
 			expectedClusterName: "cluster1",
 			expectedAgentName:   "agent2",
 		},
 		{
 			name: "take cluster/agent name from secret",
-			secret: testinghelpers.NewHubKubeconfigSecret(componentNamespace, "hub-kubeconfig-secret", "", nil, map[string][]byte{
-				"cluster-name": []byte("cluster1"),
-				"agent-name":   []byte("agent1"),
-			}),
+			secret: testinghelpers.NewHubKubeconfigSecret(
+				componentNamespace, "hub-kubeconfig-secret", "", nil, map[string][]byte{
+					"cluster-name": []byte("cluster1"),
+					"agent-name":   []byte("agent1"),
+				}),
 			expectedClusterName: "cluster1",
 			expectedAgentName:   "agent1",
 		},
 		{
-			name:                "take cluster/agent name from cert",
-			secret:              testinghelpers.NewHubKubeconfigSecret(componentNamespace, "hub-kubeconfig-secret", "", testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second), map[string][]byte{}),
+			name: "take cluster/agent name from cert",
+			secret: testinghelpers.NewHubKubeconfigSecret(
+				componentNamespace, "hub-kubeconfig-secret", "",
+				testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second), map[string][]byte{}),
 			expectedClusterName: "cluster1",
 			expectedAgentName:   "agent1",
 		},
 		{
 			name: "override cluster name in secret with value from cert",
-			secret: testinghelpers.NewHubKubeconfigSecret(componentNamespace, "hub-kubeconfig-secret", "", testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second), map[string][]byte{
-				"cluster-name": []byte("cluster2"),
-				"agent-name":   []byte("agent2"),
-			}),
+			secret: testinghelpers.NewHubKubeconfigSecret(
+				componentNamespace, "hub-kubeconfig-secret", "",
+				testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second), map[string][]byte{
+					"cluster-name": []byte("cluster2"),
+					"agent-name":   []byte("agent2"),
+				}),
 			expectedClusterName: "cluster1",
 			expectedAgentName:   "agent1",
 		},
@@ -115,6 +122,9 @@ func TestComplete(t *testing.T) {
 			err = registration.DumpSecret(
 				kubeClient.CoreV1(), componentNamespace, "hub-kubeconfig-secret",
 				options.HubKubeconfigDir, context.TODO(), eventstesting.NewTestingEventRecorder(t))
+			if err != nil {
+				t.Error(err)
+			}
 
 			if err := options.Complete(); err != nil {
 				t.Errorf("unexpected error: %v", err)

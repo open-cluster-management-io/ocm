@@ -188,7 +188,8 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 			},
 			Spec: addOnDefaultConfigSpec,
 		}
-		_, err = hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(configDefaultNamespace).Create(context.Background(), addOnDefaultConfig, metav1.CreateOptions{})
+		_, err = hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(configDefaultNamespace).Create(
+			context.Background(), addOnDefaultConfig, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		// prepare update config
@@ -223,7 +224,8 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 			ginkgo.By("check work")
 			gomega.Eventually(func() error {
 				for i := 0; i < 4; i++ {
-					work, err := hubWorkClient.WorkV1().ManifestWorks(clusterNames[i]).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
+					work, err := hubWorkClient.WorkV1().ManifestWorks(clusterNames[i]).Get(
+						context.Background(), manifestWorkName, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}
@@ -241,8 +243,12 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 				work, err := hubWorkClient.WorkV1().ManifestWorks(clusterNames[i]).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-				meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "WorkApplied", ObservedGeneration: work.Generation})
-				meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "WorkAvailable", ObservedGeneration: work.Generation})
+				meta.SetStatusCondition(
+					&work.Status.Conditions,
+					metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "WorkApplied", ObservedGeneration: work.Generation})
+				meta.SetStatusCondition(
+					&work.Status.Conditions,
+					metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "WorkAvailable", ObservedGeneration: work.Generation})
 				_, err = hubWorkClient.WorkV1().ManifestWorks(clusterNames[i]).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			}
@@ -324,10 +330,12 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 
 			ginkgo.By("update all")
 			ginkgo.By("upgrade configs to test1")
-			addOnConfig, err := hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(configDefaultNamespace).Get(context.Background(), configDefaultName, metav1.GetOptions{})
+			addOnConfig, err := hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(configDefaultNamespace).Get(
+				context.Background(), configDefaultName, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			addOnConfig.Spec = addOnTest1ConfigSpec
-			_, err = hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(configDefaultNamespace).Update(context.Background(), addOnConfig, metav1.UpdateOptions{})
+			_, err = hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(configDefaultNamespace).Update(
+				context.Background(), addOnConfig, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			ginkgo.By("check mca status")
@@ -412,8 +420,12 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 					if err != nil {
 						return err
 					}
-					meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionFalse, Reason: "WorkApplied", ObservedGeneration: work.Generation})
-					meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionFalse, Reason: "WorkAvailable", ObservedGeneration: work.Generation})
+					meta.SetStatusCondition(
+						&work.Status.Conditions,
+						metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionFalse, Reason: "WorkApplied", ObservedGeneration: work.Generation})
+					meta.SetStatusCondition(
+						&work.Status.Conditions,
+						metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionFalse, Reason: "WorkAvailable", ObservedGeneration: work.Generation})
 					_, err = hubWorkClient.WorkV1().ManifestWorks(clusterNames[i]).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
 					if err != nil {
 						return err
@@ -547,8 +559,12 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 					if err != nil {
 						return err
 					}
-					meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "WorkApplied", ObservedGeneration: work.Generation})
-					meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "WorkAvailable", ObservedGeneration: work.Generation})
+					meta.SetStatusCondition(
+						&work.Status.Conditions,
+						metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "WorkApplied", ObservedGeneration: work.Generation})
+					meta.SetStatusCondition(
+						&work.Status.Conditions,
+						metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "WorkAvailable", ObservedGeneration: work.Generation})
 					_, err = hubWorkClient.WorkV1().ManifestWorks(clusterNames[i]).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
 					if err != nil {
 						return err
@@ -639,8 +655,12 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 					if err != nil {
 						return err
 					}
-					meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "WorkApplied", ObservedGeneration: work.Generation})
-					meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "WorkAvailable", ObservedGeneration: work.Generation})
+					meta.SetStatusCondition(
+						&work.Status.Conditions,
+						metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "WorkApplied", ObservedGeneration: work.Generation})
+					meta.SetStatusCondition(
+						&work.Status.Conditions,
+						metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "WorkAvailable", ObservedGeneration: work.Generation})
 					_, err = hubWorkClient.WorkV1().ManifestWorks(clusterNames[i]).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
 					if err != nil {
 						return err

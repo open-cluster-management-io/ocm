@@ -110,6 +110,7 @@ func (k *bootstrapController) sync(ctx context.Context, controllerContext factor
 		return nil
 	}
 
+	// #nosec G101
 	hubKubeconfigSecret, err := k.secretInformers[helpers.HubKubeConfig].Lister().Secrets(agentNamespace).Get(helpers.HubKubeConfig)
 	switch {
 	case errors.IsNotFound(err):

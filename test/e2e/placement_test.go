@@ -24,7 +24,7 @@ const (
 	maxNumOfClusterDecisions = 100
 )
 
-// Test cases with lable "sanity-check" could be ran as sanity check on an existing enviroment with
+// Test cases with lable "sanity-check" could be ran as sanity check on an existing environment with
 // placement controller installed and well configured . Resource leftovers should be cleaned up on
 // the hub cluster.
 var _ = ginkgo.Describe("Placement", ginkgo.Label("sanity-check"), func() {

@@ -98,7 +98,8 @@ var _ = ginkgo.Describe("Create v1beta2 managedclusterset", func() {
 			if !reflect.DeepEqual(string(v1beta1ManagedClusterSet.Spec.ClusterSelector.SelectorType), string(managedClusterSet.Spec.ClusterSelector.SelectorType)) {
 				return false
 			}
-			if !reflect.DeepEqual(v1beta1ManagedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels, managedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels) {
+			if !reflect.DeepEqual(v1beta1ManagedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels,
+				managedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels) {
 				return false
 			}
 			return true
@@ -136,7 +137,8 @@ var _ = ginkgo.Describe("Create v1beta2 managedclusterset", func() {
 	})
 	ginkgo.It("Check if the v1beta1 storageversion is removed from clustersetbinding crd", func() {
 		gomega.Eventually(func() error {
-			clustersetBindingCrd, err := t.HubAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), clustersetBindingCrdName, metav1.GetOptions{})
+			clustersetBindingCrd, err := t.HubAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
+				context.Background(), clustersetBindingCrdName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}

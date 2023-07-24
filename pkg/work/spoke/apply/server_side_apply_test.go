@@ -22,6 +22,8 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
+const defaultOwner = "test-owner"
+
 func TestServerSideApply(t *testing.T) {
 	cases := []struct {
 		name            string
@@ -34,7 +36,7 @@ func TestServerSideApply(t *testing.T) {
 	}{
 		{
 			name:            "server side apply successfully",
-			owner:           metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"},
+			owner:           metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
 			existing:        nil,
 			required:        spoketesting.NewUnstructured("v1", "Namespace", "", "test"),
 			gvr:             schema.GroupVersionResource{Version: "v1", Resource: "namespaces"},
@@ -42,7 +44,7 @@ func TestServerSideApply(t *testing.T) {
 		},
 		{
 			name:     "server side apply successfully conflict",
-			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"},
+			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
 			existing: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
 			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},

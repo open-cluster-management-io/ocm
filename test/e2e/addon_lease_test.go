@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-	gomega "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	coordv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -18,6 +18,8 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
+
+const availableLabelValue = "available"
 
 var _ = ginkgo.Describe("Addon Health Check", func() {
 	ginkgo.Context("Checking addon lease on managed cluster to update addon status", func() {
@@ -79,7 +81,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 					return false
 				}
 				key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addOnName)
-				return cluster.Labels[key] == "available"
+				return cluster.Labels[key] == availableLabelValue
 			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeTrue())
 		})
 
@@ -117,7 +119,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 					return false
 				}
 				key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addOnName)
-				return cluster.Labels[key] == "available"
+				return cluster.Labels[key] == availableLabelValue
 			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeTrue())
 
 			ginkgo.By(fmt.Sprintf("Updating lease %q with a past time", addOnName))
@@ -186,7 +188,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 					return false
 				}
 				key := fmt.Sprintf("feature.open-cluster-management.io/addon-%s", addOnName)
-				return cluster.Labels[key] == "available"
+				return cluster.Labels[key] == availableLabelValue
 			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.BeTrue())
 
 			ginkgo.By(fmt.Sprintf("Deleting lease %q", addOnName))
@@ -223,7 +225,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 		var klusterletName, clusterName, addOnName string
 		ginkgo.BeforeEach(func() {
 			if !deployKlusterlet {
-				ginkgo.Skip(fmt.Sprintf("skip if disabling deploy klusterlet"))
+				ginkgo.Skip("skip if disabling deploy klusterlet")
 			}
 			klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
 			clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
@@ -284,7 +286,7 @@ var _ = ginkgo.Describe("Addon Health Check", func() {
 			}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(gomega.Succeed())
 
 			// delete registration agent to stop agent update its status
-			ginkgo.By(fmt.Sprintf("Stoping klusterlet"))
+			ginkgo.By("Stoping klusterlet")
 			err = t.OperatorClient.OperatorV1().Klusterlets().Delete(context.TODO(), klusterletName, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 

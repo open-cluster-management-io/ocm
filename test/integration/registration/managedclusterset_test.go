@@ -12,6 +12,8 @@ import (
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+
+	"open-cluster-management.io/ocm/pkg/registration/hub/managedclusterset"
 )
 
 var _ = ginkgo.Describe("ManagedClusterSet", func() {
@@ -43,7 +45,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 					if condition.Status != metav1.ConditionTrue {
 						return false
 					}
-					if condition.Reason != "NoClusterMatched" {
+					if condition.Reason != managedclusterset.ReasonNoClusterMatchced {
 						return false
 					}
 					return true
@@ -81,7 +83,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 					if condition.Status != metav1.ConditionFalse {
 						return false
 					}
-					if condition.Reason != "ClustersSelected" {
+					if condition.Reason != managedclusterset.ReasonClusterSelected {
 						return false
 					}
 					return true
@@ -125,7 +127,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 					if condition.Status != metav1.ConditionFalse {
 						return false
 					}
-					if condition.Reason != "ClustersSelected" {
+					if condition.Reason != managedclusterset.ReasonClusterSelected {
 						return false
 					}
 					return true
@@ -149,7 +151,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 					return fmt.Errorf("clusterset should be empty")
 				}
 
-				if cond.Reason != "NoClusterMatched" {
+				if cond.Reason != managedclusterset.ReasonNoClusterMatchced {
 					return fmt.Errorf("clusterset condition reason not correct, got %q", cond.Reason)
 				}
 
@@ -189,7 +191,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 				if condition.Status != metav1.ConditionTrue {
 					return false
 				}
-				if condition.Reason != "NoClusterMatched" {
+				if condition.Reason != managedclusterset.ReasonNoClusterMatchced {
 					return false
 				}
 				return true
@@ -227,7 +229,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 				if condition.Status != metav1.ConditionFalse {
 					return false
 				}
-				if condition.Reason != "ClustersSelected" {
+				if condition.Reason != managedclusterset.ReasonClusterSelected {
 					return false
 				}
 				return true
@@ -271,7 +273,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 				if condition.Status != metav1.ConditionFalse {
 					return false
 				}
-				if condition.Reason != "ClustersSelected" {
+				if condition.Reason != managedclusterset.ReasonClusterSelected {
 					return false
 				}
 				return true
@@ -295,7 +297,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 				return fmt.Errorf("clusterset should be empty")
 			}
 
-			if cond.Reason != "NoClusterMatched" {
+			if cond.Reason != managedclusterset.ReasonNoClusterMatchced {
 				return fmt.Errorf("clusterset condition reason not correct, got %q", cond.Reason)
 			}
 
@@ -339,7 +341,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 				if condition.Status != metav1.ConditionTrue {
 					return false
 				}
-				if condition.Reason != "NoClusterMatched" {
+				if condition.Reason != managedclusterset.ReasonNoClusterMatchced {
 					return false
 				}
 				return true
@@ -377,7 +379,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 				if condition.Status != metav1.ConditionFalse {
 					return false
 				}
-				if condition.Reason != "ClustersSelected" {
+				if condition.Reason != managedclusterset.ReasonClusterSelected {
 					return false
 				}
 				return true
@@ -432,7 +434,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 				if condition.Status != metav1.ConditionFalse {
 					return false
 				}
-				if condition.Reason != "ClustersSelected" {
+				if condition.Reason != managedclusterset.ReasonClusterSelected {
 					return false
 				}
 				return true
@@ -456,7 +458,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 				return fmt.Errorf("clusterset should be empty")
 			}
 
-			if cond.Reason != "NoClusterMatched" {
+			if cond.Reason != managedclusterset.ReasonNoClusterMatchced {
 				return fmt.Errorf("clusterset condition reason not correct, got %q", cond.Reason)
 			}
 
@@ -513,7 +515,7 @@ var _ = ginkgo.Describe("ManagedClusterSet", func() {
 				if condition.Status != metav1.ConditionFalse {
 					return false
 				}
-				if condition.Reason != "ClustersSelected" {
+				if condition.Reason != managedclusterset.ReasonClusterSelected {
 					return false
 				}
 				return true

@@ -40,6 +40,12 @@ import (
 	testinghelper "open-cluster-management.io/ocm/pkg/operator/helpers/testing"
 )
 
+const (
+	createVerb      = "create"
+	deleteVerb      = "delete"
+	crdResourceName = "customresourcedefinitions"
+)
+
 type testController struct {
 	controller         *klusterletController
 	cleanupController  *klusterletCleanupController
@@ -198,7 +204,10 @@ func newTestController(t *testing.T, klusterlet *operatorapiv1.Klusterlet, appli
 	}
 }
 
-func newTestControllerHosted(t *testing.T, klusterlet *operatorapiv1.Klusterlet, appliedManifestWorks []runtime.Object, objects ...runtime.Object) *testController {
+func newTestControllerHosted(
+	t *testing.T, klusterlet *operatorapiv1.Klusterlet,
+	appliedManifestWorks []runtime.Object,
+	objects ...runtime.Object) *testController {
 	fakeKubeClient := fakekube.NewSimpleClientset(objects...)
 	fakeAPIExtensionClient := fakeapiextensions.NewSimpleClientset()
 	fakeOperatorClient := fakeoperatorclient.NewSimpleClientset(klusterlet)
@@ -322,7 +331,7 @@ func getDeployments(actions []clienttesting.Action, verb, suffix string) *appsv1
 			continue
 		}
 
-		if verb == "create" {
+		if verb == createVerb {
 			object := action.(clienttesting.CreateActionImpl).Object
 			deployments = append(deployments, object.(*appsv1.Deployment))
 		}
@@ -402,8 +411,9 @@ func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, cl
 	}
 
 	if mode == operatorapiv1.InstallModeHosted {
-		expectArgs = append(expectArgs, "--spoke-kubeconfig=/spoke/config/kubeconfig")
-		expectArgs = append(expectArgs, "--terminate-on-files=/spoke/config/kubeconfig")
+		expectArgs = append(expectArgs,
+			"--spoke-kubeconfig=/spoke/config/kubeconfig",
+			"--terminate-on-files=/spoke/config/kubeconfig")
 	}
 	expectArgs = append(expectArgs, "--terminate-on-files=/spoke/hub-kubeconfig/kubeconfig")
 
@@ -480,7 +490,7 @@ func TestSyncDeploy(t *testing.T) {
 	var createObjects []runtime.Object
 	kubeActions := controller.kubeClient.Actions()
 	for _, action := range kubeActions {
-		if action.GetVerb() == "create" {
+		if action.GetVerb() == createVerb {
 			object := action.(clienttesting.CreateActionImpl).Object
 			createObjects = append(createObjects, object)
 
@@ -499,7 +509,7 @@ func TestSyncDeploy(t *testing.T) {
 	apiExtenstionAction := controller.apiExtensionClient.Actions()
 	var createCRDObjects []runtime.Object
 	for _, action := range apiExtenstionAction {
-		if action.GetVerb() == "create" && action.GetResource().Resource == "customresourcedefinitions" {
+		if action.GetVerb() == createVerb && action.GetResource().Resource == crdResourceName {
 			object := action.(clienttesting.CreateActionImpl).Object
 			createCRDObjects = append(createCRDObjects, object)
 		}
@@ -538,10 +548,10 @@ func TestSyncDeploySingleton(t *testing.T) {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 
-	createObjects := []runtime.Object{}
+	var createObjects []runtime.Object
 	kubeActions := controller.kubeClient.Actions()
 	for _, action := range kubeActions {
-		if action.GetVerb() == "create" {
+		if action.GetVerb() == createVerb {
 			object := action.(clienttesting.CreateActionImpl).Object
 			createObjects = append(createObjects, object)
 
@@ -558,9 +568,9 @@ func TestSyncDeploySingleton(t *testing.T) {
 	}
 
 	apiExtenstionAction := controller.apiExtensionClient.Actions()
-	createCRDObjects := []runtime.Object{}
+	var createCRDObjects []runtime.Object
 	for _, action := range apiExtenstionAction {
-		if action.GetVerb() == "create" && action.GetResource().Resource == "customresourcedefinitions" {
+		if action.GetVerb() == createVerb && action.GetResource().Resource == crdResourceName {
 			object := action.(clienttesting.CreateActionImpl).Object
 			createCRDObjects = append(createCRDObjects, object)
 		}
@@ -611,14 +621,15 @@ func TestSyncDeployHosted(t *testing.T) {
 	var createObjectsManagement []runtime.Object
 	kubeActions := controller.kubeClient.Actions()
 	for _, action := range kubeActions {
-		if action.GetVerb() == "create" {
+		if action.GetVerb() == createVerb {
 			object := action.(clienttesting.CreateActionImpl).Object
 			klog.Infof("management kube create: %v\t resource:%v \t namespace:%v", object.GetObjectKind(), action.GetResource(), action.GetNamespace())
 			createObjectsManagement = append(createObjectsManagement, object)
 		}
 	}
 	// Check if resources are created as expected on the management cluster
-	// 11 static manifests + 2 secrets(external-managed-kubeconfig-registration,external-managed-kubeconfig-work) + 2 deployments(registration-agent,work-agent) + 1 pull secret
+	// 11 static manifests + 2 secrets(external-managed-kubeconfig-registration,external-managed-kubeconfig-work) +
+	// 2 deployments(registration-agent,work-agent) + 1 pull secret
 	if len(createObjectsManagement) != 16 {
 		t.Errorf("Expect 16 objects created in the sync loop, actual %d", len(createObjectsManagement))
 	}
@@ -628,7 +639,7 @@ func TestSyncDeployHosted(t *testing.T) {
 
 	var createObjectsManaged []runtime.Object
 	for _, action := range controller.managedKubeClient.Actions() {
-		if action.GetVerb() == "create" {
+		if action.GetVerb() == createVerb {
 
 			object := action.(clienttesting.CreateActionImpl).Object
 			klog.Infof("managed kube create: %v\t resource:%v \t namespace:%v", object.GetObjectKind().GroupVersionKind(), action.GetResource(), action.GetNamespace())
@@ -647,7 +658,7 @@ func TestSyncDeployHosted(t *testing.T) {
 	apiExtenstionAction := controller.apiExtensionClient.Actions()
 	var createCRDObjects []runtime.Object
 	for _, action := range apiExtenstionAction {
-		if action.GetVerb() == "create" && action.GetResource().Resource == "customresourcedefinitions" {
+		if action.GetVerb() == createVerb && action.GetResource().Resource == crdResourceName {
 			object := action.(clienttesting.CreateActionImpl).Object
 			createCRDObjects = append(createCRDObjects, object)
 		}
@@ -658,7 +669,7 @@ func TestSyncDeployHosted(t *testing.T) {
 
 	var createCRDObjectsManaged []runtime.Object
 	for _, action := range controller.managedApiExtensionClient.Actions() {
-		if action.GetVerb() == "create" && action.GetResource().Resource == "customresourcedefinitions" {
+		if action.GetVerb() == createVerb && action.GetResource().Resource == crdResourceName {
 			object := action.(clienttesting.CreateActionImpl).Object
 			createCRDObjectsManaged = append(createCRDObjectsManaged, object)
 		}
@@ -692,7 +703,7 @@ func TestSyncDeployHostedCreateAgentNamespace(t *testing.T) {
 	klusterlet := newKlusterletHosted("klusterlet", "testns", "cluster1")
 	meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
 		Type: klusterletReadyToApply, Status: metav1.ConditionFalse, Reason: "KlusterletPrepareFailed",
-		Message: fmt.Sprintf("Failed to build managed cluster clients: secrets \"external-managed-kubeconfig\" not found"),
+		Message: "Failed to build managed cluster clients: secrets \"external-managed-kubeconfig\" not found",
 	})
 	controller := newTestControllerHosted(t, klusterlet, nil).setDefaultManagedClusterClientsBuilder()
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
@@ -704,7 +715,7 @@ func TestSyncDeployHostedCreateAgentNamespace(t *testing.T) {
 
 	kubeActions := controller.kubeClient.Actions()
 	testingcommon.AssertGet(t, kubeActions[0], "", "v1", "namespaces")
-	testingcommon.AssertAction(t, kubeActions[1], "create")
+	testingcommon.AssertAction(t, kubeActions[1], createVerb)
 	if kubeActions[1].GetResource().Resource != "namespaces" {
 		t.Errorf("expect object namespaces, but got %v", kubeActions[2].GetResource().Resource)
 	}
@@ -774,8 +785,8 @@ func TestReplica(t *testing.T) {
 	}
 
 	// should have 1 replica for registration deployment and 0 for work
-	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "create", "", "cluster1", 1)
-	assertWorkDeployment(t, controller.kubeClient.Actions(), "create", "cluster1", operatorapiv1.InstallModeDefault, 0)
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1", 1)
+	assertWorkDeployment(t, controller.kubeClient.Actions(), createVerb, "cluster1", operatorapiv1.InstallModeDefault, 0)
 
 	klusterlet = newKlusterlet("klusterlet", "testns", "cluster1")
 	klusterlet.Status.Conditions = []metav1.Condition{
@@ -838,7 +849,7 @@ func TestClusterNameChange(t *testing.T) {
 	}
 
 	// Check if deployment has the right cluster name set
-	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "create", "", "cluster1", 1)
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), createVerb, "", "cluster1", 1)
 
 	operatorAction := controller.operatorClient.Actions()
 	testingcommon.AssertActions(t, operatorAction, "patch")
@@ -928,7 +939,7 @@ func TestSyncWithPullSecret(t *testing.T) {
 	var createdSecret *corev1.Secret
 	kubeActions := controller.kubeClient.Actions()
 	for _, action := range kubeActions {
-		if action.GetVerb() == "create" && action.GetResource().Resource == "secrets" {
+		if action.GetVerb() == createVerb && action.GetResource().Resource == "secrets" {
 			createdSecret = action.(clienttesting.CreateActionImpl).Object.(*corev1.Secret)
 			break
 		}
@@ -961,14 +972,15 @@ func TestDeployOnKube111(t *testing.T) {
 	var createObjects []runtime.Object
 	kubeActions := controller.kubeClient.Actions()
 	for _, action := range kubeActions {
-		if action.GetVerb() == "create" {
+		if action.GetVerb() == createVerb {
 			object := action.(clienttesting.CreateActionImpl).Object
 			createObjects = append(createObjects, object)
 		}
 	}
 
 	// Check if resources are created as expected
-	// 11 managed static manifests + 11 management static manifests - 2 duplicated service account manifests + 1 addon namespace + 2 deployments + 2 kube111 clusterrolebindings
+	// 11 managed static manifests + 11 management static manifests -
+	// 2 duplicated service account manifests + 1 addon namespace + 2 deployments + 2 kube111 clusterrolebindings
 	if len(createObjects) != 25 {
 		t.Errorf("Expect 25 objects created in the sync loop, actual %d", len(createObjects))
 	}

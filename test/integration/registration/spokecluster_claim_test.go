@@ -93,7 +93,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 				return false
 			}
 
-			if spokeCluster.Finalizers[0] != "cluster.open-cluster-management.io/api-resource-cleanup" {
+			if spokeCluster.Finalizers[0] != clusterCleanFinalizer {
 				return false
 			}
 

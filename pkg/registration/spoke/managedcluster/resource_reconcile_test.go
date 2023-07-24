@@ -90,7 +90,8 @@ func TestHealthCheck(t *testing.T) {
 			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset) {
 				testingcommon.AssertNoActions(t, clusterClient.Actions())
 			},
-			expectedErr: "unable to get managed cluster \"testmanagedcluster\" from hub: managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
+			expectedErr: "unable to get managed cluster \"testmanagedcluster\" from hub: " +
+				"managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
 		},
 		{
 			name:        "kube-apiserver is not health",

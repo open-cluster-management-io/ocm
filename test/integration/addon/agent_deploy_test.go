@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -61,18 +61,6 @@ const (
 			}
 		}
 	}`
-
-	mchJson = `{
-    "apiVersion": "operator.open-cluster-management.io/v1",
-    "kind": "MultiClusterHub",
-    "metadata": {
-        "name": "multiclusterhub",
-        "namespace": "open-cluster-management"
-    },
-    "spec": {
-        "separateCertificateManagement": false
-    }
-}`
 )
 
 var _ = ginkgo.Describe("Agent deploy", func() {
@@ -151,7 +139,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			}
 
 			if len(work.Spec.Workload.Manifests) != 1 {
-				return fmt.Errorf("Unexpected number of work manifests")
+				return fmt.Errorf("unexpected number of work manifests")
 			}
 
 			if apiequality.Semantic.DeepEqual(work.Spec.Workload.Manifests[0].Raw, []byte(deploymentJson)) {
@@ -163,7 +151,9 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		// Update work status to trigger addon status
 		work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "WorkApplied", ObservedGeneration: work.Generation})
+		meta.SetStatusCondition(
+			&work.Status.Conditions,
+			metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "WorkApplied", ObservedGeneration: work.Generation})
 		_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -174,10 +164,10 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			}
 
 			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied) {
-				return fmt.Errorf("Unexpected addon applied condition, %v", addon.Status.Conditions)
+				return fmt.Errorf("unexpected addon applied condition, %v", addon.Status.Conditions)
 			}
 			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing) {
-				return fmt.Errorf("Unexpected addon progressing condition, %v", addon.Status.Conditions)
+				return fmt.Errorf("unexpected addon progressing condition, %v", addon.Status.Conditions)
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -185,7 +175,9 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		// update work to available so addon becomes available
 		work, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "WorkAvailable", ObservedGeneration: work.Generation})
+		meta.SetStatusCondition(
+			&work.Status.Conditions,
+			metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "WorkAvailable", ObservedGeneration: work.Generation})
 		_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -196,10 +188,10 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			}
 
 			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionAvailable) {
-				return fmt.Errorf("Unexpected addon available condition, %v", addon.Status.Conditions)
+				return fmt.Errorf("unexpected addon available condition, %v", addon.Status.Conditions)
 			}
 			if !meta.IsStatusConditionFalse(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing) {
-				return fmt.Errorf("Unexpected addon progressing condition, %v", addon.Status.Conditions)
+				return fmt.Errorf("unexpected addon progressing condition, %v", addon.Status.Conditions)
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())

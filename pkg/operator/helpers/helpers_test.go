@@ -37,6 +37,8 @@ import (
 	"open-cluster-management.io/ocm/manifests"
 )
 
+const nameFoo = "foo"
+
 func newValidatingWebhookConfiguration(name, svc, svcNameSpace string) *admissionv1.ValidatingWebhookConfiguration {
 	return &admissionv1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
@@ -197,9 +199,14 @@ func TestApplyDirectly(t *testing.T) {
 		{
 			name: "Apply webhooks & secret",
 			applyFiles: map[string]runtime.Object{
-				"validatingwebhooks": newUnstructured("admissionregistration.k8s.io/v1", "ValidatingWebhookConfiguration", "", "", map[string]interface{}{"webhooks": []interface{}{}}),
-				"mutatingwebhooks":   newUnstructured("admissionregistration.k8s.io/v1", "MutatingWebhookConfiguration", "", "", map[string]interface{}{"webhooks": []interface{}{}}),
-				"secret":             newUnstructured("v1", "Secret", "ns1", "n1", map[string]interface{}{"data": map[string]interface{}{"key1": []byte("key1")}}),
+				"validatingwebhooks": newUnstructured(
+					"admissionregistration.k8s.io/v1", "ValidatingWebhookConfiguration", "", "",
+					map[string]interface{}{"webhooks": []interface{}{}}),
+				"mutatingwebhooks": newUnstructured(
+					"admissionregistration.k8s.io/v1", "MutatingWebhookConfiguration", "", "",
+					map[string]interface{}{"webhooks": []interface{}{}}),
+				"secret": newUnstructured(
+					"v1", "Secret", "ns1", "n1", map[string]interface{}{"data": map[string]interface{}{"key1": []byte("key1")}}),
 			},
 			applyFileNames: []string{"validatingwebhooks", "mutatingwebhooks", "secret"},
 			expectErr:      false,
@@ -285,11 +292,18 @@ func TestApplyDirectly(t *testing.T) {
 
 func TestDeleteStaticObject(t *testing.T) {
 	applyFiles := map[string]runtime.Object{
-		"validatingwebhooks": newUnstructured("admissionregistration.k8s.io/v1", "ValidatingWebhookConfiguration", "", "", map[string]interface{}{"webhooks": []interface{}{}}),
-		"mutatingwebhooks":   newUnstructured("admissionregistration.k8s.io/v1", "MutatingWebhookConfiguration", "", "", map[string]interface{}{"webhooks": []interface{}{}}),
-		"secret":             newUnstructured("v1", "Secret", "ns1", "n1", map[string]interface{}{"data": map[string]interface{}{"key1": []byte("key1")}}),
-		"crd":                newUnstructured("apiextensions.k8s.io/v1beta1", "CustomResourceDefinition", "", "", map[string]interface{}{}),
-		"kind1":              newUnstructured("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": []byte("key1")}}),
+		"validatingwebhooks": newUnstructured(
+			"admissionregistration.k8s.io/v1", "ValidatingWebhookConfiguration", "", "",
+			map[string]interface{}{"webhooks": []interface{}{}}),
+		"mutatingwebhooks": newUnstructured(
+			"admissionregistration.k8s.io/v1", "MutatingWebhookConfiguration", "", "",
+			map[string]interface{}{"webhooks": []interface{}{}}),
+		"secret": newUnstructured(
+			"v1", "Secret", "ns1", "n1", map[string]interface{}{"data": map[string]interface{}{"key1": []byte("key1")}}),
+		"crd": newUnstructured(
+			"apiextensions.k8s.io/v1beta1", "CustomResourceDefinition", "", "", map[string]interface{}{}),
+		"kind1": newUnstructured(
+			"v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": []byte("key1")}}),
 	}
 	testcase := []struct {
 		name                  string
@@ -389,8 +403,9 @@ func TestLoadClientConfigFromSecret(t *testing.T) {
 			secret: newKubeConfigSecret("ns1", "secret1", newKubeConfig("testhost", "", ""), nil, nil),
 		},
 		{
-			name:             "load kubeconfig with references to external key/cert files",
-			secret:           newKubeConfigSecret("ns1", "secret1", newKubeConfig("testhost", "tls.crt", "tls.key"), []byte("--- TRUNCATED ---"), []byte("--- REDACTED ---")),
+			name: "load kubeconfig with references to external key/cert files",
+			secret: newKubeConfigSecret("ns1", "secret1",
+				newKubeConfig("testhost", "tls.crt", "tls.key"), []byte("--- TRUNCATED ---"), []byte("--- REDACTED ---")),
 			expectedCertData: []byte("--- TRUNCATED ---"),
 			expectedKeyData:  []byte("--- REDACTED ---"),
 		},
@@ -630,13 +645,13 @@ func TestApplyEndpoints(t *testing.T) {
 			name: "create",
 			existing: []runtime.Object{
 				&corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+					ObjectMeta: metav1.ObjectMeta{Name: nameFoo},
 				},
 			},
 			input: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "foo",
+					Name:      nameFoo,
+					Namespace: nameFoo,
 				},
 				Subsets: []corev1.EndpointSubset{
 					{
@@ -659,7 +674,7 @@ func TestApplyEndpoints(t *testing.T) {
 				if len(actions) != 2 {
 					t.Fatal("action count mismatch")
 				}
-				if !actions[0].Matches("get", "endpoints") || actions[0].(clienttesting.GetAction).GetName() != "foo" {
+				if !actions[0].Matches("get", "endpoints") || actions[0].(clienttesting.GetAction).GetName() != nameFoo {
 					t.Error("unexpected action:", actions[0])
 				}
 				if !actions[1].Matches("create", "endpoints") {
@@ -671,12 +686,12 @@ func TestApplyEndpoints(t *testing.T) {
 			name: "remain same",
 			existing: []runtime.Object{
 				&corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+					ObjectMeta: metav1.ObjectMeta{Name: nameFoo},
 				},
 				&corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "foo",
-						Namespace: "foo",
+						Name:      nameFoo,
+						Namespace: nameFoo,
 					},
 					Subsets: []corev1.EndpointSubset{
 						{
@@ -696,8 +711,8 @@ func TestApplyEndpoints(t *testing.T) {
 			},
 			input: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "foo",
+					Name:      nameFoo,
+					Namespace: nameFoo,
 				},
 				Subsets: []corev1.EndpointSubset{
 					{
@@ -719,7 +734,7 @@ func TestApplyEndpoints(t *testing.T) {
 				if len(actions) != 1 {
 					t.Fatal("action count mismatch")
 				}
-				if !actions[0].Matches("get", "endpoints") || actions[0].(clienttesting.GetAction).GetName() != "foo" {
+				if !actions[0].Matches("get", "endpoints") || actions[0].(clienttesting.GetAction).GetName() != nameFoo {
 					t.Error("unexpected action:", actions[0])
 				}
 			},
@@ -728,12 +743,12 @@ func TestApplyEndpoints(t *testing.T) {
 			name: "update",
 			existing: []runtime.Object{
 				&corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+					ObjectMeta: metav1.ObjectMeta{Name: nameFoo},
 				},
 				&corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "foo",
-						Namespace: "foo",
+						Name:      nameFoo,
+						Namespace: nameFoo,
 					},
 					Subsets: []corev1.EndpointSubset{
 						{
@@ -753,8 +768,8 @@ func TestApplyEndpoints(t *testing.T) {
 			},
 			input: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "foo",
+					Name:      nameFoo,
+					Namespace: nameFoo,
 				},
 				Subsets: []corev1.EndpointSubset{
 					{
@@ -776,7 +791,7 @@ func TestApplyEndpoints(t *testing.T) {
 				if len(actions) != 2 {
 					t.Fatal("action count mismatch")
 				}
-				if !actions[0].Matches("get", "endpoints") || actions[0].(clienttesting.GetAction).GetName() != "foo" {
+				if !actions[0].Matches("get", "endpoints") || actions[0].(clienttesting.GetAction).GetName() != nameFoo {
 					t.Error("unexpected action:", actions[0])
 				}
 				if !actions[1].Matches("update", "endpoints") {
@@ -1266,7 +1281,7 @@ func TestSyncSecret(t *testing.T) {
 						Name:      "sourceName",
 					},
 					Type: corev1.SecretTypeOpaque,
-					Data: map[string][]byte{"foo": []byte("bar")},
+					Data: map[string][]byte{nameFoo: []byte("bar")},
 				},
 			},
 			expectedSecret: &corev1.Secret{
@@ -1275,7 +1290,7 @@ func TestSyncSecret(t *testing.T) {
 					Name:      "targetName",
 				},
 				Type: corev1.SecretTypeOpaque,
-				Data: map[string][]byte{"foo": []byte("bar")},
+				Data: map[string][]byte{nameFoo: []byte("bar")},
 			},
 			expectedChanged: true,
 			expectedErr:     "",
@@ -1294,7 +1309,7 @@ func TestSyncSecret(t *testing.T) {
 						Name:      "sourceName",
 					},
 					Type: corev1.SecretTypeOpaque,
-					Data: map[string][]byte{"foo": []byte("bar2")},
+					Data: map[string][]byte{nameFoo: []byte("bar2")},
 				},
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1302,7 +1317,7 @@ func TestSyncSecret(t *testing.T) {
 						Name:      "targetName",
 					},
 					Type: corev1.SecretTypeOpaque,
-					Data: map[string][]byte{"foo": []byte("bar1")},
+					Data: map[string][]byte{nameFoo: []byte("bar1")},
 				},
 			},
 			expectedSecret: &corev1.Secret{
@@ -1311,7 +1326,7 @@ func TestSyncSecret(t *testing.T) {
 					Name:      "targetName",
 				},
 				Type: corev1.SecretTypeOpaque,
-				Data: map[string][]byte{"foo": []byte("bar2")},
+				Data: map[string][]byte{nameFoo: []byte("bar2")},
 			},
 			expectedChanged: true,
 			expectedErr:     "",
@@ -1342,7 +1357,7 @@ func TestSyncSecret(t *testing.T) {
 						Name:      "sourceName",
 					},
 					Type: corev1.SecretTypeServiceAccountToken,
-					Data: map[string][]byte{"foo": []byte("bar")},
+					Data: map[string][]byte{nameFoo: []byte("bar")},
 				},
 			},
 			expectedSecret:  nil,
@@ -1362,7 +1377,7 @@ func TestSyncSecret(t *testing.T) {
 						Namespace: "sourceNamespace",
 						Name:      "sourceName",
 						Annotations: map[string]string{
-							corev1.ServiceAccountNameKey: "foo",
+							corev1.ServiceAccountNameKey: nameFoo,
 							corev1.ServiceAccountUIDKey:  "bar",
 						},
 					},
@@ -1388,7 +1403,8 @@ func TestSyncSecret(t *testing.T) {
 			client := fakekube.NewSimpleClientset(tc.existingObjects...)
 			clientTarget := fakekube.NewSimpleClientset()
 			secret, changed, err := SyncSecret(
-				context.TODO(), client.CoreV1(), clientTarget.CoreV1(), events.NewInMemoryRecorder("test"), tc.sourceNamespace, tc.sourceName, tc.targetNamespace, tc.targetName, tc.ownerRefs)
+				context.TODO(), client.CoreV1(), clientTarget.CoreV1(),
+				events.NewInMemoryRecorder("test"), tc.sourceNamespace, tc.sourceName, tc.targetNamespace, tc.targetName, tc.ownerRefs)
 
 			if (err == nil && len(tc.expectedErr) != 0) || (err != nil && err.Error() != tc.expectedErr) {
 				t.Errorf("%s: expected error %v, got %v", tc.name, tc.expectedErr, err)
@@ -1441,9 +1457,11 @@ func TestGetHubKubeconfig(t *testing.T) {
 			expectedErr:  true,
 		},
 		{
-			name:         "hosted mode",
-			mode:         operatorapiv1.InstallModeHosted,
-			secret:       []runtime.Object{newKubeConfigSecret("test", ExternalHubKubeConfig, newKubeConfig("testhost", "tls.crt", "tls.key"), []byte("--- TRUNCATED ---"), []byte("--- REDACTED ---"))},
+			name: "hosted mode",
+			mode: operatorapiv1.InstallModeHosted,
+			secret: []runtime.Object{
+				newKubeConfigSecret("test", ExternalHubKubeConfig,
+					newKubeConfig("testhost", "tls.crt", "tls.key"), []byte("--- TRUNCATED ---"), []byte("--- REDACTED ---"))},
 			namespace:    "test",
 			expectedHost: "https://testhost:443",
 			expectedErr:  false,

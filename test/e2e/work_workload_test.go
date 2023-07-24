@@ -145,7 +145,7 @@ const (
 	}`
 )
 
-// Test cases with lable "sanity-check" could be ran on an existing enviroment with work agent installed
+// Test cases with lable "sanity-check" could be ran on an existing environment with work agent installed
 // and well configured as sanity check. Resource leftovers should be cleaned up on both hub and managed cluster.
 var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check"), func() {
 	var workName string
@@ -249,7 +249,7 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 
 				for _, item := range appliedManifestWorkList.Items {
 					if strings.HasSuffix(item.Name, workName) {
-						appliedManifestWork = &item
+						appliedManifestWork = item.DeepCopy()
 						return nil
 					}
 				}

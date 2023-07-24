@@ -26,6 +26,7 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 
 		managedClusterName := "bootstrap-recoverytest-spokecluster"
 
+		//#nosec G101
 		hubKubeconfigSecret := "bootstrap-recoverytest-hub-kubeconfig-secret"
 		hubKubeconfigDir := path.Join(util.TestDir, "bootstrap-recoverytest", "hub-kubeconfig")
 
@@ -119,6 +120,7 @@ var _ = ginkgo.Describe("Agent Recovery", func() {
 
 		spokeClusterName := "hubkubeconfig-recoverytest-spokecluster"
 
+		//#nosec G101
 		hubKubeconfigSecret := "hubkubeconfig-recoverytest-hub-kubeconfig-secret"
 		hubKubeconfigDir := path.Join(util.TestDir, "hubkubeconfig-recoverytest", "hub-kubeconfig")
 

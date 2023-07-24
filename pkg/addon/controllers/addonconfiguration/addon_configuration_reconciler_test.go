@@ -609,7 +609,10 @@ func (a byPatchName) Less(i, j int) bool {
 	return patchi.Namespace < patchj.Namespace
 }
 
-func newManagedClusterAddon(name, namespace string, configs []addonv1alpha1.AddOnConfig, configStatus []addonv1alpha1.ConfigReference) *addonv1alpha1.ManagedClusterAddOn {
+func newManagedClusterAddon(
+	name, namespace string,
+	configs []addonv1alpha1.AddOnConfig,
+	configStatus []addonv1alpha1.ConfigReference) *addonv1alpha1.ManagedClusterAddOn {
 	mca := addontesting.NewAddon(name, namespace)
 	mca.Spec.Configs = configs
 	mca.Status.ConfigReferences = configStatus

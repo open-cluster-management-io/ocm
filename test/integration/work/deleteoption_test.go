@@ -69,8 +69,8 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 		var anotherAppliedManifestWorkName string
 		ginkgo.BeforeEach(func() {
 			manifests = []workapiv1.Manifest{
-				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, "cm1", map[string]string{"a": "b"}, []string{})),
-				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, "cm2", map[string]string{"c": "d"}, []string{})),
+				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm1, map[string]string{"a": "b"}, []string{})),
+				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm2, map[string]string{"c": "d"}, []string{})),
 			}
 			// Create another manifestworks with one shared resource.
 			anotherWork = util.NewManifestWork(commOptions.SpokeClusterName, "sharing-resource-work", []workapiv1.Manifest{manifests[0]})
@@ -100,7 +100,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 		ginkgo.It("shared resource between the manifestwork should be kept when one manifestwork is deleted", func() {
 			// ensure configmap exists and get its uid
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
-			curentConfigMap, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+			curentConfigMap, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), cm1, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			currentUID := curentConfigMap.UID
 
@@ -112,7 +112,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 				}
 
 				for _, appliedResource := range appliedManifestWork.Status.AppliedResources {
-					if appliedResource.Name == "cm1" && appliedResource.UID == string(currentUID) {
+					if appliedResource.Name == cm1 && appliedResource.UID == string(currentUID) {
 						return nil
 					}
 				}
@@ -121,13 +121,14 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			gomega.Eventually(func() error {
-				anotherAppliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), anotherAppliedManifestWorkName, metav1.GetOptions{})
+				anotherAppliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(
+					context.Background(), anotherAppliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
 				for _, appliedResource := range anotherAppliedManifestWork.Status.AppliedResources {
-					if appliedResource.Name == "cm1" && appliedResource.UID == string(currentUID) {
+					if appliedResource.Name == cm1 && appliedResource.UID == string(currentUID) {
 						return nil
 					}
 				}
@@ -153,7 +154,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 
 			// Ensure the configmap is kept and tracked by anotherappliedmanifestwork.
 			gomega.Eventually(func() error {
-				configMap, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+				configMap, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), cm1, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -162,13 +163,14 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 					return fmt.Errorf("UID should be equal")
 				}
 
-				anotherappliedmanifestwork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), anotherAppliedManifestWorkName, metav1.GetOptions{})
+				anotherappliedmanifestwork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(
+					context.Background(), anotherAppliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
 				for _, appliedResource := range anotherappliedmanifestwork.Status.AppliedResources {
-					if appliedResource.Name != "cm1" {
+					if appliedResource.Name != cm1 {
 						return fmt.Errorf("resource Name should be cm1")
 					}
 
@@ -184,7 +186,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 		ginkgo.It("shared resource between the manifestwork should be kept when the shared resource is removed from one manifestwork", func() {
 			// ensure configmap exists and get its uid
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
-			curentConfigMap, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+			curentConfigMap, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), cm1, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			currentUID := curentConfigMap.UID
 
@@ -196,7 +198,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 				}
 
 				for _, appliedResource := range appliedManifestWork.Status.AppliedResources {
-					if appliedResource.Name == "cm1" && appliedResource.UID == string(currentUID) {
+					if appliedResource.Name == cm1 && appliedResource.UID == string(currentUID) {
 						return nil
 					}
 				}
@@ -205,13 +207,14 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			gomega.Eventually(func() error {
-				anotherAppliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), anotherAppliedManifestWorkName, metav1.GetOptions{})
+				anotherAppliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(
+					context.Background(), anotherAppliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
 				for _, appliedResource := range anotherAppliedManifestWork.Status.AppliedResources {
-					if appliedResource.Name == "cm1" && appliedResource.UID == string(currentUID) {
+					if appliedResource.Name == cm1 && appliedResource.UID == string(currentUID) {
 						return nil
 					}
 				}
@@ -234,8 +237,8 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 				}
 
 				for _, appliedResource := range appliedManifestWork.Status.AppliedResources {
-					if appliedResource.Name == "cm1" {
-						return fmt.Errorf("found applied resouce name cm1")
+					if appliedResource.Name == cm1 {
+						return fmt.Errorf("found applied resource name cm1")
 					}
 				}
 
@@ -244,7 +247,8 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 
 			// Ensure the configmap is kept and tracked by anotherappliedmanifestwork
 			gomega.Eventually(func() error {
-				configMap, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+				configMap, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(
+					context.Background(), cm1, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -253,13 +257,14 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 					return fmt.Errorf("UID should be equal")
 				}
 
-				anotherAppliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(context.Background(), anotherAppliedManifestWorkName, metav1.GetOptions{})
+				anotherAppliedManifestWork, err := spokeWorkClient.WorkV1().AppliedManifestWorks().Get(
+					context.Background(), anotherAppliedManifestWorkName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 
 				for _, appliedResource := range anotherAppliedManifestWork.Status.AppliedResources {
-					if appliedResource.Name != "cm1" {
+					if appliedResource.Name != cm1 {
 						return fmt.Errorf("resource Name should be cm1")
 					}
 
@@ -277,8 +282,8 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 	ginkgo.Context("Delete options", func() {
 		ginkgo.BeforeEach(func() {
 			manifests = []workapiv1.Manifest{
-				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, "cm1", map[string]string{"a": "b"}, []string{})),
-				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, "cm2", map[string]string{"c": "d"}, []string{})),
+				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm1, map[string]string{"a": "b"}, []string{})),
+				util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm2, map[string]string{"c": "d"}, []string{})),
 			}
 		})
 
@@ -302,7 +307,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 
 			// Ensure ownership of configmap is updated
 			gomega.Eventually(func() error {
-				cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), cm1, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -315,7 +320,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 			gomega.Eventually(func() error {
-				cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm2", metav1.GetOptions{})
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), cm2, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -350,7 +355,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 							Group:     "",
 							Resource:  "configmaps",
 							Namespace: commOptions.SpokeClusterName,
-							Name:      "cm1",
+							Name:      cm1,
 						},
 					},
 				},
@@ -371,7 +376,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 
 			// Ensure ownership of configmap is updated
 			gomega.Eventually(func() error {
-				cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), cm1, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -394,11 +399,11 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// One of the resource should be deleted.
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm2", metav1.GetOptions{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), cm2, metav1.GetOptions{})
 			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
 
 			// One of the resource should be kept
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), cm1, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 
@@ -411,7 +416,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 							Group:     "",
 							Resource:  "configmaps",
 							Namespace: commOptions.SpokeClusterName,
-							Name:      "cm1",
+							Name:      cm1,
 						},
 					},
 				},
@@ -432,7 +437,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 
 			// Ensure ownership of configmap is updated
 			gomega.Eventually(func() error {
-				cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), cm1, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -452,7 +457,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 				}
 
 				work.Spec.Workload.Manifests = []workapiv1.Manifest{
-					util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, "cm2", map[string]string{"c": "d"}, []string{})),
+					util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm2, map[string]string{"c": "d"}, []string{})),
 				}
 				_, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Update(context.Background(), work, metav1.UpdateOptions{})
 				return err
@@ -465,7 +470,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 
 			// Sleep 5 second and check the resource should be kept
 			time.Sleep(5 * time.Second)
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), cm1, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 
@@ -478,7 +483,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 							Group:     "",
 							Resource:  "configmaps",
 							Namespace: commOptions.SpokeClusterName,
-							Name:      "cm1",
+							Name:      cm1,
 						},
 					},
 				},
@@ -499,7 +504,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 
 			// Ensure ownership of configmap is updated
 			gomega.Eventually(func() error {
-				cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), cm1, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -525,7 +530,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 
 			// Ensure ownership of configmap is updated
 			gomega.Eventually(func() error {
-				cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), cm1, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -548,9 +553,9 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 			// All of the resource should be deleted.
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm2", metav1.GetOptions{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), cm2, metav1.GetOptions{})
 			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
-			_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), "cm1", metav1.GetOptions{})
+			_, err = spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.Background(), cm1, metav1.GetOptions{})
 			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
 		})
 	})

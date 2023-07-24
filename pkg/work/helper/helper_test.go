@@ -122,7 +122,9 @@ func TestMergeManifestConditions(t *testing.T) {
 				newManifestCondition(0, "resource1", newCondition("two", "False", "my-reason", "my-message", nil)),
 			},
 			expectedConditions: []workapiv1.ManifestCondition{
-				newManifestCondition(0, "resource1", newCondition("one", "True", "my-reason", "my-message", nil), newCondition("two", "False", "my-reason", "my-message", nil)),
+				newManifestCondition(0, "resource1",
+					newCondition("one", "True", "my-reason", "my-message", nil),
+					newCondition("two", "False", "my-reason", "my-message", nil)),
 			},
 		},
 		{

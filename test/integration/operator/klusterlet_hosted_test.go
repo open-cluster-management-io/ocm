@@ -116,7 +116,8 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 
 				fmt.Printf("related resources are %v\n", actual.Status.RelatedResources)
 
-				// 11 managed static manifests + 11 management static manifests + 2CRDs + 2 deployments(2 duplicated CRDs, but status also recorded in the klusterlet's status)
+				// 11 managed static manifests + 11 management static manifests +
+				// 2CRDs + 2 deployments(2 duplicated CRDs, but status also recorded in the klusterlet's status)
 				if len(actual.Status.RelatedResources) != 26 {
 					return fmt.Errorf("should get 26 relatedResources, actual got %v", len(actual.Status.RelatedResources))
 				}
@@ -125,13 +126,15 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 
 			// Check CRDs
 			gomega.Eventually(func() bool {
-				if _, err := hostedAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), "appliedmanifestworks.work.open-cluster-management.io", metav1.GetOptions{}); err != nil {
+				if _, err := hostedAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
+					context.Background(), "appliedmanifestworks.work.open-cluster-management.io", metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := hostedAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), "clusterclaims.cluster.open-cluster-management.io", metav1.GetOptions{}); err != nil {
+				if _, err := hostedAPIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
+					context.Background(), "clusterclaims.cluster.open-cluster-management.io", metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -139,7 +142,8 @@ var _ = ginkgo.Describe("Klusterlet Hosted mode", func() {
 
 			// Check clusterrole/clusterrolebinding
 			gomega.Eventually(func() bool {
-				if _, err := hostedKubeClient.RbacV1().ClusterRoles().Get(context.Background(), registrationManagedRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.RbacV1().ClusterRoles().Get(
+					context.Background(), registrationManagedRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true

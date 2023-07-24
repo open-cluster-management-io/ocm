@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -88,29 +88,29 @@ func createClusterManagementAddOn(name, defaultConfigNamespace, defaultConfigNam
 	return clusterManagementAddon, nil
 }
 
-func updateClusterManagementAddOn(ctx context.Context, new *addonapiv1alpha1.ClusterManagementAddOn) {
-	gomega.Eventually(func() bool {
+func updateClusterManagementAddOn(_ context.Context, new *addonapiv1alpha1.ClusterManagementAddOn) {
+	gomega.Eventually(func() error {
 		old, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), new.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
 		old.Spec = new.Spec
 		old.Annotations = new.Annotations
 		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Update(context.Background(), old, metav1.UpdateOptions{})
-		if err == nil {
-			return true
-		}
-		return false
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		return err
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 }
 
-func updateManagedClusterAddOnStatus(ctx context.Context, new *addonapiv1alpha1.ManagedClusterAddOn) {
-	gomega.Eventually(func() bool {
+func updateManagedClusterAddOnStatus(_ context.Context, new *addonapiv1alpha1.ManagedClusterAddOn) {
+	gomega.Eventually(func() error {
 		old, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Get(context.Background(), new.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
 		old.Status = new.Status
 		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(old.Namespace).UpdateStatus(context.Background(), old, metav1.UpdateOptions{})
-		if err == nil {
-			return true
-		}
-		return false
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		return err
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 }
 
 func assertClusterManagementAddOnDefaultConfigReferences(name string, expect ...addonapiv1alpha1.DefaultConfigReference) {
@@ -123,14 +123,14 @@ func assertClusterManagementAddOnDefaultConfigReferences(name string, expect ...
 		}
 
 		if len(actual.Status.DefaultConfigReferences) != len(expect) {
-			return fmt.Errorf("Expected %v default config reference, actual: %v", len(expect), len(actual.Status.DefaultConfigReferences))
+			return fmt.Errorf("expected %v default config reference, actual: %v", len(expect), len(actual.Status.DefaultConfigReferences))
 		}
 
 		for i, e := range expect {
 			actualConfigReference := actual.Status.DefaultConfigReferences[i]
 
 			if !apiequality.Semantic.DeepEqual(actualConfigReference, e) {
-				return fmt.Errorf("Expected default config is %v, actual: %v", e, actualConfigReference)
+				return fmt.Errorf("expected default config is %v, actual: %v", e, actualConfigReference)
 			}
 		}
 
@@ -148,14 +148,14 @@ func assertClusterManagementAddOnInstallProgression(name string, expect ...addon
 		}
 
 		if len(actual.Status.InstallProgressions) != len(expect) {
-			return fmt.Errorf("Expected %v install progression, actual: %v", len(expect), len(actual.Status.InstallProgressions))
+			return fmt.Errorf("expected %v install progression, actual: %v", len(expect), len(actual.Status.InstallProgressions))
 		}
 
 		for i, e := range expect {
 			actualInstallProgression := actual.Status.InstallProgressions[i]
 
 			if !apiequality.Semantic.DeepEqual(actualInstallProgression.ConfigReferences, e.ConfigReferences) {
-				return fmt.Errorf("Expected InstallProgression.ConfigReferences is %v, actual: %v", e.ConfigReferences, actualInstallProgression.ConfigReferences)
+				return fmt.Errorf("expected InstallProgression.ConfigReferences is %v, actual: %v", e.ConfigReferences, actualInstallProgression.ConfigReferences)
 			}
 		}
 
@@ -178,7 +178,7 @@ func assertClusterManagementAddOnConditions(name string, expect ...metav1.Condit
 				cond.Status != ec.Status ||
 				cond.Reason != ec.Reason ||
 				cond.Message != ec.Message {
-				return fmt.Errorf("Expected cma progressing condition is %v, actual: %v", ec, cond)
+				return fmt.Errorf("expected cma progressing condition is %v, actual: %v", ec, cond)
 			}
 		}
 
@@ -196,20 +196,18 @@ func assertManagedClusterAddOnConfigReferences(name, namespace string, expect ..
 		}
 
 		if len(actual.Status.ConfigReferences) != len(expect) {
-			return fmt.Errorf("Expected %v config reference, actual: %v", len(expect), len(actual.Status.ConfigReferences))
+			return fmt.Errorf("expected %v config reference, actual: %v", len(expect), len(actual.Status.ConfigReferences))
 		}
 
 		for i, e := range expect {
 			actualConfigReference := actual.Status.ConfigReferences[i]
 
 			if !apiequality.Semantic.DeepEqual(actualConfigReference, e) {
-				return fmt.Errorf("Expected mca config reference is %v %v %v, actual: %v %v %v",
+				return fmt.Errorf("expected mca config reference is %v %v, actual: %v %v",
 					e.DesiredConfig,
 					e.LastAppliedConfig,
-					e.LastObservedGeneration,
 					actualConfigReference.DesiredConfig,
 					actualConfigReference.LastAppliedConfig,
-					actualConfigReference.LastObservedGeneration,
 				)
 			}
 		}
@@ -233,7 +231,7 @@ func assertManagedClusterAddOnConditions(name, namespace string, expect ...metav
 				cond.Status != ec.Status ||
 				cond.Reason != ec.Reason ||
 				cond.Message != ec.Message {
-				return fmt.Errorf("Expected addon progressing condition is %v, actual: %v", ec, cond)
+				return fmt.Errorf("expected addon progressing condition is %v, actual: %v", ec, cond)
 			}
 		}
 

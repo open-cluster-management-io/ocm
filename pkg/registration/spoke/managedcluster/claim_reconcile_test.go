@@ -38,7 +38,8 @@ func TestSync(t *testing.T) {
 		{
 			name:            "sync no managed cluster",
 			validateActions: testingcommon.AssertNoActions,
-			expectedErr:     "unable to get managed cluster \"testmanagedcluster\" from hub: managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
+			expectedErr: "unable to get managed cluster \"testmanagedcluster\" " +
+				"from hub: managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
 		},
 		{
 			name:            "skip when managed cluster does not join the hub yet",

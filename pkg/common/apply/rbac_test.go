@@ -65,7 +65,7 @@ rules:
 			},
 		},
 		{
-			name: "comapre and no update clusterrole",
+			name: "compare and no update clusterrole",
 			existingManifest: `
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -220,7 +220,7 @@ rules:
 			},
 		},
 		{
-			name: "comapre and no update clusterrole",
+			name: "compare and no update clusterrole",
 			existingManifest: `
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role

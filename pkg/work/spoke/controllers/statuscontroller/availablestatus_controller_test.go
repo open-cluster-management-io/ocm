@@ -230,7 +230,7 @@ func TestStatusFeedback(t *testing.T) {
 		validateActions   func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
-			name: "resource identifer is not matched",
+			name: "resource identifier is not matched",
 			existingResources: []runtime.Object{
 				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1"),
 			},

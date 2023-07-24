@@ -328,7 +328,9 @@ func TestPatchLabelAnnotations(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !equality.Semantic.DeepEqual(labelPatch["metadata"], map[string]interface{}{"uid": "", "resourceVersion": "", "labels": map[string]interface{}{"key1": nil}}) {
+				if !equality.Semantic.DeepEqual(
+					labelPatch["metadata"],
+					map[string]interface{}{"uid": "", "resourceVersion": "", "labels": map[string]interface{}{"key1": nil}}) {
 					t.Errorf("not patched correctly got %v", labelPatch)
 				}
 			},

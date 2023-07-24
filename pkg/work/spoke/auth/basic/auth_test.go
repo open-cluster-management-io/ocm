@@ -140,7 +140,9 @@ func TestValidateEscalation(t *testing.T) {
 			namespace: "test-deny",
 			name:      "test",
 			obj:       spoketesting.NewUnstructured("v1", "ClusterRole", "", "test"),
-			expect:    fmt.Errorf("not allowed to apply the resource rbac.authorization.k8s.io roles, test-deny test, error: permission escalation, will try again in 1m0s"),
+			expect: fmt.Errorf(
+				"not allowed to apply the resource rbac.authorization.k8s.io roles, " +
+					"test-deny test, error: permission escalation, will try again in 1m0s"),
 		},
 		"allow": {
 			executor: &workapiv1.ManifestWorkExecutor{

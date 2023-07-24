@@ -85,7 +85,7 @@ func TestManageCABundleConfigMap(t *testing.T) {
 				}
 
 				if !reflect.DeepEqual(c.signerCert, caCerts[0]) {
-					t.Fatalf("Current signer cert should be put at the begining")
+					t.Fatalf("Current signer cert should be put at the beginning")
 				}
 			}
 		})
