@@ -8,13 +8,6 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 )
 
-const (
-	// spokeAgentNameLength is the length of the spoke agent name which is generated automatically
-	spokeAgentNameLength = 5
-	// defaultSpokeComponentNamespace is the default namespace in which the spoke agent is deployed
-	defaultSpokeComponentNamespace = "open-cluster-management-agent"
-)
-
 type Options struct {
 	CmdConfig *controllercmd.ControllerCommandConfig
 	Burst     int

@@ -7,7 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
@@ -15,6 +17,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/registration"
+	"open-cluster-management.io/ocm/pkg/version"
 )
 
 func TestComplete(t *testing.T) {
@@ -92,7 +95,7 @@ func TestComplete(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			// setup kube client
-			objects := []runtime.Object{}
+			var objects []runtime.Object
 			if c.secret != nil {
 				objects = append(objects, c.secret)
 			}
@@ -217,5 +220,36 @@ func TestGetOrGenerateClusterAgentNames(t *testing.T) {
 				t.Errorf("expect agent name %q but got %q", c.expectedAgentName, agentName)
 			}
 		})
+	}
+}
+
+func TestNewOptions(t *testing.T) {
+	opts := NewOptions()
+	cmd := &cobra.Command{
+		Use:   "test",
+		Short: "test Controller",
+		Run: func(cmd *cobra.Command, args []string) {
+			_ = cmd.Help()
+			os.Exit(1)
+		},
+	}
+
+	opts.NewControllerCommandConfig("test", version.Get(), func(ctx context.Context, controllerCtx *controllercmd.ControllerContext) error {
+		return nil
+	})
+
+	opts.AddFlags(cmd.Flags())
+	if err := cmd.Flags().Set("kube-api-qps", "10"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Flags().Set("kube-api-burst", "20"); err != nil {
+		t.Fatal(err)
+
+	}
+	if err := cmd.Flags().Set("disable-leader-election", "true"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Flags().Set("unsupported-flag", "true"); err == nil {
+		t.Errorf("Should return err")
 	}
 }
