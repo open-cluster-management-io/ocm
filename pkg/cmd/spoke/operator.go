@@ -3,7 +3,6 @@ package spoke
 import (
 	"context"
 
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/cobra"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
@@ -22,19 +21,20 @@ const agentCmdName = "agent"
 
 // NewKlusterletOperatorCmd generate a command to start klusterlet operator
 func NewKlusterletOperatorCmd() *cobra.Command {
-
-	options := klusterlet.Options{}
-	cmdConfig := controllercmd.
-		NewControllerCommandConfig("klusterlet", version.Get(), options.RunKlusterletOperator)
+	opts := commonoptions.NewOptions()
+	klOptions := klusterlet.Options{}
+	cmdConfig := opts.
+		NewControllerCommandConfig("klusterlet", version.Get(), klOptions.RunKlusterletOperator)
 	cmd := cmdConfig.NewCommandWithContext(context.TODO())
 	cmd.Use = "klusterlet"
 	cmd.Short = "Start the klusterlet operator"
 
 	// add disable leader election flag
-	cmd.Flags().BoolVar(&cmdConfig.DisableLeaderElection, "disable-leader-election", false, "Disable leader election for the agent.")
-	cmd.Flags().BoolVar(&options.SkipPlaceholderHubSecret, "skip-placeholder-hub-secret", false,
+	flags := cmd.Flags()
+	cmd.Flags().BoolVar(&klOptions.SkipPlaceholderHubSecret, "skip-placeholder-hub-secret", false,
 		"If set, will skip ensuring a placeholder hub secret which is originally intended for pulling "+
 			"work image before approved")
+	opts.AddFlags(flags)
 
 	return cmd
 }
@@ -46,7 +46,7 @@ func NewKlusterletAgentCmd() *cobra.Command {
 	registrationOption := registration.NewSpokeAgentOptions()
 
 	agentConfig := singletonspoke.NewAgentConfig(commonOptions, registrationOption, workOptions)
-	cmdConfig := controllercmd.
+	cmdConfig := commonOptions.CommoOpts.
 		NewControllerCommandConfig("klusterlet", version.Get(), agentConfig.RunSpokeAgent)
 	cmd := cmdConfig.NewCommandWithContext(context.TODO())
 	cmd.Use = agentCmdName
@@ -61,8 +61,5 @@ func NewKlusterletAgentCmd() *cobra.Command {
 	utilruntime.Must(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeRegistrationFeatureGates))
 	utilruntime.Must(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeWorkFeatureGates))
 	features.SpokeMutableFeatureGate.AddFlag(flags)
-
-	// add disable leader election flag
-	flags.BoolVar(&cmdConfig.DisableLeaderElection, "disable-leader-election", false, "Disable leader election for the agent.")
 	return cmd
 }

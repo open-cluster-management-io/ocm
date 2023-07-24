@@ -1,23 +1,27 @@
 package hub
 
 import (
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
+	"context"
+
 	"github.com/spf13/cobra"
 
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/operator/operators/clustermanager"
 	"open-cluster-management.io/ocm/pkg/version"
 )
 
 // NewHubOperatorCmd generatee a command to start hub operator
 func NewHubOperatorCmd() *cobra.Command {
-
-	options := clustermanager.Options{}
-	cmd := controllercmd.
-		NewControllerCommandConfig("clustermanager", version.Get(), options.RunClusterManagerOperator).
-		NewCommand()
+	opts := commonoptions.NewOptions()
+	cmOptions := clustermanager.Options{}
+	cmd := opts.
+		NewControllerCommandConfig("clustermanager", version.Get(), cmOptions.RunClusterManagerOperator).
+		NewCommandWithContext(context.TODO())
 	cmd.Use = "hub"
 	cmd.Short = "Start the cluster manager operator"
 
-	cmd.Flags().BoolVar(&options.SkipRemoveCRDs, "skip-remove-crds", false, "Skip removing CRDs while ClusterManager is deleting.")
+	flags := cmd.Flags()
+	flags.BoolVar(&cmOptions.SkipRemoveCRDs, "skip-remove-crds", false, "Skip removing CRDs while ClusterManager is deleting.")
+	opts.AddFlags(flags)
 	return cmd
 }
