@@ -1,18 +1,21 @@
 package hub
 
 import (
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
+	"context"
+
 	"github.com/spf13/cobra"
 
+	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/version"
 	"open-cluster-management.io/ocm/pkg/work/hub"
 )
 
 // NewHubManager generates a command to start hub manager
 func NewWorkController() *cobra.Command {
-	cmdConfig := controllercmd.
+	opts := commonoptions.NewOptions()
+	cmdConfig := opts.
 		NewControllerCommandConfig("work-manager", version.Get(), hub.RunWorkHubManager)
-	cmd := cmdConfig.NewCommand()
+	cmd := cmdConfig.NewCommandWithContext(context.TODO())
 	cmd.Use = "manager"
 	cmd.Short = "Start the Work Hub Manager"
 
