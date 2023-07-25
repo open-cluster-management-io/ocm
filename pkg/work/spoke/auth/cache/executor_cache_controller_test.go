@@ -156,7 +156,7 @@ func TestCacheController(t *testing.T) {
 		func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 			obj := action.(clienttesting.CreateActionImpl).Object.(*v1.SubjectAccessReview)
 
-			if obj.Spec.ResourceAttributes.Namespace == "test-allow" {
+			if obj.Spec.ResourceAttributes.Namespace == allowNS {
 				return true, &v1.SubjectAccessReview{
 					Status: v1.SubjectAccessReviewStatus{
 						Allowed: true,
@@ -164,7 +164,7 @@ func TestCacheController(t *testing.T) {
 				}, nil
 			}
 
-			if obj.Spec.ResourceAttributes.Namespace == "test-deny" {
+			if obj.Spec.ResourceAttributes.Namespace == denyNS {
 				return true, &v1.SubjectAccessReview{
 					Status: v1.SubjectAccessReviewStatus{
 						Denied: true,
@@ -175,12 +175,11 @@ func TestCacheController(t *testing.T) {
 		},
 	)
 
-	clusterName := "cluster1"
 	ctx := context.TODO()
 
 	work, _ := spoketesting.NewManifestWork(0,
-		spoketesting.NewUnstructured("v1", "Secret", "test-allow", "test"),
-		spoketesting.NewUnstructured("v1", "Secret", "test-deny", "test"),
+		spoketesting.NewUnstructured("v1", "Secret", allowNS, "test"),
+		spoketesting.NewUnstructured("v1", "Secret", denyNS, "test"),
 	)
 	work.Spec.Executor = executor
 	work.Spec.DeleteOption = &workapiv1.DeleteOption{
@@ -190,7 +189,7 @@ func TestCacheController(t *testing.T) {
 				{
 					Group:     "",
 					Resource:  "secrets",
-					Namespace: "test-allow",
+					Namespace: allowNS,
 					Name:      "test",
 				},
 			},

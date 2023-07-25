@@ -205,8 +205,8 @@ func aggregateManifestConditions(generation int64, manifests []workapiv1.Manifes
 func (c *AvailableStatusController) getFeedbackValues(
 	resourceMeta workapiv1.ManifestResourceMeta, obj *unstructured.Unstructured,
 	manifestOptions []workapiv1.ManifestConfigOption) ([]workapiv1.FeedbackValue, metav1.Condition) {
-	errs := []error{}
-	values := []workapiv1.FeedbackValue{}
+	var errs []error
+	var values []workapiv1.FeedbackValue
 
 	option := helper.FindManifestConiguration(resourceMeta, manifestOptions)
 

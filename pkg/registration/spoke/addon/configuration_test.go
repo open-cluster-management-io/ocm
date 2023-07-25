@@ -3,6 +3,7 @@ package addon
 import (
 	"testing"
 
+	certificates "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -10,8 +11,11 @@ import (
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
+const (
+	addOnName = "addon1"
+)
+
 func TestGetRegistrationConfigs(t *testing.T) {
-	addOnName := "addon1"
 	addOnNamespace := "ns1"
 
 	cases := []struct {
@@ -44,13 +48,13 @@ func TestGetRegistrationConfigs(t *testing.T) {
 				Status: addonv1alpha1.ManagedClusterAddOnStatus{
 					Registrations: []addonv1alpha1.RegistrationConfig{
 						{
-							SignerName: "kubernetes.io/kube-apiserver-client",
+							SignerName: certificates.KubeAPIServerClientSignerName,
 						},
 					},
 				},
 			},
 			configs: []registrationConfig{
-				newRegistrationConfig(addOnName, addOnNamespace, "kubernetes.io/kube-apiserver-client", "", nil, false),
+				newRegistrationConfig(addOnName, addOnNamespace, certificates.KubeAPIServerClientSignerName, "", nil, false),
 			},
 		},
 		{
@@ -64,14 +68,14 @@ func TestGetRegistrationConfigs(t *testing.T) {
 				Status: addonv1alpha1.ManagedClusterAddOnStatus{
 					Registrations: []addonv1alpha1.RegistrationConfig{
 						{
-							SignerName: "kubernetes.io/kube-apiserver-client",
+							SignerName: certificates.KubeAPIServerClientSignerName,
 						},
 					},
 					Namespace: addOnNamespace,
 				},
 			},
 			configs: []registrationConfig{
-				newRegistrationConfig(addOnName, addOnNamespace, "kubernetes.io/kube-apiserver-client", "", nil, false),
+				newRegistrationConfig(addOnName, addOnNamespace, certificates.KubeAPIServerClientSignerName, "", nil, false),
 			},
 		},
 		{
@@ -90,13 +94,13 @@ func TestGetRegistrationConfigs(t *testing.T) {
 				Status: addonv1alpha1.ManagedClusterAddOnStatus{
 					Registrations: []addonv1alpha1.RegistrationConfig{
 						{
-							SignerName: "kubernetes.io/kube-apiserver-client",
+							SignerName: certificates.KubeAPIServerClientSignerName,
 						},
 					},
 				},
 			},
 			configs: []registrationConfig{
-				newRegistrationConfig(addOnName, addOnNamespace, "kubernetes.io/kube-apiserver-client", "", nil, true),
+				newRegistrationConfig(addOnName, addOnNamespace, certificates.KubeAPIServerClientSignerName, "", nil, true),
 			},
 		},
 		{

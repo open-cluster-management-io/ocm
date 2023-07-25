@@ -4,7 +4,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	v1alpha1 "open-cluster-management.io/api/work/v1alpha1"
+	"open-cluster-management.io/api/work/v1alpha1"
 )
 
 type ManifestWorkReplicaSetWebhook struct {

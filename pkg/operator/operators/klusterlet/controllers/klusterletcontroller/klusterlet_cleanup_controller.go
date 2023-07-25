@@ -198,7 +198,7 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 	return n.patcher.RemoveFinalizer(ctx, klusterlet, klusterletFinalizer, klusterletHostedFinalizer)
 }
 
-func (r *klusterletCleanupController) checkConnectivity(ctx context.Context,
+func (n *klusterletCleanupController) checkConnectivity(ctx context.Context,
 	amwClient workv1client.AppliedManifestWorkInterface,
 	klusterlet *operatorapiv1.Klusterlet) (cleanupManagedClusterResources bool, err error) {
 	_, err = amwClient.List(ctx, metav1.ListOptions{})

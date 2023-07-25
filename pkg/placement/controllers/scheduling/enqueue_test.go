@@ -23,17 +23,23 @@ import (
 	testinghelpers "open-cluster-management.io/ocm/pkg/placement/helpers/testing"
 )
 
-func newClusterInformerFactory(clusterClient clusterclient.Interface, objects ...runtime.Object) clusterinformers.SharedInformerFactory {
+func newClusterInformerFactory(t *testing.T, clusterClient clusterclient.Interface, objects ...runtime.Object) clusterinformers.SharedInformerFactory {
 	clusterInformerFactory := clusterinformers.NewSharedInformerFactory(clusterClient, time.Minute*10)
 
-	clusterInformerFactory.Cluster().V1beta1().Placements().Informer().AddIndexers(cache.Indexers{
+	err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().AddIndexers(cache.Indexers{
 		placementsByScore:             indexPlacementsByScore,
 		placementsByClusterSetBinding: indexPlacementByClusterSetBinding,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Informer().AddIndexers(cache.Indexers{
+	err = clusterInformerFactory.Cluster().V1beta2().ManagedClusterSetBindings().Informer().AddIndexers(cache.Indexers{
 		clustersetBindingsByClusterSet: indexClusterSetBindingByClusterSet,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	clusterStore := clusterInformerFactory.Cluster().V1().ManagedClusters().Informer().GetStore()
 	clusterSetStore := clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Informer().GetStore()
@@ -43,19 +49,23 @@ func newClusterInformerFactory(clusterClient clusterclient.Interface, objects ..
 	addOnPlacementStore := clusterInformerFactory.Cluster().V1alpha1().AddOnPlacementScores().Informer().GetStore()
 
 	for _, obj := range objects {
+		var err error
 		switch obj.(type) {
 		case *clusterapiv1.ManagedCluster:
-			clusterStore.Add(obj)
+			err = clusterStore.Add(obj)
 		case *clusterapiv1beta2.ManagedClusterSet:
-			clusterSetStore.Add(obj)
+			err = clusterSetStore.Add(obj)
 		case *clusterapiv1beta2.ManagedClusterSetBinding:
-			clusterSetBindingStore.Add(obj)
+			err = clusterSetBindingStore.Add(obj)
 		case *clusterapiv1beta1.Placement:
-			placementStore.Add(obj)
+			err = placementStore.Add(obj)
 		case *clusterapiv1beta1.PlacementDecision:
-			placementDecisionStore.Add(obj)
+			err = placementDecisionStore.Add(obj)
 		case *clusterapiv1alpha1.AddOnPlacementScore:
-			addOnPlacementStore.Add(obj)
+			err = addOnPlacementStore.Add(obj)
+		}
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
 
@@ -175,7 +185,7 @@ func TestEnqueuePlacementsByClusterSet(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
 			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 			q := newEnqueuer(
@@ -282,7 +292,7 @@ func TestEnqueuePlacementsByClusterSetBinding(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
 			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 			q := newEnqueuer(
@@ -370,7 +380,7 @@ func TestEnqueuePlacementsByScore(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
 			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 			q := newEnqueuer(

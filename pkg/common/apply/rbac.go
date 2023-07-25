@@ -43,7 +43,7 @@ func (m *PermissionApplier) Apply(
 	recorder events.Recorder,
 	manifests resourceapply.AssetFunc,
 	files ...string) []resourceapply.ApplyResult {
-	ret := []resourceapply.ApplyResult{}
+	var ret []resourceapply.ApplyResult
 	for _, file := range files {
 		result := resourceapply.ApplyResult{File: file}
 		objBytes, err := manifests(file)
@@ -73,7 +73,7 @@ func (m *PermissionApplier) Apply(
 			result.Result, result.Changed, result.Error = Apply[*rbacv1.RoleBinding](
 				ctx, m.roleBindingLister.RoleBindings(t.Namespace), m.client.RbacV1().RoleBindings(t.Namespace), compareRoleBinding, t, recorder)
 		default:
-			result.Error = fmt.Errorf("object type is not correct.")
+			result.Error = fmt.Errorf("object type is not correct")
 		}
 	}
 	return ret

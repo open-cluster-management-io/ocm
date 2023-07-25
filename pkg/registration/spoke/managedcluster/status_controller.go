@@ -8,7 +8,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/util/errors"
-	discovery "k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"

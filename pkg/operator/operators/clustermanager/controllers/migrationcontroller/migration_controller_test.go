@@ -433,7 +433,10 @@ func TestSync(t *testing.T) {
 	}
 }
 
-func newTestController(t *testing.T, clustermanager *operatorapiv1.ClusterManager, crds ...runtime.Object) (*crdMigrationController, *fakeoperatorlient.Clientset) {
+func newTestController(
+	t *testing.T,
+	clustermanager *operatorapiv1.ClusterManager,
+	crds ...runtime.Object) (*crdMigrationController, *fakeoperatorlient.Clientset) {
 	fakeOperatorClient := fakeoperatorlient.NewSimpleClientset(clustermanager)
 	operatorInformers := operatorinformers.NewSharedInformerFactory(fakeOperatorClient, 5*time.Minute)
 	fakeAPIExtensionClient := fakeapiextensions.NewSimpleClientset(crds...)
@@ -446,7 +449,8 @@ func newTestController(t *testing.T, clustermanager *operatorapiv1.ClusterManage
 			*operatorapiv1.ClusterManager, operatorapiv1.ClusterManagerSpec, operatorapiv1.ClusterManagerStatus](
 			fakeOperatorClient.OperatorV1().ClusterManagers()),
 	}
-	crdMigrationController.generateHubClusterClients = func(hubKubeConfig *rest.Config) (apiextensionsclient.Interface, migrationv1alpha1client.StorageVersionMigrationsGetter, error) {
+	crdMigrationController.generateHubClusterClients = func(
+		hubKubeConfig *rest.Config) (apiextensionsclient.Interface, migrationv1alpha1client.StorageVersionMigrationsGetter, error) {
 		return fakeAPIExtensionClient, fakeMigrationClient.MigrationV1alpha1(), nil
 	}
 	store := operatorInformers.Operator().V1().ClusterManagers().Informer().GetStore()

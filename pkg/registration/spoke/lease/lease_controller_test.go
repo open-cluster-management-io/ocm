@@ -41,7 +41,8 @@ func TestLeaseUpdate(t *testing.T) {
 			clusters:                []runtime.Object{},
 			needToStartUpdateBefore: true,
 			validateActions:         testingcommon.AssertNoMoreUpdates,
-			expectedErr:             "unable to get managed cluster \"testmanagedcluster\" from hub: managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
+			expectedErr: "unable to get managed cluster \"testmanagedcluster\" from hub: " +
+				"managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
 		},
 		{
 			name:                    "unaccept a managed cluster after lease update routine is started",

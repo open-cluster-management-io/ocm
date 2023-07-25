@@ -106,13 +106,15 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode", func() {
 
 			// Check CRDs
 			gomega.Eventually(func() bool {
-				if _, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), "appliedmanifestworks.work.open-cluster-management.io", metav1.GetOptions{}); err != nil {
+				if _, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
+					context.Background(), "appliedmanifestworks.work.open-cluster-management.io", metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), "clusterclaims.cluster.open-cluster-management.io", metav1.GetOptions{}); err != nil {
+				if _, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
+					context.Background(), "clusterclaims.cluster.open-cluster-management.io", metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true

@@ -39,7 +39,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 			return mwrSet, reconcileStop, nil
 		}
 		if err != nil {
-			return mwrSet, reconcileContinue, fmt.Errorf("Failed get placement %w", err)
+			return mwrSet, reconcileContinue, fmt.Errorf("failed get placement %w", err)
 		}
 		placements = append(placements, placement)
 	}
@@ -49,7 +49,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 		return mwrSet, reconcileContinue, err
 	}
 
-	errs := []error{}
+	var errs []error
 	addedClusters, deletedClusters, existingClusters := sets.New[string](), sets.New[string](), sets.New[string]()
 	for _, mw := range manifestWorks {
 		existingClusters.Insert(mw.Namespace)
@@ -127,7 +127,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 	return mwrSet, reconcileContinue, utilerrors.NewAggregate(errs)
 }
 
-// Return only True status if there all clusters have manifests applied as expected
+// GetManifestworkApplied return only True status if there all clusters have manifests applied as expected
 func GetManifestworkApplied(reason string, message string) metav1.Condition {
 	if reason == workapiv1alpha1.ReasonAsExpected {
 		return getCondition(workapiv1alpha1.ManifestWorkReplicaSetConditionManifestworkApplied, reason, message, metav1.ConditionTrue)
@@ -137,7 +137,7 @@ func GetManifestworkApplied(reason string, message string) metav1.Condition {
 
 }
 
-// Return only True status if there are clusters selected
+// GetPlacementDecisionVerified return only True status if there are clusters selected
 func GetPlacementDecisionVerified(reason string, message string) metav1.Condition {
 	if reason == workapiv1alpha1.ReasonAsExpected {
 		return getCondition(workapiv1alpha1.ManifestWorkReplicaSetConditionPlacementVerified, reason, message, metav1.ConditionTrue)
@@ -158,7 +158,7 @@ func getCondition(conditionType string, reason string, message string, status me
 
 func CreateManifestWork(mwrSet *workapiv1alpha1.ManifestWorkReplicaSet, clusterNS string) (*workv1.ManifestWork, error) {
 	if clusterNS == "" {
-		return nil, fmt.Errorf("Invalid cluster namespace")
+		return nil, fmt.Errorf("invalid cluster namespace")
 	}
 
 	return &workv1.ManifestWork{

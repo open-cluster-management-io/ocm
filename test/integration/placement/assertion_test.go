@@ -37,7 +37,9 @@ func assertCreatingPlacementWithDecision(placement *clusterapiv1beta1.Placement,
 	assertPlacementDecisionCreated(newplacement)
 	assertPlacementDecisionNumbers(newplacement.Name, newplacement.Namespace, numberOfDecisionClusters, numberOfPlacementDecisions)
 	if placement.Spec.NumberOfClusters != nil {
-		assertPlacementConditionSatisfied(newplacement.Name, newplacement.Namespace, numberOfDecisionClusters, numberOfDecisionClusters == int(*placement.Spec.NumberOfClusters))
+		assertPlacementConditionSatisfied(
+			newplacement.Name, newplacement.Namespace, numberOfDecisionClusters,
+			numberOfDecisionClusters == int(*placement.Spec.NumberOfClusters))
 	}
 }
 
@@ -48,7 +50,8 @@ func assertPatchingPlacementSpec(newPlacement *clusterapiv1beta1.Placement) {
 		clusterClient.ClusterV1beta1().Placements(newPlacement.Namespace))
 
 	gomega.Eventually(func() error {
-		oldPlacement, err := clusterClient.ClusterV1beta1().Placements(newPlacement.Namespace).Get(context.Background(), newPlacement.Name, metav1.GetOptions{})
+		oldPlacement, err := clusterClient.ClusterV1beta1().Placements(newPlacement.Namespace).Get(
+			context.Background(), newPlacement.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -146,8 +149,9 @@ func assertCreatingPlacementDecision(name, namespace string, clusterNames []stri
 			},
 		},
 	}
-	placementDecision, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).Create(context.Background(), placementDecision, metav1.CreateOptions{})
-
+	placementDecision, err := clusterClient.ClusterV1beta1().PlacementDecisions(namespace).Create(
+		context.Background(), placementDecision, metav1.CreateOptions{})
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	var clusterDecisions []clusterapiv1beta1.ClusterDecision
 	for _, clusterName := range clusterNames {
 		clusterDecisions = append(clusterDecisions, clusterapiv1beta1.ClusterDecision{
@@ -156,7 +160,8 @@ func assertCreatingPlacementDecision(name, namespace string, clusterNames []stri
 	}
 
 	placementDecision.Status.Decisions = clusterDecisions
-	placementDecision, err = clusterClient.ClusterV1beta1().PlacementDecisions(namespace).UpdateStatus(context.Background(), placementDecision, metav1.UpdateOptions{})
+	placementDecision, err = clusterClient.ClusterV1beta1().PlacementDecisions(namespace).UpdateStatus(
+		context.Background(), placementDecision, metav1.UpdateOptions{})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 }
 

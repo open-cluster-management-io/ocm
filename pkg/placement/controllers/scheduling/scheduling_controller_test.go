@@ -32,6 +32,11 @@ type testScheduler struct {
 	result ScheduleResult
 }
 
+const (
+	placementNamespace = "ns1"
+	placementName      = "placement1"
+)
+
 func (s *testScheduler) Schedule(ctx context.Context,
 	placement *clusterapiv1beta1.Placement,
 	clusters []*clusterapiv1.ManagedCluster,
@@ -40,9 +45,6 @@ func (s *testScheduler) Schedule(ctx context.Context,
 }
 
 func TestSchedulingController_sync(t *testing.T) {
-	placementNamespace := "ns1"
-	placementName := "placement1"
-
 	cases := []struct {
 		name            string
 		placement       *clusterapiv1beta1.Placement
@@ -371,7 +373,7 @@ func TestSchedulingController_sync(t *testing.T) {
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
 				testingcommon.AssertActions(t, actions, "create", "patch")
-				// check if emtpy PlacementDecision has been created
+				// check if empty PlacementDecision has been created
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
@@ -418,7 +420,7 @@ func TestSchedulingController_sync(t *testing.T) {
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
 				testingcommon.AssertActions(t, actions, "create", "patch")
-				// check if emtpy PlacementDecision has been created
+				// check if empty PlacementDecision has been created
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
@@ -468,7 +470,7 @@ func TestSchedulingController_sync(t *testing.T) {
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				// check if PlacementDecision has been updated
 				testingcommon.AssertActions(t, actions, "create", "patch")
-				// check if emtpy PlacementDecision has been created
+				// check if empty PlacementDecision has been created
 				actual := actions[0].(clienttesting.CreateActionImpl).Object
 				placementDecision, ok := actual.(*clusterapiv1beta1.PlacementDecision)
 				if !ok {
@@ -551,7 +553,7 @@ func TestSchedulingController_sync(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			c.initObjs = append(c.initObjs, c.placement)
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 			s := &testScheduler{result: c.scheduleResult}
 
 			ctrl := schedulingController{
@@ -608,7 +610,7 @@ func TestGetValidManagedClusterSetBindings(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
 			ctrl := &schedulingController{
 				clusterSetLister:        clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
@@ -683,7 +685,7 @@ func TestGetValidManagedClusterSets(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
 			ctrl := &schedulingController{
 				clusterSetLister:        clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets().Lister(),
@@ -811,7 +813,7 @@ func TestGetAvailableClusters(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
 			ctrl := &schedulingController{
 				clusterLister:    clusterInformerFactory.Cluster().V1().ManagedClusters().Lister(),
@@ -975,9 +977,6 @@ func TestNewMisconfiguredCondition(t *testing.T) {
 }
 
 func TestBind(t *testing.T) {
-	placementNamespace := "ns1"
-	placementName := "placement1"
-
 	cases := []struct {
 		name            string
 		initObjs        []runtime.Object
@@ -1387,7 +1386,7 @@ func TestBind(t *testing.T) {
 				},
 			)
 
-			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
 			s := &testScheduler{}
 

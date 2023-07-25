@@ -70,7 +70,7 @@ type crdMigrationController struct {
 	generateHubClusterClients func(hubConfig *rest.Config) (apiextensionsclient.Interface, migrationv1alpha1client.StorageVersionMigrationsGetter, error)
 }
 
-// NewClusterManagerController construct cluster manager hub controller
+// NewCRDMigrationController construct crd migration controller
 func NewCRDMigrationController(
 	kubeconfig *rest.Config,
 	kubeClient kubernetes.Interface,
@@ -231,7 +231,7 @@ func applyStorageVersionMigrations(ctx context.Context,
 			continue
 		}
 
-		_, _, err = applyStorageVersionMigration(migrationClient, required, recorder)
+		_, _, err = applyStorageVersionMigration(ctx, migrationClient, required, recorder)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -337,6 +337,7 @@ func parseStorageVersionMigrationFile(
 }
 
 func applyStorageVersionMigration(
+	ctx context.Context,
 	client migrationv1alpha1client.StorageVersionMigrationsGetter,
 	required *migrationv1alpha1.StorageVersionMigration,
 	recorder events.Recorder,
@@ -344,7 +345,7 @@ func applyStorageVersionMigration(
 	if required == nil {
 		return nil, false, fmt.Errorf("required StorageVersionMigration is nil")
 	}
-	existing, err := client.StorageVersionMigrations().Get(context.TODO(), required.Name, metav1.GetOptions{})
+	existing, err := client.StorageVersionMigrations().Get(ctx, required.Name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		actual, err := client.StorageVersionMigrations().Create(context.TODO(), required, metav1.CreateOptions{})
 		if err != nil {
@@ -370,7 +371,7 @@ func applyStorageVersionMigration(
 		return existing, false, nil
 	}
 
-	actual, err := client.StorageVersionMigrations().Update(context.TODO(), existingCopy, metav1.UpdateOptions{})
+	actual, err := client.StorageVersionMigrations().Update(ctx, existingCopy, metav1.UpdateOptions{})
 	if err != nil {
 		recorder.Warningf("StorageVersionMigrationUpdateFailed", "Failed to update %s: %v", resourcehelper.FormatResourceForCLIWithNamespace(existingCopy), err)
 		return actual, true, err

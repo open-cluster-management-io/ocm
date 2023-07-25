@@ -86,7 +86,8 @@ var _ = ginkgo.Describe("Create v1beta1 managedclusterset", func() {
 			if string(v1beta2ManagedClusterSet.Spec.ClusterSelector.SelectorType) != string(managedClusterSet.Spec.ClusterSelector.SelectorType) {
 				return fmt.Errorf("unexpected v1beta2 cluster set %v", v1beta2ManagedClusterSet)
 			}
-			if !reflect.DeepEqual(v1beta2ManagedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels, managedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels) {
+			if !reflect.DeepEqual(v1beta2ManagedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels,
+				managedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels) {
 				return fmt.Errorf("unexpected v1beta2 cluster set %v", v1beta2ManagedClusterSet)
 			}
 			return nil
@@ -216,7 +217,8 @@ var _ = ginkgo.Describe("Create v1beta2 managedclusterset", func() {
 			if string(v1beta1ManagedClusterSet.Spec.ClusterSelector.SelectorType) != string(managedClusterSet.Spec.ClusterSelector.SelectorType) {
 				return fmt.Errorf("unexpected v1beta1 cluster set %v", v1beta1ManagedClusterSet)
 			}
-			if !reflect.DeepEqual(v1beta1ManagedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels, managedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels) {
+			if !reflect.DeepEqual(v1beta1ManagedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels,
+				managedClusterSet.Spec.ClusterSelector.LabelSelector.MatchLabels) {
 				return fmt.Errorf("unexpected v1beta1 cluster set %v", v1beta1ManagedClusterSet)
 			}
 			return nil

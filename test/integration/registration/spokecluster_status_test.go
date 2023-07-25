@@ -27,6 +27,7 @@ var _ = ginkgo.Describe("Collecting Node Resource", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		managedClusterName := "resorucetest-managedcluster"
+		//#nosec G101
 		hubKubeconfigSecret := "resorucetest-hub-kubeconfig-secret"
 		hubKubeconfigDir := path.Join(util.TestDir, "resorucetest", "hub-kubeconfig")
 
@@ -68,7 +69,7 @@ var _ = ginkgo.Describe("Collecting Node Resource", func() {
 				return false
 			}
 
-			if spokeCluster.Finalizers[0] != "cluster.open-cluster-management.io/api-resource-cleanup" {
+			if spokeCluster.Finalizers[0] != clusterCleanFinalizer {
 				return false
 			}
 
@@ -88,8 +89,8 @@ var _ = ginkgo.Describe("Collecting Node Resource", func() {
 			if err != nil {
 				return false
 			}
-			accpeted := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
-			return accpeted != nil
+			accepted := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
+			return accepted != nil
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 		// the hub kubeconfig secret should be filled after the csr is approved

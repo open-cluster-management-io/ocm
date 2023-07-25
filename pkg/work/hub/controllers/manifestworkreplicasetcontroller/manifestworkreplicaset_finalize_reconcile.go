@@ -43,15 +43,15 @@ func (f *finalizeReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alp
 	return mwrSet, reconcileStop, nil
 }
 
-func (m *finalizeReconciler) finalizeManifestWorkReplicaSet(ctx context.Context, manifestWorkReplicaSet *workapiv1alpha1.ManifestWorkReplicaSet) error {
-	manifestWorks, err := listManifestWorksByManifestWorkReplicaSet(manifestWorkReplicaSet, m.manifestWorkLister)
+func (f *finalizeReconciler) finalizeManifestWorkReplicaSet(ctx context.Context, manifestWorkReplicaSet *workapiv1alpha1.ManifestWorkReplicaSet) error {
+	manifestWorks, err := listManifestWorksByManifestWorkReplicaSet(manifestWorkReplicaSet, f.manifestWorkLister)
 	if err != nil {
 		return err
 	}
 
-	errs := []error{}
+	var errs []error
 	for _, mw := range manifestWorks {
-		err = m.workApplier.Delete(ctx, mw.Namespace, mw.Name)
+		err = f.workApplier.Delete(ctx, mw.Namespace, mw.Name)
 		if err != nil && !errors.IsNotFound(err) {
 			errs = append(errs, err)
 		}

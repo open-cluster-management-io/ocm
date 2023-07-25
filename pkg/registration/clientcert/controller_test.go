@@ -153,7 +153,7 @@ func TestSync(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			ctrl := &mockCSRControl{}
-			csrs := []runtime.Object{}
+			var csrs []runtime.Object
 			if c.approvedCSRCert != nil {
 				csr := testinghelpers.NewApprovedCSR(testinghelpers.CSRHolder{Name: testCSRName})
 				csr.Status.Certificate = c.approvedCSRCert.Cert
@@ -224,7 +224,7 @@ func TestSync(t *testing.T) {
 			}
 
 			if !conditionEqual(c.expectedCondition, updater.cond) {
-				t.Errorf("conditon is not correct, expected %v, got %v", c.expectedCondition, updater.cond)
+				t.Errorf("condition is not correct, expected %v, got %v", c.expectedCondition, updater.cond)
 			}
 
 			c.validateActions(t, hubKubeClient.Actions(), agentKubeClient.Actions())
@@ -258,7 +258,7 @@ type fakeStatusUpdater struct {
 	cond *metav1.Condition
 }
 
-func (f *fakeStatusUpdater) update(ctx context.Context, cond metav1.Condition) error {
+func (f *fakeStatusUpdater) update(_ context.Context, cond metav1.Condition) error {
 	f.cond = cond.DeepCopy()
 	return nil
 }
@@ -269,7 +269,8 @@ type mockCSRControl struct {
 	csrClient      *clienttesting.Fake
 }
 
-func (m *mockCSRControl) create(ctx context.Context, recorder events.Recorder, objMeta metav1.ObjectMeta, csrData []byte, signerName string, expirationSeconds *int32) (string, error) {
+func (m *mockCSRControl) create(
+	_ context.Context, _ events.Recorder, objMeta metav1.ObjectMeta, _ []byte, _ string, _ *int32) (string, error) {
 	mockCSR := &unstructured.Unstructured{}
 	_, err := m.csrClient.Invokes(clienttesting.CreateActionImpl{
 		ActionImpl: clienttesting.ActionImpl{

@@ -4,8 +4,6 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -99,14 +97,6 @@ func TestFindTaintByKey(t *testing.T) {
 			}
 		})
 	}
-}
-
-func getApplyFileNames(applyFiles map[string]runtime.Object) []string {
-	keys := []string{}
-	for key := range applyFiles {
-		keys = append(keys, key)
-	}
-	return keys
 }
 
 var (

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
+	certificates "k8s.io/api/certificates/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,7 +67,7 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 			addon: NewFakeTemplateManagedClusterAddon("addon1", "cluster1", "template1", "fakehash"),
 			expectedConfigs: []addonapiv1alpha1.RegistrationConfig{
 				{
-					SignerName: "kubernetes.io/kube-apiserver-client",
+					SignerName: certificates.KubeAPIServerClientSignerName,
 					Subject: addonapiv1alpha1.Subject{
 						User: "system:open-cluster-management:cluster:cluster1:addon:addon1:agent:agent1",
 
@@ -188,7 +189,7 @@ func TestTemplateCSRApproveCheckFunc(t *testing.T) {
 					Name: "csr1",
 				},
 				Spec: certificatesv1.CertificateSigningRequestSpec{
-					SignerName: "kubernetes.io/kube-apiserver-client",
+					SignerName: certificates.KubeAPIServerClientSignerName,
 				},
 			},
 			expectedApprove: false, // fake csr data
@@ -288,7 +289,7 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 					Name: "csr1",
 				},
 				Spec: certificatesv1.CertificateSigningRequestSpec{
-					SignerName: "kubernetes.io/kube-apiserver-client",
+					SignerName: certificates.KubeAPIServerClientSignerName,
 					Username:   "system:open-cluster-management:cluster1:adcde",
 				},
 			},
@@ -356,7 +357,7 @@ func NewFakeManagedCluster(name string) *clusterv1.ManagedCluster {
 	return &clusterv1.ManagedCluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ManagedCluster",
-			APIVersion: clusterv1.SchemeGroupVersion.String(),
+			APIVersion: clusterv1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,

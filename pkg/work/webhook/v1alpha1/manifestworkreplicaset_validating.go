@@ -45,7 +45,7 @@ func (r *ManifestWorkReplicaSetWebhook) ValidateUpdate(ctx context.Context, oldO
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ManifestWorkReplicaSetWebhook) ValidateDelete(_ context.Context, obj runtime.Object) (
+func (r *ManifestWorkReplicaSetWebhook) ValidateDelete(_ context.Context, _ runtime.Object) (
 	admission.Warnings, error) {
 	if err := checkFeatureEnabled(); err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func (r *ManifestWorkReplicaSetWebhook) ValidateDelete(_ context.Context, obj ru
 }
 
 func (r *ManifestWorkReplicaSetWebhook) validateRequest(
-	newmwrSet *workv1alpha1.ManifestWorkReplicaSet, oldmwrSet *workv1alpha1.ManifestWorkReplicaSet,
+	newmwrSet *workv1alpha1.ManifestWorkReplicaSet, _ *workv1alpha1.ManifestWorkReplicaSet,
 	ctx context.Context) error {
 	if err := checkFeatureEnabled(); err != nil {
 		return err

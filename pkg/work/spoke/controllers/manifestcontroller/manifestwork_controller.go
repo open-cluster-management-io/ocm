@@ -142,7 +142,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 	// We creat a ownerref instead of controller ref since multiple controller can declare the ownership of a manifests
 	owner := helper.NewAppliedManifestWorkOwner(appliedManifestWork)
 
-	errs := []error{}
+	var errs []error
 	// Apply resources on spoke cluster.
 	resourceResults := make([]applyResult, len(manifestWork.Spec.Workload.Manifests))
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -161,7 +161,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 		klog.Errorf("failed to apply resource with error %v", err)
 	}
 
-	newManifestConditions := []workapiv1.ManifestCondition{}
+	var newManifestConditions []workapiv1.ManifestCondition
 	var requeueTime = MaxRequeueDuration
 	for _, result := range resourceResults {
 		manifestCondition := workapiv1.ManifestCondition{
@@ -238,7 +238,7 @@ func (m *ManifestWorkController) applyAppliedManifestWork(ctx context.Context, w
 			Finalizers: []string{controllers.AppliedManifestWorkFinalizer},
 		},
 		Spec: workapiv1.AppliedManifestWorkSpec{
-			HubHash:          m.hubHash,
+			HubHash:          hubHash,
 			ManifestWorkName: workName,
 			AgentID:          agentID,
 		},

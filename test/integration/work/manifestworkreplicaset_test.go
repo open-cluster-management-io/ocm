@@ -50,7 +50,7 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 		generateTestFixture = func(numberOfClusters int) (*workapiv1alpha1.ManifestWorkReplicaSet, sets.Set[string], error) {
 			clusterNames := sets.New[string]()
 			manifests := []workapiv1.Manifest{
-				util.ToManifest(util.NewConfigmap("defaut", "cm1", map[string]string{"a": "b"}, nil)),
+				util.ToManifest(util.NewConfigmap("defaut", cm1, map[string]string{"a": "b"}, nil)),
 			}
 			placementRef := workapiv1alpha1.LocalPlacementReference{Name: placement.Name}
 
@@ -79,7 +79,8 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 				return nil, clusterNames, err
 			}
 
-			decision, err := hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).Create(context.TODO(), placementDecision, metav1.CreateOptions{})
+			decision, err := hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).Create(
+				context.TODO(), placementDecision, metav1.CreateOptions{})
 			if err != nil {
 				return nil, clusterNames, err
 			}
@@ -96,7 +97,8 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 				clusterNames.Insert(clusterName)
 			}
 
-			decision, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).UpdateStatus(context.TODO(), decision, metav1.UpdateOptions{})
+			decision, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).UpdateStatus(
+				context.TODO(), decision, metav1.UpdateOptions{})
 			return manifestWorkReplicaSet, clusterNames, err
 		}
 	})
@@ -118,11 +120,13 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 			}, manifestWorkReplicaSet), eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 			ginkgo.By("Update decision so manifestworks should be updated")
-			decision, err := hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).Get(context.TODO(), placementDecision.Name, metav1.GetOptions{})
+			decision, err := hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).Get(
+				context.TODO(), placementDecision.Name, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			removedCluster := decision.Status.Decisions[2].ClusterName
 			decision.Status.Decisions = decision.Status.Decisions[:2]
-			decision, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).UpdateStatus(context.TODO(), decision, metav1.UpdateOptions{})
+			decision, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).UpdateStatus(
+				context.TODO(), decision, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			clusterNames.Delete(removedCluster)
 			gomega.Eventually(assertWorksByReplicaSet(clusterNames, manifestWorkReplicaSet), eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())

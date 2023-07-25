@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -18,7 +18,7 @@ import (
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
-	scheduling "open-cluster-management.io/ocm/pkg/placement/controllers/scheduling"
+	"open-cluster-management.io/ocm/pkg/placement/controllers/scheduling"
 	testinghelpers "open-cluster-management.io/ocm/pkg/placement/helpers/testing"
 )
 
@@ -102,7 +102,7 @@ func TestDebugger(t *testing.T) {
 				t.Errorf("Expect no error but get %v", err)
 			}
 
-			responseBody, err := ioutil.ReadAll(res.Body)
+			responseBody, err := io.ReadAll(res.Body)
 			if err != nil {
 				t.Errorf("Unexpected error reading response body: %v", err)
 			}

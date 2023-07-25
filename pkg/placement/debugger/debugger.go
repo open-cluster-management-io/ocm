@@ -13,7 +13,7 @@ import (
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 
-	scheduling "open-cluster-management.io/ocm/pkg/placement/controllers/scheduling"
+	"open-cluster-management.io/ocm/pkg/placement/controllers/scheduling"
 )
 
 const DebugPath = "/debug/placements/"

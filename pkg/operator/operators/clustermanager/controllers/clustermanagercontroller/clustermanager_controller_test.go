@@ -36,7 +36,8 @@ import (
 )
 
 var (
-	ctx = context.Background()
+	ctx        = context.Background()
+	createVerb = "create"
 )
 
 type testController struct {
@@ -260,7 +261,8 @@ func setup(t *testing.T, tc *testController, cd []runtime.Object, crds ...runtim
 	// set clients in clustermanager controller
 	tc.clusterManagerController.recorder = eventstesting.NewTestingEventRecorder(t)
 	tc.clusterManagerController.operatorKubeClient = fakeManagementKubeClient
-	tc.clusterManagerController.generateHubClusterClients = func(hubKubeConfig *rest.Config) (kubernetes.Interface, apiextensionsclient.Interface, migrationclient.StorageVersionMigrationsGetter, error) {
+	tc.clusterManagerController.generateHubClusterClients = func(hubKubeConfig *rest.Config) (
+		kubernetes.Interface, apiextensionsclient.Interface, migrationclient.StorageVersionMigrationsGetter, error) {
 		return fakeHubKubeClient, fakeAPIExtensionClient, fakeMigrationClient.MigrationV1alpha1(), nil
 	}
 	tc.clusterManagerController.ensureSAKubeconfigs = func(ctx context.Context,
@@ -308,10 +310,10 @@ func TestSyncDeploy(t *testing.T) {
 		t.Fatalf("Expected no error when sync, %v", err)
 	}
 
-	createKubeObjects := []runtime.Object{}
+	var createKubeObjects []runtime.Object
 	kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...) // record objects from both hub and management cluster
 	for _, action := range kubeActions {
-		if action.GetVerb() == "create" {
+		if action.GetVerb() == createVerb {
 			object := action.(clienttesting.CreateActionImpl).Object
 			createKubeObjects = append(createKubeObjects, object)
 		}
@@ -324,10 +326,10 @@ func TestSyncDeploy(t *testing.T) {
 		ensureObject(t, object, clusterManager)
 	}
 
-	createCRDObjects := []runtime.Object{}
+	var createCRDObjects []runtime.Object
 	crdActions := tc.apiExtensionClient.Actions()
 	for _, action := range crdActions {
-		if action.GetVerb() == "create" {
+		if action.GetVerb() == createVerb {
 			object := action.(clienttesting.CreateActionImpl).Object
 			createCRDObjects = append(createCRDObjects, object)
 		}
@@ -348,10 +350,10 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 		t.Fatalf("Expected no error when sync, %v", err)
 	}
 
-	createKubeObjects := []runtime.Object{}
+	var createKubeObjects []runtime.Object
 	kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...) // record objects from both hub and management cluster
 	for _, action := range kubeActions {
-		if action.GetVerb() == "create" {
+		if action.GetVerb() == createVerb {
 			object := action.(clienttesting.CreateActionImpl).Object
 			createKubeObjects = append(createKubeObjects, object)
 		}
@@ -364,10 +366,10 @@ func TestSyncDeployNoWebhook(t *testing.T) {
 		ensureObject(t, object, clusterManager)
 	}
 
-	createCRDObjects := []runtime.Object{}
+	var createCRDObjects []runtime.Object
 	crdActions := tc.apiExtensionClient.Actions()
 	for _, action := range crdActions {
-		if action.GetVerb() == "create" {
+		if action.GetVerb() == createVerb {
 			object := action.(clienttesting.CreateActionImpl).Object
 			createCRDObjects = append(createCRDObjects, object)
 		}
@@ -393,7 +395,7 @@ func TestSyncDelete(t *testing.T) {
 		t.Fatalf("Expected non error when sync, %v", err)
 	}
 
-	deleteKubeActions := []clienttesting.DeleteActionImpl{}
+	var deleteKubeActions []clienttesting.DeleteActionImpl
 	kubeActions := append(tc.hubKubeClient.Actions(), tc.managementKubeClient.Actions()...)
 	for _, action := range kubeActions {
 		if action.GetVerb() == "delete" {
@@ -403,7 +405,7 @@ func TestSyncDelete(t *testing.T) {
 	}
 	testingcommon.AssertEqualNumber(t, len(deleteKubeActions), 29) // delete namespace both from the hub cluster and the mangement cluster
 
-	deleteCRDActions := []clienttesting.DeleteActionImpl{}
+	var deleteCRDActions []clienttesting.DeleteActionImpl
 	crdActions := tc.apiExtensionClient.Actions()
 	for _, action := range crdActions {
 		if action.GetVerb() == "delete" {

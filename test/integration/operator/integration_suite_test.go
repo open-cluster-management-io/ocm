@@ -227,7 +227,7 @@ func ServiceAccountCtl(ctx context.Context, kubeClient kubernetes.Interface) {
 
 			sa, ok := event.Object.(*corev1.ServiceAccount)
 			if !ok {
-				klog.Infof("not a service account, contine")
+				klog.Infof("not a service account, continue")
 				continue
 			}
 

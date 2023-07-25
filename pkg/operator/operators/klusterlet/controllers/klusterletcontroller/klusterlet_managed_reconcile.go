@@ -22,7 +22,7 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/ocm/manifests"
-	patcher "open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
@@ -170,7 +170,7 @@ func (r *managedReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.
 
 // cleanUpAppliedManifestWorks removes finalizer from the AppliedManifestWorks whose name starts with
 // the hash of the given hub host.
-func (r *managedReconcile) cleanUpAppliedManifestWorks(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, config klusterletConfig) error {
+func (r *managedReconcile) cleanUpAppliedManifestWorks(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, _ klusterletConfig) error {
 	appliedManifestWorks, err := r.managedClusterClients.appliedManifestWorkClient.List(ctx, metav1.ListOptions{})
 	if errors.IsNotFound(err) {
 		return nil

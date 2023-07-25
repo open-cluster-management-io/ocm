@@ -14,7 +14,7 @@ type Options struct {
 	QPS       float32
 }
 
-// NewAgentOptions returns the flags with default value set
+// NewOptions returns the flags with default value set
 func NewOptions() *Options {
 	opts := &Options{
 		QPS:   50,

@@ -24,6 +24,11 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
+const (
+	testImage      = "testimage:latest"
+	infraNodeLabel = "node-role.kubernetes.io/infra"
+)
+
 func startHubOperator(ctx context.Context, mode operatorapiv1.InstallMode) {
 	certrotation.SigningCertValidity = time.Second * 30
 	certrotation.TargetCertValidity = time.Second * 10
@@ -236,6 +241,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
+			//#nosec G101
 			workWebhookSecret := "work-webhook-serving-cert"
 			gomega.Eventually(func() error {
 				s, err := kubeClient.CoreV1().Secrets(hubNamespace).Get(context.Background(), workWebhookSecret, metav1.GetOptions{})
@@ -605,7 +611,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 
 			clusterManager, err := operatorClient.OperatorV1().ClusterManagers().Get(context.Background(), clusterManagerName, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			clusterManager.Spec.RegistrationImagePullSpec = "testimage:latest"
+			clusterManager.Spec.RegistrationImagePullSpec = testImage
 			_, err = operatorClient.OperatorV1().ClusterManagers().Update(context.Background(), clusterManager, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -615,7 +621,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 					return err
 				}
 				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
-				if actual.Spec.Template.Spec.Containers[0].Image != "testimage:latest" {
+				if actual.Spec.Template.Spec.Containers[0].Image != testImage {
 					return fmt.Errorf("expected image to be testimage:latest but get %s", actual.Spec.Template.Spec.Containers[0].Image)
 				}
 				return nil
@@ -659,10 +665,10 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 					return err
 				}
 				clusterManager.Spec.NodePlacement = operatorapiv1.NodePlacement{
-					NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
+					NodeSelector: map[string]string{infraNodeLabel: ""},
 					Tolerations: []corev1.Toleration{
 						{
-							Key:      "node-role.kubernetes.io/infra",
+							Key:      infraNodeLabel,
 							Operator: corev1.TolerationOpExists,
 							Effect:   corev1.TaintEffectNoSchedule,
 						},
@@ -681,14 +687,14 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				if len(actual.Spec.Template.Spec.NodeSelector) == 0 {
 					return fmt.Errorf("length of node selector should not equals to 0")
 				}
-				if _, ok := actual.Spec.Template.Spec.NodeSelector["node-role.kubernetes.io/infra"]; !ok {
+				if _, ok := actual.Spec.Template.Spec.NodeSelector[infraNodeLabel]; !ok {
 					return fmt.Errorf("node-role.kubernetes.io/infra not exist")
 				}
 				if len(actual.Spec.Template.Spec.Tolerations) == 0 {
 					return fmt.Errorf("length of node selecor should not equals to 0")
 				}
 				for _, toleration := range actual.Spec.Template.Spec.Tolerations {
-					if toleration.Key == "node-role.kubernetes.io/infra" {
+					if toleration.Key == infraNodeLabel {
 						return nil
 					}
 				}
@@ -716,7 +722,7 @@ var _ = ginkgo.Describe("ClusterManager Default Mode", func() {
 				if err != nil {
 					return err
 				}
-				if registrationoDeployment.Spec.Template.Spec.Containers[0].Image != "testimage:latest" {
+				if registrationoDeployment.Spec.Template.Spec.Containers[0].Image != testImage {
 					return fmt.Errorf("image should be testimage:latest, but get %s", registrationoDeployment.Spec.Template.Spec.Containers[0].Image)
 				}
 				return nil

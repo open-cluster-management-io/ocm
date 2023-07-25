@@ -22,6 +22,7 @@ var _ = ginkgo.Describe("Cluster Auto Approval", func() {
 		var err error
 
 		managedClusterName := "autoapprovaltest-spokecluster"
+		//#nosec G101
 		hubKubeconfigSecret := "autoapprovaltest-hub-kubeconfig-secret"
 		hubKubeconfigDir := path.Join(util.TestDir, "autoapprovaltest", "hub-kubeconfig")
 

@@ -5,7 +5,7 @@ import (
 	"reflect"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/cache"
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 )

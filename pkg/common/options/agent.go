@@ -65,7 +65,7 @@ func (o *AgentOptions) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.AgentID, "agent-id", o.AgentID, "ID of the agent")
 }
 
-// spokeKubeConfig builds kubeconfig for the spoke/managed cluster
+// SpokeKubeConfig builds kubeconfig for the spoke/managed cluster
 func (o *AgentOptions) SpokeKubeConfig(managedRestConfig *rest.Config) (*rest.Config, error) {
 	if o.SpokeKubeconfigFile == "" {
 		managedRestConfig.QPS = o.CommoOpts.QPS

@@ -19,7 +19,7 @@ import (
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
-	patcher "open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
@@ -83,7 +83,7 @@ func (c *managedClusterAddOnHealthCheckController) sync(ctx context.Context, syn
 		return err
 	}
 
-	errs := []error{}
+	var errs []error
 	patcher := patcher.NewPatcher[
 		*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus](
 		c.addOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName),

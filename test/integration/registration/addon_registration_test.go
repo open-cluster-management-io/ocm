@@ -84,7 +84,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 				return false
 			}
 
-			if spokeCluster.Finalizers[0] != "cluster.open-cluster-management.io/api-resource-cleanup" {
+			if spokeCluster.Finalizers[0] != clusterCleanFinalizer {
 				return false
 			}
 
@@ -105,8 +105,8 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			if err != nil {
 				return false
 			}
-			accpeted := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
-			return accpeted != nil
+			accepted := meta.FindStatusCondition(spokeCluster.Status.Conditions, clusterv1.ManagedClusterConditionHubAccepted)
+			return accepted != nil
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
 		// the hub kubeconfig secret should be filled after the csr is approved
@@ -162,10 +162,10 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 				return false
 			}
 			_, ok := secret.Data[clientcert.KubeconfigFile]
-			if !ok && signerName == "kubernetes.io/kube-apiserver-client" {
+			if !ok && signerName == certificates.KubeAPIServerClientSignerName {
 				return false
 			}
-			if ok && signerName != "kubernetes.io/kube-apiserver-client" {
+			if ok && signerName != certificates.KubeAPIServerClientSignerName {
 				return false
 			}
 			return true
@@ -265,7 +265,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 
 	ginkgo.It("should register addon successfully", func() {
 		assertSuccessClusterBootstrap()
-		signerName := "kubernetes.io/kube-apiserver-client"
+		signerName := certificates.KubeAPIServerClientSignerName
 		assertSuccessAddOnBootstrap(signerName)
 
 		ginkgo.By("Delete the addon and check if secret is gone")
@@ -279,7 +279,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 	ginkgo.It("should register addon successfully even when the install namespace is not available at the beginning", func() {
 		assertSuccessClusterBootstrap()
 
-		signerName := "kubernetes.io/kube-apiserver-client"
+		signerName := certificates.KubeAPIServerClientSignerName
 		ginkgo.By("Create ManagedClusterAddOn cr with required annotations")
 
 		// create addon
@@ -344,7 +344,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 
 	ginkgo.It("should addon registraton config updated successfully", func() {
 		assertSuccessClusterBootstrap()
-		signerName := "kubernetes.io/kube-apiserver-client"
+		signerName := certificates.KubeAPIServerClientSignerName
 		assertSuccessAddOnBootstrap(signerName)
 
 		// update registration config and change the signer
@@ -368,7 +368,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 
 	ginkgo.It("should rotate addon client cert successfully", func() {
 		assertSuccessClusterBootstrap()
-		signerName := "kubernetes.io/kube-apiserver-client"
+		signerName := certificates.KubeAPIServerClientSignerName
 		assertSuccessAddOnBootstrap(signerName)
 
 		secretName := getSecretName(addOnName, signerName)
@@ -388,7 +388,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 
 	ginkgo.It("should stop addon client cert update if too frequent", func() {
 		assertSuccessClusterBootstrap()
-		signerName := "kubernetes.io/kube-apiserver-client"
+		signerName := certificates.KubeAPIServerClientSignerName
 		assertSuccessAddOnBootstrap(signerName)
 
 		// update subject for 15 times
@@ -435,7 +435,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 })
 
 func getSecretName(addOnName, signerName string) string {
-	if signerName == "kubernetes.io/kube-apiserver-client" {
+	if signerName == certificates.KubeAPIServerClientSignerName {
 		return fmt.Sprintf("%s-hub-kubeconfig", addOnName)
 	}
 	return fmt.Sprintf("%s-%s-client-cert", addOnName, strings.ReplaceAll(signerName, "/", "-"))

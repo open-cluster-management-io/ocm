@@ -39,7 +39,7 @@ func TestSyncDelete(t *testing.T) {
 	var deleteActions []clienttesting.DeleteActionImpl
 	kubeActions := controller.kubeClient.Actions()
 	for _, action := range kubeActions {
-		if action.GetVerb() == "delete" {
+		if action.GetVerb() == deleteVerb {
 			deleteAction := action.(clienttesting.DeleteActionImpl)
 			klog.Infof("kube delete name: %v\t resource:%v \t namespace:%v", deleteAction.Name, deleteAction.GetResource(), deleteAction.GetNamespace())
 			deleteActions = append(deleteActions, deleteAction)
@@ -97,7 +97,7 @@ func TestSyncDeleteHosted(t *testing.T) {
 	var deleteActionsManagement []clienttesting.DeleteActionImpl
 	kubeActions := controller.kubeClient.Actions()
 	for _, action := range kubeActions {
-		if action.GetVerb() == "delete" {
+		if action.GetVerb() == deleteVerb {
 			deleteAction := action.(clienttesting.DeleteActionImpl)
 			klog.Infof("management kube delete name: %v\t resource:%v \t namespace:%v", deleteAction.Name, deleteAction.GetResource(), deleteAction.GetNamespace())
 			deleteActionsManagement = append(deleteActionsManagement, deleteAction)
@@ -112,7 +112,7 @@ func TestSyncDeleteHosted(t *testing.T) {
 
 	var deleteActionsManaged []clienttesting.DeleteActionImpl
 	for _, action := range controller.managedKubeClient.Actions() {
-		if action.GetVerb() == "delete" {
+		if action.GetVerb() == deleteVerb {
 			deleteAction := action.(clienttesting.DeleteActionImpl)
 			klog.Infof("managed kube delete name: %v\t resource:%v \t namespace:%v", deleteAction.Name, deleteAction.GetResource(), deleteAction.GetNamespace())
 			deleteActionsManaged = append(deleteActionsManaged, deleteAction)
@@ -177,7 +177,7 @@ func TestSyncDeleteHostedDeleteWaitKubeconfig(t *testing.T) {
 
 	// assert no delete action on the management cluster,should wait for the kubeconfig
 	for _, action := range controller.kubeClient.Actions() {
-		if action.GetVerb() == "delete" {
+		if action.GetVerb() == deleteVerb {
 			t.Errorf("Expected not delete the resources, should wait for the kubeconfig, but got delete actions")
 		}
 	}

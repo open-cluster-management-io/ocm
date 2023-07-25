@@ -29,7 +29,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 )
 
-// HasValidClientCertificate checks if there exists a valid client certificate in the given secret
+// HasValidHubKubeconfig checks if there exists a valid client certificate in the given secret
 // Returns true if all the conditions below are met:
 //  1. KubeconfigFile exists when hasKubeconfig is true
 //  2. TLSKeyFile exists
@@ -177,7 +177,7 @@ type CSRControl interface {
 	isApproved(name string) (bool, error)
 	getIssuedCertificate(name string) ([]byte, error)
 
-	// public so we can add indexer outside
+	// Informer is public so we can add indexer outside
 	Informer() cache.SharedIndexInformer
 }
 

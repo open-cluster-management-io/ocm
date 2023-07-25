@@ -13,7 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/version"
-	discovery "k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery"
 	kubeinformers "k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
@@ -90,7 +90,8 @@ func TestHealthCheck(t *testing.T) {
 			validateActions: func(t *testing.T, clusterClient *clusterfake.Clientset) {
 				testingcommon.AssertNoActions(t, clusterClient.Actions())
 			},
-			expectedErr: "unable to get managed cluster \"testmanagedcluster\" from hub: managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
+			expectedErr: "unable to get managed cluster \"testmanagedcluster\" from hub: " +
+				"managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
 		},
 		{
 			name:        "kube-apiserver is not health",

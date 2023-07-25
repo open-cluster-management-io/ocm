@@ -9,6 +9,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	certificatesv1 "k8s.io/api/certificates/v1"
+	certificates "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -245,7 +246,7 @@ var _ = ginkgo.Describe("Loopback registration [development]", func() {
 		created.Status = addonv1alpha1.ManagedClusterAddOnStatus{
 			Registrations: []addonv1alpha1.RegistrationConfig{
 				{
-					SignerName: "kubernetes.io/kube-apiserver-client",
+					SignerName: certificates.KubeAPIServerClientSignerName,
 				},
 			},
 		}

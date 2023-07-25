@@ -413,7 +413,9 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 					return fmt.Errorf("status feedback values are not correct, we got %v", work.Status.ResourceStatus.Manifests[1].StatusFeedbacks.Values)
 				}
 
-				if !util.HaveManifestCondition(work.Status.ResourceStatus.Manifests, "StatusFeedbackSynced", []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionFalse}) {
+				if !util.HaveManifestCondition(
+					work.Status.ResourceStatus.Manifests, "StatusFeedbackSynced",
+					[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionFalse}) {
 					return fmt.Errorf("status sync condition should be True")
 				}
 

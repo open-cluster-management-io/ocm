@@ -23,6 +23,12 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
+const (
+	denyNS      = "test-deny"
+	allowNS     = "test-allow"
+	clusterName = "cluster1"
+)
+
 func newExecutorCacheValidator(t *testing.T, ctx context.Context, clusterName string,
 	kubeClient kubernetes.Interface, manifestWorkObjects ...runtime.Object) *sarCacheValidator {
 
@@ -84,7 +90,7 @@ func TestValidate(t *testing.T) {
 					},
 				},
 			},
-			namespace: "test-deny",
+			namespace: denyNS,
 			name:      "test",
 			expect:    fmt.Errorf("not allowed to apply the resource  secrets, test-deny test, will try again in 1m0s"),
 		},
@@ -98,7 +104,7 @@ func TestValidate(t *testing.T) {
 					},
 				},
 			},
-			namespace: "test-allow",
+			namespace: allowNS,
 			name:      "test",
 			expect:    nil,
 		},
@@ -110,7 +116,7 @@ func TestValidate(t *testing.T) {
 		func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 			obj := action.(clienttesting.CreateActionImpl).Object.(*v1.SubjectAccessReview)
 
-			if obj.Spec.ResourceAttributes.Namespace == "test-allow" {
+			if obj.Spec.ResourceAttributes.Namespace == allowNS {
 				return true, &v1.SubjectAccessReview{
 					Status: v1.SubjectAccessReviewStatus{
 						Allowed: true,
@@ -118,7 +124,7 @@ func TestValidate(t *testing.T) {
 				}, nil
 			}
 
-			if obj.Spec.ResourceAttributes.Namespace == "test-deny" {
+			if obj.Spec.ResourceAttributes.Namespace == denyNS {
 				return true, &v1.SubjectAccessReview{
 					Status: v1.SubjectAccessReviewStatus{
 						Denied: true,
@@ -129,7 +135,6 @@ func TestValidate(t *testing.T) {
 		},
 	)
 
-	clusterName := "cluster1"
 	ctx := context.TODO()
 	cacheValidator := newExecutorCacheValidator(t, ctx, clusterName, kubeClient)
 	for testName, test := range tests {
@@ -165,13 +170,13 @@ func TestCacheWorks(t *testing.T) {
 	}{
 		"forbidden": {
 			executor:  executor,
-			namespace: "test-deny",
+			namespace: denyNS,
 			name:      "test",
 			expect:    fmt.Errorf("not allowed to apply the resource  secrets, test-deny test, will try again in 1m0s"),
 		},
 		"allow": {
 			executor:  executor,
-			namespace: "test-allow",
+			namespace: allowNS,
 			name:      "test",
 			expect:    nil,
 		},
@@ -183,7 +188,7 @@ func TestCacheWorks(t *testing.T) {
 		func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 			obj := action.(clienttesting.CreateActionImpl).Object.(*v1.SubjectAccessReview)
 
-			if obj.Spec.ResourceAttributes.Namespace == "test-allow" {
+			if obj.Spec.ResourceAttributes.Namespace == allowNS {
 				return true, &v1.SubjectAccessReview{
 					Status: v1.SubjectAccessReviewStatus{
 						Allowed: true,
@@ -191,7 +196,7 @@ func TestCacheWorks(t *testing.T) {
 				}, nil
 			}
 
-			if obj.Spec.ResourceAttributes.Namespace == "test-deny" {
+			if obj.Spec.ResourceAttributes.Namespace == denyNS {
 				return true, &v1.SubjectAccessReview{
 					Status: v1.SubjectAccessReviewStatus{
 						Denied: true,
@@ -202,12 +207,11 @@ func TestCacheWorks(t *testing.T) {
 		},
 	)
 
-	clusterName := "cluster1"
 	ctx := context.TODO()
 
 	work, _ := spoketesting.NewManifestWork(0,
-		spoketesting.NewUnstructured("v1", "Secret", "test-allow", "test"),
-		spoketesting.NewUnstructured("v1", "Secret", "test-deny", "test"),
+		spoketesting.NewUnstructured("v1", "Secret", allowNS, "test"),
+		spoketesting.NewUnstructured("v1", "Secret", denyNS, "test"),
 	)
 	work.Spec.Executor = executor
 

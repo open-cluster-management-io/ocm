@@ -156,14 +156,14 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration",
 		registrationFeatureGates, ocmfeature.DefaultHubRegistrationFeatureGates)
 
-	workFeatureGates := []operatorapiv1.FeatureGate{}
+	var workFeatureGates []operatorapiv1.FeatureGate
 	if clusterManager.Spec.WorkConfiguration != nil {
 		workFeatureGates = clusterManager.Spec.WorkConfiguration.FeatureGates
 	}
 	config.WorkFeatureGates, workFeatureMsgs = helpers.ConvertToFeatureGateFlags("Work", workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates)
 	config.MWReplicaSetEnabled = helpers.FeatureGateEnabled(workFeatureGates, ocmfeature.DefaultHubWorkFeatureGates, ocmfeature.ManifestWorkReplicaSet)
 
-	addonFeatureGates := []operatorapiv1.FeatureGate{}
+	var addonFeatureGates []operatorapiv1.FeatureGate
 	if clusterManager.Spec.AddOnManagerConfiguration != nil {
 		addonFeatureGates = clusterManager.Spec.AddOnManagerConfiguration.FeatureGates
 	}

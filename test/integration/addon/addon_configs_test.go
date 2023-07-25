@@ -60,7 +60,8 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 			},
 			Spec: addOnDefaultConfigSpec,
 		}
-		_, err = hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(configDefaultNamespace).Create(context.Background(), addOnDefaultConfig, metav1.CreateOptions{})
+		_, err = hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(configDefaultNamespace).Create(
+			context.Background(), addOnDefaultConfig, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 

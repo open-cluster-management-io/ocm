@@ -76,7 +76,7 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return err
 	}
 
-	errs := []error{}
+	var errs []error
 	// Clean up managedcluser cluserroles if there are no managed clusters
 	if len(managedClusters) == 0 {
 		results := resourceapply.DeleteAll(

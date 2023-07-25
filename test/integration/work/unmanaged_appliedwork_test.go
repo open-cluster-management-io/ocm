@@ -54,7 +54,7 @@ var _ = ginkgo.Describe("Unmanaged ApplieManifestWork", func() {
 		go startWorkAgent(ctx, o, commOptions)
 
 		manifests = []workapiv1.Manifest{
-			util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, "cm1", map[string]string{"a": "b"}, nil)),
+			util.ToManifest(util.NewConfigmap(commOptions.SpokeClusterName, cm1, map[string]string{"a": "b"}, nil)),
 		}
 
 		work = util.NewManifestWork(commOptions.SpokeClusterName, "unmanaged-appliedwork", manifests)
@@ -113,7 +113,8 @@ var _ = ginkgo.Describe("Unmanaged ApplieManifestWork", func() {
 			err := newHub.Stop()
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			if newHubTempDir != "" {
-				os.RemoveAll(newHubTempDir)
+				err := os.RemoveAll(newHubTempDir)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			}
 		})
 
@@ -153,7 +154,7 @@ var _ = ginkgo.Describe("Unmanaged ApplieManifestWork", func() {
 
 			// ensure the resource has two ownerrefs
 			gomega.Eventually(func() error {
-				cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.TODO(), "cm1", metav1.GetOptions{})
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.TODO(), cm1, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -212,7 +213,7 @@ var _ = ginkgo.Describe("Unmanaged ApplieManifestWork", func() {
 
 			// ensure the resource has only one ownerref
 			gomega.Eventually(func() error {
-				cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.TODO(), "cm1", metav1.GetOptions{})
+				cm, err := spokeKubeClient.CoreV1().ConfigMaps(commOptions.SpokeClusterName).Get(context.TODO(), cm1, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}

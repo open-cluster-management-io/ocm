@@ -82,27 +82,31 @@ func TestHasValidHubKubeconfig(t *testing.T) {
 		},
 		{
 			name: "no cert",
-			secret: testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "", &testinghelpers.TestCert{Key: []byte("key")}, map[string][]byte{
-				KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
-			}),
+			secret: testinghelpers.NewHubKubeconfigSecret(
+				testNamespace, testSecretName, "", &testinghelpers.TestCert{Key: []byte("key")}, map[string][]byte{
+					KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
+				}),
 		},
 		{
 			name: "bad cert",
-			secret: testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "", &testinghelpers.TestCert{Key: []byte("key"), Cert: []byte("bad cert")}, map[string][]byte{
-				KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
-			}),
+			secret: testinghelpers.NewHubKubeconfigSecret(
+				testNamespace, testSecretName, "", &testinghelpers.TestCert{Key: []byte("key"), Cert: []byte("bad cert")}, map[string][]byte{
+					KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
+				}),
 		},
 		{
 			name: "expired cert",
-			secret: testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "", testinghelpers.NewTestCert("test", -60*time.Second), map[string][]byte{
-				KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
-			}),
+			secret: testinghelpers.NewHubKubeconfigSecret(
+				testNamespace, testSecretName, "", testinghelpers.NewTestCert("test", -60*time.Second), map[string][]byte{
+					KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
+				}),
 		},
 		{
 			name: "invalid common name",
-			secret: testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "", testinghelpers.NewTestCert("test", 60*time.Second), map[string][]byte{
-				KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
-			}),
+			secret: testinghelpers.NewHubKubeconfigSecret(
+				testNamespace, testSecretName, "", testinghelpers.NewTestCert("test", 60*time.Second), map[string][]byte{
+					KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
+				}),
 			subject: &pkix.Name{
 				CommonName: "wrong-common-name",
 			},
@@ -204,8 +208,10 @@ func TestGetCertValidityPeriod(t *testing.T) {
 			expectedErr: "no client certificate found in secret \"testns/testsecret\"",
 		},
 		{
-			name:        "bad cert",
-			secret:      testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "", &testinghelpers.TestCert{Cert: []byte("bad cert")}, map[string][]byte{}),
+			name: "bad cert",
+			secret: testinghelpers.NewHubKubeconfigSecret(
+				testNamespace, testSecretName, "",
+				&testinghelpers.TestCert{Cert: []byte("bad cert")}, map[string][]byte{}),
 			expectedErr: "unable to parse TLS certificates: data does not contain any valid RSA or ECDSA certificates",
 		},
 		{

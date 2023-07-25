@@ -15,12 +15,12 @@ import (
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 )
 
-type placementBuilder struct {
+type PlacementBuilder struct {
 	placement *clusterapiv1beta1.Placement
 }
 
-func NewPlacement(namespace, name string) *placementBuilder {
-	return &placementBuilder{
+func NewPlacement(namespace, name string) *PlacementBuilder {
+	return &PlacementBuilder{
 		placement: &clusterapiv1beta1.Placement{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
@@ -30,8 +30,8 @@ func NewPlacement(namespace, name string) *placementBuilder {
 	}
 }
 
-func NewPlacementWithAnnotations(namespace, name string, annotations map[string]string) *placementBuilder {
-	return &placementBuilder{
+func NewPlacementWithAnnotations(namespace, name string, annotations map[string]string) *PlacementBuilder {
+	return &PlacementBuilder{
 		placement: &clusterapiv1beta1.Placement{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:   namespace,
@@ -42,29 +42,29 @@ func NewPlacementWithAnnotations(namespace, name string, annotations map[string]
 	}
 }
 
-func (b *placementBuilder) WithUID(uid string) *placementBuilder {
+func (b *PlacementBuilder) WithUID(uid string) *PlacementBuilder {
 	b.placement.UID = types.UID(uid)
 	return b
 }
 
-func (b *placementBuilder) WithNOC(noc int32) *placementBuilder {
+func (b *PlacementBuilder) WithNOC(noc int32) *PlacementBuilder {
 	b.placement.Spec.NumberOfClusters = &noc
 	return b
 }
 
-func (b *placementBuilder) WithGroupStrategy(groupStrategy clusterapiv1beta1.GroupStrategy) *placementBuilder {
+func (b *PlacementBuilder) WithGroupStrategy(groupStrategy clusterapiv1beta1.GroupStrategy) *PlacementBuilder {
 	b.placement.Spec.DecisionStrategy.GroupStrategy = groupStrategy
 	return b
 }
 
-func (b *placementBuilder) WithPrioritizerPolicy(mode clusterapiv1beta1.PrioritizerPolicyModeType) *placementBuilder {
+func (b *PlacementBuilder) WithPrioritizerPolicy(mode clusterapiv1beta1.PrioritizerPolicyModeType) *PlacementBuilder {
 	b.placement.Spec.PrioritizerPolicy = clusterapiv1beta1.PrioritizerPolicy{
 		Mode: mode,
 	}
 	return b
 }
 
-func (b *placementBuilder) WithPrioritizerConfig(name string, weight int32) *placementBuilder {
+func (b *PlacementBuilder) WithPrioritizerConfig(name string, weight int32) *PlacementBuilder {
 	if b.placement.Spec.PrioritizerPolicy.Configurations == nil {
 		b.placement.Spec.PrioritizerPolicy.Configurations = []clusterapiv1beta1.PrioritizerConfig{}
 	}
@@ -80,7 +80,7 @@ func (b *placementBuilder) WithPrioritizerConfig(name string, weight int32) *pla
 	return b
 }
 
-func (b *placementBuilder) WithScoreCoordinateAddOn(resourceName, scoreName string, weight int32) *placementBuilder {
+func (b *PlacementBuilder) WithScoreCoordinateAddOn(resourceName, scoreName string, weight int32) *PlacementBuilder {
 	if b.placement.Spec.PrioritizerPolicy.Configurations == nil {
 		b.placement.Spec.PrioritizerPolicy.Configurations = []clusterapiv1beta1.PrioritizerConfig{}
 	}
@@ -96,18 +96,18 @@ func (b *placementBuilder) WithScoreCoordinateAddOn(resourceName, scoreName stri
 	return b
 }
 
-func (b *placementBuilder) WithClusterSets(clusterSets ...string) *placementBuilder {
+func (b *PlacementBuilder) WithClusterSets(clusterSets ...string) *PlacementBuilder {
 	b.placement.Spec.ClusterSets = clusterSets
 	return b
 }
 
-func (b *placementBuilder) WithDeletionTimestamp() *placementBuilder {
+func (b *PlacementBuilder) WithDeletionTimestamp() *PlacementBuilder {
 	now := metav1.Now()
 	b.placement.DeletionTimestamp = &now
 	return b
 }
 
-func (b *placementBuilder) AddPredicate(labelSelector *metav1.LabelSelector, claimSelector *clusterapiv1beta1.ClusterClaimSelector) *placementBuilder {
+func (b *PlacementBuilder) AddPredicate(labelSelector *metav1.LabelSelector, claimSelector *clusterapiv1beta1.ClusterClaimSelector) *PlacementBuilder {
 	if b.placement.Spec.Predicates == nil {
 		b.placement.Spec.Predicates = []clusterapiv1beta1.ClusterPredicate{}
 	}
@@ -115,7 +115,7 @@ func (b *placementBuilder) AddPredicate(labelSelector *metav1.LabelSelector, cla
 	return b
 }
 
-func (b *placementBuilder) AddToleration(toleration *clusterapiv1beta1.Toleration) *placementBuilder {
+func (b *PlacementBuilder) AddToleration(toleration *clusterapiv1beta1.Toleration) *PlacementBuilder {
 	if b.placement.Spec.Tolerations == nil {
 		b.placement.Spec.Tolerations = []clusterapiv1beta1.Toleration{}
 	}
@@ -123,7 +123,7 @@ func (b *placementBuilder) AddToleration(toleration *clusterapiv1beta1.Toleratio
 	return b
 }
 
-func (b *placementBuilder) WithNumOfSelectedClusters(nosc int, placementName string) *placementBuilder {
+func (b *PlacementBuilder) WithNumOfSelectedClusters(nosc int, placementName string) *PlacementBuilder {
 	b.placement.Status.NumberOfSelectedClusters = int32(nosc)
 	b.placement.Status.DecisionGroups = []clusterapiv1beta1.DecisionGroupStatus{
 		{
@@ -136,7 +136,7 @@ func (b *placementBuilder) WithNumOfSelectedClusters(nosc int, placementName str
 	return b
 }
 
-func (b *placementBuilder) WithSatisfiedCondition(numbOfScheduledDecisions, numbOfUnscheduledDecisions int) *placementBuilder {
+func (b *PlacementBuilder) WithSatisfiedCondition(numbOfScheduledDecisions, numbOfUnscheduledDecisions int) *PlacementBuilder {
 	condition := metav1.Condition{
 		Type: clusterapiv1beta1.PlacementConditionSatisfied,
 	}
@@ -154,7 +154,7 @@ func (b *placementBuilder) WithSatisfiedCondition(numbOfScheduledDecisions, numb
 	return b
 }
 
-func (b *placementBuilder) WithMisconfiguredCondition(status metav1.ConditionStatus) *placementBuilder {
+func (b *PlacementBuilder) WithMisconfiguredCondition(status metav1.ConditionStatus) *PlacementBuilder {
 	condition := metav1.Condition{
 		Type:    clusterapiv1beta1.PlacementConditionMisconfigured,
 		Status:  status,
@@ -165,7 +165,7 @@ func (b *placementBuilder) WithMisconfiguredCondition(status metav1.ConditionSta
 	return b
 }
 
-func (b *placementBuilder) Build() *clusterapiv1beta1.Placement {
+func (b *PlacementBuilder) Build() *clusterapiv1beta1.Placement {
 	return b.placement
 }
 
@@ -185,12 +185,12 @@ func NewClusterPredicate(labelSelector *metav1.LabelSelector, claimSelector *clu
 	return predicate
 }
 
-type placementDecisionBuilder struct {
+type PlacementDecisionBuilder struct {
 	placementDecision *clusterapiv1beta1.PlacementDecision
 }
 
-func NewPlacementDecision(namespace, name string) *placementDecisionBuilder {
-	return &placementDecisionBuilder{
+func NewPlacementDecision(namespace, name string) *PlacementDecisionBuilder {
+	return &PlacementDecisionBuilder{
 		placementDecision: &clusterapiv1beta1.PlacementDecision{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
@@ -200,7 +200,7 @@ func NewPlacementDecision(namespace, name string) *placementDecisionBuilder {
 	}
 }
 
-func (b *placementDecisionBuilder) WithController(uid string) *placementDecisionBuilder {
+func (b *PlacementDecisionBuilder) WithController(uid string) *PlacementDecisionBuilder {
 	controller := true
 	b.placementDecision.OwnerReferences = append(b.placementDecision.OwnerReferences, metav1.OwnerReference{
 		Controller: &controller,
@@ -209,7 +209,7 @@ func (b *placementDecisionBuilder) WithController(uid string) *placementDecision
 	return b
 }
 
-func (b *placementDecisionBuilder) WithLabel(name, value string) *placementDecisionBuilder {
+func (b *PlacementDecisionBuilder) WithLabel(name, value string) *PlacementDecisionBuilder {
 	if b.placementDecision.Labels == nil {
 		b.placementDecision.Labels = map[string]string{}
 	}
@@ -217,14 +217,14 @@ func (b *placementDecisionBuilder) WithLabel(name, value string) *placementDecis
 	return b
 }
 
-func (b *placementDecisionBuilder) WithDeletionTimestamp() *placementDecisionBuilder {
+func (b *PlacementDecisionBuilder) WithDeletionTimestamp() *PlacementDecisionBuilder {
 	now := metav1.Now()
 	b.placementDecision.DeletionTimestamp = &now
 	return b
 }
 
-func (b *placementDecisionBuilder) WithDecisions(clusterNames ...string) *placementDecisionBuilder {
-	decisions := []clusterapiv1beta1.ClusterDecision{}
+func (b *PlacementDecisionBuilder) WithDecisions(clusterNames ...string) *PlacementDecisionBuilder {
+	var decisions []clusterapiv1beta1.ClusterDecision
 	for _, clusterName := range clusterNames {
 		decisions = append(decisions, clusterapiv1beta1.ClusterDecision{
 			ClusterName: clusterName,
@@ -234,16 +234,16 @@ func (b *placementDecisionBuilder) WithDecisions(clusterNames ...string) *placem
 	return b
 }
 
-func (b *placementDecisionBuilder) Build() *clusterapiv1beta1.PlacementDecision {
+func (b *PlacementDecisionBuilder) Build() *clusterapiv1beta1.PlacementDecision {
 	return b.placementDecision
 }
 
-type managedClusterBuilder struct {
+type ManagedClusterBuilder struct {
 	cluster *clusterapiv1.ManagedCluster
 }
 
-func NewManagedCluster(clusterName string) *managedClusterBuilder {
-	return &managedClusterBuilder{
+func NewManagedCluster(clusterName string) *ManagedClusterBuilder {
+	return &ManagedClusterBuilder{
 		cluster: &clusterapiv1.ManagedCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: clusterName,
@@ -252,7 +252,7 @@ func NewManagedCluster(clusterName string) *managedClusterBuilder {
 	}
 }
 
-func (b *managedClusterBuilder) WithLabel(name, value string) *managedClusterBuilder {
+func (b *ManagedClusterBuilder) WithLabel(name, value string) *ManagedClusterBuilder {
 	if b.cluster.Labels == nil {
 		b.cluster.Labels = map[string]string{}
 	}
@@ -260,14 +260,14 @@ func (b *managedClusterBuilder) WithLabel(name, value string) *managedClusterBui
 	return b
 }
 
-func (b *managedClusterBuilder) WithClaim(name, value string) *managedClusterBuilder {
+func (b *ManagedClusterBuilder) WithClaim(name, value string) *ManagedClusterBuilder {
 	claimMap := map[string]string{}
 	for _, claim := range b.cluster.Status.ClusterClaims {
 		claimMap[claim.Name] = claim.Value
 	}
 	claimMap[name] = value
 
-	clusterClaims := []clusterapiv1.ManagedClusterClaim{}
+	var clusterClaims []clusterapiv1.ManagedClusterClaim
 	for k, v := range claimMap {
 		clusterClaims = append(clusterClaims, clusterapiv1.ManagedClusterClaim{
 			Name:  k,
@@ -279,7 +279,7 @@ func (b *managedClusterBuilder) WithClaim(name, value string) *managedClusterBui
 	return b
 }
 
-func (b *managedClusterBuilder) WithResource(resourceName clusterapiv1.ResourceName, allocatable, capacity string) *managedClusterBuilder {
+func (b *ManagedClusterBuilder) WithResource(resourceName clusterapiv1.ResourceName, allocatable, capacity string) *ManagedClusterBuilder {
 	if b.cluster.Status.Allocatable == nil {
 		b.cluster.Status.Allocatable = make(map[clusterapiv1.ResourceName]resource.Quantity)
 	}
@@ -292,7 +292,7 @@ func (b *managedClusterBuilder) WithResource(resourceName clusterapiv1.ResourceN
 	return b
 }
 
-func (b *managedClusterBuilder) WithTaint(taint *clusterapiv1.Taint) *managedClusterBuilder {
+func (b *ManagedClusterBuilder) WithTaint(taint *clusterapiv1.Taint) *ManagedClusterBuilder {
 	if b.cluster.Spec.Taints == nil {
 		b.cluster.Spec.Taints = []clusterapiv1.Taint{}
 	}
@@ -300,16 +300,16 @@ func (b *managedClusterBuilder) WithTaint(taint *clusterapiv1.Taint) *managedClu
 	return b
 }
 
-func (b *managedClusterBuilder) Build() *clusterapiv1.ManagedCluster {
+func (b *ManagedClusterBuilder) Build() *clusterapiv1.ManagedCluster {
 	return b.cluster
 }
 
-type managedClusterSetBuilder struct {
+type ManagedClusterSetBuilder struct {
 	clusterset *clusterapiv1beta2.ManagedClusterSet
 }
 
-func NewClusterSet(clusterSetName string) *managedClusterSetBuilder {
-	return &managedClusterSetBuilder{
+func NewClusterSet(clusterSetName string) *ManagedClusterSetBuilder {
+	return &ManagedClusterSetBuilder{
 		clusterset: &clusterapiv1beta2.ManagedClusterSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: clusterSetName,
@@ -318,12 +318,12 @@ func NewClusterSet(clusterSetName string) *managedClusterSetBuilder {
 	}
 }
 
-func (b *managedClusterSetBuilder) WithClusterSelector(clusterSelector clusterapiv1beta2.ManagedClusterSelector) *managedClusterSetBuilder {
+func (b *ManagedClusterSetBuilder) WithClusterSelector(clusterSelector clusterapiv1beta2.ManagedClusterSelector) *ManagedClusterSetBuilder {
 	b.clusterset.Spec.ClusterSelector = clusterSelector
 	return b
 }
 
-func (b *managedClusterSetBuilder) Build() *clusterapiv1beta2.ManagedClusterSet {
+func (b *ManagedClusterSetBuilder) Build() *clusterapiv1beta2.ManagedClusterSet {
 	return b.clusterset
 }
 
@@ -339,12 +339,12 @@ func NewClusterSetBinding(namespace, clusterSetName string) *clusterapiv1beta2.M
 	}
 }
 
-type addOnPlacementScoreBuilder struct {
+type AddOnPlacementScoreBuilder struct {
 	addOnPlacementScore *clusterapiv1alpha1.AddOnPlacementScore
 }
 
-func NewAddOnPlacementScore(clusternamespace, name string) *addOnPlacementScoreBuilder {
-	return &addOnPlacementScoreBuilder{
+func NewAddOnPlacementScore(clusternamespace, name string) *AddOnPlacementScoreBuilder {
+	return &AddOnPlacementScoreBuilder{
 		addOnPlacementScore: &clusterapiv1alpha1.AddOnPlacementScore{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: clusternamespace,
@@ -354,7 +354,7 @@ func NewAddOnPlacementScore(clusternamespace, name string) *addOnPlacementScoreB
 	}
 }
 
-func (a *addOnPlacementScoreBuilder) WithScore(name string, score int32) *addOnPlacementScoreBuilder {
+func (a *AddOnPlacementScoreBuilder) WithScore(name string, score int32) *AddOnPlacementScoreBuilder {
 	if a.addOnPlacementScore.Status.Scores == nil {
 		a.addOnPlacementScore.Status.Scores = []clusterapiv1alpha1.AddOnPlacementScoreItem{}
 	}
@@ -366,12 +366,12 @@ func (a *addOnPlacementScoreBuilder) WithScore(name string, score int32) *addOnP
 	return a
 }
 
-func (a *addOnPlacementScoreBuilder) WithValidUntil(validUntil time.Time) *addOnPlacementScoreBuilder {
+func (a *AddOnPlacementScoreBuilder) WithValidUntil(validUntil time.Time) *AddOnPlacementScoreBuilder {
 	vu := metav1.NewTime(validUntil)
 	a.addOnPlacementScore.Status.ValidUntil = &vu
 	return a
 }
 
-func (a *addOnPlacementScoreBuilder) Build() *clusterapiv1alpha1.AddOnPlacementScore {
+func (a *AddOnPlacementScoreBuilder) Build() *clusterapiv1alpha1.AddOnPlacementScore {
 	return a.addOnPlacementScore
 }
