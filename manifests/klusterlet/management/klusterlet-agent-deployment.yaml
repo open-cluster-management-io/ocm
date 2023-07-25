@@ -75,6 +75,9 @@ spec:
           {{if gt .ClientCertExpirationSeconds 0}}
           - "--client-cert-expiration-seconds={{ .ClientCertExpirationSeconds }}"
           {{end}}
+          {{if .ClusterAnnotationsString}}
+          - "--cluster-annotations={{ .ClusterAnnotationsString }}"
+          {{end}}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

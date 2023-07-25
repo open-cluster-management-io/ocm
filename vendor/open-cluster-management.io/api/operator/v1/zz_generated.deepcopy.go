@@ -434,6 +434,13 @@ func (in *RegistrationConfiguration) DeepCopyInto(out *RegistrationConfiguration
 		*out = make([]FeatureGate, len(*in))
 		copy(*out, *in)
 	}
+	if in.ClusterAnnotations != nil {
+		in, out := &in.ClusterAnnotations, &out.ClusterAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 

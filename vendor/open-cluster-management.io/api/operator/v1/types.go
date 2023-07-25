@@ -107,7 +107,17 @@ type RegistrationConfiguration struct {
 	//  	he can set featuregate/Foo=false before upgrading. Let's say the cluster-admin wants featuregate/Foo=false.
 	// +optional
 	FeatureGates []FeatureGate `json:"featureGates,omitempty"`
+
+	// ClusterAnnotations is annotations with the reserve prefix "agent.open-cluster-management.io" set on
+	// ManagedCluster when creating only, other actors can update it afterwards.
+	// +optional
+	ClusterAnnotations map[string]string `json:"clusterAnnotations,omitempty"`
 }
+
+const (
+	// ClusterAnnotationsKeyPrefix is the prefix of annotations set on ManagedCluster when creating only.
+	ClusterAnnotationsKeyPrefix = "agent.open-cluster-management.io"
+)
 
 type WorkConfiguration struct {
 	// FeatureGates represents the list of feature gates for work

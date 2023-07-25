@@ -18,6 +18,7 @@ type SpokeAgentOptions struct {
 	ClusterHealthCheckPeriod    time.Duration
 	MaxCustomClusterClaims      int
 	ClientCertExpirationSeconds int32
+	ClusterAnnotations          map[string]string
 }
 
 func NewSpokeAgentOptions() *SpokeAgentOptions {
@@ -43,6 +44,8 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&o.ClientCertExpirationSeconds, "client-cert-expiration-seconds", o.ClientCertExpirationSeconds,
 		"The requested duration in seconds of validity of the issued client certificate. If this is not set, "+
 			"the value of --cluster-signing-duration command-line flag of the kube-controller-manager will be used.")
+	fs.StringToStringVar(&o.ClusterAnnotations, "cluster-annotations", o.ClusterAnnotations, `the annotations with the reserve
+	 prefix "agent.open-cluster-management.io" set on ManagedCluster when creating only, other actors can update it afterwards.`)
 }
 
 // Validate verifies the inputs.

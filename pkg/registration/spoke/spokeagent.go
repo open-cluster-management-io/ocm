@@ -173,7 +173,7 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 
 	// start a SpokeClusterCreatingController to make sure there is a spoke cluster on hub cluster
 	spokeClusterCreatingController := registration.NewManagedClusterCreatingController(
-		o.agentOptions.SpokeClusterName, o.registrationOption.SpokeExternalServerURLs,
+		o.agentOptions.SpokeClusterName, o.registrationOption.SpokeExternalServerURLs, o.registrationOption.ClusterAnnotations,
 		spokeClusterCABundle,
 		bootstrapClusterClient,
 		recorder,

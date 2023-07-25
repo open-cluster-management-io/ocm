@@ -184,6 +184,13 @@ spec:
                       set.
                     format: int32
                     type: integer
+                  clusterAnnotations:
+                    additionalProperties:
+                      type: string
+                    description: ClusterAnnotations is annotations with the reserve
+                      prefix "agent.open-cluster-management.io" set on ManagedCluster
+                      when creating only, other actors can update it afterwards.
+                    type: object
                   featureGates:
                     description: 'FeatureGates represents the list of feature gates
                       for registration If it is set empty, default feature gates will

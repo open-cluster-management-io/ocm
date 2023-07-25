@@ -36,6 +36,14 @@ func TestCreateSpokeCluster(t *testing.T) {
 				actual := actions[1].(clienttesting.CreateActionImpl).Object
 				actualClientConfigs := actual.(*clusterv1.ManagedCluster).Spec.ManagedClusterClientConfigs
 				testinghelpers.AssertManagedClusterClientConfigs(t, actualClientConfigs, expectedClientConfigs)
+				clusterannotations := actual.(*clusterv1.ManagedCluster).Annotations
+				if len(clusterannotations) != 1 {
+					t.Errorf("expected cluster annotations %#v but got: %#v", 1, len(clusterannotations))
+				}
+				if value, ok := clusterannotations["agent.open-cluster-management.io/test"]; !ok || value != "true" {
+					t.Errorf("expected cluster annotations %#v but got: %#v", "agent.open-cluster-management.io/test",
+						clusterannotations["agent.open-cluster-management.io/test"])
+				}
 			},
 		},
 		{
@@ -55,6 +63,9 @@ func TestCreateSpokeCluster(t *testing.T) {
 				spokeExternalServerURLs: []string{testSpokeExternalServerUrl},
 				spokeCABundle:           []byte("testcabundle"),
 				hubClusterClient:        clusterClient,
+				clusterAnnotations: map[string]string{
+					"agent.open-cluster-management.io/test": "true",
+				},
 			}
 
 			syncErr := ctrl.sync(context.TODO(), testingcommon.NewFakeSyncContext(t, ""))
