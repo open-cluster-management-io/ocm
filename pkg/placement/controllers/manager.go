@@ -20,9 +20,6 @@ import (
 
 // RunControllerManager starts the controllers on hub to make placement decisions.
 func RunControllerManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
-	kubeConf := controllerContext.KubeConfig
-	kubeConf.QPS = 50
-	kubeConf.Burst = 100
 	clusterClient, err := clusterclient.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
@@ -35,6 +32,16 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 
 	clusterInformers := clusterinformers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
 
+	return RunControllerManagerWithInformers(ctx, controllerContext, kubeClient, clusterClient, clusterInformers)
+}
+
+func RunControllerManagerWithInformers(
+	ctx context.Context,
+	controllerContext *controllercmd.ControllerContext,
+	kubeClient kubernetes.Interface,
+	clusterClient clusterclient.Interface,
+	clusterInformers clusterinformers.SharedInformerFactory,
+) error {
 	broadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: kubeClient.EventsV1()})
 
 	broadcaster.StartRecordingToSink(ctx.Done())
@@ -77,6 +84,7 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 	go schedulingController.Run(ctx, 1)
 
 	<-ctx.Done()
+
 	return nil
 }
 

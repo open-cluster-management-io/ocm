@@ -28,7 +28,6 @@ func RunWorkHubManager(ctx context.Context, controllerContext *controllercmd.Con
 	}
 
 	clusterInformerFactory := clusterinformers.NewSharedInformerFactory(hubClusterClient, 30*time.Minute)
-	workInformerFactory := workinformers.NewSharedInformerFactory(hubWorkClient, 30*time.Minute)
 
 	// we need a separated filtered manifestwork informers so we only watch the manifestworks that manifestworkreplicaset cares.
 	// This could reduce a lot of memory consumptions
@@ -46,18 +45,28 @@ func RunWorkHubManager(ctx context.Context, controllerContext *controllercmd.Con
 		},
 	))
 
+	return RunControllerManagerWithInformers(ctx, controllerContext, hubWorkClient, manifestWorkInformerFactory, clusterInformerFactory)
+}
+
+func RunControllerManagerWithInformers(
+	ctx context.Context,
+	controllerContext *controllercmd.ControllerContext,
+	hubWorkClient workclientset.Interface,
+	manifestWorkInformers workinformers.SharedInformerFactory,
+	clusterInformers clusterinformers.SharedInformerFactory,
+) error {
+	workInformerFactory := workinformers.NewSharedInformerFactory(hubWorkClient, 30*time.Minute)
 	manifestWorkReplicaSetController := manifestworkreplicasetcontroller.NewManifestWorkReplicaSetController(
 		controllerContext.EventRecorder,
 		hubWorkClient,
 		workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets(),
-		manifestWorkInformerFactory.Work().V1().ManifestWorks(),
-		clusterInformerFactory.Cluster().V1beta1().Placements(),
-		clusterInformerFactory.Cluster().V1beta1().PlacementDecisions(),
+		manifestWorkInformers.Work().V1().ManifestWorks(),
+		clusterInformers.Cluster().V1beta1().Placements(),
+		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
 	)
-
-	go clusterInformerFactory.Start(ctx.Done())
+	go clusterInformers.Start(ctx.Done())
 	go workInformerFactory.Start(ctx.Done())
-	go manifestWorkInformerFactory.Start(ctx.Done())
+	go manifestWorkInformers.Start(ctx.Done())
 	go manifestWorkReplicaSetController.Run(ctx, 5)
 
 	<-ctx.Done()
