@@ -187,6 +187,8 @@ func (c *addonTemplateController) runController(
 		c.addonClient,
 		c.addonInformers,
 		kubeInformers.Rbac().V1().RoleBindings().Lister(),
+		// image overrides from cluster annotation has lower priority than from the addonDeploymentConfig
+		templateagent.GetAddOnRegistriesPrivateValuesFromClusterAnnotation,
 		addonfactory.GetAddOnDeploymentConfigValues(
 			addonfactory.NewAddOnDeploymentConfigGetter(c.addonClient),
 			addonfactory.ToAddOnCustomizedVariableValues,
