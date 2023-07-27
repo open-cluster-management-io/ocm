@@ -54,7 +54,7 @@ copy-crd:
 patch-crd: ensure-yaml-patch
 	bash hack/patch/patch-crd.sh $(YAML_PATCH)
 
-update: patch-crd copy-crd
+update: patch-crd copy-crd update-csv
 
 update-csv: ensure-operator-sdk
 	cd deploy/cluster-manager && ../../$(OPERATOR_SDK) generate bundle --manifests --deploy-dir config/ --crds-dir config/crds/ --output-dir olm-catalog/cluster-manager/ --version $(CSV_VERSION)
