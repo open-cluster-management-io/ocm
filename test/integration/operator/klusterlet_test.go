@@ -963,6 +963,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			gomega.Expect(operatorClient.OperatorV1().Klusterlets().Delete(context.Background(),
 				klusterlet.Name, metav1.DeleteOptions{})).To(gomega.BeNil())
 		})
+
 		ginkgo.It("feature gates configuration is nil or empty", func() {
 			klusterlet.Spec.RegistrationConfiguration = nil
 			klusterlet.Spec.WorkConfiguration = &operatorapiv1.WorkConfiguration{}
@@ -1083,6 +1084,10 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 						Mode:    operatorapiv1.FeatureGateModeTypeDisable,
 					},
 				},
+				ClusterAnnotations: map[string]string{
+					"foo":                                  "bar", // should be ignored
+					"agent.open-cluster-management.io/foo": "bar",
+				},
 			}
 			klusterlet.Spec.WorkConfiguration = &operatorapiv1.WorkConfiguration{
 				FeatureGates: []operatorapiv1.FeatureGate{
@@ -1140,6 +1145,10 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(registrationDeployment.Spec.Template.Spec.Containers[0].Args).Should(
 				gomega.ContainElement("--feature-gates=ClusterClaim=false"))
+
+			ginkgo.By("Check the registration-agent has the expected cluster-annotations")
+			gomega.Expect(registrationDeployment.Spec.Template.Spec.Containers[0].Args).Should(
+				gomega.ContainElement("--cluster-annotations=agent.open-cluster-management.io/foo=bar"))
 
 			ginkgo.By("Check the work-agent has the expected feature gates")
 			workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(

@@ -14,6 +14,8 @@ import (
 
 	clientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 )
 
 var (
@@ -26,19 +28,22 @@ type managedClusterCreatingController struct {
 	clusterName             string
 	spokeExternalServerURLs []string
 	spokeCABundle           []byte
+	clusterAnnotations      map[string]string
 	hubClusterClient        clientset.Interface
 }
 
 // NewManagedClusterCreatingController creates a new managedClusterCreatingController on the managed cluster.
 func NewManagedClusterCreatingController(
-	clusterName string, spokeExternalServerURLs []string,
+	clusterName string, spokeExternalServerURLs []string, annotations map[string]string,
 	spokeCABundle []byte,
 	hubClusterClient clientset.Interface,
 	recorder events.Recorder) factory.Controller {
+
 	c := &managedClusterCreatingController{
 		clusterName:             clusterName,
 		spokeExternalServerURLs: spokeExternalServerURLs,
 		spokeCABundle:           spokeCABundle,
+		clusterAnnotations:      commonhelpers.FilterClusterAnnotations(annotations),
 		hubClusterClient:        hubClusterClient,
 	}
 
@@ -64,7 +69,8 @@ func (c *managedClusterCreatingController) sync(ctx context.Context, syncCtx fac
 	if errors.IsNotFound(err) {
 		managedCluster := &clusterv1.ManagedCluster{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: c.clusterName,
+				Name:        c.clusterName,
+				Annotations: c.clusterAnnotations,
 			},
 		}
 
