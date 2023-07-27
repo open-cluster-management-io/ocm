@@ -465,12 +465,6 @@ func (c *schedulingController) generatePlacementDecisionsAndStatus(
 
 	// generate placement decision for each decision group
 	for decisionGroupIndex, decisionGroup := range decisionGroups {
-		// sort clusterdecisions by cluster name
-		clusterDecisions := decisionGroup.clusterDecisions
-		sort.SliceStable(clusterDecisions, func(i, j int) bool {
-			return clusterDecisions[i].ClusterName < clusterDecisions[j].ClusterName
-		})
-
 		// generate placement decisions and status, group and placement name index starts from 0.
 		pds, groupStatus := c.generateDecision(placement, decisionGroup, decisionGroupIndex, placementDecisionIndex)
 
@@ -498,15 +492,15 @@ func (c *schedulingController) generateDecisionGroups(
 	}
 
 	// Record the cluster names
-	clusterNames := sets.New[string]()
+	clusterNameSet := sets.New[string]()
 	for _, cluster := range clusters {
-		clusterNames.Insert(cluster.Name)
+		clusterNameSet.Insert(cluster.Name)
 	}
 
 	// First groups the clusters by ClusterSelector defined in spec.DecisionStrategy.GroupStrategy.DecisionGroups.
 	for _, d := range placement.Spec.DecisionStrategy.GroupStrategy.DecisionGroups {
 		// filter clusters by cluster selector
-		matched, status := filterClustersBySelector(d.ClusterSelector, clusters, clusterNames)
+		matched, status := filterClustersBySelector(d.ClusterSelector, clusters, clusterNameSet)
 		if status.IsError() {
 			return groups, status
 		}
@@ -517,7 +511,7 @@ func (c *schedulingController) generateDecisionGroups(
 
 	// The rest of the clusters will also be put into decision groups.
 	var matched []clusterapiv1beta1.ClusterDecision
-	for _, cluster := range clusterNames.UnsortedList() {
+	for _, cluster := range clusterNameSet.UnsortedList() {
 		matched = append(matched, clusterapiv1beta1.ClusterDecision{
 			ClusterName: cluster,
 		})
@@ -801,6 +795,12 @@ func filterClustersBySelector(
 // divideDecisionGroups divide the matched clusters to the groups and ensuring that each group has the specified length.
 func divideDecisionGroups(groupName string, matched []clusterapiv1beta1.ClusterDecision, groupLength int) []clusterDecisionGroup {
 	var groups []clusterDecisionGroup
+
+	// sort the matched cluster decisions by name before divide
+	sort.SliceStable(matched, func(i, j int) bool {
+		return matched[i].ClusterName < matched[j].ClusterName
+	})
+
 	for len(matched) > 0 {
 		groupClusters := matched
 		if groupLength < len(matched) {
