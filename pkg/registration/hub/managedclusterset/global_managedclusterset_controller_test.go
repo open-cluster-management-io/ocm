@@ -64,8 +64,9 @@ func TestSyncGlobalClusterSet(t *testing.T) {
 			},
 		},
 		{
-			name:               "sync global cluster set with disabled annotation",
-			existingClusterSet: newGlobalManagedClusterSetWithAnnotation(GlobalManagedClusterSetName, autoUpdateAnnotation, "false", GlobalManagedClusterSet.Spec, false),
+			name: "sync global cluster set with disabled annotation",
+			existingClusterSet: newGlobalManagedClusterSetWithAnnotation(
+				GlobalManagedClusterSetName, autoUpdateAnnotation, "false", GlobalManagedClusterSet.Spec, false),
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertNoActions(t, actions)
 			},
@@ -74,7 +75,7 @@ func TestSyncGlobalClusterSet(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			objects := []runtime.Object{}
+			var objects []runtime.Object
 
 			if c.existingClusterSet != nil {
 				objects = append(objects, c.existingClusterSet)
@@ -120,7 +121,8 @@ func newGlobalManagedClusterSet(name string, spec clusterv1beta2.ManagedClusterS
 	return clusterSet
 }
 
-func newGlobalManagedClusterSetWithAnnotation(name string, k, v string, spec clusterv1beta2.ManagedClusterSetSpec, terminating bool) *clusterv1beta2.ManagedClusterSet {
+func newGlobalManagedClusterSetWithAnnotation(
+	name, k, v string, spec clusterv1beta2.ManagedClusterSetSpec, terminating bool) *clusterv1beta2.ManagedClusterSet {
 	clusterSet := &clusterv1beta2.ManagedClusterSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,

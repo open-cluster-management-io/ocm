@@ -97,7 +97,7 @@ func TestOnClusterChange(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
 			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 			q := newEnqueuer(
@@ -259,7 +259,7 @@ func TestOnClusterUpdate(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
 			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 			q := newEnqueuer(
@@ -361,7 +361,7 @@ func TestOnClusterDelete(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
-			clusterInformerFactory := newClusterInformerFactory(clusterClient, c.initObjs...)
+			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
 			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 			q := newEnqueuer(

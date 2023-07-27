@@ -65,7 +65,7 @@ rules:
 			},
 		},
 		{
-			name: "comapre and no update clusterrole",
+			name: "compare and no update clusterrole",
 			existingManifest: `
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -220,7 +220,7 @@ rules:
 			},
 		},
 		{
-			name: "comapre and no update clusterrole",
+			name: "compare and no update clusterrole",
 			existingManifest: `
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -351,13 +351,16 @@ subjects:
 				informerFactory = informers.NewSharedInformerFactory(kubeClient, 3*time.Minute)
 				switch t := o.(type) {
 				case *rbacv1.ClusterRole:
-					informerFactory.Rbac().V1().ClusterRoles().Informer().GetStore().Add(t)
+					err = informerFactory.Rbac().V1().ClusterRoles().Informer().GetStore().Add(t)
 				case *rbacv1.ClusterRoleBinding:
-					informerFactory.Rbac().V1().ClusterRoleBindings().Informer().GetStore().Add(t)
+					err = informerFactory.Rbac().V1().ClusterRoleBindings().Informer().GetStore().Add(t)
 				case *rbacv1.Role:
-					informerFactory.Rbac().V1().Roles().Informer().GetStore().Add(t)
+					err = informerFactory.Rbac().V1().Roles().Informer().GetStore().Add(t)
 				case *rbacv1.RoleBinding:
-					informerFactory.Rbac().V1().RoleBindings().Informer().GetStore().Add(t)
+					err = informerFactory.Rbac().V1().RoleBindings().Informer().GetStore().Add(t)
+				}
+				if err != nil {
+					t.Fatal(err)
 				}
 			} else {
 				kubeClient = kubefake.NewSimpleClientset()

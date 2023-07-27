@@ -25,7 +25,7 @@ var _ = ginkgo.Describe("GlobalManagedClusterSet", func() {
 			if mcs.ObjectMeta.Name == setcontroller.GlobalManagedClusterSetName && reflect.DeepEqual(mcs.Spec, setcontroller.GlobalManagedClusterSet.Spec) {
 				return nil
 			}
-			return fmt.Errorf("check not pass!")
+			return fmt.Errorf("check not pass")
 
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
@@ -52,7 +52,7 @@ var _ = ginkgo.Describe("GlobalManagedClusterSet", func() {
 			if mcs.ObjectMeta.Name == setcontroller.GlobalManagedClusterSetName && equality.Semantic.DeepEqual(mcs.Spec, setcontroller.GlobalManagedClusterSet.Spec) {
 				return nil
 			}
-			return fmt.Errorf("check not pass!")
+			return fmt.Errorf("check not pass")
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
@@ -81,10 +81,12 @@ var _ = ginkgo.Describe("GlobalManagedClusterSet", func() {
 			if err != nil {
 				return err
 			}
-			if equality.Semantic.DeepEqual(mcs.Spec, setcontroller.GlobalManagedClusterSet.Spec) && equality.Semantic.DeepEqual(mcs.Annotations, updateMcs.Annotations) && equality.Semantic.DeepEqual(mcs.Labels, updateMcs.Labels) {
+			if equality.Semantic.DeepEqual(mcs.Spec, setcontroller.GlobalManagedClusterSet.Spec) &&
+				equality.Semantic.DeepEqual(mcs.Annotations, updateMcs.Annotations) &&
+				equality.Semantic.DeepEqual(mcs.Labels, updateMcs.Labels) {
 				return nil
 			}
-			return fmt.Errorf("check not pass!")
+			return fmt.Errorf("check not pass")
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
@@ -103,7 +105,7 @@ var _ = ginkgo.Describe("GlobalManagedClusterSet", func() {
 			if mcs.ObjectMeta.Name == setcontroller.GlobalManagedClusterSetName && equality.Semantic.DeepEqual(mcs.Spec, setcontroller.GlobalManagedClusterSet.Spec) {
 				return nil
 			}
-			return fmt.Errorf("check not pass!")
+			return fmt.Errorf("check not pass")
 
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})

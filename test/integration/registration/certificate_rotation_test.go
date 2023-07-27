@@ -17,6 +17,7 @@ var _ = ginkgo.Describe("Certificate Rotation", func() {
 		var err error
 
 		managedClusterName := "rotationtest-spokecluster"
+		//#nosec G101
 		hubKubeconfigSecret := "rotationtest-hub-kubeconfig-secret"
 		hubKubeconfigDir := path.Join(util.TestDir, "rotationtest", "hub-kubeconfig")
 

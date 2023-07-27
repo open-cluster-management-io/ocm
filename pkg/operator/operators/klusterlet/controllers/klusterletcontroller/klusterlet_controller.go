@@ -28,6 +28,7 @@ import (
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
@@ -134,6 +135,7 @@ type klusterletConfig struct {
 	OperatorNamespace           string
 	Replica                     int32
 	ClientCertExpirationSeconds int32
+	ClusterAnnotationsString    string
 
 	ExternalManagedKubeConfigSecret             string
 	ExternalManagedKubeConfigRegistrationSecret string
@@ -234,11 +236,18 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	if klusterlet.Spec.RegistrationConfiguration != nil {
 		registrationFeatureGates = klusterlet.Spec.RegistrationConfiguration.FeatureGates
 		config.ClientCertExpirationSeconds = klusterlet.Spec.RegistrationConfiguration.ClientCertExpirationSeconds
+
+		// construct cluster annotations string, the final format is "key1=value1,key2=value2"
+		var annotationsArray []string
+		for k, v := range commonhelpers.FilterClusterAnnotations(klusterlet.Spec.RegistrationConfiguration.ClusterAnnotations) {
+			annotationsArray = append(annotationsArray, fmt.Sprintf("%s=%s", k, v))
+		}
+		config.ClusterAnnotationsString = strings.Join(annotationsArray, ",")
 	}
 	config.RegistrationFeatureGates, registrationFeatureMsgs = helpers.ConvertToFeatureGateFlags("Registration",
 		registrationFeatureGates, ocmfeature.DefaultSpokeRegistrationFeatureGates)
 
-	workFeatureGates := []operatorapiv1.FeatureGate{}
+	var workFeatureGates []operatorapiv1.FeatureGate
 	if klusterlet.Spec.WorkConfiguration != nil {
 		workFeatureGates = klusterlet.Spec.WorkConfiguration.FeatureGates
 	}

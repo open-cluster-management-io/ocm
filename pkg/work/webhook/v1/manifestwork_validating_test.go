@@ -100,7 +100,8 @@ func TestManifestWorkExecutorValidate(t *testing.T) {
 					},
 				},
 			},
-			expectErr: apierrors.NewBadRequest(fmt.Sprintf("user test2 cannot manipulate the Manifestwork with executor /klusterlet-work-sa in namespace cluster1")),
+			expectErr: apierrors.NewBadRequest(
+				"user test2 cannot manipulate the Manifestwork with executor /klusterlet-work-sa in namespace cluster1"),
 		},
 		{
 			name: "validate executor not nil success",
@@ -164,7 +165,8 @@ func TestManifestWorkExecutorValidate(t *testing.T) {
 					},
 				},
 			},
-			expectErr: apierrors.NewBadRequest(fmt.Sprintf("user test1 cannot manipulate the Manifestwork with executor ns1/executor2 in namespace cluster1")),
+			expectErr: apierrors.NewBadRequest(
+				"user test1 cannot manipulate the Manifestwork with executor ns1/executor2 in namespace cluster1"),
 		},
 		{
 			name: "validate executor not changed success",
@@ -246,7 +248,8 @@ func TestManifestWorkExecutorValidate(t *testing.T) {
 					},
 				},
 			},
-			expectErr: apierrors.NewBadRequest(fmt.Sprintf("user test1 cannot manipulate the Manifestwork with executor ns1/executor2 in namespace cluster1")),
+			expectErr: apierrors.NewBadRequest(
+				"user test1 cannot manipulate the Manifestwork with executor ns1/executor2 in namespace cluster1"),
 		},
 	}
 

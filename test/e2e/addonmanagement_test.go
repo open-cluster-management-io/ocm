@@ -29,7 +29,8 @@ const (
 	originalImageValue                = "quay.io/open-cluster-management/addon-examples:latest"
 	overrideImageValue                = "quay.io/ocm/addon-examples:latest"
 	customSignerName                  = "example.com/signer-name"
-	customSignerSecretName            = "addon-signer-secret"
+	//#nosec G101
+	customSignerSecretName = "addon-signer-secret"
 )
 
 var (

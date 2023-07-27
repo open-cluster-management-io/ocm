@@ -28,6 +28,12 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
+const (
+	// TODO move these to api repos
+	ReasonClusterSelected   = "ClustersSelected"
+	ReasonNoClusterMatchced = "NoClusterMatched"
+)
+
 // managedClusterSetController reconciles instances of ManagedClusterSet on the hub.
 type managedClusterSetController struct {
 	patcher          patcher.Patcher[*clusterv1beta2.ManagedClusterSet, clusterv1beta2.ManagedClusterSetSpec, clusterv1beta2.ManagedClusterSetStatus]
@@ -157,11 +163,11 @@ func (c *managedClusterSetController) syncClusterSet(ctx context.Context, origin
 	}
 	if count == 0 {
 		emptyCondition.Status = metav1.ConditionTrue
-		emptyCondition.Reason = "NoClusterMatched"
+		emptyCondition.Reason = ReasonNoClusterMatchced
 		emptyCondition.Message = "No ManagedCluster selected"
 	} else {
 		emptyCondition.Status = metav1.ConditionFalse
-		emptyCondition.Reason = "ClustersSelected"
+		emptyCondition.Reason = ReasonClusterSelected
 		emptyCondition.Message = fmt.Sprintf("%d ManagedClusters selected", count)
 	}
 	meta.SetStatusCondition(&clusterSet.Status.Conditions, emptyCondition)
@@ -207,9 +213,9 @@ func (c *managedClusterSetController) enqueueUpdateClusterClusterSet(oldCluster,
 }
 
 // getDiffClusterSetsNames return the diff clustersets names
-func getDiffClusterSetsNames(oldSets, newSets []*clusterv1beta2.ManagedClusterSet) sets.String {
-	oldSetsMap := sets.NewString()
-	newSetsMap := sets.NewString()
+func getDiffClusterSetsNames(oldSets, newSets []*clusterv1beta2.ManagedClusterSet) sets.Set[string] {
+	oldSetsMap := sets.New[string]()
+	newSetsMap := sets.New[string]()
 
 	for _, oldSet := range oldSets {
 		oldSetsMap.Insert(oldSet.Name)

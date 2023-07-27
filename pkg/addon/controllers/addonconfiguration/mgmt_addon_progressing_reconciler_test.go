@@ -240,10 +240,14 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if len(cma.Status.DefaultConfigReferences) != 0 {
 					t.Errorf("DefaultConfigReferences object is not correct: %v", cma.Status.DefaultConfigReferences)
 				}
-				if !apiequality.Semantic.DeepEqual(cma.Status.InstallProgressions[0].ConfigReferences[0].LastAppliedConfig, cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig) {
+				if !apiequality.Semantic.DeepEqual(
+					cma.Status.InstallProgressions[0].ConfigReferences[0].LastAppliedConfig,
+					cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig) {
 					t.Errorf("InstallProgressions LastAppliedConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
 				}
-				if !apiequality.Semantic.DeepEqual(cma.Status.InstallProgressions[0].ConfigReferences[0].LastKnownGoodConfig, cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig) {
+				if !apiequality.Semantic.DeepEqual(
+					cma.Status.InstallProgressions[0].ConfigReferences[0].LastKnownGoodConfig,
+					cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig) {
 					t.Errorf("InstallProgressions LastKnownGoodConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
 				}
 				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonInstallSucceed {
@@ -389,10 +393,14 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if len(cma.Status.DefaultConfigReferences) != 0 {
 					t.Errorf("DefaultConfigReferences object is not correct: %v", cma.Status.DefaultConfigReferences)
 				}
-				if !apiequality.Semantic.DeepEqual(cma.Status.InstallProgressions[0].ConfigReferences[0].LastAppliedConfig, cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig) {
+				if !apiequality.Semantic.DeepEqual(
+					cma.Status.InstallProgressions[0].ConfigReferences[0].LastAppliedConfig,
+					cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig) {
 					t.Errorf("InstallProgressions LastAppliedConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
 				}
-				if !apiequality.Semantic.DeepEqual(cma.Status.InstallProgressions[0].ConfigReferences[0].LastKnownGoodConfig, cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig) {
+				if !apiequality.Semantic.DeepEqual(
+					cma.Status.InstallProgressions[0].ConfigReferences[0].LastKnownGoodConfig,
+					cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig) {
 					t.Errorf("InstallProgressions LastKnownGoodConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
 				}
 				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonUpgradeSucceed {

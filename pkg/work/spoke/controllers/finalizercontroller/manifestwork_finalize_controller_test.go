@@ -190,8 +190,7 @@ func TestSyncManifestWorkController(t *testing.T) {
 				t.Errorf("Expect no sync error, but got %v", err)
 			}
 
-			workAction := []clienttesting.Action{}
-			appliedWorkAction := []clienttesting.Action{}
+			var workAction, appliedWorkAction []clienttesting.Action
 			for _, action := range fakeClient.Actions() {
 				if action.GetResource().Resource == "manifestworks" {
 					workAction = append(workAction, action)

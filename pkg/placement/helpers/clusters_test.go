@@ -151,7 +151,7 @@ func TestGetClusterClaims(t *testing.T) {
 			expected: map[string]string{"cloud": "Amazon"},
 		},
 		{
-			name:     "convert emtpy cluster claim",
+			name:     "convert empty cluster claim",
 			cluster:  testinghelpers.NewManagedCluster("cluster1").Build(),
 			expected: map[string]string{},
 		},

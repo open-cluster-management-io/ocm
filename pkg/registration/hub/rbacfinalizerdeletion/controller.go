@@ -173,7 +173,7 @@ func removeFinalizer(obj runtime.Object, finalizerName string) bool {
 		return false
 	}
 
-	newFinalizers := []string{}
+	var newFinalizers []string
 	accessor, _ := meta.Accessor(obj)
 	found := false
 	for _, finalizer := range accessor.GetFinalizers() {

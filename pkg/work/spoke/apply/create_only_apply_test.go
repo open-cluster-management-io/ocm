@@ -27,7 +27,7 @@ func TestCreateOnlyApply(t *testing.T) {
 	}{
 		{
 			name:     "create a non exist object",
-			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"},
+			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
 			existing: nil,
 			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
@@ -40,14 +40,14 @@ func TestCreateOnlyApply(t *testing.T) {
 					t.Errorf("Expect 1 owners, but have %d", len(owners))
 				}
 
-				if owners[0].UID != "testowner" {
+				if owners[0].UID != defaultOwner {
 					t.Errorf("Owner UId is not correct, got %s", owners[0].UID)
 				}
 			},
 		},
 		{
 			name:     "create an already existing object",
-			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"},
+			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
 			existing: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
 			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
@@ -64,7 +64,7 @@ func TestCreateOnlyApply(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			objects := []runtime.Object{}
+			var objects []runtime.Object
 			if c.existing != nil {
 				objects = append(objects, c.existing)
 			}

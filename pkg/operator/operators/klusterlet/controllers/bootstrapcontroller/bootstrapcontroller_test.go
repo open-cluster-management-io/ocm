@@ -13,6 +13,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -171,25 +172,25 @@ func TestBootstrapSecretQueueKeyFunc(t *testing.T) {
 		name        string
 		object      runtime.Object
 		klusterlet  *operatorapiv1.Klusterlet
-		expectedKey string
+		expectedKey []string
 	}{
 		{
 			name:        "key by bootstrap secret",
 			object:      newSecret("bootstrap-hub-kubeconfig", "test", []byte{}),
 			klusterlet:  newKlusterlet("testklusterlet", "test"),
-			expectedKey: "test/testklusterlet",
+			expectedKey: []string{"test/testklusterlet"},
 		},
 		{
 			name:        "key by wrong secret",
 			object:      newSecret("dummy", "test", []byte{}),
 			klusterlet:  newKlusterlet("testklusterlet", "test"),
-			expectedKey: "",
+			expectedKey: []string{},
 		},
 		{
 			name:        "key by klusterlet with empty namespace",
 			object:      newSecret("bootstrap-hub-kubeconfig", "open-cluster-management-agent", []byte{}),
 			klusterlet:  newKlusterlet("testklusterlet", ""),
-			expectedKey: "open-cluster-management-agent/testklusterlet",
+			expectedKey: []string{"open-cluster-management-agent/testklusterlet"},
 		},
 	}
 
@@ -203,7 +204,7 @@ func TestBootstrapSecretQueueKeyFunc(t *testing.T) {
 			}
 			keyFunc := bootstrapSecretQueueKeyFunc(operatorInformers.Operator().V1().Klusterlets().Lister())
 			actualKey := keyFunc(c.object)
-			if actualKey != c.expectedKey {
+			if !equality.Semantic.DeepEqual(actualKey, c.expectedKey) {
 				t.Errorf("Queued key is not correct: actual %s, expected %s", actualKey, c.expectedKey)
 			}
 		})

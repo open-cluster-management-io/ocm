@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -23,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/cache"
 	kevents "k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 
@@ -58,8 +57,6 @@ type clusterDecisionGroup struct {
 	decisionGroupName string
 	clusterDecisions  []clusterapiv1beta1.ClusterDecision
 }
-
-var ResyncInterval = time.Minute * 5
 
 // schedulingController schedules cluster decisions for Placements
 type schedulingController struct {
@@ -167,8 +164,7 @@ func NewSchedulingController(
 			placementInformer.Informer()).
 		WithFilteredEventsInformersQueueKeyFunc(func(obj runtime.Object) string {
 			accessor, _ := meta.Accessor(obj)
-			labels := accessor.GetLabels()
-			placementName := labels[clusterapiv1beta1.PlacementLabel]
+			placementName := accessor.GetLabels()[clusterapiv1beta1.PlacementLabel]
 			return fmt.Sprintf("%s/%s", accessor.GetNamespace(), placementName)
 		},
 			queue.FileterByLabel(clusterapiv1beta1.PlacementLabel),
@@ -287,7 +283,7 @@ func (c *schedulingController) getValidManagedClusterSetBindings(placementNamesp
 		bindings = nil
 	}
 
-	validBindings := []*clusterapiv1beta2.ManagedClusterSetBinding{}
+	var validBindings []*clusterapiv1beta2.ManagedClusterSetBinding
 	for _, binding := range bindings {
 		// ignore clustersetbinding refers to a non-existent clusterset
 		_, err := c.clusterSetLister.Get(binding.Name)
@@ -352,7 +348,7 @@ func (c *schedulingController) getAvailableClusters(clusterSetNames []string) ([
 		return nil, nil
 	}
 
-	result := []*clusterapiv1.ManagedCluster{}
+	var result []*clusterapiv1.ManagedCluster
 	for _, c := range availableClusters {
 		result = append(result, c)
 	}
@@ -461,20 +457,14 @@ func (c *schedulingController) generatePlacementDecisionsAndStatus(
 	clusters []*clusterapiv1.ManagedCluster,
 ) ([]*clusterapiv1beta1.PlacementDecision, []*clusterapiv1beta1.DecisionGroupStatus, *framework.Status) {
 	placementDecisionIndex := 0
-	placementDecisions := []*clusterapiv1beta1.PlacementDecision{}
-	decisionGroupStatus := []*clusterapiv1beta1.DecisionGroupStatus{}
+	var placementDecisions []*clusterapiv1beta1.PlacementDecision
+	var decisionGroupStatus []*clusterapiv1beta1.DecisionGroupStatus
 
 	// generate decision group
 	decisionGroups, status := c.generateDecisionGroups(placement, clusters)
 
 	// generate placement decision for each decision group
 	for decisionGroupIndex, decisionGroup := range decisionGroups {
-		// sort clusterdecisions by cluster name
-		clusterDecisions := decisionGroup.clusterDecisions
-		sort.SliceStable(clusterDecisions, func(i, j int) bool {
-			return clusterDecisions[i].ClusterName < clusterDecisions[j].ClusterName
-		})
-
 		// generate placement decisions and status, group and placement name index starts from 0.
 		pds, groupStatus := c.generateDecision(placement, decisionGroup, decisionGroupIndex, placementDecisionIndex)
 
@@ -491,78 +481,45 @@ func (c *schedulingController) generateDecisionGroups(
 	placement *clusterapiv1beta1.Placement,
 	clusters []*clusterapiv1.ManagedCluster,
 ) (clusterDecisionGroups, *framework.Status) {
-	groups := []clusterDecisionGroup{}
+	var groups []clusterDecisionGroup
 
 	// Calculate the group length
+	// The number of items in each group is determined by the specific number or percentage defined in
+	// spec.DecisionStrategy.GroupStrategy.ClustersPerDecisionGroup.
 	groupLength, status := calculateLength(&placement.Spec.DecisionStrategy.GroupStrategy.ClustersPerDecisionGroup, len(clusters))
 	if status.IsError() {
 		return groups, status
 	}
 
 	// Record the cluster names
-	clusterNames := sets.NewString()
+	clusterNameSet := sets.New[string]()
 	for _, cluster := range clusters {
-		clusterNames.Insert(cluster.Name)
+		clusterNameSet.Insert(cluster.Name)
 	}
 
 	// First groups the clusters by ClusterSelector defined in spec.DecisionStrategy.GroupStrategy.DecisionGroups.
 	for _, d := range placement.Spec.DecisionStrategy.GroupStrategy.DecisionGroups {
-		// create cluster label selector
-		clusterSelector, err := helpers.NewClusterSelector(d.ClusterSelector)
-		if err != nil {
-			status = framework.NewStatus("", framework.Misconfigured, err.Error())
+		// filter clusters by cluster selector
+		matched, status := filterClustersBySelector(d.ClusterSelector, clusters, clusterNameSet)
+		if status.IsError() {
 			return groups, status
 		}
-
-		// filter clusters by label selector
-		groupName := d.GroupName
-		matched := []clusterapiv1beta1.ClusterDecision{}
-		for _, cluster := range clusters {
-			if ok := clusterSelector.Matches(cluster.Labels, helpers.GetClusterClaims(cluster)); !ok {
-				continue
-			}
-			if !clusterNames.Has(cluster.Name) {
-				continue
-			}
-
-			matched = append(matched, clusterapiv1beta1.ClusterDecision{
-				ClusterName: cluster.Name,
-			})
-			clusterNames.Delete(cluster.Name)
-		}
-
-		if len(matched) > 0 {
-			decisionGroup := clusterDecisionGroup{
-				decisionGroupName: groupName,
-				clusterDecisions:  matched,
-			}
-			groups = append(groups, decisionGroup)
-		}
+		// If matched clusters number meets groupLength, divide into multiple groups.
+		decisionGroups := divideDecisionGroups(d.GroupName, matched, groupLength)
+		groups = append(groups, decisionGroups...)
 	}
 
 	// The rest of the clusters will also be put into decision groups.
-	// The number of items in each group is determined by the specific number or
-	// percentage defined in spec.DecisionStrategy.GroupStrategy.ClustersPerDecisionGroup.
-	for len(clusterNames) > 0 {
-		clusterList := clusterNames.List()
-		resultNumber := len(clusterList)
-		if groupLength < resultNumber {
-			resultNumber = groupLength
-		}
-
-		matched := []clusterapiv1beta1.ClusterDecision{}
-		for i := 0; i < resultNumber; i++ {
-			matched = append(matched, clusterapiv1beta1.ClusterDecision{
-				ClusterName: clusterList[i],
-			})
-			delete(clusterNames, clusterList[i])
-		}
-		decisionGroup := clusterDecisionGroup{
-			decisionGroupName: "",
-			clusterDecisions:  matched,
-		}
-		groups = append(groups, decisionGroup)
+	var matched []clusterapiv1beta1.ClusterDecision
+	for _, cluster := range clusterNameSet.UnsortedList() {
+		matched = append(matched, clusterapiv1beta1.ClusterDecision{
+			ClusterName: cluster,
+		})
 	}
+
+	// If the rest of clusters number meets groupLength, divide into multiple groups.
+	decisionGroups := divideDecisionGroups("", matched, groupLength)
+	groups = append(groups, decisionGroups...)
 
 	// generate at least on empty decisionGroup, this is to ensure there's an empty placement decision if no cluster selected.
 	if len(groups) == 0 {
@@ -579,7 +536,7 @@ func (c *schedulingController) generateDecision(
 ) ([]*clusterapiv1beta1.PlacementDecision, *clusterapiv1beta1.DecisionGroupStatus) {
 	// split the cluster decisions into slices, the size of each slice cannot exceed
 	// maxNumOfClusterDecisions.
-	decisionSlices := [][]clusterapiv1beta1.ClusterDecision{}
+	var decisionSlices [][]clusterapiv1beta1.ClusterDecision
 	remainingDecisions := clusterDecisionGroup.clusterDecisions
 	for index := 0; len(remainingDecisions) > 0; index++ {
 		var decisionSlice []clusterapiv1beta1.ClusterDecision
@@ -600,8 +557,8 @@ func (c *schedulingController) generateDecision(
 		decisionSlices = append(decisionSlices, []clusterapiv1beta1.ClusterDecision{})
 	}
 
-	placementDecisionNames := []string{}
-	placementDecisions := []*clusterapiv1beta1.PlacementDecision{}
+	var placementDecisionNames []string
+	var placementDecisions []*clusterapiv1beta1.PlacementDecision
 	for index, decisionSlice := range decisionSlices {
 		placementDecisionName := fmt.Sprintf("%s-decision-%d", placement.Name, placementDecisionIndex+index)
 		owner := metav1.NewControllerRef(placement, clusterapiv1beta1.GroupVersion.WithKind("Placement"))
@@ -644,7 +601,7 @@ func (c *schedulingController) bind(
 	clusterScores PrioritizerScore,
 	status *framework.Status,
 ) error {
-	errs := []error{}
+	var errs []error
 	placementDecisionNames := sets.NewString()
 
 	// create/update placement decisions
@@ -801,4 +758,64 @@ func calculateLength(intOrStr *intstr.IntOrString, total int) (int, *framework.S
 		length = total
 	}
 	return length, framework.NewStatus("", framework.Success, "")
+}
+
+// filterClustersBySelector filters clusters based on the provided label selector and returns the matched clusters.
+func filterClustersBySelector(
+	selector clusterapiv1beta1.ClusterSelector,
+	clusters []*clusterapiv1.ManagedCluster,
+	clusterNames sets.Set[string],
+) ([]clusterapiv1beta1.ClusterDecision, *framework.Status) {
+	var matched []clusterapiv1beta1.ClusterDecision
+	// create cluster label selector
+	clusterSelector, err := helpers.NewClusterSelector(selector)
+	if err != nil {
+		status := framework.NewStatus("", framework.Misconfigured, err.Error())
+		return matched, status
+	}
+
+	// filter clusters by label selector
+	for _, cluster := range clusters {
+		if ok := clusterSelector.Matches(cluster.Labels, helpers.GetClusterClaims(cluster)); !ok {
+			continue
+		}
+		if !clusterNames.Has(cluster.Name) {
+			continue
+		}
+
+		matched = append(matched, clusterapiv1beta1.ClusterDecision{
+			ClusterName: cluster.Name,
+		})
+		clusterNames.Delete(cluster.Name)
+	}
+
+	return matched, framework.NewStatus("", framework.Success, "")
+}
+
+// divideDecisionGroups divide the matched clusters to the groups and ensuring that each group has the specified length.
+func divideDecisionGroups(groupName string, matched []clusterapiv1beta1.ClusterDecision, groupLength int) []clusterDecisionGroup {
+	var groups []clusterDecisionGroup
+
+	// sort the matched cluster decisions by name before divide
+	sort.SliceStable(matched, func(i, j int) bool {
+		return matched[i].ClusterName < matched[j].ClusterName
+	})
+
+	for len(matched) > 0 {
+		groupClusters := matched
+		if groupLength < len(matched) {
+			groupClusters = matched[:groupLength]
+			matched = matched[groupLength:]
+		} else {
+			matched = nil
+		}
+
+		decisionGroup := clusterDecisionGroup{
+			decisionGroupName: groupName,
+			clusterDecisions:  groupClusters,
+		}
+		groups = append(groups, decisionGroup)
+	}
+
+	return groups
 }

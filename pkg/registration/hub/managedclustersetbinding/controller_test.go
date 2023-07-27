@@ -91,7 +91,7 @@ func TestSync(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			objects := []runtime.Object{}
+			var objects []runtime.Object
 			objects = append(objects, c.clusterSets...)
 			objects = append(objects, c.clusterSetBinding)
 
@@ -154,7 +154,7 @@ func TestEnqueue(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			objects := []runtime.Object{}
+			var objects []runtime.Object
 			objects = append(objects, c.clusterSet)
 			objects = append(objects, c.clusterSetBindings...)
 

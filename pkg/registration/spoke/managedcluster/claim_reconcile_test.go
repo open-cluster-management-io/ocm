@@ -38,7 +38,8 @@ func TestSync(t *testing.T) {
 		{
 			name:            "sync no managed cluster",
 			validateActions: testingcommon.AssertNoActions,
-			expectedErr:     "unable to get managed cluster \"testmanagedcluster\" from hub: managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
+			expectedErr: "unable to get managed cluster \"testmanagedcluster\" " +
+				"from hub: managedcluster.cluster.open-cluster-management.io \"testmanagedcluster\" not found",
 		},
 		{
 			name:            "skip when managed cluster does not join the hub yet",
@@ -87,7 +88,7 @@ func TestSync(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			objects := []runtime.Object{}
+			var objects []runtime.Object
 			if c.cluster != nil {
 				objects = append(objects, c.cluster)
 			}

@@ -114,7 +114,7 @@ func (c *addOnRegistrationController) sync(ctx context.Context, syncCtx factory.
 	}
 
 	// handle resync
-	errs := []error{}
+	var errs []error
 	for addOnName := range c.addOnRegistrationConfigs {
 		_, err := c.hubAddOnLister.ManagedClusterAddOns(c.clusterName).Get(addOnName)
 		if err == nil {
@@ -158,7 +158,7 @@ func (c *addOnRegistrationController) syncAddOn(ctx context.Context, syncCtx fac
 	}
 
 	// stop registration for the stale registration configs
-	errs := []error{}
+	var errs []error
 	for hash, cachedConfig := range cachedConfigs {
 		if _, ok := configs[hash]; ok {
 			continue
@@ -202,7 +202,7 @@ func (c *addOnRegistrationController) startRegistration(ctx context.Context, con
 	// the addon agent runs outside the managed cluster, for more details see the hosted mode design docs for addon:
 	// https://github.com/open-cluster-management-io/enhancements/pull/65), it generate the secret on the
 	// management(hosting) cluster
-	var kubeClient kubernetes.Interface = c.spokeKubeClient
+	kubeClient := c.spokeKubeClient
 	if config.AgentRunningOutsideManagedCluster {
 		kubeClient = c.managementKubeClient
 	}
@@ -298,7 +298,7 @@ func (c *addOnRegistrationController) stopRegistration(ctx context.Context, conf
 		config.stopFunc()
 	}
 
-	var kubeClient kubernetes.Interface = c.spokeKubeClient
+	kubeClient := c.spokeKubeClient
 	if config.AgentRunningOutsideManagedCluster {
 		// delete the secret generated on the management cluster
 		kubeClient = c.managementKubeClient
@@ -315,7 +315,7 @@ func (c *addOnRegistrationController) stopRegistration(ctx context.Context, conf
 
 // cleanup cleans both the registration configs and client certificate controllers for the addon
 func (c *addOnRegistrationController) cleanup(ctx context.Context, addOnName string) error {
-	errs := []error{}
+	var errs []error
 	for _, config := range c.addOnRegistrationConfigs[addOnName] {
 		if err := c.stopRegistration(ctx, config); err != nil {
 			errs = append(errs, err)

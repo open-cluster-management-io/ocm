@@ -30,6 +30,7 @@ import (
 const (
 	eventuallyTimeout  = 30 // seconds
 	eventuallyInterval = 1  // seconds
+	cm1, cm2           = "cm1", "cm2"
 )
 
 var tempDir string

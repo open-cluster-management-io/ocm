@@ -3,7 +3,6 @@ package spoke
 import (
 	"context"
 
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/cobra"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
@@ -20,7 +19,7 @@ func NewWorkAgent() *cobra.Command {
 	commonOptions := commonoptions.NewAgentOptions()
 	agentOption := spoke.NewWorkloadAgentOptions()
 	cfg := spoke.NewWorkAgentConfig(commonOptions, agentOption)
-	cmdConfig := controllercmd.
+	cmdConfig := commonOptions.CommoOpts.
 		NewControllerCommandConfig("work-agent", version.Get(), cfg.RunWorkloadAgent)
 	cmd := cmdConfig.NewCommandWithContext(context.TODO())
 	cmd.Use = agentCmdName
@@ -32,8 +31,6 @@ func NewWorkAgent() *cobra.Command {
 	agentOption.AddFlags(flags)
 	utilruntime.Must(features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeWorkFeatureGates))
 	features.SpokeMutableFeatureGate.AddFlag(flags)
-
-	flags.BoolVar(&cmdConfig.DisableLeaderElection, "disable-leader-election", false, "Disable leader election for the agent.")
 
 	return cmd
 }

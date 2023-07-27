@@ -154,7 +154,7 @@ func checkAgentDeploymentDesired(ctx context.Context, kubeClient kubernetes.Inte
 
 // Check agent deployments, if both of them have at least 1 available replicas, return available condition
 func checkAgentsDeploymentAvailable(ctx context.Context, kubeClient kubernetes.Interface, agents []klusterletAgent) metav1.Condition {
-	availableMessages := []string{}
+	var availableMessages []string
 	for _, agent := range agents {
 		deployment, err := kubeClient.AppsV1().Deployments(agent.namespace).Get(ctx, agent.deploymentName, metav1.GetOptions{})
 		if err != nil {

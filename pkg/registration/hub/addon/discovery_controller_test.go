@@ -244,7 +244,7 @@ func TestDiscoveryController_Sync(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			objs := []runtime.Object{}
+			var objs []runtime.Object
 			if c.cluster != nil {
 				objs = append(objs, c.cluster)
 			}

@@ -19,7 +19,7 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-// Test cases with lable "sanity-check" could be ran on an existing enviroment with validating webhook installed
+// Test cases with lable "sanity-check" could be ran on an existing environment with validating webhook installed
 // and well configured as sanity check. Resource leftovers should be cleaned up on both hub and managed cluster.
 var _ = ginkgo.Describe("ManifestWork admission webhook", ginkgo.Label("validating-webhook", "sanity-check"), func() {
 	var nameSuffix string

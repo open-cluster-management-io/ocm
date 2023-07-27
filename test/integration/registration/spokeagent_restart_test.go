@@ -99,7 +99,7 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 		// is restarted successfully
 		spokeCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		conditions := []metav1.Condition{}
+		var conditions []metav1.Condition
 		for _, condition := range spokeCluster.Status.Conditions {
 			if condition.Type == clusterv1.ManagedClusterConditionJoined {
 				continue
@@ -147,7 +147,7 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
-	// This case happens when registration agent is restarted with a new cluster name by specifing
+	// This case happens when registration agent is restarted with a new cluster name by specifying
 	// argument 'cluster-name' and the agent has already had a hub kubecofig with a different
 	// cluster name. A bootstrap process is expected.
 	ginkgo.It("restart agent with a different cluster name", func() {

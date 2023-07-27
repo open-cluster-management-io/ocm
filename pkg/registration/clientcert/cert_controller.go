@@ -36,14 +36,6 @@ const (
 
 	// ClusterCertificateRotatedCondition is a condition type that client certificate is rotated
 	ClusterCertificateRotatedCondition = "ClusterCertificateRotated"
-
-	// ClientCertificateUpdateFailedReason is a reason of condition ClusterCertificateRotatedCondition that
-	// the client certificate rotation fails.
-	ClientCertificateUpdateFailedReason = "ClientCertificateUpdateFailed"
-
-	// ClientCertificateUpdatedReason is a reason of condition ClusterCertificateRotatedCondition that
-	// the the client certificate succeeds
-	ClientCertificateUpdatedReason = "ClientCertificateUpdated"
 )
 
 // ControllerResyncInterval is exposed so that integration tests can crank up the constroller sync speed.

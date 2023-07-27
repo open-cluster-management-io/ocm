@@ -137,13 +137,15 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 
 			// Check CRDs
 			gomega.Eventually(func() bool {
-				if _, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), "appliedmanifestworks.work.open-cluster-management.io", metav1.GetOptions{}); err != nil {
+				if _, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
+					context.Background(), "appliedmanifestworks.work.open-cluster-management.io", metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), "clusterclaims.cluster.open-cluster-management.io", metav1.GetOptions{}); err != nil {
+				if _, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
+					context.Background(), "clusterclaims.cluster.open-cluster-management.io", metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -189,7 +191,8 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 			gomega.Eventually(func() bool {
-				if _, err := kubeClient.RbacV1().RoleBindings(klusterletNamespace).Get(context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
+				if _, err := kubeClient.RbacV1().RoleBindings(klusterletNamespace).Get(
+					context.Background(), registrationManagementRoleName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -281,10 +284,10 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				}
 
 				KlusterletObj.Spec.NodePlacement = operatorapiv1.NodePlacement{
-					NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
+					NodeSelector: map[string]string{infraNodeLabel: ""},
 					Tolerations: []corev1.Toleration{
 						{
-							Key:      "node-role.kubernetes.io/infra",
+							Key:      infraNodeLabel,
 							Operator: corev1.TolerationOpExists,
 							Effect:   corev1.TaintEffectNoSchedule,
 						},
@@ -303,14 +306,14 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				if len(deployment.Spec.Template.Spec.NodeSelector) == 0 {
 					return false
 				}
-				if _, ok := deployment.Spec.Template.Spec.NodeSelector["node-role.kubernetes.io/infra"]; !ok {
+				if _, ok := deployment.Spec.Template.Spec.NodeSelector[infraNodeLabel]; !ok {
 					return false
 				}
 				if len(deployment.Spec.Template.Spec.Tolerations) == 0 {
 					return false
 				}
 				for _, toleration := range deployment.Spec.Template.Spec.Tolerations {
-					if toleration.Key == "node-role.kubernetes.io/infra" {
+					if toleration.Key == infraNodeLabel {
 						return true
 					}
 				}
@@ -703,7 +706,8 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(), bootStrapSecret, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "HubConnectionDegraded", "BootstrapSecretFunctional,HubKubeConfigMissing", metav1.ConditionTrue)
+			util.AssertKlusterletCondition(
+				klusterlet.Name, operatorClient, "HubConnectionDegraded", "BootstrapSecretFunctional,HubKubeConfigMissing", metav1.ConditionTrue)
 
 			hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.HubKubeConfig, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -721,7 +725,8 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "WorkDesiredDegraded", "UnavailablePods", metav1.ConditionTrue)
 
 			// Update replica of deployment
-			registrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+			registrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
+				context.Background(), registrationDeploymentName, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			registrationDeployment = registrationDeployment.DeepCopy()
 			registrationDeployment.Status.AvailableReplicas = 3
@@ -746,7 +751,10 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			hubSecret.Data["kubeconfig"] = util.NewKubeConfig(&rest.Config{Host: "https://nohost"})
 			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(), hubSecret, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "HubConnectionDegraded", "BootstrapSecretFunctional,HubKubeConfigSecretMissing", metav1.ConditionTrue)
+			util.AssertKlusterletCondition(
+				klusterlet.Name, operatorClient,
+				"HubConnectionDegraded",
+				"BootstrapSecretFunctional,HubKubeConfigSecretMissing", metav1.ConditionTrue)
 		})
 
 		ginkgo.It("should have correct available conditions", func() {
@@ -760,7 +768,8 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
-			registrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+			registrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
+				context.Background(), registrationDeploymentName, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			gomega.Eventually(func() bool {
@@ -835,10 +844,12 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			var registrationDeployment *appsv1.Deployment
 			var workDeployment *appsv1.Deployment
 			gomega.Eventually(func() bool {
-				if registrationDeployment, err = kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{}); err != nil {
+				if registrationDeployment, err = kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
+					context.Background(), registrationDeploymentName, metav1.GetOptions{}); err != nil {
 					return false
 				}
-				if workDeployment, err = kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{}); err != nil {
+				if workDeployment, err = kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
+					context.Background(), workDeploymentName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -854,7 +865,8 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 
 			// Make sure the deployments are deleted and recreated
 			gomega.Eventually(func() bool {
-				lastRegistrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				lastRegistrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
+					context.Background(), registrationDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -893,10 +905,12 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			var registrationDeployment *appsv1.Deployment
 			var workDeployment *appsv1.Deployment
 			gomega.Eventually(func() bool {
-				if registrationDeployment, err = kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{}); err != nil {
+				if registrationDeployment, err = kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
+					context.Background(), registrationDeploymentName, metav1.GetOptions{}); err != nil {
 					return false
 				}
-				if workDeployment, err = kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{}); err != nil {
+				if workDeployment, err = kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
+					context.Background(), workDeploymentName, metav1.GetOptions{}); err != nil {
 					return false
 				}
 				return true
@@ -920,7 +934,8 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 
 			// Make sure the deployments are deleted and recreated
 			gomega.Eventually(func() bool {
-				lastRegistrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				lastRegistrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
+					context.Background(), registrationDeploymentName, metav1.GetOptions{})
 				if err != nil {
 					return false
 				}
@@ -948,11 +963,12 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			gomega.Expect(operatorClient.OperatorV1().Klusterlets().Delete(context.Background(),
 				klusterlet.Name, metav1.DeleteOptions{})).To(gomega.BeNil())
 		})
+
 		ginkgo.It("feature gates configuration is nil or empty", func() {
 			klusterlet.Spec.RegistrationConfiguration = nil
 			klusterlet.Spec.WorkConfiguration = &operatorapiv1.WorkConfiguration{}
 
-			ginkgo.By("Create the klusterlet with RegistrationConfiguration nil and WorkConfiguration emtpy")
+			ginkgo.By("Create the klusterlet with RegistrationConfiguration nil and WorkConfiguration empty")
 			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(),
 				klusterlet, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1068,6 +1084,10 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 						Mode:    operatorapiv1.FeatureGateModeTypeDisable,
 					},
 				},
+				ClusterAnnotations: map[string]string{
+					"foo":                                  "bar", // should be ignored
+					"agent.open-cluster-management.io/foo": "bar",
+				},
 			}
 			klusterlet.Spec.WorkConfiguration = &operatorapiv1.WorkConfiguration{
 				FeatureGates: []operatorapiv1.FeatureGate{
@@ -1125,6 +1145,10 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(registrationDeployment.Spec.Template.Spec.Containers[0].Args).Should(
 				gomega.ContainElement("--feature-gates=ClusterClaim=false"))
+
+			ginkgo.By("Check the registration-agent has the expected cluster-annotations")
+			gomega.Expect(registrationDeployment.Spec.Template.Spec.Containers[0].Args).Should(
+				gomega.ContainElement("--cluster-annotations=agent.open-cluster-management.io/foo=bar"))
 
 			ginkgo.By("Check the work-agent has the expected feature gates")
 			workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(

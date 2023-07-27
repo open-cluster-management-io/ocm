@@ -25,11 +25,6 @@ import (
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
-func newClusterManagementOwner(name string) metav1.OwnerReference {
-	clusterManagementAddon := addontesting.NewClusterManagementAddon(name, "testcrd", "testcr").Build()
-	return *metav1.NewControllerRef(clusterManagementAddon, addonapiv1alpha1.GroupVersion.WithKind("ClusterManagementAddOn"))
-}
-
 func TestReconcile(t *testing.T) {
 	cases := []struct {
 		name                   string

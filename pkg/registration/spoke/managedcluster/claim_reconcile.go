@@ -45,8 +45,7 @@ func (r *claimReconcile) reconcile(ctx context.Context, cluster *clusterv1.Manag
 // managed cluster on hub. Some of the customized claims might not be exposed once
 // the total number of the claims exceeds the value of `cluster-claims-max`.
 func (r *claimReconcile) exposeClaims(ctx context.Context, cluster *clusterv1.ManagedCluster) error {
-	reservedClaims := []clusterv1.ManagedClusterClaim{}
-	customClaims := []clusterv1.ManagedClusterClaim{}
+	var reservedClaims, customClaims []clusterv1.ManagedClusterClaim
 
 	// clusterClaim with label `open-cluster-management.io/spoke-only` will not be synced to managedCluster.Status at hub.
 	requirement, _ := labels.NewRequirement(labelCustomizedOnly, selection.DoesNotExist, []string{})

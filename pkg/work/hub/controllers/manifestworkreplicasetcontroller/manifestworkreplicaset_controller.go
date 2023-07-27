@@ -50,7 +50,7 @@ type ManifestWorkReplicaSetController struct {
 	reconcilers []ManifestWorkReplicaSetReconcile
 }
 
-// manifestWorkReplicaSetReconcile is a interface for reconcile logic. It returns an updated manifestWorkReplicaSet and whether further
+// ManifestWorkReplicaSetReconcile is a interface for reconcile logic. It returns an updated manifestWorkReplicaSet and whether further
 // reconcile needs to proceed.
 type ManifestWorkReplicaSetReconcile interface {
 	reconcile(ctx context.Context, pw *workapiv1alpha1.ManifestWorkReplicaSet) (*workapiv1alpha1.ManifestWorkReplicaSet, reconcileState, error)

@@ -80,10 +80,10 @@ func (s *clusterManagerStatusController) sync(ctx context.Context, controllerCon
 	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManagerName, clusterManager.Spec.DeployOption.Mode)
 	newClusterManager := clusterManager.DeepCopy()
 
-	registrationCond := s.updateStatusOfRegistration(ctx, clusterManager.Name, clusterManagerNamespace)
+	registrationCond := s.updateStatusOfRegistration(clusterManager.Name, clusterManagerNamespace)
 	registrationCond.ObservedGeneration = clusterManager.Generation
 	meta.SetStatusCondition(&newClusterManager.Status.Conditions, registrationCond)
-	placementCond := s.updateStatusOfPlacement(ctx, clusterManager.Name, clusterManagerNamespace)
+	placementCond := s.updateStatusOfPlacement(clusterManager.Name, clusterManagerNamespace)
 	placementCond.ObservedGeneration = clusterManager.Generation
 	meta.SetStatusCondition(&newClusterManager.Status.Conditions, placementCond)
 
@@ -92,7 +92,7 @@ func (s *clusterManagerStatusController) sync(ctx context.Context, controllerCon
 }
 
 // updateStatusOfRegistration checks registration deployment status and updates condition of clustermanager
-func (s *clusterManagerStatusController) updateStatusOfRegistration(ctx context.Context, clusterManagerName, clusterManagerNamespace string) metav1.Condition {
+func (s *clusterManagerStatusController) updateStatusOfRegistration(clusterManagerName, clusterManagerNamespace string) metav1.Condition {
 	// Check registration deployment status
 	registrationDeploymentName := fmt.Sprintf("%s-registration-controller", clusterManagerName)
 	registrationDeployment, err := s.deploymentLister.Deployments(clusterManagerNamespace).Get(registrationDeploymentName)
@@ -124,7 +124,7 @@ func (s *clusterManagerStatusController) updateStatusOfRegistration(ctx context.
 }
 
 // updateStatusOfRegistration checks placement deployment status and updates condition of clustermanager
-func (s *clusterManagerStatusController) updateStatusOfPlacement(ctx context.Context, clusterManagerName, clusterManagerNamespace string) metav1.Condition {
+func (s *clusterManagerStatusController) updateStatusOfPlacement(clusterManagerName, clusterManagerNamespace string) metav1.Condition {
 	// Check registration deployment status
 	placementDeploymentName := fmt.Sprintf("%s-placement-controller", clusterManagerName)
 	placementDeployment, err := s.deploymentLister.Deployments(clusterManagerNamespace).Get(placementDeploymentName)

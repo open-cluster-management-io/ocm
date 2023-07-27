@@ -7,7 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
+	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
@@ -15,6 +17,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 	"open-cluster-management.io/ocm/pkg/registration/spoke/registration"
+	"open-cluster-management.io/ocm/pkg/version"
 )
 
 func TestComplete(t *testing.T) {
@@ -55,35 +58,42 @@ func TestComplete(t *testing.T) {
 		{
 			name:        "override cluster name in cert with specified value",
 			clusterName: "cluster1",
-			secret: testinghelpers.NewHubKubeconfigSecret(componentNamespace, "hub-kubeconfig-secret", "", testinghelpers.NewTestCert("system:open-cluster-management:cluster2:agent2", 60*time.Second), map[string][]byte{
-				"kubeconfig":   testinghelpers.NewKubeconfig(nil, nil),
-				"cluster-name": []byte("cluster3"),
-				"agent-name":   []byte("agent3"),
-			}),
+			secret: testinghelpers.NewHubKubeconfigSecret(
+				componentNamespace, "hub-kubeconfig-secret", "",
+				testinghelpers.NewTestCert("system:open-cluster-management:cluster2:agent2", 60*time.Second), map[string][]byte{
+					"kubeconfig":   testinghelpers.NewKubeconfig(nil, nil),
+					"cluster-name": []byte("cluster3"),
+					"agent-name":   []byte("agent3"),
+				}),
 			expectedClusterName: "cluster1",
 			expectedAgentName:   "agent2",
 		},
 		{
 			name: "take cluster/agent name from secret",
-			secret: testinghelpers.NewHubKubeconfigSecret(componentNamespace, "hub-kubeconfig-secret", "", nil, map[string][]byte{
-				"cluster-name": []byte("cluster1"),
-				"agent-name":   []byte("agent1"),
-			}),
+			secret: testinghelpers.NewHubKubeconfigSecret(
+				componentNamespace, "hub-kubeconfig-secret", "", nil, map[string][]byte{
+					"cluster-name": []byte("cluster1"),
+					"agent-name":   []byte("agent1"),
+				}),
 			expectedClusterName: "cluster1",
 			expectedAgentName:   "agent1",
 		},
 		{
-			name:                "take cluster/agent name from cert",
-			secret:              testinghelpers.NewHubKubeconfigSecret(componentNamespace, "hub-kubeconfig-secret", "", testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second), map[string][]byte{}),
+			name: "take cluster/agent name from cert",
+			secret: testinghelpers.NewHubKubeconfigSecret(
+				componentNamespace, "hub-kubeconfig-secret", "",
+				testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second), map[string][]byte{}),
 			expectedClusterName: "cluster1",
 			expectedAgentName:   "agent1",
 		},
 		{
 			name: "override cluster name in secret with value from cert",
-			secret: testinghelpers.NewHubKubeconfigSecret(componentNamespace, "hub-kubeconfig-secret", "", testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second), map[string][]byte{
-				"cluster-name": []byte("cluster2"),
-				"agent-name":   []byte("agent2"),
-			}),
+			secret: testinghelpers.NewHubKubeconfigSecret(
+				componentNamespace, "hub-kubeconfig-secret", "",
+				testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second), map[string][]byte{
+					"cluster-name": []byte("cluster2"),
+					"agent-name":   []byte("agent2"),
+				}),
 			expectedClusterName: "cluster1",
 			expectedAgentName:   "agent1",
 		},
@@ -92,7 +102,7 @@ func TestComplete(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			// setup kube client
-			objects := []runtime.Object{}
+			var objects []runtime.Object
 			if c.secret != nil {
 				objects = append(objects, c.secret)
 			}
@@ -112,6 +122,9 @@ func TestComplete(t *testing.T) {
 			err = registration.DumpSecret(
 				kubeClient.CoreV1(), componentNamespace, "hub-kubeconfig-secret",
 				options.HubKubeconfigDir, context.TODO(), eventstesting.NewTestingEventRecorder(t))
+			if err != nil {
+				t.Error(err)
+			}
 
 			if err := options.Complete(); err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -217,5 +230,36 @@ func TestGetOrGenerateClusterAgentNames(t *testing.T) {
 				t.Errorf("expect agent name %q but got %q", c.expectedAgentName, agentName)
 			}
 		})
+	}
+}
+
+func TestNewOptions(t *testing.T) {
+	opts := NewOptions()
+	cmd := &cobra.Command{
+		Use:   "test",
+		Short: "test Controller",
+		Run: func(cmd *cobra.Command, args []string) {
+			_ = cmd.Help()
+			os.Exit(1)
+		},
+	}
+
+	opts.NewControllerCommandConfig("test", version.Get(), func(ctx context.Context, controllerCtx *controllercmd.ControllerContext) error {
+		return nil
+	})
+
+	opts.AddFlags(cmd.Flags())
+	if err := cmd.Flags().Set("kube-api-qps", "10"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Flags().Set("kube-api-burst", "20"); err != nil {
+		t.Fatal(err)
+
+	}
+	if err := cmd.Flags().Set("disable-leader-election", "true"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Flags().Set("unsupported-flag", "true"); err == nil {
+		t.Errorf("Should return err")
 	}
 }

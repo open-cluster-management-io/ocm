@@ -336,7 +336,6 @@ func checkHubConfigSecret(ctx context.Context, kubeClient kubernetes.Interface, 
 
 func getHubConfigSSARs(clusterName string) []authorizationv1.SelfSubjectAccessReview {
 	var reviews []authorizationv1.SelfSubjectAccessReview
-
 	// registration resources
 	certResource := authorizationv1.ResourceAttributes{
 		Group:    "certificates.k8s.io",

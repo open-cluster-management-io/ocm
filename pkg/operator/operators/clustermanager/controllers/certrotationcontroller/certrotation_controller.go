@@ -105,7 +105,7 @@ func (c certRotationController) sync(ctx context.Context, syncCtx factory.SyncCo
 			return nil
 		}
 
-		errs := []error{}
+		var errs []error
 		for i := range clustermanagers {
 			err = c.syncOne(ctx, syncCtx, clustermanagers[i])
 			if err != nil {
@@ -235,7 +235,7 @@ func (c certRotationController) syncOne(ctx context.Context, syncCtx factory.Syn
 	}
 
 	// reconcile target cert/key pairs
-	errs := []error{}
+	var errs []error
 	for _, targetRotation := range rotations.targetRotations {
 		if err := targetRotation.EnsureTargetCertKeyPair(ctx, signingCertKeyPair, cabundleCerts); err != nil {
 			errs = append(errs, err)

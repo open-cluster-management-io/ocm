@@ -335,7 +335,7 @@ func FindAddOnCSRs(kubeClient kubernetes.Interface, spokeClusterName, addOnName 
 		return nil, err
 	}
 
-	csrs := []*certificates.CertificateSigningRequest{}
+	var csrs []*certificates.CertificateSigningRequest
 	for _, csr := range csrList.Items {
 		csr := csr
 		csrs = append(csrs, &csr)

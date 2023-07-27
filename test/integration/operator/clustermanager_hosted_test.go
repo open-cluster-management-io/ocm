@@ -97,6 +97,7 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 		gomega.Expect(err).To(gomega.BeNil())
 
 		// Create the external hub kubeconfig secret
+		// #nosec G101
 		hubKubeconfigSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      helpers.ExternalHubKubeConfig,
@@ -233,14 +234,16 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 
 			// Check service
 			gomega.Eventually(func() error {
-				if _, err := hostedKubeClient.CoreV1().Services(hubNamespaceHosted).Get(hostedCtx, "cluster-manager-registration-webhook", metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.CoreV1().Services(hubNamespaceHosted).Get(
+					hostedCtx, "cluster-manager-registration-webhook", metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
 			gomega.Eventually(func() error {
-				if _, err := hostedKubeClient.CoreV1().Services(hubNamespaceHosted).Get(hostedCtx, "cluster-manager-work-webhook", metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.CoreV1().Services(hubNamespaceHosted).Get(
+					hostedCtx, "cluster-manager-work-webhook", metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -263,6 +266,7 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				return nil
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
 
+			//#nosec G101
 			workWebhookSecret := "work-webhook-serving-cert"
 			gomega.Eventually(func() error {
 				s, err := hostedKubeClient.CoreV1().Secrets(hubNamespaceHosted).Get(hostedCtx, workWebhookSecret, metav1.GetOptions{})
@@ -593,7 +597,8 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 
 			// Check deployment
 			gomega.Eventually(func() error {
-				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(context.Background(), hubAddOnManagerDeployment, metav1.GetOptions{}); err != nil {
+				if _, err := hostedKubeClient.AppsV1().Deployments(hubNamespaceHosted).Get(
+					context.Background(), hubAddOnManagerDeployment, metav1.GetOptions{}); err != nil {
 					return err
 				}
 				return nil
@@ -642,7 +647,7 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				if err != nil {
 					return err
 				}
-				clusterManager.Spec.RegistrationImagePullSpec = "testimage:latest"
+				clusterManager.Spec.RegistrationImagePullSpec = testImage
 				_, err = hostedOperatorClient.OperatorV1().ClusterManagers().Update(hostedCtx, clusterManager, metav1.UpdateOptions{})
 				return err
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
@@ -653,7 +658,7 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 					return err
 				}
 				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
-				if actual.Spec.Template.Spec.Containers[0].Image != "testimage:latest" {
+				if actual.Spec.Template.Spec.Containers[0].Image != testImage {
 					return fmt.Errorf("expected image to be testimage:latest but get %s", actual.Spec.Template.Spec.Containers[0].Image)
 				}
 				return nil
@@ -697,10 +702,10 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 					return err
 				}
 				clusterManager.Spec.NodePlacement = operatorapiv1.NodePlacement{
-					NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
+					NodeSelector: map[string]string{infraNodeLabel: ""},
 					Tolerations: []corev1.Toleration{
 						{
-							Key:      "node-role.kubernetes.io/infra",
+							Key:      infraNodeLabel,
 							Operator: corev1.TolerationOpExists,
 							Effect:   corev1.TaintEffectNoSchedule,
 						},
@@ -719,14 +724,14 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				if len(actual.Spec.Template.Spec.NodeSelector) == 0 {
 					return fmt.Errorf("length of node selector should not equals to 0")
 				}
-				if _, ok := actual.Spec.Template.Spec.NodeSelector["node-role.kubernetes.io/infra"]; !ok {
+				if _, ok := actual.Spec.Template.Spec.NodeSelector[infraNodeLabel]; !ok {
 					return fmt.Errorf("node-role.kubernetes.io/infra not exist")
 				}
 				if len(actual.Spec.Template.Spec.Tolerations) == 0 {
 					return fmt.Errorf("length of node selecor should not equals to 0")
 				}
 				for _, toleration := range actual.Spec.Template.Spec.Tolerations {
-					if toleration.Key == "node-role.kubernetes.io/infra" {
+					if toleration.Key == infraNodeLabel {
 						return nil
 					}
 				}
@@ -782,7 +787,7 @@ var _ = ginkgo.Describe("ClusterManager Hosted Mode", func() {
 				if err != nil {
 					return err
 				}
-				if registrationoDeployment.Spec.Template.Spec.Containers[0].Image != "testimage:latest" {
+				if registrationoDeployment.Spec.Template.Spec.Containers[0].Image != testImage {
 					return fmt.Errorf("image should be testimage:latest, but get %s", registrationoDeployment.Spec.Template.Spec.Containers[0].Image)
 				}
 				return nil

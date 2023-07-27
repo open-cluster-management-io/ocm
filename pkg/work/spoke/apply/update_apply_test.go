@@ -47,15 +47,19 @@ func TestIsSameUnstructured(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "different spec",
-			obj1:     spoketesting.NewUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}}),
-			obj2:     spoketesting.NewUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val2"}}),
+			name: "different spec",
+			obj1: spoketesting.NewUnstructuredWithContent(
+				"v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}}),
+			obj2: spoketesting.NewUnstructuredWithContent(
+				"v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val2"}}),
 			expected: false,
 		},
 		{
-			name:     "same spec, different status",
-			obj1:     spoketesting.NewUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}, "status": "status1"}),
-			obj2:     spoketesting.NewUnstructuredWithContent("v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}, "status": "status2"}),
+			name: "same spec, different status",
+			obj1: spoketesting.NewUnstructuredWithContent(
+				"v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}, "status": "status1"}),
+			obj2: spoketesting.NewUnstructuredWithContent(
+				"v1", "Kind1", "ns1", "n1", map[string]interface{}{"spec": map[string]interface{}{"key1": "val1"}, "status": "status2"}),
 			expected: true,
 		},
 	}
@@ -81,7 +85,7 @@ func TestApplyUnstructred(t *testing.T) {
 	}{
 		{
 			name:     "create a new object with owner",
-			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"},
+			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
 			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -92,7 +96,7 @@ func TestApplyUnstructred(t *testing.T) {
 					t.Errorf("Expect 1 owners, but have %d", len(owners))
 				}
 
-				if owners[0].UID != "testowner" {
+				if owners[0].UID != defaultOwner {
 					t.Errorf("Owner UId is not correct, got %s", owners[0].UID)
 				}
 			},
@@ -120,7 +124,7 @@ func TestApplyUnstructred(t *testing.T) {
 			name: "update an object owner",
 			existing: spoketesting.NewUnstructured(
 				"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test1", UID: "testowner1"}),
-			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"},
+			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
 			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -139,7 +143,7 @@ func TestApplyUnstructred(t *testing.T) {
 				if owners[0].UID != "testowner1" {
 					t.Errorf("Owner UId is not correct, got %s", owners[0].UID)
 				}
-				if owners[1].UID != "testowner" {
+				if owners[1].UID != defaultOwner {
 					t.Errorf("Owner UId is not correct, got %s", owners[1].UID)
 				}
 			},
@@ -160,7 +164,7 @@ func TestApplyUnstructred(t *testing.T) {
 		{
 			name: "remove an object owner",
 			existing: spoketesting.NewUnstructured(
-				"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"}),
+				"v1", "Secret", "ns1", "test", metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner}),
 			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner-"},
 			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
@@ -285,7 +289,7 @@ func TestApplyUnstructred(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			objects := []runtime.Object{}
+			var objects []runtime.Object
 			if c.existing != nil {
 				objects = append(objects, c.existing)
 			}
@@ -318,7 +322,7 @@ func TestUpdateApplyKube(t *testing.T) {
 	}{
 		{
 			name:     "apply non exist object using kube client",
-			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"},
+			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
 			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -331,7 +335,7 @@ func TestUpdateApplyKube(t *testing.T) {
 		},
 		{
 			name:     "apply existing object using kube client",
-			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"},
+			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
 			existing: spoketesting.NewSecretWithType("test", "ns1", "foo", corev1.SecretTypeOpaque),
 			required: spoketesting.NewUnstructured("v1", "Secret", "ns1", "test"),
 			gvr:      schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
@@ -353,7 +357,7 @@ func TestUpdateApplyKube(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			objects := []runtime.Object{}
+			var objects []runtime.Object
 			if c.existing != nil {
 				objects = append(objects, c.existing)
 			}
@@ -404,14 +408,14 @@ func TestUpdateApplyDynamic(t *testing.T) {
 	}{
 		{
 			name:         "apply non exist object using dynamic client",
-			owner:        metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"},
+			owner:        metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
 			required:     spoketesting.NewUnstructured("monitoring.coreos.com/v1", "ServiceMonitor", "ns1", "test"),
 			gvr:          schema.GroupVersionResource{Group: "monitoring.coreos.com", Version: "v1", Resource: "servicemonitors"},
 			ownerApplied: true,
 		},
 		{
 			name:         "apply existing object using dynamic client",
-			owner:        metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"},
+			owner:        metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
 			existing:     spoketesting.NewUnstructured("monitoring.coreos.com/v1", "ServiceMonitor", "ns1", "test"),
 			required:     spoketesting.NewUnstructured("monitoring.coreos.com/v1", "ServiceMonitor", "ns1", "test"),
 			gvr:          schema.GroupVersionResource{Group: "monitoring.coreos.com", Version: "v1", Resource: "servicemonitors"},
@@ -421,7 +425,7 @@ func TestUpdateApplyDynamic(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			objects := []runtime.Object{}
+			var objects []runtime.Object
 			if c.existing != nil {
 				objects = append(objects, c.existing)
 			}
@@ -473,7 +477,7 @@ func TestUpdateApplyApiExtension(t *testing.T) {
 	}{
 		{
 			name:     "apply non exist object using api extension client",
-			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"},
+			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
 			required: spoketesting.NewUnstructured("apiextensions.k8s.io/v1", "CustomResourceDefinition", "", "testcrd"),
 			gvr:      schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinition"},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -486,7 +490,7 @@ func TestUpdateApplyApiExtension(t *testing.T) {
 		},
 		{
 			name:     "apply existing object using api extension client",
-			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: "testowner"},
+			owner:    metav1.OwnerReference{APIVersion: "v1", Name: "test", UID: defaultOwner},
 			existing: newCRD("testcrd"),
 			required: spoketesting.NewUnstructured("apiextensions.k8s.io/v1", "CustomResourceDefinition", "", "testcrd"),
 			gvr:      schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinition"},
@@ -502,7 +506,7 @@ func TestUpdateApplyApiExtension(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			objects := []runtime.Object{}
+			var objects []runtime.Object
 			if c.existing != nil {
 				objects = append(objects, c.existing)
 			}

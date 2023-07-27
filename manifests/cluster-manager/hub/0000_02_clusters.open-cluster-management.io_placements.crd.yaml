@@ -82,7 +82,7 @@ spec:
                         - type: integer
                         - type: string
                         default: 100%
-                        description: ClustersPerDecisionGroup is a specific number
+                        description: "ClustersPerDecisionGroup is a specific number
                           or percentage of the total selected clusters. The specific
                           number will divide the placementDecisions to decisionGroups
                           each group has max number of clusters equal to that specific
@@ -92,14 +92,22 @@ spec:
                           ex; for a total 100 clusters selected, ClustersPerDecisionGroup
                           equal to 20% will divide the placement decision to 5 groups
                           each group should have 20 clusters. Default is having all
-                          clusters in a single group. If the DecisionGroups field
-                          defined, it will be considered first to create the decisionGroups
-                          then the ClustersPerDecisionGroup will be used to determine
-                          the rest of decisionGroups.
+                          clusters in a single group. \n The predefined decisionGroups
+                          is expected to be a subset of the selected clusters and
+                          the number of items in each group SHOULD be less than ClustersPerDecisionGroup.
+                          Once the number of items exceeds the ClustersPerDecisionGroup,
+                          the decisionGroups will also be be divided into multiple
+                          decisionGroups with same GroupName but different GroupIndex."
+                        pattern: ^((100|[1-9][0-9]{0,1})%|[1-9][0-9]*)$
                         x-kubernetes-int-or-string: true
                       decisionGroups:
                         description: DecisionGroups represents a list of predefined
-                          groups to put decision results.
+                          groups to put decision results. Decision groups will be
+                          constructed based on the DecisionGroups field at first.
+                          The clusters not included in the DecisionGroups will be
+                          divided to other decision groups afterwards. Each decision
+                          group should not have the number of clusters larger than
+                          the ClustersPerDecisionGroup.
                         items:
                           description: DecisionGroup define a subset of clusters that
                             will be added to placementDecisions with groupName label.

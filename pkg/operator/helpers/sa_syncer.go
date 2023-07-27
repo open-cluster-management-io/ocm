@@ -59,7 +59,7 @@ func SATokenGetter(ctx context.Context, saName, saNamespace string, saClient kub
 		tr, err := saClient.CoreV1().ServiceAccounts(saNamespace).
 			CreateToken(ctx, saName, &authv1.TokenRequest{
 				Spec: authv1.TokenRequestSpec{
-					ExpirationSeconds: pointer.Int64Ptr(8640 * 3600),
+					ExpirationSeconds: pointer.Int64(8640 * 3600),
 				},
 			}, metav1.CreateOptions{})
 		if err != nil {
@@ -80,7 +80,7 @@ func SATokenCreater(ctx context.Context, saName, saNamespace string, saClient ku
 		tr, err := saClient.CoreV1().ServiceAccounts(saNamespace).
 			CreateToken(ctx, saName, &authv1.TokenRequest{
 				Spec: authv1.TokenRequestSpec{
-					ExpirationSeconds: pointer.Int64Ptr(8640 * 3600),
+					ExpirationSeconds: pointer.Int64(8640 * 3600),
 				},
 			}, metav1.CreateOptions{})
 		if err != nil {

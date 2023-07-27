@@ -78,4 +78,69 @@ func (AddOnPlacementScoreStatus) SwaggerDoc() map[string]string {
 	return map_AddOnPlacementScoreStatus
 }
 
+var map_MandatoryDecisionGroup = map[string]string{
+	"":           "MandatoryDecisionGroup set the decision group name or group index. GroupName is considered first to select the decisionGroups then GroupIndex.",
+	"groupName":  "GroupName of the decision group should match the placementDecisions label value with label key cluster.open-cluster-management.io/decision-group-name",
+	"groupIndex": "GroupIndex of the decision group should match the placementDecisions label value with label key cluster.open-cluster-management.io/decision-group-index",
+}
+
+func (MandatoryDecisionGroup) SwaggerDoc() map[string]string {
+	return map_MandatoryDecisionGroup
+}
+
+var map_MandatoryDecisionGroups = map[string]string{
+	"":                        "MandatoryDecisionGroups",
+	"mandatoryDecisionGroups": "List of the decision groups names or indexes to apply the workload first and fail if workload did not reach successful state. GroupName or GroupIndex must match with the decisionGroups defined in the placement's decisionStrategy",
+}
+
+func (MandatoryDecisionGroups) SwaggerDoc() map[string]string {
+	return map_MandatoryDecisionGroups
+}
+
+var map_RolloutAll = map[string]string{
+	"": "RolloutAll is a RolloutStrategy Type",
+}
+
+func (RolloutAll) SwaggerDoc() map[string]string {
+	return map_RolloutAll
+}
+
+var map_RolloutProgressive = map[string]string{
+	"":               "RolloutProgressive is a RolloutStrategy Type",
+	"maxConcurrency": "MaxConcurrency is the max number of clusters to deploy workload concurrently. The default value for MaxConcurrency is determined from the clustersPerDecisionGroup defined in the placement->DecisionStrategy.",
+}
+
+func (RolloutProgressive) SwaggerDoc() map[string]string {
+	return map_RolloutProgressive
+}
+
+var map_RolloutProgressivePerGroup = map[string]string{
+	"": "RolloutProgressivePerGroup is a RolloutStrategy Type",
+}
+
+func (RolloutProgressivePerGroup) SwaggerDoc() map[string]string {
+	return map_RolloutProgressivePerGroup
+}
+
+var map_RolloutStrategy = map[string]string{
+	"":                    "Rollout strategy to apply workload to the selected clusters by Placement and DecisionStrategy.",
+	"type":                "Rollout strategy Types are All, Progressive and ProgressivePerGroup 1) All means apply the workload to all clusters in the decision groups at once. 2) Progressive means apply the workload to the selected clusters progressively per cluster. The workload will not be applied to the next cluster unless one of the current applied clusters reach the successful state or timeout. 3) ProgressivePerGroup means apply the workload to decisionGroup clusters progressively per group. The workload will not be applied to the next decisionGroup unless all clusters in the current group reach the successful state or timeout.",
+	"all":                 "All define required fields for RolloutStrategy type All",
+	"progressive":         "Progressive define required fields for RolloutStrategy type Progressive",
+	"progressivePerGroup": "ProgressivePerGroup define required fields for RolloutStrategy type ProgressivePerGroup",
+}
+
+func (RolloutStrategy) SwaggerDoc() map[string]string {
+	return map_RolloutStrategy
+}
+
+var map_Timeout = map[string]string{
+	"":        "Timeout to consider while applying the workload.",
+	"timeout": "Timeout define how long workload applier controller will wait till workload reach successful state in the cluster. Timeout default value is None meaning the workload applier will not proceed apply workload to other clusters if did not reach the successful state. Timeout must be defined in [0-9h]|[0-9m]|[0-9s] format examples; 2h , 90m , 360s",
+}
+
+func (Timeout) SwaggerDoc() map[string]string {
+	return map_Timeout
+}
+
 // AUTO-GENERATED FUNCTIONS END HERE

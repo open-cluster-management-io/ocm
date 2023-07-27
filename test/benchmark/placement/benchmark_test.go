@@ -21,7 +21,6 @@ import (
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 
 	controllers "open-cluster-management.io/ocm/pkg/placement/controllers"
-	scheduling "open-cluster-management.io/ocm/pkg/placement/controllers/scheduling"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
@@ -103,7 +102,6 @@ func BenchmarkSchedulePlacements10000(b *testing.B) {
 func benchmarkSchedulePlacements(b *testing.B, pnum, cnum int) {
 	var err error
 	ctx, cancel := context.WithCancel(context.Background())
-	scheduling.ResyncInterval = time.Second * 5
 
 	// start a kube-apiserver
 	testEnv := &envtest.Environment{

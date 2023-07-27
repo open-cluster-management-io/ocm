@@ -101,7 +101,7 @@ func (c *leaseController) sync(ctx context.Context, syncCtx factory.SyncContext)
 				Labels:    map[string]string{clusterv1.ClusterNameLabelKey: cluster.Name},
 			},
 			Spec: coordv1.LeaseSpec{
-				HolderIdentity: pointer.StringPtr(leaseName),
+				HolderIdentity: pointer.String(leaseName),
 				RenewTime:      &metav1.MicroTime{Time: time.Now()},
 			},
 		}

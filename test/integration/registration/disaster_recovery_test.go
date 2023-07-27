@@ -32,7 +32,12 @@ import (
 )
 
 var _ = ginkgo.Describe("Disaster Recovery", func() {
-	startHub := func(ctx context.Context) (string, kubernetes.Interface, clusterclientset.Interface, addonclientset.Interface, *envtest.Environment, *util.TestAuthn) {
+	startHub := func(ctx context.Context) (
+		string,
+		kubernetes.Interface,
+		clusterclientset.Interface,
+		addonclientset.Interface,
+		*envtest.Environment, *util.TestAuthn) {
 		apiserver := &envtest.APIServer{}
 		newAuthn := util.NewTestAuthn(path.Join(util.CertDir, "another-ca.crt"), path.Join(util.CertDir, "another-ca.key"))
 		apiserver.SecureServing.Authn = newAuthn
@@ -49,7 +54,7 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		gomega.Expect(cfg).ToNot(gomega.BeNil())
 
-		err = clusterv1.AddToScheme(scheme.Scheme)
+		err = clusterv1.Install(scheme.Scheme)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// prepare configs
@@ -99,7 +104,8 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 		return runAgent("addontest", agentOptions, commOptions, spokeCfg)
 	}
 
-	assertSuccessClusterBootstrap := func(testNamespace, managedClusterName, hubKubeconfigSecret string, hubKubeClient, spokeKubeClient kubernetes.Interface, hubClusterClient clusterclientset.Interface, auth *util.TestAuthn) {
+	assertSuccessClusterBootstrap := func(testNamespace, managedClusterName, hubKubeconfigSecret string,
+		hubKubeClient, spokeKubeClient kubernetes.Interface, hubClusterClient clusterclientset.Interface, auth *util.TestAuthn) {
 		// the spoke cluster and csr should be created after bootstrap
 		ginkgo.By("Check existence of ManagedCluster & CSR")
 		gomega.Eventually(func() bool {
@@ -126,7 +132,7 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 				return false
 			}
 
-			if spokeCluster.Finalizers[0] != "cluster.open-cluster-management.io/api-resource-cleanup" {
+			if spokeCluster.Finalizers[0] != clusterCleanFinalizer {
 				return false
 			}
 
@@ -216,10 +222,10 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 				return false
 			}
 			_, ok := secret.Data[clientcert.KubeconfigFile]
-			if !ok && signerName == "kubernetes.io/kube-apiserver-client" {
+			if !ok && signerName == certificates.KubeAPIServerClientSignerName {
 				return false
 			}
-			if ok && signerName != "kubernetes.io/kube-apiserver-client" {
+			if ok && signerName != certificates.KubeAPIServerClientSignerName {
 				return false
 			}
 			return true
@@ -241,7 +247,10 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 	}
 
-	assertSuccessAddOnBootstrap := func(managedClusterName, addOnName, signerName string, hubKubeClient, spokeKubeClient kubernetes.Interface, hubClusterClient clusterclientset.Interface, hubAddOnClient addonclientset.Interface) {
+	assertSuccessAddOnBootstrap := func(
+		managedClusterName, addOnName, signerName string,
+		hubKubeClient, spokeKubeClient kubernetes.Interface,
+		hubClusterClient clusterclientset.Interface, hubAddOnClient addonclientset.Interface) {
 		ginkgo.By("Create ManagedClusterAddOn cr with required annotations")
 		// create addon namespace
 		ns := &corev1.Namespace{
@@ -294,7 +303,7 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 		hubKubeconfigSecret := fmt.Sprintf("hub-kubeconfig-secret-%s", suffix)
 		hubKubeconfigDir := path.Join(util.TestDir, fmt.Sprintf("recoverytest-%s", suffix), "hub-kubeconfig")
 		addOnName := fmt.Sprintf("addon-%s", suffix)
-		signerName := "kubernetes.io/kube-apiserver-client"
+		signerName := certificates.KubeAPIServerClientSignerName
 
 		hubKubeClient := kubeClient
 		hubClusterClient := clusterClient

@@ -16,7 +16,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// Patcher is just the Patch API with a generic to keep use sites type safe.
+// PatchClient is just the Patch API with a generic to keep use sites type safe.
 // This is inspired by the commiter code in https://github.com/kcp-dev/kcp/blob/main/pkg/reconciler/committer/committer.go
 type PatchClient[R runtime.Object] interface {
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (R, error)
@@ -28,6 +28,7 @@ type Patcher[R runtime.Object, Sp any, St any] interface {
 	PatchStatus(context.Context, R, St, St) (bool, error)
 	PatchSpec(context.Context, R, Sp, Sp) (bool, error)
 	PatchLabelAnnotations(context.Context, R, metav1.ObjectMeta, metav1.ObjectMeta) (bool, error)
+	WithOptions(options PatchOptions) Patcher[R, Sp, St]
 }
 
 type PatchOptions struct {
@@ -47,14 +48,14 @@ type patcher[R runtime.Object, Sp any, St any] struct {
 	opts   PatchOptions
 }
 
-func NewPatcher[R runtime.Object, Sp any, St any](client PatchClient[R]) *patcher[R, Sp, St] {
+func NewPatcher[R runtime.Object, Sp any, St any](client PatchClient[R]) Patcher[R, Sp, St] {
 	p := &patcher[R, Sp, St]{
 		client: client,
 	}
 	return p
 }
 
-func (p *patcher[R, Sp, St]) WithOptions(options PatchOptions) *patcher[R, Sp, St] {
+func (p *patcher[R, Sp, St]) WithOptions(options PatchOptions) Patcher[R, Sp, St] {
 	p.opts = options
 	return p
 }
@@ -66,7 +67,7 @@ func (p *patcher[R, Sp, St]) AddFinalizer(ctx context.Context, object R, finaliz
 	}
 
 	existingFinalizers := accessor.GetFinalizers()
-	finalizersToAdd := []string{}
+	var finalizersToAdd []string
 	for _, finalizer := range finalizers {
 		hasFinalizer := false
 		for i := range existingFinalizers {
@@ -120,7 +121,7 @@ func (p *patcher[R, Sp, St]) RemoveFinalizer(ctx context.Context, object R, fina
 		return err
 	}
 
-	copiedFinalizers := []string{}
+	var copiedFinalizers []string
 	existingFinalizers := accessor.GetFinalizers()
 	for i := range existingFinalizers {
 		matchFinalizer := false
