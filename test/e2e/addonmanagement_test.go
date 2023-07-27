@@ -18,7 +18,7 @@ import (
 	"k8s.io/klog/v2"
 
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	clusterv1apha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/ocm/pkg/addon/templateagent"
 	"open-cluster-management.io/ocm/test/e2e/manifests"
@@ -51,7 +51,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 	s := runtime.NewScheme()
 	_ = scheme.AddToScheme(s)
-	_ = clusterv1apha1.Install(s)
+	_ = clusterv1.Install(s)
 	_ = addonapiv1alpha1.Install(s)
 
 	templateResources := []string{

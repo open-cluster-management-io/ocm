@@ -158,29 +158,13 @@ func hubKubeconfigPath() string {
 	return "/managed/hub-kubeconfig/kubeconfig"
 }
 
-const (
-	// ClusterImageRegistriesAnnotation represent the annotation key for image registries, the vale of the annotation
-	// should be a json string like this:
-	//
-	// {
-	//   "registries": [
-	//     {
-	//       "source": "quay.io/ocm",
-	//       "mirrors": "quay.io/open-cluster-management"
-	//     }
-	//   ]
-	// }
-	// TODO: move this to the api repo
-	ClusterImageRegistriesAnnotation = "open-cluster-management.io/image-registries"
-)
-
 func GetAddOnRegistriesPrivateValuesFromClusterAnnotation(
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
 	values := map[string]interface{}{}
 	annotations := cluster.GetAnnotations()
-	klog.V(4).Infof("Try to get image registries from annotation %v", annotations[ClusterImageRegistriesAnnotation])
-	if len(annotations[ClusterImageRegistriesAnnotation]) == 0 {
+	klog.V(4).Infof("Try to get image registries from annotation %v", annotations[clusterv1.ClusterImageRegistriesAnnotationKey])
+	if len(annotations[clusterv1.ClusterImageRegistriesAnnotationKey]) == 0 {
 		return values, nil
 	}
 	type ImageRegistries struct {
@@ -188,9 +172,9 @@ func GetAddOnRegistriesPrivateValuesFromClusterAnnotation(
 	}
 
 	imageRegistries := ImageRegistries{}
-	err := json.Unmarshal([]byte(annotations[ClusterImageRegistriesAnnotation]), &imageRegistries)
+	err := json.Unmarshal([]byte(annotations[clusterv1.ClusterImageRegistriesAnnotationKey]), &imageRegistries)
 	if err != nil {
-		klog.Errorf("failed to unmarshal the annotation %v, err %v", annotations[ClusterImageRegistriesAnnotation], err)
+		klog.Errorf("failed to unmarshal the annotation %v, err %v", annotations[clusterv1.ClusterImageRegistriesAnnotationKey], err)
 		return values, err
 	}
 

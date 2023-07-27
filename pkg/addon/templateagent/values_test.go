@@ -29,7 +29,7 @@ func TestGetAddOnRegistriesPrivateValuesFromClusterAnnotation(t *testing.T) {
 			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						ClusterImageRegistriesAnnotation: `{"registries-test":[{"mirror-test":"quay.io/ocm","source-test":"quay-test.io/ocm"}]}`,
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries-test":[{"mirror-test":"quay.io/ocm","source-test":"quay-test.io/ocm"}]}`,
 					},
 				},
 			},
@@ -40,7 +40,7 @@ func TestGetAddOnRegistriesPrivateValuesFromClusterAnnotation(t *testing.T) {
 			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						ClusterImageRegistriesAnnotation: `{"registries":`,
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":`,
 					},
 				},
 			},
@@ -52,7 +52,7 @@ func TestGetAddOnRegistriesPrivateValuesFromClusterAnnotation(t *testing.T) {
 			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						ClusterImageRegistriesAnnotation: `{"registries":[{"mirror":"quay.io/ocm","source":"quay-test.io/ocm"}]}`,
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"quay.io/ocm","source":"quay-test.io/ocm"}]}`,
 					},
 				},
 			},
@@ -70,7 +70,7 @@ func TestGetAddOnRegistriesPrivateValuesFromClusterAnnotation(t *testing.T) {
 			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						ClusterImageRegistriesAnnotation: `{"registries":[{"mirror":"quay.io/ocm/test","source":"quay.io/open-cluster-management/test"}]}`,
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"quay.io/ocm/test","source":"quay.io/open-cluster-management/test"}]}`,
 					},
 				},
 			},

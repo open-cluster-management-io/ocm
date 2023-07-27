@@ -234,3 +234,20 @@ const (
 	// ClusterNameLabelKey is the key of a label to set ManagedCluster name.
 	ClusterNameLabelKey = "open-cluster-management.io/cluster-name"
 )
+
+const (
+	// ClusterImageRegistriesAnnotationKey is an annotation key on ManagedCluster to configure image override for addons
+	// running on the ManagedCluster, the value of the annotation should be a json string like this:
+	//
+	// {
+	//   "registries": [
+	//     {
+	//       "source": "quay.io/ocm",
+	//       "mirrors": "quay.io/open-cluster-management"
+	//     }
+	//   ]
+	// }
+	//
+	// Note: Image registries configured in the addonDeploymentConfig will take precedence over this annotation.
+	ClusterImageRegistriesAnnotationKey = "open-cluster-management.io/image-registries"
+)
