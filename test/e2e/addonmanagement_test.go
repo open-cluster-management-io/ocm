@@ -459,30 +459,6 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			return err
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
-		// TODO: make the addon-framework deploy controller watch the ManagedCluster resurce, after that
-		// we can remove this
-		ginkgo.By("UPDATE ManagedClusterAddOn to trigger reconcile")
-		gomega.Eventually(func() error {
-			addon, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(
-				context.Background(), addOnName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			newAddon := addon.DeepCopy()
-			annotations := addon.Annotations
-			if annotations == nil {
-				annotations = make(map[string]string)
-			}
-			annotations["test"] = rand.String(6)
-			newAddon.Annotations = annotations
-			_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Update(
-				context.Background(), newAddon, metav1.UpdateOptions{})
-			if err != nil {
-				return err
-			}
-			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
-
 		ginkgo.By("Make sure addon is configured")
 		gomega.Eventually(func() error {
 			agentDeploy, err := t.SpokeKubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
@@ -518,26 +494,6 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			_, err = t.ClusterClient.ClusterV1().ManagedClusters().Update(
 				context.Background(), newCluster, metav1.UpdateOptions{})
 			return err
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
-
-		// TODO: make the addon-framework deploy controller watch the ManagedCluster resurce, after that
-		// we can remove this
-		ginkgo.By("UPDATE ManagedClusterAddOn to trigger reconcile")
-		gomega.Eventually(func() error {
-			addon, err := t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(
-				context.Background(), addOnName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			newAddon := addon.DeepCopy()
-
-			delete(newAddon.Annotations, "test")
-			_, err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Update(
-				context.Background(), newAddon, metav1.UpdateOptions{})
-			if err != nil {
-				return err
-			}
-			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Make sure addon config is restored")

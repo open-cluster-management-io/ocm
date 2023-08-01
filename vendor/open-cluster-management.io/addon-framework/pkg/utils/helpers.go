@@ -22,6 +22,7 @@ import (
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
 )
@@ -367,4 +368,26 @@ func GetSpecHash(obj *unstructured.Unstructured) (string, error) {
 	hash := sha256.Sum256(specBytes)
 
 	return fmt.Sprintf("%x", hash), nil
+}
+
+// MapValueChanged returns true if the value of the given key in the new map is different from the old map
+func MapValueChanged(old, new map[string]string, key string) bool {
+	oval, ok := old[key]
+	nval, nk := new[key]
+	if !ok && !nk {
+		return false
+	}
+	if ok && nk {
+		return oval != nval
+	}
+	return true
+}
+
+// ClusterImageRegistriesAnnotationChanged returns true if the value of the ClusterImageRegistriesAnnotationKey
+// in the new managed cluster annotation is different from the old managed cluster annotation
+func ClusterImageRegistriesAnnotationChanged(old, new *clusterv1.ManagedCluster) bool {
+	if new == nil || old == nil {
+		return false
+	}
+	return MapValueChanged(old.Annotations, new.Annotations, clusterv1.ClusterImageRegistriesAnnotationKey)
 }

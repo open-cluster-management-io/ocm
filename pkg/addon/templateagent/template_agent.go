@@ -116,6 +116,7 @@ func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 			CSRApproveCheck:   a.TemplateCSRApproveCheckFunc(),
 			CSRSign:           a.TemplateCSRSignFunc(),
 		},
+		AgentDeployTriggerClusterFilter: utils.ClusterImageRegistriesAnnotationChanged,
 	}
 }
 
