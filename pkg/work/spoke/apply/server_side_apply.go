@@ -2,7 +2,6 @@ package apply
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -11,10 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/utils/pointer"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
@@ -53,16 +50,10 @@ func (c *ServerSideApply) Apply(
 		}
 	}
 
-	patch, err := json.Marshal(required)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO use Apply method instead when upgrading the client-go to 0.25.x
 	obj, err := c.client.
 		Resource(gvr).
 		Namespace(required.GetNamespace()).
-		Patch(ctx, required.GetName(), types.ApplyPatchType, patch, metav1.PatchOptions{FieldManager: fieldManager, Force: pointer.Bool(force)})
+		Apply(ctx, required.GetName(), required, metav1.ApplyOptions{FieldManager: fieldManager, Force: force})
 	resourceKey, _ := cache.MetaNamespaceKeyFunc(required)
 	if err != nil {
 		recorder.Eventf(fmt.Sprintf(
