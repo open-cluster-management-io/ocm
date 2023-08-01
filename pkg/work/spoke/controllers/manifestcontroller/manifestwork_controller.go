@@ -296,6 +296,12 @@ func (m *ManifestWorkController) applyOneManifest(
 		return result
 	}
 
+	// ignore the required object UID to avoid UID precondition failed error
+	if len(required.GetUID()) != 0 {
+		klog.Warningf("Ignore the UID %s for the manifest index %d", required.GetUID(), index)
+		required.SetUID("")
+	}
+
 	resMeta, gvr, err := helper.BuildResourceMeta(index, required, m.restMapper)
 	result.resourceMeta = resMeta
 	if err != nil {
