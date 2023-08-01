@@ -15,7 +15,6 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/common/queue"
-	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 )
 
 // AddFinalizerController is to add the cluster.open-cluster-management.io/manifest-work-cleanup finalizer to manifestworks.
@@ -68,7 +67,7 @@ func (m *AddFinalizerController) syncManifestWork(ctx context.Context, originalM
 	}
 
 	// if this conflicts, we'll simply try again later
-	_, err := m.patcher.AddFinalizer(ctx, manifestWork, controllers.ManifestWorkFinalizer)
+	_, err := m.patcher.AddFinalizer(ctx, manifestWork, workapiv1.ManifestWorkFinalizer)
 
 	return err
 }

@@ -20,7 +20,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/work/helper"
-	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 )
 
 // ManifestWorkFinalizeController handles cleanup of manifestwork resources before deletion is allowed.
@@ -107,7 +106,7 @@ func (m *ManifestWorkFinalizeController) sync(ctx context.Context, controllerCon
 
 	m.rateLimiter.Forget(manifestWorkName)
 	manifestWork = manifestWork.DeepCopy()
-	if err := m.patcher.RemoveFinalizer(ctx, manifestWork, controllers.ManifestWorkFinalizer); err != nil {
+	if err := m.patcher.RemoveFinalizer(ctx, manifestWork, workapiv1.ManifestWorkFinalizer); err != nil {
 		return fmt.Errorf("failed to remove finalizer from ManifestWork %s/%s: %w", manifestWork.Namespace, manifestWork.Name, err)
 	}
 

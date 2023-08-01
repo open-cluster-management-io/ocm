@@ -47,7 +47,7 @@ func TestSyncManagedCluster(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				testinghelpers.AssertFinalizers(t, managedCluster, []string{managedClusterFinalizer})
+				testinghelpers.AssertFinalizers(t, managedCluster, []string{v1.ManagedClusterFinalizer})
 			},
 		},
 		{

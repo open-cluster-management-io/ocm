@@ -264,7 +264,7 @@ var _ = ginkgo.Describe("Work agent", ginkgo.Label("work-agent", "sanity-check")
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "configmaps", Namespace: ns2, Name: "cm3"}},
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Resource: "namespaces", Name: ns1}},
 			}
-			actualAppliedResources := []workapiv1.AppliedManifestResourceMeta{}
+			var actualAppliedResources []workapiv1.AppliedManifestResourceMeta
 			for _, appliedResource := range appliedManifestWork.Status.AppliedResources {
 				actualAppliedResources = append(actualAppliedResources, workapiv1.AppliedManifestResourceMeta{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{

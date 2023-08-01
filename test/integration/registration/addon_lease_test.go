@@ -22,8 +22,6 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-const clusterCleanFinalizer = "cluster.open-cluster-management.io/api-resource-cleanup"
-
 var _ = ginkgo.Describe("Addon Lease Resync", func() {
 	var managedClusterName, hubKubeconfigSecret, hubKubeconfigDir, addOnName string
 	var err error
@@ -56,7 +54,7 @@ var _ = ginkgo.Describe("Addon Lease Resync", func() {
 				return false
 			}
 
-			if spokeCluster.Finalizers[0] != clusterCleanFinalizer {
+			if spokeCluster.Finalizers[0] != clusterv1.ManagedClusterFinalizer {
 				return false
 			}
 

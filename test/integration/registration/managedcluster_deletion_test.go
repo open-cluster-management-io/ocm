@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
@@ -60,7 +61,7 @@ var _ = ginkgo.Describe("Cluster deleting", func() {
 		roleBinding, err := kubeClient.RbacV1().RoleBindings(managedCluster.Name).Get(context.Background(), roleBindingName, metav1.GetOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(len(roleBinding.Finalizers)).Should(gomega.Equal(1))
-		gomega.Expect(roleBinding.Finalizers[0]).Should(gomega.Equal("cluster.open-cluster-management.io/manifest-work-cleanup"))
+		gomega.Expect(roleBinding.Finalizers[0]).Should(gomega.Equal(workapiv1.ManifestWorkFinalizer))
 		gomega.Expect(roleBinding.DeletionTimestamp.IsZero()).Should(gomega.BeFalse())
 
 		// Delete work

@@ -21,7 +21,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/work/helper"
-	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 )
 
 // AppliedManifestWorkFinalizeController handles cleanup of appliedmanifestwork resources before deletion is allowed.
@@ -84,7 +83,7 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 	}
 
 	// don't do work if the finalizer is not present
-	if !helper.HasFinalizer(appliedManifestWork.Finalizers, controllers.AppliedManifestWorkFinalizer) {
+	if !helper.HasFinalizer(appliedManifestWork.Finalizers, workapiv1.AppliedManifestWorkFinalizer) {
 		return nil
 	}
 
@@ -118,7 +117,7 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 	// reset the rate limiter for the appliedmanifestwork
 	m.rateLimiter.Forget(appliedManifestWork.Name)
 
-	if err := m.patcher.RemoveFinalizer(ctx, appliedManifestWork, controllers.AppliedManifestWorkFinalizer); err != nil {
+	if err := m.patcher.RemoveFinalizer(ctx, appliedManifestWork, workapiv1.AppliedManifestWorkFinalizer); err != nil {
 		return fmt.Errorf("failed to remove finalizer from AppliedManifestWork %s: %w", appliedManifestWork.Name, err)
 	}
 	return nil

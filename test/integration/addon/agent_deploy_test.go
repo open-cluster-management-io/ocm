@@ -199,7 +199,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		// do nothing if cluster is deleting and addon is not deleted
 		cluster, err := hubClusterClient.ClusterV1().ManagedClusters().Get(context.Background(), managedClusterName, metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		cluster.SetFinalizers([]string{"cluster.open-cluster-management.io/api-resource-cleanup"})
+		cluster.SetFinalizers([]string{clusterv1.ManagedClusterFinalizer})
 		_, err = hubClusterClient.ClusterV1().ManagedClusters().Update(context.Background(), cluster, metav1.UpdateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
