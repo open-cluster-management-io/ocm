@@ -781,11 +781,11 @@ func assertManifestWorkAppliedSuccessfully(workNamespace, workName string,
 
 	// check manifest status conditions
 	if ok := haveManifestCondition(work.Status.ResourceStatus.Manifests,
-		string(workapiv1.ManifestApplied), expectedManifestStatuses); !ok {
+		workapiv1.ManifestApplied, expectedManifestStatuses); !ok {
 		return fmt.Errorf("%s not equal", workapiv1.ManifestApplied)
 	}
 	if ok := haveManifestCondition(work.Status.ResourceStatus.Manifests,
-		string(workapiv1.ManifestAvailable), expectedManifestStatuses); !ok {
+		workapiv1.ManifestAvailable, expectedManifestStatuses); !ok {
 		return fmt.Errorf("%s not equal", workapiv1.ManifestAvailable)
 	}
 
