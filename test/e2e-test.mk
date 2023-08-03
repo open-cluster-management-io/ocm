@@ -7,6 +7,8 @@ KUBECTL?=kubectl
 KUBECONFIG?=./.kubeconfig
 HUB_KUBECONFIG?=./.hub-kubeconfig
 KLUSTERLET_DEPLOY_MODE?=Default
+MANAGED_CLUSTER_NAME?=cluster1
+KLUSTERLET_NAME?=klusterlet
 
 SED_CMD:=sed
 ifeq ($(GOHOSTOS),darwin)

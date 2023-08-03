@@ -14,9 +14,11 @@ import (
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
-const addOnDefaultConfigSpecHash = "287d774850847584cc3ebd8b72e2ad3ef8ac6c31803a59324943a7f94054b08a"
-const addOnTest1ConfigSpecHash = "d76dad0a6448910652950163cc4324e4616ab5143046555c5ad5b003a622ab8d"
-const addOnTest2ConfigSpecHash = "3f815fe02492288fd235ed9bd881987aebb6f15fd2fa2b37c982525c293679bd"
+// TODO: The spec hash is hardcoded here and will break the test once the API changes.
+// We need a better way to handle the spec hash.
+const addOnDefaultConfigSpecHash = "e374ecc7f9ab844fd9ccdf4630a8bd317a8e1821716b215f219b4d3b10f12680"
+const addOnTest1ConfigSpecHash = "d00480f0e83b1a6222d550c84993a50e08b3c41a59b22262bd5080a4c18dd027"
+const addOnTest2ConfigSpecHash = "51dde570b90ada12bcaf0650f5157560ab9fd29e34044d380a8537df159e8391"
 
 var addOnDefaultConfigSpec = addonapiv1alpha1.AddOnDeploymentConfigSpec{
 	CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{

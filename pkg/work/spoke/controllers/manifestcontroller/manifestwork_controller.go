@@ -196,7 +196,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 		manifestWork.Status.ResourceStatus.Manifests, newManifestConditions)
 	// handle condition type Applied
 	// #1: Applied - work status condition (with type Applied) is applied if all manifest conditions (with type Applied) are applied
-	if inCondition, exists := allInCondition(string(workapiv1.ManifestApplied), newManifestConditions); exists {
+	if inCondition, exists := allInCondition(workapiv1.ManifestApplied, newManifestConditions); exists {
 		appliedCondition := metav1.Condition{
 			Type:               workapiv1.WorkApplied,
 			ObservedGeneration: manifestWork.Generation,
@@ -296,6 +296,12 @@ func (m *ManifestWorkController) applyOneManifest(
 		return result
 	}
 
+	// ignore the required object UID to avoid UID precondition failed error
+	if len(required.GetUID()) != 0 {
+		klog.Warningf("Ignore the UID %s for the manifest index %d", required.GetUID(), index)
+		required.SetUID("")
+	}
+
 	resMeta, gvr, err := helper.BuildResourceMeta(index, required, m.restMapper)
 	result.resourceMeta = resMeta
 	if err != nil {
@@ -370,7 +376,7 @@ func allInCondition(conditionType string, manifests []workapiv1.ManifestConditio
 func buildAppliedStatusCondition(result applyResult) metav1.Condition {
 	if result.Error != nil {
 		return metav1.Condition{
-			Type:    string(workapiv1.ManifestApplied),
+			Type:    workapiv1.ManifestApplied,
 			Status:  metav1.ConditionFalse,
 			Reason:  "AppliedManifestFailed",
 			Message: fmt.Sprintf("Failed to apply manifest: %v", result.Error),
@@ -378,7 +384,7 @@ func buildAppliedStatusCondition(result applyResult) metav1.Condition {
 	}
 
 	return metav1.Condition{
-		Type:    string(workapiv1.ManifestApplied),
+		Type:    workapiv1.ManifestApplied,
 		Status:  metav1.ConditionTrue,
 		Reason:  "AppliedManifestComplete",
 		Message: "Apply manifest complete",

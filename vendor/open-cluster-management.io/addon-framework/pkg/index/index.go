@@ -21,6 +21,7 @@ import (
 const (
 	ClusterManagementAddonByPlacement = "clusterManagementAddonByPlacement"
 	ManagedClusterAddonByName         = "managedClusterAddonByName"
+	ManagedClusterAddonByNamespace    = "managedClusterAddonByNamespace"
 )
 
 func IndexClusterManagementAddonByPlacement(obj interface{}) ([]string, error) {
@@ -51,6 +52,16 @@ func IndexManagedClusterAddonByName(obj interface{}) ([]string, error) {
 	}
 
 	return []string{mca.Name}, nil
+}
+
+func IndexManagedClusterAddonByNamespace(obj interface{}) ([]string, error) {
+	mca, ok := obj.(*addonv1alpha1.ManagedClusterAddOn)
+
+	if !ok {
+		return []string{}, fmt.Errorf("obj %T is not a ManagedClusterAddon", obj)
+	}
+
+	return []string{mca.Namespace}, nil
 }
 
 func ClusterManagementAddonByPlacementQueueKey(

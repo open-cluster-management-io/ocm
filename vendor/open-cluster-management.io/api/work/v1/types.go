@@ -475,22 +475,28 @@ const (
 	JsonRaw ValueType = "JsonRaw"
 )
 
-// ManifestConditionType represents the condition type of a single
-// resource manifest deployed on the managed cluster.
-type ManifestConditionType string
-
 const (
 	// ManifestProgressing represents that the resource is being applied on the managed cluster
-	ManifestProgressing ManifestConditionType = "Progressing"
+	ManifestProgressing string = "Progressing"
 	// ManifestApplied represents that the resource object is applied
 	// on the managed cluster.
-	ManifestApplied ManifestConditionType = "Applied"
+	ManifestApplied string = "Applied"
 	// ManifestAvailable represents that the resource object exists
 	// on the managed cluster.
-	ManifestAvailable ManifestConditionType = "Available"
+	ManifestAvailable string = "Available"
 	// ManifestDegraded represents that the current state of resource object does not
 	// match the desired state for a certain period.
-	ManifestDegraded ManifestConditionType = "Degraded"
+	ManifestDegraded string = "Degraded"
+)
+
+const (
+	// ManifestWorkFinalizer is the name of the finalizer added to manifestworks. It is used to ensure
+	// related appliedmanifestwork of a manifestwork are deleted before the manifestwork itself is deleted
+	ManifestWorkFinalizer = "cluster.open-cluster-management.io/manifest-work-cleanup"
+	// AppliedManifestWorkFinalizer is the name of the finalizer added to appliedmanifestwork. It is to
+	// ensure all resource relates to appliedmanifestwork is deleted before appliedmanifestwork itself
+	// is deleted.
+	AppliedManifestWorkFinalizer = "cluster.open-cluster-management.io/applied-manifest-work-cleanup"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

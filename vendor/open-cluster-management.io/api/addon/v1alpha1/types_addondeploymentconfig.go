@@ -45,6 +45,11 @@ type AddOnDeploymentConfigSpec struct {
 	//
 	// +optional
 	Registries []ImageMirror `json:"registries,omitempty"`
+
+	// ProxyConfig holds proxy settings for add-on agent on the managed cluster.
+	// Empty means no proxy settings is available.
+	// +optional
+	ProxyConfig ProxyConfig `json:"proxyConfig,omitempty"`
 }
 
 // CustomizedVariable represents a customized variable for add-on deployment.
@@ -87,6 +92,22 @@ type ImageMirror struct {
 	// Source is the source registry. All image registries will be replaced by Mirror if Source is empty.
 	// +optional
 	Source string `json:"source"`
+}
+
+// ProxyConfig describes the proxy settings for the add-on agent
+type ProxyConfig struct {
+	// HTTPProxy is the URL of the proxy for HTTP requests
+	// +optional
+	HTTPProxy string `json:"httpProxy,omitempty"`
+
+	// HTTPSProxy is the URL of the proxy for HTTPS requests
+	// +optional
+	HTTPSProxy string `json:"httpsProxy,omitempty"`
+
+	// NoProxy is a comma-separated list of hostnames and/or CIDRs and/or IPs for which the proxy
+	// should not be used.
+	// +optional
+	NoProxy string `json:"noProxy,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -118,6 +118,21 @@ spec:
                       type: object
                     type: array
                 type: object
+              proxyConfig:
+                description: ProxyConfig holds proxy settings for add-on agent on
+                  the managed cluster. Empty means no proxy settings is available.
+                properties:
+                  httpProxy:
+                    description: HTTPProxy is the URL of the proxy for HTTP requests
+                    type: string
+                  httpsProxy:
+                    description: HTTPSProxy is the URL of the proxy for HTTPS requests
+                    type: string
+                  noProxy:
+                    description: NoProxy is a comma-separated list of hostnames and/or
+                      CIDRs and/or IPs for which the proxy should not be used.
+                    type: string
+                type: object
               registries:
                 description: "Registries describes how to override images used by
                   the addon agent on the managed cluster. the following example will

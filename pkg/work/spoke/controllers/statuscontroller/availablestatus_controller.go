@@ -151,7 +151,7 @@ func aggregateManifestConditions(generation int64, manifests []workapiv1.Manifes
 	available, unavailable, unknown := 0, 0, 0
 	for _, manifest := range manifests {
 		for _, condition := range manifest.Conditions {
-			if condition.Type != string(workapiv1.ManifestAvailable) {
+			if condition.Type != workapiv1.ManifestAvailable {
 				continue
 			}
 
@@ -249,7 +249,7 @@ func (c *AvailableStatusController) getFeedbackValues(
 // buildAvailableStatusCondition returns a StatusCondition with type Available for a given manifest resource
 func buildAvailableStatusCondition(resourceMeta workapiv1.ManifestResourceMeta,
 	dynamicClient dynamic.Interface) (*unstructured.Unstructured, metav1.Condition, error) {
-	conditionType := string(workapiv1.ManifestAvailable)
+	conditionType := workapiv1.ManifestAvailable
 
 	if len(resourceMeta.Resource) == 0 || len(resourceMeta.Version) == 0 || len(resourceMeta.Name) == 0 {
 		return nil, metav1.Condition{
