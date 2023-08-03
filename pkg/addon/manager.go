@@ -84,31 +84,21 @@ func RunManager(ctx context.Context, controllerContext *controllercmd.Controller
 		return err
 	}
 
-	// addonConfigController
 	err = addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
-		cache.Indexers{index.AddonByConfig: index.IndexAddonByConfig},
+		cache.Indexers{
+			index.ManagedClusterAddonByNamespace: index.IndexManagedClusterAddonByNamespace, // addonDeployController
+			index.ManagedClusterAddonByName:      index.IndexManagedClusterAddonByName,      // addonConfigController
+			index.AddonByConfig:                  index.IndexAddonByConfig,                  // addonConfigController
+		},
 	)
 	if err != nil {
 		return err
 	}
-	// managementAddonConfigController
-	err = addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
-		cache.Indexers{index.ClusterManagementAddonByConfig: index.IndexClusterManagementAddonByConfig})
-	if err != nil {
-		return err
-	}
 
 	err = addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
 		cache.Indexers{
-			index.ClusterManagementAddonByPlacement: index.IndexClusterManagementAddonByPlacement,
-		})
-	if err != nil {
-		return err
-	}
-
-	err = addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
-		cache.Indexers{
-			index.ManagedClusterAddonByName: index.IndexManagedClusterAddonByName,
+			index.ClusterManagementAddonByConfig:    index.IndexClusterManagementAddonByConfig,    // managementAddonConfigController
+			index.ClusterManagementAddonByPlacement: index.IndexClusterManagementAddonByPlacement, // addonConfigController
 		})
 	if err != nil {
 		return err

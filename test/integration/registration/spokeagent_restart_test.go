@@ -176,20 +176,16 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 
 		ginkgo.By("Check existence of csr and ManagedCluster")
 		// the csr should be created
-		gomega.Eventually(func() bool {
-			if _, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName); err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		gomega.Eventually(func() error {
+			_, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName)
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		// the spoke cluster should be created
-		gomega.Eventually(func() bool {
-			if _, err := util.GetManagedCluster(clusterClient, managedClusterName); err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		gomega.Eventually(func() error {
+			_, err := util.GetManagedCluster(clusterClient, managedClusterName)
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Accept ManagedCluster and approve csr")
 		err = util.AcceptManagedCluster(clusterClient, managedClusterName)
@@ -200,12 +196,10 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 
 		ginkgo.By("Check if hub kubeconfig secret is updated")
 		// the hub kubeconfig secret should be filled after the csr is approved
-		gomega.Eventually(func() bool {
-			if _, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret); err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		gomega.Eventually(func() error {
+			_, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret)
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Check if ManagedCluster joins the hub")
 		// the spoke cluster should have joined condition finally
@@ -239,20 +233,16 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 
 		ginkgo.By("Check the existence of csr and the new ManagedCluster")
 		// the csr should be created
-		gomega.Eventually(func() bool {
-			if _, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName); err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		gomega.Eventually(func() error {
+			_, err := util.FindUnapprovedSpokeCSR(kubeClient, managedClusterName)
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		// the spoke cluster should be created
-		gomega.Eventually(func() bool {
-			if _, err := util.GetManagedCluster(clusterClient, managedClusterName); err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		gomega.Eventually(func() error {
+			_, err := util.GetManagedCluster(clusterClient, managedClusterName)
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Accept the new ManagedCluster and approve csr")
 		err = util.AcceptManagedCluster(clusterClient, managedClusterName)
@@ -263,12 +253,10 @@ var _ = ginkgo.Describe("Agent Restart", func() {
 
 		ginkgo.By("Check if hub kubeconfig secret is updated")
 		// the hub kubeconfig secret should be filled after the csr is approved
-		gomega.Eventually(func() bool {
-			if _, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret); err != nil {
-				return false
-			}
-			return true
-		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		gomega.Eventually(func() error {
+			_, err := util.GetFilledHubKubeConfigSecret(kubeClient, testNamespace, hubKubeconfigSecret)
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Check if the new ManagedCluster joins the hub")
 		// the spoke cluster should have joined condition finally

@@ -1,8 +1,11 @@
 package templateagent
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
+
+	"k8s.io/klog/v2"
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -52,7 +55,7 @@ func (a *CRDTemplateAgentAddon) getValues(
 
 	defaultSortedKeys, defaultValues, err := a.getDefaultValues(cluster, addon, template)
 	if err != nil {
-		return presetValues, overrideValues, privateValues, nil
+		return presetValues, overrideValues, privateValues, err
 	}
 	overrideValues = addonfactory.MergeValues(overrideValues, defaultValues)
 
@@ -153,4 +156,34 @@ func (a *CRDTemplateAgentAddon) sortValueKeys(value addonfactory.Values) []strin
 
 func hubKubeconfigPath() string {
 	return "/managed/hub-kubeconfig/kubeconfig"
+}
+
+func GetAddOnRegistriesPrivateValuesFromClusterAnnotation(
+	cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+	values := map[string]interface{}{}
+	annotations := cluster.GetAnnotations()
+	klog.V(4).Infof("Try to get image registries from annotation %v", annotations[clusterv1.ClusterImageRegistriesAnnotationKey])
+	if len(annotations[clusterv1.ClusterImageRegistriesAnnotationKey]) == 0 {
+		return values, nil
+	}
+	type ImageRegistries struct {
+		Registries []addonapiv1alpha1.ImageMirror `json:"registries"`
+	}
+
+	imageRegistries := ImageRegistries{}
+	err := json.Unmarshal([]byte(annotations[clusterv1.ClusterImageRegistriesAnnotationKey]), &imageRegistries)
+	if err != nil {
+		klog.Errorf("failed to unmarshal the annotation %v, err %v", annotations[clusterv1.ClusterImageRegistriesAnnotationKey], err)
+		return values, err
+	}
+
+	if len(imageRegistries.Registries) == 0 {
+		return values, nil
+	}
+
+	klog.V(4).Infof("Image registries values %v", imageRegistries.Registries)
+	return addonfactory.Values{
+		RegistriesPrivateValueKey: imageRegistries.Registries,
+	}, nil
 }

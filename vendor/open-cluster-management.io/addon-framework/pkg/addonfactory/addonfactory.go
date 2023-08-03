@@ -124,6 +124,24 @@ func (f *AgentAddonFactory) WithHostingCluster(cluster *clusterv1.ManagedCluster
 	return f
 }
 
+// WithAgentDeployTriggerClusterFilter defines the filter func to trigger the agent deploy/redploy when cluster info is
+// changed. Addons that need information from the ManagedCluster resource when deploying the agent should use this
+// function to set what information they need, otherwise the expected/up-to-date agent may be deployed delayed since the
+// default filter func returns false when the ManagedCluster resource is updated.
+//
+// For example, the agentAddon needs information from the ManagedCluster annotation, it can set the filter function
+// like:
+//
+//	WithAgentDeployClusterTriggerFilter(func(old, new *clusterv1.ManagedCluster) bool {
+//	 return !equality.Semantic.DeepEqual(old.Annotations, new.Annotations)
+//	})
+func (f *AgentAddonFactory) WithAgentDeployTriggerClusterFilter(
+	filter func(old, new *clusterv1.ManagedCluster) bool,
+) *AgentAddonFactory {
+	f.agentAddonOptions.AgentDeployTriggerClusterFilter = filter
+	return f
+}
+
 // BuildHelmAgentAddon builds a helm agentAddon instance.
 func (f *AgentAddonFactory) BuildHelmAgentAddon() (agent.AgentAddon, error) {
 	if err := validateSupportedConfigGVRs(f.agentAddonOptions.SupportedConfigGVRs); err != nil {
