@@ -111,7 +111,7 @@ func TestSyncManifestWork(t *testing.T) {
 				if len(work.Status.ResourceStatus.Manifests) != 1 {
 					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests))
 				}
-				if !hasStatusCondition(work.Status.ResourceStatus.Manifests[0].Conditions, string(workapiv1.ManifestAvailable), metav1.ConditionTrue) {
+				if !hasStatusCondition(work.Status.ResourceStatus.Manifests[0].Conditions, workapiv1.ManifestAvailable, metav1.ConditionTrue) {
 					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests[0].Conditions))
 				}
 
@@ -141,10 +141,10 @@ func TestSyncManifestWork(t *testing.T) {
 				if err := json.Unmarshal(p, work); err != nil {
 					t.Fatal(err)
 				}
-				if !hasStatusCondition(work.Status.ResourceStatus.Manifests[0].Conditions, string(workapiv1.ManifestAvailable), metav1.ConditionTrue) {
+				if !hasStatusCondition(work.Status.ResourceStatus.Manifests[0].Conditions, workapiv1.ManifestAvailable, metav1.ConditionTrue) {
 					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests[0].Conditions))
 				}
-				if !hasStatusCondition(work.Status.ResourceStatus.Manifests[1].Conditions, string(workapiv1.ManifestAvailable), metav1.ConditionFalse) {
+				if !hasStatusCondition(work.Status.ResourceStatus.Manifests[1].Conditions, workapiv1.ManifestAvailable, metav1.ConditionFalse) {
 					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests[1].Conditions))
 				}
 
@@ -177,10 +177,10 @@ func TestSyncManifestWork(t *testing.T) {
 				if len(work.Status.ResourceStatus.Manifests) != 2 {
 					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests))
 				}
-				if !hasStatusCondition(work.Status.ResourceStatus.Manifests[0].Conditions, string(workapiv1.ManifestAvailable), metav1.ConditionTrue) {
+				if !hasStatusCondition(work.Status.ResourceStatus.Manifests[0].Conditions, workapiv1.ManifestAvailable, metav1.ConditionTrue) {
 					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests[0].Conditions))
 				}
-				if !hasStatusCondition(work.Status.ResourceStatus.Manifests[1].Conditions, string(workapiv1.ManifestAvailable), metav1.ConditionUnknown) {
+				if !hasStatusCondition(work.Status.ResourceStatus.Manifests[1].Conditions, workapiv1.ManifestAvailable, metav1.ConditionUnknown) {
 					t.Fatal(spew.Sdump(work.Status.ResourceStatus.Manifests[1].Conditions))
 				}
 
@@ -433,7 +433,7 @@ func newManifestWthCondition(group, version, resource, namespace, name string) w
 	cond := newManifest(group, version, resource, namespace, name)
 	cond.Conditions = []metav1.Condition{
 		{
-			Type:    string(workapiv1.ManifestAvailable),
+			Type:    workapiv1.ManifestAvailable,
 			Status:  metav1.ConditionTrue,
 			Reason:  "ResourceAvailable",
 			Message: "Resource is available",

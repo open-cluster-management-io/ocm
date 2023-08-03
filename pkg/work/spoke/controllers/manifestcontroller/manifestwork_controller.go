@@ -196,7 +196,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 		manifestWork.Status.ResourceStatus.Manifests, newManifestConditions)
 	// handle condition type Applied
 	// #1: Applied - work status condition (with type Applied) is applied if all manifest conditions (with type Applied) are applied
-	if inCondition, exists := allInCondition(string(workapiv1.ManifestApplied), newManifestConditions); exists {
+	if inCondition, exists := allInCondition(workapiv1.ManifestApplied, newManifestConditions); exists {
 		appliedCondition := metav1.Condition{
 			Type:               workapiv1.WorkApplied,
 			ObservedGeneration: manifestWork.Generation,
@@ -376,7 +376,7 @@ func allInCondition(conditionType string, manifests []workapiv1.ManifestConditio
 func buildAppliedStatusCondition(result applyResult) metav1.Condition {
 	if result.Error != nil {
 		return metav1.Condition{
-			Type:    string(workapiv1.ManifestApplied),
+			Type:    workapiv1.ManifestApplied,
 			Status:  metav1.ConditionFalse,
 			Reason:  "AppliedManifestFailed",
 			Message: fmt.Sprintf("Failed to apply manifest: %v", result.Error),
@@ -384,7 +384,7 @@ func buildAppliedStatusCondition(result applyResult) metav1.Condition {
 	}
 
 	return metav1.Condition{
-		Type:    string(workapiv1.ManifestApplied),
+		Type:    workapiv1.ManifestApplied,
 		Status:  metav1.ConditionTrue,
 		Reason:  "AppliedManifestComplete",
 		Message: "Apply manifest complete",

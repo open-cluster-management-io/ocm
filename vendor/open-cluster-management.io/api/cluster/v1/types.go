@@ -251,3 +251,9 @@ const (
 	// Note: Image registries configured in the addonDeploymentConfig will take precedence over this annotation.
 	ClusterImageRegistriesAnnotationKey = "open-cluster-management.io/image-registries"
 )
+
+const (
+	// ManagedClusterFinalizer is the name of the finalizer added to ManagedCluster, it is to ensure that resources
+	// relating to the ManagedCluster is removed when the ManagedCluster is deleted.
+	ManagedClusterFinalizer = "cluster.open-cluster-management.io/api-resource-cleanup"
+)
