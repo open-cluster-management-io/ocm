@@ -36,7 +36,7 @@ func (c *Options) RunWebhookServer() error {
 		WebhookServer: webhook.NewServer(webhook.Options{
 			TLSOpts: []func(config *tls.Config){
 				func(config *tls.Config) {
-					config.MinVersion = tls.VersionTLS13
+					config.MinVersion = tls.VersionTLS12
 				},
 			},
 			Port:    c.Port,

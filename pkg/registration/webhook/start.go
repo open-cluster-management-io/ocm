@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"context"
+	"crypto/tls"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -36,7 +37,13 @@ func (c *Options) RunWebhookServer() error {
 		Port:                   c.Port,
 		HealthProbeBindAddress: ":8000",
 		CertDir:                c.CertDir,
-		WebhookServer:          webhook.NewServer(webhook.Options{TLSMinVersion: "1.3"}),
+		WebhookServer: webhook.NewServer(webhook.Options{
+			TLSOpts: []func(config *tls.Config){
+				func(config *tls.Config) {
+					config.MinVersion = tls.VersionTLS12
+				},
+			},
+		}),
 	})
 	logger := klog.LoggerWithName(klog.FromContext(context.Background()), "Webhook Server") //MYTODO: Recheck it later
 
