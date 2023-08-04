@@ -3,6 +3,8 @@ SHELL :=/bin/bash
 all: build
 .PHONY: all
 
+export CGO_ENABLED  = 1
+
 # Include the library makefile
 include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
