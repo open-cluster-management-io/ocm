@@ -21,7 +21,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/features"
-	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 	"open-cluster-management.io/ocm/pkg/work/spoke/statusfeedback"
 )
@@ -194,7 +193,7 @@ func TestSyncManifestWork(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			testingWork, _ := spoketesting.NewManifestWork(0)
-			testingWork.Finalizers = []string{controllers.ManifestWorkFinalizer}
+			testingWork.Finalizers = []string{workapiv1.ManifestWorkFinalizer}
 			testingWork.Status = workapiv1.ManifestWorkStatus{
 				Conditions: c.workConditions,
 				ResourceStatus: workapiv1.ManifestResourceStatus{
@@ -387,7 +386,7 @@ func TestStatusFeedback(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			testingWork, _ := spoketesting.NewManifestWork(0)
-			testingWork.Finalizers = []string{controllers.ManifestWorkFinalizer}
+			testingWork.Finalizers = []string{workapiv1.ManifestWorkFinalizer}
 			testingWork.Spec.ManifestConfigs = c.configOption
 			testingWork.Status = workapiv1.ManifestWorkStatus{
 				ResourceStatus: workapiv1.ManifestResourceStatus{

@@ -26,7 +26,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/work/helper"
-	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 	"open-cluster-management.io/ocm/pkg/work/spoke/statusfeedback"
 )
 
@@ -105,7 +104,7 @@ func (c *AvailableStatusController) syncManifestWork(ctx context.Context, origin
 	manifestWork := originalManifestWork.DeepCopy()
 
 	// do nothing when finalizer is not added.
-	if !helper.HasFinalizer(manifestWork.Finalizers, controllers.ManifestWorkFinalizer) {
+	if !helper.HasFinalizer(manifestWork.Finalizers, workapiv1.ManifestWorkFinalizer) {
 		return nil
 	}
 

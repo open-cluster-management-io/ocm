@@ -28,10 +28,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 )
 
-const (
-	managedClusterFinalizer = "cluster.open-cluster-management.io/api-resource-cleanup"
-)
-
 //go:embed manifests
 var manifestFiles embed.FS
 
@@ -103,7 +99,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 
 	newManagedCluster := managedCluster.DeepCopy()
 	if managedCluster.DeletionTimestamp.IsZero() {
-		updated, err := c.patcher.AddFinalizer(ctx, managedCluster, managedClusterFinalizer)
+		updated, err := c.patcher.AddFinalizer(ctx, managedCluster, v1.ManagedClusterFinalizer)
 		if err != nil || updated {
 			return err
 		}
@@ -114,7 +110,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 		if err := c.removeManagedClusterResources(ctx, managedClusterName); err != nil {
 			return err
 		}
-		return c.patcher.RemoveFinalizer(ctx, managedCluster, managedClusterFinalizer)
+		return c.patcher.RemoveFinalizer(ctx, managedCluster, v1.ManagedClusterFinalizer)
 	}
 
 	if !managedCluster.Spec.HubAcceptsClient {

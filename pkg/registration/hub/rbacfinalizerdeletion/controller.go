@@ -25,12 +25,9 @@ import (
 	clusterv1listers "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/ocm/pkg/common/queue"
-)
-
-const (
-	manifestWorkFinalizer = "cluster.open-cluster-management.io/manifest-work-cleanup"
 )
 
 type finalizeController struct {
@@ -123,12 +120,12 @@ func (m *finalizeController) syncRoleBindings(ctx context.Context, controllerCon
 
 	for _, roleBinding := range roleBindings {
 		// Skip if roleBinding has no the finalizer
-		if !hasFinalizer(roleBinding, manifestWorkFinalizer) {
+		if !hasFinalizer(roleBinding, workapiv1.ManifestWorkFinalizer) {
 			continue
 		}
 		// remove finalizer from roleBinding
 		if pendingFinalization(roleBinding) {
-			if err := m.removeFinalizerFromRoleBinding(ctx, roleBinding, manifestWorkFinalizer); err != nil {
+			if err := m.removeFinalizerFromRoleBinding(ctx, roleBinding, workapiv1.ManifestWorkFinalizer); err != nil {
 				return err
 			}
 		}

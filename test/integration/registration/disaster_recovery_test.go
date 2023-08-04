@@ -132,7 +132,7 @@ var _ = ginkgo.Describe("Disaster Recovery", func() {
 				return false
 			}
 
-			if spokeCluster.Finalizers[0] != clusterCleanFinalizer {
+			if spokeCluster.Finalizers[0] != clusterv1.ManagedClusterFinalizer {
 				return false
 			}
 

@@ -93,7 +93,7 @@ var _ = ginkgo.Describe("Cluster Claim", func() {
 				return false
 			}
 
-			if spokeCluster.Finalizers[0] != clusterCleanFinalizer {
+			if spokeCluster.Finalizers[0] != clusterv1.ManagedClusterFinalizer {
 				return false
 			}
 

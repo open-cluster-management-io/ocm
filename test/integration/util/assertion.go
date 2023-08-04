@@ -152,7 +152,7 @@ func AssertFinalizerAdded(namespace, name string, workClient workclientset.Inter
 		}
 
 		for _, finalizer := range work.Finalizers {
-			if finalizer == "cluster.open-cluster-management.io/manifest-work-cleanup" {
+			if finalizer == workapiv1.ManifestWorkFinalizer {
 				return nil
 			}
 		}
