@@ -829,8 +829,32 @@ func TestReplica(t *testing.T) {
 		t.Errorf("Expected non error when sync, %v", err)
 	}
 
+	// should have 3 replicas for clusters with multiple nodes
 	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "update", "", "cluster1", 3)
 	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster1", operatorapiv1.InstallModeDefault, 3)
+
+	klusterlet = newKlusterlet("klusterlet", "testns", "cluster1")
+	klusterlet.Status.Conditions = []metav1.Condition{
+		{
+			Type:   helpers.KlusterletRebootstrapProgressing,
+			Status: metav1.ConditionTrue,
+		},
+	}
+	if err := controller.operatorStore.Update(klusterlet); err != nil {
+		t.Fatal(err)
+	}
+
+	controller.kubeClient.ClearActions()
+	controller.operatorClient.ClearActions()
+
+	err = controller.controller.sync(context.TODO(), syncContext)
+	if err != nil {
+		t.Errorf("Expected non error when sync, %v", err)
+	}
+
+	// should have 0 replicas for klusterlet in rebootstrapping state
+	assertRegistrationDeployment(t, controller.kubeClient.Actions(), "update", "", "cluster1", 0)
+	assertWorkDeployment(t, controller.kubeClient.Actions(), "update", "cluster1", operatorapiv1.InstallModeDefault, 0)
 }
 
 func TestClusterNameChange(t *testing.T) {

@@ -141,6 +141,7 @@ func (o *Options) RunKlusterletOperator(ctx context.Context, controllerContext *
 
 	bootstrapController := bootstrapcontroller.NewBootstrapController(
 		kubeClient,
+		operatorClient.OperatorV1().Klusterlets(),
 		operatorInformer.Operator().V1().Klusterlets(),
 		secretInformers,
 		controllerContext.EventRecorder,

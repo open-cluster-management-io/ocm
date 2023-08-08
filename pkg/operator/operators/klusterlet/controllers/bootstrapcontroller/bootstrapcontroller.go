@@ -22,9 +22,12 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
 
+	operatorv1client "open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1"
 	operatorinformer "open-cluster-management.io/api/client/operator/informers/externalversions/operator/v1"
 	operatorlister "open-cluster-management.io/api/client/operator/listers/operator/v1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
@@ -40,19 +43,25 @@ var BootstrapControllerSyncInterval = 5 * time.Minute
 type bootstrapController struct {
 	kubeClient       kubernetes.Interface
 	klusterletLister operatorlister.KlusterletLister
+	klusterletClient operatorv1client.KlusterletInterface
 	secretInformers  map[string]coreinformer.SecretInformer
+	patcher          patcher.Patcher[*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus]
 }
 
 // NewBootstrapController returns a bootstrapController
 func NewBootstrapController(
 	kubeClient kubernetes.Interface,
+	klusterletClient operatorv1client.KlusterletInterface,
 	klusterletInformer operatorinformer.KlusterletInformer,
 	secretInformers map[string]coreinformer.SecretInformer,
 	recorder events.Recorder) factory.Controller {
 	controller := &bootstrapController{
 		kubeClient:       kubeClient,
+		klusterletClient: klusterletClient,
 		klusterletLister: klusterletInformer.Lister(),
 		secretInformers:  secretInformers,
+		patcher: patcher.NewPatcher[
+			*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](klusterletClient),
 	}
 	return factory.New().WithSync(controller.sync).
 		WithInformersQueueKeysFunc(bootstrapSecretQueueKeyFunc(controller.klusterletLister),
@@ -91,6 +100,18 @@ func (k *bootstrapController) sync(ctx context.Context, controllerContext factor
 		}
 
 		return nil
+	}
+
+	// handle rebootstrap if the klusterlet is in rebootstrapping state
+	klusterlet, err := k.klusterletLister.Get(klusterletName)
+	if err != nil {
+		return err
+	}
+	requeueFunc := func(duration time.Duration) {
+		controllerContext.Queue().AddAfter(queueKey, duration)
+	}
+	if meta.IsStatusConditionTrue(klusterlet.Status.Conditions, helpers.KlusterletRebootstrapProgressing) {
+		return k.processRebootstrap(ctx, agentNamespace, klusterlet, controllerContext.Recorder(), requeueFunc)
 	}
 
 	bootstrapHubKubeconfigSecret, err := k.secretInformers[helpers.BootstrapHubKubeConfig].Lister().Secrets(agentNamespace).Get(helpers.BootstrapHubKubeConfig)
@@ -136,7 +157,7 @@ func (k *bootstrapController) sync(ctx context.Context, controllerContext factor
 		!bytes.Equal(bootstrapKubeconfig.CertificateAuthorityData, hubKubeconfig.CertificateAuthorityData) {
 		// the bootstrap kubeconfig secret is changed, reload the klusterlet agents
 		reloadReason := fmt.Sprintf("the bootstrap secret %s/%s is changed", agentNamespace, helpers.BootstrapHubKubeConfig)
-		return k.reloadAgents(ctx, controllerContext, agentNamespace, klusterletName, reloadReason)
+		return k.startRebootstrap(ctx, klusterlet, reloadReason, controllerContext.Recorder(), requeueFunc)
 	}
 
 	expired, err := isHubKubeconfigSecretExpired(hubKubeconfigSecret)
@@ -154,33 +175,72 @@ func (k *bootstrapController) sync(ctx context.Context, controllerContext factor
 
 	// the hub kubeconfig secret cert is expired, reload klusterlet to restart bootstrap
 	reloadReason := fmt.Sprintf("the hub kubeconfig secret %s/%s is expired", agentNamespace, helpers.HubKubeConfig)
-	return k.reloadAgents(ctx, controllerContext, agentNamespace, klusterletName, reloadReason)
+	return k.startRebootstrap(ctx, klusterlet, reloadReason, controllerContext.Recorder(), requeueFunc)
 }
 
-// reloadAgents reload klusterlet agents by
-// 1. make the registration agent re-bootstrap by deleting the current hub kubeconfig secret to
-// 2. restart the registration and work agents to reload the new hub ca by deleting the agent deployments
-func (k *bootstrapController) reloadAgents(ctx context.Context, ctrlContext factory.SyncContext, namespace, klusterletName, reason string) error {
-	if err := k.kubeClient.CoreV1().Secrets(namespace).Delete(ctx, helpers.HubKubeConfig, metav1.DeleteOptions{}); err != nil {
+func (k *bootstrapController) processRebootstrap(ctx context.Context, agentNamespace string, klusterlet *operatorapiv1.Klusterlet,
+	recorder events.Recorder, requeueFunc func(time.Duration)) error {
+	deploymentName := fmt.Sprintf("%s-registration-agent", klusterlet.Name)
+	deployment, err := k.kubeClient.AppsV1().Deployments(agentNamespace).Get(ctx, deploymentName, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		return k.completeRebootstrap(ctx, agentNamespace, klusterlet, recorder)
+	}
+	if err != nil {
 		return err
 	}
-	ctrlContext.Recorder().Eventf("HubKubeconfigSecretDeleted", fmt.Sprintf("the hub kubeconfig secret %s/%s is deleted due to %s",
-		namespace, helpers.HubKubeConfig, reason))
 
-	registrationName := fmt.Sprintf("%s-registration-agent", klusterletName)
-	if err := k.kubeClient.AppsV1().Deployments(namespace).Delete(ctx, registrationName, metav1.DeleteOptions{}); err != nil {
+	if deployment.Status.AvailableReplicas == 0 {
+		return k.completeRebootstrap(ctx, agentNamespace, klusterlet, recorder)
+	}
+
+	// there still is registation agent pod running. Resync in 5 seconds
+	requeueFunc(5 * time.Second)
+	return nil
+}
+
+func (k *bootstrapController) startRebootstrap(ctx context.Context, klusterlet *operatorapiv1.Klusterlet, message string,
+	recorder events.Recorder, requeueFunc func(duration time.Duration)) error {
+	klusterletCopy := klusterlet.DeepCopy()
+	meta.SetStatusCondition(&klusterletCopy.Status.Conditions, metav1.Condition{
+		Type:    helpers.KlusterletRebootstrapProgressing,
+		Status:  metav1.ConditionTrue,
+		Reason:  "RebootstrapStarted",
+		Message: message,
+	})
+	_, err := k.patcher.PatchStatus(ctx, klusterlet, klusterletCopy.Status, klusterlet.Status)
+	if err != nil {
 		return err
 	}
-	ctrlContext.Recorder().Eventf("KlusterletAgentDeploymentDeleted", fmt.Sprintf("the deployment %s/%s is deleted due to %s",
-		namespace, registrationName, reason))
+	recorder.Eventf("KlusterletRebootstrap", fmt.Sprintf("The klusterlet %q starts rebootstrapping due to %s",
+		klusterlet.Name, message))
 
-	workName := fmt.Sprintf("%s-work-agent", klusterletName)
-	if err := k.kubeClient.AppsV1().Deployments(namespace).Delete(ctx, workName, metav1.DeleteOptions{}); err != nil {
+	// requeue and check the rebootstrap progress in 5 seconds
+	requeueFunc(5 * time.Second)
+	return nil
+}
+
+func (k *bootstrapController) completeRebootstrap(ctx context.Context, agentNamespace string, klusterlet *operatorapiv1.Klusterlet,
+	recorder events.Recorder) error {
+	// delete the existing hub kubeconfig
+	if err := k.kubeClient.CoreV1().Secrets(agentNamespace).Delete(ctx, helpers.HubKubeConfig, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
-	ctrlContext.Recorder().Eventf("KlusterletAgentDeploymentDeleted", fmt.Sprintf("the deployment %s/%s is deleted due to %s",
-		namespace, workName, reason))
+	recorder.Eventf("KlusterletRebootstrap", fmt.Sprintf("Secret %s/%s is deleted", agentNamespace, helpers.HubKubeConfig))
 
+	// update the condition of klusterlet
+	klusterletCopy := klusterlet.DeepCopy()
+	meta.SetStatusCondition(&klusterletCopy.Status.Conditions, metav1.Condition{
+		Type:    helpers.KlusterletRebootstrapProgressing,
+		Status:  metav1.ConditionFalse,
+		Reason:  "RebootstrapCompleted",
+		Message: fmt.Sprintf("Secret %s/%s is deleted and bootstrap is triggered", agentNamespace, helpers.HubKubeConfig),
+	})
+
+	_, err := k.patcher.PatchStatus(ctx, klusterlet, klusterletCopy.Status, klusterlet.Status)
+	if err != nil {
+		return err
+	}
+	recorder.Eventf("KlusterletRebootstrap", fmt.Sprintf("Rebootstrap of the klusterlet %q is completed", klusterlet.Name))
 	return nil
 }
 
