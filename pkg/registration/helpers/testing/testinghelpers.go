@@ -47,7 +47,7 @@ func NewManagedCluster() *clusterv1.ManagedCluster {
 
 func NewAcceptingManagedCluster() *clusterv1.ManagedCluster {
 	managedCluster := NewManagedCluster()
-	managedCluster.Finalizers = []string{"cluster.open-cluster-management.io/api-resource-cleanup"}
+	managedCluster.Finalizers = []string{clusterv1.ManagedClusterFinalizer}
 	managedCluster.Spec.HubAcceptsClient = true
 	return managedCluster
 }
@@ -140,7 +140,7 @@ func NewDeletingManagedCluster() *clusterv1.ManagedCluster {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              TestManagedClusterName,
 			DeletionTimestamp: &now,
-			Finalizers:        []string{"cluster.open-cluster-management.io/api-resource-cleanup"},
+			Finalizers:        []string{clusterv1.ManagedClusterFinalizer},
 		},
 	}
 }

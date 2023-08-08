@@ -32,7 +32,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/basic"
-	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 )
 
 var (
@@ -129,7 +128,7 @@ func (m *ManifestWorkController) sync(ctx context.Context, controllerContext fac
 
 	// don't do work if the finalizer is not present
 	// it ensures all maintained resources will be cleaned once manifestwork is deleted
-	if !helper.HasFinalizer(manifestWork.Finalizers, controllers.ManifestWorkFinalizer) {
+	if !helper.HasFinalizer(manifestWork.Finalizers, workapiv1.ManifestWorkFinalizer) {
 		return nil
 	}
 
@@ -235,7 +234,7 @@ func (m *ManifestWorkController) applyAppliedManifestWork(ctx context.Context, w
 	requiredAppliedWork := &workapiv1.AppliedManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       appliedManifestWorkName,
-			Finalizers: []string{controllers.AppliedManifestWorkFinalizer},
+			Finalizers: []string{workapiv1.AppliedManifestWorkFinalizer},
 		},
 		Spec: workapiv1.AppliedManifestWorkSpec{
 			HubHash:          hubHash,

@@ -44,7 +44,6 @@ const (
 	klusterletReadyToApply                = "ReadyToApply"
 	hubConnectionDegraded                 = "HubConnectionDegraded"
 	hubKubeConfigSecretMissing            = "HubKubeConfigSecretMissing" // #nosec G101
-	appliedManifestWorkFinalizer          = "cluster.open-cluster-management.io/applied-manifest-work-cleanup"
 	managedResourcesEvictionTimestampAnno = "operator.open-cluster-management.io/managed-resources-eviction-timestamp"
 )
 

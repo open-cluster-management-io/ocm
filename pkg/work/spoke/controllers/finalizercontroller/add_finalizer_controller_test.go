@@ -15,7 +15,6 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
-	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
@@ -36,7 +35,7 @@ func TestAddFinalizer(t *testing.T) {
 				if err := json.Unmarshal(p, work); err != nil {
 					t.Fatal(err)
 				}
-				if !reflect.DeepEqual(work.Finalizers, []string{controllers.ManifestWorkFinalizer}) {
+				if !reflect.DeepEqual(work.Finalizers, []string{workapiv1.ManifestWorkFinalizer}) {
 					t.Fatal(spew.Sdump(actions))
 				}
 			},
@@ -51,7 +50,7 @@ func TestAddFinalizer(t *testing.T) {
 				if err := json.Unmarshal(p, work); err != nil {
 					t.Fatal(err)
 				}
-				if !reflect.DeepEqual(work.Finalizers, []string{"other", controllers.ManifestWorkFinalizer}) {
+				if !reflect.DeepEqual(work.Finalizers, []string{"other", workapiv1.ManifestWorkFinalizer}) {
 					t.Fatal(spew.Sdump(actions))
 				}
 			},
@@ -63,7 +62,7 @@ func TestAddFinalizer(t *testing.T) {
 		},
 		{
 			name:               "skip when present",
-			existingFinalizers: []string{controllers.ManifestWorkFinalizer},
+			existingFinalizers: []string{workapiv1.ManifestWorkFinalizer},
 			validateActions:    testingcommon.AssertNoActions,
 		},
 	}

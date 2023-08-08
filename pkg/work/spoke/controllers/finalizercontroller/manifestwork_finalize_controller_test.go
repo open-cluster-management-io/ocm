@@ -17,7 +17,6 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
-	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 )
 
 func TestSyncManifestWorkController(t *testing.T) {
@@ -78,7 +77,7 @@ func TestSyncManifestWorkController(t *testing.T) {
 					Name:              "work",
 					Namespace:         "cluster1",
 					DeletionTimestamp: &now,
-					Finalizers:        []string{controllers.ManifestWorkFinalizer},
+					Finalizers:        []string{workapiv1.ManifestWorkFinalizer},
 				},
 			},
 			appliedWork: &workapiv1.AppliedManifestWork{
@@ -100,7 +99,7 @@ func TestSyncManifestWorkController(t *testing.T) {
 					Name:              "work",
 					Namespace:         "cluster1",
 					DeletionTimestamp: &now,
-					Finalizers:        []string{controllers.ManifestWorkFinalizer},
+					Finalizers:        []string{workapiv1.ManifestWorkFinalizer},
 				},
 			},
 			appliedWork: &workapiv1.AppliedManifestWork{
@@ -121,7 +120,7 @@ func TestSyncManifestWorkController(t *testing.T) {
 					Name:              "work",
 					Namespace:         "cluster1",
 					DeletionTimestamp: &now,
-					Finalizers:        []string{controllers.ManifestWorkFinalizer},
+					Finalizers:        []string{workapiv1.ManifestWorkFinalizer},
 				},
 			},
 			appliedWork: &workapiv1.AppliedManifestWork{

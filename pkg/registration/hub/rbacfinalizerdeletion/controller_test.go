@@ -19,6 +19,7 @@ import (
 	fakeworkclient "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
@@ -66,8 +67,10 @@ func TestSync(t *testing.T) {
 			key:        testinghelpers.TestManagedClusterName,
 			namespaces: []runtime.Object{testinghelpers.NewNamespace(testinghelpers.TestManagedClusterName, true)},
 			roleBindings: []runtime.Object{testinghelpers.NewRoleBinding(testinghelpers.TestManagedClusterName, roleName,
-				[]string{manifestWorkFinalizer}, map[string]string{clusterv1.ClusterNameLabelKey: testinghelpers.TestManagedClusterName}, true)},
-			works:       []runtime.Object{testinghelpers.NewManifestWork(testinghelpers.TestManagedClusterName, "work1", []string{manifestWorkFinalizer}, nil)},
+				[]string{workapiv1.ManifestWorkFinalizer}, map[string]string{clusterv1.ClusterNameLabelKey: testinghelpers.TestManagedClusterName}, true)},
+			works: []runtime.Object{
+				testinghelpers.NewManifestWork(
+					testinghelpers.TestManagedClusterName, "work1", []string{workapiv1.ManifestWorkFinalizer}, nil)},
 			expectedErr: "",
 		},
 	}
@@ -145,23 +148,25 @@ func TestSyncRoleAndRoleBinding(t *testing.T) {
 			validateRbacActions: testingcommon.AssertNoActions,
 		},
 		{
-			name: "skip if rolebinding has no finalizer", roleBinding: testinghelpers.NewRoleBinding(testinghelpers.TestManagedClusterName, roleName, nil, nil, false),
+			name:                "skip if rolebinding has no finalizer",
+			roleBinding:         testinghelpers.NewRoleBinding(testinghelpers.TestManagedClusterName, roleName, nil, nil, false),
 			namespace:           testinghelpers.TestManagedClusterName,
 			validateRbacActions: testingcommon.AssertNoActions,
 		},
 		{
-			name:                          "skip if rolebinding has no labels",
-			roleBinding:                   testinghelpers.NewRoleBinding(testinghelpers.TestManagedClusterName, roleName, []string{manifestWorkFinalizer}, nil, false),
+			name: "skip if rolebinding has no labels",
+			roleBinding: testinghelpers.NewRoleBinding(
+				testinghelpers.TestManagedClusterName, roleName, []string{workapiv1.ManifestWorkFinalizer}, nil, false),
 			namespace:                     testinghelpers.TestManagedClusterName,
-			expectedRoleBindingFinalizers: []string{manifestWorkFinalizer},
+			expectedRoleBindingFinalizers: []string{workapiv1.ManifestWorkFinalizer},
 			validateRbacActions:           testingcommon.AssertNoActions,
 		},
 		{
 			name: "remove finalizer from deleting roleBinding",
-			roleBinding: testinghelpers.NewRoleBinding(testinghelpers.TestManagedClusterName, roleName, []string{manifestWorkFinalizer},
+			roleBinding: testinghelpers.NewRoleBinding(testinghelpers.TestManagedClusterName, roleName, []string{workapiv1.ManifestWorkFinalizer},
 				map[string]string{clusterv1.ClusterNameLabelKey: testinghelpers.TestManagedClusterName}, true),
 			namespace:              testinghelpers.TestManagedClusterName,
-			expectedRoleFinalizers: []string{manifestWorkFinalizer},
+			expectedRoleFinalizers: []string{workapiv1.ManifestWorkFinalizer},
 			validateRbacActions: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "update")
 			},

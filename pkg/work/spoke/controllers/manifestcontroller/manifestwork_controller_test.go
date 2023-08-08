@@ -29,7 +29,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/helper"
 	"open-cluster-management.io/ocm/pkg/work/spoke/apply"
 	"open-cluster-management.io/ocm/pkg/work/spoke/auth/basic"
-	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
@@ -333,7 +332,7 @@ func TestSync(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			work, workKey := spoketesting.NewManifestWork(0, c.workManifest...)
-			work.Finalizers = []string{controllers.ManifestWorkFinalizer}
+			work.Finalizers = []string{workapiv1.ManifestWorkFinalizer}
 			controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
 				withKubeObject(c.spokeObject...).
 				withUnstructuredObject(c.spokeDynamicObject...)
@@ -364,7 +363,7 @@ func TestFailedToApplyResource(t *testing.T) {
 		withExpectedWorkCondition(expectedCondition{workapiv1.WorkApplied, metav1.ConditionFalse})
 
 	work, workKey := spoketesting.NewManifestWork(0, tc.workManifest...)
-	work.Finalizers = []string{controllers.ManifestWorkFinalizer}
+	work.Finalizers = []string{workapiv1.ManifestWorkFinalizer}
 	controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).withKubeObject(tc.spokeObject...).withUnstructuredObject()
 
 	// Add a reactor on fake client to throw error when creating secret on namespace ns2
@@ -484,7 +483,7 @@ func TestUpdateStrategy(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			work, workKey := spoketesting.NewManifestWork(0, c.workManifest...)
 			work.Spec.ManifestConfigs = c.workManifestConfig
-			work.Finalizers = []string{controllers.ManifestWorkFinalizer}
+			work.Finalizers = []string{workapiv1.ManifestWorkFinalizer}
 			controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
 				withKubeObject(c.spokeObject...).
 				withUnstructuredObject(c.spokeDynamicObject...)
@@ -527,7 +526,7 @@ func TestServerSideApplyConflict(t *testing.T) {
 
 	work, workKey := spoketesting.NewManifestWork(0, testCase.workManifest...)
 	work.Spec.ManifestConfigs = testCase.workManifestConfig
-	work.Finalizers = []string{controllers.ManifestWorkFinalizer}
+	work.Finalizers = []string{workapiv1.ManifestWorkFinalizer}
 	controller := newController(t, work, nil, spoketesting.NewFakeRestMapper()).
 		withKubeObject(testCase.spokeObject...).
 		withUnstructuredObject(testCase.spokeDynamicObject...)

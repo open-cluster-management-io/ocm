@@ -22,7 +22,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/work/helper"
-	"open-cluster-management.io/ocm/pkg/work/spoke/controllers"
 	"open-cluster-management.io/ocm/pkg/work/spoke/spoketesting"
 )
 
@@ -43,7 +42,7 @@ func TestFinalize(t *testing.T) {
 	}{
 		{
 			name:                               "skip when not delete",
-			existingFinalizers:                 []string{controllers.ManifestWorkFinalizer},
+			existingFinalizers:                 []string{workapiv1.ManifestWorkFinalizer},
 			validateAppliedManifestWorkActions: testingcommon.AssertNoActions,
 			validateDynamicActions:             testingcommon.AssertNoActions,
 		},
@@ -57,7 +56,7 @@ func TestFinalize(t *testing.T) {
 		{
 			name:               "get resources and remove finalizer",
 			terminated:         true,
-			existingFinalizers: []string{"a", controllers.AppliedManifestWorkFinalizer, "b"},
+			existingFinalizers: []string{"a", workapiv1.AppliedManifestWorkFinalizer, "b"},
 			resourcesToRemove: []workapiv1.AppliedManifestResourceMeta{
 				{Version: "v1", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g1", Resource: "r1", Namespace: "", Name: "n1"}},
 				{Version: "v2", ResourceIdentifier: workapiv1.ResourceIdentifier{Group: "g2", Resource: "r2", Namespace: "ns2", Name: "n2"}},
@@ -105,7 +104,7 @@ func TestFinalize(t *testing.T) {
 		{
 			name:               "requeue work when deleting resources are still visiable",
 			terminated:         true,
-			existingFinalizers: []string{controllers.AppliedManifestWorkFinalizer},
+			existingFinalizers: []string{workapiv1.AppliedManifestWorkFinalizer},
 			existingResources: []runtime.Object{
 				spoketesting.NewUnstructuredSecret("ns1", "n1", true, "ns1-n1", *owner),
 				spoketesting.NewUnstructuredSecret("ns2", "n2", true, "ns2-n2", *owner),
@@ -136,7 +135,7 @@ func TestFinalize(t *testing.T) {
 		{
 			name:               "ignore re-created resource and remove finalizer",
 			terminated:         true,
-			existingFinalizers: []string{controllers.AppliedManifestWorkFinalizer},
+			existingFinalizers: []string{workapiv1.AppliedManifestWorkFinalizer},
 			existingResources: []runtime.Object{
 				spoketesting.NewUnstructuredSecret("ns1", "n1", false, "ns1-n1", *owner),
 			},

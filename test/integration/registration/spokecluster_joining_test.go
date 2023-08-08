@@ -62,7 +62,7 @@ var _ = ginkgo.Describe("Joining Process", func() {
 				return fmt.Errorf("cluster should have finalizer")
 			}
 
-			if spokeCluster.Finalizers[0] != clusterCleanFinalizer {
+			if spokeCluster.Finalizers[0] != clusterv1.ManagedClusterFinalizer {
 				return fmt.Errorf("finalizer is not correct")
 			}
 

@@ -11,6 +11,8 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2"
 
+	workv1 "open-cluster-management.io/api/work/v1"
+
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
@@ -25,8 +27,8 @@ func TestSyncDelete(t *testing.T) {
 	namespace := newNamespace("testns")
 	appliedManifestWorks := []runtime.Object{
 		newAppliedManifestWorks("testhost", nil, false),
-		newAppliedManifestWorks("testhost", []string{appliedManifestWorkFinalizer}, true),
-		newAppliedManifestWorks("testhost-2", []string{appliedManifestWorkFinalizer}, false),
+		newAppliedManifestWorks("testhost", []string{workv1.AppliedManifestWorkFinalizer}, true),
+		newAppliedManifestWorks("testhost-2", []string{workv1.AppliedManifestWorkFinalizer}, false),
 	}
 	controller := newTestController(t, klusterlet, appliedManifestWorks, namespace, bootstrapKubeConfigSecret)
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
@@ -83,8 +85,8 @@ func TestSyncDeleteHosted(t *testing.T) {
 	namespace := newNamespace(agentNamespace)
 	appliedManifestWorks := []runtime.Object{
 		newAppliedManifestWorks("testhost", nil, false),
-		newAppliedManifestWorks("testhost", []string{appliedManifestWorkFinalizer}, true),
-		newAppliedManifestWorks("testhost-2", []string{appliedManifestWorkFinalizer}, false),
+		newAppliedManifestWorks("testhost", []string{workv1.AppliedManifestWorkFinalizer}, true),
+		newAppliedManifestWorks("testhost-2", []string{workv1.AppliedManifestWorkFinalizer}, false),
 	}
 	controller := newTestControllerHosted(t, klusterlet, appliedManifestWorks, bootstrapKubeConfigSecret, namespace /*externalManagedSecret*/)
 	syncContext := testingcommon.NewFakeSyncContext(t, klusterlet.Name)
