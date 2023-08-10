@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2/ktesting"
 
 	"open-cluster-management.io/api/cluster/v1beta1"
 	"open-cluster-management.io/api/cluster/v1beta2"
@@ -131,9 +130,8 @@ func TestConvertTo(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
 			dstSet := &internalv1beta1.ManagedClusterSet{}
-			err := c.srcSet.ConvertTo(logger, dstSet)
+			err := c.srcSet.ConvertTo(dstSet)
 			if err != nil {
 				t.Errorf("Failed to convert clusterset. %v", err)
 			}
@@ -262,9 +260,8 @@ func TestConvertFrom(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
 			dstSet := &ManagedClusterSet{}
-			err := dstSet.ConvertFrom(logger, c.srcSet)
+			err := dstSet.ConvertFrom(c.srcSet)
 			if err != nil {
 				t.Errorf("Failed to convert clusterset. %v", err)
 			}
