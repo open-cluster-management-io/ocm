@@ -63,7 +63,8 @@ func NewHubKubeconfigSecretController(
 }
 
 func (s *hubKubeconfigSecretController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	klog.V(4).Infof("Reconciling Hub KubeConfig secret %q", s.hubKubeconfigSecretName)
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Reconciling Hub KubeConfig secret", "hubKubeconfigSecretName", s.hubKubeconfigSecretName)
 	return DumpSecret(s.spokeCoreClient, s.hubKubeconfigSecretNamespace, s.hubKubeconfigSecretName, s.hubKubeconfigDir, ctx, syncCtx.Recorder())
 }
 

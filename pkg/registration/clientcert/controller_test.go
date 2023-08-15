@@ -17,6 +17,7 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/test/utils/ktesting"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
@@ -79,11 +80,12 @@ func TestSync(t *testing.T) {
 			},
 			approvedCSRCert: testinghelpers.NewTestCert(commonName, 10*time.Second),
 			validateActions: func(t *testing.T, hubActions, agentActions []clienttesting.Action) {
+				logger, _ := ktesting.NewTestContext(t)
 				testingcommon.AssertActions(t, hubActions, "get", "get")
 				testingcommon.AssertActions(t, agentActions, "get", "update")
 				actual := agentActions[1].(clienttesting.UpdateActionImpl).Object
 				secret := actual.(*corev1.Secret)
-				valid, err := IsCertificateValid(secret.Data[TLSCertFile], testSubject)
+				valid, err := IsCertificateValid(logger, secret.Data[TLSCertFile], testSubject)
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}

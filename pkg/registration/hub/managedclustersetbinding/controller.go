@@ -132,12 +132,13 @@ func (c *managedClusterSetBindingController) enqueueBindingsByClusterSet(obj int
 }
 
 func (c *managedClusterSetBindingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	logger := klog.FromContext(ctx)
 	key := syncCtx.QueueKey()
 	if len(key) == 0 {
 		return nil
 	}
 
-	klog.V(4).Infof("Reconciling ManagedClusterSetBinding %s", key)
+	logger.V(4).Info("Reconciling ManagedClusterSetBinding", "key", key)
 
 	bindingNamespace, bindingName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {

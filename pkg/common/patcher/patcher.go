@@ -173,6 +173,7 @@ func (p *patcher[R, Sp, St]) RemoveFinalizer(ctx context.Context, object R, fina
 }
 
 func (p *patcher[R, Sp, St]) patch(ctx context.Context, object R, newObject, oldObject *Resource[Sp, St], subresources ...string) error {
+	logger := klog.FromContext(ctx)
 	accessor, err := meta.Accessor(object)
 	if err != nil {
 		return err
@@ -203,7 +204,10 @@ func (p *patcher[R, Sp, St]) patch(ctx context.Context, object R, newObject, old
 	_, err = p.client.Patch(
 		ctx, accessor.GetName(), types.MergePatchType, patchBytes, metav1.PatchOptions{}, subresources...)
 	if err != nil {
-		klog.V(2).Infof("Object with type %T and name %s is patched with patch %s", object, accessor.GetName(), string(patchBytes))
+		logger.V(2).Info("Object is patched",
+			"objectType", fmt.Sprintf("%T", object),
+			"objectName", accessor.GetName(),
+			"patch", string(patchBytes))
 	}
 	return err
 }

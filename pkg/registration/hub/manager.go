@@ -64,6 +64,7 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 	// If qps in kubconfig is not set, increase the qps and burst to enhance the ability of kube client to handle
 	// requests in concurrent
 	// TODO: Use ClientConnectionOverrides flags to change qps/burst when library-go exposes them in the future
+	logger := klog.FromContext(ctx)
 	kubeConfig := rest.CopyConfig(controllerContext.KubeConfig)
 	if kubeConfig.QPS == 0.0 {
 		kubeConfig.QPS = 100.0
@@ -155,7 +156,7 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 				csrReconciles,
 				controllerContext.EventRecorder,
 			)
-			klog.Info("Using v1beta1 CSR api to manage spoke client certificate")
+			logger.Info("Using v1beta1 CSR api to manage spoke client certificate")
 		}
 	}
 	if csrController == nil {

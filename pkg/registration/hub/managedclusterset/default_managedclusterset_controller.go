@@ -68,8 +68,8 @@ func NewDefaultManagedClusterSetController(
 }
 
 func (c *defaultManagedClusterSetController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	klog.V(4).Infof("Reconciling DefaultManagedClusterSet")
-
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Reconciling DefaultManagedClusterSet")
 	defaultClusterSet, err := c.clusterSetLister.Get(DefaultManagedClusterSetName)
 	if err != nil {
 		// if the defaultClusterSet not found, apply it.
@@ -93,11 +93,12 @@ func (c *defaultManagedClusterSetController) sync(ctx context.Context, syncCtx f
 
 // syncDefaultClusterSet syncs default cluster set.
 func (c *defaultManagedClusterSetController) syncDefaultClusterSet(ctx context.Context, originalDefaultClusterSet *clusterv1beta2.ManagedClusterSet) error {
+	logger := klog.FromContext(ctx)
 	defaultClusterSet := originalDefaultClusterSet.DeepCopy()
 
 	// if the annotation has set to disable, default clusterset controller will not work.
 	if hasAnnotation(defaultClusterSet, autoUpdateAnnotation, "false") {
-		klog.V(4).Info("DefaultManagedClusterSetDisabled", "The DefaultManagedClusterSet is disabled by user")
+		logger.V(4).Info("DefaultManagedClusterSetDisabled", "reason", "The DefaultManagedClusterSet is disabled by user")
 		return nil
 	}
 

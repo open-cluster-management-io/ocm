@@ -87,7 +87,8 @@ func NewManagedClusterController(
 
 func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	managedClusterName := syncCtx.QueueKey()
-	klog.V(4).Infof("Reconciling ManagedCluster %s", managedClusterName)
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Reconciling ManagedCluster", "managedClusterName", managedClusterName)
 	managedCluster, err := c.clusterLister.Get(managedClusterName)
 	if errors.IsNotFound(err) {
 		// Spoke cluster not found, could have been deleted, do nothing.
