@@ -39,6 +39,10 @@ spec:
       {{ if not .HostedMode }}
       serviceAccountName: work-controller-sa
       {{ end }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: {{ .ClusterManagerName }}-work-controller
         image:  {{ .WorkImage }}
@@ -55,7 +59,6 @@ spec:
             drop:
               - ALL
           privileged: false
-          runAsNonRoot: true
         livenessProbe:
           httpGet:
             path: /healthz
