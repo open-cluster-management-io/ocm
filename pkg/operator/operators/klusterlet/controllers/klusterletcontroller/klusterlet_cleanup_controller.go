@@ -60,7 +60,7 @@ func NewKlusterletCleanupController(
 		klusterletLister:             klusterletInformer.Lister(),
 		kubeVersion:                  kubeVersion,
 		operatorNamespace:            operatorNamespace,
-		managedClusterClientsBuilder: newManagedClusterClientsBuilder(kubeClient, apiExtensionClient, appliedManifestWorkClient),
+		managedClusterClientsBuilder: newManagedClusterClientsBuilder(kubeClient, apiExtensionClient, appliedManifestWorkClient, recorder),
 	}
 
 	return factory.New().WithSync(controller.sync).
