@@ -14,6 +14,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,16 +30,19 @@ import (
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
+	"open-cluster-management.io/ocm/pkg/common/patcher"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
 func TestSync(t *testing.T) {
 	cases := []struct {
-		name            string
-		queueKey        string
-		objects         []runtime.Object
-		validateActions func(t *testing.T, actions []clienttesting.Action)
+		name                    string
+		queueKey                string
+		initRebootstrapping     bool
+		objects                 []runtime.Object
+		expectedRebootstrapping bool
+		validateActions         func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
 			name:    "the changed secret is not bootstrap secret",
@@ -50,18 +54,17 @@ func TestSync(t *testing.T) {
 			},
 		},
 		{
-			name:     "checking the hub kubeconfig secret",
+			name:     "client certificate expired",
 			queueKey: "test/test",
 			objects: []runtime.Object{
 				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.47:6443")),
 				newHubKubeConfigSecret("test", time.Now().Add(-60*time.Second).UTC()),
-				newDeployment("test-registration-agent", "test"),
-				newDeployment("test-work-agent", "test"),
 			},
+			expectedRebootstrapping: true,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertDelete(t, actions[0], "secrets", "test", "hub-kubeconfig-secret")
-				testingcommon.AssertDelete(t, actions[1], "deployments", "test", "test-registration-agent")
-				testingcommon.AssertDelete(t, actions[2], "deployments", "test", "test-work-agent")
+				if len(actions) != 0 {
+					t.Errorf("expected no actions happens, but got %#v", actions)
+				}
 			},
 		},
 		{
@@ -93,13 +96,39 @@ func TestSync(t *testing.T) {
 			objects: []runtime.Object{
 				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.48:6443")),
 				newHubKubeConfigSecret("test", time.Now().Add(60*time.Second).UTC()),
+			},
+			expectedRebootstrapping: true,
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 0 {
+					t.Errorf("expected no actions happens, but got %#v", actions)
+				}
+			},
+		},
+		{
+			name:                "wait for scaling down",
+			queueKey:            "test/test",
+			initRebootstrapping: true,
+			objects: []runtime.Object{
+				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.48:6443")),
+				newHubKubeConfigSecret("test", time.Now().Add(60*time.Second).UTC()),
+				newDeploymentWithAvailableReplicas("test-registration-agent", "test", 1),
+			},
+			expectedRebootstrapping: true,
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertGet(t, actions[0], "apps", "v1", "deployments")
+			},
+		},
+		{
+			name:                "rebootstrap is completed",
+			queueKey:            "test/test",
+			initRebootstrapping: true,
+			objects: []runtime.Object{
+				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.48:6443")),
+				newHubKubeConfigSecret("test", time.Now().Add(60*time.Second).UTC()),
 				newDeployment("test-registration-agent", "test"),
-				newDeployment("test-work-agent", "test"),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertDelete(t, actions[0], "secrets", "test", "hub-kubeconfig-secret")
-				testingcommon.AssertDelete(t, actions[1], "deployments", "test", "test-registration-agent")
-				testingcommon.AssertDelete(t, actions[2], "deployments", "test", "test-work-agent")
+				testingcommon.AssertDelete(t, actions[1], "secrets", "test", "hub-kubeconfig-secret")
 			},
 		},
 	}
@@ -107,11 +136,19 @@ func TestSync(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fakeKubeClient := fakekube.NewSimpleClientset(c.objects...)
-
-			fakeOperatorClient := fakeoperatorclient.NewSimpleClientset()
+			klusterlet := newKlusterlet("test", "test")
+			if c.initRebootstrapping {
+				klusterlet.Status.Conditions = []metav1.Condition{
+					{
+						Type:   helpers.KlusterletRebootstrapProgressing,
+						Status: metav1.ConditionTrue,
+					},
+				}
+			}
+			fakeOperatorClient := fakeoperatorclient.NewSimpleClientset(klusterlet)
 			operatorInformers := operatorinformers.NewSharedInformerFactory(fakeOperatorClient, 5*time.Minute)
 			operatorStore := operatorInformers.Operator().V1().Klusterlets().Informer().GetStore()
-			if err := operatorStore.Add(newKlusterlet("test", "test")); err != nil {
+			if err := operatorStore.Add(klusterlet); err != nil {
 				t.Fatal(err)
 			}
 
@@ -151,10 +188,14 @@ func TestSync(t *testing.T) {
 				}
 			}
 
+			klusterletClient := fakeOperatorClient.OperatorV1().Klusterlets()
+			klusterletPatcher := patcher.NewPatcher[*operatorapiv1.Klusterlet, operatorapiv1.KlusterletSpec, operatorapiv1.KlusterletStatus](klusterletClient)
 			controller := &bootstrapController{
 				kubeClient:       fakeKubeClient,
+				klusterletClient: klusterletClient,
 				klusterletLister: operatorInformers.Operator().V1().Klusterlets().Lister(),
 				secretInformers:  secretInformers,
+				patcher:          klusterletPatcher,
 			}
 
 			syncContext := testingcommon.NewFakeSyncContext(t, c.queueKey)
@@ -163,6 +204,15 @@ func TestSync(t *testing.T) {
 			}
 
 			c.validateActions(t, fakeKubeClient.Actions())
+
+			klusterlet, err := fakeOperatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("Expected no errors, but got %v", err)
+			}
+			rebootstrapping := meta.IsStatusConditionTrue(klusterlet.Status.Conditions, helpers.KlusterletRebootstrapProgressing)
+			if c.expectedRebootstrapping != rebootstrapping {
+				t.Errorf("Expected rebootstrapping is %v, but got %v", c.expectedRebootstrapping, rebootstrapping)
+			}
 		})
 	}
 }
@@ -312,4 +362,10 @@ func newDeployment(name, namespace string) *appsv1.Deployment {
 		},
 		Spec: appsv1.DeploymentSpec{},
 	}
+}
+
+func newDeploymentWithAvailableReplicas(name, namespace string, availableReplicas int32) *appsv1.Deployment {
+	deploy := newDeployment(name, namespace)
+	deploy.Status.AvailableReplicas = availableReplicas
+	return deploy
 }

@@ -58,8 +58,9 @@ func NewTaintController(
 }
 
 func (c *taintController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	logger := klog.FromContext(ctx)
 	managedClusterName := syncCtx.QueueKey()
-	klog.V(4).Infof("Reconciling ManagedCluster %s", managedClusterName)
+	logger.V(4).Info("Reconciling ManagedCluster", "managedClusterName", managedClusterName)
 	managedCluster, err := c.clusterLister.Get(managedClusterName)
 	if errors.IsNotFound(err) {
 		// Spoke cluster not found, could have been deleted, do nothing.

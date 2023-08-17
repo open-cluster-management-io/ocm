@@ -134,8 +134,8 @@ func (c *addOnRegistrationController) sync(ctx context.Context, syncCtx factory.
 }
 
 func (c *addOnRegistrationController) syncAddOn(ctx context.Context, syncCtx factory.SyncContext, addOnName string) error {
-	klog.V(4).Infof("Reconciling addOn %q", addOnName)
-
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Reconciling addOn", "addOnName", addOnName)
 	addOn, err := c.hubAddOnLister.ManagedClusterAddOns(c.clusterName).Get(addOnName)
 	if errors.IsNotFound(err) {
 		// addon is deleted

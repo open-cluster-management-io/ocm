@@ -35,31 +35,31 @@ import (
 //  2. TLSKeyFile exists
 //  3. TLSCertFile exists and the certificate is not expired
 //  4. If subject is specified, it matches the subject in the certificate stored in TLSCertFile
-func HasValidHubKubeconfig(secret *corev1.Secret, subject *pkix.Name) bool {
+func HasValidHubKubeconfig(logger klog.Logger, secret *corev1.Secret, subject *pkix.Name) bool {
 	if len(secret.Data) == 0 {
-		klog.V(4).Infof("No data found in secret %q", secret.Namespace+"/"+secret.Name)
+		logger.V(4).Info("No data found in secret", "secret", klog.KObj(secret))
 		return false
 	}
 
 	if _, ok := secret.Data[KubeconfigFile]; !ok {
-		klog.V(4).Infof("No %q found in secret %q", KubeconfigFile, secret.Namespace+"/"+secret.Name)
+		logger.V(4).Info("No specific file found in secret", "file", KubeconfigFile, "secret", klog.KObj(secret))
 		return false
 	}
 
 	if _, ok := secret.Data[TLSKeyFile]; !ok {
-		klog.V(4).Infof("No %q found in secret %q", TLSKeyFile, secret.Namespace+"/"+secret.Name)
+		logger.V(4).Info("No specific key file found in secret", "keyFile", TLSKeyFile, "secret", klog.KObj(secret))
 		return false
 	}
 
 	certData, ok := secret.Data[TLSCertFile]
 	if !ok {
-		klog.V(4).Infof("No %q found in secret %q", TLSCertFile, secret.Namespace+"/"+secret.Name)
+		logger.V(4).Info("No specific cert file found in secret", "certFile", TLSCertFile, "secret", klog.KObj(secret))
 		return false
 	}
 
-	valid, err := IsCertificateValid(certData, subject)
+	valid, err := IsCertificateValid(logger, certData, subject)
 	if err != nil {
-		klog.V(4).Infof("Unable to validate certificate in secret %s: %v", secret.Namespace+"/"+secret.Name, err)
+		logger.V(4).Error(err, "Unable to validate certificate in secret", "secret", klog.KObj(secret))
 		return false
 	}
 
@@ -69,7 +69,7 @@ func HasValidHubKubeconfig(secret *corev1.Secret, subject *pkix.Name) bool {
 // IsCertificateValid return true if
 // 1) All certs in client certificate are not expired.
 // 2) At least one cert matches the given subject if specified
-func IsCertificateValid(certData []byte, subject *pkix.Name) (bool, error) {
+func IsCertificateValid(logger klog.Logger, certData []byte, subject *pkix.Name) (bool, error) {
 	certs, err := certutil.ParseCertsPEM(certData)
 	if err != nil {
 		return false, errors.New("unable to parse certificate")
@@ -83,7 +83,7 @@ func IsCertificateValid(certData []byte, subject *pkix.Name) (bool, error) {
 	// make sure no cert in the certificate chain expired
 	for _, cert := range certs {
 		if now.After(cert.NotAfter) {
-			klog.V(4).Infof("Part of the certificate is expired: %v", cert.NotAfter)
+			logger.V(4).Info("Part of the certificate is expired", "expiryDate", cert.NotAfter)
 			return false, nil
 		}
 	}
@@ -100,7 +100,7 @@ func IsCertificateValid(certData []byte, subject *pkix.Name) (bool, error) {
 		return true, nil
 	}
 
-	klog.V(4).Infof("Certificate is not issued for subject (cn=%s)", subject.CommonName)
+	logger.V(4).Info("Certificate is not issued for subject", "commonName", subject.CommonName)
 	return false, nil
 }
 
@@ -258,7 +258,7 @@ func (v *v1CSRControl) get(name string) (metav1.Object, error) {
 	return csr, nil
 }
 
-func NewCSRControl(hubCSRInformer certificatesinformers.Interface, hubKubeClient kubernetes.Interface) (CSRControl, error) {
+func NewCSRControl(logger klog.Logger, hubCSRInformer certificatesinformers.Interface, hubKubeClient kubernetes.Interface) (CSRControl, error) {
 	if features.SpokeMutableFeatureGate.Enabled(ocmfeature.V1beta1CSRAPICompatibility) {
 		v1CSRSupported, v1beta1CSRSupported, err := helpers.IsCSRSupported(hubKubeClient)
 		if err != nil {
@@ -270,7 +270,7 @@ func NewCSRControl(hubCSRInformer certificatesinformers.Interface, hubKubeClient
 				hubCSRLister:   hubCSRInformer.V1beta1().CertificateSigningRequests().Lister(),
 				hubCSRClient:   hubKubeClient.CertificatesV1beta1().CertificateSigningRequests(),
 			}
-			klog.Info("Using v1beta1 CSR api to manage spoke client certificate")
+			logger.Info("Using v1beta1 CSR api to manage spoke client certificate")
 			return csrCtrl, nil
 		}
 	}

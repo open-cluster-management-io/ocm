@@ -48,7 +48,7 @@ type managementReconcile struct {
 
 func (r *managementReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
-	err := ensureNamespace(ctx, r.kubeClient, klusterlet, config.AgentNamespace)
+	err := ensureNamespace(ctx, r.kubeClient, klusterlet, config.AgentNamespace, r.recorder)
 	if err != nil {
 		return klusterlet, reconcileStop, err
 	}

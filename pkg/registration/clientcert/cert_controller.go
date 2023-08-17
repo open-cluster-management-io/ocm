@@ -159,6 +159,7 @@ func NewClientCertificateController(
 }
 
 func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	logger := klog.FromContext(ctx)
 	// get secret containing client certificate
 	secret, err := c.managementCoreClient.Secrets(c.SecretNamespace).Get(ctx, c.SecretName, metav1.GetOptions{})
 	switch {
@@ -200,7 +201,7 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 				return nil, nil
 			}
 
-			klog.V(4).Infof("Sync csr %v", c.csrName)
+			logger.V(4).Info("Sync csr", "name", c.csrName)
 			// check if cert in csr status matches with the corresponding private key
 			if c.keyData == nil {
 				return nil, fmt.Errorf("no private key found for certificate in csr: %s", c.csrName)
@@ -287,6 +288,7 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 	// b. client certificate is sensitive to the additional secret data and the data changes;
 	// c. client certificate exists and has less than a random percentage range from 20% to 25% of its life remaining;
 	shouldCreate, err := shouldCreateCSR(
+		logger,
 		c.controllerName,
 		secret,
 		syncCtx.Recorder(),
@@ -352,6 +354,7 @@ func (c *clientCertificateController) reset() {
 }
 
 func shouldCreateCSR(
+	logger klog.Logger,
 	controllerName string,
 	secret *corev1.Secret,
 	recorder events.Recorder,
@@ -359,7 +362,7 @@ func shouldCreateCSR(
 	additionalSecretDataSensitive bool,
 	additionalSecretData map[string][]byte) (bool, error) {
 	switch {
-	case !hasValidClientCertificate(subject, secret):
+	case !hasValidClientCertificate(logger, subject, secret):
 		recorder.Eventf("NoValidCertificateFound",
 			"No valid client certificate for %s is found. Bootstrap is required", controllerName)
 	case additionalSecretDataSensitive && !hasAdditionalSecretData(additionalSecretData, secret):
@@ -373,12 +376,13 @@ func shouldCreateCSR(
 
 		total := notAfter.Sub(*notBefore)
 		remaining := time.Until(*notAfter)
-		klog.V(4).Infof("Client certificate for %s: time total=%v, remaining=%v, remaining/total=%v",
-			controllerName, total, remaining, remaining.Seconds()/total.Seconds())
+		logger.V(4).Info("Client certificate for:", "name", controllerName, "time total", total,
+			"remaining", remaining, "remaining/total", remaining.Seconds()/total.Seconds())
 		threshold := jitter(0.2, 0.25)
 		if remaining.Seconds()/total.Seconds() > threshold {
 			// Do nothing if the client certificate is valid and has more than a random percentage range from 20% to 25% of its life remaining
-			klog.V(4).Infof("Client certificate for %s is valid and has more than %.2f%% of its life remaining", controllerName, threshold*100)
+			logger.V(4).Info("Client certificate for:", "name", controllerName, "time total", total,
+				"remaining", remaining, "remaining/total", remaining.Seconds()/total.Seconds())
 			return false, nil
 		}
 		recorder.Eventf("CertificateRotationStarted",
@@ -411,8 +415,8 @@ func jitter(percentage float64, maxFactor float64) float64 {
 	return newPercentage
 }
 
-func hasValidClientCertificate(subject *pkix.Name, secret *corev1.Secret) bool {
-	if valid, err := IsCertificateValid(secret.Data[TLSCertFile], subject); err == nil {
+func hasValidClientCertificate(logger klog.Logger, subject *pkix.Name, secret *corev1.Secret) bool {
+	if valid, err := IsCertificateValid(logger, secret.Data[TLSCertFile], subject); err == nil {
 		return valid
 	}
 	return false

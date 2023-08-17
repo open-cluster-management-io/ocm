@@ -58,8 +58,9 @@ func NewCSRApprovingController[T CSR](
 }
 
 func (c *csrApprovingController[T]) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	logger := klog.FromContext(ctx)
 	csrName := syncCtx.QueueKey()
-	klog.V(4).Infof("Reconciling CertificateSigningRequests %q", csrName)
+	logger.V(4).Info("Reconciling CertificateSigningRequests", "csrName", csrName)
 
 	csr, err := c.lister.Get(csrName)
 	if errors.IsNotFound(err) {
@@ -73,7 +74,7 @@ func (c *csrApprovingController[T]) sync(ctx context.Context, syncCtx factory.Sy
 		return nil
 	}
 
-	csrInfo := newCSRInfo(csr)
+	csrInfo := newCSRInfo(logger, csr)
 	for _, r := range c.reconcilers {
 		state, err := r.Reconcile(ctx, csrInfo, c.approver.approve(ctx, csr))
 		if err != nil {

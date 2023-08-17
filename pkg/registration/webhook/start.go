@@ -1,6 +1,9 @@
 package webhook
 
 import (
+	"context"
+	"crypto/tls"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -34,49 +37,56 @@ func (c *Options) RunWebhookServer() error {
 		Port:                   c.Port,
 		HealthProbeBindAddress: ":8000",
 		CertDir:                c.CertDir,
-		WebhookServer:          webhook.NewServer(webhook.Options{TLSMinVersion: "1.3"}),
+		WebhookServer: webhook.NewServer(webhook.Options{
+			TLSOpts: []func(config *tls.Config){
+				func(config *tls.Config) {
+					config.MinVersion = tls.VersionTLS12
+				},
+			},
+		}),
 	})
+	logger := klog.LoggerWithName(klog.FromContext(context.Background()), "Webhook Server") //MYTODO: Recheck it later
 
 	if err != nil {
-		klog.Error(err, "unable to start manager")
+		logger.Error(err, "unable to start manager")
 		return err
 	}
 
 	// add healthz/readyz check handler
 	if err := mgr.AddHealthzCheck("healthz-ping", healthz.Ping); err != nil {
-		klog.Errorf("unable to add healthz check handler: %v", err)
+		logger.Error(err, "unable to add healthz check handler")
 		return err
 	}
 
 	if err := mgr.AddReadyzCheck("readyz-ping", healthz.Ping); err != nil {
-		klog.Errorf("unable to add readyz check handler: %v", err)
+		logger.Error(err, "unable to add readyz check handler")
 		return err
 	}
 
 	if err = (&internalv1.ManagedClusterWebhook{}).Init(mgr); err != nil {
-		klog.Error(err, "unable to create ManagedCluster webhook")
+		logger.Error(err, "unable to create ManagedCluster webhook")
 		return err
 	}
 	if err = (&internalv1beta1.ManagedClusterSetBindingWebhook{}).Init(mgr); err != nil {
-		klog.Error(err, "unable to create ManagedClusterSetBinding webhook", "v1beta1")
+		logger.Error(err, "unable to create ManagedClusterSetBinding webhook", "version", "v1beta1")
 		return err
 	}
 	if err = (&internalv1beta2.ManagedClusterSetBindingWebhook{}).Init(mgr); err != nil {
-		klog.Error(err, "unable to create ManagedClusterSetBinding webhook", "v1beta1")
+		logger.Error(err, "unable to create ManagedClusterSetBinding webhook", "version", "v1beta2")
 		return err
 	}
 	if err = (&internalv1beta1.ManagedClusterSet{}).SetupWebhookWithManager(mgr); err != nil {
-		klog.Error(err, "unable to create ManagedClusterSet webhook", "v1beta1")
+		logger.Error(err, "unable to create ManagedClusterSet webhook", "version", "v1beta1")
 		return err
 	}
 	if err = (&internalv1beta2.ManagedClusterSet{}).SetupWebhookWithManager(mgr); err != nil {
-		klog.Error(err, "unable to create ManagedClusterSet webhook", "v1beta2")
+		logger.Error(err, "unable to create ManagedClusterSet webhook", "version", "v1beta2")
 		return err
 	}
 
-	klog.Info("starting manager")
+	logger.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		klog.Error(err, "problem running manager")
+		logger.Error(err, "problem running manager")
 		return err
 	}
 	return nil

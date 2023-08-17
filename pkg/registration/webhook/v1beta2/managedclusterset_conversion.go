@@ -18,7 +18,6 @@ Most of the conversion is straightforward copying, except for converting our cha
 func (src *ManagedClusterSet) ConvertTo(dstRaw conversion.Hub) error {
 	dst := dstRaw.(*internalv1beta1.ManagedClusterSet)
 	klog.V(4).Infof("Converting ManagedClusterset %v from v1beta2 to v1beta1", src.Name)
-
 	dst.ObjectMeta = src.ObjectMeta
 	if len(src.Spec.ClusterSelector.SelectorType) == 0 || src.Spec.ClusterSelector.SelectorType == v1beta2.ExclusiveClusterSetLabel {
 		dst.Spec.ClusterSelector.SelectorType = v1beta1.LegacyClusterSetLabel
@@ -38,7 +37,7 @@ Most of the conversion is straightforward copying, except for converting our cha
 // ConvertFrom converts from the Hub version (v1beta1) to this version.
 func (dst *ManagedClusterSet) ConvertFrom(srcRaw conversion.Hub) error {
 	src := srcRaw.(*internalv1beta1.ManagedClusterSet)
-	klog.V(4).Infof("Converting ManagedClusterset %v from v1beta1 to v1beta2", src.Name)
+	klog.V(4).Infof("Converting ManagedClusterset %v from v1beta2 to v1beta1", src.Name)
 
 	dst.ObjectMeta = src.ObjectMeta
 	if len(src.Spec.ClusterSelector.SelectorType) == 0 || src.Spec.ClusterSelector.SelectorType == v1beta1.LegacyClusterSetLabel {

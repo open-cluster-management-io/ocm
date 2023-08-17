@@ -39,6 +39,10 @@ spec:
       {{ if not .HostedMode }}
       serviceAccountName: placement-controller-sa
       {{ end }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: placement-controller
         image: {{ .PlacementImage }}
@@ -54,7 +58,6 @@ spec:
             drop:
               - ALL
           privileged: false
-          runAsNonRoot: true
         livenessProbe:
           httpGet:
             path: /healthz

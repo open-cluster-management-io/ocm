@@ -65,6 +65,7 @@ func NewFinalizeController(
 }
 
 func (m *finalizeController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
+	logger := klog.FromContext(ctx)
 	key := controllerContext.QueueKey()
 	if key == "" {
 		return nil
@@ -101,7 +102,7 @@ func (m *finalizeController) sync(ctx context.Context, controllerContext factory
 
 		if len(works) != 0 {
 			controllerContext.Queue().AddAfter(clusterName, 10*time.Second)
-			klog.Warningf("still having %d works in the cluster namespace %s", len(works), ns.Name)
+			logger.Info("Still having works in the cluster namespace", "workCount", len(works), "namespace", ns.Name)
 			return nil
 		}
 		return m.syncRoleBindings(ctx, controllerContext, clusterName)

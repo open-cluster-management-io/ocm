@@ -30,8 +30,8 @@ func TestSyncDelete(t *testing.T) {
 		newAppliedManifestWorks("testhost", []string{workv1.AppliedManifestWorkFinalizer}, true),
 		newAppliedManifestWorks("testhost-2", []string{workv1.AppliedManifestWorkFinalizer}, false),
 	}
-	controller := newTestController(t, klusterlet, appliedManifestWorks, namespace, bootstrapKubeConfigSecret)
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestController(t, klusterlet, syncContext.Recorder(), appliedManifestWorks, namespace, bootstrapKubeConfigSecret)
 
 	err := controller.cleanupController.sync(context.TODO(), syncContext)
 	if err != nil {
@@ -88,8 +88,9 @@ func TestSyncDeleteHosted(t *testing.T) {
 		newAppliedManifestWorks("testhost", []string{workv1.AppliedManifestWorkFinalizer}, true),
 		newAppliedManifestWorks("testhost-2", []string{workv1.AppliedManifestWorkFinalizer}, false),
 	}
-	controller := newTestControllerHosted(t, klusterlet, appliedManifestWorks, bootstrapKubeConfigSecret, namespace /*externalManagedSecret*/)
 	syncContext := testingcommon.NewFakeSyncContext(t, klusterlet.Name)
+	controller := newTestControllerHosted(t, klusterlet, syncContext.Recorder(), appliedManifestWorks,
+		bootstrapKubeConfigSecret, namespace /*externalManagedSecret*/)
 
 	err := controller.cleanupController.sync(context.TODO(), syncContext)
 	if err != nil {
@@ -152,8 +153,8 @@ func TestSyncDeleteHostedDeleteAgentNamespace(t *testing.T) {
 	})
 	now := metav1.Now()
 	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
-	controller := newTestControllerHosted(t, klusterlet, nil).setDefaultManagedClusterClientsBuilder()
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestControllerHosted(t, klusterlet, syncContext.Recorder(), nil).setDefaultManagedClusterClientsBuilder()
 
 	err := controller.cleanupController.sync(context.TODO(), syncContext)
 	if err != nil {
@@ -169,8 +170,8 @@ func TestSyncDeleteHostedDeleteWaitKubeconfig(t *testing.T) {
 	klusterlet := newKlusterletHosted("klusterlet", "testns", "cluster1")
 	now := metav1.Now()
 	klusterlet.ObjectMeta.SetDeletionTimestamp(&now)
-	controller := newTestControllerHosted(t, klusterlet, nil).setDefaultManagedClusterClientsBuilder()
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	controller := newTestControllerHosted(t, klusterlet, syncContext.Recorder(), nil).setDefaultManagedClusterClientsBuilder()
 
 	err := controller.cleanupController.sync(context.TODO(), syncContext)
 	if err != nil {
@@ -190,8 +191,8 @@ func TestSyncAddHostedFinalizerWhenKubeconfigReady(t *testing.T) {
 		newKlusterletHosted("klusterlet", "testns", "cluster1"),
 		klusterletHostedFinalizer)
 
-	c := newTestControllerHosted(t, klusterlet, nil)
 	syncContext := testingcommon.NewFakeSyncContext(t, "klusterlet")
+	c := newTestControllerHosted(t, klusterlet, syncContext.Recorder(), nil)
 
 	err := c.cleanupController.sync(context.TODO(), syncContext)
 	if err != nil {

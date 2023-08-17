@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/klog/v2/ktesting"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
@@ -313,7 +314,8 @@ func TestIsSpokeClusterClientCertRenewal(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			isRenewal, clusterName, commonName := validateCSR(newCSRInfo(testinghelpers.NewCSR(c.csr)))
+			logger, _ := ktesting.NewTestContext(t)
+			isRenewal, clusterName, commonName := validateCSR(logger, newCSRInfo(logger, testinghelpers.NewCSR(c.csr)))
 			if isRenewal != c.isRenewal {
 				t.Errorf("expected %t, but failed", c.isRenewal)
 			}

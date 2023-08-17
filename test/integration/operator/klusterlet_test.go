@@ -12,6 +12,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/rest"
@@ -479,11 +480,15 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
-			klusterlet, err = operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			klusterlet.Spec.ClusterName = "cluster2"
-			_, err = operatorClient.OperatorV1().Klusterlets().Update(context.Background(), klusterlet, metav1.UpdateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Eventually(func() error {
+				klusterlet, err = operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				klusterlet.Spec.ClusterName = "cluster2"
+				_, err = operatorClient.OperatorV1().Klusterlets().Update(context.Background(), klusterlet, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 			gomega.Eventually(func() bool {
 				actual, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
@@ -751,6 +756,15 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			hubSecret.Data["kubeconfig"] = util.NewKubeConfig(&rest.Config{Host: "https://nohost"})
 			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(), hubSecret, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Update replica of deployment
+			registrationDeployment, err = kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			registrationDeployment = registrationDeployment.DeepCopy()
+			registrationDeployment.Status.AvailableReplicas = 0
+			_, err = kubeClient.AppsV1().Deployments(klusterletNamespace).UpdateStatus(context.Background(), registrationDeployment, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 			util.AssertKlusterletCondition(
 				klusterlet.Name, operatorClient,
 				"HubConnectionDegraded",
@@ -799,7 +813,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 		})
 	})
 
-	ginkgo.Context("bootstrap reconciliation", func() {
+	ginkgo.Context("rebootstrap", func() {
 		ginkgo.BeforeEach(func() {
 			registrationDeploymentName = fmt.Sprintf("%s-registration-agent", klusterlet.Name)
 			workDeploymentName = fmt.Sprintf("%s-work-agent", klusterlet.Name)
@@ -807,6 +821,74 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 		ginkgo.AfterEach(func() {
 			gomega.Expect(operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})).To(gomega.BeNil())
 		})
+
+		assertRebootstrap := func() {
+			// Check if the rebootstrap is started
+			gomega.Eventually(func() error {
+				klusterlet, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if meta.IsStatusConditionTrue(klusterlet.Status.Conditions, helpers.KlusterletRebootstrapProgressing) {
+					return nil
+				}
+
+				return fmt.Errorf("Rebootstrap is not started yet")
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+			// Make sure the deployments are scaled down to 0 during rebootstrapping;
+			gomega.Eventually(func() error {
+				// return if the rebootstrap is completed
+				klusterlet, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if meta.IsStatusConditionFalse(klusterlet.Status.Conditions, helpers.KlusterletRebootstrapProgressing) {
+					return nil
+				}
+
+				// check the Replicas of deployments
+				registrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(),
+					registrationDeploymentName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if *registrationDeployment.Spec.Replicas != 0 {
+					return fmt.Errorf("registrationDeployment.Spec.Replicas is not 0: %d", *registrationDeployment.Spec.Replicas)
+				}
+
+				workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				if *workDeployment.Spec.Replicas != 0 {
+					return fmt.Errorf("workDeployment.Spec.Replicas is not 0: %d", *registrationDeployment.Spec.Replicas)
+				}
+
+				return nil
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+
+			// check if the rebootstrap is completed
+			gomega.Eventually(func() error {
+				klusterlet, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if !meta.IsStatusConditionFalse(klusterlet.Status.Conditions, helpers.KlusterletRebootstrapProgressing) {
+					return fmt.Errorf("Rebootstrap is not completed yet")
+				}
+
+				_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.HubKubeConfig, metav1.GetOptions{})
+				if errors.IsNotFound(err) {
+					return nil
+				} else if err != nil {
+					return err
+				}
+				return fmt.Errorf("hub kubeconfig secret %s/%s is not deleted yet", klusterletNamespace, helpers.HubKubeConfig)
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
+		}
 
 		ginkgo.It("should reload the klusterlet after the bootstrap secret is changed", func() {
 			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
@@ -840,21 +922,6 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
-			// Get the deployments
-			var registrationDeployment *appsv1.Deployment
-			var workDeployment *appsv1.Deployment
-			gomega.Eventually(func() bool {
-				if registrationDeployment, err = kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
-					context.Background(), registrationDeploymentName, metav1.GetOptions{}); err != nil {
-					return false
-				}
-				if workDeployment, err = kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
-					context.Background(), workDeploymentName, metav1.GetOptions{}); err != nil {
-					return false
-				}
-				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
 			// Change the bootstrap secret server address
 			bootStrapSecret, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.BootstrapHubKubeConfig, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -863,25 +930,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(), bootStrapSecret, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			// Make sure the deployments are deleted and recreated
-			gomega.Eventually(func() bool {
-				lastRegistrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
-					context.Background(), registrationDeploymentName, metav1.GetOptions{})
-				if err != nil {
-					return false
-				}
-				lastWorkDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
-				if err != nil {
-					return false
-				}
-				if registrationDeployment.UID == lastRegistrationDeployment.UID {
-					return false
-				}
-				if workDeployment.UID == lastWorkDeployment.UID {
-					return false
-				}
-				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			assertRebootstrap()
 		})
 
 		ginkgo.It("should reload the klusterlet after the hub secret is expired", func() {
@@ -901,21 +950,6 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(), bootStrapSecret, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			// Get the deployments
-			var registrationDeployment *appsv1.Deployment
-			var workDeployment *appsv1.Deployment
-			gomega.Eventually(func() bool {
-				if registrationDeployment, err = kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
-					context.Background(), registrationDeploymentName, metav1.GetOptions{}); err != nil {
-					return false
-				}
-				if workDeployment, err = kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
-					context.Background(), workDeploymentName, metav1.GetOptions{}); err != nil {
-					return false
-				}
-				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
 			// Update the hub secret and make it same with the bootstrap secret
 			gomega.Eventually(func() bool {
 				hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.HubKubeConfig, metav1.GetOptions{})
@@ -932,25 +966,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 				return true
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
-			// Make sure the deployments are deleted and recreated
-			gomega.Eventually(func() bool {
-				lastRegistrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(
-					context.Background(), registrationDeploymentName, metav1.GetOptions{})
-				if err != nil {
-					return false
-				}
-				lastWorkDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
-				if err != nil {
-					return false
-				}
-				if registrationDeployment.UID == lastRegistrationDeployment.UID {
-					return false
-				}
-				if workDeployment.UID == lastWorkDeployment.UID {
-					return false
-				}
-				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+			assertRebootstrap()
 		})
 	})
 
