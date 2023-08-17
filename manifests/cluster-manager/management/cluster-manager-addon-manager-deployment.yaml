@@ -39,6 +39,10 @@ spec:
       {{ if not .HostedMode }}
       serviceAccountName: addon-manager-controller-sa
       {{ end }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: addon-manager-controller
         image: {{ .AddOnManagerImage }}
@@ -59,7 +63,6 @@ spec:
             drop:
               - ALL
           privileged: false
-          runAsNonRoot: true
         livenessProbe:
           httpGet:
             path: /healthz

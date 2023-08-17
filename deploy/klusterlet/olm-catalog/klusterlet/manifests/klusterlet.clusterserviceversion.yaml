@@ -39,10 +39,10 @@ metadata:
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
     containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2023-05-24T20:00:31Z"
+    createdAt: "2023-08-15T09:59:53Z"
     description: Manages the installation and upgrade of the Klusterlet.
-    operators.operatorframework.io/builder: operator-sdk-v1.1.0
-    operators.operatorframework.io/project_layout: go
+    operators.operatorframework.io/builder: operator-sdk-v1.28.0
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/open-cluster-management-io/registration-operator
     support: Red Hat, Inc.
   name: klusterlet.v0.12.0
@@ -51,7 +51,8 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: Klusterlet defines the configurations of agents running on the managed cluster
+    - description: Klusterlet defines the configurations of agents running on the
+        managed cluster
       displayName: Klusterlet
       kind: Klusterlet
       name: klusterlets.operator.open-cluster-management.io
@@ -237,7 +238,9 @@ spec:
           - patch
         serviceAccountName: klusterlet
       deployments:
-      - name: klusterlet
+      - label:
+          app: klusterlet
+        name: klusterlet
         spec:
           replicas: 3
           selector:
@@ -295,6 +298,16 @@ spec:
                   requests:
                     cpu: 100m
                     memory: 128Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+                  privileged: false
+              securityContext:
+                runAsNonRoot: true
+                seccompProfile:
+                  type: RuntimeDefault
               serviceAccountName: klusterlet
     strategy: deployment
   installModes:

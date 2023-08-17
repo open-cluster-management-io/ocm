@@ -46,6 +46,10 @@ spec:
                   values:
                   - klusterlet-manifestwork-agent
       serviceAccountName: {{ .KlusterletName }}-work-sa
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: klusterlet-manifestwork-agent
         image: {{ .WorkImage }}
@@ -74,7 +78,6 @@ spec:
             drop:
               - ALL
           privileged: false
-          runAsNonRoot: true
         volumeMounts:
         - name: hub-kubeconfig-secret
           mountPath: "/spoke/hub-kubeconfig"
