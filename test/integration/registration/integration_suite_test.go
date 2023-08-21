@@ -104,7 +104,6 @@ var _ = ginkgo.BeforeSuite(func() {
 	transport.CertCallbackRefreshDuration = 5 * time.Second
 	clientcert.ControllerResyncInterval = 5 * time.Second
 	registration.CreatingControllerSyncInterval = 1 * time.Second
-	hub.ResyncInterval = 5 * time.Second
 
 	// crank up the addon lease sync and udpate speed
 	spoke.AddOnLeaseControllerSyncInterval = 5 * time.Second
@@ -130,6 +129,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	gomega.Expect(cfg).ToNot(gomega.BeNil())
 
 	features.SpokeMutableFeatureGate.Add(ocmfeature.DefaultSpokeRegistrationFeatureGates)
+	features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates)
 
 	err = clusterv1.Install(scheme.Scheme)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -175,11 +175,11 @@ var _ = ginkgo.BeforeSuite(func() {
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	// enable DefaultClusterSet feature gate
-	err = features.DefaultHubRegistrationMutableFeatureGate.Set("DefaultClusterSet=true")
+	err = features.HubMutableFeatureGate.Set("DefaultClusterSet=true")
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	// enable ManagedClusterAutoApproval feature gate
-	err = features.DefaultHubRegistrationMutableFeatureGate.Set("ManagedClusterAutoApproval=true")
+	err = features.HubMutableFeatureGate.Set("ManagedClusterAutoApproval=true")
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	// start hub controller

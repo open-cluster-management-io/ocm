@@ -54,7 +54,7 @@ func (r *ManagedClusterWebhook) Default(ctx context.Context, obj runtime.Object)
 	}
 
 	//Set default clusterset label
-	if features.DefaultHubRegistrationMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
 		r.addDefaultClusterSetLabel(managedCluster)
 	}
 

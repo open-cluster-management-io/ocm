@@ -9,12 +9,16 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+
+	ocmfeature "open-cluster-management.io/api/feature"
 
 	"open-cluster-management.io/ocm/pkg/cmd/hub"
 	"open-cluster-management.io/ocm/pkg/cmd/spoke"
 	"open-cluster-management.io/ocm/pkg/cmd/webhook"
+	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/version"
 )
 
@@ -27,6 +31,9 @@ func main() {
 	logs.AddFlags(pflag.CommandLine)
 	logs.InitLogs()
 	defer logs.FlushLogs()
+
+	utilruntime.Must(features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubWorkFeatureGates))
+	features.HubMutableFeatureGate.AddFlag(pflag.CommandLine)
 
 	command := newWorkCommand()
 	if err := command.Execute(); err != nil {
@@ -54,5 +61,6 @@ func newWorkCommand() *cobra.Command {
 	cmd.AddCommand(spoke.NewWorkAgent())
 	cmd.AddCommand(webhook.NewWorkWebhook())
 	cmd.AddCommand(hub.NewWorkController())
+
 	return cmd
 }
