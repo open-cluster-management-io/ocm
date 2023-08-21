@@ -25,7 +25,7 @@ deploy-hub: deploy-hub-operator apply-hub-cr hub-kubeconfig
 deploy-hub-operator: ensure-kustomize
 	cp deploy/cluster-manager/config/kustomization.yaml deploy/cluster-manager/config/kustomization.yaml.tmp
 	cd deploy/cluster-manager/config && ../../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/registration-operator:latest=$(OPERATOR_IMAGE_NAME)
-	$(KUSTOMIZE) build deploy/cluster-manager/config | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build deploy/cluster-manager/config | $(KUBECTL) apply --validate=false -f -
 	mv deploy/cluster-manager/config/kustomization.yaml.tmp deploy/cluster-manager/config/kustomization.yaml
 
 apply-hub-cr:
@@ -57,7 +57,7 @@ bootstrap-secret:
 deploy-spoke-operator: ensure-kustomize
 	cp deploy/klusterlet/config/kustomization.yaml deploy/klusterlet/config/kustomization.yaml.tmp
 	cd deploy/klusterlet/config && ../../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/registration-operator:latest=$(OPERATOR_IMAGE_NAME)
-	$(KUSTOMIZE) build deploy/klusterlet/config | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build deploy/klusterlet/config | $(KUBECTL) apply --validate=false -f -
 	mv deploy/klusterlet/config/kustomization.yaml.tmp deploy/klusterlet/config/kustomization.yaml
 
 apply-spoke-cr: bootstrap-secret
