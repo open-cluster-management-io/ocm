@@ -13,15 +13,15 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 )
 
 OPERATOR_SDK?=$(PERMANENT_TMP_GOPATH)/bin/operator-sdk
-OPERATOR_SDK_VERSION?=v1.28.0
+OPERATOR_SDK_VERSION?=v1.1.0
 operatorsdk_gen_dir:=$(dir $(OPERATOR_SDK))
 # CSV_VERSION is used to generate new CSV manifests
 CSV_VERSION?=0.12.0
 
-OPERATOR_SDK_ARCHOS:=linux_amd64
+OPERATOR_SDK_ARCHOS:=x86_64-linux-gnu
 ifeq ($(GOHOSTOS),darwin)
 	ifeq ($(GOHOSTARCH),amd64)
-		OPERATOR_SDK_ARCHOS:=darwin_amd64
+		OPERATOR_SDK_ARCHOS:=x86_64-apple-darwin
 	endif
 endif
 
@@ -57,12 +57,12 @@ patch-crd: ensure-yaml-patch
 update: patch-crd copy-crd update-csv
 
 update-csv: ensure-operator-sdk
-	cd deploy/cluster-manager && ../../$(OPERATOR_SDK) generate bundle --version $(CSV_VERSION) --package cluster-manager --input-dir config --output-dir olm-catalog/cluster-manager
-	cd deploy/klusterlet && ../../$(OPERATOR_SDK) generate bundle --version $(CSV_VERSION) --package klusterlet --input-dir config --output-dir olm-catalog/klusterlet
+	cd deploy/cluster-manager && ../../$(OPERATOR_SDK) generate bundle --manifests --deploy-dir config/ --crds-dir config/crds/ --output-dir olm-catalog/cluster-manager/ --version $(CSV_VERSION)
+	cd deploy/klusterlet && ../../$(OPERATOR_SDK) generate bundle --manifests --deploy-dir config/ --crds-dir config/crds/ --output-dir olm-catalog/klusterlet/ --version=$(CSV_VERSION)
 
-	# delete bundle.Dockerfile since we do not use it to build image.
-	rm ./deploy/cluster-manager/bundle.Dockerfile
-	rm ./deploy/klusterlet/bundle.Dockerfile
+	# delete useless serviceaccounts in manifests although they are copied from config by operator-sdk.
+	rm ./deploy/cluster-manager/olm-catalog/cluster-manager/manifests/cluster-manager_v1_serviceaccount.yaml
+	rm ./deploy/klusterlet/olm-catalog/klusterlet/manifests/klusterlet_v1_serviceaccount.yaml
 
 verify-crds: patch-crd
 	bash -x hack/verify-crds.sh
@@ -93,7 +93,7 @@ ensure-operator-sdk:
 ifeq "" "$(wildcard $(OPERATOR_SDK))"
 	$(info Installing operator-sdk into '$(OPERATOR_SDK)')
 	mkdir -p '$(operatorsdk_gen_dir)'
-	curl -s -f -L https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$(OPERATOR_SDK_ARCHOS) -o '$(OPERATOR_SDK)'
+	curl -s -f -L https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk-$(OPERATOR_SDK_VERSION)-$(OPERATOR_SDK_ARCHOS) -o '$(OPERATOR_SDK)'
 	chmod +x '$(OPERATOR_SDK)';
 else
 	$(info Using existing operator-sdk from "$(OPERATOR_SDK)")
