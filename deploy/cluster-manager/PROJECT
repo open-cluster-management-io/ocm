@@ -1,4 +1,2 @@
-version: "3"
-layout:
-- go.kubebuilder.io/v3
 projectName: cluster-manager
+version: 2

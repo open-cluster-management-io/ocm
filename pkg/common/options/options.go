@@ -1,6 +1,7 @@
 package options
 
 import (
+	"context"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -25,8 +26,16 @@ func NewOptions() *Options {
 
 func (o *Options) NewControllerCommandConfig(
 	componentName string, version version.Info, startFunc controllercmd.StartFunc) *controllercmd.ControllerCommandConfig {
-	o.CmdConfig = controllercmd.NewControllerCommandConfig(componentName, version, startFunc)
+	o.CmdConfig = controllercmd.NewControllerCommandConfig(componentName, version, o.startWithQPS(startFunc))
 	return o.CmdConfig
+}
+
+func (o *Options) startWithQPS(startFunc controllercmd.StartFunc) controllercmd.StartFunc {
+	return func(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+		controllerContext.KubeConfig.QPS = o.QPS
+		controllerContext.KubeConfig.Burst = o.Burst
+		return startFunc(ctx, controllerContext)
+	}
 }
 
 func (o *Options) AddFlags(flags *pflag.FlagSet) {

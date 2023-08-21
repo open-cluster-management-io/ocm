@@ -253,7 +253,8 @@ func TestManifestWorkExecutorValidate(t *testing.T) {
 		},
 	}
 
-	utilruntime.Must(features.DefaultHubWorkMutableFeatureGate.Set(
+	utilruntime.Must(features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubWorkFeatureGates))
+	utilruntime.Must(features.HubMutableFeatureGate.Set(
 		fmt.Sprintf("%s=true", ocmfeature.NilExecutorValidating),
 	))
 

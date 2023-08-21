@@ -13,7 +13,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -39,8 +38,6 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/hub/taint"
 )
 
-var ResyncInterval = 5 * time.Minute
-
 // HubManagerOptions holds configuration for hub manager controller
 type HubManagerOptions struct {
 	ClusterAutoApprovalUsers []string
@@ -53,7 +50,6 @@ func NewHubManagerOptions() *HubManagerOptions {
 
 // AddFlags registers flags for manager
 func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
-	features.DefaultHubRegistrationMutableFeatureGate.AddFlag(fs)
 	fs.StringSliceVar(&m.ClusterAutoApprovalUsers, "cluster-auto-approval-users", m.ClusterAutoApprovalUsers,
 		"A bootstrap user list whose cluster registration requests can be automatically approved.")
 
@@ -61,32 +57,22 @@ func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 
 // RunControllerManager starts the controllers on hub to manage spoke cluster registration.
 func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
-	// If qps in kubconfig is not set, increase the qps and burst to enhance the ability of kube client to handle
-	// requests in concurrent
-	// TODO: Use ClientConnectionOverrides flags to change qps/burst when library-go exposes them in the future
-	logger := klog.FromContext(ctx)
-	kubeConfig := rest.CopyConfig(controllerContext.KubeConfig)
-	if kubeConfig.QPS == 0.0 {
-		kubeConfig.QPS = 100.0
-		kubeConfig.Burst = 200
-	}
-
-	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
+	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
 
-	clusterClient, err := clusterv1client.NewForConfig(kubeConfig)
+	clusterClient, err := clusterv1client.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
 
-	workClient, err := workv1client.NewForConfig(kubeConfig)
+	workClient, err := workv1client.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
 
-	addOnClient, err := addonclient.NewForConfig(kubeConfig)
+	addOnClient, err := addonclient.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
@@ -113,14 +99,33 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 		}))
 	addOnInformers := addoninformers.NewSharedInformerFactory(addOnClient, 30*time.Minute)
 
+	return m.RunControllerManagerWithInformers(
+		ctx, controllerContext,
+		kubeClient, clusterClient, addOnClient,
+		kubeInfomers, clusterInformers, workInformers, addOnInformers,
+	)
+}
+
+func (m *HubManagerOptions) RunControllerManagerWithInformers(
+	ctx context.Context,
+	controllerContext *controllercmd.ControllerContext,
+	kubeClient kubernetes.Interface,
+	clusterClient clusterv1client.Interface,
+	addOnClient addonclient.Interface,
+	kubeInformers kubeinformers.SharedInformerFactory,
+	clusterInformers clusterv1informers.SharedInformerFactory,
+	workInformers workv1informers.SharedInformerFactory,
+	addOnInformers addoninformers.SharedInformerFactory,
+) error {
+	logger := klog.FromContext(ctx)
 	managedClusterController := managedcluster.NewManagedClusterController(
 		kubeClient,
 		clusterClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
-		kubeInfomers.Rbac().V1().Roles(),
-		kubeInfomers.Rbac().V1().ClusterRoles(),
-		kubeInfomers.Rbac().V1().RoleBindings(),
-		kubeInfomers.Rbac().V1().ClusterRoleBindings(),
+		kubeInformers.Rbac().V1().Roles(),
+		kubeInformers.Rbac().V1().ClusterRoles(),
+		kubeInformers.Rbac().V1().RoleBindings(),
+		kubeInformers.Rbac().V1().ClusterRoleBindings(),
 		controllerContext.EventRecorder,
 	)
 
@@ -131,7 +136,7 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 	)
 
 	csrReconciles := []csr.Reconciler{csr.NewCSRRenewalReconciler(kubeClient, controllerContext.EventRecorder)}
-	if features.DefaultHubRegistrationMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.ManagedClusterAutoApproval) {
 		csrReconciles = append(csrReconciles, csr.NewCSRBootstrapReconciler(
 			kubeClient,
 			clusterClient,
@@ -142,7 +147,7 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 	}
 
 	var csrController factory.Controller
-	if features.DefaultHubRegistrationMutableFeatureGate.Enabled(ocmfeature.V1beta1CSRAPICompatibility) {
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.V1beta1CSRAPICompatibility) {
 		v1CSRSupported, v1beta1CSRSupported, err := helpers.IsCSRSupported(kubeClient)
 		if err != nil {
 			return errors.Wrapf(err, "failed CSR api discovery")
@@ -150,8 +155,8 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 
 		if !v1CSRSupported && v1beta1CSRSupported {
 			csrController = csr.NewCSRApprovingController[*certv1beta1.CertificateSigningRequest](
-				kubeInfomers.Certificates().V1beta1().CertificateSigningRequests().Informer(),
-				kubeInfomers.Certificates().V1beta1().CertificateSigningRequests().Lister(),
+				kubeInformers.Certificates().V1beta1().CertificateSigningRequests().Informer(),
+				kubeInformers.Certificates().V1beta1().CertificateSigningRequests().Lister(),
 				csr.NewCSRV1beta1Approver(kubeClient),
 				csrReconciles,
 				controllerContext.EventRecorder,
@@ -161,8 +166,8 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 	}
 	if csrController == nil {
 		csrController = csr.NewCSRApprovingController[*certv1.CertificateSigningRequest](
-			kubeInfomers.Certificates().V1().CertificateSigningRequests().Informer(),
-			kubeInfomers.Certificates().V1().CertificateSigningRequests().Lister(),
+			kubeInformers.Certificates().V1().CertificateSigningRequests().Informer(),
+			kubeInformers.Certificates().V1().CertificateSigningRequests().Lister(),
 			csr.NewCSRV1Approver(kubeClient),
 			csrReconciles,
 			controllerContext.EventRecorder,
@@ -173,13 +178,13 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 		kubeClient,
 		clusterClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
-		kubeInfomers.Coordination().V1().Leases(),
+		kubeInformers.Coordination().V1().Leases(),
 		controllerContext.EventRecorder,
 	)
 
 	rbacFinalizerController := rbacfinalizerdeletion.NewFinalizeController(
-		kubeInfomers.Rbac().V1().RoleBindings().Lister(),
-		kubeInfomers.Core().V1().Namespaces(),
+		kubeInformers.Rbac().V1().RoleBindings().Lister(),
+		kubeInformers.Core().V1().Namespaces(),
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		workInformers.Work().V1().ManifestWorks().Lister(),
 		kubeClient.RbacV1(),
@@ -203,7 +208,7 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 	clusterroleController := clusterrole.NewManagedClusterClusterroleController(
 		kubeClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
-		kubeInfomers.Rbac().V1().ClusterRoles(),
+		kubeInformers.Rbac().V1().ClusterRoles(),
 		controllerContext.EventRecorder,
 	)
 
@@ -222,7 +227,7 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 	)
 
 	var defaultManagedClusterSetController, globalManagedClusterSetController factory.Controller
-	if features.DefaultHubRegistrationMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
 		defaultManagedClusterSetController = managedclusterset.NewDefaultManagedClusterSetController(
 			clusterClient.ClusterV1beta2(),
 			clusterInformers.Cluster().V1beta2().ManagedClusterSets(),
@@ -237,7 +242,7 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 
 	go clusterInformers.Start(ctx.Done())
 	go workInformers.Start(ctx.Done())
-	go kubeInfomers.Start(ctx.Done())
+	go kubeInformers.Start(ctx.Done())
 	go addOnInformers.Start(ctx.Done())
 
 	go managedClusterController.Run(ctx, 1)
@@ -250,7 +255,7 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 	go clusterroleController.Run(ctx, 1)
 	go addOnHealthCheckController.Run(ctx, 1)
 	go addOnFeatureDiscoveryController.Run(ctx, 1)
-	if features.DefaultHubRegistrationMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
+	if features.HubMutableFeatureGate.Enabled(ocmfeature.DefaultClusterSet) {
 		go defaultManagedClusterSetController.Run(ctx, 1)
 		go globalManagedClusterSetController.Run(ctx, 1)
 	}

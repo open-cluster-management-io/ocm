@@ -76,7 +76,7 @@ func (r *ManifestWorkWebhook) validateRequest(newWork, oldWork *workv1.ManifestW
 
 func validateExecutor(kubeClient kubernetes.Interface, work *workv1.ManifestWork, userInfo authenticationv1.UserInfo) error {
 	executor := work.Spec.Executor
-	if !features.DefaultHubWorkMutableFeatureGate.Enabled(ocmfeature.NilExecutorValidating) {
+	if !features.HubMutableFeatureGate.Enabled(ocmfeature.NilExecutorValidating) {
 		if executor == nil {
 			return nil
 		}

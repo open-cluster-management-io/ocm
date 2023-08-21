@@ -3,7 +3,6 @@ package webhook
 import (
 	"github.com/spf13/cobra"
 
-	"open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/registration/webhook"
 )
 
@@ -21,6 +20,5 @@ func NewRegistrationWebhook() *cobra.Command {
 	flags := cmd.Flags()
 	ops.AddFlags(flags)
 
-	features.DefaultHubRegistrationMutableFeatureGate.AddFlag(flags)
 	return cmd
 }

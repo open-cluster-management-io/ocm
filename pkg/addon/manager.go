@@ -72,8 +72,31 @@ func RunManager(ctx context.Context, controllerContext *controllercmd.Controller
 		}),
 	)
 
+	dynamicInformers := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, 10*time.Minute)
+
+	return RunControllerManagerWithInformers(
+		ctx, controllerContext,
+		hubKubeClient,
+		addonClient,
+		clusterInformerFactory,
+		addonInformerFactory,
+		workInformers,
+		dynamicInformers,
+	)
+}
+
+func RunControllerManagerWithInformers(
+	ctx context.Context,
+	controllerContext *controllercmd.ControllerContext,
+	hubKubeClient kubernetes.Interface,
+	hubAddOnClient addonv1alpha1client.Interface,
+	clusterInformers clusterinformers.SharedInformerFactory,
+	addonInformers addoninformers.SharedInformerFactory,
+	workinformers workv1informers.SharedInformerFactory,
+	dynamicInformers dynamicinformer.DynamicSharedInformerFactory,
+) error {
 	// addonDeployController
-	err = workInformers.Work().V1().ManifestWorks().Informer().AddIndexers(
+	err := workinformers.Work().V1().ManifestWorks().Informer().AddIndexers(
 		cache.Indexers{
 			index.ManifestWorkByAddon:           index.IndexManifestWorkByAddon,
 			index.ManifestWorkByHostedAddon:     index.IndexManifestWorkByHostedAddon,
@@ -84,7 +107,7 @@ func RunManager(ctx context.Context, controllerContext *controllercmd.Controller
 		return err
 	}
 
-	err = addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
+	err = addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
 		cache.Indexers{
 			index.ManagedClusterAddonByNamespace: index.IndexManagedClusterAddonByNamespace, // addonDeployController
 			index.ManagedClusterAddonByName:      index.IndexManagedClusterAddonByName,      // addonConfigController
@@ -95,70 +118,69 @@ func RunManager(ctx context.Context, controllerContext *controllercmd.Controller
 		return err
 	}
 
-	err = addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
+	// managementAddonConfigController
+	err = addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
 		cache.Indexers{
-			index.ClusterManagementAddonByConfig:    index.IndexClusterManagementAddonByConfig,    // managementAddonConfigController
-			index.ClusterManagementAddonByPlacement: index.IndexClusterManagementAddonByPlacement, // addonConfigController
+			index.ClusterManagementAddonByConfig:    index.IndexClusterManagementAddonByConfig,
+			index.ClusterManagementAddonByPlacement: index.IndexClusterManagementAddonByPlacement,
 		})
 	if err != nil {
 		return err
 	}
 
-	dynamicInformers := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, 10*time.Minute)
-
 	addonManagementController := addonmanagement.NewAddonManagementController(
-		addonClient,
-		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
-		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
-		clusterInformerFactory.Cluster().V1beta1().Placements(),
-		clusterInformerFactory.Cluster().V1beta1().PlacementDecisions(),
+		hubAddOnClient,
+		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
+		clusterInformers.Cluster().V1beta1().Placements(),
+		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
 		utils.ManagedByAddonManager,
 		controllerContext.EventRecorder,
 	)
 
 	addonConfigurationController := addonconfiguration.NewAddonConfigurationController(
-		addonClient,
-		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
-		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
-		clusterInformerFactory.Cluster().V1beta1().Placements(),
-		clusterInformerFactory.Cluster().V1beta1().PlacementDecisions(),
+		hubAddOnClient,
+		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
+		clusterInformers.Cluster().V1beta1().Placements(),
+		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
 		utils.ManagedByAddonManager,
 		controllerContext.EventRecorder,
 	)
 
 	addonOwnerController := addonowner.NewAddonOwnerController(
-		addonClient,
-		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
-		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
+		hubAddOnClient,
+		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 		utils.ManagedByAddonManager,
 		controllerContext.EventRecorder,
 	)
 
 	addonProgressingController := addonprogressing.NewAddonProgressingController(
-		addonClient,
-		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
-		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
-		workInformers.Work().V1().ManifestWorks(),
+		hubAddOnClient,
+		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
+		workinformers.Work().V1().ManifestWorks(),
 		utils.ManagedByAddonManager,
 		controllerContext.EventRecorder,
 	)
 
 	mgmtAddonInstallProgressionController := managementaddoninstallprogression.NewManagementAddonInstallProgressionController(
-		addonClient,
-		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
-		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
+		hubAddOnClient,
+		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 		utils.ManagedByAddonManager,
 		controllerContext.EventRecorder,
 	)
 
 	addonTemplateController := addontemplate.NewAddonTemplateController(
-		kubeConfig,
+		controllerContext.KubeConfig,
 		hubKubeClient,
-		addonClient,
-		addonInformerFactory,
-		clusterInformerFactory,
+		hubAddOnClient,
+		addonInformers,
+		clusterInformers,
 		dynamicInformers,
-		workInformers,
+		workinformers,
 		controllerContext.EventRecorder,
 	)
 
@@ -171,9 +193,9 @@ func RunManager(ctx context.Context, controllerContext *controllercmd.Controller
 	// start a goroutine for each template-type addon it watches.
 	go addonTemplateController.Run(ctx, 1)
 
-	clusterInformerFactory.Start(ctx.Done())
-	addonInformerFactory.Start(ctx.Done())
-	workInformers.Start(ctx.Done())
+	clusterInformers.Start(ctx.Done())
+	addonInformers.Start(ctx.Done())
+	workinformers.Start(ctx.Done())
 	dynamicInformers.Start(ctx.Done())
 
 	<-ctx.Done()

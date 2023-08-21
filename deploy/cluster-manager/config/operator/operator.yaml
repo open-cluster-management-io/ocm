@@ -37,10 +37,6 @@ spec:
                   values:
                   - cluster-manager
       serviceAccountName: cluster-manager
-      securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
       containers:
       - name: registration-operator
         image: quay.io/open-cluster-management/registration-operator:latest
@@ -53,6 +49,7 @@ spec:
             drop:
               - ALL
           privileged: false
+          runAsNonRoot: true
         livenessProbe:
           httpGet:
             path: /healthz

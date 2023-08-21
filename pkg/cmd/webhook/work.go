@@ -3,7 +3,6 @@ package webhook
 import (
 	"github.com/spf13/cobra"
 
-	"open-cluster-management.io/ocm/pkg/features"
 	_ "open-cluster-management.io/ocm/pkg/features"
 	"open-cluster-management.io/ocm/pkg/work/webhook"
 )
@@ -21,8 +20,6 @@ func NewWorkWebhook() *cobra.Command {
 
 	flags := cmd.Flags()
 	ops.AddFlags(flags)
-
-	features.DefaultHubWorkMutableFeatureGate.AddFlag(flags)
 
 	return cmd
 }

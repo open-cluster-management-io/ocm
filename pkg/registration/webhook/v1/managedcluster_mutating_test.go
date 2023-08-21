@@ -445,8 +445,8 @@ func TestDefault(t *testing.T) {
 			},
 		},
 	}
-	runtime.Must(features.DefaultHubRegistrationMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates))
-	if err := features.DefaultHubRegistrationMutableFeatureGate.Set(fmt.Sprintf("%s=true", string(ocmfeature.DefaultClusterSet))); err != nil {
+	runtime.Must(features.HubMutableFeatureGate.Add(ocmfeature.DefaultHubRegistrationFeatureGates))
+	if err := features.HubMutableFeatureGate.Set(fmt.Sprintf("%s=true", string(ocmfeature.DefaultClusterSet))); err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range cases {
