@@ -46,10 +46,6 @@ spec:
                   values:
                   - klusterlet-registration-agent
       serviceAccountName: {{ .KlusterletName }}-agent-sa
-      securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
       containers:
       - name: klusterlet-agent
         image: {{ .SingletonImage }}
@@ -88,6 +84,7 @@ spec:
             drop:
               - ALL
           privileged: false
+          runAsNonRoot: true
         volumeMounts:
         - name: bootstrap-secret
           mountPath: "/spoke/bootstrap"

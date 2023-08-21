@@ -39,10 +39,6 @@ spec:
       {{ if not .HostedMode }}
       serviceAccountName: registration-webhook-sa
       {{ end }}
-      securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
       containers:
       - name: {{ .ClusterManagerName }}-webhook
         image: {{ .RegistrationImage }}
@@ -70,6 +66,7 @@ spec:
             drop:
             - ALL
           privileged: false
+          runAsNonRoot: true
         livenessProbe:
           httpGet:
             path: /healthz

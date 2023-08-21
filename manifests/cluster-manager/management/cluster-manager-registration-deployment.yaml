@@ -39,10 +39,6 @@ spec:
       {{ if not .HostedMode }}
       serviceAccountName: registration-controller-sa
       {{ end }}
-      securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
       containers:
       - name: hub-registration-controller
         image: {{ .RegistrationImage }}
@@ -66,6 +62,7 @@ spec:
             drop:
               - ALL
           privileged: false
+          runAsNonRoot: true
         livenessProbe:
           httpGet:
             path: /healthz
