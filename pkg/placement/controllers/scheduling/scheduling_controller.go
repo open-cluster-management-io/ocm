@@ -456,7 +456,7 @@ func (c *schedulingController) generatePlacementDecisionsAndStatus(
 	placement *clusterapiv1beta1.Placement,
 	clusters []*clusterapiv1.ManagedCluster,
 ) ([]*clusterapiv1beta1.PlacementDecision, []*clusterapiv1beta1.DecisionGroupStatus, *framework.Status) {
-	placementDecisionIndex := 0
+	placementDecisionIndex := 1
 	var placementDecisions []*clusterapiv1beta1.PlacementDecision
 	var decisionGroupStatus []*clusterapiv1beta1.DecisionGroupStatus
 
@@ -465,7 +465,9 @@ func (c *schedulingController) generatePlacementDecisionsAndStatus(
 
 	// generate placement decision for each decision group
 	for decisionGroupIndex, decisionGroup := range decisionGroups {
-		// generate placement decisions and status, group and placement name index starts from 0.
+		// generate placement decisions and status, decision group index starts from 0
+		// placement name index starts from 1 to keep backward compatibility
+		// TODO: should be consistent with index or using a random generate name when version bumps
 		pds, groupStatus := c.generateDecision(placement, decisionGroup, decisionGroupIndex, placementDecisionIndex)
 
 		placementDecisions = append(placementDecisions, pds...)
