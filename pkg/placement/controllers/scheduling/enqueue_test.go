@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2/ktesting"
 
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -184,11 +185,13 @@ func TestEnqueuePlacementsByClusterSet(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
 			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
 			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 			q := newEnqueuer(
+				ctx,
 				syncCtx.Queue(),
 				clusterInformerFactory.Cluster().V1().ManagedClusters(),
 				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets(),
@@ -291,11 +294,13 @@ func TestEnqueuePlacementsByClusterSetBinding(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
 			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
 			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 			q := newEnqueuer(
+				ctx,
 				syncCtx.Queue(),
 				clusterInformerFactory.Cluster().V1().ManagedClusters(),
 				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets(),
@@ -379,11 +384,13 @@ func TestEnqueuePlacementsByScore(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			clusterClient := clusterfake.NewSimpleClientset(c.initObjs...)
 			clusterInformerFactory := newClusterInformerFactory(t, clusterClient, c.initObjs...)
 
 			syncCtx := testingcommon.NewFakeSyncContext(t, "fake")
 			q := newEnqueuer(
+				ctx,
 				syncCtx.Queue(),
 				clusterInformerFactory.Cluster().V1().ManagedClusters(),
 				clusterInformerFactory.Cluster().V1beta2().ManagedClusterSets(),

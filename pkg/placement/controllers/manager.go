@@ -68,6 +68,7 @@ func RunControllerManagerWithInformers(
 	}
 
 	schedulingController := scheduling.NewSchedulingController(
+		ctx,
 		clusterClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		clusterInformers.Cluster().V1beta2().ManagedClusterSets(),

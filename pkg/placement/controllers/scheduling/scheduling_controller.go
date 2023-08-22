@@ -72,6 +72,7 @@ type schedulingController struct {
 
 // NewSchedulingController return an instance of schedulingController
 func NewSchedulingController(
+	ctx context.Context,
 	clusterClient clusterclient.Interface,
 	clusterInformer clusterinformerv1.ManagedClusterInformer,
 	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer,
@@ -84,7 +85,7 @@ func NewSchedulingController(
 ) factory.Controller {
 	syncCtx := factory.NewSyncContext(schedulingControllerName, recorder)
 
-	enQueuer := newEnqueuer(syncCtx.Queue(), clusterInformer, clusterSetInformer, placementInformer, clusterSetBindingInformer)
+	enQueuer := newEnqueuer(ctx, syncCtx.Queue(), clusterInformer, clusterSetInformer, placementInformer, clusterSetBindingInformer)
 
 	// build controller
 	c := &schedulingController{
@@ -175,8 +176,9 @@ func NewSchedulingController(
 }
 
 func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	logger := klog.FromContext(ctx)
 	queueKey := syncCtx.QueueKey()
-	klog.V(4).Infof("Reconciling placement %q", queueKey)
+	logger.V(4).Info("Reconciling placement", "queueKey", queueKey)
 
 	placement, err := c.getPlacement(queueKey)
 	if errors.IsNotFound(err) {
@@ -207,6 +209,7 @@ func (c *schedulingController) getPlacement(queueKey string) (*clusterapiv1beta1
 }
 
 func (c *schedulingController) syncPlacement(ctx context.Context, syncCtx factory.SyncContext, placement *clusterapiv1beta1.Placement) error {
+	logger := klog.FromContext(ctx)
 	// no work if placement is deleting
 	if !placement.DeletionTimestamp.IsZero() {
 		return nil
@@ -254,7 +257,7 @@ func (c *schedulingController) syncPlacement(ctx context.Context, syncCtx factor
 	if syncCtx != nil && scheduleResult.RequeueAfter() != nil {
 		key, _ := cache.MetaNamespaceKeyFunc(placement)
 		t := scheduleResult.RequeueAfter()
-		klog.V(4).Infof("Requeue placement %s after %t", key, t)
+		logger.V(4).Info("Requeue placement after time", "placementKey", key, "time", t)
 		syncCtx.Queue().AddAfter(key, *t)
 	}
 

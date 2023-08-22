@@ -91,7 +91,7 @@ func (pl *TaintToleration) Filter(ctx context.Context, placement *clusterapiv1be
 func (pl *TaintToleration) RequeueAfter(ctx context.Context, placement *clusterapiv1beta1.Placement) (plugins.PluginRequeueResult, *framework.Status) {
 	status := framework.NewStatus(pl.Name(), framework.Success, "")
 	// get exist decisions clusters
-	decisionClusterNames, decisionClusters := getDecisionClusters(pl.handle, placement)
+	decisionClusterNames, decisionClusters := getDecisionClusters(klog.FromContext(ctx), pl.handle, placement)
 	if decisionClusterNames == nil || decisionClusters == nil {
 		return plugins.PluginRequeueResult{}, status
 	}
@@ -226,7 +226,7 @@ func getDecisionClusterNames(handle plugins.Handle, placement *clusterapiv1beta1
 	return existingDecisions
 }
 
-func getDecisionClusters(handle plugins.Handle, placement *clusterapiv1beta1.Placement) (sets.String, []*clusterapiv1.ManagedCluster) {
+func getDecisionClusters(logger klog.Logger, handle plugins.Handle, placement *clusterapiv1beta1.Placement) (sets.String, []*clusterapiv1.ManagedCluster) {
 	// get existing decision cluster name
 	decisionClusterNames := getDecisionClusterNames(handle, placement)
 
@@ -234,7 +234,7 @@ func getDecisionClusters(handle plugins.Handle, placement *clusterapiv1beta1.Pla
 	decisionClusters := []*clusterapiv1.ManagedCluster{}
 	for c := range decisionClusterNames {
 		if managedCluser, err := handle.ClusterLister().Get(c); err != nil {
-			klog.Warningf("Failed to get ManagedCluster: %s", err)
+			logger.Info("Failed to get ManagedCluster", "error", err)
 		} else {
 			decisionClusters = append(decisionClusters, managedCluser)
 		}
