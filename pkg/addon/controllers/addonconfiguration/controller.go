@@ -94,14 +94,14 @@ func NewAddonConfigurationController(
 }
 
 func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	logger := klog.FromContext(ctx)
 	key := syncCtx.QueueKey()
 	_, addonName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		// ignore addon whose key is invalid
 		return nil
 	}
-
-	klog.V(4).Infof("Reconciling addon %q", addonName)
+	logger.V(4).Info("Reconciling addon", "addonName", addonName)
 
 	cma, err := c.clusterManagementAddonLister.Get(addonName)
 	switch {
@@ -116,7 +116,7 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 	}
 
 	cma = cma.DeepCopy()
-	graph, err := c.buildConfigurationGraph(cma)
+	graph, err := c.buildConfigurationGraph(logger, cma)
 	if err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 	return utilerrors.NewAggregate(errs)
 }
 
-func (c *addonConfigurationController) buildConfigurationGraph(cma *addonv1alpha1.ClusterManagementAddOn) (*configurationGraph, error) {
+func (c *addonConfigurationController) buildConfigurationGraph(logger klog.Logger, cma *addonv1alpha1.ClusterManagementAddOn) (*configurationGraph, error) {
 	graph := newGraph(cma.Spec.SupportedConfigs, cma.Status.DefaultConfigReferences)
 	addons, err := c.managedClusterAddonIndexer.ByIndex(index.ManagedClusterAddonByName, cma.Name)
 	if err != nil {
@@ -158,7 +158,8 @@ func (c *addonConfigurationController) buildConfigurationGraph(cma *addonv1alpha
 	for _, installProgression := range cma.Status.InstallProgressions {
 		clusters, err := c.getClustersByPlacement(installProgression.PlacementRef.Name, installProgression.PlacementRef.Namespace)
 		if errors.IsNotFound(err) {
-			klog.V(2).Infof("placement %s/%s is not found for addon %s", installProgression.PlacementRef.Namespace, installProgression.PlacementRef.Name, cma.Name)
+			logger.V(2).Info("Placement not found for addon", "placementNamespace", installProgression.PlacementRef.Namespace,
+				"placementName", installProgression.PlacementRef.Name, "addonName", cma.Name)
 			continue
 		}
 		if err != nil {

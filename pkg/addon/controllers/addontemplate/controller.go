@@ -19,12 +19,14 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/ocm/pkg/addon/templateagent"
 	"open-cluster-management.io/ocm/pkg/common/queue"
@@ -94,11 +96,12 @@ func (c *addonTemplateController) stopUnusedManagers(
 	if ok {
 		stopFunc()
 		delete(c.addonManagers, addOnName)
-		klog.Infof("Stop the manager for addon %s", addOnName)
+		klog.FromContext(ctx).Info("Stopping the manager for addon", "addonName", addOnName)
 	}
 }
 
 func (c *addonTemplateController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	logger := klog.FromContext(ctx)
 	key := syncCtx.QueueKey()
 	_, addonName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
@@ -122,11 +125,11 @@ func (c *addonTemplateController) sync(ctx context.Context, syncCtx factory.Sync
 
 	_, exist := c.addonManagers[addonName]
 	if exist {
-		klog.Infof("There already is a manager started for addon %s, skip.", addonName)
+		logger.Info("There already is a manager started for addon, skipping", "addonName", addonName)
 		return nil
 	}
 
-	klog.Infof("Start an addon manager for addon %s", addonName)
+	logger.Info("Starting an addon manager for addon", "addonName", addonName)
 
 	stopFunc := c.startManager(ctx, addonName)
 	c.addonManagers[addonName] = stopFunc
@@ -137,10 +140,11 @@ func (c *addonTemplateController) startManager(
 	pctx context.Context,
 	addonName string) context.CancelFunc {
 	ctx, stopFunc := context.WithCancel(pctx)
+	logger := klog.FromContext(ctx)
 	go func() {
 		err := c.runControllerFunc(ctx, addonName)
 		if err != nil {
-			klog.Errorf("run controller for addon %s error: %v", addonName, err)
+			logger.Error(err, "Error running controller for addon", "addonName", addonName)
 			utilruntime.HandleError(err)
 		}
 
@@ -152,7 +156,7 @@ func (c *addonTemplateController) startManager(
 		c.dynamicInformers.Start(pctx.Done())
 
 		<-ctx.Done()
-		klog.Infof("Addon %s Manager stopped", addonName)
+		logger.Info("Addon Manager stopped", "addonName", addonName)
 	}()
 	return stopFunc
 }
@@ -178,8 +182,11 @@ func (c *addonTemplateController) runController(
 			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
 		}),
 	)
-
+	getValuesClosure := func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+		return templateagent.GetAddOnRegistriesPrivateValuesFromClusterAnnotation(klog.FromContext(ctx), cluster, addon)
+	}
 	agentAddon := templateagent.NewCRDTemplateAgentAddon(
+		ctx,
 		addonName,
 		// TODO: agentName should not be changed after restarting the agent
 		utilrand.String(5),
@@ -188,7 +195,7 @@ func (c *addonTemplateController) runController(
 		c.addonInformers,
 		kubeInformers.Rbac().V1().RoleBindings().Lister(),
 		// image overrides from cluster annotation has lower priority than from the addonDeploymentConfig
-		templateagent.GetAddOnRegistriesPrivateValuesFromClusterAnnotation,
+		getValuesClosure,
 		addonfactory.GetAddOnDeploymentConfigValues(
 			addonfactory.NewAddOnDeploymentConfigGetter(c.addonClient),
 			addonfactory.ToAddOnCustomizedVariableValues,
