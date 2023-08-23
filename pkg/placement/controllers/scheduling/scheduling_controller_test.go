@@ -86,7 +86,7 @@ func TestSchedulingController_sync(t *testing.T) {
 					{
 						DecisionGroupIndex: 0,
 						DecisionGroupName:  "",
-						Decisions:          []string{"placement1-decision-0"},
+						Decisions:          []string{testinghelpers.PlacementDecisionName(placementName, 1)},
 						ClustersCount:      3,
 					},
 				}
@@ -194,25 +194,25 @@ func TestSchedulingController_sync(t *testing.T) {
 					{
 						DecisionGroupIndex: 0,
 						DecisionGroupName:  "canary",
-						Decisions:          []string{"placement1-decision-0"},
+						Decisions:          []string{testinghelpers.PlacementDecisionName(placementName, 1)},
 						ClustersCount:      1,
 					},
 					{
 						DecisionGroupIndex: 1,
 						DecisionGroupName:  "canary",
-						Decisions:          []string{"placement1-decision-1"},
+						Decisions:          []string{testinghelpers.PlacementDecisionName(placementName, 2)},
 						ClustersCount:      1,
 					},
 					{
 						DecisionGroupIndex: 2,
 						DecisionGroupName:  "",
-						Decisions:          []string{"placement1-decision-2"},
+						Decisions:          []string{testinghelpers.PlacementDecisionName(placementName, 3)},
 						ClustersCount:      1,
 					},
 					{
 						DecisionGroupIndex: 3,
 						DecisionGroupName:  "",
-						Decisions:          []string{"placement1-decision-3"},
+						Decisions:          []string{testinghelpers.PlacementDecisionName(placementName, 4)},
 						ClustersCount:      1,
 					},
 				}
@@ -276,13 +276,13 @@ func TestSchedulingController_sync(t *testing.T) {
 					{
 						DecisionGroupIndex: 0,
 						DecisionGroupName:  "group1",
-						Decisions:          []string{"placement1-decision-0"},
+						Decisions:          []string{testinghelpers.PlacementDecisionName(placementName, 1)},
 						ClustersCount:      2,
 					},
 					{
 						DecisionGroupIndex: 1,
 						DecisionGroupName:  "group2",
-						Decisions:          []string{"placement1-decision-1"},
+						Decisions:          []string{testinghelpers.PlacementDecisionName(placementName, 2)},
 						ClustersCount:      1,
 					},
 				}
@@ -334,19 +334,19 @@ func TestSchedulingController_sync(t *testing.T) {
 					{
 						DecisionGroupIndex: 0,
 						DecisionGroupName:  "",
-						Decisions:          []string{"placement1-decision-0"},
+						Decisions:          []string{testinghelpers.PlacementDecisionName(placementName, 1)},
 						ClustersCount:      1,
 					},
 					{
 						DecisionGroupIndex: 1,
 						DecisionGroupName:  "",
-						Decisions:          []string{"placement1-decision-1"},
+						Decisions:          []string{testinghelpers.PlacementDecisionName(placementName, 2)},
 						ClustersCount:      1,
 					},
 					{
 						DecisionGroupIndex: 2,
 						DecisionGroupName:  "",
-						Decisions:          []string{"placement1-decision-2"},
+						Decisions:          []string{testinghelpers.PlacementDecisionName(placementName, 3)},
 						ClustersCount:      1,
 					},
 				}
@@ -510,7 +510,7 @@ func TestSchedulingController_sync(t *testing.T) {
 				testinghelpers.NewClusterSet("clusterset1").Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, "clusterset1"),
 				testinghelpers.NewManagedCluster("cluster1").WithLabel(clusterapiv1beta2.ClusterSetLabel, "clusterset1").Build(),
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 0)).
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 1)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
 					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
@@ -1265,12 +1265,12 @@ func TestBind(t *testing.T) {
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
 			clusters:  newClusters(128),
 			initObjs: []runtime.Object{
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 0)).
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 1)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
 					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
 					WithDecisions(newSelectedClusters(128)[:100]...).Build(),
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 2)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
 					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
@@ -1283,7 +1283,7 @@ func TestBind(t *testing.T) {
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
 			clusters:  newClusters(128),
 			initObjs: []runtime.Object{
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 0)).
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 1)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "fakegroup").
 					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
@@ -1317,12 +1317,12 @@ func TestBind(t *testing.T) {
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
 			clusters:  newClusters(10),
 			initObjs: []runtime.Object{
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 0)).
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 1)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
 					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
 					WithDecisions(newSelectedClusters(128)[:100]...).Build(),
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 2)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
 					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
@@ -1344,12 +1344,12 @@ func TestBind(t *testing.T) {
 			placement: testinghelpers.NewPlacement(placementNamespace, placementName).Build(),
 			clusters:  newClusters(0),
 			initObjs: []runtime.Object{
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 0)).
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 1)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
 					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
 					WithDecisions(newSelectedClusters(128)[:100]...).Build(),
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 2)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithLabel(clusterapiv1beta1.DecisionGroupNameLabel, "").
 					WithLabel(clusterapiv1beta1.DecisionGroupIndexLabel, "0").
