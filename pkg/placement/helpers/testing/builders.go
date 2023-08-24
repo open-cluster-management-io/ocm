@@ -130,7 +130,7 @@ func (b *PlacementBuilder) WithNumOfSelectedClusters(nosc int, placementName str
 			DecisionGroupIndex: 0,
 			DecisionGroupName:  "",
 			ClustersCount:      int32(nosc),
-			Decisions:          []string{fmt.Sprintf("%s-decision-%d", placementName, 0)},
+			Decisions:          []string{PlacementDecisionName(placementName, 1)},
 		},
 	}
 	return b
@@ -374,4 +374,8 @@ func (a *AddOnPlacementScoreBuilder) WithValidUntil(validUntil time.Time) *AddOn
 
 func (a *AddOnPlacementScoreBuilder) Build() *clusterapiv1alpha1.AddOnPlacementScore {
 	return a.addOnPlacementScore
+}
+
+func PlacementDecisionName(placementName string, index int) string {
+	return fmt.Sprintf("%s-decision-%d", placementName, index)
 }

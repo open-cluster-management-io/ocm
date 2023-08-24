@@ -3,7 +3,6 @@ package scheduling
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -148,7 +147,7 @@ func TestSchedule(t *testing.T) {
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 1)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithDecisions("cluster1", "cluster2").Build(),
 			},
@@ -420,7 +419,7 @@ func TestSchedule(t *testing.T) {
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 1)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithDecisions("cluster1").Build(),
 			},
@@ -467,7 +466,7 @@ func TestSchedule(t *testing.T) {
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName("others", 1)).
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName("others", 1)).
 					WithDecisions("cluster1", "cluster2").Build(),
 			},
 			clusters: []*clusterapiv1.ManagedCluster{
@@ -513,11 +512,11 @@ func TestSchedule(t *testing.T) {
 			initObjs: []runtime.Object{
 				testinghelpers.NewClusterSet(clusterSetName).Build(),
 				testinghelpers.NewClusterSetBinding(placementNamespace, clusterSetName),
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName("others", 1)).
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName("others", 1)).
 					WithDecisions("cluster2", "cluster3").Build(),
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName("others", 2)).
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName("others", 2)).
 					WithDecisions("cluster1", "cluster2").Build(),
-				testinghelpers.NewPlacementDecision(placementNamespace, placementDecisionName(placementName, 1)).
+				testinghelpers.NewPlacementDecision(placementNamespace, testinghelpers.PlacementDecisionName(placementName, 1)).
 					WithLabel(clusterapiv1beta1.PlacementLabel, placementName).
 					WithDecisions("cluster3").Build(),
 			},
@@ -603,10 +602,6 @@ func TestSchedule(t *testing.T) {
 			}
 		})
 	}
-}
-
-func placementDecisionName(placementName string, index int) string {
-	return fmt.Sprintf("%s-decision-%d", placementName, index)
 }
 
 func TestFilterResults(t *testing.T) {
