@@ -14,6 +14,7 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog/v2/ktesting"
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -23,6 +24,7 @@ import (
 )
 
 func TestAddonTemplateAgent_Manifests(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	addonName := "hello"
 	clusterName := "cluster1"
 	data, err := os.ReadFile("./testmanifests/addontemplate.yaml")
@@ -139,6 +141,7 @@ func TestAddonTemplateAgent_Manifests(t *testing.T) {
 	kubeInformers := kubeinformers.NewSharedInformerFactoryWithOptions(hubKubeClient, 10*time.Minute)
 
 	agentAddon := NewCRDTemplateAgentAddon(
+		ctx,
 		addonName,
 		"test-agent",
 		hubKubeClient,

@@ -1,6 +1,7 @@
 package templateagent
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/valyala/fasttemplate"
@@ -45,6 +46,7 @@ type templateCRDDefaultValues struct {
 }
 
 type CRDTemplateAgentAddon struct {
+	logger             klog.Logger
 	getValuesFuncs     []addonfactory.GetValuesFunc
 	trimCRDDescription bool
 
@@ -59,6 +61,7 @@ type CRDTemplateAgentAddon struct {
 
 // NewCRDTemplateAgentAddon creates a CRDTemplateAgentAddon instance
 func NewCRDTemplateAgentAddon(
+	ctx context.Context,
 	addonName, agentName string,
 	hubKubeClient kubernetes.Interface,
 	addonClient addonv1alpha1client.Interface,
@@ -68,6 +71,7 @@ func NewCRDTemplateAgentAddon(
 ) *CRDTemplateAgentAddon {
 
 	a := &CRDTemplateAgentAddon{
+		logger:             klog.FromContext(ctx),
 		getValuesFuncs:     getValuesFuncs,
 		trimCRDDescription: true,
 
@@ -129,12 +133,18 @@ func (a *CRDTemplateAgentAddon) renderObjects(
 	if err != nil {
 		return objects, err
 	}
-	klog.V(4).Infof("presetValues %v\t configValues: %v\t privateValues: %v", presetValues, configValues, privateValues)
+	a.logger.V(4).Info("Logging presetValues, configValues, and privateValues",
+		"presetValues", presetValues,
+		"configValues", configValues,
+		"privateValues", privateValues)
 
 	for _, manifest := range template.Spec.AgentSpec.Workload.Manifests {
 		t := fasttemplate.New(string(manifest.Raw), "{{", "}}")
 		manifestStr := t.ExecuteString(configValues)
-		klog.V(4).Infof("addon %s/%s render result: %v", addon.Namespace, addon.Name, manifestStr)
+		a.logger.V(4).Info("Addon render result",
+			"addonNamespace", addon.Namespace,
+			"addonName", addon.Name,
+			"renderResult", manifestStr)
 		object := &unstructured.Unstructured{}
 		if err := object.UnmarshalJSON([]byte(manifestStr)); err != nil {
 			return objects, err
@@ -183,13 +193,13 @@ func (a *CRDTemplateAgentAddon) GetDesiredAddOnTemplateByAddon(
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnTemplate, error) {
 	ok, templateRef := AddonTemplateConfigRef(addon.Status.ConfigReferences)
 	if !ok {
-		klog.V(4).Infof("Addon %s template config in status is empty", addon.Name)
+		a.logger.V(4).Info("Addon template config in status is empty", "addonName", addon.Name)
 		return nil, nil
 	}
 
 	desiredTemplate := templateRef.DesiredConfig
 	if desiredTemplate == nil || desiredTemplate.SpecHash == "" {
-		klog.Infof("Addon %s template spec hash is empty", addon.Name)
+		a.logger.Info("Addon template spec hash is empty", "addonName", addon.Name)
 		return nil, fmt.Errorf("addon %s template desired spec hash is empty", addon.Name)
 	}
 

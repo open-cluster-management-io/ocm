@@ -166,7 +166,7 @@ func (a *CRDTemplateAgentAddon) TemplateCSRApproveCheckFunc() agent.CSRApproveFu
 					continue
 				}
 				if csr.Spec.SignerName == registration.CustomSigner.SignerName {
-					return CustomerSignerCSRApprover(a.addonName)(cluster, addon, csr)
+					return CustomerSignerCSRApprover(a.logger, a.addonName)(cluster, addon, csr)
 				}
 
 			default:
@@ -194,14 +194,16 @@ func KubeClientCSRApprover(agentName string) agent.CSRApproveFunc {
 }
 
 // CustomerSignerCSRApprover approve the csr when addon agent uses custom signer to sign csr.
-func CustomerSignerCSRApprover(agentName string) agent.CSRApproveFunc {
+func CustomerSignerCSRApprover(logger klog.Logger, agentName string) agent.CSRApproveFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		addon *addonapiv1alpha1.ManagedClusterAddOn,
 		csr *certificatesv1.CertificateSigningRequest) bool {
 
-		klog.Infof("Customer signer CSR is approved. cluster: %s, addon %s, requester: %s",
-			cluster.Name, addon.Name, csr.Spec.Username)
+		logger.Info("Customer signer CSR is approved",
+			"clusterName", cluster.Name,
+			"addonName", addon.Name,
+			"requester", csr.Spec.Username)
 		return true
 	}
 }
@@ -361,8 +363,12 @@ func (a *CRDTemplateAgentAddon) createKubeClientPermissions(
 	for _, pc := range kcrc.HubPermissions {
 		switch pc.Type {
 		case addonapiv1alpha1.HubPermissionsBindingCurrentCluster:
-			klog.V(5).Infof("Set hub permission for addon %s/%s, UID: %s, APIVersion: %s, Kind: %s",
-				addon.Namespace, addon.Name, addon.UID, addon.APIVersion, addon.Kind)
+			a.logger.V(5).Info("Set hub permission for addon",
+				"addonNamespace", addon.Namespace,
+				"addonName", addon.Name,
+				"UID", addon.UID,
+				"APIVersion", addon.APIVersion,
+				"Kind", addon.Kind)
 
 			owner := metav1.OwnerReference{
 				// TODO: use apiVersion and kind in addon object, but now they could be empty at some unknown reason
@@ -422,7 +428,7 @@ func (a *CRDTemplateAgentAddon) createPermissionBinding(templateName, clusterNam
 	switch {
 	case err == nil:
 		// TODO: update the rolebinding if it is not the same
-		klog.Infof("rolebinding %s already exists", binding.Name)
+		a.logger.Info("Rolebinding already exists", "rolebindingName", binding.Name)
 		return nil
 	case apierrors.IsNotFound(err):
 		_, createErr := a.hubKubeClient.RbacV1().RoleBindings(namespace).Create(

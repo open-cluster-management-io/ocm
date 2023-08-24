@@ -16,6 +16,7 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	fakekube "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klog/v2/ktesting"
 
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
@@ -121,6 +122,7 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
+		_, ctx := ktesting.NewTestContext(t)
 		addonClient := fakeaddon.NewSimpleClientset(c.template, c.addon)
 		addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
 		mcaStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
@@ -132,7 +134,7 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		agent := NewCRDTemplateAgentAddon(c.addon.Name, c.agentName, nil, addonClient, addonInformerFactory, nil, nil)
+		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, c.agentName, nil, addonClient, addonInformerFactory, nil, nil)
 		f := agent.TemplateCSRConfigurationsFunc()
 		registrationConfigs := f(c.cluster)
 		if !equality.Semantic.DeepEqual(registrationConfigs, c.expectedConfigs) {
@@ -230,6 +232,7 @@ func TestTemplateCSRApproveCheckFunc(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
+		_, ctx := ktesting.NewTestContext(t)
 		addonClient := fakeaddon.NewSimpleClientset(c.template, c.addon)
 		addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
 		mcaStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
@@ -240,7 +243,7 @@ func TestTemplateCSRApproveCheckFunc(t *testing.T) {
 		if err := atStore.Add(c.template); err != nil {
 			t.Fatal(err)
 		}
-		agent := NewCRDTemplateAgentAddon(c.addon.Name, c.agentName, nil, addonClient, addonInformerFactory, nil, nil)
+		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, c.agentName, nil, addonClient, addonInformerFactory, nil, nil)
 		f := agent.TemplateCSRApproveCheckFunc()
 		approve := f(c.cluster, c.addon, c.csr)
 		if approve != c.expectedApprove {
@@ -332,6 +335,7 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
+		_, ctx := ktesting.NewTestContext(t)
 		addonClient := fakeaddon.NewSimpleClientset(c.template, c.addon)
 		hubKubeClient := fakekube.NewSimpleClientset()
 		addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
@@ -344,7 +348,7 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		agent := NewCRDTemplateAgentAddon(c.addon.Name, c.agentName, hubKubeClient, addonClient, addonInformerFactory, nil, nil)
+		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, c.agentName, hubKubeClient, addonClient, addonInformerFactory, nil, nil)
 		f := agent.TemplateCSRSignFunc()
 		cert := f(c.csr)
 		if !bytes.Equal(cert, c.expectedCert) {
@@ -575,6 +579,7 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
+		_, ctx := ktesting.NewTestContext(t)
 		addonClient := fakeaddon.NewSimpleClientset(c.template, c.addon)
 		hubKubeClient := fakekube.NewSimpleClientset()
 		if c.rolebinding != nil {
@@ -598,7 +603,7 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 			}
 		}
 
-		agent := NewCRDTemplateAgentAddon(c.addon.Name, c.agentName, hubKubeClient, addonClient, addonInformerFactory,
+		agent := NewCRDTemplateAgentAddon(ctx, c.addon.Name, c.agentName, hubKubeClient, addonClient, addonInformerFactory,
 			kubeInformers.Rbac().V1().RoleBindings().Lister(), nil)
 		f := agent.TemplatePermissionConfigFunc()
 		err := f(c.cluster, c.addon)

@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2/ktesting"
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -86,8 +87,9 @@ func TestGetAddOnRegistriesPrivateValuesFromClusterAnnotation(t *testing.T) {
 	}
 
 	for _, c := range cases {
+		logger, _ := ktesting.NewTestContext(t)
 		t.Run(c.name, func(t *testing.T) {
-			values, err := GetAddOnRegistriesPrivateValuesFromClusterAnnotation(c.cluster, nil)
+			values, err := GetAddOnRegistriesPrivateValuesFromClusterAnnotation(logger, c.cluster, nil)
 			if err != nil || len(c.expectedError) > 0 {
 				assert.ErrorContains(t, err, c.expectedError, "expected error: %v, got: %v", c.expectedError, err)
 			}
