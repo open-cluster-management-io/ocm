@@ -3,19 +3,6 @@ kind: CustomResourceDefinition
 metadata:
   name: managedclustersets.cluster.open-cluster-management.io
 spec:
-  conversion:
-    strategy: Webhook
-    webhook:
-      clientConfig:
-        caBundle: {{ .RegistrationAPIServiceCABundle }}
-        service:
-          name: cluster-manager-registration-webhook
-          namespace: {{ .ClusterManagerNamespace }}
-          path: /convert
-          port: {{.RegistrationWebhook.Port}}
-      conversionReviewVersions:
-      - v1beta1
-      - v1beta2
   group: cluster.open-cluster-management.io
   names:
     kind: ManagedClusterSet

@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	v1 "open-cluster-management.io/api/cluster/v1"
-	"open-cluster-management.io/api/cluster/v1beta1"
+	"open-cluster-management.io/api/cluster/v1beta2"
 )
 
 func TestValidateCreate(t *testing.T) {
@@ -118,7 +118,7 @@ func TestValidateCreate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set",
 					Labels: map[string]string{
-						v1beta1.ClusterSetLabel: "clusterset1",
+						v1beta2.ClusterSetLabel: "clusterset1",
 					},
 				},
 			},
@@ -133,7 +133,7 @@ func TestValidateCreate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set",
 					Labels: map[string]string{
-						v1beta1.ClusterSetLabel: "clusterset1",
+						v1beta2.ClusterSetLabel: "clusterset1",
 					},
 				},
 			},
@@ -230,7 +230,7 @@ func TestValidateCreate(t *testing.T) {
 		})
 	}
 	w := ManagedClusterWebhook{}
-	_, err := w.ValidateCreate(context.Background(), &v1beta1.ManagedClusterSet{})
+	_, err := w.ValidateCreate(context.Background(), &v1beta2.ManagedClusterSet{})
 	if err == nil {
 		t.Errorf("Non cluster obj, Expect Error but got nil")
 	}
@@ -383,7 +383,7 @@ func TestValidateUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set",
 					Labels: map[string]string{
-						v1beta1.ClusterSetLabel: "clusterset1",
+						v1beta2.ClusterSetLabel: "clusterset1",
 					},
 				},
 			},
@@ -403,7 +403,7 @@ func TestValidateUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set",
 					Labels: map[string]string{
-						v1beta1.ClusterSetLabel: "clusterset1",
+						v1beta2.ClusterSetLabel: "clusterset1",
 					},
 				},
 			},
@@ -424,7 +424,7 @@ func TestValidateUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set",
 					Labels: map[string]string{
-						v1beta1.ClusterSetLabel: "clusterset1",
+						v1beta2.ClusterSetLabel: "clusterset1",
 					},
 				},
 			},
@@ -432,7 +432,7 @@ func TestValidateUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set",
 					Labels: map[string]string{
-						v1beta1.ClusterSetLabel: "clusterset2",
+						v1beta2.ClusterSetLabel: "clusterset2",
 					},
 				},
 			},
@@ -448,7 +448,7 @@ func TestValidateUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set",
 					Labels: map[string]string{
-						v1beta1.ClusterSetLabel: "clusterset1",
+						v1beta2.ClusterSetLabel: "clusterset1",
 					},
 				},
 			},
@@ -456,7 +456,7 @@ func TestValidateUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set",
 					Labels: map[string]string{
-						v1beta1.ClusterSetLabel: "clusterset2",
+						v1beta2.ClusterSetLabel: "clusterset2",
 					},
 				},
 			},
@@ -476,7 +476,7 @@ func TestValidateUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set",
 					Labels: map[string]string{
-						v1beta1.ClusterSetLabel: "clusterset1",
+						v1beta2.ClusterSetLabel: "clusterset1",
 					},
 				},
 			},
@@ -492,7 +492,7 @@ func TestValidateUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set",
 					Labels: map[string]string{
-						v1beta1.ClusterSetLabel: "clusterset1",
+						v1beta2.ClusterSetLabel: "clusterset1",
 					},
 				},
 			},
@@ -500,7 +500,7 @@ func TestValidateUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "set",
 					Labels: map[string]string{
-						v1beta1.ClusterSetLabel: "clusterset2",
+						v1beta2.ClusterSetLabel: "clusterset2",
 					},
 				},
 			},
@@ -598,7 +598,7 @@ func TestValidateUpdate(t *testing.T) {
 		})
 	}
 	w := ManagedClusterWebhook{}
-	_, err := w.ValidateUpdate(context.Background(), nil, &v1beta1.ManagedClusterSetBinding{})
+	_, err := w.ValidateUpdate(context.Background(), nil, &v1beta2.ManagedClusterSetBinding{})
 	if err == nil {
 		t.Errorf("Non cluster obj, Expect Error but got nil")
 	}
