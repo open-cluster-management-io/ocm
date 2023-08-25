@@ -63,7 +63,7 @@ spec:
                 description: DeployOption contains the options of deploying a cluster-manager Default mode is used if DeployOption is not set.
                 properties:
                   hosted:
-                    description: Hosted includes configurations we needs for clustermanager in the Hosted mode.
+                    description: Hosted includes configurations we need for clustermanager in the Hosted mode.
                     properties:
                       registrationWebhookConfiguration:
                         description: RegistrationWebhookConfiguration represents the customized webhook-server configuration of registration.
@@ -117,7 +117,7 @@ spec:
                     description: NodeSelector defines which Nodes the Pods are scheduled on. The default is an empty list.
                     type: object
                   tolerations:
-                    description: Tolerations is attached by pods to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>. The default is an empty list.
+                    description: Tolerations are attached by pods to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>. The default is an empty list.
                     items:
                       description: The pod this Toleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.
                       properties:

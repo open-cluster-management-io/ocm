@@ -137,7 +137,6 @@ type GroupStrategy struct {
 	// group SHOULD be less than ClustersPerDecisionGroup. Once the number of items exceeds the ClustersPerDecisionGroup,
 	// the decisionGroups will also be be divided into multiple decisionGroups with same GroupName but different GroupIndex.
 	//
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XIntOrString
 	// +kubebuilder:validation:Pattern=`^((100|[1-9][0-9]{0,1})%|[1-9][0-9]*)$`
 	// +kubebuilder:default:="100%"

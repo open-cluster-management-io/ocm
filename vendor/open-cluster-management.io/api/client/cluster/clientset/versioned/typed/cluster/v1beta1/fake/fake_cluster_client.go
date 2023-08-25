@@ -12,14 +12,6 @@ type FakeClusterV1beta1 struct {
 	*testing.Fake
 }
 
-func (c *FakeClusterV1beta1) ManagedClusterSets() v1beta1.ManagedClusterSetInterface {
-	return &FakeManagedClusterSets{c}
-}
-
-func (c *FakeClusterV1beta1) ManagedClusterSetBindings(namespace string) v1beta1.ManagedClusterSetBindingInterface {
-	return &FakeManagedClusterSetBindings{c, namespace}
-}
-
 func (c *FakeClusterV1beta1) Placements(namespace string) v1beta1.PlacementInterface {
 	return &FakePlacements{c, namespace}
 }

@@ -62,8 +62,8 @@ spec:
                     type: string
                 type: object
               externalServerURLs:
-                description: ExternalServerURLs represents the a list of apiserver
-                  urls and ca bundles that is accessible externally If it is set empty,
+                description: ExternalServerURLs represents a list of apiserver urls
+                  and ca bundles that is accessible externally If it is set empty,
                   managed cluster has no externally accessible url that hub cluster
                   can visit.
                 items:
@@ -128,8 +128,8 @@ spec:
                       on. The default is an empty list.
                     type: object
                   tolerations:
-                    description: Tolerations is attached by pods to tolerate any taint
-                      that matches the triple <key,value,effect> using the matching
+                    description: Tolerations are attached by pods to tolerate any
+                      taint that matches the triple <key,value,effect> using the matching
                       operator <operator>. The default is an empty list.
                     items:
                       description: The pod this Toleration is attached to tolerates

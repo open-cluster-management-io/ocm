@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	cluster "open-cluster-management.io/api/cluster/v1alpha1"
 	work "open-cluster-management.io/api/work/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,8 +76,11 @@ type ManifestWorkReplicaSetStatus struct {
 	// 2. PlacementRefValid
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// Summary totals of resulting ManifestWorks
+	// Summary totals of resulting ManifestWorks for all placements
 	Summary ManifestWorkReplicaSetSummary `json:"summary"`
+
+	// PlacementRef Summary
+	PlacementsSummary []PlacementSummary `json:"placementSummary"`
 }
 
 // localPlacementReference is the name of a Placement resource in current namespace
@@ -86,6 +90,23 @@ type LocalPlacementReference struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
+
+	// +optional
+	// +kubebuilder:default={type: All, all: {timeout: None}}
+	RolloutStrategy cluster.RolloutStrategy `json:"rolloutStrategy"`
+}
+
+// PlacementSummary provides info regards number of clusters and clusterGroups selected by the placement refs.
+type PlacementSummary struct {
+	// PlacementRef Name
+	Name string `json:"name"`
+
+	// availableDecisionGroups shows number of decisionGroups that have all clusters manifestWorks in available state regards total number of decisionGroups.
+	// ex; 2/4 (2 out of 4)
+	AvailableDecisionGroups string `json:"availableDecisionGroups"`
+
+	// Summary totals of resulting ManifestWorks for the placement
+	Summary ManifestWorkReplicaSetSummary `json:"summary"`
 }
 
 // ManifestWorkReplicaSetSummary provides reference counts of all ManifestWorks that are associated with a
@@ -129,11 +150,22 @@ const (
 	// ReasonNotAsExpected is a reason for ManifestWorkReplicaSetConditionManifestworkApplied condition type representing
 	// the ManifestWorkSet is not applied correctly.
 	ReasonNotAsExpected = "NotAsExpected"
+	// ReasonProgressing is a reason for ManifestWorkReplicaSetConditionPlacementRolledOut condition type representing.
+	// The ManifestWorks are progressively applied to the placement clusters.
+	ReasonProgressing = "Progressing"
+	// ReasonComplete is a reason for ManifestWorkReplicaSetConditionPlacementRolledOut condition type representing.
+	// The ManifestWorks are completely applied to the placement clusters.
+	ReasonComplete = "Complete"
 
 	// ManifestWorkSetConditionPlacementVerified indicates if Placement is valid
 	//
 	// Reason: AsExpected, PlacementDecisionNotFound, PlacementDecisionEmpty or NotAsExpected
 	ManifestWorkReplicaSetConditionPlacementVerified string = "PlacementVerified"
+
+	// ManifestWorkReplicaSetConditionPlacementRolledOut indicates if RollOut Strategy is complete.
+	//
+	// Reason: Progressing or Complete.
+	ManifestWorkReplicaSetConditionPlacementRolledOut string = "PlacementRolledOut"
 
 	// ManifestWorkSetConditionManifestworkApplied confirms that a ManifestWork has been created in each cluster defined by PlacementDecision
 	//
