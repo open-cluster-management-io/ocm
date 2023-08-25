@@ -376,6 +376,12 @@ func Test_syncStorageVersionMigrationsCondition(t *testing.T) {
 			},
 		},
 	}
+
+	if len(migrationRequestFiles) == 0 {
+		t.Log("skip testing applyStorageVersionMigrations as no migrationRequestFiles")
+		return
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fakeMigrationClient := fakemigrationclient.NewSimpleClientset(tt.existingObjects...)
@@ -393,6 +399,11 @@ func Test_syncStorageVersionMigrationsCondition(t *testing.T) {
 }
 
 func TestSync(t *testing.T) {
+	if len(migrationRequestFiles) == 0 {
+		t.Log("skip testing applyStorageVersionMigrations as no migrationRequestFiles")
+		return
+	}
+
 	clusterManager := newClusterManager("testhub")
 	tc, client := newTestController(t, clusterManager)
 
