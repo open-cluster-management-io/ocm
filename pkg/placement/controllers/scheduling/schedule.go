@@ -171,6 +171,7 @@ func (s *pluginScheduler) Schedule(
 	placement *clusterapiv1beta1.Placement,
 	clusters []*clusterapiv1.ManagedCluster,
 ) (ScheduleResult, *framework.Status) {
+	logger := klog.FromContext(ctx)
 	filtered := clusters
 	finalStatus := framework.NewStatus("", framework.Success, "")
 
@@ -190,7 +191,7 @@ func (s *pluginScheduler) Schedule(
 		case status.IsError():
 			return results, status
 		case status.Code() == framework.Warning:
-			klog.Warningf("%v", status.Message())
+			logger.Info("Warning status message", "message", status.Message())
 			finalStatus = status
 		}
 
@@ -207,7 +208,7 @@ func (s *pluginScheduler) Schedule(
 	case status.IsError():
 		return results, status
 	case status.Code() == framework.Warning:
-		klog.Warningf("%v", status.Message())
+		logger.Info("Warning status message", "message", status.Message())
 		finalStatus = status
 	}
 
@@ -217,7 +218,7 @@ func (s *pluginScheduler) Schedule(
 	case status.IsError():
 		return results, status
 	case status.Code() == framework.Warning:
-		klog.Warningf("%v", status.Message())
+		logger.Info("Warning status message", "message", status.Message())
 		finalStatus = status
 	}
 
@@ -235,7 +236,7 @@ func (s *pluginScheduler) Schedule(
 		case status.IsError():
 			return results, status
 		case status.Code() == framework.Warning:
-			klog.Warningf("%v", status.Message())
+			logger.Info("Warning status message", "message", status.Message())
 			finalStatus = status
 		}
 
