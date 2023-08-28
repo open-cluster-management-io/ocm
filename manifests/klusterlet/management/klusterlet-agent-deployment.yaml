@@ -78,6 +78,10 @@ spec:
           {{if .ClusterAnnotationsString}}
           - "--cluster-annotations={{ .ClusterAnnotationsString }}"
           {{end}}
+          {{if eq .InstallMode "SingletonHosted"}}
+          - "--spoke-kubeconfig=/spoke/config/kubeconfig"
+          - "--terminate-on-files=/spoke/config/kubeconfig"
+          {{end}}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -91,6 +95,11 @@ spec:
           readOnly: true
         - name: hub-kubeconfig
           mountPath: "/spoke/hub-kubeconfig"
+        {{if eq .InstallMode "SingletonHosted"}}
+        - name: spoke-kubeconfig-secret
+          mountPath: "/spoke/config"
+          readOnly: true
+        {{end}}
         livenessProbe:
           httpGet:
             path: /healthz
@@ -115,3 +124,8 @@ spec:
       - name: hub-kubeconfig
         emptyDir:
           medium: Memory
+      {{if eq .InstallMode "SingletonHosted"}}
+      - name: spoke-kubeconfig-secret
+        secret:
+          secretName: { { .ExternalManagedKubeConfigWorkSecret } }
+      {{end}}
