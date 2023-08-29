@@ -37,6 +37,10 @@ const (
 	// TODO move this to the api repo
 	ManifestWorkReplicaSetControllerNameLabelKey = "work.open-cluster-management.io/manifestworkreplicaset"
 
+	// ManifestWorkReplicaSetPlacementNameLabelKey is the label key on manifestwork to ref to the Placement that select
+	// the managedCluster on the manifestWorkReplicaSet's PlacementRef.
+	ManifestWorkReplicaSetPlacementNameLabelKey = "work.open-cluster-management.io/PlacementName"
+
 	// ManifestWorkReplicaSetFinalizer is the name of the finalizer added to ManifestWorkReplicaSet. It is used to ensure
 	// related manifestworks is deleted
 	ManifestWorkReplicaSetFinalizer = "work.open-cluster-management.io/manifest-work-cleanup"
@@ -178,5 +182,21 @@ func listManifestWorksByManifestWorkReplicaSet(mwrs *workapiv1alpha1.ManifestWor
 	}
 
 	selector := labels.NewSelector().Add(*req)
+	return manifestWorkLister.List(selector)
+}
+
+func listManifestWorksByMWRSetPlacementRef(mwrs *workapiv1alpha1.ManifestWorkReplicaSet, placementName string,
+	manifestWorkLister worklisterv1.ManifestWorkLister) ([]*workapiv1.ManifestWork, error) {
+	reqMWRSet, err := labels.NewRequirement(ManifestWorkReplicaSetControllerNameLabelKey, selection.Equals, []string{manifestWorkReplicaSetKey(mwrs)})
+	if err != nil {
+		return nil, err
+	}
+
+	reqPlacementRef, err := labels.NewRequirement(ManifestWorkReplicaSetPlacementNameLabelKey, selection.Equals, []string{placementName})
+	if err != nil {
+		return nil, err
+	}
+
+	selector := labels.NewSelector().Add(*reqMWRSet, *reqPlacementRef)
 	return manifestWorkLister.List(selector)
 }

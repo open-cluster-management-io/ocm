@@ -18,7 +18,7 @@ import (
 // Test finalize reconcile
 func TestFinalizeReconcile(t *testing.T) {
 	mwrSetTest := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
-	mw, _ := CreateManifestWork(mwrSetTest, "cluster1")
+	mw, _ := CreateManifestWork(mwrSetTest, "cluster1", "plc1")
 	fakeClient := fakeclient.NewSimpleClientset(mwrSetTest, mw)
 	manifestWorkInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fakeClient, 1*time.Second)
 	mwLister := manifestWorkInformerFactory.Work().V1().ManifestWorks().Lister()

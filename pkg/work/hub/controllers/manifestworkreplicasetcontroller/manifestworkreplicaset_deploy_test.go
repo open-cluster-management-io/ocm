@@ -20,7 +20,7 @@ import (
 
 func TestDeployReconcileAsExpected(t *testing.T) {
 	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
-	mw, _ := CreateManifestWork(mwrSet, "cls1")
+	mw, _ := CreateManifestWork(mwrSet, "cls1", "plc1")
 	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet, mw)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
 
