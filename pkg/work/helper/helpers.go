@@ -482,8 +482,8 @@ func (pdl PlacementDecisionGetter) List(selector labels.Selector, namespace stri
 
 // Get added and deleted clusters names
 func GetClusters(client clusterlister.PlacementDecisionLister, placement *clusterv1beta1.Placement,
-	existingClusters sets.Set[string], existingClusterGroups map[clusterv1beta1.GroupKey]sets.Set[string]) (sets.Set[string], sets.Set[string], error) {
-	pdtracker := clusterv1beta1.NewPlacementDecisionClustersTracker(placement, PlacementDecisionGetter{Client: client}, existingClusters, existingClusterGroups)
+	existingClusters sets.Set[string]) (sets.Set[string], sets.Set[string], error) {
+	pdtracker := clusterv1beta1.NewPlacementDecisionClustersTracker(placement, PlacementDecisionGetter{Client: client}, existingClusters)
 
 	return pdtracker.Get()
 }

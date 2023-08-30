@@ -2,8 +2,6 @@ module open-cluster-management.io/ocm
 
 go 1.20
 
-replace open-cluster-management.io/api v0.11.1-0.20230801071340-86e3c7b4d5da => github.com/haoqing0110/api v0.0.0-20230824103600-921a7cef32ce
-
 require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/evanphx/json-patch v5.6.0+incompatible
@@ -31,7 +29,7 @@ require (
 	k8s.io/kubernetes v1.27.3
 	k8s.io/utils v0.0.0-20230313181309-38a27ef9d749
 	open-cluster-management.io/addon-framework v0.7.1-0.20230803002113-eea76f8f5ad7
-	open-cluster-management.io/api v0.11.1-0.20230801071340-86e3c7b4d5da
+	open-cluster-management.io/api v0.11.1-0.20230830071821-9675ab737d20
 	sigs.k8s.io/controller-runtime v0.15.0
 	sigs.k8s.io/kube-storage-version-migrator v0.0.5
 )

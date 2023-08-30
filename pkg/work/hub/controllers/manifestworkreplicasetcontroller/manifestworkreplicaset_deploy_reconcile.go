@@ -54,10 +54,9 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 	for _, mw := range manifestWorks {
 		existingClusters.Insert(mw.Namespace)
 	}
-	existingClusterGroups := map[clusterv1beta1.GroupKey]sets.Set[string]{{GroupIndex: 0}: existingClusters}
 
 	for _, placement := range placements {
-		added, deleted, err := helper.GetClusters(d.placeDecisionLister, placement, existingClusters, existingClusterGroups)
+		added, deleted, err := helper.GetClusters(d.placeDecisionLister, placement, existingClusters)
 		if err != nil {
 			apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetPlacementDecisionVerified(workapiv1alpha1.ReasonNotAsExpected, ""))
 
