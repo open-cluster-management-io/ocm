@@ -41,7 +41,7 @@ spec:
                     type: string
                 type: object
               externalServerURLs:
-                description: ExternalServerURLs represents the a list of apiserver urls and ca bundles that is accessible externally If it is set empty, managed cluster has no externally accessible url that hub cluster can visit.
+                description: ExternalServerURLs represents a list of apiserver urls and ca bundles that is accessible externally If it is set empty, managed cluster has no externally accessible url that hub cluster can visit.
                 items:
                   description: ServerURL represents the apiserver url and ca bundle that is accessible externally
                   properties:
@@ -86,7 +86,7 @@ spec:
                     description: NodeSelector defines which Nodes the Pods are scheduled on. The default is an empty list.
                     type: object
                   tolerations:
-                    description: Tolerations is attached by pods to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>. The default is an empty list.
+                    description: Tolerations are attached by pods to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>. The default is an empty list.
                     items:
                       description: The pod this Toleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.
                       properties:

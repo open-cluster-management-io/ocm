@@ -16,7 +16,6 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	internalv1 "open-cluster-management.io/ocm/pkg/registration/webhook/v1"
-	internalv1beta1 "open-cluster-management.io/ocm/pkg/registration/webhook/v1beta1"
 	internalv1beta2 "open-cluster-management.io/ocm/pkg/registration/webhook/v1beta2"
 )
 
@@ -27,7 +26,6 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(clusterv1.Install(scheme))
-	utilruntime.Must(internalv1beta1.Install(scheme))
 	utilruntime.Must(internalv1beta2.Install(scheme))
 }
 
@@ -67,16 +65,8 @@ func (c *Options) RunWebhookServer() error {
 		logger.Error(err, "unable to create ManagedCluster webhook")
 		return err
 	}
-	if err = (&internalv1beta1.ManagedClusterSetBindingWebhook{}).Init(mgr); err != nil {
-		logger.Error(err, "unable to create ManagedClusterSetBinding webhook", "version", "v1beta1")
-		return err
-	}
 	if err = (&internalv1beta2.ManagedClusterSetBindingWebhook{}).Init(mgr); err != nil {
 		logger.Error(err, "unable to create ManagedClusterSetBinding webhook", "version", "v1beta2")
-		return err
-	}
-	if err = (&internalv1beta1.ManagedClusterSet{}).SetupWebhookWithManager(mgr); err != nil {
-		logger.Error(err, "unable to create ManagedClusterSet webhook", "version", "v1beta1")
 		return err
 	}
 	if err = (&internalv1beta2.ManagedClusterSet{}).SetupWebhookWithManager(mgr); err != nil {

@@ -221,8 +221,6 @@ spec:
                           - groupName
                           type: object
                         type: array
-                    required:
-                    - clustersPerDecisionGroup
                     type: object
                 type: object
               numberOfClusters:

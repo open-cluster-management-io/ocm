@@ -1,4 +1,4 @@
-package v1beta1
+package v1beta2
 
 import (
 	"context"
@@ -12,13 +12,13 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"open-cluster-management.io/api/cluster/v1beta1"
+	"open-cluster-management.io/api/cluster/v1beta2"
 )
 
 func TestValidateCreate(t *testing.T) {
 	cases := []struct {
 		name                     string
-		setbinding               *v1beta1.ManagedClusterSetBinding
+		setbinding               *v1beta2.ManagedClusterSetBinding
 		expectedError            bool
 		allowBindingToClusterSet bool
 	}{
@@ -26,12 +26,12 @@ func TestValidateCreate(t *testing.T) {
 			name:                     "Right Clustersetbinding",
 			expectedError:            false,
 			allowBindingToClusterSet: true,
-			setbinding: &v1beta1.ManagedClusterSetBinding{
+			setbinding: &v1beta2.ManagedClusterSetBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns-1",
 					Name:      "setbinding-1",
 				},
-				Spec: v1beta1.ManagedClusterSetBindingSpec{
+				Spec: v1beta2.ManagedClusterSetBindingSpec{
 					ClusterSet: "setbinding-1",
 				},
 			},
@@ -40,12 +40,12 @@ func TestValidateCreate(t *testing.T) {
 			name:                     "Set name is not right",
 			expectedError:            true,
 			allowBindingToClusterSet: true,
-			setbinding: &v1beta1.ManagedClusterSetBinding{
+			setbinding: &v1beta2.ManagedClusterSetBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns-1",
 					Name:      "setbinding-1",
 				},
-				Spec: v1beta1.ManagedClusterSetBindingSpec{
+				Spec: v1beta2.ManagedClusterSetBindingSpec{
 					ClusterSet: "setbinding",
 				},
 			},
@@ -54,12 +54,12 @@ func TestValidateCreate(t *testing.T) {
 			name:                     "Do not have permission",
 			expectedError:            true,
 			allowBindingToClusterSet: false,
-			setbinding: &v1beta1.ManagedClusterSetBinding{
+			setbinding: &v1beta2.ManagedClusterSetBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns-1",
 					Name:      "setbinding-1",
 				},
-				Spec: v1beta1.ManagedClusterSetBindingSpec{
+				Spec: v1beta2.ManagedClusterSetBindingSpec{
 					ClusterSet: "setbinding-1",
 				},
 			},
@@ -104,7 +104,7 @@ func TestValidateCreate(t *testing.T) {
 		})
 	}
 	w := ManagedClusterSetBindingWebhook{}
-	_, err := w.ValidateCreate(context.Background(), &v1beta1.ManagedClusterSet{})
+	_, err := w.ValidateCreate(context.Background(), &v1beta2.ManagedClusterSet{})
 	if err == nil {
 		t.Errorf("Non setbinding obj, Expect Error but got nil")
 	}
@@ -113,18 +113,18 @@ func TestValidateCreate(t *testing.T) {
 func TestValidateUpddate(t *testing.T) {
 	cases := []struct {
 		name          string
-		setbinding    *v1beta1.ManagedClusterSetBinding
+		setbinding    *v1beta2.ManagedClusterSetBinding
 		expectedError bool
 	}{
 		{
 			name:          "Right Clustersetbinding",
 			expectedError: false,
-			setbinding: &v1beta1.ManagedClusterSetBinding{
+			setbinding: &v1beta2.ManagedClusterSetBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns-1",
 					Name:      "setbinding-1",
 				},
-				Spec: v1beta1.ManagedClusterSetBindingSpec{
+				Spec: v1beta2.ManagedClusterSetBindingSpec{
 					ClusterSet: "setbinding-1",
 				},
 			},
@@ -132,12 +132,12 @@ func TestValidateUpddate(t *testing.T) {
 		{
 			name:          "Set name is not right",
 			expectedError: true,
-			setbinding: &v1beta1.ManagedClusterSetBinding{
+			setbinding: &v1beta2.ManagedClusterSetBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns-1",
 					Name:      "setbinding-1",
 				},
-				Spec: v1beta1.ManagedClusterSetBindingSpec{
+				Spec: v1beta2.ManagedClusterSetBindingSpec{
 					ClusterSet: "setbinding",
 				},
 			},
@@ -168,7 +168,7 @@ func TestValidateUpddate(t *testing.T) {
 		})
 	}
 	w := ManagedClusterSetBindingWebhook{}
-	_, err := w.ValidateUpdate(context.Background(), nil, &v1beta1.ManagedClusterSet{})
+	_, err := w.ValidateUpdate(context.Background(), nil, &v1beta2.ManagedClusterSet{})
 	if err == nil {
 		t.Errorf("Non setbinding obj, Expect Error but got nil")
 	}

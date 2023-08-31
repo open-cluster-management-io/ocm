@@ -8,10 +8,6 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// ManagedClusterSets returns a ManagedClusterSetInformer.
-	ManagedClusterSets() ManagedClusterSetInformer
-	// ManagedClusterSetBindings returns a ManagedClusterSetBindingInformer.
-	ManagedClusterSetBindings() ManagedClusterSetBindingInformer
 	// Placements returns a PlacementInformer.
 	Placements() PlacementInformer
 	// PlacementDecisions returns a PlacementDecisionInformer.
@@ -27,16 +23,6 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
-}
-
-// ManagedClusterSets returns a ManagedClusterSetInformer.
-func (v *version) ManagedClusterSets() ManagedClusterSetInformer {
-	return &managedClusterSetInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
-// ManagedClusterSetBindings returns a ManagedClusterSetBindingInformer.
-func (v *version) ManagedClusterSetBindings() ManagedClusterSetBindingInformer {
-	return &managedClusterSetBindingInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Placements returns a PlacementInformer.

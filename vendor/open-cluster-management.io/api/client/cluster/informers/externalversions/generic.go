@@ -50,10 +50,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1alpha1().ClusterClaims().Informer()}, nil
 
 		// Group=cluster.open-cluster-management.io, Version=v1beta1
-	case v1beta1.SchemeGroupVersion.WithResource("managedclustersets"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1beta1().ManagedClusterSets().Informer()}, nil
-	case v1beta1.SchemeGroupVersion.WithResource("managedclustersetbindings"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1beta1().ManagedClusterSetBindings().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("placements"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1beta1().Placements().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("placementdecisions"):

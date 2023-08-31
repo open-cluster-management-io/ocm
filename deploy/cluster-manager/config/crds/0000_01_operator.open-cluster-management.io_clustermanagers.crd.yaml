@@ -88,7 +88,7 @@ spec:
                   Default mode is used if DeployOption is not set.
                 properties:
                   hosted:
-                    description: Hosted includes configurations we needs for clustermanager
+                    description: Hosted includes configurations we need for clustermanager
                       in the Hosted mode.
                     properties:
                       registrationWebhookConfiguration:
@@ -160,8 +160,8 @@ spec:
                       on. The default is an empty list.
                     type: object
                   tolerations:
-                    description: Tolerations is attached by pods to tolerate any taint
-                      that matches the triple <key,value,effect> using the matching
+                    description: Tolerations are attached by pods to tolerate any
+                      taint that matches the triple <key,value,effect> using the matching
                       operator <operator>. The default is an empty list.
                     items:
                       description: The pod this Toleration is attached to tolerates

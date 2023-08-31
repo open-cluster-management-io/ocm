@@ -12,8 +12,6 @@ import (
 
 type ClusterV1beta1Interface interface {
 	RESTClient() rest.Interface
-	ManagedClusterSetsGetter
-	ManagedClusterSetBindingsGetter
 	PlacementsGetter
 	PlacementDecisionsGetter
 }
@@ -21,14 +19,6 @@ type ClusterV1beta1Interface interface {
 // ClusterV1beta1Client is used to interact with features provided by the cluster.open-cluster-management.io group.
 type ClusterV1beta1Client struct {
 	restClient rest.Interface
-}
-
-func (c *ClusterV1beta1Client) ManagedClusterSets() ManagedClusterSetInterface {
-	return newManagedClusterSets(c)
-}
-
-func (c *ClusterV1beta1Client) ManagedClusterSetBindings(namespace string) ManagedClusterSetBindingInterface {
-	return newManagedClusterSetBindings(c, namespace)
 }
 
 func (c *ClusterV1beta1Client) Placements(namespace string) PlacementInterface {

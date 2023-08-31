@@ -49,9 +49,10 @@ func (ManifestWorkReplicaSetSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ManifestWorkReplicaSetStatus = map[string]string{
-	"":           "ManifestWorkReplicaSetStatus defines the observed state of ManifestWorkReplicaSet",
-	"conditions": "Conditions contains the different condition statuses for distrbution of ManifestWork resources Valid condition types are: 1. AppliedManifestWorks represents ManifestWorks have been distributed as per placement All, Partial, None, Problem 2. PlacementRefValid",
-	"summary":    "Summary totals of resulting ManifestWorks",
+	"":                 "ManifestWorkReplicaSetStatus defines the observed state of ManifestWorkReplicaSet",
+	"conditions":       "Conditions contains the different condition statuses for distrbution of ManifestWork resources Valid condition types are: 1. AppliedManifestWorks represents ManifestWorks have been distributed as per placement All, Partial, None, Problem 2. PlacementRefValid",
+	"summary":          "Summary totals of resulting ManifestWorks for all placements",
+	"placementSummary": "PlacementRef Summary",
 }
 
 func (ManifestWorkReplicaSetStatus) SwaggerDoc() map[string]string {
@@ -67,6 +68,17 @@ var map_ManifestWorkReplicaSetSummary = map[string]string{
 
 func (ManifestWorkReplicaSetSummary) SwaggerDoc() map[string]string {
 	return map_ManifestWorkReplicaSetSummary
+}
+
+var map_PlacementSummary = map[string]string{
+	"":                        "PlacementSummary provides info regards number of clusters and clusterGroups selected by the placement refs.",
+	"name":                    "PlacementRef Name",
+	"availableDecisionGroups": "availableDecisionGroups shows number of decisionGroups that have all clusters manifestWorks in available state regards total number of decisionGroups. ex; 2/4 (2 out of 4)",
+	"summary":                 "Summary totals of resulting ManifestWorks for the placement",
+}
+
+func (PlacementSummary) SwaggerDoc() map[string]string {
+	return map_PlacementSummary
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

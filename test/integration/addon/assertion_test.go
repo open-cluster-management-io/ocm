@@ -16,9 +16,9 @@ import (
 
 // TODO: The spec hash is hardcoded here and will break the test once the API changes.
 // We need a better way to handle the spec hash.
-const addOnDefaultConfigSpecHash = "e374ecc7f9ab844fd9ccdf4630a8bd317a8e1821716b215f219b4d3b10f12680"
-const addOnTest1ConfigSpecHash = "d00480f0e83b1a6222d550c84993a50e08b3c41a59b22262bd5080a4c18dd027"
-const addOnTest2ConfigSpecHash = "51dde570b90ada12bcaf0650f5157560ab9fd29e34044d380a8537df159e8391"
+const addOnDefaultConfigSpecHash = "19afba0192e93f738a3b6e118f177dffbc6546f7d32a3aed79cba761e6123a1f"
+const addOnTest1ConfigSpecHash = "1eef585d8f4d92a0d1aa5ac3a61337dd03c2723f9f8d1c56f339e0af0becd4af"
+const addOnTest2ConfigSpecHash = "c0f1c4105357e7a298a8789d88c7acffc83704f407a35d73fa0b83a079958440"
 
 var addOnDefaultConfigSpec = addonapiv1alpha1.AddOnDeploymentConfigSpec{
 	CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{

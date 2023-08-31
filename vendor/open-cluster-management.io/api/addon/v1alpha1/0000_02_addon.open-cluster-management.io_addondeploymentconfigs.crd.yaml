@@ -33,6 +33,13 @@ spec:
           spec:
             description: spec represents a desired configuration for an add-on.
             properties:
+              agentInstallNamespace:
+                default: open-cluster-management-agent-addon
+                description: AgentInstallNamespace is the namespace where the add-on
+                  agent should be installed on the managed cluster.
+                maxLength: 63
+                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                type: string
               customizedVariables:
                 description: CustomizedVariables is a list of name-value variables
                   for the current add-on deployment. The add-on implementation can
