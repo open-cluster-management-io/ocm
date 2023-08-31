@@ -13,6 +13,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"reflect"
 	"time"
 
 	certificates "k8s.io/api/certificates/v1"
@@ -49,17 +50,27 @@ type TestAuthn struct {
 	caKeyFile string
 }
 
-func createKubeConfigByClientCert(context string, securePort string, serverCertFile, certFile, keyFile string) (*clientcmdapi.Config, error) {
+func createKubeConfigByClientCertWithProxy(context string, securePort string, serverCertFile, certFile, keyFile,
+	proxyURL string, proxyServerCertData []byte) (*clientcmdapi.Config, error) {
 	caData, err := os.ReadFile(serverCertFile)
 	if err != nil {
 		return nil, err
 	}
 
+	caData, err = mergeCertificateData(caData, proxyServerCertData)
+	if err != nil {
+		return nil, err
+	}
+
 	config := clientcmdapi.NewConfig()
-	config.Clusters["hub"] = &clientcmdapi.Cluster{
+	hubCluster := &clientcmdapi.Cluster{
 		Server:                   fmt.Sprintf("https://127.0.0.1:%s", securePort),
 		CertificateAuthorityData: caData,
 	}
+	if len(proxyURL) > 0 {
+		hubCluster.ProxyURL = proxyURL
+	}
+	config.Clusters["hub"] = hubCluster
 	config.AuthInfos["user"] = &clientcmdapi.AuthInfo{
 		ClientCertificate: certFile,
 		ClientKey:         keyFile,
@@ -71,6 +82,48 @@ func createKubeConfigByClientCert(context string, securePort string, serverCertF
 	config.CurrentContext = context
 
 	return config, nil
+}
+
+func mergeCertificateData(caBundles ...[]byte) ([]byte, error) {
+	var all []*x509.Certificate
+	for _, caBundle := range caBundles {
+		if len(caBundle) == 0 {
+			continue
+		}
+		certs, err := certutil.ParseCertsPEM(caBundle)
+		if err != nil {
+			return []byte{}, err
+		}
+		all = append(all, certs...)
+	}
+
+	// remove duplicated cert
+	var merged []*x509.Certificate
+	for i := range all {
+		found := false
+		for j := range merged {
+			if reflect.DeepEqual(all[i].Raw, merged[j].Raw) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			merged = append(merged, all[i])
+		}
+	}
+
+	// encode the merged certificates
+	b := bytes.Buffer{}
+	for _, cert := range merged {
+		if err := pem.Encode(&b, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}); err != nil {
+			return []byte{}, err
+		}
+	}
+	return b.Bytes(), nil
+}
+
+func createKubeConfigByClientCert(context string, securePort string, serverCertFile, certFile, keyFile string) (*clientcmdapi.Config, error) {
+	return createKubeConfigByClientCertWithProxy(context, securePort, serverCertFile, certFile, keyFile, "", nil)
 }
 
 func NewTestAuthn(caFile, caKeyFile string) *TestAuthn {
@@ -168,6 +221,35 @@ func (t *TestAuthn) CreateBootstrapKubeConfigWithUser(configFileName, serverCert
 	return t.CreateBootstrapKubeConfig(configFileName, serverCertFile, securePort, bootstrapUser, 24*time.Hour)
 }
 
+func (t *TestAuthn) CreateBootstrapKubeConfigWithProxy(configFileName, serverCertFile, securePort, proxyURL string, proxyServerCertData []byte) error {
+	certData, keyData, err := t.signClientCertKeyWithCA(bootstrapUser, bootstrapGroups, 24*time.Hour)
+	if err != nil {
+		return err
+	}
+
+	configDir := path.Dir(configFileName)
+	if _, err := os.Stat(configDir); os.IsNotExist(err) {
+		if err = os.MkdirAll(configDir, 0755); err != nil {
+			return err
+		}
+	}
+
+	if err := os.WriteFile(path.Join(configDir, "bootstrap.crt"), certData, 0600); err != nil {
+		return err
+	}
+	if err := os.WriteFile(path.Join(configDir, "bootstrap.key"), keyData, 0600); err != nil {
+		return err
+	}
+
+	config, err := createKubeConfigByClientCertWithProxy(configFileName, securePort, serverCertFile,
+		path.Join(configDir, "bootstrap.crt"), path.Join(configDir, "bootstrap.key"), proxyURL, proxyServerCertData)
+	if err != nil {
+		return err
+	}
+
+	return clientcmd.WriteToFile(*config, configFileName)
+}
+
 func (t *TestAuthn) CreateBootstrapKubeConfig(configFileName, serverCertFile, securePort, bootstrapUser string, certAge time.Duration) error {
 	certData, keyData, err := t.signClientCertKeyWithCA(bootstrapUser, bootstrapGroups, certAge)
 	if err != nil {
@@ -243,6 +325,66 @@ func (t *TestAuthn) signClientCertKeyWithCA(user string, groups []string, maxAge
 				"kubernetes.default.svc.cluster",
 				"kubernetes.default.svc.cluster.local",
 			},
+		},
+		caCert,
+		&serverKey.PublicKey,
+		caKey,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	certBuffer := bytes.Buffer{}
+	if err := pem.Encode(&certBuffer, &pem.Block{Type: certutil.CertificateBlockType, Bytes: serverDERBytes}); err != nil {
+		return nil, nil, err
+	}
+
+	keyBuffer := bytes.Buffer{}
+	if err := pem.Encode(
+		&keyBuffer, &pem.Block{Type: keyutil.RSAPrivateKeyBlockType, Bytes: x509.MarshalPKCS1PrivateKey(serverKey)}); err != nil {
+		return nil, nil, err
+	}
+	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
+}
+
+func (t *TestAuthn) SignServerCert(commonName string, maxAge time.Duration) ([]byte, []byte, error) {
+	now := time.Now()
+	caData, err := os.ReadFile(t.caFile)
+	if err != nil {
+		return nil, nil, err
+	}
+	caBlock, _ := pem.Decode(caData)
+	caCert, err := x509.ParseCertificate(caBlock.Bytes)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	caKeyData, err := os.ReadFile(t.caKeyFile)
+	if err != nil {
+		return nil, nil, err
+	}
+	keyBlock, _ := pem.Decode(caKeyData)
+	caKey, err := x509.ParsePKCS1PrivateKey(keyBlock.Bytes)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	serverKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	serverDERBytes, err := x509.CreateCertificate(
+		rand.Reader,
+		&x509.Certificate{
+			SerialNumber:          big.NewInt(1),
+			Subject:               pkix.Name{CommonName: commonName},
+			NotBefore:             now.UTC(),
+			NotAfter:              now.Add(maxAge).UTC(),
+			BasicConstraintsValid: false,
+			IsCA:                  false,
+			KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDataEncipherment,
+			ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+			IPAddresses:           []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("10.0.0.0")},
 		},
 		caCert,
 		&serverKey.PublicKey,

@@ -213,7 +213,12 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 			managementKubeClient, 10*time.Minute, informers.WithNamespace(o.agentOptions.ComponentNamespace))
 
 		// create a kubeconfig with references to the key/cert files in the same secret
-		kubeconfig := clientcert.BuildKubeconfig(bootstrapClientConfig, clientcert.TLSCertFile, clientcert.TLSKeyFile)
+		proxyURL, err := getProxyURLFromKubeconfig(o.registrationOption.BootstrapKubeconfig)
+		if err != nil {
+			return err
+		}
+		kubeconfig := clientcert.BuildKubeconfig(bootstrapClientConfig.Host, bootstrapClientConfig.CAData, proxyURL,
+			clientcert.TLSCertFile, clientcert.TLSKeyFile)
 		kubeconfigData, err := clientcmd.Write(kubeconfig)
 		if err != nil {
 			return err
@@ -303,7 +308,12 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	recorder.Event("HubClientConfigReady", "Client config for hub is ready.")
 
 	// create a kubeconfig with references to the key/cert files in the same secret
-	kubeconfig := clientcert.BuildKubeconfig(hubClientConfig, clientcert.TLSCertFile, clientcert.TLSKeyFile)
+	proxyURL, err := getProxyURLFromKubeconfig(o.agentOptions.HubKubeconfigFile)
+	if err != nil {
+		return err
+	}
+	kubeconfig := clientcert.BuildKubeconfig(hubClientConfig.Host, hubClientConfig.CAData, proxyURL,
+		clientcert.TLSCertFile, clientcert.TLSKeyFile)
 	kubeconfigData, err := clientcmd.Write(kubeconfig)
 	if err != nil {
 		return err
@@ -464,4 +474,23 @@ func (o *SpokeAgentConfig) getSpokeClusterCABundle(kubeConfig *rest.Config) ([]b
 		return nil, err
 	}
 	return data, nil
+}
+
+func getProxyURLFromKubeconfig(filename string) (string, error) {
+	config, err := clientcmd.LoadFromFile(filename)
+	if err != nil {
+		return "", err
+	}
+
+	currentContext, ok := config.Contexts[config.CurrentContext]
+	if !ok {
+		return "", nil
+	}
+
+	cluster, ok := config.Clusters[currentContext.Cluster]
+	if !ok {
+		return "", nil
+	}
+
+	return cluster.ProxyURL, nil
 }
