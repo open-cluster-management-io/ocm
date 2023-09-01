@@ -154,6 +154,7 @@ func (k *bootstrapController) sync(ctx context.Context, controllerContext factor
 	}
 
 	if bootstrapKubeconfig.Server != hubKubeconfig.Server ||
+		bootstrapKubeconfig.ProxyURL != hubKubeconfig.ProxyURL ||
 		!bytes.Equal(bootstrapKubeconfig.CertificateAuthorityData, hubKubeconfig.CertificateAuthorityData) {
 		// the bootstrap kubeconfig secret is changed, reload the klusterlet agents
 		reloadReason := fmt.Sprintf("the bootstrap secret %s/%s is changed", agentNamespace, helpers.BootstrapHubKubeConfig)

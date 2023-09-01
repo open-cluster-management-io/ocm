@@ -57,7 +57,7 @@ func TestSync(t *testing.T) {
 			name:     "client certificate expired",
 			queueKey: "test/test",
 			objects: []runtime.Object{
-				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.47:6443")),
+				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.47:6443", "")),
 				newHubKubeConfigSecret("test", time.Now().Add(-60*time.Second).UTC()),
 			},
 			expectedRebootstrapping: true,
@@ -70,7 +70,7 @@ func TestSync(t *testing.T) {
 		{
 			name:     "the bootstrap is not started",
 			queueKey: "test/test",
-			objects:  []runtime.Object{newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.47:6443"))},
+			objects:  []runtime.Object{newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.47:6443", ""))},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 0 {
 					t.Errorf("expected no actions happens, but got %#v", actions)
@@ -81,7 +81,7 @@ func TestSync(t *testing.T) {
 			name:     "the bootstrap secret is not changed",
 			queueKey: "test/test",
 			objects: []runtime.Object{
-				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.47:6443")),
+				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.47:6443", "")),
 				newHubKubeConfigSecret("test", time.Now().Add(60*time.Second).UTC()),
 			},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -91,10 +91,24 @@ func TestSync(t *testing.T) {
 			},
 		},
 		{
-			name:     "the bootstrap secret is changed",
+			name:     "hub server url is changed",
 			queueKey: "test/test",
 			objects: []runtime.Object{
-				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.48:6443")),
+				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.48:6443", "")),
+				newHubKubeConfigSecret("test", time.Now().Add(60*time.Second).UTC()),
+			},
+			expectedRebootstrapping: true,
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 0 {
+					t.Errorf("expected no actions happens, but got %#v", actions)
+				}
+			},
+		},
+		{
+			name:     "proxy url is changed",
+			queueKey: "test/test",
+			objects: []runtime.Object{
+				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.48:6443", "https://10.0.118.10:3129")),
 				newHubKubeConfigSecret("test", time.Now().Add(60*time.Second).UTC()),
 			},
 			expectedRebootstrapping: true,
@@ -109,7 +123,7 @@ func TestSync(t *testing.T) {
 			queueKey:            "test/test",
 			initRebootstrapping: true,
 			objects: []runtime.Object{
-				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.48:6443")),
+				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.48:6443", "")),
 				newHubKubeConfigSecret("test", time.Now().Add(60*time.Second).UTC()),
 				newDeploymentWithAvailableReplicas("test-registration-agent", "test", 1),
 			},
@@ -123,7 +137,7 @@ func TestSync(t *testing.T) {
 			queueKey:            "test/test",
 			initRebootstrapping: true,
 			objects: []runtime.Object{
-				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.48:6443")),
+				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.48:6443", "")),
 				newHubKubeConfigSecret("test", time.Now().Add(60*time.Second).UTC()),
 				newDeployment("test-registration-agent", "test"),
 			},
@@ -284,11 +298,12 @@ func newSecret(name, namespace string, kubeConfig []byte) *corev1.Secret {
 	return secret
 }
 
-func newKubeConfig(host string) []byte {
+func newKubeConfig(host, proxyURL string) []byte {
 	configData, _ := runtime.Encode(clientcmdlatest.Codec, &clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{"default-cluster": {
 			Server:                host,
 			InsecureSkipTLSVerify: true,
+			ProxyURL:              proxyURL,
 		}},
 		Contexts: map[string]*clientcmdapi.Context{"default-context": {
 			Cluster: "default-cluster",
@@ -345,7 +360,7 @@ func newHubKubeConfigSecret(namespace string, notAfter time.Time) *corev1.Secret
 			Namespace: namespace,
 		},
 		Data: map[string][]byte{
-			"kubeconfig": newKubeConfig("https://10.0.118.47:6443"),
+			"kubeconfig": newKubeConfig("https://10.0.118.47:6443", ""),
 			"tls.crt": pem.EncodeToMemory(&pem.Block{
 				Type:  certutil.CertificateBlockType,
 				Bytes: cert.Raw,

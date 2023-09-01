@@ -9,9 +9,12 @@ import (
 	"time"
 
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	"open-cluster-management.io/ocm/pkg/registration/clientcert"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 
@@ -227,6 +230,51 @@ func TestGetSpokeClusterCABundle(t *testing.T) {
 			}
 			if !bytes.Equal(caData, c.expectedCAData) {
 				t.Errorf("expect %v but got %v", c.expectedCAData, caData)
+			}
+		})
+	}
+}
+
+func TestGetProxyURLFromKubeconfig(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "testgetproxyurl")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	kubeconfigWithoutProxy := clientcert.BuildKubeconfig("https://127.0.0.1:6443", nil, "", "tls.crt", "tls.key")
+	kubeconfigWithProxy := clientcert.BuildKubeconfig("https://127.0.0.1:6443", nil, "https://127.0.0.1:3129", "tls.crt", "tls.key")
+
+	cases := []struct {
+		name             string
+		kubeconfig       clientcmdapi.Config
+		expectedProxyURL string
+	}{
+		{
+			name:             "without proxy url",
+			kubeconfig:       kubeconfigWithoutProxy,
+			expectedProxyURL: "",
+		},
+		{
+			name:             "with proxy url",
+			kubeconfig:       kubeconfigWithProxy,
+			expectedProxyURL: "https://127.0.0.1:3129",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			filename := path.Join(tempDir, "kubeconfig")
+			if err := clientcmd.WriteToFile(c.kubeconfig, filename); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			proxyURL, err := getProxyURLFromKubeconfig(filename)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			if c.expectedProxyURL != proxyURL {
+				t.Errorf("expect %s, but %s", c.expectedProxyURL, proxyURL)
 			}
 		})
 	}

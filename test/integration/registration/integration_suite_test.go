@@ -42,6 +42,11 @@ const (
 
 var spokeCfg *rest.Config
 var bootstrapKubeConfigFile string
+var bootstrapKubeConfigHTTPProxyFile string
+var bootstrapKubeConfigHTTPSProxyFile string
+
+var httpProxyURL string
+var httpsProxyURL string
 
 var testEnv *envtest.Environment
 var securePort string
@@ -192,6 +197,24 @@ var _ = ginkgo.BeforeSuite(func() {
 		})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	}()
+
+	// start a proxy server
+	proxyCertData, proxyKeyData, err := authn.SignServerCert("proxyserver", 24*time.Hour)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	proxyServer := util.NewProxyServer(proxyCertData, proxyKeyData)
+	err = proxyServer.Start(ctx, 5*time.Second)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	httpProxyURL = proxyServer.HTTPProxyURL
+	httpsProxyURL = proxyServer.HTTPSProxyURL
+
+	// create bootstrap hub kubeconfig with http/https proxy settings
+	bootstrapKubeConfigHTTPProxyFile = path.Join(util.TestDir, "bootstrap-http-proxy", "kubeconfig")
+	err = authn.CreateBootstrapKubeConfigWithProxy(bootstrapKubeConfigHTTPProxyFile, serverCertFile, securePort, httpProxyURL, nil)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	bootstrapKubeConfigHTTPSProxyFile = path.Join(util.TestDir, "bootstrap-https-proxy", "kubeconfig")
+	err = authn.CreateBootstrapKubeConfigWithProxy(bootstrapKubeConfigHTTPSProxyFile, serverCertFile, securePort, httpsProxyURL, proxyCertData)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 })
 
 var _ = ginkgo.AfterSuite(func() {
