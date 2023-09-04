@@ -182,6 +182,9 @@ func (k *bootstrapController) sync(ctx context.Context, controllerContext factor
 func (k *bootstrapController) processRebootstrap(ctx context.Context, agentNamespace string, klusterlet *operatorapiv1.Klusterlet,
 	recorder events.Recorder, requeueFunc func(time.Duration)) error {
 	deploymentName := fmt.Sprintf("%s-registration-agent", klusterlet.Name)
+	if helpers.IsSingleton(klusterlet.Spec.DeployOption.Mode) {
+		deploymentName = fmt.Sprintf("%s-agent", klusterlet.Name)
+	}
 	deployment, err := k.kubeClient.AppsV1().Deployments(agentNamespace).Get(ctx, deploymentName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		return k.completeRebootstrap(ctx, agentNamespace, klusterlet, recorder)
@@ -194,7 +197,7 @@ func (k *bootstrapController) processRebootstrap(ctx context.Context, agentNames
 		return k.completeRebootstrap(ctx, agentNamespace, klusterlet, recorder)
 	}
 
-	// there still is registation agent pod running. Resync in 5 seconds
+	// there still is agent pod running. Resync in 5 seconds
 	requeueFunc(5 * time.Second)
 	return nil
 }
