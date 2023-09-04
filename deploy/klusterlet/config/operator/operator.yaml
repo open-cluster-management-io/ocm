@@ -39,12 +39,20 @@ spec:
                   values:
                   - klusterlet
       serviceAccountName: klusterlet
+      securityContext:
+        runAsNonRoot: true
       containers:
       - name: klusterlet
         image: quay.io/open-cluster-management/registration-operator:latest
         args:
           - "/registration-operator"
           - "klusterlet"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
         livenessProbe:
           httpGet:
             path: /healthz

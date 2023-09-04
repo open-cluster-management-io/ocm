@@ -59,10 +59,10 @@ metadata:
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
     containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2023-05-24T20:00:31Z"
+    createdAt: "2023-09-04T03:11:35Z"
     description: Manages the installation and upgrade of the ClusterManager.
-    operators.operatorframework.io/builder: operator-sdk-v1.1.0
-    operators.operatorframework.io/project_layout: go
+    operators.operatorframework.io/builder: operator-sdk-v1.28.0
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/open-cluster-management-io/registration-operator
     support: Red Hat, Inc.
   name: cluster-manager.v0.12.0
@@ -71,7 +71,8 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: ClusterManager defines the configurations of controllers running hub that govern registration and work distribution for attached Klusterlets
+    - description: ClusterManager defines the configurations of controllers running
+        hub that govern registration and work distribution for attached Klusterlets
       displayName: ClusterManager
       kind: ClusterManager
       name: clustermanagers.operator.open-cluster-management.io
@@ -499,7 +500,9 @@ spec:
           - get
         serviceAccountName: cluster-manager
       deployments:
-      - name: cluster-manager
+      - label:
+          app: cluster-manager
+        name: cluster-manager
         spec:
           replicas: 3
           selector:
