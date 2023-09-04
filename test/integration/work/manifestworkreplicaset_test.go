@@ -43,7 +43,9 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-placement-decision",
 				Namespace: namespaceName,
-				Labels:    map[string]string{clusterv1beta1.PlacementLabel: placement.Name},
+				Labels: map[string]string{clusterv1beta1.PlacementLabel: placement.Name,
+					clusterv1beta1.DecisionGroupIndexLabel: "0",
+				},
 			},
 		}
 

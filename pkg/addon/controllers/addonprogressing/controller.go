@@ -78,8 +78,9 @@ func NewAddonProgressingController(
 }
 
 func (c *addonProgressingController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	logger := klog.FromContext(ctx)
 	key := syncCtx.QueueKey()
-	klog.V(4).Infof("Reconciling addon %q", key)
+	logger.V(4).Info("Reconciling addon", "addon", key)
 
 	namespace, addonName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
@@ -173,7 +174,7 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(
 		}
 
 		// check if work configs matches addon configs
-		if !workConfigsMatchesAddon(work, newaddon) {
+		if !workConfigsMatchesAddon(klog.FromContext(ctx), work, newaddon) {
 			setAddOnProgressingAndLastApplied(isUpgrade, ProgressingDoing, "configs mismatch", newaddon)
 			return patcher.PatchStatus(ctx, newaddon, newaddon.Status, oldaddon.Status)
 		}
@@ -205,7 +206,7 @@ func isConfigurationSupported(addon *addonapiv1alpha1.ManagedClusterAddOn) (bool
 	return true, addonapiv1alpha1.ConfigGroupResource{}
 }
 
-func workConfigsMatchesAddon(work *workapiv1.ManifestWork, addon *addonapiv1alpha1.ManagedClusterAddOn) bool {
+func workConfigsMatchesAddon(logger klog.Logger, work *workapiv1.ManifestWork, addon *addonapiv1alpha1.ManagedClusterAddOn) bool {
 	// get work spec hash
 	if _, ok := work.Annotations[workapiv1.ManifestConfigSpecHashAnnotationKey]; !ok {
 		return len(addon.Status.ConfigReferences) == 0
@@ -214,7 +215,7 @@ func workConfigsMatchesAddon(work *workapiv1.ManifestWork, addon *addonapiv1alph
 	// parse work spec hash
 	workSpecHashMap := make(map[string]string)
 	if err := json.Unmarshal([]byte(work.Annotations[workapiv1.ManifestConfigSpecHashAnnotationKey]), &workSpecHashMap); err != nil {
-		klog.Warningf("%v", err)
+		logger.Info("Failed to parse work spec hash", "error", err)
 		return false
 	}
 

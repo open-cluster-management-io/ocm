@@ -17,7 +17,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1"
 	certificatesv1listers "k8s.io/client-go/listers/certificates/v1"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
@@ -146,19 +145,20 @@ func getCertValidityPeriod(secret *corev1.Secret) (*time.Time, *time.Time, error
 }
 
 // BuildKubeconfig builds a kubeconfig based on a rest config template with a cert/key pair
-func BuildKubeconfig(clientConfig *restclient.Config, certPath, keyPath string) clientcmdapi.Config {
+func BuildKubeconfig(server string, caData []byte, proxyURL, clientCertPath, clientKeyPath string) clientcmdapi.Config {
 	// Build kubeconfig.
 	kubeconfig := clientcmdapi.Config{
 		// Define a cluster stanza based on the bootstrap kubeconfig.
 		Clusters: map[string]*clientcmdapi.Cluster{"default-cluster": {
-			Server:                   clientConfig.Host,
+			Server:                   server,
 			InsecureSkipTLSVerify:    false,
-			CertificateAuthorityData: clientConfig.CAData,
+			CertificateAuthorityData: caData,
+			ProxyURL:                 proxyURL,
 		}},
 		// Define auth based on the obtained client cert.
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{"default-auth": {
-			ClientCertificate: certPath,
-			ClientKey:         keyPath,
+			ClientCertificate: clientCertPath,
+			ClientKey:         clientKeyPath,
 		}},
 		// Define a context that connects the auth info and cluster, and set it as the default
 		Contexts: map[string]*clientcmdapi.Context{"default-context": {

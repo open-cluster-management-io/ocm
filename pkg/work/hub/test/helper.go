@@ -89,7 +89,7 @@ func CreateTestPlacement(name string, ns string, clusters ...string) (*clusterv1
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name + "-decision",
 			Namespace: ns,
-			Labels:    map[string]string{clusterv1beta1.PlacementLabel: name},
+			Labels:    map[string]string{clusterv1beta1.PlacementLabel: name, clusterv1beta1.DecisionGroupIndexLabel: "0"},
 		},
 	}
 

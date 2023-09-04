@@ -52,8 +52,8 @@ func NewManagementAddonInstallProgressionController(
 
 func (c *managementAddonInstallProgressionController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	addonName := syncCtx.QueueKey()
-	klog.V(4).Infof("Reconciling addon %q", addonName)
-
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Reconciling addon", "addonName", addonName)
 	mgmtAddon, err := c.clusterManagementAddonLister.Get(addonName)
 	switch {
 	case errors.IsNotFound(err):

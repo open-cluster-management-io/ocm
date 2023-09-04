@@ -29,6 +29,7 @@ type managedClusterAddonInstallReconciler struct {
 
 func (d *managedClusterAddonInstallReconciler) reconcile(
 	ctx context.Context, cma *addonv1alpha1.ClusterManagementAddOn) (*addonv1alpha1.ClusterManagementAddOn, reconcileState, error) {
+	logger := klog.FromContext(ctx)
 	// skip apply install strategy for self-managed addon
 	// this is to avoid conflict when addon also define WithInstallStrategy()
 	// the filter will be removed after WithInstallStrategy() is removed from framework.
@@ -51,7 +52,7 @@ func (d *managedClusterAddonInstallReconciler) reconcile(
 		existingDeployed.Insert(addon.Namespace)
 	}
 
-	requiredDeployed, err := d.getAllDecisions(cma.Name, cma.Spec.InstallStrategy.Placements)
+	requiredDeployed, err := d.getAllDecisions(logger, cma.Name, cma.Spec.InstallStrategy.Placements)
 	if err != nil {
 		return cma, reconcileContinue, err
 	}
@@ -86,13 +87,17 @@ func (d *managedClusterAddonInstallReconciler) reconcile(
 	return cma, reconcileContinue, utilerrors.NewAggregate(errs)
 }
 
-func (d *managedClusterAddonInstallReconciler) getAllDecisions(addonName string, placements []addonv1alpha1.PlacementStrategy) (sets.Set[string], error) {
+func (d *managedClusterAddonInstallReconciler) getAllDecisions(
+	logger klog.Logger,
+	addonName string,
+	placements []addonv1alpha1.PlacementStrategy) (sets.Set[string], error) {
 	var errs []error
 	required := sets.Set[string]{}
 	for _, strategy := range placements {
 		_, err := d.placementLister.Placements(strategy.PlacementRef.Namespace).Get(strategy.PlacementRef.Name)
 		if errors.IsNotFound(err) {
-			klog.V(2).Infof("placement %s/%s is not found for addon %s", strategy.PlacementRef.Namespace, strategy.PlacementRef.Name, addonName)
+			logger.V(2).Info("Placement not found for addon", "placementNamespace",
+				strategy.PlacementRef.Namespace, "placementName", strategy.PlacementRef.Name, "addonName", addonName)
 			continue
 		}
 		if err != nil {

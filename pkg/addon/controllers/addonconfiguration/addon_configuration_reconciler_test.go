@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2/ktesting"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/index"
@@ -535,6 +536,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			clusterObj := append(c.placements, c.placementDecisions...)
 			fakeClusterClient := fakecluster.NewSimpleClientset(clusterObj...)
 			fakeAddonClient := fakeaddon.NewSimpleClientset(c.managedClusteraddon...)
@@ -580,7 +582,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 				addonClient: fakeAddonClient,
 			}
 
-			graph, err := controller.buildConfigurationGraph(c.clusterManagementAddon)
+			graph, err := controller.buildConfigurationGraph(logger, c.clusterManagementAddon)
 			if err != nil {
 				t.Errorf("expected no error when build graph: %v", err)
 			}

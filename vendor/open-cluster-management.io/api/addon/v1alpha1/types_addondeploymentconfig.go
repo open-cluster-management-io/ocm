@@ -50,6 +50,13 @@ type AddOnDeploymentConfigSpec struct {
 	// Empty means no proxy settings is available.
 	// +optional
 	ProxyConfig ProxyConfig `json:"proxyConfig,omitempty"`
+
+	// AgentInstallNamespace is the namespace where the add-on agent should be installed on the managed cluster.
+	// +optional
+	// +kubebuilder:default=open-cluster-management-agent-addon
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+	AgentInstallNamespace string `json:"agentInstallNamespace,omitempty"`
 }
 
 // CustomizedVariable represents a customized variable for add-on deployment.

@@ -2,6 +2,7 @@ package clientcert
 
 import (
 	"crypto/x509/pkix"
+	"reflect"
 	"testing"
 	"time"
 
@@ -236,6 +237,72 @@ func TestGetCertValidityPeriod(t *testing.T) {
 			}
 			if !c.notAfter.Equal(*notAfter) {
 				t.Errorf("expect %v, but got %v", c.notAfter, *notAfter)
+			}
+		})
+	}
+}
+
+func TestBuildKubeconfig(t *testing.T) {
+	cases := []struct {
+		name           string
+		server         string
+		proxyURL       string
+		caData         []byte
+		clientCertFile string
+		clientKeyFile  string
+	}{
+		{
+			name:           "without proxy",
+			server:         "https://127.0.0.1:6443",
+			caData:         []byte("fake-ca-bundle"),
+			clientCertFile: "tls.crt",
+			clientKeyFile:  "tls.key",
+		},
+		{
+			name:           "with proxy",
+			server:         "https://127.0.0.1:6443",
+			caData:         []byte("fake-ca-bundle-with-proxy-ca"),
+			proxyURL:       "https://127.0.0.1:3129",
+			clientCertFile: "tls.crt",
+			clientKeyFile:  "tls.key",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			kubeconfig := BuildKubeconfig(c.server, c.caData, c.proxyURL, c.clientCertFile, c.clientKeyFile)
+			currentContext, ok := kubeconfig.Contexts[kubeconfig.CurrentContext]
+			if !ok {
+				t.Errorf("current context %q not found: %v", kubeconfig.CurrentContext, kubeconfig)
+			}
+
+			cluster, ok := kubeconfig.Clusters[currentContext.Cluster]
+			if !ok {
+				t.Errorf("cluster %q not found: %v", currentContext.Cluster, kubeconfig)
+			}
+
+			if cluster.Server != c.server {
+				t.Errorf("expected server %q, but got %q", c.server, cluster.Server)
+			}
+
+			if cluster.ProxyURL != c.proxyURL {
+				t.Errorf("expected proxy URL %q, but got %q", c.proxyURL, cluster.ProxyURL)
+			}
+
+			if !reflect.DeepEqual(cluster.CertificateAuthorityData, c.caData) {
+				t.Errorf("expected ca data %v, but got %v", c.caData, cluster.CertificateAuthorityData)
+			}
+
+			authInfo, ok := kubeconfig.AuthInfos[currentContext.AuthInfo]
+			if !ok {
+				t.Errorf("auth info %q not found: %v", currentContext.AuthInfo, kubeconfig)
+			}
+
+			if authInfo.ClientCertificate != c.clientCertFile {
+				t.Errorf("expected client certificate %q, but got %q", c.clientCertFile, authInfo.ClientCertificate)
+			}
+
+			if authInfo.ClientKey != c.clientKeyFile {
+				t.Errorf("expected client key %q, but got %q", c.clientKeyFile, authInfo.ClientKey)
 			}
 		})
 	}

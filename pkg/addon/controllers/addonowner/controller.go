@@ -56,8 +56,9 @@ func NewAddonOwnerController(
 }
 
 func (c *addonOwnerController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	logger := klog.FromContext(ctx)
 	key := syncCtx.QueueKey()
-	klog.V(4).Infof("Reconciling addon %q", key)
+	logger.V(4).Info("Reconciling addon", "addon", key)
 
 	namespace, addonName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {

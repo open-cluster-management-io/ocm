@@ -159,11 +159,14 @@ func hubKubeconfigPath() string {
 }
 
 func GetAddOnRegistriesPrivateValuesFromClusterAnnotation(
+	logger klog.Logger,
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
 	values := map[string]interface{}{}
 	annotations := cluster.GetAnnotations()
-	klog.V(4).Infof("Try to get image registries from annotation %v", annotations[clusterv1.ClusterImageRegistriesAnnotationKey])
+	logger.V(4).Info("Try to get image registries from annotation",
+		"annotationKey", clusterv1.ClusterImageRegistriesAnnotationKey,
+		"annotationValue", annotations[clusterv1.ClusterImageRegistriesAnnotationKey])
 	if len(annotations[clusterv1.ClusterImageRegistriesAnnotationKey]) == 0 {
 		return values, nil
 	}
@@ -174,7 +177,9 @@ func GetAddOnRegistriesPrivateValuesFromClusterAnnotation(
 	imageRegistries := ImageRegistries{}
 	err := json.Unmarshal([]byte(annotations[clusterv1.ClusterImageRegistriesAnnotationKey]), &imageRegistries)
 	if err != nil {
-		klog.Errorf("failed to unmarshal the annotation %v, err %v", annotations[clusterv1.ClusterImageRegistriesAnnotationKey], err)
+		logger.Error(err, "Failed to unmarshal the annotation",
+			"annotationKey", clusterv1.ClusterImageRegistriesAnnotationKey,
+			"annotationValue", annotations[clusterv1.ClusterImageRegistriesAnnotationKey])
 		return values, err
 	}
 
@@ -182,7 +187,7 @@ func GetAddOnRegistriesPrivateValuesFromClusterAnnotation(
 		return values, nil
 	}
 
-	klog.V(4).Infof("Image registries values %v", imageRegistries.Registries)
+	logger.V(4).Info("Image registries values", "registries", imageRegistries.Registries)
 	return addonfactory.Values{
 		RegistriesPrivateValueKey: imageRegistries.Registries,
 	}, nil

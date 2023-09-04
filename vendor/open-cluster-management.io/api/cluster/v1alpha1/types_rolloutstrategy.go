@@ -75,22 +75,22 @@ type MandatoryDecisionGroups struct {
 // RolloutAll is a RolloutStrategy Type
 type RolloutAll struct {
 	// +optional
-	Timeout Timeout `json:",inline"`
+	Timeout `json:",inline"`
 }
 
 // RolloutProgressivePerGroup is a RolloutStrategy Type
 type RolloutProgressivePerGroup struct {
 	// +optional
-	MandatoryDecisionGroups MandatoryDecisionGroups `json:",inline"`
+	MandatoryDecisionGroups `json:",inline"`
 
 	// +optional
-	Timeout Timeout `json:",inline"`
+	Timeout `json:",inline"`
 }
 
 // RolloutProgressive is a RolloutStrategy Type
 type RolloutProgressive struct {
 	// +optional
-	MandatoryDecisionGroups MandatoryDecisionGroups `json:",inline"`
+	MandatoryDecisionGroups `json:",inline"`
 
 	// MaxConcurrency is the max number of clusters to deploy workload concurrently. The default value for MaxConcurrency is determined from the clustersPerDecisionGroup defined in the placement->DecisionStrategy.
 	// +kubebuilder:validation:Pattern="^((100|[0-9]{1,2})%|[0-9]+)$"
@@ -99,5 +99,5 @@ type RolloutProgressive struct {
 	MaxConcurrency intstr.IntOrString `json:"maxConcurrency,omitempty"`
 
 	// +optional
-	Timeout Timeout `json:",inline"`
+	Timeout `json:",inline"`
 }

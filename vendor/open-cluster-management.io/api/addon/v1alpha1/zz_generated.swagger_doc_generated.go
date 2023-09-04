@@ -31,10 +31,11 @@ func (AddOnDeploymentConfigList) SwaggerDoc() map[string]string {
 }
 
 var map_AddOnDeploymentConfigSpec = map[string]string{
-	"customizedVariables": "CustomizedVariables is a list of name-value variables for the current add-on deployment. The add-on implementation can use these variables to render its add-on deployment. The default is an empty list.",
-	"nodePlacement":       "NodePlacement enables explicit control over the scheduling of the add-on agents on the managed cluster. All add-on agent pods are expected to comply with this node placement. If the placement is nil, the placement is not specified, it will be omitted. If the placement is an empty object, the placement will match all nodes and tolerate nothing.",
-	"registries":          "Registries describes how to override images used by the addon agent on the managed cluster. the following example will override image \"quay.io/open-cluster-management/addon-agent\" to \"quay.io/ocm/addon-agent\" when deploying the addon agent\n\nregistries:\n  - source: quay.io/open-cluster-management/addon-agent\n    mirror: quay.io/ocm/addon-agent",
-	"proxyConfig":         "ProxyConfig holds proxy settings for add-on agent on the managed cluster. Empty means no proxy settings is available.",
+	"customizedVariables":   "CustomizedVariables is a list of name-value variables for the current add-on deployment. The add-on implementation can use these variables to render its add-on deployment. The default is an empty list.",
+	"nodePlacement":         "NodePlacement enables explicit control over the scheduling of the add-on agents on the managed cluster. All add-on agent pods are expected to comply with this node placement. If the placement is nil, the placement is not specified, it will be omitted. If the placement is an empty object, the placement will match all nodes and tolerate nothing.",
+	"registries":            "Registries describes how to override images used by the addon agent on the managed cluster. the following example will override image \"quay.io/open-cluster-management/addon-agent\" to \"quay.io/ocm/addon-agent\" when deploying the addon agent\n\nregistries:\n  - source: quay.io/open-cluster-management/addon-agent\n    mirror: quay.io/ocm/addon-agent",
+	"proxyConfig":           "ProxyConfig holds proxy settings for add-on agent on the managed cluster. Empty means no proxy settings is available.",
+	"agentInstallNamespace": "AgentInstallNamespace is the namespace where the add-on agent should be installed on the managed cluster.",
 }
 
 func (AddOnDeploymentConfigSpec) SwaggerDoc() map[string]string {

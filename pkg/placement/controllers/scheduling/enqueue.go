@@ -1,6 +1,7 @@
 package scheduling
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -29,6 +30,7 @@ const (
 )
 
 type enqueuer struct {
+	logger               klog.Logger
 	queue                workqueue.RateLimitingInterface
 	enqueuePlacementFunc func(obj interface{}, queue workqueue.RateLimitingInterface)
 
@@ -39,6 +41,7 @@ type enqueuer struct {
 }
 
 func newEnqueuer(
+	ctx context.Context,
 	queue workqueue.RateLimitingInterface,
 	clusterInformer clusterinformerv1.ManagedClusterInformer,
 	clusterSetInformer clusterinformerv1beta2.ManagedClusterSetInformer,
@@ -60,6 +63,7 @@ func newEnqueuer(
 	}
 
 	return &enqueuer{
+		logger:                   klog.FromContext(ctx),
 		queue:                    queue,
 		enqueuePlacementFunc:     enqueuePlacement,
 		clusterLister:            clusterInformer.Lister(),
@@ -108,7 +112,7 @@ func (e *enqueuer) enqueueClusterSetBinding(obj interface{}) {
 
 	for _, o := range objs {
 		placement := o.(*clusterapiv1beta1.Placement)
-		klog.V(4).Infof("enqueue placement %s/%s, because of binding %s", placement.Namespace, placement.Name, key)
+		e.logger.V(4).Info("Enqueue placement because of binding", "placementNamespace", placement.Namespace, "placementName", placement.Name, "bindingKey", key)
 		e.enqueuePlacementFunc(placement, e.queue)
 	}
 }
@@ -128,7 +132,7 @@ func (e *enqueuer) enqueueClusterSet(obj interface{}) {
 
 	for _, o := range objs {
 		clusterSetBinding := o.(*clusterapiv1beta2.ManagedClusterSetBinding)
-		klog.V(4).Infof("enqueue clustersetbinding %s/%s, because of clusterset %s", clusterSetBinding.Namespace, clusterSetBinding.Name, key)
+		e.logger.V(4).Info("Enqueue clustersetbinding because of clusterset", "clusterSetBinding", klog.KObj(clusterSetBinding), "clustersetKey", key)
 		e.enqueueClusterSetBinding(clusterSetBinding)
 	}
 }
@@ -142,12 +146,12 @@ func (e *enqueuer) enqueueCluster(obj interface{}) {
 
 	clusterSets, err := clusterapiv1beta2.GetClusterSetsOfCluster(cluster, e.clusterSetLister)
 	if err != nil {
-		klog.V(4).Infof("Unable to get clusterSets of cluster %q: %w", cluster.GetName(), err)
+		e.logger.V(4).Error(err, "Unable to get clusterSets of cluster", "clusterName", cluster.GetName())
 		return
 	}
 
 	for _, clusterSet := range clusterSets {
-		klog.V(4).Infof("enqueue clusterSet %s, because of cluster %s", clusterSet.Name, cluster.Name)
+		e.logger.V(4).Info("Enqueue clusterSet because of cluster", "clusterSetName", clusterSet.Name, "clusterName", cluster.Name)
 		e.enqueueClusterSet(clusterSet)
 	}
 }
@@ -177,19 +181,19 @@ func (e *enqueuer) enqueuePlacementScore(obj interface{}) {
 	filteredBindingNamespaces := sets.NewString()
 	cluster, err := e.clusterLister.Get(namespace)
 	if err != nil {
-		klog.V(4).Infof("Unable to get cluster %s: %w", namespace, err)
+		e.logger.V(4).Error(err, "Unable to get cluster", "clusterNamespace", namespace)
 	}
 
 	clusterSets, err := clusterapiv1beta2.GetClusterSetsOfCluster(cluster, e.clusterSetLister)
 	if err != nil {
-		klog.V(4).Infof("Unable to get clusterSets of cluster %q: %w", cluster.GetName(), err)
+		e.logger.V(4).Error(err, "Unable to get clusterSets of cluster", "clusterName", cluster.GetName())
 		return
 	}
 
 	for _, clusterset := range clusterSets {
 		bindingObjs, err := e.clusterSetBindingIndexer.ByIndex(clustersetBindingsByClusterSet, clusterset.Name)
 		if err != nil {
-			klog.V(4).Infof("Unable to get clusterSetBindings of clusterset %q: %w", clusterset.Name, err)
+			e.logger.V(4).Error(err, "Unable to get clusterSetBindings of clusterset", "clustersetName", clusterset.Name)
 			continue
 		}
 
@@ -202,7 +206,7 @@ func (e *enqueuer) enqueuePlacementScore(obj interface{}) {
 	for _, o := range objs {
 		placement := o.(*clusterapiv1beta1.Placement)
 		if filteredBindingNamespaces.Has(placement.Namespace) {
-			klog.V(4).Infof("enqueue placement %s/%s, because of score %s", placement.Namespace, placement.Name, key)
+			e.logger.V(4).Info("Enqueue placement because of score", "placementNamespace", placement.Namespace, "placementName", placement.Name, "scoreKey", key)
 			e.enqueuePlacementFunc(placement, e.queue)
 		}
 	}
