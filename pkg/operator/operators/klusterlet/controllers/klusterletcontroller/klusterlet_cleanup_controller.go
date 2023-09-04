@@ -128,7 +128,7 @@ func (n *klusterletCleanupController) sync(ctx context.Context, controllerContex
 	// we should clean managedcluster resource when
 	// 1. install mode is not hosted
 	// 2. install mode is hosted and some resources has been applied on managed cluster (if hosted finalizer exists)
-	if config.InstallMode != operatorapiv1.InstallModeHosted || hasFinalizer(klusterlet, klusterletHostedFinalizer) {
+	if !helpers.IsHosted(config.InstallMode) || hasFinalizer(klusterlet, klusterletHostedFinalizer) {
 		managedClusterClients, err := n.managedClusterClientsBuilder.
 			withMode(config.InstallMode).
 			withKubeConfigSecret(config.AgentNamespace, config.ExternalManagedKubeConfigSecret).
@@ -257,7 +257,7 @@ func isTCPNoSuchHostError(err error) bool {
 // readyToAddHostedFinalizer checkes whether the hosted finalizer should be added.
 // It is only added when mode is hosted, and some resources have been applied to the managed cluster.
 func readyToAddHostedFinalizer(klusterlet *operatorapiv1.Klusterlet, mode operatorapiv1.InstallMode) bool {
-	if mode != operatorapiv1.InstallModeHosted {
+	if !helpers.IsHosted(mode) {
 		return false
 	}
 

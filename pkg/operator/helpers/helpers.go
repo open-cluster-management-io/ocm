@@ -420,7 +420,7 @@ func LoadClientConfigFromSecret(secret *corev1.Secret) (*rest.Config, error) {
 func DetermineReplica(ctx context.Context, kubeClient kubernetes.Interface, mode operatorapiv1.InstallMode, kubeVersion *version.Version) int32 {
 	// For hosted mode, there may be many cluster-manager/klusterlet running on the management cluster,
 	// set the replica to 1 to reduce the footprint of the management cluster.
-	if mode == operatorapiv1.InstallModeHosted {
+	if IsHosted(mode) {
 		return singleReplica
 	}
 
@@ -599,7 +599,7 @@ func KlusterletNamespace(klusterlet *operatorapiv1.Klusterlet) string {
 // AgentNamespace returns the namespace to deploy the agents.
 // It is on the managed cluster in the Default mode, and on the management cluster in the Hosted mode.
 func AgentNamespace(klusterlet *operatorapiv1.Klusterlet) string {
-	if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeHosted {
+	if IsHosted(klusterlet.Spec.DeployOption.Mode) {
 		return klusterlet.GetName()
 	}
 
@@ -751,4 +751,8 @@ func FeatureGateEnabled(features []operatorapiv1.FeatureGate,
 // IsSingleton returns if agent is deployed in singleton mode either hosted or not
 func IsSingleton(mode operatorapiv1.InstallMode) bool {
 	return mode == operatorapiv1.InstallModeSingleton || mode == operatorapiv1.InstallModeSingletonHosted
+}
+
+func IsHosted(mode operatorapiv1.InstallMode) bool {
+	return mode == operatorapiv1.InstallModeHosted || mode == operatorapiv1.InstallModeSingletonHosted
 }

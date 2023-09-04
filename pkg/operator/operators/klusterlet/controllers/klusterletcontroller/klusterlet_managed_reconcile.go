@@ -78,7 +78,7 @@ func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 		return klusterlet, reconcileStop, err
 	}
 
-	if config.InstallMode == operatorapiv1.InstallModeHosted {
+	if helpers.IsHosted(config.InstallMode) {
 		// In hosted mode, we should ensure the namespace on the managed cluster since
 		// some resources(eg:service account) are still deployed on managed cluster.
 		err := ensureNamespace(ctx, r.managedClusterClients.kubeClient, klusterlet, config.KlusterletNamespace, r.recorder)
@@ -134,7 +134,7 @@ func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 func (r *managedReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
 	// nothing should be done when deploy mode is hosted and hosted finalizer is not added.
-	if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeHosted && !hasFinalizer(klusterlet, klusterletHostedFinalizer) {
+	if helpers.IsHosted(klusterlet.Spec.DeployOption.Mode) && !hasFinalizer(klusterlet, klusterletHostedFinalizer) {
 		return klusterlet, reconcileContinue, nil
 	}
 

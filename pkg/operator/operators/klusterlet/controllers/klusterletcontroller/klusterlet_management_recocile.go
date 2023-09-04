@@ -100,7 +100,7 @@ func (r *managementReconcile) clean(ctx context.Context, klusterlet *operatorapi
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
 	// Remove secrets
 	secrets := []string{config.HubKubeConfigSecret}
-	if config.InstallMode == operatorapiv1.InstallModeHosted {
+	if helpers.IsHosted(config.InstallMode) {
 		// In Hosted mod, also need to remove the external-managed-kubeconfig-registration and external-managed-kubeconfig-work
 		secrets = append(secrets, []string{config.ExternalManagedKubeConfigRegistrationSecret, config.ExternalManagedKubeConfigWorkSecret}...)
 	}
@@ -121,7 +121,7 @@ func (r *managementReconcile) clean(ctx context.Context, klusterlet *operatorapi
 	// The agent namespace on the management cluster should be removed **at the end**. Otherwise if any failure occurred,
 	// the managed-external-kubeconfig secret would be removed and the next reconcile will fail due to can not build the
 	// managed cluster clients.
-	if config.InstallMode == operatorapiv1.InstallModeHosted {
+	if helpers.IsHosted(config.InstallMode) {
 		// remove the agent namespace on the management cluster
 		err = r.kubeClient.CoreV1().Namespaces().Delete(ctx, config.AgentNamespace, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {

@@ -44,7 +44,7 @@ const (
 )
 
 func ClusterManagerNamespace(clustermanagername string, mode operatorapiv1.InstallMode) string {
-	if mode == operatorapiv1.InstallModeHosted {
+	if IsHosted(mode) {
 		return clustermanagername
 	}
 	return ClusterManagerDefaultNamespace

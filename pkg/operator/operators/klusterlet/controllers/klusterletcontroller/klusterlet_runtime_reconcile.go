@@ -33,11 +33,7 @@ type runtimeReconcile struct {
 
 func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
-	if helpers.IsSingleton(config.InstallMode) {
-		return r.installSingletonAgent(ctx, klusterlet, config)
-	}
-
-	if config.InstallMode == operatorapiv1.InstallModeHosted {
+	if helpers.IsHosted(config.InstallMode) {
 		// Create managed config secret for registration and work.
 		if err := r.createManagedClusterKubeconfig(ctx, klusterlet, config.KlusterletNamespace, config.AgentNamespace,
 			config.RegistrationServiceAccount, config.ExternalManagedKubeConfigRegistrationSecret,
@@ -59,6 +55,15 @@ func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 		runtimeConfig.Replica = 0
 	}
 
+	if helpers.IsSingleton(config.InstallMode) {
+		return r.installSingletonAgent(ctx, klusterlet, runtimeConfig)
+	}
+
+	return r.installAgent(ctx, klusterlet, runtimeConfig)
+}
+
+func (r *runtimeReconcile) installAgent(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
+	runtimeConfig klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
 	// Deploy registration agent
 	_, generationStatus, err := helpers.ApplyDeployment(
 		ctx,
@@ -88,7 +93,7 @@ func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 	// registration-agent generated the cluster name and set it into hub config secret.
 	workConfig := runtimeConfig
 	if workConfig.ClusterName == "" {
-		workConfig.ClusterName, err = r.getClusterNameFromHubKubeConfigSecret(ctx, config.AgentNamespace, klusterlet)
+		workConfig.ClusterName, err = r.getClusterNameFromHubKubeConfigSecret(ctx, runtimeConfig.AgentNamespace, klusterlet)
 		if err != nil {
 			return klusterlet, reconcileStop, err
 		}
@@ -134,9 +139,9 @@ func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 	}
 
 	// clean singleton agent if there is any
-	deployments := []string{fmt.Sprintf("%s-agent", config.KlusterletName)}
+	deployments := []string{fmt.Sprintf("%s-agent", runtimeConfig.KlusterletName)}
 	for _, deployment := range deployments {
-		err := r.kubeClient.AppsV1().Deployments(config.AgentNamespace).Delete(ctx, deployment, metav1.DeleteOptions{})
+		err := r.kubeClient.AppsV1().Deployments(runtimeConfig.AgentNamespace).Delete(ctx, deployment, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			return klusterlet, reconcileStop, err
 		}
@@ -151,13 +156,6 @@ func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 
 func (r *runtimeReconcile) installSingletonAgent(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
-	// Check if the klusterlet is in rebootstrapping state.
-	// The agent is scaled to 0 if the klusterlet is in rebootstrapping state.
-	runtimeConfig := config
-	if meta.IsStatusConditionTrue(klusterlet.Status.Conditions, helpers.KlusterletRebootstrapProgressing) {
-		runtimeConfig.Replica = 0
-	}
-
 	// Deploy singleton agent
 	_, generationStatus, err := helpers.ApplyDeployment(
 		ctx,
@@ -169,7 +167,7 @@ func (r *runtimeReconcile) installSingletonAgent(ctx context.Context, klusterlet
 			if err != nil {
 				return nil, err
 			}
-			objData := assets.MustCreateAssetFromTemplate(name, template, runtimeConfig).Data
+			objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
 			helpers.SetRelatedResourcesStatusesWithObj(&klusterlet.Status.RelatedResources, objData)
 			return objData, nil
 		},

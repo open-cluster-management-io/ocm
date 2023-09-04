@@ -72,7 +72,7 @@ jobs:
           kind load docker-image --name=kind quay.io/open-cluster-management/addon-manager:e2e
       - name: Test E2E
         run: |
-          IMAGE_TAG=e2e KLUSTERLET_DEPLOY_MODE=Hosted make test-e2e
+          IMAGE_TAG=e2e KLUSTERLET_DEPLOY_MODE=SingletonHosted make test-e2e
         env:
           KUBECONFIG: /home/runner/.kube/config
   e2e-singleton:
