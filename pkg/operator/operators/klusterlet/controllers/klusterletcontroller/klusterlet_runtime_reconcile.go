@@ -33,7 +33,7 @@ type runtimeReconcile struct {
 
 func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
-	if config.InstallMode == operatorapiv1.InstallModeSingleton {
+	if helpers.IsSingleton(config.InstallMode) {
 		return r.installSingletonAgent(ctx, klusterlet, config)
 	}
 
@@ -133,6 +133,15 @@ func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 		return klusterlet, reconcileStop, err
 	}
 
+	// clean singleton agent if there is any
+	deployments := []string{fmt.Sprintf("%s-agent", config.KlusterletName)}
+	for _, deployment := range deployments {
+		err := r.kubeClient.AppsV1().Deployments(config.AgentNamespace).Delete(ctx, deployment, metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			return klusterlet, reconcileStop, err
+		}
+	}
+
 	helpers.SetGenerationStatuses(&klusterlet.Status.Generations, generationStatus)
 
 	// TODO check progressing condition
@@ -163,6 +172,18 @@ func (r *runtimeReconcile) installSingletonAgent(ctx context.Context, klusterlet
 	if err != nil {
 		// TODO update condition
 		return klusterlet, reconcileStop, err
+	}
+
+	// clean registration/work if there is any
+	deployments := []string{
+		fmt.Sprintf("%s-registration-agent", config.KlusterletName),
+		fmt.Sprintf("%s-work-agent", config.KlusterletName),
+	}
+	for _, deployment := range deployments {
+		err := r.kubeClient.AppsV1().Deployments(config.AgentNamespace).Delete(ctx, deployment, metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			return klusterlet, reconcileStop, err
+		}
 	}
 
 	helpers.SetGenerationStatuses(&klusterlet.Status.Generations, generationStatus)
@@ -213,7 +234,7 @@ func (r *runtimeReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.
 		fmt.Sprintf("%s-registration-agent", config.KlusterletName),
 		fmt.Sprintf("%s-work-agent", config.KlusterletName),
 	}
-	if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingleton {
+	if helpers.IsSingleton(klusterlet.Spec.DeployOption.Mode) {
 		deployments = []string{fmt.Sprintf("%s-agent", config.KlusterletName)}
 	}
 	for _, deployment := range deployments {

@@ -22,14 +22,6 @@ metadata:
             ],
             "imagePullSpec": "quay.io/open-cluster-management/registration-operator",
             "namespace": "open-cluster-management-agent",
-            "registrationConfiguration": {
-              "featureGates": [
-                {
-                  "feature": "AddonManagement",
-                  "mode": "Enable"
-                }
-              ]
-            },
             "registrationImagePullSpec": "quay.io/open-cluster-management/registration",
             "workImagePullSpec": "quay.io/open-cluster-management/work"
           }
