@@ -49,12 +49,9 @@ $(call build-image,registration-operator,$(OPERATOR_IMAGE_NAME),./build/Dockerfi
 $(call build-image,addon-manager,$(ADDON_MANAGER_IMAGE),./build/Dockerfile.addon,.)
 
 copy-crd:
-	bash -x hack/copy-crds.sh
+	bash -x hack/copy-crds.sh $(YAML_PATCH)
 
-patch-crd: ensure-yaml-patch
-	bash hack/patch/patch-crd.sh $(YAML_PATCH)
-
-update: patch-crd copy-crd update-csv
+update: copy-crd update-csv
 
 update-csv: ensure-operator-sdk
 	cd deploy/cluster-manager && ../../$(OPERATOR_SDK) generate bundle --manifests --deploy-dir config/ --crds-dir config/crds/ --output-dir olm-catalog/cluster-manager/ --version $(CSV_VERSION)
@@ -64,7 +61,7 @@ update-csv: ensure-operator-sdk
 	rm ./deploy/cluster-manager/olm-catalog/cluster-manager/manifests/cluster-manager_v1_serviceaccount.yaml
 	rm ./deploy/klusterlet/olm-catalog/klusterlet/manifests/klusterlet_v1_serviceaccount.yaml
 
-verify-crds: patch-crd
+verify-crds:
 	bash -x hack/verify-crds.sh
 
 verify-gocilint:

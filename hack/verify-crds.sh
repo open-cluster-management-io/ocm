@@ -2,11 +2,15 @@
 
 source "$(dirname "${BASH_SOURCE}")/init.sh"
 
+BASE_DIR=$(dirname $(readlink -f $0))
+
 for f in $HUB_CRD_FILES
 do
-    if [ -f "$PATCHED_DIR/$(basename $f)" ]
+    if [ -f "$BASE_DIR/$(basename $f).yaml-patch" ];
     then
-        diff -N $PATCHED_DIR/$(basename $f) ./manifests/cluster-manager/hub/$(basename $f) || ( echo 'crd content is incorrect' && false )
+        $1 -o $BASE_DIR/$(basename $f).yaml-patch < $f > ./manifests/cluster-manager/hub/$(basename $f).tmp
+        diff -N ./manifests/cluster-manager/hub/$(basename $f).tmp ./manifests/cluster-manager/hub/$(basename $f) || ( echo 'crd content is incorrect' && false )
+        rm ./manifests/cluster-manager/hub/$(basename $f).tmp
     else 
         diff -N $f ./manifests/cluster-manager/hub/$(basename $f) || ( echo 'crd content is incorrect' && false )
     fi
