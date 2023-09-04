@@ -62,7 +62,7 @@ update-csv: ensure-operator-sdk
 	rm ./deploy/klusterlet/bundle.Dockerfile
 
 verify-crds:
-	bash -x hack/verify-crds.sh
+	bash -x hack/verify-crds.sh $(YAML_PATCH)
 
 verify-gocilint:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.2
