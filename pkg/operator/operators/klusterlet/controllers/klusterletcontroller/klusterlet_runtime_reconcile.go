@@ -151,6 +151,13 @@ func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 
 func (r *runtimeReconcile) installSingletonAgent(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+	// Check if the klusterlet is in rebootstrapping state.
+	// The agent is scaled to 0 if the klusterlet is in rebootstrapping state.
+	runtimeConfig := config
+	if meta.IsStatusConditionTrue(klusterlet.Status.Conditions, helpers.KlusterletRebootstrapProgressing) {
+		runtimeConfig.Replica = 0
+	}
+
 	// Deploy singleton agent
 	_, generationStatus, err := helpers.ApplyDeployment(
 		ctx,
@@ -162,7 +169,7 @@ func (r *runtimeReconcile) installSingletonAgent(ctx context.Context, klusterlet
 			if err != nil {
 				return nil, err
 			}
-			objData := assets.MustCreateAssetFromTemplate(name, template, config).Data
+			objData := assets.MustCreateAssetFromTemplate(name, template, runtimeConfig).Data
 			helpers.SetRelatedResourcesStatusesWithObj(&klusterlet.Status.RelatedResources, objData)
 			return objData, nil
 		},

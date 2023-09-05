@@ -39,6 +39,7 @@ func TestSync(t *testing.T) {
 	cases := []struct {
 		name                    string
 		queueKey                string
+		klusterletInstallMode   operatorapiv1.InstallMode
 		initRebootstrapping     bool
 		objects                 []runtime.Object
 		expectedRebootstrapping bool
@@ -119,13 +120,14 @@ func TestSync(t *testing.T) {
 			},
 		},
 		{
-			name:                "wait for scaling down",
-			queueKey:            "test/test",
-			initRebootstrapping: true,
+			name:                  "wait for scaling down",
+			queueKey:              "test/test",
+			klusterletInstallMode: operatorapiv1.InstallModeSingleton,
+			initRebootstrapping:   true,
 			objects: []runtime.Object{
 				newSecret("bootstrap-hub-kubeconfig", "test", newKubeConfig("https://10.0.118.48:6443", "")),
 				newHubKubeConfigSecret("test", time.Now().Add(60*time.Second).UTC()),
-				newDeploymentWithAvailableReplicas("test-registration-agent", "test", 1),
+				newDeploymentWithAvailableReplicas("test-agent", "test", 1),
 			},
 			expectedRebootstrapping: true,
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -150,7 +152,7 @@ func TestSync(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fakeKubeClient := fakekube.NewSimpleClientset(c.objects...)
-			klusterlet := newKlusterlet("test", "test")
+			klusterlet := newKlusterlet("test", "test", c.klusterletInstallMode)
 			if c.initRebootstrapping {
 				klusterlet.Status.Conditions = []metav1.Condition{
 					{
@@ -241,19 +243,19 @@ func TestBootstrapSecretQueueKeyFunc(t *testing.T) {
 		{
 			name:        "key by bootstrap secret",
 			object:      newSecret("bootstrap-hub-kubeconfig", "test", []byte{}),
-			klusterlet:  newKlusterlet("testklusterlet", "test"),
+			klusterlet:  newKlusterlet("testklusterlet", "test", ""),
 			expectedKey: []string{"test/testklusterlet"},
 		},
 		{
 			name:        "key by wrong secret",
 			object:      newSecret("dummy", "test", []byte{}),
-			klusterlet:  newKlusterlet("testklusterlet", "test"),
+			klusterlet:  newKlusterlet("testklusterlet", "test", ""),
 			expectedKey: []string{},
 		},
 		{
 			name:        "key by klusterlet with empty namespace",
 			object:      newSecret("bootstrap-hub-kubeconfig", "open-cluster-management-agent", []byte{}),
-			klusterlet:  newKlusterlet("testklusterlet", ""),
+			klusterlet:  newKlusterlet("testklusterlet", "", ""),
 			expectedKey: []string{"open-cluster-management-agent/testklusterlet"},
 		},
 	}
@@ -275,13 +277,16 @@ func TestBootstrapSecretQueueKeyFunc(t *testing.T) {
 	}
 }
 
-func newKlusterlet(name, namespace string) *operatorapiv1.Klusterlet {
+func newKlusterlet(name, namespace string, installMode operatorapiv1.InstallMode) *operatorapiv1.Klusterlet {
 	return &operatorapiv1.Klusterlet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: operatorapiv1.KlusterletSpec{
 			Namespace: namespace,
+			DeployOption: operatorapiv1.KlusterletDeployOption{
+				Mode: installMode,
+			},
 		},
 	}
 }
