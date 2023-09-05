@@ -384,7 +384,7 @@ func ensureNamespace(ctx context.Context, kubeClient kubernetes.Interface, klust
 func serviceAccountName(suffix string, klusterlet *operatorapiv1.Klusterlet) string {
 	// in singleton mode, we only need one sa, so the name of work and registration sa are
 	// the same.
-	if klusterlet.Spec.DeployOption.Mode == operatorapiv1.InstallModeSingleton {
+	if helpers.IsSingleton(klusterlet.Spec.DeployOption.Mode) {
 		return fmt.Sprintf("%s-agent-sa", klusterlet.Name)
 	}
 	return fmt.Sprintf("%s-%s", klusterlet.Name, suffix)

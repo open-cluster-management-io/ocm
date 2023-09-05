@@ -49,12 +49,9 @@ $(call build-image,registration-operator,$(OPERATOR_IMAGE_NAME),./build/Dockerfi
 $(call build-image,addon-manager,$(ADDON_MANAGER_IMAGE),./build/Dockerfile.addon,.)
 
 copy-crd:
-	bash -x hack/copy-crds.sh
+	bash -x hack/copy-crds.sh $(YAML_PATCH)
 
-patch-crd: ensure-yaml-patch
-	bash hack/patch/patch-crd.sh $(YAML_PATCH)
-
-update: patch-crd copy-crd update-csv
+update: copy-crd update-csv
 
 update-csv: ensure-operator-sdk
 	cd deploy/cluster-manager && ../../$(OPERATOR_SDK) generate bundle --version $(CSV_VERSION) --package cluster-manager --input-dir config --output-dir olm-catalog/cluster-manager
@@ -64,8 +61,8 @@ update-csv: ensure-operator-sdk
 	rm ./deploy/cluster-manager/bundle.Dockerfile
 	rm ./deploy/klusterlet/bundle.Dockerfile
 
-verify-crds: patch-crd
-	bash -x hack/verify-crds.sh
+verify-crds:
+	bash -x hack/verify-crds.sh $(YAML_PATCH)
 
 verify-gocilint:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.2

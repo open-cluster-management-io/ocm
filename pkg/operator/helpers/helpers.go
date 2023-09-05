@@ -747,3 +747,8 @@ func FeatureGateEnabled(features []operatorapiv1.FeatureGate,
 
 	return defaultFeature.Default
 }
+
+// IsSingleton returns if agent is deployed in singleton mode either hosted or not
+func IsSingleton(mode operatorapiv1.InstallMode) bool {
+	return mode == operatorapiv1.InstallModeSingleton || mode == operatorapiv1.InstallModeSingletonHosted
+}
