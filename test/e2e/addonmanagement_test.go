@@ -87,7 +87,7 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		ginkgo.By(fmt.Sprintf("create the addon %v on the managed cluster namespace %v", addOnName, clusterName))
-		err = t.CreateManagedClusterAddOn(clusterName, addOnName, addonInstallNamespace)
+		err = t.CreateManagedClusterAddOn(clusterName, addOnName, "test-ns") // the install namespace will be ignored
 		if err != nil {
 			klog.Errorf("failed to create managed cluster addon %v on the managed cluster namespace %v: %v", addOnName, clusterName, err)
 			gomega.Expect(errors.IsAlreadyExists(err)).To(gomega.BeTrue())
@@ -140,6 +140,29 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			ginkgo.Fail(fmt.Sprintf("failed to delete custom signer secret %v/%v: %v",
 				templateagent.AddonManagerNamespace(), customSignerSecretName, err))
 		}
+
+		// delete all CSR created for the addon on the hub cluster, otherwise if it reches the limit number 10, the
+		// other tests will fail
+		gomega.Eventually(func() error {
+			csrs, err := t.HubKubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(),
+				metav1.ListOptions{
+					LabelSelector: fmt.Sprintf("%s=%s,%s=%s", addonapiv1alpha1.AddonLabelKey, addOnName,
+						clusterv1.ClusterNameLabelKey, clusterName),
+				})
+			if err != nil {
+				return err
+			}
+
+			for _, csr := range csrs.Items {
+				err = t.HubKubeClient.CertificatesV1().CertificateSigningRequests().Delete(context.TODO(),
+					csr.Name, metav1.DeleteOptions{})
+				if err != nil {
+					return err
+				}
+			}
+
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("Template type addon should be functioning", func() {
@@ -231,7 +254,6 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 
 			return fmt.Errorf("the job should be deleted")
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
-
 	})
 
 	ginkgo.It("Template type addon should be configured by addon deployment config for image override even there are cluster annotation config", func() {

@@ -1156,10 +1156,10 @@ k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89/go.mod h1:sZAwmy6armz5eXlNoLmJcl
 k8s.io/utils v0.0.0-20201110183641-67b214c5f920/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
 k8s.io/utils v0.0.0-20230313181309-38a27ef9d749 h1:xMMXJlJbsU8w3V5N2FLDQ8YgU8s1EoULdbQBcAeNJkY=
 k8s.io/utils v0.0.0-20230313181309-38a27ef9d749/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
-open-cluster-management.io/addon-framework v0.7.1-0.20230803002113-eea76f8f5ad7 h1:GozqvUtekO4Zg90wLih3CA/ZYKLJlGKX+vL990U8DoQ=
-open-cluster-management.io/addon-framework v0.7.1-0.20230803002113-eea76f8f5ad7/go.mod h1:gLGpXkdwAzzV+JB5eQPNHbZFJwp7HsKSSwgqOxGNVCw=
-open-cluster-management.io/api v0.11.1-0.20230830071821-9675ab737d20 h1:R2aOyfax0T8LMofjAW5xQCQN+tEoxUiouHGK8SKFZz0=
-open-cluster-management.io/api v0.11.1-0.20230830071821-9675ab737d20/go.mod h1:nsQ/G5JpfjQUg7dHpblyywWC6BRqklNaF6fIswVCHyY=
+open-cluster-management.io/addon-framework v0.7.1-0.20230911140813-9676b4f8c180 h1:fEqGXqPJhBUSkeXXlJaAalX36F9NWRcv1pdbj2tYCfk=
+open-cluster-management.io/addon-framework v0.7.1-0.20230911140813-9676b4f8c180/go.mod h1:8ESgg9EzyUZ2n5/Qgl8E2jnMmnd02YxXn92K5+Egedc=
+open-cluster-management.io/api v0.11.1-0.20230905055724-cf1ead467a83 h1:3zbT3sT/tEAQbpjIk6uRiTQGknQ3kQlfd11ElVuXyyQ=
+open-cluster-management.io/api v0.11.1-0.20230905055724-cf1ead467a83/go.mod h1:nsQ/G5JpfjQUg7dHpblyywWC6BRqklNaF6fIswVCHyY=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
 rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
