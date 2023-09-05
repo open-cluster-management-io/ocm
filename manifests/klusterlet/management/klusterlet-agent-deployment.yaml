@@ -68,7 +68,6 @@ spec:
           {{if .ExternalServerURL}}
           - "--spoke-external-server-urls={{ .ExternalServerURL }}"
           {{end}}
-          - "--terminate-on-files=/spoke/hub-kubeconfig/kubeconfig"
           {{if eq .Replica 1}}
           - "--disable-leader-election"
           - "--status-sync-interval=60s"

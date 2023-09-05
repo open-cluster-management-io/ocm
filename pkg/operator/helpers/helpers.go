@@ -46,8 +46,6 @@ const (
 	FeatureGatesTypeValid             = "ValidFeatureGates"
 	FeatureGatesReasonAllValid        = "FeatureGatesAllValid"
 	FeatureGatesReasonInvalidExisting = "InvalidFeatureGatesExisting"
-
-	KlusterletRebootstrapProgressing = "RebootstrapProgressing"
 )
 
 var (

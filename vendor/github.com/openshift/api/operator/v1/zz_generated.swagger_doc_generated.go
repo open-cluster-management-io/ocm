@@ -26,7 +26,8 @@ func (GenerationStatus) SwaggerDoc() map[string]string {
 }
 
 var map_MyOperatorResource = map[string]string{
-	"": "MyOperatorResource is an example operator configuration type\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"":         "MyOperatorResource is an example operator configuration type\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (MyOperatorResource) SwaggerDoc() map[string]string {
@@ -63,7 +64,7 @@ var map_OperatorSpec = map[string]string{
 	"managementState":            "managementState indicates whether and how the operator should manage the component",
 	"logLevel":                   "logLevel is an intent based logging for an overall component.  It does not give fine grained control, but it is a simple way to manage coarse grained logging choices that operators have to interpret for their operands.\n\nValid values are: \"Normal\", \"Debug\", \"Trace\", \"TraceAll\". Defaults to \"Normal\".",
 	"operatorLogLevel":           "operatorLogLevel is an intent based logging for the operator itself.  It does not give fine grained control, but it is a simple way to manage coarse grained logging choices that operators have to interpret for themselves.\n\nValid values are: \"Normal\", \"Debug\", \"Trace\", \"TraceAll\". Defaults to \"Normal\".",
-	"unsupportedConfigOverrides": "unsupportedConfigOverrides holds a sparse config that will override any previously set options.  It only needs to be the fields to override it will end up overlaying in the following order: 1. hardcoded defaults 2. observedConfig 3. unsupportedConfigOverrides",
+	"unsupportedConfigOverrides": "unsupportedConfigOverrides overrides the final configuration that was computed by the operator. Red Hat does not support the use of this field. Misuse of this field could lead to unexpected behavior or conflict with other configuration options. Seek guidance from the Red Hat support before using this field. Use of this property blocks cluster upgrades, it must be removed before upgrading your cluster.",
 	"observedConfig":             "observedConfig holds a sparse config that controller has observed from the cluster state.  It exists in spec because it is an input to the level for the operator",
 }
 
@@ -106,7 +107,8 @@ func (StaticPodOperatorStatus) SwaggerDoc() map[string]string {
 }
 
 var map_Authentication = map[string]string{
-	"": "Authentication provides information to configure an operator to manage authentication.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "Authentication provides information to configure an operator to manage authentication.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (Authentication) SwaggerDoc() map[string]string {
@@ -114,7 +116,8 @@ func (Authentication) SwaggerDoc() map[string]string {
 }
 
 var map_AuthenticationList = map[string]string{
-	"": "AuthenticationList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "AuthenticationList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (AuthenticationList) SwaggerDoc() map[string]string {
@@ -138,7 +141,8 @@ func (OAuthAPIServerStatus) SwaggerDoc() map[string]string {
 }
 
 var map_CloudCredential = map[string]string{
-	"": "CloudCredential provides a means to configure an operator to manage CredentialsRequests.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "CloudCredential provides a means to configure an operator to manage CredentialsRequests.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (CloudCredential) SwaggerDoc() map[string]string {
@@ -146,7 +150,8 @@ func (CloudCredential) SwaggerDoc() map[string]string {
 }
 
 var map_CloudCredentialList = map[string]string{
-	"": "Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (CloudCredentialList) SwaggerDoc() map[string]string {
@@ -171,9 +176,10 @@ func (CloudCredentialStatus) SwaggerDoc() map[string]string {
 }
 
 var map_Config = map[string]string{
-	"":       "Config specifies the behavior of the config operator which is responsible for creating the initial configuration of other components on the cluster.  The operator also handles installation, migration or synchronization of cloud configurations for AWS and Azure cloud based clusters\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"spec":   "spec is the specification of the desired behavior of the Config Operator.",
-	"status": "status defines the observed status of the Config Operator.",
+	"":         "Config specifies the behavior of the config operator which is responsible for creating the initial configuration of other components on the cluster.  The operator also handles installation, migration or synchronization of cloud configurations for AWS and Azure cloud based clusters\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec is the specification of the desired behavior of the Config Operator.",
+	"status":   "status defines the observed status of the Config Operator.",
 }
 
 func (Config) SwaggerDoc() map[string]string {
@@ -181,8 +187,9 @@ func (Config) SwaggerDoc() map[string]string {
 }
 
 var map_ConfigList = map[string]string{
-	"":      "ConfigList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"items": "Items contains the items",
+	"":         "ConfigList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "Items contains the items",
 }
 
 func (ConfigList) SwaggerDoc() map[string]string {
@@ -199,7 +206,8 @@ func (AddPage) SwaggerDoc() map[string]string {
 }
 
 var map_Console = map[string]string{
-	"": "Console provides a means to configure an operator to manage the console.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "Console provides a means to configure an operator to manage the console.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (Console) SwaggerDoc() map[string]string {
@@ -234,7 +242,8 @@ func (ConsoleCustomization) SwaggerDoc() map[string]string {
 }
 
 var map_ConsoleList = map[string]string{
-	"": "Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (ConsoleList) SwaggerDoc() map[string]string {
@@ -380,9 +389,41 @@ func (StatuspageProvider) SwaggerDoc() map[string]string {
 	return map_StatuspageProvider
 }
 
+var map_AWSCSIDriverConfigSpec = map[string]string{
+	"":          "AWSCSIDriverConfigSpec defines properties that can be configured for the AWS CSI driver.",
+	"kmsKeyARN": "kmsKeyARN sets the cluster default storage class to encrypt volumes with a user-defined KMS key, rather than the default KMS key used by AWS. The value may be either the ARN or Alias ARN of a KMS key.",
+}
+
+func (AWSCSIDriverConfigSpec) SwaggerDoc() map[string]string {
+	return map_AWSCSIDriverConfigSpec
+}
+
+var map_AzureCSIDriverConfigSpec = map[string]string{
+	"":                  "AzureCSIDriverConfigSpec defines properties that can be configured for the Azure CSI driver.",
+	"diskEncryptionSet": "diskEncryptionSet sets the cluster default storage class to encrypt volumes with a customer-managed encryption set, rather than the default platform-managed keys.",
+}
+
+func (AzureCSIDriverConfigSpec) SwaggerDoc() map[string]string {
+	return map_AzureCSIDriverConfigSpec
+}
+
+var map_AzureDiskEncryptionSet = map[string]string{
+	"":               "AzureDiskEncryptionSet defines the configuration for a disk encryption set.",
+	"subscriptionID": "subscriptionID defines the Azure subscription that contains the disk encryption set. The value should meet the following conditions: 1. It should be a 128-bit number. 2. It should be 36 characters (32 hexadecimal characters and 4 hyphens) long. 3. It should be displayed in five groups separated by hyphens (-). 4. The first group should be 8 characters long. 5. The second, third, and fourth groups should be 4 characters long. 6. The fifth group should be 12 characters long. An Example SubscrionID: f2007bbf-f802-4a47-9336-cf7c6b89b378",
+	"resourceGroup":  "resourceGroup defines the Azure resource group that contains the disk encryption set. The value should consist of only alphanumberic characters, underscores (_), parentheses, hyphens and periods. The value should not end in a period and be at most 90 characters in length.",
+	"name":           "name is the name of the disk encryption set that will be set on the default storage class. The value should consist of only alphanumberic characters, underscores (_), hyphens, and be at most 80 characters in length.",
+}
+
+func (AzureDiskEncryptionSet) SwaggerDoc() map[string]string {
+	return map_AzureDiskEncryptionSet
+}
+
 var map_CSIDriverConfigSpec = map[string]string{
 	"":           "CSIDriverConfigSpec defines configuration spec that can be used to optionally configure a specific CSI Driver.",
-	"driverType": "driverType indicates type of CSI driver for which the driverConfig is being applied to.\n\nValid values are:\n\n* vSphere\n\nAllows configuration of vsphere CSI driver topology.",
+	"driverType": "driverType indicates type of CSI driver for which the driverConfig is being applied to. Valid values are: AWS, Azure, GCP, vSphere and omitted. Consumers should treat unknown values as a NO-OP.",
+	"aws":        "aws is used to configure the AWS CSI driver.",
+	"azure":      "azure is used to configure the Azure CSI driver.",
+	"gcp":        "gcp is used to configure the GCP CSI driver.",
 	"vSphere":    "vsphere is used to configure the vsphere CSI driver.",
 }
 
@@ -391,9 +432,10 @@ func (CSIDriverConfigSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterCSIDriver = map[string]string{
-	"":       "ClusterCSIDriver object allows management and configuration of a CSI driver operator installed by default in OpenShift. Name of the object must be name of the CSI driver it operates. See CSIDriverName type for list of allowed values.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"spec":   "spec holds user settable values for configuration",
-	"status": "status holds observed values from the cluster. They may not be overridden.",
+	"":         "ClusterCSIDriver object allows management and configuration of a CSI driver operator installed by default in OpenShift. Name of the object must be name of the CSI driver it operates. See CSIDriverName type for list of allowed values.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec holds user settable values for configuration",
+	"status":   "status holds observed values from the cluster. They may not be overridden.",
 }
 
 func (ClusterCSIDriver) SwaggerDoc() map[string]string {
@@ -401,7 +443,8 @@ func (ClusterCSIDriver) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterCSIDriverList = map[string]string{
-	"": "ClusterCSIDriverList contains a list of ClusterCSIDriver\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "ClusterCSIDriverList contains a list of ClusterCSIDriver\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (ClusterCSIDriverList) SwaggerDoc() map[string]string {
@@ -426,6 +469,27 @@ func (ClusterCSIDriverStatus) SwaggerDoc() map[string]string {
 	return map_ClusterCSIDriverStatus
 }
 
+var map_GCPCSIDriverConfigSpec = map[string]string{
+	"":       "GCPCSIDriverConfigSpec defines properties that can be configured for the GCP CSI driver.",
+	"kmsKey": "kmsKey sets the cluster default storage class to encrypt volumes with customer-supplied encryption keys, rather than the default keys managed by GCP.",
+}
+
+func (GCPCSIDriverConfigSpec) SwaggerDoc() map[string]string {
+	return map_GCPCSIDriverConfigSpec
+}
+
+var map_GCPKMSKeyReference = map[string]string{
+	"":          "GCPKMSKeyReference gathers required fields for looking up a GCP KMS Key",
+	"name":      "name is the name of the customer-managed encryption key to be used for disk encryption. The value should correspond to an existing KMS key and should consist of only alphanumeric characters, hyphens (-) and underscores (_), and be at most 63 characters in length.",
+	"keyRing":   "keyRing is the name of the KMS Key Ring which the KMS Key belongs to. The value should correspond to an existing KMS key ring and should consist of only alphanumeric characters, hyphens (-) and underscores (_), and be at most 63 characters in length.",
+	"projectID": "projectID is the ID of the Project in which the KMS Key Ring exists. It must be 6 to 30 lowercase letters, digits, or hyphens. It must start with a letter. Trailing hyphens are prohibited.",
+	"location":  "location is the GCP location in which the Key Ring exists. The value must match an existing GCP location, or \"global\". Defaults to global, if not set.",
+}
+
+func (GCPKMSKeyReference) SwaggerDoc() map[string]string {
+	return map_GCPKMSKeyReference
+}
+
 var map_VSphereCSIDriverConfigSpec = map[string]string{
 	"":                   "VSphereCSIDriverConfigSpec defines properties that can be configured for vsphere CSI driver.",
 	"topologyCategories": "topologyCategories indicates tag categories with which vcenter resources such as hostcluster or datacenter were tagged with. If cluster Infrastructure object has a topology, values specified in Infrastructure object will be used and modifications to topologyCategories will be rejected.",
@@ -436,9 +500,10 @@ func (VSphereCSIDriverConfigSpec) SwaggerDoc() map[string]string {
 }
 
 var map_CSISnapshotController = map[string]string{
-	"":       "CSISnapshotController provides a means to configure an operator to manage the CSI snapshots. `cluster` is the canonical name.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"spec":   "spec holds user settable values for configuration",
-	"status": "status holds observed values from the cluster. They may not be overridden.",
+	"":         "CSISnapshotController provides a means to configure an operator to manage the CSI snapshots. `cluster` is the canonical name.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec holds user settable values for configuration",
+	"status":   "status holds observed values from the cluster. They may not be overridden.",
 }
 
 func (CSISnapshotController) SwaggerDoc() map[string]string {
@@ -446,7 +511,8 @@ func (CSISnapshotController) SwaggerDoc() map[string]string {
 }
 
 var map_CSISnapshotControllerList = map[string]string{
-	"": "CSISnapshotControllerList contains a list of CSISnapshotControllers.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "CSISnapshotControllerList contains a list of CSISnapshotControllers.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (CSISnapshotControllerList) SwaggerDoc() map[string]string {
@@ -470,9 +536,10 @@ func (CSISnapshotControllerStatus) SwaggerDoc() map[string]string {
 }
 
 var map_DNS = map[string]string{
-	"":       "DNS manages the CoreDNS component to provide a name resolution service for pods and services in the cluster.\n\nThis supports the DNS-based service discovery specification: https://github.com/kubernetes/dns/blob/master/docs/specification.md\n\nMore details: https://kubernetes.io/docs/tasks/administer-cluster/coredns\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"spec":   "spec is the specification of the desired behavior of the DNS.",
-	"status": "status is the most recently observed status of the DNS.",
+	"":         "DNS manages the CoreDNS component to provide a name resolution service for pods and services in the cluster.\n\nThis supports the DNS-based service discovery specification: https://github.com/kubernetes/dns/blob/master/docs/specification.md\n\nMore details: https://kubernetes.io/docs/tasks/administer-cluster/coredns\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec is the specification of the desired behavior of the DNS.",
+	"status":   "status is the most recently observed status of the DNS.",
 }
 
 func (DNS) SwaggerDoc() map[string]string {
@@ -490,7 +557,8 @@ func (DNSCache) SwaggerDoc() map[string]string {
 }
 
 var map_DNSList = map[string]string{
-	"": "DNSList contains a list of DNS\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "DNSList contains a list of DNS\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (DNSList) SwaggerDoc() map[string]string {
@@ -554,10 +622,11 @@ func (DNSTransportConfig) SwaggerDoc() map[string]string {
 }
 
 var map_ForwardPlugin = map[string]string{
-	"":                "ForwardPlugin defines a schema for configuring the CoreDNS forward plugin.",
-	"upstreams":       "upstreams is a list of resolvers to forward name queries for subdomains of Zones. Each instance of CoreDNS performs health checking of Upstreams. When a healthy upstream returns an error during the exchange, another resolver is tried from Upstreams. The Upstreams are selected in the order specified in Policy. Each upstream is represented by an IP address or IP:port if the upstream listens on a port other than 53.\n\nA maximum of 15 upstreams is allowed per ForwardPlugin.",
-	"policy":          "policy is used to determine the order in which upstream servers are selected for querying. Any one of the following values may be specified:\n\n* \"Random\" picks a random upstream server for each query. * \"RoundRobin\" picks upstream servers in a round-robin order, moving to the next server for each new query. * \"Sequential\" tries querying upstream servers in a sequential order until one responds, starting with the first server for each new query.\n\nThe default value is \"Random\"",
-	"transportConfig": "transportConfig is used to configure the transport type, server name, and optional custom CA or CA bundle to use when forwarding DNS requests to an upstream resolver.\n\nThe default value is \"\" (empty) which results in a standard cleartext connection being used when forwarding DNS requests to an upstream resolver.",
+	"":                 "ForwardPlugin defines a schema for configuring the CoreDNS forward plugin.",
+	"upstreams":        "upstreams is a list of resolvers to forward name queries for subdomains of Zones. Each instance of CoreDNS performs health checking of Upstreams. When a healthy upstream returns an error during the exchange, another resolver is tried from Upstreams. The Upstreams are selected in the order specified in Policy. Each upstream is represented by an IP address or IP:port if the upstream listens on a port other than 53.\n\nA maximum of 15 upstreams is allowed per ForwardPlugin.",
+	"policy":           "policy is used to determine the order in which upstream servers are selected for querying. Any one of the following values may be specified:\n\n* \"Random\" picks a random upstream server for each query. * \"RoundRobin\" picks upstream servers in a round-robin order, moving to the next server for each new query. * \"Sequential\" tries querying upstream servers in a sequential order until one responds, starting with the first server for each new query.\n\nThe default value is \"Random\"",
+	"transportConfig":  "transportConfig is used to configure the transport type, server name, and optional custom CA or CA bundle to use when forwarding DNS requests to an upstream resolver.\n\nThe default value is \"\" (empty) which results in a standard cleartext connection being used when forwarding DNS requests to an upstream resolver.",
+	"protocolStrategy": "protocolStrategy specifies the protocol to use for upstream DNS requests. Valid values for protocolStrategy are \"TCP\" and omitted. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is to use the protocol of the original client request. \"TCP\" specifies that the platform should use TCP for all upstream DNS requests, even if the client request uses UDP. \"TCP\" is useful for UDP-specific issues such as those created by non-compliant upstream resolvers, but may consume more bandwidth or increase DNS response time. Note that protocolStrategy only affects the protocol of DNS requests that CoreDNS makes to upstream resolvers. It does not affect the protocol of DNS requests between clients and CoreDNS.",
 }
 
 func (ForwardPlugin) SwaggerDoc() map[string]string {
@@ -587,10 +656,11 @@ func (Upstream) SwaggerDoc() map[string]string {
 }
 
 var map_UpstreamResolvers = map[string]string{
-	"":                "UpstreamResolvers defines a schema for configuring the CoreDNS forward plugin in the specific case of the default (\".\") server. It defers from ForwardPlugin in the default values it accepts: * At least one upstream should be specified. * the default policy is Sequential",
-	"upstreams":       "Upstreams is a list of resolvers to forward name queries for the \".\" domain. Each instance of CoreDNS performs health checking of Upstreams. When a healthy upstream returns an error during the exchange, another resolver is tried from Upstreams. The Upstreams are selected in the order specified in Policy.\n\nA maximum of 15 upstreams is allowed per ForwardPlugin. If no Upstreams are specified, /etc/resolv.conf is used by default",
-	"policy":          "Policy is used to determine the order in which upstream servers are selected for querying. Any one of the following values may be specified:\n\n* \"Random\" picks a random upstream server for each query. * \"RoundRobin\" picks upstream servers in a round-robin order, moving to the next server for each new query. * \"Sequential\" tries querying upstream servers in a sequential order until one responds, starting with the first server for each new query.\n\nThe default value is \"Sequential\"",
-	"transportConfig": "transportConfig is used to configure the transport type, server name, and optional custom CA or CA bundle to use when forwarding DNS requests to an upstream resolver.\n\nThe default value is \"\" (empty) which results in a standard cleartext connection being used when forwarding DNS requests to an upstream resolver.",
+	"":                 "UpstreamResolvers defines a schema for configuring the CoreDNS forward plugin in the specific case of the default (\".\") server. It defers from ForwardPlugin in the default values it accepts: * At least one upstream should be specified. * the default policy is Sequential",
+	"upstreams":        "Upstreams is a list of resolvers to forward name queries for the \".\" domain. Each instance of CoreDNS performs health checking of Upstreams. When a healthy upstream returns an error during the exchange, another resolver is tried from Upstreams. The Upstreams are selected in the order specified in Policy.\n\nA maximum of 15 upstreams is allowed per ForwardPlugin. If no Upstreams are specified, /etc/resolv.conf is used by default",
+	"policy":           "Policy is used to determine the order in which upstream servers are selected for querying. Any one of the following values may be specified:\n\n* \"Random\" picks a random upstream server for each query. * \"RoundRobin\" picks upstream servers in a round-robin order, moving to the next server for each new query. * \"Sequential\" tries querying upstream servers in a sequential order until one responds, starting with the first server for each new query.\n\nThe default value is \"Sequential\"",
+	"transportConfig":  "transportConfig is used to configure the transport type, server name, and optional custom CA or CA bundle to use when forwarding DNS requests to an upstream resolver.\n\nThe default value is \"\" (empty) which results in a standard cleartext connection being used when forwarding DNS requests to an upstream resolver.",
+	"protocolStrategy": "protocolStrategy specifies the protocol to use for upstream DNS requests. Valid values for protocolStrategy are \"TCP\" and omitted. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is to use the protocol of the original client request. \"TCP\" specifies that the platform should use TCP for all upstream DNS requests, even if the client request uses UDP. \"TCP\" is useful for UDP-specific issues such as those created by non-compliant upstream resolvers, but may consume more bandwidth or increase DNS response time. Note that protocolStrategy only affects the protocol of DNS requests that CoreDNS makes to upstream resolvers. It does not affect the protocol of DNS requests between clients and CoreDNS.",
 }
 
 func (UpstreamResolvers) SwaggerDoc() map[string]string {
@@ -598,7 +668,8 @@ func (UpstreamResolvers) SwaggerDoc() map[string]string {
 }
 
 var map_Etcd = map[string]string{
-	"": "Etcd provides information to configure an operator to manage etcd.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "Etcd provides information to configure an operator to manage etcd.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (Etcd) SwaggerDoc() map[string]string {
@@ -606,12 +677,21 @@ func (Etcd) SwaggerDoc() map[string]string {
 }
 
 var map_EtcdList = map[string]string{
-	"":      "KubeAPISOperatorConfigList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"items": "Items contains the items",
+	"":         "KubeAPISOperatorConfigList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "Items contains the items",
 }
 
 func (EtcdList) SwaggerDoc() map[string]string {
 	return map_EtcdList
+}
+
+var map_EtcdSpec = map[string]string{
+	"controlPlaneHardwareSpeed": "HardwareSpeed allows user to change the etcd tuning profile which configures the latency parameters for heartbeat interval and leader election timeouts allowing the cluster to tolerate longer round-trip-times between etcd members. Valid values are \"\", \"Standard\" and \"Slower\".\n\t\"\" means no opinion and the platform is left to choose a reasonable default\n\twhich is subject to change without notice.",
+}
+
+func (EtcdSpec) SwaggerDoc() map[string]string {
+	return map_EtcdSpec
 }
 
 var map_AWSClassicLoadBalancerParameters = map[string]string{
@@ -667,7 +747,8 @@ func (ClientTLS) SwaggerDoc() map[string]string {
 }
 
 var map_ContainerLoggingDestinationParameters = map[string]string{
-	"": "ContainerLoggingDestinationParameters describes parameters for the Container logging destination type.",
+	"":          "ContainerLoggingDestinationParameters describes parameters for the Container logging destination type.",
+	"maxLength": "maxLength is the maximum length of the log message.\n\nValid values are integers in the range 480 to 8192, inclusive.\n\nWhen omitted, the default value is 1024.",
 }
 
 func (ContainerLoggingDestinationParameters) SwaggerDoc() map[string]string {
@@ -727,9 +808,10 @@ func (IBMLoadBalancerParameters) SwaggerDoc() map[string]string {
 }
 
 var map_IngressController = map[string]string{
-	"":       "IngressController describes a managed ingress controller for the cluster. The controller can service OpenShift Route and Kubernetes Ingress resources.\n\nWhen an IngressController is created, a new ingress controller deployment is created to allow external traffic to reach the services that expose Ingress or Route resources. Updating this resource may lead to disruption for public facing network connections as a new ingress controller revision may be rolled out.\n\nhttps://kubernetes.io/docs/concepts/services-networking/ingress-controllers\n\nWhenever possible, sensible defaults for the platform are used. See each field for more details.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"spec":   "spec is the specification of the desired behavior of the IngressController.",
-	"status": "status is the most recently observed status of the IngressController.",
+	"":         "IngressController describes a managed ingress controller for the cluster. The controller can service OpenShift Route and Kubernetes Ingress resources.\n\nWhen an IngressController is created, a new ingress controller deployment is created to allow external traffic to reach the services that expose Ingress or Route resources. Updating this resource may lead to disruption for public facing network connections as a new ingress controller revision may be rolled out.\n\nhttps://kubernetes.io/docs/concepts/services-networking/ingress-controllers\n\nWhenever possible, sensible defaults for the platform are used. See each field for more details.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec is the specification of the desired behavior of the IngressController.",
+	"status":   "status is the most recently observed status of the IngressController.",
 }
 
 func (IngressController) SwaggerDoc() map[string]string {
@@ -776,11 +858,42 @@ func (IngressControllerCaptureHTTPHeaders) SwaggerDoc() map[string]string {
 	return map_IngressControllerCaptureHTTPHeaders
 }
 
+var map_IngressControllerHTTPHeader = map[string]string{
+	"":       "IngressControllerHTTPHeader specifies configuration for setting or deleting an HTTP header.",
+	"name":   "name specifies the name of a header on which to perform an action. Its value must be a valid HTTP header name as defined in RFC 2616 section 4.2. The name must consist only of alphanumeric and the following special characters, \"-!#$%&'*+.^_`\". The following header names are reserved and may not be modified via this API: Strict-Transport-Security, Proxy, Host, Cookie, Set-Cookie. It must be no more than 255 characters in length. Header name must be unique.",
+	"action": "action specifies actions to perform on headers, such as setting or deleting headers.",
+}
+
+func (IngressControllerHTTPHeader) SwaggerDoc() map[string]string {
+	return map_IngressControllerHTTPHeader
+}
+
+var map_IngressControllerHTTPHeaderActionUnion = map[string]string{
+	"":     "IngressControllerHTTPHeaderActionUnion specifies an action to take on an HTTP header.",
+	"type": "type defines the type of the action to be applied on the header. Possible values are Set or Delete. Set allows you to set HTTP request and response headers. Delete allows you to delete HTTP request and response headers.",
+	"set":  "set specifies how the HTTP header should be set. This field is required when type is Set and forbidden otherwise.",
+}
+
+func (IngressControllerHTTPHeaderActionUnion) SwaggerDoc() map[string]string {
+	return map_IngressControllerHTTPHeaderActionUnion
+}
+
+var map_IngressControllerHTTPHeaderActions = map[string]string{
+	"":         "IngressControllerHTTPHeaderActions defines configuration for actions on HTTP request and response headers.",
+	"response": "response is a list of HTTP response headers to modify. Actions defined here will modify the response headers of all requests passing through an ingress controller. These actions are applied to all Routes i.e. for all connections handled by the ingress controller defined within a cluster. IngressController actions for response headers will be executed after Route actions. Currently, actions may define to either `Set` or `Delete` headers values. Actions are applied in sequence as defined in this list. A maximum of 20 response header actions may be configured. Sample fetchers allowed are \"res.hdr\" and \"ssl_c_der\". Converters allowed are \"lower\" and \"base64\". Example header values: \"%[res.hdr(X-target),lower]\", \"%{+Q}[ssl_c_der,base64]\".",
+	"request":  "request is a list of HTTP request headers to modify. Actions defined here will modify the request headers of all requests passing through an ingress controller. These actions are applied to all Routes i.e. for all connections handled by the ingress controller defined within a cluster. IngressController actions for request headers will be executed before Route actions. Currently, actions may define to either `Set` or `Delete` headers values. Actions are applied in sequence as defined in this list. A maximum of 20 request header actions may be configured. Sample fetchers allowed are \"req.hdr\" and \"ssl_c_der\". Converters allowed are \"lower\" and \"base64\". Example header values: \"%[req.hdr(X-target),lower]\", \"%{+Q}[ssl_c_der,base64]\". ",
+}
+
+func (IngressControllerHTTPHeaderActions) SwaggerDoc() map[string]string {
+	return map_IngressControllerHTTPHeaderActions
+}
+
 var map_IngressControllerHTTPHeaders = map[string]string{
 	"":                          "IngressControllerHTTPHeaders specifies how the IngressController handles certain HTTP headers.",
 	"forwardedHeaderPolicy":     "forwardedHeaderPolicy specifies when and how the IngressController sets the Forwarded, X-Forwarded-For, X-Forwarded-Host, X-Forwarded-Port, X-Forwarded-Proto, and X-Forwarded-Proto-Version HTTP headers.  The value may be one of the following:\n\n* \"Append\", which specifies that the IngressController appends the\n  headers, preserving existing headers.\n\n* \"Replace\", which specifies that the IngressController sets the\n  headers, replacing any existing Forwarded or X-Forwarded-* headers.\n\n* \"IfNone\", which specifies that the IngressController sets the\n  headers if they are not already set.\n\n* \"Never\", which specifies that the IngressController never sets the\n  headers, preserving any existing headers.\n\nBy default, the policy is \"Append\".",
 	"uniqueId":                  "uniqueId describes configuration for a custom HTTP header that the ingress controller should inject into incoming HTTP requests. Typically, this header is configured to have a value that is unique to the HTTP request.  The header can be used by applications or included in access logs to facilitate tracing individual HTTP requests.\n\nIf this field is empty, no such header is injected into requests.",
 	"headerNameCaseAdjustments": "headerNameCaseAdjustments specifies case adjustments that can be applied to HTTP header names.  Each adjustment is specified as an HTTP header name with the desired capitalization.  For example, specifying \"X-Forwarded-For\" indicates that the \"x-forwarded-for\" HTTP header should be adjusted to have the specified capitalization.\n\nThese adjustments are only applied to cleartext, edge-terminated, and re-encrypt routes, and only when using HTTP/1.\n\nFor request headers, these adjustments are applied only for routes that have the haproxy.router.openshift.io/h1-adjust-case=true annotation.  For response headers, these adjustments are applied to all HTTP responses.\n\nIf this field is empty, no request headers are adjusted.",
+	"actions":                   "actions specifies options for modifying headers and their values. Note that this option only applies to cleartext HTTP connections and to secure HTTP connections for which the ingress controller terminates encryption (that is, edge-terminated or reencrypt connections).  Headers cannot be modified for TLS passthrough connections. Setting the HSTS (`Strict-Transport-Security`) header is not supported via actions. `Strict-Transport-Security` may only be configured using the \"haproxy.router.openshift.io/hsts_header\" route annotation, and only in accordance with the policy specified in Ingress.Spec.RequiredHSTSPolicies. Any actions defined here are applied after any actions related to the following other fields: cache-control, spec.clientTLS, spec.httpHeaders.forwardedHeaderPolicy, spec.httpHeaders.uniqueId, and spec.httpHeaders.headerNameCaseAdjustments. In case of HTTP request headers, the actions specified in spec.httpHeaders.actions on the Route will be executed after the actions specified in the IngressController's spec.httpHeaders.actions field. In case of HTTP response headers, the actions specified in spec.httpHeaders.actions on the IngressController will be executed after the actions specified in the Route's spec.httpHeaders.actions field. Headers set using this API cannot be captured for use in access logs. The following header names are reserved and may not be modified via this API: Strict-Transport-Security, Proxy, Host, Cookie, Set-Cookie. Note that the total size of all net added headers *after* interpolating dynamic values must not exceed the value of spec.tuningOptions.headerBufferMaxRewriteBytes on the IngressController. Please refer to the documentation for that API field for more details.",
 }
 
 func (IngressControllerHTTPHeaders) SwaggerDoc() map[string]string {
@@ -798,7 +911,8 @@ func (IngressControllerHTTPUniqueIdHeaderPolicy) SwaggerDoc() map[string]string 
 }
 
 var map_IngressControllerList = map[string]string{
-	"": "IngressControllerList contains a list of IngressControllers.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "IngressControllerList contains a list of IngressControllers.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (IngressControllerList) SwaggerDoc() map[string]string {
@@ -812,6 +926,15 @@ var map_IngressControllerLogging = map[string]string{
 
 func (IngressControllerLogging) SwaggerDoc() map[string]string {
 	return map_IngressControllerLogging
+}
+
+var map_IngressControllerSetHTTPHeader = map[string]string{
+	"":      "IngressControllerSetHTTPHeader defines the value which needs to be set on an HTTP header.",
+	"value": "value specifies a header value. Dynamic values can be added. The value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6  and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. The value of this field must be no more than 16384 characters in length. Note that the total size of all net added headers *after* interpolating dynamic values must not exceed the value of spec.tuningOptions.headerBufferMaxRewriteBytes on the IngressController. ",
+}
+
+func (IngressControllerSetHTTPHeader) SwaggerDoc() map[string]string {
+	return map_IngressControllerSetHTTPHeader
 }
 
 var map_IngressControllerSpec = map[string]string{
@@ -954,7 +1077,7 @@ var map_SyslogLoggingDestinationParameters = map[string]string{
 	"address":   "address is the IP address of the syslog endpoint that receives log messages.",
 	"port":      "port is the UDP port number of the syslog endpoint that receives log messages.",
 	"facility":  "facility specifies the syslog facility of log messages.\n\nIf this field is empty, the facility is \"local1\".",
-	"maxLength": "maxLength is the maximum length of the syslog message\n\nIf this field is empty, the maxLength is set to \"1024\".",
+	"maxLength": "maxLength is the maximum length of the log message.\n\nValid values are integers in the range 480 to 4096, inclusive.\n\nWhen omitted, the default value is 1024.",
 }
 
 func (SyslogLoggingDestinationParameters) SwaggerDoc() map[string]string {
@@ -996,9 +1119,10 @@ func (HealthCheck) SwaggerDoc() map[string]string {
 }
 
 var map_InsightsOperator = map[string]string{
-	"":       "\n\nInsightsOperator holds cluster-wide information about the Insights Operator.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"spec":   "spec is the specification of the desired behavior of the Insights.",
-	"status": "status is the most recently observed status of the Insights operator.",
+	"":         "\n\nInsightsOperator holds cluster-wide information about the Insights Operator.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec is the specification of the desired behavior of the Insights.",
+	"status":   "status is the most recently observed status of the Insights operator.",
 }
 
 func (InsightsOperator) SwaggerDoc() map[string]string {
@@ -1006,7 +1130,8 @@ func (InsightsOperator) SwaggerDoc() map[string]string {
 }
 
 var map_InsightsOperatorList = map[string]string{
-	"": "InsightsOperatorList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "InsightsOperatorList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (InsightsOperatorList) SwaggerDoc() map[string]string {
@@ -1033,9 +1158,10 @@ func (InsightsReport) SwaggerDoc() map[string]string {
 }
 
 var map_KubeAPIServer = map[string]string{
-	"":       "KubeAPIServer provides information to configure an operator to manage kube-apiserver.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"spec":   "spec is the specification of the desired behavior of the Kubernetes API Server",
-	"status": "status is the most recently observed status of the Kubernetes API Server",
+	"":         "KubeAPIServer provides information to configure an operator to manage kube-apiserver.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec is the specification of the desired behavior of the Kubernetes API Server",
+	"status":   "status is the most recently observed status of the Kubernetes API Server",
 }
 
 func (KubeAPIServer) SwaggerDoc() map[string]string {
@@ -1043,8 +1169,9 @@ func (KubeAPIServer) SwaggerDoc() map[string]string {
 }
 
 var map_KubeAPIServerList = map[string]string{
-	"":      "KubeAPIServerList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"items": "Items contains the items",
+	"":         "KubeAPIServerList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "Items contains the items",
 }
 
 func (KubeAPIServerList) SwaggerDoc() map[string]string {
@@ -1069,9 +1196,10 @@ func (ServiceAccountIssuerStatus) SwaggerDoc() map[string]string {
 }
 
 var map_KubeControllerManager = map[string]string{
-	"":       "KubeControllerManager provides information to configure an operator to manage kube-controller-manager.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"spec":   "spec is the specification of the desired behavior of the Kubernetes Controller Manager",
-	"status": "status is the most recently observed status of the Kubernetes Controller Manager",
+	"":         "KubeControllerManager provides information to configure an operator to manage kube-controller-manager.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec is the specification of the desired behavior of the Kubernetes Controller Manager",
+	"status":   "status is the most recently observed status of the Kubernetes Controller Manager",
 }
 
 func (KubeControllerManager) SwaggerDoc() map[string]string {
@@ -1079,8 +1207,9 @@ func (KubeControllerManager) SwaggerDoc() map[string]string {
 }
 
 var map_KubeControllerManagerList = map[string]string{
-	"":      "KubeControllerManagerList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"items": "Items contains the items",
+	"":         "KubeControllerManagerList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "Items contains the items",
 }
 
 func (KubeControllerManagerList) SwaggerDoc() map[string]string {
@@ -1096,7 +1225,8 @@ func (KubeControllerManagerSpec) SwaggerDoc() map[string]string {
 }
 
 var map_KubeStorageVersionMigrator = map[string]string{
-	"": "KubeStorageVersionMigrator provides information to configure an operator to manage kube-storage-version-migrator.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "KubeStorageVersionMigrator provides information to configure an operator to manage kube-storage-version-migrator.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (KubeStorageVersionMigrator) SwaggerDoc() map[string]string {
@@ -1104,8 +1234,9 @@ func (KubeStorageVersionMigrator) SwaggerDoc() map[string]string {
 }
 
 var map_KubeStorageVersionMigratorList = map[string]string{
-	"":      "KubeStorageVersionMigratorList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"items": "Items contains the items",
+	"":         "KubeStorageVersionMigratorList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "Items contains the items",
 }
 
 func (KubeStorageVersionMigratorList) SwaggerDoc() map[string]string {
@@ -1177,6 +1308,9 @@ func (FeaturesMigration) SwaggerDoc() map[string]string {
 var map_GatewayConfig = map[string]string{
 	"":               "GatewayConfig holds node gateway-related parsed config file parameters and command-line overrides",
 	"routingViaHost": "RoutingViaHost allows pod egress traffic to exit via the ovn-k8s-mp0 management port into the host before sending it out. If this is not set, traffic will always egress directly from OVN to outside without touching the host stack. Setting this to true means hardware offload will not be supported. Default is false if GatewayConfig is specified.",
+	"ipForwarding":   "IPForwarding controls IP forwarding for all traffic on OVN-Kubernetes managed interfaces (such as br-ex). By default this is set to Restricted, and Kubernetes related traffic is still forwarded appropriately, but other IP traffic will not be routed by the OCP node. If there is a desire to allow the host to forward traffic across OVN-Kubernetes managed interfaces, then set this field to \"Global\". The supported values are \"Restricted\" and \"Global\".",
+	"ipv4":           "ipv4 allows users to configure IP settings for IPv4 connections. When omitted, this means no opinion and the default configuration is used. Check individual members fields within ipv4 for details of default values.",
+	"ipv6":           "ipv6 allows users to configure IP settings for IPv6 connections. When omitted, this means no opinion and the default configuration is used. Check individual members fields within ipv6 for details of default values.",
 }
 
 func (GatewayConfig) SwaggerDoc() map[string]string {
@@ -1208,6 +1342,24 @@ var map_IPFIXConfig = map[string]string{
 
 func (IPFIXConfig) SwaggerDoc() map[string]string {
 	return map_IPFIXConfig
+}
+
+var map_IPv4GatewayConfig = map[string]string{
+	"":                         "IPV4GatewayConfig holds the configuration paramaters for IPV4 connections in the GatewayConfig for OVN-Kubernetes",
+	"internalMasqueradeSubnet": "internalMasqueradeSubnet contains the masquerade addresses in IPV4 CIDR format used internally by ovn-kubernetes to enable host to service traffic. Each host in the cluster is configured with these addresses, as well as the shared gateway bridge interface. The values can be changed after installation. The subnet chosen should not overlap with other networks specified for OVN-Kubernetes as well as other networks used on the host. Additionally the subnet must be large enough to accommodate 6 IPs (maximum prefix length /29). When omitted, this means no opinion and the platform is left to choose a reasonable default which is subject to change over time. The current default subnet is 169.254.169.0/29 The value must be in proper IPV4 CIDR format",
+}
+
+func (IPv4GatewayConfig) SwaggerDoc() map[string]string {
+	return map_IPv4GatewayConfig
+}
+
+var map_IPv6GatewayConfig = map[string]string{
+	"":                         "IPV6GatewayConfig holds the configuration paramaters for IPV6 connections in the GatewayConfig for OVN-Kubernetes",
+	"internalMasqueradeSubnet": "internalMasqueradeSubnet contains the masquerade addresses in IPV6 CIDR format used internally by ovn-kubernetes to enable host to service traffic. Each host in the cluster is configured with these addresses, as well as the shared gateway bridge interface. The values can be changed after installation. The subnet chosen should not overlap with other networks specified for OVN-Kubernetes as well as other networks used on the host. Additionally the subnet must be large enough to accommodate 6 IPs (maximum prefix length /125). When omitted, this means no opinion and the platform is left to choose a reasonable default which is subject to change over time. The current default subnet is fd69::/125 Note that IPV6 dual addresses are not permitted",
+}
+
+func (IPv6GatewayConfig) SwaggerDoc() map[string]string {
+	return map_IPv6GatewayConfig
 }
 
 var map_KuryrConfig = map[string]string{
@@ -1255,7 +1407,8 @@ func (NetFlowConfig) SwaggerDoc() map[string]string {
 }
 
 var map_Network = map[string]string{
-	"": "Network describes the cluster's desired network configuration. It is consumed by the cluster-network-operator.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "Network describes the cluster's desired network configuration. It is consumed by the cluster-network-operator.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (Network) SwaggerDoc() map[string]string {
@@ -1263,7 +1416,8 @@ func (Network) SwaggerDoc() map[string]string {
 }
 
 var map_NetworkList = map[string]string{
-	"": "NetworkList contains a list of Network configurations\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "NetworkList contains a list of Network configurations\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (NetworkList) SwaggerDoc() map[string]string {
@@ -1341,6 +1495,7 @@ func (OpenShiftSDNConfig) SwaggerDoc() map[string]string {
 var map_PolicyAuditConfig = map[string]string{
 	"rateLimit":      "rateLimit is the approximate maximum number of messages to generate per-second per-node. If unset the default of 20 msg/sec is used.",
 	"maxFileSize":    "maxFilesSize is the max size an ACL_audit log file is allowed to reach before rotation occurs Units are in MB and the Default is 50MB",
+	"maxLogFiles":    "maxLogFiles specifies the maximum number of ACL_audit log files that can be present.",
 	"destination":    "destination is the location for policy log messages. Regardless of this config, persistent logs will always be dumped to the host at /var/log/ovn/ however Additionally syslog output may be configured as follows. Valid values are: - \"libc\" -> to use the libc syslog() function of the host node's journdald process - \"udp:host:port\" -> for sending syslog over UDP - \"unix:file\" -> for using the UNIX domain socket directly - \"null\" -> to discard all messages logged to syslog The default is \"null\"",
 	"syslogFacility": "syslogFacility the RFC5424 facility for generated messages, e.g. \"kern\". Default is \"local0\"",
 }
@@ -1423,9 +1578,10 @@ func (StaticIPAMRoutes) SwaggerDoc() map[string]string {
 }
 
 var map_OpenShiftAPIServer = map[string]string{
-	"":       "OpenShiftAPIServer provides information to configure an operator to manage openshift-apiserver.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"spec":   "spec is the specification of the desired behavior of the OpenShift API Server.",
-	"status": "status defines the observed status of the OpenShift API Server.",
+	"":         "OpenShiftAPIServer provides information to configure an operator to manage openshift-apiserver.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec is the specification of the desired behavior of the OpenShift API Server.",
+	"status":   "status defines the observed status of the OpenShift API Server.",
 }
 
 func (OpenShiftAPIServer) SwaggerDoc() map[string]string {
@@ -1433,8 +1589,9 @@ func (OpenShiftAPIServer) SwaggerDoc() map[string]string {
 }
 
 var map_OpenShiftAPIServerList = map[string]string{
-	"":      "OpenShiftAPIServerList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"items": "Items contains the items",
+	"":         "OpenShiftAPIServerList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "Items contains the items",
 }
 
 func (OpenShiftAPIServerList) SwaggerDoc() map[string]string {
@@ -1450,7 +1607,8 @@ func (OpenShiftAPIServerStatus) SwaggerDoc() map[string]string {
 }
 
 var map_OpenShiftControllerManager = map[string]string{
-	"": "OpenShiftControllerManager provides information to configure an operator to manage openshift-controller-manager.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "OpenShiftControllerManager provides information to configure an operator to manage openshift-controller-manager.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (OpenShiftControllerManager) SwaggerDoc() map[string]string {
@@ -1458,8 +1616,9 @@ func (OpenShiftControllerManager) SwaggerDoc() map[string]string {
 }
 
 var map_OpenShiftControllerManagerList = map[string]string{
-	"":      "OpenShiftControllerManagerList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"items": "Items contains the items",
+	"":         "OpenShiftControllerManagerList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "Items contains the items",
 }
 
 func (OpenShiftControllerManagerList) SwaggerDoc() map[string]string {
@@ -1467,9 +1626,10 @@ func (OpenShiftControllerManagerList) SwaggerDoc() map[string]string {
 }
 
 var map_KubeScheduler = map[string]string{
-	"":       "KubeScheduler provides information to configure an operator to manage scheduler.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"spec":   "spec is the specification of the desired behavior of the Kubernetes Scheduler",
-	"status": "status is the most recently observed status of the Kubernetes Scheduler",
+	"":         "KubeScheduler provides information to configure an operator to manage scheduler.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec is the specification of the desired behavior of the Kubernetes Scheduler",
+	"status":   "status is the most recently observed status of the Kubernetes Scheduler",
 }
 
 func (KubeScheduler) SwaggerDoc() map[string]string {
@@ -1477,8 +1637,9 @@ func (KubeScheduler) SwaggerDoc() map[string]string {
 }
 
 var map_KubeSchedulerList = map[string]string{
-	"":      "KubeSchedulerList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"items": "Items contains the items",
+	"":         "KubeSchedulerList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "Items contains the items",
 }
 
 func (KubeSchedulerList) SwaggerDoc() map[string]string {
@@ -1486,9 +1647,10 @@ func (KubeSchedulerList) SwaggerDoc() map[string]string {
 }
 
 var map_ServiceCA = map[string]string{
-	"":       "ServiceCA provides information to configure an operator to manage the service cert controllers\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"spec":   "spec holds user settable values for configuration",
-	"status": "status holds observed values from the cluster. They may not be overridden.",
+	"":         "ServiceCA provides information to configure an operator to manage the service cert controllers\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec holds user settable values for configuration",
+	"status":   "status holds observed values from the cluster. They may not be overridden.",
 }
 
 func (ServiceCA) SwaggerDoc() map[string]string {
@@ -1496,8 +1658,9 @@ func (ServiceCA) SwaggerDoc() map[string]string {
 }
 
 var map_ServiceCAList = map[string]string{
-	"":      "ServiceCAList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"items": "Items contains the items",
+	"":         "ServiceCAList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "Items contains the items",
 }
 
 func (ServiceCAList) SwaggerDoc() map[string]string {
@@ -1505,7 +1668,8 @@ func (ServiceCAList) SwaggerDoc() map[string]string {
 }
 
 var map_ServiceCatalogAPIServer = map[string]string{
-	"": "ServiceCatalogAPIServer provides information to configure an operator to manage Service Catalog API Server DEPRECATED: will be removed in 4.6\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "ServiceCatalogAPIServer provides information to configure an operator to manage Service Catalog API Server DEPRECATED: will be removed in 4.6\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (ServiceCatalogAPIServer) SwaggerDoc() map[string]string {
@@ -1513,8 +1677,9 @@ func (ServiceCatalogAPIServer) SwaggerDoc() map[string]string {
 }
 
 var map_ServiceCatalogAPIServerList = map[string]string{
-	"":      "ServiceCatalogAPIServerList is a collection of items DEPRECATED: will be removed in 4.6\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"items": "Items contains the items",
+	"":         "ServiceCatalogAPIServerList is a collection of items DEPRECATED: will be removed in 4.6\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "Items contains the items",
 }
 
 func (ServiceCatalogAPIServerList) SwaggerDoc() map[string]string {
@@ -1522,7 +1687,8 @@ func (ServiceCatalogAPIServerList) SwaggerDoc() map[string]string {
 }
 
 var map_ServiceCatalogControllerManager = map[string]string{
-	"": "ServiceCatalogControllerManager provides information to configure an operator to manage Service Catalog Controller Manager DEPRECATED: will be removed in 4.6\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "ServiceCatalogControllerManager provides information to configure an operator to manage Service Catalog Controller Manager DEPRECATED: will be removed in 4.6\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (ServiceCatalogControllerManager) SwaggerDoc() map[string]string {
@@ -1530,8 +1696,9 @@ func (ServiceCatalogControllerManager) SwaggerDoc() map[string]string {
 }
 
 var map_ServiceCatalogControllerManagerList = map[string]string{
-	"":      "ServiceCatalogControllerManagerList is a collection of items DEPRECATED: will be removed in 4.6\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"items": "Items contains the items",
+	"":         "ServiceCatalogControllerManagerList is a collection of items DEPRECATED: will be removed in 4.6\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "Items contains the items",
 }
 
 func (ServiceCatalogControllerManagerList) SwaggerDoc() map[string]string {
@@ -1539,9 +1706,10 @@ func (ServiceCatalogControllerManagerList) SwaggerDoc() map[string]string {
 }
 
 var map_Storage = map[string]string{
-	"":       "Storage provides a means to configure an operator to manage the cluster storage operator. `cluster` is the canonical name.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"spec":   "spec holds user settable values for configuration",
-	"status": "status holds observed values from the cluster. They may not be overridden.",
+	"":         "Storage provides a means to configure an operator to manage the cluster storage operator. `cluster` is the canonical name.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec holds user settable values for configuration",
+	"status":   "status holds observed values from the cluster. They may not be overridden.",
 }
 
 func (Storage) SwaggerDoc() map[string]string {
@@ -1549,7 +1717,8 @@ func (Storage) SwaggerDoc() map[string]string {
 }
 
 var map_StorageList = map[string]string{
-	"": "StorageList contains a list of Storages.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "StorageList contains a list of Storages.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (StorageList) SwaggerDoc() map[string]string {
@@ -1557,7 +1726,8 @@ func (StorageList) SwaggerDoc() map[string]string {
 }
 
 var map_StorageSpec = map[string]string{
-	"": "StorageSpec is the specification of the desired behavior of the cluster storage operator.",
+	"":                     "StorageSpec is the specification of the desired behavior of the cluster storage operator.",
+	"vsphereStorageDriver": "VSphereStorageDriver indicates the storage driver to use on VSphere clusters. Once this field is set to CSIWithMigrationDriver, it can not be changed. If this is empty, the platform will choose a good default, which may change over time without notice. The current default is CSIWithMigrationDriver and may not be changed. DEPRECATED: This field will be removed in a future release.",
 }
 
 func (StorageSpec) SwaggerDoc() map[string]string {

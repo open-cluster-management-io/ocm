@@ -25,7 +25,6 @@ import (
 	"open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
-	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/bootstrapcontroller"
 	"open-cluster-management.io/ocm/pkg/operator/operators/klusterlet/controllers/ssarcontroller"
 )
 
@@ -69,7 +68,6 @@ var _ = ginkgo.BeforeSuite(func() {
 	ginkgo.By("bootstrapping test environment")
 
 	// crank up the sync speed
-	bootstrapcontroller.BootstrapControllerSyncInterval = 2 * time.Second
 	ssarcontroller.SSARReSyncTime = 1 * time.Second
 
 	var err error

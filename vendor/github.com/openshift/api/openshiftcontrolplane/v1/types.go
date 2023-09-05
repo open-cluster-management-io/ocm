@@ -46,7 +46,43 @@ type OpenShiftAPIServerConfig struct {
 
 	// TODO this needs to be removed.
 	APIServerArguments map[string][]string `json:"apiServerArguments"`
+
+	// apiServers holds information about enabled/disabled API servers
+	APIServers APIServers `json:"apiServers"`
 }
+
+type APIServers struct {
+	// perGroupOptions is a list of enabled/disabled API servers in addition to the defaults
+	PerGroupOptions []PerGroupOptions `json:"perGroupOptions"`
+}
+
+type PerGroupOptions struct {
+	// name is an API server name (see OpenShiftAPIserverName
+	// typed constants for a complete list of available API servers).
+	Name OpenShiftAPIserverName `json:"name"`
+
+	// enabledVersions is a list of versions that must be enabled in addition to the defaults.
+	// Must not collide with the list of disabled versions
+	EnabledVersions []string `json:"enabledVersions"`
+
+	// disabledVersions is a list of versions that must be disabled in addition to the defaults.
+	// Must not collide with the list of enabled versions
+	DisabledVersions []string `json:"disabledVersions"`
+}
+
+type OpenShiftAPIserverName string
+
+const (
+	OpenShiftAppsAPIserver          OpenShiftAPIserverName = "apps.openshift.io"
+	OpenShiftAuthorizationAPIserver OpenShiftAPIserverName = "authorization.openshift.io"
+	OpenShiftBuildAPIserver         OpenShiftAPIserverName = "build.openshift.io"
+	OpenShiftImageAPIserver         OpenShiftAPIserverName = "image.openshift.io"
+	OpenShiftProjectAPIserver       OpenShiftAPIserverName = "project.openshift.io"
+	OpenShiftQuotaAPIserver         OpenShiftAPIserverName = "quota.openshift.io"
+	OpenShiftRouteAPIserver         OpenShiftAPIserverName = "route.openshift.io"
+	OpenShiftSecurityAPIserver      OpenShiftAPIserverName = "security.openshift.io"
+	OpenShiftTemplateAPIserver      OpenShiftAPIserverName = "template.openshift.io"
+)
 
 type FrontProxyConfig struct {
 	// clientCA is a path to the CA bundle to use to verify the common name of the front proxy's client cert
@@ -155,6 +191,29 @@ type JenkinsPipelineConfig struct {
 	// parameters specifies a set of optional parameters to the Jenkins template.
 	Parameters map[string]string `json:"parameters"`
 }
+
+// OpenShiftControllerName defines a string type used to represent the various
+// OpenShift controllers within openshift-controller-manager. These constants serve as identifiers
+// for the controllers and are used on both openshift/openshift-controller-manager 
+// and openshift/cluster-openshift-controller-manager-operator repositories.
+type OpenShiftControllerName string
+
+const (
+	OpenShiftServiceAccountController            OpenShiftControllerName = "openshift.io/serviceaccount"
+	OpenShiftDefaultRoleBindingsController       OpenShiftControllerName = "openshift.io/default-rolebindings"
+	OpenShiftServiceAccountPullSecretsController OpenShiftControllerName = "openshift.io/serviceaccount-pull-secrets"
+	OpenshiftOriginNamespaceController           OpenShiftControllerName = "openshift.io/origin-namespace"
+	OpenshiftBuildController                     OpenShiftControllerName = "openshift.io/build"
+	OpenshiftBuildConfigChangeController         OpenShiftControllerName = "openshift.io/build-config-change"
+	OpenshiftDeployerController                  OpenShiftControllerName = "openshift.io/deployer"
+	OpenshiftDeploymentConfigController          OpenShiftControllerName = "openshift.io/deploymentconfig"
+	OpenshiftImageTriggerController              OpenShiftControllerName = "openshift.io/image-trigger"
+	OpenshiftImageImportController               OpenShiftControllerName = "openshift.io/image-import"
+	OpenshiftImageSignatureImportController      OpenShiftControllerName = "openshift.io/image-signature-import"
+	OpenshiftTemplateInstanceController          OpenShiftControllerName = "openshift.io/templateinstance"
+	OpenshiftTemplateInstanceFinalizerController OpenShiftControllerName = "openshift.io/templateinstancefinalizer"
+	OpenshiftUnidlingController                  OpenShiftControllerName = "openshift.io/unidling"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

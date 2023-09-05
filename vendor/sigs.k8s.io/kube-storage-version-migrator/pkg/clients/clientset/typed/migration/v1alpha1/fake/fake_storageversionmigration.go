@@ -23,7 +23,6 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,9 +34,9 @@ type FakeStorageVersionMigrations struct {
 	Fake *FakeMigrationV1alpha1
 }
 
-var storageversionmigrationsResource = schema.GroupVersionResource{Group: "migration.k8s.io", Version: "v1alpha1", Resource: "storageversionmigrations"}
+var storageversionmigrationsResource = v1alpha1.SchemeGroupVersion.WithResource("storageversionmigrations")
 
-var storageversionmigrationsKind = schema.GroupVersionKind{Group: "migration.k8s.io", Version: "v1alpha1", Kind: "StorageVersionMigration"}
+var storageversionmigrationsKind = v1alpha1.SchemeGroupVersion.WithKind("StorageVersionMigration")
 
 // Get takes name of the storageVersionMigration, and returns the corresponding storageVersionMigration object, and an error if there is any.
 func (c *FakeStorageVersionMigrations) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.StorageVersionMigration, err error) {
@@ -110,7 +109,7 @@ func (c *FakeStorageVersionMigrations) UpdateStatus(ctx context.Context, storage
 // Delete takes name of the storageVersionMigration and deletes it. Returns an error if one occurs.
 func (c *FakeStorageVersionMigrations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(storageversionmigrationsResource, name), &v1alpha1.StorageVersionMigration{})
+		Invokes(testing.NewRootDeleteActionWithOptions(storageversionmigrationsResource, name, opts), &v1alpha1.StorageVersionMigration{})
 	return err
 }
 

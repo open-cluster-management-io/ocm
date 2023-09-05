@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path"
+	"reflect"
 	"testing"
 	"time"
 
@@ -94,16 +95,17 @@ func TestHasValidHubClientConfig(t *testing.T) {
 	cert1 := testinghelpers.NewTestCert("system:open-cluster-management:cluster1:agent1", 60*time.Second)
 	cert2 := testinghelpers.NewTestCert("test", 60*time.Second)
 
-	kubeconfig := testinghelpers.NewKubeconfig(nil, nil)
+	kubeconfig := testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "", nil, nil, nil)
 
 	cases := []struct {
-		name        string
-		clusterName string
-		agentName   string
-		kubeconfig  []byte
-		tlsCert     []byte
-		tlsKey      []byte
-		isValid     bool
+		name               string
+		clusterName        string
+		agentName          string
+		kubeconfig         []byte
+		bootstapKubeconfig []byte
+		tlsCert            []byte
+		tlsKey             []byte
+		isValid            bool
 	}{
 		{
 			name:    "no kubeconfig",
@@ -130,17 +132,49 @@ func TestHasValidHubClientConfig(t *testing.T) {
 			isValid:     false,
 		},
 		{
-			name:        "valid hub client config",
-			clusterName: "cluster1",
-			agentName:   "agent1",
-			kubeconfig:  kubeconfig,
-			tlsKey:      cert1.Key,
-			tlsCert:     cert1.Cert,
-			isValid:     true,
+			name:               "hub server url changes",
+			clusterName:        "cluster1",
+			agentName:          "agent1",
+			kubeconfig:         kubeconfig,
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("https://127.0.0.2:6001", "", nil, nil, nil),
+			tlsKey:             cert1.Key,
+			tlsCert:            cert1.Cert,
+			isValid:            false,
+		},
+		{
+			name:               "proxy url changes",
+			clusterName:        "cluster1",
+			agentName:          "agent1",
+			kubeconfig:         kubeconfig,
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "https://127.0.0.1:3129", nil, nil, nil),
+			tlsKey:             cert1.Key,
+			tlsCert:            cert1.Cert,
+			isValid:            false,
+		},
+		{
+			name:               "ca bundle changes",
+			clusterName:        "cluster1",
+			agentName:          "agent1",
+			kubeconfig:         kubeconfig,
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "", []byte("test"), nil, nil),
+			tlsKey:             cert1.Key,
+			tlsCert:            cert1.Cert,
+			isValid:            false,
+		},
+		{
+			name:               "valid hub client config",
+			clusterName:        "cluster1",
+			agentName:          "agent1",
+			kubeconfig:         kubeconfig,
+			bootstapKubeconfig: testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "", nil, nil, nil),
+			tlsKey:             cert1.Key,
+			tlsCert:            cert1.Cert,
+			isValid:            true,
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			spokeAgentOptions := NewSpokeAgentOptions()
 			if c.kubeconfig != nil {
 				testinghelpers.WriteFile(path.Join(tempDir, "kubeconfig"), c.kubeconfig)
 			}
@@ -150,13 +184,18 @@ func TestHasValidHubClientConfig(t *testing.T) {
 			if c.tlsCert != nil {
 				testinghelpers.WriteFile(path.Join(tempDir, "tls.crt"), c.tlsCert)
 			}
+			if c.bootstapKubeconfig != nil {
+				bootstrapKubeconfigFile := path.Join(tempDir, "bootstrap-kubeconfig")
+				testinghelpers.WriteFile(bootstrapKubeconfigFile, c.bootstapKubeconfig)
+				spokeAgentOptions.BootstrapKubeconfig = bootstrapKubeconfigFile
+			}
 
 			agentOpts := &commonoptions.AgentOptions{
 				SpokeClusterName: c.clusterName,
 				AgentID:          c.agentName,
 				HubKubeconfigDir: tempDir,
 			}
-			cfg := NewSpokeAgentConfig(agentOpts, NewSpokeAgentOptions())
+			cfg := NewSpokeAgentConfig(agentOpts, spokeAgentOptions)
 			if err := agentOpts.Complete(); err != nil {
 				t.Fatal(err)
 			}
@@ -235,30 +274,42 @@ func TestGetSpokeClusterCABundle(t *testing.T) {
 	}
 }
 
-func TestGetProxyURLFromKubeconfig(t *testing.T) {
+func TestParseKubeconfig(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "testgetproxyurl")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer os.RemoveAll(tempDir)
 
-	kubeconfigWithoutProxy := clientcert.BuildKubeconfig("https://127.0.0.1:6443", nil, "", "tls.crt", "tls.key")
-	kubeconfigWithProxy := clientcert.BuildKubeconfig("https://127.0.0.1:6443", nil, "https://127.0.0.1:3129", "tls.crt", "tls.key")
+	server1 := "https://127.0.0.1:6443"
+	server2 := "https://api.cluster1.example.com:6443"
+	caData1 := []byte("fake-ca-data1")
+	caData2 := []byte("fake-ca-data2")
+	proxyURL := "https://127.0.0.1:3129"
+
+	kubeconfigWithoutProxy := clientcert.BuildKubeconfig(server1, caData1, "", "tls.crt", "tls.key")
+	kubeconfigWithProxy := clientcert.BuildKubeconfig(server2, caData2, proxyURL, "tls.crt", "tls.key")
 
 	cases := []struct {
 		name             string
 		kubeconfig       clientcmdapi.Config
+		expectedServer   string
+		expectedCAData   []byte
 		expectedProxyURL string
 	}{
 		{
 			name:             "without proxy url",
 			kubeconfig:       kubeconfigWithoutProxy,
+			expectedServer:   server1,
+			expectedCAData:   caData1,
 			expectedProxyURL: "",
 		},
 		{
 			name:             "with proxy url",
 			kubeconfig:       kubeconfigWithProxy,
-			expectedProxyURL: "https://127.0.0.1:3129",
+			expectedServer:   server2,
+			expectedCAData:   caData2,
+			expectedProxyURL: proxyURL,
 		},
 	}
 	for _, c := range cases {
@@ -268,13 +319,21 @@ func TestGetProxyURLFromKubeconfig(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			proxyURL, err := getProxyURLFromKubeconfig(filename)
+			server, proxyURL, caData, err := parseKubeconfig(filename)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 
+			if c.expectedServer != server {
+				t.Errorf("expect server %s, but %s", c.expectedServer, server)
+			}
+
 			if c.expectedProxyURL != proxyURL {
-				t.Errorf("expect %s, but %s", c.expectedProxyURL, proxyURL)
+				t.Errorf("expect proxy url %s, but %s", c.expectedProxyURL, proxyURL)
+			}
+
+			if !reflect.DeepEqual(c.expectedCAData, caData) {
+				t.Errorf("expect ca data %v, but %v", c.expectedCAData, caData)
 			}
 		})
 	}

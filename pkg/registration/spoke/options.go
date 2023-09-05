@@ -6,33 +6,53 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
+	"k8s.io/apiserver/pkg/server/healthz"
 
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
 )
 
+var ClientCertHealthCheckInterval = 30 * time.Second
+
 // SpokeAgentOptions holds configuration for spoke cluster agent
 type SpokeAgentOptions struct {
 	BootstrapKubeconfig         string
+	BootstrapKubeconfigSecret   string
 	HubKubeconfigSecret         string
 	SpokeExternalServerURLs     []string
 	ClusterHealthCheckPeriod    time.Duration
 	MaxCustomClusterClaims      int
 	ClientCertExpirationSeconds int32
 	ClusterAnnotations          map[string]string
+
+	clientCertHealthChecker          *clientCertHealthChecker
+	bootstrapKubeconfigHealthChecker *bootstrapKubeconfigHealthChecker
 }
 
 func NewSpokeAgentOptions() *SpokeAgentOptions {
-	return &SpokeAgentOptions{
-		HubKubeconfigSecret:      "hub-kubeconfig-secret",
-		ClusterHealthCheckPeriod: 1 * time.Minute,
-		MaxCustomClusterClaims:   20,
+	options := &SpokeAgentOptions{
+		BootstrapKubeconfigSecret: "bootstrap-hub-kubeconfig",
+		HubKubeconfigSecret:       "hub-kubeconfig-secret",
+		ClusterHealthCheckPeriod:  1 * time.Minute,
+		MaxCustomClusterClaims:    20,
+
+		clientCertHealthChecker: &clientCertHealthChecker{
+			interval: ClientCertHealthCheckInterval,
+		},
 	}
+
+	options.bootstrapKubeconfigHealthChecker = &bootstrapKubeconfigHealthChecker{
+		bootstrapKubeconfigSecretName: &options.BootstrapKubeconfigSecret,
+	}
+
+	return options
 }
 
 // AddFlags registers flags for Agent
 func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.BootstrapKubeconfig, "bootstrap-kubeconfig", o.BootstrapKubeconfig,
 		"The path of the kubeconfig file for agent bootstrap.")
+	fs.StringVar(&o.BootstrapKubeconfigSecret, "bootstrap-kubeconfig-secret", o.BootstrapKubeconfigSecret,
+		"The name of secret in component namespace storing kubeconfig for agent bootstrap.")
 	fs.StringVar(&o.HubKubeconfigSecret, "hub-kubeconfig-secret", o.HubKubeconfigSecret,
 		"The name of secret in component namespace storing kubeconfig for hub.")
 	fs.StringArrayVar(&o.SpokeExternalServerURLs, "spoke-external-server-urls", o.SpokeExternalServerURLs,
@@ -72,4 +92,11 @@ func (o *SpokeAgentOptions) Validate() error {
 	}
 
 	return nil
+}
+
+func (o *SpokeAgentOptions) GetHealthCheckers() []healthz.HealthChecker {
+	return []healthz.HealthChecker{
+		o.bootstrapKubeconfigHealthChecker,
+		o.clientCertHealthChecker,
+	}
 }
