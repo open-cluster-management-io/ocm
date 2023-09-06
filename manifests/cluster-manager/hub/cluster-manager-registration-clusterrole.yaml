@@ -87,7 +87,7 @@ rules:
 # Allow hub to manage managed cluster addons
 - apiGroups: ["addon.open-cluster-management.io"]
   resources: ["managedclusteraddons"]
-  verbs: ["get", "list", "watch"]
+  verbs: ["get", "list", "watch", "delete"]
 - apiGroups: ["addon.open-cluster-management.io"]
   resources: ["managedclusteraddons/status"]
   verbs: ["patch", "update"]

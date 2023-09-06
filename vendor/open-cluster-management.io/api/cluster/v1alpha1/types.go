@@ -7,6 +7,7 @@ import (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:deepcopy-gen=true
 // +kubebuilder:resource:scope="Cluster"
 
 // ClusterClaim represents cluster information that a managed cluster claims
@@ -25,6 +26,7 @@ type ClusterClaim struct {
 	Spec ClusterClaimSpec `json:"spec,omitempty"`
 }
 
+// +k8s:deepcopy-gen=true
 type ClusterClaimSpec struct {
 	// Value is a claim-dependent string
 	// +kubebuilder:validation:MaxLength=1024
@@ -33,6 +35,7 @@ type ClusterClaimSpec struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:deepcopy-gen=true
 
 // ClusterClaimList is a collection of ClusterClaim.
 type ClusterClaimList struct {

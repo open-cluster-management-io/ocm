@@ -67,6 +67,9 @@ const (
 	// RawFeedbackJsonString will make the work agent to return the feedback result as a json string if the result
 	// is not a scalar value.
 	RawFeedbackJsonString featuregate.Feature = "RawFeedbackJsonString"
+
+	// ResourceCleanup will start gc controller to clean up resources in cluster ns after cluster is deleted.
+	ResourceCleanup featuregate.Feature = "ResourceCleanup"
 )
 
 // DefaultSpokeRegistrationFeatureGates consists of all known ocm-registration
@@ -85,6 +88,7 @@ var DefaultHubRegistrationFeatureGates = map[featuregate.Feature]featuregate.Fea
 	DefaultClusterSet:          {Default: false, PreRelease: featuregate.Alpha},
 	V1beta1CSRAPICompatibility: {Default: false, PreRelease: featuregate.Alpha},
 	ManagedClusterAutoApproval: {Default: false, PreRelease: featuregate.Alpha},
+	ResourceCleanup:            {Default: false, PreRelease: featuregate.Alpha},
 }
 
 var DefaultHubAddonManagerFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{

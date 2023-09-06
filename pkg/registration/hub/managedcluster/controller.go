@@ -2,7 +2,6 @@ package managedcluster
 
 import (
 	"context"
-	"embed"
 	"fmt"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -26,16 +25,14 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/registration/helpers"
+	"open-cluster-management.io/ocm/pkg/registration/hub/manifests"
 )
 
-//go:embed manifests
-var manifestFiles embed.FS
-
 var staticFiles = []string{
-	"manifests/managedcluster-clusterrole.yaml",
-	"manifests/managedcluster-clusterrolebinding.yaml",
-	"manifests/managedcluster-registration-rolebinding.yaml",
-	"manifests/managedcluster-work-rolebinding.yaml",
+	"rbac/managedcluster-clusterrole.yaml",
+	"rbac/managedcluster-clusterrolebinding.yaml",
+	"rbac/managedcluster-registration-rolebinding.yaml",
+	"rbac/managedcluster-work-rolebinding.yaml",
 }
 
 // managedClusterController reconciles instances of ManagedCluster on the hub.
@@ -99,19 +96,10 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	}
 
 	newManagedCluster := managedCluster.DeepCopy()
-	if managedCluster.DeletionTimestamp.IsZero() {
-		updated, err := c.patcher.AddFinalizer(ctx, managedCluster, v1.ManagedClusterFinalizer)
-		if err != nil || updated {
-			return err
-		}
-	}
 
-	// Spoke cluster is deleting, we remove its related resources
 	if !managedCluster.DeletionTimestamp.IsZero() {
-		if err := c.removeManagedClusterResources(ctx, managedClusterName); err != nil {
-			return err
-		}
-		return c.patcher.RemoveFinalizer(ctx, managedCluster, v1.ManagedClusterFinalizer)
+		// the cleanup job is moved to gc controller
+		return nil
 	}
 
 	if !managedCluster.Spec.HubAcceptsClient {
@@ -165,7 +153,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	resourceResults := c.applier.Apply(
 		ctx,
 		syncCtx.Recorder(),
-		helpers.ManagedClusterAssetFn(manifestFiles, managedClusterName),
+		helpers.ManagedClusterAssetFn(manifests.RBACManifests, managedClusterName),
 		staticFiles...,
 	)
 	for _, result := range resourceResults {
@@ -202,7 +190,7 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 func (c *managedClusterController) removeManagedClusterResources(ctx context.Context, managedClusterName string) error {
 	var errs []error
 	// Clean up managed cluster manifests
-	assetFn := helpers.ManagedClusterAssetFn(manifestFiles, managedClusterName)
+	assetFn := helpers.ManagedClusterAssetFn(manifests.RBACManifests, managedClusterName)
 	resourceResults := resourceapply.DeleteAll(ctx, resourceapply.NewKubeClientHolder(c.kubeClient), c.eventRecorder, assetFn, staticFiles...)
 	for _, result := range resourceResults {
 		if result.Error != nil {

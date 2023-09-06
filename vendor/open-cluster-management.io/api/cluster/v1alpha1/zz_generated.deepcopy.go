@@ -316,15 +316,22 @@ func (in *RolloutResult) DeepCopyInto(out *RolloutResult) {
 	if in.ClustersToRollout != nil {
 		in, out := &in.ClustersToRollout, &out.ClustersToRollout
 		*out = make([]ClusterRolloutStatus, len(*in))
-		for key, val := range *in {
-			(*out)[key] = *val.DeepCopy()
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.ClustersTimeOut != nil {
 		in, out := &in.ClustersTimeOut, &out.ClustersTimeOut
 		*out = make([]ClusterRolloutStatus, len(*in))
-		for key, val := range *in {
-			(*out)[key] = *val.DeepCopy()
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.ClustersRemoved != nil {
+		in, out := &in.ClustersRemoved, &out.ClustersRemoved
+		*out = make([]ClusterRolloutStatus, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	return

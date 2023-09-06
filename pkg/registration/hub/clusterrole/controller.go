@@ -2,7 +2,6 @@ package clusterrole
 
 import (
 	"context"
-	"embed"
 	"fmt"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -18,6 +17,7 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/common/apply"
 	"open-cluster-management.io/ocm/pkg/common/queue"
+	"open-cluster-management.io/ocm/pkg/registration/hub/manifests"
 )
 
 const (
@@ -26,12 +26,9 @@ const (
 )
 
 var clusterRoleFiles = []string{
-	"manifests/managedcluster-registration-clusterrole.yaml",
-	"manifests/managedcluster-work-clusterrole.yaml",
+	"rbac/managedcluster-registration-clusterrole.yaml",
+	"rbac/managedcluster-work-clusterrole.yaml",
 }
-
-//go:embed manifests
-var manifestFiles embed.FS
 
 // clusterroleController maintains the necessary clusterroles for registration and work agent on hub cluster.
 type clusterroleController struct {
@@ -83,7 +80,7 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 			ctx,
 			resourceapply.NewKubeClientHolder(c.kubeClient),
 			c.eventRecorder,
-			manifestFiles.ReadFile,
+			manifests.RBACManifests.ReadFile,
 			clusterRoleFiles...,
 		)
 		for _, result := range results {
@@ -98,7 +95,7 @@ func (c *clusterroleController) sync(ctx context.Context, syncCtx factory.SyncCo
 	results := c.applier.Apply(
 		ctx,
 		syncCtx.Recorder(),
-		manifestFiles.ReadFile,
+		manifests.RBACManifests.ReadFile,
 		clusterRoleFiles...,
 	)
 

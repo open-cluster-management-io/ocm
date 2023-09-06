@@ -10,6 +10,7 @@ spec:
     listKind: AddOnTemplateList
     plural: addontemplates
     singular: addontemplate
+  preserveUnknownFields: false
   scope: Cluster
   versions:
   - additionalPrinterColumns:
