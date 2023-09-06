@@ -139,6 +139,7 @@ type klusterletConfig struct {
 	ExternalManagedKubeConfigSecret             string
 	ExternalManagedKubeConfigRegistrationSecret string
 	ExternalManagedKubeConfigWorkSecret         string
+	ExternalManagedKubeConfigAgentSecret        string
 	InstallMode                                 operatorapiv1.InstallMode
 
 	RegistrationFeatureGates []string
@@ -178,6 +179,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		ExternalManagedKubeConfigSecret:             helpers.ExternalManagedKubeConfig,
 		ExternalManagedKubeConfigRegistrationSecret: helpers.ExternalManagedKubeConfigRegistration,
 		ExternalManagedKubeConfigWorkSecret:         helpers.ExternalManagedKubeConfigWork,
+		ExternalManagedKubeConfigAgentSecret:        helpers.ExternalManagedKubeConfigAgent,
 		InstallMode:                                 klusterlet.Spec.DeployOption.Mode,
 		HubApiServerHostAlias:                       klusterlet.Spec.HubApiServerHostAlias,
 

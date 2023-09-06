@@ -33,20 +33,6 @@ type runtimeReconcile struct {
 
 func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
-	if helpers.IsHosted(config.InstallMode) {
-		// Create managed config secret for registration and work.
-		if err := r.createManagedClusterKubeconfig(ctx, klusterlet, config.KlusterletNamespace, config.AgentNamespace,
-			config.RegistrationServiceAccount, config.ExternalManagedKubeConfigRegistrationSecret,
-			r.recorder); err != nil {
-			return klusterlet, reconcileStop, err
-		}
-		if err := r.createManagedClusterKubeconfig(ctx, klusterlet, config.KlusterletNamespace, config.AgentNamespace,
-			config.WorkServiceAccount, config.ExternalManagedKubeConfigWorkSecret,
-			r.recorder); err != nil {
-			return klusterlet, reconcileStop, err
-		}
-	}
-
 	// Check if the klusterlet is in rebootstrapping state
 	// Both registration agent and work agent are scaled to 0 if the klusterlet is
 	// in rebootstrapping state.
@@ -64,6 +50,19 @@ func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 
 func (r *runtimeReconcile) installAgent(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	runtimeConfig klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+	if helpers.IsHosted(runtimeConfig.InstallMode) {
+		// Create managed config secret for registration and work.
+		if err := r.createManagedClusterKubeconfig(ctx, klusterlet, runtimeConfig.KlusterletNamespace, runtimeConfig.AgentNamespace,
+			runtimeConfig.RegistrationServiceAccount, runtimeConfig.ExternalManagedKubeConfigRegistrationSecret,
+			r.recorder); err != nil {
+			return klusterlet, reconcileStop, err
+		}
+		if err := r.createManagedClusterKubeconfig(ctx, klusterlet, runtimeConfig.KlusterletNamespace, runtimeConfig.AgentNamespace,
+			runtimeConfig.WorkServiceAccount, runtimeConfig.ExternalManagedKubeConfigWorkSecret,
+			r.recorder); err != nil {
+			return klusterlet, reconcileStop, err
+		}
+	}
 	// Deploy registration agent
 	_, generationStatus, err := helpers.ApplyDeployment(
 		ctx,
@@ -156,6 +155,15 @@ func (r *runtimeReconcile) installAgent(ctx context.Context, klusterlet *operato
 
 func (r *runtimeReconcile) installSingletonAgent(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
+	if helpers.IsHosted(config.InstallMode) {
+		// Create managed config secret for agent. In singletonHosted mode, service account for registration/work is actually
+		// the same one, and we just pick one of them to build the external kubeconfig.
+		if err := r.createManagedClusterKubeconfig(ctx, klusterlet, config.KlusterletNamespace, config.AgentNamespace,
+			config.RegistrationServiceAccount, config.ExternalManagedKubeConfigAgentSecret,
+			r.recorder); err != nil {
+			return klusterlet, reconcileStop, err
+		}
+	}
 	// Deploy singleton agent
 	_, generationStatus, err := helpers.ApplyDeployment(
 		ctx,

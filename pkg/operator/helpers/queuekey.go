@@ -33,6 +33,9 @@ const (
 	// ExternalManagedKubeConfigWork is the secret name of kubeconfig secret to connecting to the managed cluster
 	// Only applicable to Hosted mode, work-agent uses it to connect to the managed cluster.
 	ExternalManagedKubeConfigWork = "external-managed-kubeconfig-work"
+	// ExternalManagedKubeConfigAgent is the secret name of kubeconfig secret to connecting to the managed cluster
+	// Only applicable to SingletonHosted mode, agent uses it to connect to the managed cluster.
+	ExternalManagedKubeConfigAgent = "external-managed-kubeconfig-agent"
 
 	RegistrationWebhookSecret  = "registration-webhook-serving-cert"
 	RegistrationWebhookService = "cluster-manager-registration-webhook"

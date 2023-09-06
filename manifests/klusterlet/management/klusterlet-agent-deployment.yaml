@@ -127,5 +127,5 @@ spec:
       {{if eq .InstallMode "SingletonHosted"}}
       - name: spoke-kubeconfig-secret
         secret:
-          secretName: {{ .ExternalManagedKubeConfigWorkSecret }}
+          secretName: {{ .ExternalManagedKubeConfigAgentSecret }}
       {{end}}
