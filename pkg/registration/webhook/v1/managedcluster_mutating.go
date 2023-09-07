@@ -89,7 +89,8 @@ func (r *ManagedClusterWebhook) processTaints(managedCluster, oldManagedCluster 
 			// handle UPDATE operation.
 			// no change
 			// The request will be denied if it has any taint with different timeAdded specified.
-			if !originalTaint.TimeAdded.Equal(&taint.TimeAdded) {
+			timeAdded := taint.TimeAdded
+			if !originalTaint.TimeAdded.Equal(&timeAdded) {
 				invalidTaints = append(invalidTaints, taint.Key)
 			}
 		default:

@@ -201,7 +201,9 @@ func TestSync(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			meta.SetStatusCondition(&c.expectedConditions, testinghelper.NamedCondition(klusterletApplied, "", metav1.ConditionTrue))
+			expectedConditions := c.expectedConditions
+			meta.SetStatusCondition(&expectedConditions, testinghelper.NamedCondition(klusterletApplied, "", metav1.ConditionTrue))
+			c.expectedConditions = expectedConditions
 			testinghelper.AssertOnlyConditions(t, klusterlet, c.expectedConditions...)
 		})
 	}
