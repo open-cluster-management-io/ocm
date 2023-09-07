@@ -12,6 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
 var _ = Describe("Delete hosted klusterlet CR", func() {
@@ -20,7 +22,7 @@ var _ = Describe("Delete hosted klusterlet CR", func() {
 	var klusterletNamespace string
 
 	BeforeEach(func() {
-		if klusterletDeployMode != string(operatorapiv1.InstallModeHosted) {
+		if !helpers.IsHosted(operatorapiv1.InstallMode(klusterletDeployMode)) {
 			Skip(fmt.Sprintf("Klusterlet deploy is %s", klusterletDeployMode))
 		}
 		klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
