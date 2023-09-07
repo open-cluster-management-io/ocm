@@ -65,7 +65,7 @@ verify-crds:
 	bash -x hack/verify-crds.sh $(YAML_PATCH)
 
 verify-gocilint:
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.2
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2
 	golangci-lint run --timeout=5m --modules-download-mode vendor ./...
 
 install-golang-gci:

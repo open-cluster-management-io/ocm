@@ -178,7 +178,8 @@ func assertPlacementDecisionCreated(placement *clusterapiv1beta1.Placement) {
 			return false
 		}
 		for _, pd := range pdl.Items {
-			if controlled := metav1.IsControlledBy(&pd.ObjectMeta, placement); !controlled {
+			objectMeta := pd.ObjectMeta
+			if controlled := metav1.IsControlledBy(&objectMeta, placement); !controlled {
 				return false
 			}
 		}
