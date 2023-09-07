@@ -157,7 +157,7 @@ func getHubResources(mode operatorapiv1.InstallMode, config manifests.HubConfig)
 		hubResources = append(hubResources, mwReplicaSetResourceFiles...)
 	}
 	// the hubHostedWebhookServiceFiles are only used in hosted mode
-	if mode == operatorapiv1.InstallModeHosted {
+	if helpers.IsHosted(mode) {
 		hubResources = append(hubResources, hubHostedWebhookServiceFiles...)
 		if config.RegistrationWebhook.IsIPFormat {
 			hubResources = append(hubResources, hubHostedWebhookEndpointRegistration)

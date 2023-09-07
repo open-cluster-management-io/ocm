@@ -139,6 +139,7 @@ type klusterletConfig struct {
 	ExternalManagedKubeConfigSecret             string
 	ExternalManagedKubeConfigRegistrationSecret string
 	ExternalManagedKubeConfigWorkSecret         string
+	ExternalManagedKubeConfigAgentSecret        string
 	InstallMode                                 operatorapiv1.InstallMode
 
 	RegistrationFeatureGates []string
@@ -178,6 +179,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		ExternalManagedKubeConfigSecret:             helpers.ExternalManagedKubeConfig,
 		ExternalManagedKubeConfigRegistrationSecret: helpers.ExternalManagedKubeConfigRegistration,
 		ExternalManagedKubeConfigWorkSecret:         helpers.ExternalManagedKubeConfigWork,
+		ExternalManagedKubeConfigAgentSecret:        helpers.ExternalManagedKubeConfigAgent,
 		InstallMode:                                 klusterlet.Spec.DeployOption.Mode,
 		HubApiServerHostAlias:                       klusterlet.Spec.HubApiServerHostAlias,
 
@@ -192,7 +194,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 	// update klusterletReadyToApply condition at first in hosted mode
 	// this conditions should be updated even when klusterlet is in deleting state.
-	if config.InstallMode == operatorapiv1.InstallModeHosted {
+	if helpers.IsHosted(config.InstallMode) {
 		if err != nil {
 			meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
 				Type: klusterletReadyToApply, Status: metav1.ConditionFalse, Reason: "KlusterletPrepareFailed",

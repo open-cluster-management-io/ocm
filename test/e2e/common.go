@@ -278,7 +278,7 @@ func (t *Tester) CreateKlusterlet(name, clusterName, klusterletNamespace string,
 		}
 	}
 
-	if mode == operatorapiv1.InstallModeHosted {
+	if helpers.IsHosted(mode) {
 		// create external-managed-kubeconfig, will use the same cluster to simulate the Hosted mode.
 		secret.Namespace = agentNamespace
 		secret.Name = helpers.ExternalManagedKubeConfig

@@ -420,7 +420,7 @@ func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, cl
 		"--agent-id=",
 	}
 
-	if mode == operatorapiv1.InstallModeHosted {
+	if helpers.IsHosted(mode) {
 		expectArgs = append(expectArgs,
 			"--spoke-kubeconfig=/spoke/config/kubeconfig",
 			"--terminate-on-files=/spoke/config/kubeconfig")

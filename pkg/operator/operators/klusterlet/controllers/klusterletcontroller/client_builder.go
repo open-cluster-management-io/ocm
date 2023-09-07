@@ -15,6 +15,8 @@ import (
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
+	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
 type managedClusterClientsBuilderInterface interface {
@@ -70,7 +72,7 @@ func (m *managedClusterClientsBuilder) withKubeConfigSecret(namespace, name stri
 }
 
 func (m *managedClusterClientsBuilder) build(ctx context.Context) (*managedClusterClients, error) {
-	if m.mode != operatorapiv1.InstallModeHosted {
+	if !helpers.IsHosted(m.mode) {
 		return &managedClusterClients{
 			kubeClient:                m.kubeClient,
 			apiExtensionClient:        m.apiExtensionClient,
