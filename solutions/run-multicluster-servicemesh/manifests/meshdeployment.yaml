@@ -9,7 +9,7 @@ spec:
     components: ["base", "istiod", "istio-ingress"]
     namespace: istio-system
     profiles: ["default"]
-    version: 1.13.2
-    revision: 1-13-2
+    version: 1.16.7
+    revision: 1-16-7
   meshMemberRoll: ["bookinfo"]
   meshProvider: Upstream Istio
