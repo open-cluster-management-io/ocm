@@ -125,7 +125,8 @@ func getCertValidityPeriod(secret *corev1.Secret) (*time.Time, *time.Time, error
 
 	// find out the validity period for all certs in the certificate chain
 	var notBefore, notAfter *time.Time
-	for index, cert := range certs {
+	for index, c := range certs {
+		cert := c
 		if index == 0 {
 			notBefore = &cert.NotBefore
 			notAfter = &cert.NotAfter

@@ -46,15 +46,15 @@ Switched to context "kind-cluster1".
 # kubectl -n istio-system get pod
 NAME                                     READY   STATUS    RESTARTS   AGE
 istio-ingressgateway-6f87f4f86c-gt4tr    1/1     Running   0          19s
-istio-operator-1-13-2-858b59bdb8-zpj5g   1/1     Running   0          53s
-istiod-1-13-2-67b8bf75f8-28lrl           1/1     Running   0          28s
+istio-operator-1-16-7-858b59bdb8-zpj5g   1/1     Running   0          53s
+istiod-1-16-7-67b8bf75f8-28lrl           1/1     Running   0          28s
 # kubectl config use-context kind-cluster2
 Switched to context "kind-cluster2".
 # kubectl -n istio-system get pod
 NAME                                     READY   STATUS    RESTARTS   AGE
 istio-ingressgateway-6f87f4f86c-jrs9k    1/1     Running   0          21s
-istio-operator-1-13-2-858b59bdb8-d9xgs   1/1     Running   0          53s
-istiod-1-13-2-67b8bf75f8-qk4rd           1/1     Running   0          32s
+istio-operator-1-16-7-858b59bdb8-d9xgs   1/1     Running   0          53s
+istiod-1-16-7-67b8bf75f8-qk4rd           1/1     Running   0          32s
 ```
 
 ## Federate Service Meshes from Hub
@@ -73,9 +73,9 @@ kubectl apply -f ./manifests/meshfederation.yaml
 ```bash
 kubectl config use-context kind-cluster1
 kubectl create ns bookinfo
-kubectl label namespace bookinfo istio.io/rev=1-13-2
-kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/release-1.13/samples/bookinfo/platform/kube/bookinfo.yaml -l 'app,version notin (v3)'
-kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/release-1.13/samples/bookinfo/platform/kube/bookinfo.yaml -l 'account'
+kubectl label namespace bookinfo istio.io/rev=1-16-7
+kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/release-1.16/samples/bookinfo/platform/kube/bookinfo.yaml -l 'app,version notin (v3)'
+kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/release-1.16/samples/bookinfo/platform/kube/bookinfo.yaml -l 'account'
 ```
 
 2. Deploy another part(reviews-v3, ratings) of bookinfo application in cluster2:
@@ -83,12 +83,12 @@ kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/relea
 ```bash
 kubectl config use-context kind-cluster2
 kubectl create ns bookinfo
-kubectl label namespace bookinfo istio.io/rev=1-13-2
-kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/release-1.8/samples/bookinfo/platform/kube/bookinfo.yaml -l 'app,version in (v3)'
-kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/release-1.8/samples/bookinfo/platform/kube/bookinfo.yaml -l 'service=reviews'
-kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/release-1.8/samples/bookinfo/platform/kube/bookinfo.yaml -l 'account=reviews'
-kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/release-1.8/samples/bookinfo/platform/kube/bookinfo.yaml -l 'app=ratings'
-kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/release-1.8/samples/bookinfo/platform/kube/bookinfo.yaml -l 'account=ratings'
+kubectl label namespace bookinfo istio.io/rev=1-16-7
+kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/release-1.16/samples/bookinfo/platform/kube/bookinfo.yaml -l 'app,version in (v3)'
+kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/release-1.16/samples/bookinfo/platform/kube/bookinfo.yaml -l 'service=reviews'
+kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/release-1.16/samples/bookinfo/platform/kube/bookinfo.yaml -l 'account=reviews'
+kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/release-1.16/samples/bookinfo/platform/kube/bookinfo.yaml -l 'app=ratings'
+kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/release-1.16/samples/bookinfo/platform/kube/bookinfo.yaml -l 'account=ratings'
 ```
 
 3. Verify the microservices for the bookinfo application are up and running in cluster1 and cluster2:

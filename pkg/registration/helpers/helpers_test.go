@@ -187,7 +187,9 @@ func TestAddTaints(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			updated := AddTaints(&c.taints, c.addTaint)
+			taints := c.taints
+			updated := AddTaints(&taints, c.addTaint)
+			c.taints = taints
 			if updated != c.expectUpdated {
 				t.Errorf("updated expected %t, but %t", c.expectUpdated, updated)
 			}
@@ -231,7 +233,9 @@ func TestRemoveTaints(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			updated := RemoveTaints(&c.taints, c.removeTaint)
+			taints := c.taints
+			updated := RemoveTaints(&taints, c.removeTaint)
+			c.taints = taints
 			if updated != c.expectUpdated {
 				t.Errorf("updated expected %t, but %t", c.expectUpdated, updated)
 			}

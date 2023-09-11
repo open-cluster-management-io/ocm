@@ -1006,7 +1006,9 @@ func TestSetRelatedResourcesStatusesWithObj(t *testing.T) {
 			}
 			objData := assets.MustCreateAssetFromTemplate(c.manifestFile, template, c.config).Data
 
-			SetRelatedResourcesStatusesWithObj(&c.relatedResources, objData)
+			relatedResources := c.relatedResources
+			SetRelatedResourcesStatusesWithObj(&relatedResources, objData)
+			c.relatedResources = relatedResources
 			if !reflect.DeepEqual(c.relatedResources, c.expectedRelatedResource) {
 				t.Errorf("Expect to get %v, but got %v", c.expectedRelatedResource, c.relatedResources)
 			}
@@ -1111,7 +1113,9 @@ func TestRemoveRelatedResourcesStatusesWithObj(t *testing.T) {
 			}
 			objData := assets.MustCreateAssetFromTemplate(c.manifestFile, template, c.config).Data
 
-			RemoveRelatedResourcesStatusesWithObj(&c.relatedResources, objData)
+			relatedResources := c.relatedResources
+			RemoveRelatedResourcesStatusesWithObj(&relatedResources, objData)
+			c.relatedResources = relatedResources
 			if !reflect.DeepEqual(c.relatedResources, c.expectedRelatedResource) {
 				t.Errorf("Expect to get %v, but got %v", c.expectedRelatedResource, c.relatedResources)
 			}

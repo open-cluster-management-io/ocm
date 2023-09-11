@@ -19,6 +19,8 @@ type Getter[T runtime.Object] interface {
 
 // Client is a wrapper interface of client
 type Client[T runtime.Object] interface {
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (T, error)
+
 	Create(ctx context.Context, obj T, opts metav1.CreateOptions) (T, error)
 
 	Update(ctx context.Context, obj T, opts metav1.UpdateOptions) (T, error)
@@ -43,20 +45,27 @@ func Apply[T runtime.Object](
 	existing, err := getter.Get(requiredAccessor.GetName())
 	if errors.IsNotFound(err) {
 		actual, createErr := client.Create(ctx, required, metav1.CreateOptions{})
-		if errors.IsAlreadyExists(createErr) {
-			return required, false, nil
-		}
-		if createErr == nil {
+		switch {
+		case errors.IsAlreadyExists(createErr):
+			// This happens when the getter fetches the resource from a cache, like informer cache,
+			// while the resource is filtered by a label/field selector.
+			// Get the resource with the client and update it if it is different from the required.
+			actual, getErr := client.Get(ctx, requiredAccessor.GetName(), metav1.GetOptions{})
+			if getErr != nil {
+				return required, false, getErr
+			}
+			existing = actual
+		case createErr == nil:
 			recorder.Eventf(
 				fmt.Sprintf("%sCreated", gvk.Kind),
 				"Created %s because it was missing", resourcehelper.FormatResourceForCLIWithNamespace(actual))
-		} else {
+			return actual, true, nil
+		default:
 			recorder.Warningf(
 				fmt.Sprintf("%sCreateFailed", gvk.Kind),
 				"Failed to create %s: %v", resourcehelper.FormatResourceForCLIWithNamespace(required), createErr)
+			return actual, true, createErr
 		}
-
-		return actual, true, createErr
 	}
 
 	updated, modified := compare(required, existing)

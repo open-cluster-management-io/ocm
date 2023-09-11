@@ -62,7 +62,7 @@ deploy-spoke-operator: ensure-kustomize
 
 apply-spoke-cr: bootstrap-secret
 	$(KUSTOMIZE) build deploy/klusterlet/config/samples \
-	| $(SED_CMD) -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/registration-operator,$(OPERATOR_IMAGE_NAME)," -e "s,cluster1,$(MANAGED_CLUSTER_NAME)," \
+	| $(SED_CMD) -e "s,quay.io/open-cluster-management/registration$$,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/registration-operator,$(OPERATOR_IMAGE_NAME)," -e "s,cluster1,$(MANAGED_CLUSTER_NAME)," \
 	| $(KUBECTL) apply -f -
 
 clean-hub-cr:
@@ -115,7 +115,7 @@ bootstrap-secret-hosted:
 	$(KUSTOMIZE) build deploy/klusterlet/config/samples/bootstrap | $(SED_CMD) -e "s,namespace: open-cluster-management-agent,namespace: $(KLUSTERLET_NAME)," | $(KUBECTL) apply -f -
 
 apply-spoke-cr-hosted: bootstrap-secret-hosted external-managed-secret
-	$(KUSTOMIZE) build deploy/klusterlet/config/samples | $(SED_CMD) -e "s,mode: Default,mode: SingletonHosted," -e "s,quay.io/open-cluster-management/registration,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/registration-operator,$(OPERATOR_IMAGE_NAME)," -e "s,cluster1,$(MANAGED_CLUSTER_NAME)," -e "s,name: klusterlet,name: $(KLUSTERLET_NAME)," -r | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build deploy/klusterlet/config/samples | $(SED_CMD) -e "s,mode: Default,mode: SingletonHosted," -e "s,quay.io/open-cluster-management/registration$$,$(REGISTRATION_IMAGE)," -e "s,quay.io/open-cluster-management/work,$(WORK_IMAGE)," -e "s,quay.io/open-cluster-management/registration-operator,$(OPERATOR_IMAGE_NAME)," -e "s,cluster1,$(MANAGED_CLUSTER_NAME)," -e "s,name: klusterlet,name: $(KLUSTERLET_NAME)," -r | $(KUBECTL) apply -f -
 
 clean-hub-cr-hosted:
 	$(KUBECTL) delete managedcluster --all --ignore-not-found

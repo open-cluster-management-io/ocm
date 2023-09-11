@@ -19,7 +19,7 @@ const (
 	// KlusterletDefaultNamespace is the default namespace of klusterlet
 	KlusterletDefaultNamespace = "open-cluster-management-agent"
 	// BootstrapHubKubeConfig is the secret name of bootstrap kubeconfig secret to connect to hub
-	BootstrapHubKubeConfig = "bootstrap-hub-kubeconfig"
+	BootstrapHubKubeConfig = "bootstrap-hub-kubeconfig" // #nosec G101
 	// HubKubeConfig is the secret name of kubeconfig secret to connect to hub with mtls
 	HubKubeConfig = "hub-kubeconfig-secret"
 	// ExternalHubKubeConfig is the secret name of kubeconfig secret to connecting to the hub cluster.

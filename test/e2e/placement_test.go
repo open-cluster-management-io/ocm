@@ -95,7 +95,8 @@ var _ = ginkgo.Describe("Placement", ginkgo.Label("sanity-check"), func() {
 				return false
 			}
 			for _, pd := range pdl.Items {
-				if controlled := metav1.IsControlledBy(&pd.ObjectMeta, placement); !controlled {
+				objectMeta := pd.ObjectMeta
+				if controlled := metav1.IsControlledBy(&objectMeta, placement); !controlled {
 					return false
 				}
 			}

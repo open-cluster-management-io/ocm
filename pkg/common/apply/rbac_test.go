@@ -20,7 +20,10 @@ func TestPermissionApply(t *testing.T) {
 		name             string
 		manifest         string
 		existingManifest string
-		validateAction   func(t *testing.T, actions []clienttesting.Action)
+		// filtered indicates if the existing manifest is in the informer cache or not. For example,
+		// it may not match the expected label/field selector of the informer factory.
+		filtered       bool
+		validateAction func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
 			name: "create clusterrole",
@@ -62,6 +65,33 @@ rules:
 `,
 			validateAction: func(t *testing.T, actions []clienttesting.Action) {
 				testingcommon.AssertActions(t, actions, "update")
+			},
+		},
+		{
+			name: "upate clusterrole with no cache",
+			existingManifest: `
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: test
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "events"]
+  verbs: ["get", "list", "watch", "create"] 
+`,
+			manifest: `
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: test
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "events"]
+  verbs: ["get", "list", "watch"] 
+`,
+			filtered: true,
+			validateAction: func(t *testing.T, actions []clienttesting.Action) {
+				testingcommon.AssertActions(t, actions, "create", "get", "update")
 			},
 		},
 		{
@@ -349,18 +379,20 @@ subjects:
 				}
 				kubeClient = kubefake.NewSimpleClientset(o)
 				informerFactory = informers.NewSharedInformerFactory(kubeClient, 3*time.Minute)
-				switch t := o.(type) {
-				case *rbacv1.ClusterRole:
-					err = informerFactory.Rbac().V1().ClusterRoles().Informer().GetStore().Add(t)
-				case *rbacv1.ClusterRoleBinding:
-					err = informerFactory.Rbac().V1().ClusterRoleBindings().Informer().GetStore().Add(t)
-				case *rbacv1.Role:
-					err = informerFactory.Rbac().V1().Roles().Informer().GetStore().Add(t)
-				case *rbacv1.RoleBinding:
-					err = informerFactory.Rbac().V1().RoleBindings().Informer().GetStore().Add(t)
-				}
-				if err != nil {
-					t.Fatal(err)
+				if !c.filtered {
+					switch t := o.(type) {
+					case *rbacv1.ClusterRole:
+						err = informerFactory.Rbac().V1().ClusterRoles().Informer().GetStore().Add(t)
+					case *rbacv1.ClusterRoleBinding:
+						err = informerFactory.Rbac().V1().ClusterRoleBindings().Informer().GetStore().Add(t)
+					case *rbacv1.Role:
+						err = informerFactory.Rbac().V1().Roles().Informer().GetStore().Add(t)
+					case *rbacv1.RoleBinding:
+						err = informerFactory.Rbac().V1().RoleBindings().Informer().GetStore().Add(t)
+					}
+					if err != nil {
+						t.Fatal(err)
+					}
 				}
 			} else {
 				kubeClient = kubefake.NewSimpleClientset()

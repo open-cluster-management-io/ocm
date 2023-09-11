@@ -13,7 +13,7 @@ import (
 	v1 "k8s.io/client-go/listers/certificates/v1"
 	"k8s.io/client-go/tools/cache"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/klog/v2/ktesting"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
