@@ -82,6 +82,11 @@ spec:
           - "--spoke-kubeconfig=/spoke/config/kubeconfig"
           - "--terminate-on-files=/spoke/config/kubeconfig"
           {{end}}
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
