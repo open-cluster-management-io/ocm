@@ -156,6 +156,16 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 		managedClusterAddonCopy.Status.Namespace = managedClusterAddonCopy.Spec.InstallNamespace
 	}
 
+	if registrationOption.AgentInstallNamespace != nil {
+		ns := registrationOption.AgentInstallNamespace(managedClusterAddonCopy)
+		if len(ns) > 0 {
+			managedClusterAddonCopy.Status.Namespace = ns
+		} else {
+			klog.Infof("Namespace for addon %s/%s returned by agent install namespace func is empty",
+				managedClusterAddonCopy.Namespace, managedClusterAddonCopy.Name)
+		}
+	}
+
 	meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
 		Type:    addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied,
 		Status:  metav1.ConditionTrue,

@@ -509,9 +509,10 @@ func getManifestConfigOption(agentAddon agent.AgentAddon,
 
 	if updaters := agentAddon.GetAgentAddonOptions().Updaters; updaters != nil {
 		for _, updater := range updaters {
+			strategy := updater.UpdateStrategy
 			manifestConfigs = append(manifestConfigs, workapiv1.ManifestConfigOption{
 				ResourceIdentifier: updater.ResourceIdentifier,
-				UpdateStrategy:     &updater.UpdateStrategy,
+				UpdateStrategy:     &strategy,
 			})
 		}
 	}

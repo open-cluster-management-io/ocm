@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -29,25 +28,10 @@ var AddOnDeploymentConfigGVR = schema.GroupVersionResource{
 // Deprecated: use AddOnDeploymentConfigToValuesFunc instead.
 type AddOnDeloymentConfigToValuesFunc func(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error)
 
-// AddOnDeloymentConfigGetter has a method to return a AddOnDeploymentConfig object
-// Deprecated: use AddOnDeploymentConfigGetter instead.
-type AddOnDeloymentConfigGetter interface {
-	Get(ctx context.Context, namespace, name string) (*addonapiv1alpha1.AddOnDeploymentConfig, error)
-}
-
-type defaultAddOnDeploymentConfigGetter struct {
-	addonClient addonv1alpha1client.Interface
-}
-
-func (g *defaultAddOnDeploymentConfigGetter) Get(
-	ctx context.Context, namespace, name string) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
-	return g.addonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(ctx, name, metav1.GetOptions{})
-}
-
 // NewAddOnDeloymentConfigGetter returns a AddOnDeloymentConfigGetter with addon client
-// Deprecated: use NewAddOnDeploymentConfigGetter instead.
-func NewAddOnDeloymentConfigGetter(addonClient addonv1alpha1client.Interface) AddOnDeloymentConfigGetter {
-	return &defaultAddOnDeploymentConfigGetter{addonClient: addonClient}
+// Deprecated: use NewAddOnDeploymentConfigGetter in pkg/utils package instead.
+func NewAddOnDeloymentConfigGetter(addonClient addonv1alpha1client.Interface) utils.AddOnDeploymentConfigGetter {
+	return utils.NewAddOnDeploymentConfigGetter(addonClient)
 }
 
 // GetAddOnDeloymentConfigValues uses AddOnDeloymentConfigGetter to get the AddOnDeploymentConfig object, then
@@ -56,7 +40,7 @@ func NewAddOnDeloymentConfigGetter(addonClient addonv1alpha1client.Interface) Ad
 // override the one from small index
 // Deprecated: use GetAddOnDeploymentConfigValues instead.
 func GetAddOnDeloymentConfigValues(
-	getter AddOnDeloymentConfigGetter, toValuesFuncs ...AddOnDeloymentConfigToValuesFunc) GetValuesFunc {
+	getter utils.AddOnDeploymentConfigGetter, toValuesFuncs ...AddOnDeloymentConfigToValuesFunc) GetValuesFunc {
 	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
 		var lastValues = Values{}
 		for _, config := range addon.Status.ConfigReferences {
@@ -144,6 +128,52 @@ func ToAddOnNodePlacementValues(config addonapiv1alpha1.AddOnDeploymentConfig) (
 	return values, nil
 }
 
+// ToAddOnProxyConfigValues transform the spec.proxyConfig of AddOnDeploymentConfig into Values object that has
+// a specific for helm chart values
+// for example: the spec of one AddOnDeploymentConfig is:
+//
+//	{
+//	 proxyConfig: {"httpProxy": "http://10.11.12.13:3128", "httpsProxy": "https://10.11.12.13:3129", "noProxy": "example.com"},
+//	}
+//
+// after transformed, the Values will be:
+// map[global:map[proxyConfig:map[httpProxy:http://10.11.12.13:3128 httpsProxy:https://10.11.12.13:3129 noProxy:example.com]]]
+func ToAddOnProxyConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
+	proxyConfig := map[string]string{}
+	if len(config.Spec.ProxyConfig.HTTPProxy) > 0 {
+		proxyConfig["HTTP_PROXY"] = config.Spec.ProxyConfig.HTTPProxy
+	}
+	if len(config.Spec.ProxyConfig.HTTPSProxy) > 0 {
+		proxyConfig["HTTPS_PROXY"] = config.Spec.ProxyConfig.HTTPSProxy
+	}
+	if len(proxyConfig) == 0 {
+		return nil, nil
+	}
+
+	if len(config.Spec.ProxyConfig.NoProxy) > 0 {
+		proxyConfig["NO_PROXY"] = config.Spec.ProxyConfig.NoProxy
+	}
+
+	type global struct {
+		ProxyConfig map[string]string `json:"proxyConfig"`
+	}
+
+	jsonStruct := struct {
+		Global global `json:"global"`
+	}{
+		Global: global{
+			ProxyConfig: proxyConfig,
+		},
+	}
+
+	values, err := JsonStructToValues(jsonStruct)
+	if err != nil {
+		return nil, err
+	}
+
+	return values, nil
+}
+
 // ToAddOnCustomizedVariableValues only transform the CustomizedVariables in the spec of AddOnDeploymentConfig into Values object.
 // for example: the spec of one AddOnDeploymentConfig is:
 //
@@ -166,14 +196,10 @@ func ToAddOnCustomizedVariableValues(config addonapiv1alpha1.AddOnDeploymentConf
 // The transformation logic depends on the definition of the addon template
 type AddOnDeploymentConfigToValuesFunc func(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error)
 
-// AddOnDeploymentConfigGetter has a method to return a AddOnDeploymentConfig object
-type AddOnDeploymentConfigGetter interface {
-	Get(ctx context.Context, namespace, name string) (*addonapiv1alpha1.AddOnDeploymentConfig, error)
-}
-
 // NewAddOnDeploymentConfigGetter returns a AddOnDeploymentConfigGetter with addon client
-func NewAddOnDeploymentConfigGetter(addonClient addonv1alpha1client.Interface) AddOnDeploymentConfigGetter {
-	return &defaultAddOnDeploymentConfigGetter{addonClient: addonClient}
+// Deprecated: use NewAddOnDeploymentConfigGetter in pkg/utils package instead.
+func NewAddOnDeploymentConfigGetter(addonClient addonv1alpha1client.Interface) utils.AddOnDeploymentConfigGetter {
+	return utils.NewAddOnDeploymentConfigGetter(addonClient)
 }
 
 // GetAddOnDeploymentConfigValues uses AddOnDeploymentConfigGetter to get the AddOnDeploymentConfig object, then
@@ -181,7 +207,7 @@ func NewAddOnDeploymentConfigGetter(addonClient addonv1alpha1client.Interface) A
 // If there are multiple AddOnDeploymentConfig objects in the AddOn ConfigReferences, the big index object will
 // override the one from small index
 func GetAddOnDeploymentConfigValues(
-	getter AddOnDeploymentConfigGetter, toValuesFuncs ...AddOnDeploymentConfigToValuesFunc) GetValuesFunc {
+	getter utils.AddOnDeploymentConfigGetter, toValuesFuncs ...AddOnDeploymentConfigToValuesFunc) GetValuesFunc {
 	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
 		var lastValues = Values{}
 		for _, config := range addon.Status.ConfigReferences {
@@ -226,6 +252,17 @@ func ToAddOnDeploymentConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig
 	if config.Spec.NodePlacement != nil {
 		values["NodeSelector"] = config.Spec.NodePlacement.NodeSelector
 		values["Tolerations"] = config.Spec.NodePlacement.Tolerations
+	}
+
+	// load add-on proxy settings
+	if len(config.Spec.ProxyConfig.HTTPProxy) > 0 {
+		values["HTTPProxy"] = config.Spec.ProxyConfig.HTTPProxy
+	}
+	if len(config.Spec.ProxyConfig.HTTPSProxy) > 0 {
+		values["HTTPSProxy"] = config.Spec.ProxyConfig.HTTPSProxy
+	}
+	if len(config.Spec.ProxyConfig.NoProxy) > 0 {
+		values["NoProxy"] = config.Spec.ProxyConfig.NoProxy
 	}
 
 	return values, nil
@@ -303,7 +340,7 @@ func getRegistriesFromClusterAnnotation(
 //   - the imageKey can support the nested key, for example: "global.imageOverrides.helloWorldImage", the output
 //     will be: {"global": {"imageOverrides": {"helloWorldImage": "quay.io/ocm/addon-agent:v1"}}}
 //   - Image registries configured in the addonDeploymentConfig will take precedence over the managed cluster annotation
-func GetAgentImageValues(getter AddOnDeploymentConfigGetter, imageKey, image string) GetValuesFunc {
+func GetAgentImageValues(getter utils.AddOnDeploymentConfigGetter, imageKey, image string) GetValuesFunc {
 	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
 
 		// Get image from AddOnDeploymentConfig

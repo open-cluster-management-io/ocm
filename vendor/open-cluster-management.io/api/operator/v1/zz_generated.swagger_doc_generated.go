@@ -183,7 +183,7 @@ func (Klusterlet) SwaggerDoc() map[string]string {
 
 var map_KlusterletDeployOption = map[string]string{
 	"":     "KlusterletDeployOption describes the deployment options for klusterlet",
-	"mode": "Mode can be Default, Hosted or Singleton. It is Default mode if not specified In Default mode, all klusterlet related resources are deployed on the managed cluster. In Hosted mode, only crd and configurations are installed on the spoke/managed cluster. Controllers run in another cluster (defined as management-cluster) and connect to the mangaged cluster with the kubeconfig in secret of \"external-managed-kubeconfig\"(a kubeconfig of managed-cluster with cluster-admin permission). In Singleton mode, registration/work agent is started as a single deployment. Note: Do not modify the Mode field once it's applied.",
+	"mode": "Mode can be Default, Hosted, Singleton or SingletonHosted. It is Default mode if not specified In Default mode, all klusterlet related resources are deployed on the managed cluster. In Hosted mode, only crd and configurations are installed on the spoke/managed cluster. Controllers run in another cluster (defined as management-cluster) and connect to the mangaged cluster with the kubeconfig in secret of \"external-managed-kubeconfig\"(a kubeconfig of managed-cluster with cluster-admin permission). In Singleton mode, registration/work agent is started as a single deployment. In SingletonHosted mode, agent is started as a single deployment in hosted mode. Note: Do not modify the Mode field once it's applied.",
 }
 
 func (KlusterletDeployOption) SwaggerDoc() map[string]string {

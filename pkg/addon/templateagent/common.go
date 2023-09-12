@@ -1,6 +1,8 @@
 package templateagent
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -11,27 +13,21 @@ import (
 // AddonTemplateConfigRef return the first addon template config
 func AddonTemplateConfigRef(
 	configReferences []addonapiv1alpha1.ConfigReference) (bool, addonapiv1alpha1.ConfigReference) {
-	for _, config := range configReferences {
-		if config.Group == utils.AddOnTemplateGVR.Group && config.Resource == utils.AddOnTemplateGVR.Resource {
-			return true, config
-		}
-	}
-	return false, addonapiv1alpha1.ConfigReference{}
+	return utils.GetAddOnConfigRef(configReferences, utils.AddOnTemplateGVR.Group, utils.AddOnTemplateGVR.Resource)
 }
 
-// GetTemplateSpecHash returns the sha256 hash of the spec field of the addon template
-func GetTemplateSpecHash(template *addonapiv1alpha1.AddOnTemplate) (string, error) {
+// GetAddOnTemplateSpecHash returns the sha256 hash of the spec field of the addon template
+func GetAddOnTemplateSpecHash(template *addonapiv1alpha1.AddOnTemplate) (string, error) {
+	if template == nil {
+		return "", fmt.Errorf("addon template is nil")
+	}
 	unstructuredTemplate, err := runtime.DefaultUnstructuredConverter.ToUnstructured(template)
 	if err != nil {
 		return "", err
 	}
-	specHash, err := utils.GetSpecHash(&unstructured.Unstructured{
+	return utils.GetSpecHash(&unstructured.Unstructured{
 		Object: unstructuredTemplate,
 	})
-	if err != nil {
-		return specHash, err
-	}
-	return specHash, nil
 }
 
 // SupportAddOnTemplate return true if the given ClusterManagementAddOn supports the AddOnTemplate
