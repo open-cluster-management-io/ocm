@@ -7,3 +7,5 @@ spec:
   customizedVariables:
   - name: LOG_LEVEL
     value: "4"
+  agentInstallNamespace: << AddonInstallNamespace >>
+  # proxyConfig: {}

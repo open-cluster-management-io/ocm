@@ -110,7 +110,15 @@ type RegistrationOption struct {
 
 	// Namespace is the namespace where registraiton credential will be put on the managed cluster. It
 	// will be overridden by installNamespace on ManagedClusterAddon spec if set
+	// Deprecated: use AgentInstallNamespace instead
 	Namespace string
+
+	// AgentInstallNamespace returns the namespace where registration credential will be put on the managed cluster.
+	// It will override the installNamespace on ManagedClusterAddon spec if set and the returned value is not empty.
+	// Note: Set this very carefully. If this is set, the addon agent must be deployed in the same namespace, which
+	// means when implementing Manifests function in AgentAddon interface, the namespace of the addon agent manifest
+	// must be set to the same value returned by this function.
+	AgentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) string
 
 	// CSRApproveCheck checks whether the addon agent registration should be approved by the hub.
 	// Addon hub controller can implement this func to auto-approve all the CSRs. A better CSR check is
