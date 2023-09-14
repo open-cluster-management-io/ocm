@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -225,5 +226,39 @@ func TestSyncAddHostedFinalizerWhenKubeconfigReady(t *testing.T) {
 	}
 	if !hasFinalizer(klusterlet, klusterletHostedFinalizer) {
 		t.Errorf("Expected there is klusterlet hosted finalizer")
+	}
+}
+
+func TestConnectivityError(t *testing.T) {
+	cases := []struct {
+		name                        string
+		err                         error
+		isTCPTimeOutError           bool
+		isTCPNoSuchHostError        bool
+		isTCPConnectionRefusedError bool
+	}{
+		{
+			name:              "TCPTimeOutError",
+			err:               fmt.Errorf("dial tcp 172.0.0.1:443: connect: i/o timeout"),
+			isTCPTimeOutError: true,
+		},
+		{
+			name:                 "TCPNoSuchHostError",
+			err:                  fmt.Errorf("dial tcp: lookup foo.bar.com: connect: no such host"),
+			isTCPNoSuchHostError: true,
+		},
+		{
+			name:                        "TCPConnectionRefusedError",
+			err:                         fmt.Errorf("dial tcp 172.0.0.1:443: connect: connection refused"),
+			isTCPConnectionRefusedError: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			assert.Equal(t, c.isTCPTimeOutError, isTCPTimeOutError(c.err), c.name)
+			assert.Equal(t, c.isTCPNoSuchHostError, isTCPNoSuchHostError(c.err), c.name)
+			assert.Equal(t, c.isTCPConnectionRefusedError, isTCPConnectionRefusedError(c.err), c.name)
+		})
 	}
 }
