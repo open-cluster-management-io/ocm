@@ -76,6 +76,11 @@ spec:
           {{if .ClusterAnnotationsString}}
           - "--cluster-annotations={{ .ClusterAnnotationsString }}"
           {{end}}
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

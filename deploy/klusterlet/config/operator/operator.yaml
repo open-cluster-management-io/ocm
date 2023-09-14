@@ -47,6 +47,11 @@ spec:
         args:
           - "/registration-operator"
           - "klusterlet"
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
