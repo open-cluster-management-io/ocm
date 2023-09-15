@@ -35,7 +35,7 @@ spec:
                 - key: app
                   operator: In
                   values:
-                  - klusterlet-registration-agent
+                  - klusterlet-agent
           - weight: 30
             podAffinityTerm:
               topologyKey: kubernetes.io/hostname
@@ -44,8 +44,8 @@ spec:
                 - key: app
                   operator: In
                   values:
-                  - klusterlet-registration-agent
-      serviceAccountName: {{ .KlusterletName }}-agent-sa
+                  - klusterlet-agent
+      serviceAccountName: {{ .KlusterletName }}-work-sa
       containers:
       - name: klusterlet-agent
         image: {{ .SingletonImage }}

@@ -989,7 +989,7 @@ func newAggregatedClusterRole(name, apiGroup, resource string) *rbacv1.ClusterRo
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
-				"rbac.authorization.k8s.io/aggregate-to-admin": "true",
+				"open-cluster-management.io/aggregate-to-work": "true",
 			},
 		},
 		Rules: []rbacv1.PolicyRule{
