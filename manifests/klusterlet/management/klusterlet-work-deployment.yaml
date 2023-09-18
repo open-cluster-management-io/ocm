@@ -68,6 +68,11 @@ spec:
           {{if eq .Replica 1}}
           - "--disable-leader-election"
           {{end}}
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

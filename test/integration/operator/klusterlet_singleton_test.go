@@ -77,7 +77,7 @@ var _ = ginkgo.Describe("Klusterlet Singleton mode", func() {
 			workManagementRoleName = fmt.Sprintf("open-cluster-management:management:%s-work:agent", klusterlet.Name)
 			registrationManagedRoleName = fmt.Sprintf("open-cluster-management:%s-registration:agent", klusterlet.Name)
 			workManagedRoleName = fmt.Sprintf("open-cluster-management:%s-work:agent", klusterlet.Name)
-			saName = fmt.Sprintf("%s-agent-sa", klusterlet.Name)
+			saName = fmt.Sprintf("%s-work-sa", klusterlet.Name)
 		})
 
 		ginkgo.AfterEach(func() {

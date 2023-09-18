@@ -43,6 +43,11 @@ spec:
         args:
           - "/registration-operator"
           - "hub"
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

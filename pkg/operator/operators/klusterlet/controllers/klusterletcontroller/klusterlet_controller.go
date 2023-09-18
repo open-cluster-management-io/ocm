@@ -385,9 +385,11 @@ func ensureNamespace(ctx context.Context, kubeClient kubernetes.Interface, klust
 
 func serviceAccountName(suffix string, klusterlet *operatorapiv1.Klusterlet) string {
 	// in singleton mode, we only need one sa, so the name of work and registration sa are
-	// the same.
+	// the same. We need to use the name of work sa for now, since the work sa permission can be
+	// escalated by create manifestwork from other actors.
+	// TODO(qiujian16) revisit to see if we can use inpersonate in work agent.
 	if helpers.IsSingleton(klusterlet.Spec.DeployOption.Mode) {
-		return fmt.Sprintf("%s-agent-sa", klusterlet.Name)
+		return fmt.Sprintf("%s-work-sa", klusterlet.Name)
 	}
 	return fmt.Sprintf("%s-%s", klusterlet.Name, suffix)
 }

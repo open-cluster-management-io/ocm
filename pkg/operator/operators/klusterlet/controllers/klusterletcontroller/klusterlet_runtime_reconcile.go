@@ -159,7 +159,7 @@ func (r *runtimeReconcile) installSingletonAgent(ctx context.Context, klusterlet
 		// Create managed config secret for agent. In singletonHosted mode, service account for registration/work is actually
 		// the same one, and we just pick one of them to build the external kubeconfig.
 		if err := r.createManagedClusterKubeconfig(ctx, klusterlet, config.KlusterletNamespace, config.AgentNamespace,
-			config.RegistrationServiceAccount, config.ExternalManagedKubeConfigAgentSecret,
+			config.WorkServiceAccount, config.ExternalManagedKubeConfigAgentSecret,
 			r.recorder); err != nil {
 			return klusterlet, reconcileStop, err
 		}

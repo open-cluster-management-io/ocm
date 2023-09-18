@@ -11,6 +11,7 @@ import (
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -119,6 +120,11 @@ func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 		}
 	}
 
+	// add aggregation clusterrole for work, this is not allowed in library-go for now, so need an additional creating
+	if err := r.createAggregationRule(ctx, klusterlet); err != nil {
+		errs = append(errs, err)
+	}
+
 	if len(errs) > 0 {
 		applyErrors := utilerrors.NewAggregate(errs)
 		meta.SetStatusCondition(&klusterlet.Status.Conditions, metav1.Condition{
@@ -129,6 +135,32 @@ func (r *managedReconcile) reconcile(ctx context.Context, klusterlet *operatorap
 	}
 
 	return klusterlet, reconcileContinue, nil
+}
+
+func (r *managedReconcile) createAggregationRule(ctx context.Context, klusterlet *operatorapiv1.Klusterlet) error {
+	aggregateClusterRoleName := fmt.Sprintf("open-cluster-management:%s-work:aggregate", klusterlet.Name)
+	_, err := r.managedClusterClients.kubeClient.RbacV1().ClusterRoles().Get(ctx, aggregateClusterRoleName, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		aggregateClusterRole := &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: aggregateClusterRoleName,
+			},
+			AggregationRule: &rbacv1.AggregationRule{
+				ClusterRoleSelectors: []metav1.LabelSelector{
+					{
+						MatchLabels: map[string]string{
+							"open-cluster-management.io/aggregate-to-work": "true",
+						},
+					},
+				},
+			},
+			Rules: []rbacv1.PolicyRule{},
+		}
+		_, createErr := r.managedClusterClients.kubeClient.RbacV1().ClusterRoles().Create(ctx, aggregateClusterRole, metav1.CreateOptions{})
+		return createErr
+	}
+
+	return nil
 }
 
 func (r *managedReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
@@ -153,6 +185,13 @@ func (r *managedReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.
 		if err != nil {
 			return klusterlet, reconcileStop, err
 		}
+	}
+
+	// remove aggregate work clusterrole
+	aggregateClusterRoleName := fmt.Sprintf("open-cluster-management:%s-work:aggregate", klusterlet.Name)
+	if err := r.managedClusterClients.kubeClient.RbacV1().ClusterRoles().Delete(
+		ctx, aggregateClusterRoleName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		return klusterlet, reconcileStop, err
 	}
 
 	// remove the klusterlet namespace and klusterlet addon namespace on the managed cluster

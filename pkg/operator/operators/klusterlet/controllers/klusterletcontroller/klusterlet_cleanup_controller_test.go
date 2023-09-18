@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,9 +49,9 @@ func TestSyncDelete(t *testing.T) {
 		}
 	}
 
-	// 11 managed static manifests + 11 management static manifests + 1 hub kubeconfig + 2 namespaces + 2 deployments
-	if len(deleteActions) != 27 {
-		t.Errorf("Expected 27 delete actions, but got %d", len(deleteActions))
+	// 11 managed static manifests + 12 management static manifests + 1 hub kubeconfig + 2 namespaces + 2 deployments
+	if len(deleteActions) != 28 {
+		t.Errorf("Expected 28 delete actions, but got %d", len(deleteActions))
 	}
 
 	var updateWorkActions []clienttesting.PatchActionImpl
@@ -122,9 +123,9 @@ func TestSyncDeleteHosted(t *testing.T) {
 		}
 	}
 
-	// 11 static manifests + 2 namespaces
-	if len(deleteActionsManaged) != 13 {
-		t.Errorf("Expected 13 delete actions, but got %d", len(deleteActionsManaged))
+	// 12 static manifests + 2 namespaces
+	if len(deleteActionsManaged) != 14 {
+		t.Errorf("Expected 14 delete actions, but got %d", len(deleteActionsManaged))
 	}
 
 	var updateWorkActions []clienttesting.PatchActionImpl
@@ -225,5 +226,39 @@ func TestSyncAddHostedFinalizerWhenKubeconfigReady(t *testing.T) {
 	}
 	if !hasFinalizer(klusterlet, klusterletHostedFinalizer) {
 		t.Errorf("Expected there is klusterlet hosted finalizer")
+	}
+}
+
+func TestConnectivityError(t *testing.T) {
+	cases := []struct {
+		name                        string
+		err                         error
+		isTCPTimeOutError           bool
+		isTCPNoSuchHostError        bool
+		isTCPConnectionRefusedError bool
+	}{
+		{
+			name:              "TCPTimeOutError",
+			err:               fmt.Errorf("dial tcp 172.0.0.1:443: connect: i/o timeout"),
+			isTCPTimeOutError: true,
+		},
+		{
+			name:                 "TCPNoSuchHostError",
+			err:                  fmt.Errorf("dial tcp: lookup foo.bar.com: connect: no such host"),
+			isTCPNoSuchHostError: true,
+		},
+		{
+			name:                        "TCPConnectionRefusedError",
+			err:                         fmt.Errorf("dial tcp 172.0.0.1:443: connect: connection refused"),
+			isTCPConnectionRefusedError: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			assert.Equal(t, c.isTCPTimeOutError, isTCPTimeOutError(c.err), c.name)
+			assert.Equal(t, c.isTCPNoSuchHostError, isTCPNoSuchHostError(c.err), c.name)
+			assert.Equal(t, c.isTCPConnectionRefusedError, isTCPConnectionRefusedError(c.err), c.name)
+		})
 	}
 }
