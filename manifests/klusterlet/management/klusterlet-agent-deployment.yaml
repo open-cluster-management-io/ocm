@@ -71,6 +71,7 @@ spec:
           - "--terminate-on-files=/spoke/hub-kubeconfig/kubeconfig"
           {{if eq .Replica 1}}
           - "--disable-leader-election"
+          - "--status-sync-interval=60s"
           {{end}}
           {{if gt .ClientCertExpirationSeconds 0}}
           - "--client-cert-expiration-seconds={{ .ClientCertExpirationSeconds }}"

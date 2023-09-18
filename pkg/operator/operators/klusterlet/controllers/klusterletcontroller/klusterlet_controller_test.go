@@ -428,7 +428,7 @@ func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, cl
 	expectArgs = append(expectArgs, "--terminate-on-files=/spoke/hub-kubeconfig/kubeconfig")
 
 	if *deployment.Spec.Replicas == 1 {
-		expectArgs = append(expectArgs, "--disable-leader-election")
+		expectArgs = append(expectArgs, "--disable-leader-election", "--status-sync-interval=60s")
 	}
 
 	if !equality.Semantic.DeepEqual(args, expectArgs) {
