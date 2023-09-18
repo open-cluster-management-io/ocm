@@ -9,5 +9,5 @@ roleRef:
   name: cluster-admin
 subjects:
   - kind: ServiceAccount
-    name: {{ .KlusterletName }}-work-sa
+    name: {{ .WorkServiceAccount }}
     namespace: {{ .KlusterletNamespace }}
