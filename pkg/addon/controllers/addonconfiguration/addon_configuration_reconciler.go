@@ -19,7 +19,7 @@ func (d *managedClusterAddonConfigurationReconciler) reconcile(
 	ctx context.Context, cma *addonv1alpha1.ClusterManagementAddOn, graph *configurationGraph) (*addonv1alpha1.ClusterManagementAddOn, reconcileState, error) {
 	var errs []error
 
-	for _, addon := range graph.addonToUpdate() {
+	for _, addon := range graph.getAddonsToUpdate() {
 		mca := d.mergeAddonConfig(addon.mca, addon.desiredConfigs)
 		patcher := patcher.NewPatcher[
 			*addonv1alpha1.ManagedClusterAddOn, addonv1alpha1.ManagedClusterAddOnSpec, addonv1alpha1.ManagedClusterAddOnStatus](

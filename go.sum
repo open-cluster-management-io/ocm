@@ -352,8 +352,8 @@ github.com/gophercloud/gophercloud v0.1.0/go.mod h1:vxM41WHh5uqHVBMZHzuwNOHh8XEo
 github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1/go.mod h1:wJfORRmW1u3UXTncJ5qlYoELFm8eSnnEO6hX4iZ3EWY=
 github.com/gorilla/websocket v0.0.0-20170926233335-4201258b820c/go.mod h1:E7qHFY5m1UJ88s3WnNqhKjPHQ0heANvMoAMk2YaljkQ=
 github.com/gorilla/websocket v1.4.0/go.mod h1:E7qHFY5m1UJ88s3WnNqhKjPHQ0heANvMoAMk2YaljkQ=
-github.com/gorilla/websocket v1.4.2 h1:+/TMaTYc4QFitKJxsQ7Yye35DkWvkdLcvGKqM+x0Ufc=
 github.com/gorilla/websocket v1.4.2/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
+github.com/gorilla/websocket v1.5.0 h1:PPwGk2jz7EePpoHN/+ClbZu8SPxiqlu12wZP/3sWmnc=
 github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7/go.mod h1:FecbI9+v66THATjSRHfNgh1IVFe/9kFxbXtjV0ctIMA=
 github.com/grpc-ecosystem/go-grpc-middleware v1.0.0/go.mod h1:FiyG127CGDf3tlThmgyCl78X/SZQqEOJBCDaAfeWzPs=
 github.com/grpc-ecosystem/go-grpc-middleware v1.0.1-0.20190118093823-f849b5445de4/go.mod h1:FiyG127CGDf3tlThmgyCl78X/SZQqEOJBCDaAfeWzPs=
@@ -1156,10 +1156,10 @@ k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89/go.mod h1:sZAwmy6armz5eXlNoLmJcl
 k8s.io/utils v0.0.0-20201110183641-67b214c5f920/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
 k8s.io/utils v0.0.0-20230313181309-38a27ef9d749 h1:xMMXJlJbsU8w3V5N2FLDQ8YgU8s1EoULdbQBcAeNJkY=
 k8s.io/utils v0.0.0-20230313181309-38a27ef9d749/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
-open-cluster-management.io/addon-framework v0.7.1-0.20230911140813-9676b4f8c180 h1:fEqGXqPJhBUSkeXXlJaAalX36F9NWRcv1pdbj2tYCfk=
-open-cluster-management.io/addon-framework v0.7.1-0.20230911140813-9676b4f8c180/go.mod h1:8ESgg9EzyUZ2n5/Qgl8E2jnMmnd02YxXn92K5+Egedc=
-open-cluster-management.io/api v0.11.1-0.20230905055724-cf1ead467a83 h1:3zbT3sT/tEAQbpjIk6uRiTQGknQ3kQlfd11ElVuXyyQ=
-open-cluster-management.io/api v0.11.1-0.20230905055724-cf1ead467a83/go.mod h1:nsQ/G5JpfjQUg7dHpblyywWC6BRqklNaF6fIswVCHyY=
+open-cluster-management.io/addon-framework v0.7.1-0.20230920005921-65bcbb446df8 h1:cVyjsSeboWwgg2bkMU2s78hkUTK3LzVyQMWwEf+/gRw=
+open-cluster-management.io/addon-framework v0.7.1-0.20230920005921-65bcbb446df8/go.mod h1:xdIh8sARZ7zoH/KvHp9ATYoousIdotI+Js0VZt0+qtc=
+open-cluster-management.io/api v0.11.1-0.20230919033310-0146ddfab71c h1:p73vRGhWgBucvoYmMHKlVjABz5SWBT0rmfzKqXnF1I0=
+open-cluster-management.io/api v0.11.1-0.20230919033310-0146ddfab71c/go.mod h1:/CZhelEH+30/pX7vXGSZOzLMX0zvjthYOkT/5ZTzVTQ=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
 rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
