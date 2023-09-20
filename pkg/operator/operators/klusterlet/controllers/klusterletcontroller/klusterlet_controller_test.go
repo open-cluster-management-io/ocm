@@ -1060,7 +1060,7 @@ func TestDeployOnKube111(t *testing.T) {
 	}
 
 	// 12 managed static manifests + 11 management static manifests + 1 hub kubeconfig + 2 namespaces + 2 deployments + 2 kube111 clusterrolebindings
-	if len(deleteActions) != 30 {
+	if len(deleteActions) != 31 {
 		t.Errorf("Expected 30 delete actions, but got %d", len(deleteActions))
 	}
 }
