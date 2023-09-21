@@ -38,9 +38,12 @@ var (
 		"klusterlet/managed/klusterlet-work-clusterrole.yaml",
 		"klusterlet/managed/klusterlet-work-clusterrole-execution.yaml",
 		"klusterlet/managed/klusterlet-work-clusterrolebinding.yaml",
-		"klusterlet/managed/klusterlet-work-clusterrolebinding-execution.yaml",
+		"klusterlet/managed/klusterlet-work-clusterrolebinding-aggregate.yaml",
 		"klusterlet/managed/klusterlet-work-clusterrolebinding-execution-admin.yaml",
 	}
+
+	cleanedManagedStaticResourceFiles = append(managedStaticResourceFiles,
+		"klusterlet/managed/klusterlet-work-clusterrolebinding-execution.yaml")
 
 	kube111StaticResourceFiles = []string{
 		"klusterletkube111/klusterlet-registration-operator-clusterrolebinding.yaml",
@@ -175,7 +178,7 @@ func (r *managedReconcile) clean(ctx context.Context, klusterlet *operatorapiv1.
 	}
 
 	if err := removeStaticResources(ctx, r.managedClusterClients.kubeClient, r.managedClusterClients.apiExtensionClient,
-		managedStaticResourceFiles, config); err != nil {
+		cleanedManagedStaticResourceFiles, config); err != nil {
 		return klusterlet, reconcileStop, err
 	}
 
