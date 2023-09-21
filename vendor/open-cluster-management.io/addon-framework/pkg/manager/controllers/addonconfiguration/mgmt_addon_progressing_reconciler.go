@@ -45,8 +45,9 @@ func (d *clusterManagementAddonProgressingReconciler) reconcile(
 
 		setAddOnInstallProgressionsAndLastApplied(&cmaCopy.Status.InstallProgressions[i],
 			isUpgrade,
-			placementNode.addonUpgrading(),
-			placementNode.addonUpgraded(),
+			placementNode.countAddonUpgrading(),
+			placementNode.countAddonUpgradeSucceed(),
+			placementNode.countAddonTimeOut(),
 			len(placementNode.clusters),
 		)
 	}
@@ -96,7 +97,10 @@ func (d *clusterManagementAddonProgressingReconciler) patchMgmtAddonStatus(ctx c
 	return err
 }
 
-func setAddOnInstallProgressionsAndLastApplied(installProgression *addonv1alpha1.InstallProgression, isUpgrade bool, progressing, done, total int) {
+func setAddOnInstallProgressionsAndLastApplied(
+	installProgression *addonv1alpha1.InstallProgression,
+	isUpgrade bool,
+	progressing, done, timeout, total int) {
 	// always update progressing condition when there is no config
 	// skip update progressing condition when last applied config already the same as desired
 	skip := len(installProgression.ConfigReferences) > 0
@@ -116,10 +120,10 @@ func setAddOnInstallProgressionsAndLastApplied(installProgression *addonv1alpha1
 		condition.Status = metav1.ConditionTrue
 		if isUpgrade {
 			condition.Reason = addonv1alpha1.ProgressingReasonUpgrading
-			condition.Message = fmt.Sprintf("%d/%d upgrading...", progressing+done, total)
+			condition.Message = fmt.Sprintf("%d/%d upgrading..., %d timeout.", progressing+done, total, timeout)
 		} else {
 			condition.Reason = addonv1alpha1.ProgressingReasonInstalling
-			condition.Message = fmt.Sprintf("%d/%d installing...", progressing+done, total)
+			condition.Message = fmt.Sprintf("%d/%d installing..., %d timeout.", progressing+done, total, timeout)
 		}
 	} else {
 		for i, configRef := range installProgression.ConfigReferences {
@@ -129,10 +133,10 @@ func setAddOnInstallProgressionsAndLastApplied(installProgression *addonv1alpha1
 		condition.Status = metav1.ConditionFalse
 		if isUpgrade {
 			condition.Reason = addonv1alpha1.ProgressingReasonUpgradeSucceed
-			condition.Message = fmt.Sprintf("%d/%d upgrade completed with no errors.", done, total)
+			condition.Message = fmt.Sprintf("%d/%d upgrade completed with no errors, %d timeout.", done, total, timeout)
 		} else {
 			condition.Reason = addonv1alpha1.ProgressingReasonInstallSucceed
-			condition.Message = fmt.Sprintf("%d/%d install completed with no errors.", done, total)
+			condition.Message = fmt.Sprintf("%d/%d install completed with no errors, %d timeout.", done, total, timeout)
 		}
 	}
 	meta.SetStatusCondition(&installProgression.Conditions, condition)

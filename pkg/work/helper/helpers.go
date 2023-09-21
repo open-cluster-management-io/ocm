@@ -19,16 +19,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 
-	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
@@ -470,21 +466,4 @@ func BuildResourceMeta(
 
 	resourceMeta.Resource = mapping.Resource.Resource
 	return resourceMeta, mapping.Resource, err
-}
-
-type PlacementDecisionGetter struct {
-	Client clusterlister.PlacementDecisionLister
-}
-
-func (pdl PlacementDecisionGetter) List(selector labels.Selector, namespace string) ([]*clusterv1beta1.PlacementDecision, error) {
-	return pdl.Client.PlacementDecisions(namespace).List(selector)
-}
-
-// Get added and deleted clusters names
-func GetClusters(client clusterlister.PlacementDecisionLister, placement *clusterv1beta1.Placement,
-	existingClusters sets.Set[string]) (sets.Set[string], sets.Set[string], error) {
-	pdtracker := clusterv1beta1.NewPlacementDecisionClustersTracker(
-		placement, PlacementDecisionGetter{Client: client}, existingClusters)
-
-	return pdtracker.Get()
 }
