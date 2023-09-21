@@ -52,13 +52,13 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 						HubPermissions: []addonapiv1alpha1.HubPermissionConfig{
 							{
 								Type: addonapiv1alpha1.HubPermissionsBindingSingleNamespace,
-								RoleRef: rbacv1.RoleRef{
-									APIGroup: "rbac.authorization.k8s.io",
-									Kind:     "ClusterRole",
-									Name:     "test",
-								},
 								SingleNamespace: &addonapiv1alpha1.SingleNamespaceBindingConfig{
 									Namespace: "test",
+									RoleRef: rbacv1.RoleRef{
+										APIGroup: rbacv1.GroupName,
+										Kind:     "ClusterRole",
+										Name:     "test",
+									},
 								},
 							},
 						},
@@ -172,13 +172,13 @@ func TestTemplateCSRApproveCheckFunc(t *testing.T) {
 						HubPermissions: []addonapiv1alpha1.HubPermissionConfig{
 							{
 								Type: addonapiv1alpha1.HubPermissionsBindingSingleNamespace,
-								RoleRef: rbacv1.RoleRef{
-									APIGroup: "rbac.authorization.k8s.io",
-									Kind:     "ClusterRole",
-									Name:     "test",
-								},
 								SingleNamespace: &addonapiv1alpha1.SingleNamespaceBindingConfig{
 									Namespace: "test",
+									RoleRef: rbacv1.RoleRef{
+										APIGroup: rbacv1.GroupName,
+										Kind:     "ClusterRole",
+										Name:     "test",
+									},
 								},
 							},
 						},
@@ -273,13 +273,13 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 						HubPermissions: []addonapiv1alpha1.HubPermissionConfig{
 							{
 								Type: addonapiv1alpha1.HubPermissionsBindingSingleNamespace,
-								RoleRef: rbacv1.RoleRef{
-									APIGroup: "rbac.authorization.k8s.io",
-									Kind:     "ClusterRole",
-									Name:     "test",
-								},
 								SingleNamespace: &addonapiv1alpha1.SingleNamespaceBindingConfig{
 									Namespace: "test",
+									RoleRef: rbacv1.RoleRef{
+										APIGroup: rbacv1.GroupName,
+										Kind:     "ClusterRole",
+										Name:     "test",
+									},
 								},
 							},
 						},
@@ -445,7 +445,7 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 		validatePermissionFunc func(*testing.T, kubernetes.Interface)
 	}{
 		{
-			name:      "kubeclient current cluster binding",
+			name:      "kubeclient current cluster binding, rolebinding not exist",
 			agentName: "agent1",
 			cluster:   NewFakeManagedCluster("cluster1"),
 			template: NewFakeAddonTemplate("template1", []addonapiv1alpha1.RegistrationSpec{
@@ -455,10 +455,57 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 						HubPermissions: []addonapiv1alpha1.HubPermissionConfig{
 							{
 								Type: addonapiv1alpha1.HubPermissionsBindingCurrentCluster,
-								RoleRef: rbacv1.RoleRef{
-									APIGroup: "rbac.authorization.k8s.io",
-									Kind:     "Role",
-									Name:     "test",
+								CurrentCluster: &addonapiv1alpha1.CurrentClusterBindingConfig{
+									ClusterRoleName: "test",
+								},
+							},
+						},
+					},
+				},
+			}),
+			addon:       NewFakeTemplateManagedClusterAddon("addon1", "cluster1", "template1", "fakehash"),
+			expectedErr: nil,
+			validatePermissionFunc: func(t *testing.T, kubeClient kubernetes.Interface) {
+				rb, err := kubeClient.RbacV1().RoleBindings("cluster1").Get(context.TODO(),
+					fmt.Sprintf("open-cluster-management:%s:%s:agent", "addon1", strings.ToLower("ClusterRole")),
+					metav1.GetOptions{},
+				)
+				if err != nil {
+					t.Errorf("failed to get rolebinding: %v", err)
+				}
+
+				if rb.RoleRef.Name != "test" {
+					t.Errorf("expected rolebinding %s, got %s", "test", rb.RoleRef.Name)
+				}
+				if rb.RoleRef.Kind != "ClusterRole" {
+					t.Errorf("expected rolebinding kind %s, got %s", "ClusterRole", rb.RoleRef.Kind)
+				}
+				if len(rb.OwnerReferences) != 1 {
+					t.Errorf("expected rolebinding to have 1 owner reference, got %d", len(rb.OwnerReferences))
+				}
+				if rb.OwnerReferences[0].Kind != "ManagedClusterAddOn" {
+					t.Errorf("expected rolebinding owner reference kind to be ManagedClusterAddOn, got %s",
+						rb.OwnerReferences[0].Kind)
+				}
+				if rb.OwnerReferences[0].Name != "addon1" {
+					t.Errorf("expected rolebinding owner reference name to be addon1, got %s",
+						rb.OwnerReferences[0].Name)
+				}
+			},
+		},
+		{
+			name:      "kubeclient current cluster binding, rolebinding exists",
+			agentName: "agent1",
+			cluster:   NewFakeManagedCluster("cluster1"),
+			template: NewFakeAddonTemplate("template1", []addonapiv1alpha1.RegistrationSpec{
+				{
+					Type: addonapiv1alpha1.RegistrationTypeKubeClient,
+					KubeClient: &addonapiv1alpha1.KubeClientRegistrationConfig{
+						HubPermissions: []addonapiv1alpha1.HubPermissionConfig{
+							{
+								Type: addonapiv1alpha1.HubPermissionsBindingCurrentCluster,
+								CurrentCluster: &addonapiv1alpha1.CurrentClusterBindingConfig{
+									ClusterRoleName: "test",
 								},
 							},
 						},
@@ -473,7 +520,7 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 					Name:     "system:authenticated"},
 				}, rbacv1.RoleRef{
 					APIGroup: "rbac.authorization.k8s.io",
-					Kind:     "Role",
+					Kind:     "ClusterRole",
 					Name:     "test",
 				},
 				metav1.OwnerReference{
@@ -485,7 +532,7 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 			expectedErr: nil,
 			validatePermissionFunc: func(t *testing.T, kubeClient kubernetes.Interface) {
 				rb, err := kubeClient.RbacV1().RoleBindings("cluster1").Get(context.TODO(),
-					fmt.Sprintf("open-cluster-management:%s:%s:agent", "addon1", strings.ToLower("Role")),
+					fmt.Sprintf("open-cluster-management:%s:%s:agent", "addon1", strings.ToLower("ClusterRole")),
 					metav1.GetOptions{},
 				)
 				if err != nil {
@@ -494,6 +541,9 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 
 				if rb.RoleRef.Name != "test" {
 					t.Errorf("expected rolebinding %s, got %s", "test", rb.RoleRef.Name)
+				}
+				if rb.RoleRef.Kind != "ClusterRole" {
+					t.Errorf("expected rolebinding kind %s, got %s", "ClusterRole", rb.RoleRef.Kind)
 				}
 				if len(rb.OwnerReferences) != 1 {
 					t.Errorf("expected rolebinding to have 1 owner reference, got %d", len(rb.OwnerReferences))
@@ -519,13 +569,13 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 						HubPermissions: []addonapiv1alpha1.HubPermissionConfig{
 							{
 								Type: addonapiv1alpha1.HubPermissionsBindingSingleNamespace,
-								RoleRef: rbacv1.RoleRef{
-									APIGroup: "rbac.authorization.k8s.io",
-									Kind:     "ClusterRole",
-									Name:     "test",
-								},
 								SingleNamespace: &addonapiv1alpha1.SingleNamespaceBindingConfig{
 									Namespace: "test",
+									RoleRef: rbacv1.RoleRef{
+										APIGroup: rbacv1.GroupName,
+										Kind:     "ClusterRole",
+										Name:     "test",
+									},
 								},
 							},
 						},

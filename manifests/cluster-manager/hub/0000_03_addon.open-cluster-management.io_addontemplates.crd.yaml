@@ -384,38 +384,59 @@ spec:
                               to bind the user provided ClusterRole/Role to the "system:open-cluster-management:cluster:<cluster-name>:addon:<addon-name>"
                               Group.
                             properties:
-                              roleRef:
-                                description: RoleRef is an reference to the permission
-                                  resource. it could be a role or a cluster role,
-                                  the user must make sure it exist on the hub cluster.
+                              currentCluster:
+                                description: CurrentCluster contains the configuration
+                                  of CurrentCluster type binding. It is required when
+                                  the type is CurrentCluster.
                                 properties:
-                                  apiGroup:
-                                    description: APIGroup is the group for the resource
-                                      being referenced
-                                    type: string
-                                  kind:
-                                    description: Kind is the type of resource being
-                                      referenced
-                                    type: string
-                                  name:
-                                    description: Name is the name of resource being
-                                      referenced
+                                  clusterRoleName:
+                                    description: ClusterRoleName is the name of the
+                                      clusterrole the addon agent is bound. A rolebinding
+                                      will be created referring to this cluster role
+                                      in each cluster namespace. The user must make
+                                      sure the clusterrole exists on the hub cluster.
                                     type: string
                                 required:
-                                - apiGroup
-                                - kind
-                                - name
+                                - clusterRoleName
                                 type: object
-                                x-kubernetes-map-type: atomic
                               singleNamespace:
                                 description: SingleNamespace contains the configuration
                                   of SingleNamespace type binding. It is required
                                   when the type is SingleNamespace
                                 properties:
                                   namespace:
+                                    description: Namespace is the namespace the addon
+                                      agent has permissions to bind to. A rolebinding
+                                      will be created in this namespace referring
+                                      to the RoleRef.
                                     type: string
+                                  roleRef:
+                                    description: RoleRef is an reference to the permission
+                                      resource. it could be a role or a cluster role,
+                                      the user must make sure it exist on the hub
+                                      cluster.
+                                    properties:
+                                      apiGroup:
+                                        description: APIGroup is the group for the
+                                          resource being referenced
+                                        type: string
+                                      kind:
+                                        description: Kind is the type of resource
+                                          being referenced
+                                        type: string
+                                      name:
+                                        description: Name is the name of resource
+                                          being referenced
+                                        type: string
+                                    required:
+                                    - apiGroup
+                                    - kind
+                                    - name
+                                    type: object
+                                    x-kubernetes-map-type: atomic
                                 required:
                                 - namespace
+                                - roleRef
                                 type: object
                               type:
                                 description: 'Type of the permissions setting. It
@@ -429,7 +450,6 @@ spec:
                                 - SingleNamespace
                                 type: string
                             required:
-                            - roleRef
                             - type
                             type: object
                           type: array
