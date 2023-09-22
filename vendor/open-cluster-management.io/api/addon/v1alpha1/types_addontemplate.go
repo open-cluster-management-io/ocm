@@ -123,19 +123,33 @@ type HubPermissionConfig struct {
 	// +kubebuilder:validation:Enum:=CurrentCluster;SingleNamespace
 	Type HubPermissionsBindingType `json:"type"`
 
-	// RoleRef is an reference to the permission resource. it could be a role or a cluster role,
-	// the user must make sure it exist on the hub cluster.
-	// +kubebuilder:validation:Required
-	RoleRef rbacv1.RoleRef `json:"roleRef"`
+	// CurrentCluster contains the configuration of CurrentCluster type binding.
+	// It is required when the type is CurrentCluster.
+	CurrentCluster *CurrentClusterBindingConfig `json:"currentCluster,omitempty"`
 
 	// SingleNamespace contains the configuration of SingleNamespace type binding.
 	// It is required when the type is SingleNamespace
 	SingleNamespace *SingleNamespaceBindingConfig `json:"singleNamespace,omitempty"`
 }
 
+type CurrentClusterBindingConfig struct {
+	// ClusterRoleName is the name of the clusterrole the addon agent is bound. A rolebinding
+	// will be created referring to this cluster role in each cluster namespace.
+	// The user must make sure the clusterrole exists on the hub cluster.
+	// +kubebuilder:validation:Required
+	ClusterRoleName string `json:"clusterRoleName"`
+}
+
 type SingleNamespaceBindingConfig struct {
+	// Namespace is the namespace the addon agent has permissions to bind to. A rolebinding
+	// will be created in this namespace referring to the RoleRef.
 	// +kubebuilder:validation:Required
 	Namespace string `json:"namespace"`
+
+	// RoleRef is an reference to the permission resource. it could be a role or a cluster role,
+	// the user must make sure it exist on the hub cluster.
+	// +kubebuilder:validation:Required
+	RoleRef rbacv1.RoleRef `json:"roleRef"`
 }
 
 type CustomSignerRegistrationConfig struct {
