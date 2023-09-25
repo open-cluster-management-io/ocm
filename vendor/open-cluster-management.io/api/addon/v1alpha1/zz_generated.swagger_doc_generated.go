@@ -113,6 +113,14 @@ func (AddOnTemplateSpec) SwaggerDoc() map[string]string {
 	return map_AddOnTemplateSpec
 }
 
+var map_CurrentClusterBindingConfig = map[string]string{
+	"clusterRoleName": "ClusterRoleName is the name of the clusterrole the addon agent is bound. A rolebinding will be created referring to this cluster role in each cluster namespace. The user must make sure the clusterrole exists on the hub cluster.",
+}
+
+func (CurrentClusterBindingConfig) SwaggerDoc() map[string]string {
+	return map_CurrentClusterBindingConfig
+}
+
 var map_CustomSignerRegistrationConfig = map[string]string{
 	"signerName": "signerName is the name of signer that addon agent will use to create csr.",
 	"subject":    "Subject is the user subject of the addon agent to be registered to the hub. If it is not set, the addon agent will have the default subject \"subject\": {\n  \"user\": \"system:open-cluster-management:cluster:{clusterName}:addon:{addonName}:agent:{agentName}\",\n  \"groups: [\"system:open-cluster-management:cluster:{clusterName}:addon:{addonName}\",\n            \"system:open-cluster-management:addon:{addonName}\", \"system:authenticated\"]\n}",
@@ -126,7 +134,7 @@ func (CustomSignerRegistrationConfig) SwaggerDoc() map[string]string {
 var map_HubPermissionConfig = map[string]string{
 	"":                "HubPermissionConfig configures the permission of the addon agent to access the hub cluster. Will create a RoleBinding in the same namespace as the managedClusterAddon to bind the user provided ClusterRole/Role to the \"system:open-cluster-management:cluster:<cluster-name>:addon:<addon-name>\" Group.",
 	"type":            "Type of the permissions setting. It defines how to bind the roleRef on the hub cluster. It can be: - CurrentCluster: Bind the roleRef to the namespace with the same name as the managedCluster. - SingleNamespace: Bind the roleRef to the namespace specified by SingleNamespaceBindingConfig.",
-	"roleRef":         "RoleRef is an reference to the permission resource. it could be a role or a cluster role, the user must make sure it exist on the hub cluster.",
+	"currentCluster":  "CurrentCluster contains the configuration of CurrentCluster type binding. It is required when the type is CurrentCluster.",
 	"singleNamespace": "SingleNamespace contains the configuration of SingleNamespace type binding. It is required when the type is SingleNamespace",
 }
 
@@ -160,6 +168,15 @@ var map_SigningCARef = map[string]string{
 
 func (SigningCARef) SwaggerDoc() map[string]string {
 	return map_SigningCARef
+}
+
+var map_SingleNamespaceBindingConfig = map[string]string{
+	"namespace": "Namespace is the namespace the addon agent has permissions to bind to. A rolebinding will be created in this namespace referring to the RoleRef.",
+	"roleRef":   "RoleRef is an reference to the permission resource. it could be a role or a cluster role, the user must make sure it exist on the hub cluster.",
+}
+
+func (SingleNamespaceBindingConfig) SwaggerDoc() map[string]string {
+	return map_SingleNamespaceBindingConfig
 }
 
 var map_AddOnMeta = map[string]string{

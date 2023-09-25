@@ -363,6 +363,10 @@ func (a *CRDTemplateAgentAddon) createKubeClientPermissions(
 	for _, pc := range kcrc.HubPermissions {
 		switch pc.Type {
 		case addonapiv1alpha1.HubPermissionsBindingCurrentCluster:
+			if pc.CurrentCluster == nil {
+				return fmt.Errorf("current cluster is required when the HubPermission type is CurrentCluster")
+			}
+
 			a.logger.V(5).Info("Set hub permission for addon",
 				"addonNamespace", addon.Namespace,
 				"addonName", addon.Name,
@@ -377,19 +381,26 @@ func (a *CRDTemplateAgentAddon) createKubeClientPermissions(
 				Name:       addon.Name,
 				UID:        addon.UID,
 			}
+
+			roleRef := rbacv1.RoleRef{
+				Kind:     "ClusterRole",
+				APIGroup: rbacv1.GroupName,
+				Name:     pc.CurrentCluster.ClusterRoleName,
+			}
 			err := a.createPermissionBinding(templateName,
-				cluster.Name, addon.Name, cluster.Name, pc.RoleRef, &owner)
+				cluster.Name, addon.Name, cluster.Name, roleRef, &owner)
 			if err != nil {
 				return err
 			}
 		case addonapiv1alpha1.HubPermissionsBindingSingleNamespace:
 			if pc.SingleNamespace == nil {
-				return fmt.Errorf("single namespace is nil")
+				return fmt.Errorf("single namespace is required when the HubPermission type is SingleNamespace")
 			}
+
 			// set owner reference nil since the rolebinding has different namespace with the ManagedClusterAddon
 			// TODO: cleanup the rolebinding when the addon is deleted
 			err := a.createPermissionBinding(templateName,
-				cluster.Name, addon.Name, pc.SingleNamespace.Namespace, pc.RoleRef, nil)
+				cluster.Name, addon.Name, pc.SingleNamespace.Namespace, pc.SingleNamespace.RoleRef, nil)
 			if err != nil {
 				return err
 			}
@@ -405,7 +416,7 @@ func (a *CRDTemplateAgentAddon) createPermissionBinding(templateName, clusterNam
 	subject := []rbacv1.Subject{}
 	for _, group := range groups {
 		subject = append(subject, rbacv1.Subject{
-			Kind: "Group", APIGroup: "rbac.authorization.k8s.io", Name: group,
+			Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: group,
 		})
 	}
 	binding := &rbacv1.RoleBinding{
