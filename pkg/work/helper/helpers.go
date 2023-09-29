@@ -28,7 +28,6 @@ import (
 	"k8s.io/klog/v2"
 
 	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
-	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
@@ -484,15 +483,13 @@ func (pdl PlacementDecisionGetter) List(selector labels.Selector, namespace stri
 // Get added and deleted clusters names
 func GetClusters(client clusterlister.PlacementDecisionLister, placement *clusterv1beta1.Placement,
 	existingClusters sets.Set[string]) (sets.Set[string], sets.Set[string], error) {
-	existingClusterGroups := make(map[clusterv1beta1.GroupKey]sets.Set[string])
-	pdtracker := clusterv1beta1.NewPlacementDecisionClustersTracker(placement, PlacementDecisionGetter{Client: client}, existingClusters, existingClusterGroups)
+	pdtracker := GetPlacementTracker(client, placement, existingClusters)
 
-	return pdtracker.Get()
+	return pdtracker.GetClusterChanges()
 }
 
-func GetRollOutHandler(client clusterlister.PlacementDecisionLister, placement *clusterv1beta1.Placement, existingClusters sets.Set[string]) (*clusterv1alpha1.RolloutHandler, error) {
-	existingClusterGroups := make(map[clusterv1beta1.GroupKey]sets.Set[string])
-	pdtracker := clusterv1beta1.NewPlacementDecisionClustersTracker(placement, PlacementDecisionGetter{Client: client}, existingClusters, existingClusterGroups)
+func GetPlacementTracker(client clusterlister.PlacementDecisionLister, placement *clusterv1beta1.Placement,
+	existingClusters sets.Set[string]) *clusterv1beta1.PlacementDecisionClustersTracker {
 
-	return clusterv1alpha1.NewRolloutHandler(pdtracker)
+	return clusterv1beta1.NewPlacementDecisionClustersTracker(placement, PlacementDecisionGetter{Client: client}, existingClusters)
 }

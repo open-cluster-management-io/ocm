@@ -39,7 +39,7 @@ const (
 
 	// ManifestWorkReplicaSetPlacementNameLabelKey is the label key on manifestwork to ref to the Placement that select
 	// the managedCluster on the manifestWorkReplicaSet's PlacementRef.
-	ManifestWorkReplicaSetPlacementNameLabelKey = "work.open-cluster-management.io/PlacementName"
+	ManifestWorkReplicaSetPlacementNameLabelKey = "work.open-cluster-management.io/placementname"
 
 	// ManifestWorkReplicaSetFinalizer is the name of the finalizer added to ManifestWorkReplicaSet. It is used to ensure
 	// related manifestworks is deleted
@@ -128,7 +128,7 @@ func newController(workClient workclientset.Interface,
 	}
 }
 
-// sync is the main reconcile loop for placeManifest work. It is triggered every 15sec
+// sync is the main reconcile loop for ManifestWorkReplicaSet. It is triggered every 15sec
 func (m *ManifestWorkReplicaSetController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
 	key := controllerContext.QueueKey()
 	klog.V(4).Infof("Reconciling ManifestWorkReplicaSet %q", key)
