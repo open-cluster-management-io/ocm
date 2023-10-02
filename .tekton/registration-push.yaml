@@ -276,9 +276,6 @@ spec:
         operator: in
         values:
         - "false"
-      workspaces:
-      - name: test-ws
-        workspace: workspace
     - name: clair-scan
       params:
       - name: image-digest
