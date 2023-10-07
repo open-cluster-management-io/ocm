@@ -37,11 +37,10 @@ const (
 	Skip
 )
 
-// ClusterRolloutStatusFunc defines a function to return the rollout status for a managed cluster.
-type ClusterRolloutStatusFunc func(clusterName string) ClusterRolloutStatus
-
 // ClusterRolloutStatus holds the rollout status information for a cluster.
 type ClusterRolloutStatus struct {
+	// cluster name
+	ClusterName string
 	// GroupKey represents the cluster group key (optional field).
 	GroupKey clusterv1beta1.GroupKey
 	// Status is the required field indicating the rollout status.
@@ -53,50 +52,57 @@ type ClusterRolloutStatus struct {
 	TimeOutTime *metav1.Time
 }
 
-// RolloutResult contains the clusters to be rolled out and the clusters that have timed out.
+// RolloutResult contains list of clusters that are timeOut, removed and required to rollOut
 type RolloutResult struct {
-	// ClustersToRollout is a map where the key is the cluster name and the value is the ClusterRolloutStatus.
-	ClustersToRollout map[string]ClusterRolloutStatus
-	// ClustersTimeOut is a map where the key is the cluster name and the value is the ClusterRolloutStatus.
-	ClustersTimeOut map[string]ClusterRolloutStatus
+	// ClustersToRollout is a slice of ClusterRolloutStatus that will be rolled out.
+	ClustersToRollout []ClusterRolloutStatus
+	// ClustersTimeOut is a slice of ClusterRolloutStatus that are timeout.
+	ClustersTimeOut []ClusterRolloutStatus
+	// ClustersRemoved is a slice of ClusterRolloutStatus that are removed.
+	ClustersRemoved []ClusterRolloutStatus
 }
 
+// ClusterRolloutStatusFunc defines a function that return the rollout status for a given workload.
+type ClusterRolloutStatusFunc[T any] func(clusterName string, workload T) (ClusterRolloutStatus, error)
+
+// The RolloutHandler required workload type (interface/struct) to be assigned to the generic type.
+// The custom implementation of the ClusterRolloutStatusFunc is required to use the RolloutHandler.
 // +k8s:deepcopy-gen=false
-type RolloutHandler struct {
+type RolloutHandler[T any] struct {
 	// placement decision tracker
-	pdTracker *clusterv1beta1.PlacementDecisionClustersTracker
+	pdTracker  *clusterv1beta1.PlacementDecisionClustersTracker
+	statusFunc ClusterRolloutStatusFunc[T]
 }
 
-func NewRolloutHandler(pdTracker *clusterv1beta1.PlacementDecisionClustersTracker) (*RolloutHandler, error) {
+// NewRolloutHandler creates a new RolloutHandler with the give workload type.
+func NewRolloutHandler[T any](pdTracker *clusterv1beta1.PlacementDecisionClustersTracker, statusFunc ClusterRolloutStatusFunc[T]) (*RolloutHandler[T], error) {
 	if pdTracker == nil {
 		return nil, fmt.Errorf("invalid placement decision tracker %v", pdTracker)
 	}
 
-	return &RolloutHandler{pdTracker: pdTracker}, nil
+	return &RolloutHandler[T]{pdTracker: pdTracker, statusFunc: statusFunc}, nil
 }
 
-// The input is a duck type RolloutStrategy and a ClusterRolloutStatusFunc to return the rollout status on each managed cluster.
-// Return the strategy actual take effect and a list of clusters that need to rollout and that are timeout.
+// The input are a RolloutStrategy and existingClusterRolloutStatus list.
+// The existing ClusterRolloutStatus list should be created using the ClusterRolloutStatusFunc to determine the current workload rollout status.
+// The existing ClusterRolloutStatus list should contain all the current workloads rollout status such as ToApply, Progressing, Succeeded,
+// Failed, TimeOut and Skip in order to determine the added, removed, timeout clusters and next clusters to rollout.
 //
-// ClustersToRollout: If mandatory decision groups are defined in strategy, will return the clusters to rollout in mandatory decision groups first.
-// When all the mandatory decision groups rollout successfully, will return the rest of the clusters that need to rollout.
-//
-// ClustersTimeOut: If the cluster status is Progressing or Failed, and the status lasts longer than timeout defined in strategy,
-// will list them RolloutResult.ClustersTimeOut with status TimeOut.
-func (r *RolloutHandler) GetRolloutCluster(rolloutStrategy RolloutStrategy, statusFunc ClusterRolloutStatusFunc) (*RolloutStrategy, RolloutResult, error) {
+// Return the actual RolloutStrategy that take effect and a RolloutResult contain list of ClusterToRollout, ClustersTimeout and ClusterRemoved.
+func (r *RolloutHandler[T]) GetRolloutCluster(rolloutStrategy RolloutStrategy, existingClusterStatus []ClusterRolloutStatus) (*RolloutStrategy, RolloutResult, error) {
 	switch rolloutStrategy.Type {
 	case All:
-		return r.getRolloutAllClusters(rolloutStrategy, statusFunc)
+		return r.getRolloutAllClusters(rolloutStrategy, existingClusterStatus)
 	case Progressive:
-		return r.getProgressiveClusters(rolloutStrategy, statusFunc)
+		return r.getProgressiveClusters(rolloutStrategy, existingClusterStatus)
 	case ProgressivePerGroup:
-		return r.getProgressivePerGroupClusters(rolloutStrategy, statusFunc)
+		return r.getProgressivePerGroupClusters(rolloutStrategy, existingClusterStatus)
 	default:
 		return nil, RolloutResult{}, fmt.Errorf("incorrect rollout strategy type %v", rolloutStrategy.Type)
 	}
 }
 
-func (r *RolloutHandler) getRolloutAllClusters(rolloutStrategy RolloutStrategy, statusFunc ClusterRolloutStatusFunc) (*RolloutStrategy, RolloutResult, error) {
+func (r *RolloutHandler[T]) getRolloutAllClusters(rolloutStrategy RolloutStrategy, existingClusterStatus []ClusterRolloutStatus) (*RolloutStrategy, RolloutResult, error) {
 	// Prepare the rollout strategy
 	strategy := RolloutStrategy{Type: All}
 	strategy.All = rolloutStrategy.All.DeepCopy()
@@ -110,30 +116,23 @@ func (r *RolloutHandler) getRolloutAllClusters(rolloutStrategy RolloutStrategy, 
 		return &strategy, RolloutResult{}, err
 	}
 
-	// Get all clusters and perform progressive rollout
-	totalClusterGroups := r.pdTracker.ExistingClusterGroupsBesides()
-	totalClusters := totalClusterGroups.GetClusters().UnsortedList()
-	rolloutResult := progressivePerCluster(totalClusterGroups, len(totalClusters), failureTimeout, statusFunc)
+	allClusterGroups := r.pdTracker.ExistingClusterGroupsBesides()
+	allClusters := allClusterGroups.GetClusters().UnsortedList()
+
+	// Check for removed Clusters
+	currentClusterStatus, removedClusterStatus := r.getRemovedClusters(allClusterGroups, existingClusterStatus)
+	rolloutResult := progressivePerCluster(allClusterGroups, len(allClusters), failureTimeout, currentClusterStatus)
+	rolloutResult.ClustersRemoved = removedClusterStatus
 
 	return &strategy, rolloutResult, nil
 }
 
-func (r *RolloutHandler) getProgressiveClusters(rolloutStrategy RolloutStrategy, statusFunc ClusterRolloutStatusFunc) (*RolloutStrategy, RolloutResult, error) {
+func (r *RolloutHandler[T]) getProgressiveClusters(rolloutStrategy RolloutStrategy, existingClusterStatus []ClusterRolloutStatus) (*RolloutStrategy, RolloutResult, error) {
 	// Prepare the rollout strategy
 	strategy := RolloutStrategy{Type: Progressive}
 	strategy.Progressive = rolloutStrategy.Progressive.DeepCopy()
 	if strategy.Progressive == nil {
 		strategy.Progressive = &RolloutProgressive{}
-	}
-
-	// Upgrade mandatory decision groups first
-	groupKeys := decisionGroupsToGroupKeys(strategy.Progressive.MandatoryDecisionGroups.MandatoryDecisionGroups)
-	clusterGroups := r.pdTracker.ExistingClusterGroups(groupKeys...)
-
-	// Perform progressive rollout for mandatory decision groups
-	rolloutResult := progressivePerGroup(clusterGroups, maxTimeDuration, statusFunc)
-	if len(rolloutResult.ClustersToRollout) > 0 {
-		return &strategy, rolloutResult, nil
 	}
 
 	// Parse timeout for non-mandatory decision groups
@@ -142,37 +141,44 @@ func (r *RolloutHandler) getProgressiveClusters(rolloutStrategy RolloutStrategy,
 		return &strategy, RolloutResult{}, err
 	}
 
-	// Calculate the length for progressive rollout
-	totalClusters := r.pdTracker.ExistingClusterGroupsBesides().GetClusters()
-	length, err := calculateLength(strategy.Progressive.MaxConcurrency, len(totalClusters))
+	// Check for removed clusters
+	clusterGroups := r.pdTracker.ExistingClusterGroupsBesides()
+	currentClusterStatus, removedClusterStatus := r.getRemovedClusters(clusterGroups, existingClusterStatus)
+
+	// Upgrade mandatory decision groups first
+	groupKeys := decisionGroupsToGroupKeys(strategy.Progressive.MandatoryDecisionGroups.MandatoryDecisionGroups)
+	clusterGroups = r.pdTracker.ExistingClusterGroups(groupKeys...)
+
+	// Perform progressive rollOut for mandatory decision groups first.
+	if len(clusterGroups) > 0 {
+		rolloutResult := progressivePerGroup(clusterGroups, failureTimeout, currentClusterStatus)
+		if len(rolloutResult.ClustersToRollout) > 0 || len(rolloutResult.ClustersTimeOut) > 0 {
+			rolloutResult.ClustersRemoved = removedClusterStatus
+			return &strategy, rolloutResult, nil
+		}
+	}
+
+	// Calculate the size of progressive rollOut
+	// If the MaxConcurrency not defined, total clusters length is considered as maxConcurrency.
+	clusterGroups = r.pdTracker.ExistingClusterGroupsBesides(groupKeys...)
+	length, err := calculateRolloutSize(strategy.Progressive.MaxConcurrency, len(clusterGroups.GetClusters()))
 	if err != nil {
 		return &strategy, RolloutResult{}, err
 	}
 
-	// Upgrade the remaining clusters
-	restClusterGroups := r.pdTracker.ExistingClusterGroupsBesides(clusterGroups.GetOrderedGroupKeys()...)
-	rolloutResult = progressivePerCluster(restClusterGroups, length, failureTimeout, statusFunc)
+	// Rollout the remaining clusters
+	rolloutResult := progressivePerCluster(clusterGroups, length, failureTimeout, currentClusterStatus)
+	rolloutResult.ClustersRemoved = removedClusterStatus
 
 	return &strategy, rolloutResult, nil
 }
 
-func (r *RolloutHandler) getProgressivePerGroupClusters(rolloutStrategy RolloutStrategy, statusFunc ClusterRolloutStatusFunc) (*RolloutStrategy, RolloutResult, error) {
+func (r *RolloutHandler[T]) getProgressivePerGroupClusters(rolloutStrategy RolloutStrategy, existingClusterStatus []ClusterRolloutStatus) (*RolloutStrategy, RolloutResult, error) {
 	// Prepare the rollout strategy
 	strategy := RolloutStrategy{Type: ProgressivePerGroup}
 	strategy.ProgressivePerGroup = rolloutStrategy.ProgressivePerGroup.DeepCopy()
 	if strategy.ProgressivePerGroup == nil {
 		strategy.ProgressivePerGroup = &RolloutProgressivePerGroup{}
-	}
-
-	// Upgrade mandatory decision groups first
-	mandatoryDecisionGroups := strategy.ProgressivePerGroup.MandatoryDecisionGroups.MandatoryDecisionGroups
-	groupKeys := decisionGroupsToGroupKeys(mandatoryDecisionGroups)
-	clusterGroups := r.pdTracker.ExistingClusterGroups(groupKeys...)
-
-	// Perform progressive rollout per group for mandatory decision groups
-	rolloutResult := progressivePerGroup(clusterGroups, maxTimeDuration, statusFunc)
-	if len(rolloutResult.ClustersToRollout) > 0 {
-		return &strategy, rolloutResult, nil
 	}
 
 	// Parse timeout for non-mandatory decision groups
@@ -181,48 +187,93 @@ func (r *RolloutHandler) getProgressivePerGroupClusters(rolloutStrategy RolloutS
 		return &strategy, RolloutResult{}, err
 	}
 
-	// Upgrade the rest of the decision groups
-	restClusterGroups := r.pdTracker.ExistingClusterGroupsBesides(clusterGroups.GetOrderedGroupKeys()...)
+	// Check for removed Clusters
+	clusterGroups := r.pdTracker.ExistingClusterGroupsBesides()
+	currentClusterStatus, removedClusterStatus := r.getRemovedClusters(clusterGroups, existingClusterStatus)
+
+	// Upgrade mandatory decision groups first
+	mandatoryDecisionGroups := strategy.ProgressivePerGroup.MandatoryDecisionGroups.MandatoryDecisionGroups
+	groupKeys := decisionGroupsToGroupKeys(mandatoryDecisionGroups)
+	clusterGroups = r.pdTracker.ExistingClusterGroups(groupKeys...)
+
+	// Perform progressive rollout per group for mandatory decision groups first
+	if len(clusterGroups) > 0 {
+		rolloutResult := progressivePerGroup(clusterGroups, failureTimeout, currentClusterStatus)
+
+		if len(rolloutResult.ClustersToRollout) > 0 || len(rolloutResult.ClustersTimeOut) > 0 {
+			rolloutResult.ClustersRemoved = removedClusterStatus
+			return &strategy, rolloutResult, nil
+		}
+	}
+
+	// RollOut the rest of the decision groups
+	restClusterGroups := r.pdTracker.ExistingClusterGroupsBesides(groupKeys...)
 
 	// Perform progressive rollout per group for the remaining decision groups
-	rolloutResult = progressivePerGroup(restClusterGroups, failureTimeout, statusFunc)
+	rolloutResult := progressivePerGroup(restClusterGroups, failureTimeout, currentClusterStatus)
+	rolloutResult.ClustersRemoved = removedClusterStatus
+
 	return &strategy, rolloutResult, nil
 }
 
-func progressivePerCluster(clusterGroupsMap clusterv1beta1.ClusterGroupsMap, length int, timeout time.Duration, statusFunc ClusterRolloutStatusFunc) RolloutResult {
-	rolloutClusters := map[string]ClusterRolloutStatus{}
-	timeoutClusters := map[string]ClusterRolloutStatus{}
+func (r *RolloutHandler[T]) getRemovedClusters(clusterGroupsMap clusterv1beta1.ClusterGroupsMap, existingClusterStatus []ClusterRolloutStatus) ([]ClusterRolloutStatus, []ClusterRolloutStatus) {
+	var currentClusterStatus, removedClusterStatus []ClusterRolloutStatus
 
-	if length == 0 {
-		return RolloutResult{
-			ClustersToRollout: rolloutClusters,
-			ClustersTimeOut:   timeoutClusters,
+	clusters := clusterGroupsMap.GetClusters().UnsortedList()
+	for _, clusterStatus := range existingClusterStatus {
+		exist := false
+		for _, cluster := range clusters {
+			if clusterStatus.ClusterName == cluster {
+				exist = true
+				currentClusterStatus = append(currentClusterStatus, clusterStatus)
+				break
+			}
+		}
+
+		if !exist {
+			removedClusterStatus = append(removedClusterStatus, clusterStatus)
+		}
+	}
+	return currentClusterStatus, removedClusterStatus
+}
+
+func progressivePerCluster(clusterGroupsMap clusterv1beta1.ClusterGroupsMap, length int, timeout time.Duration, existingClusterStatus []ClusterRolloutStatus) RolloutResult {
+	var rolloutClusters, timeoutClusters []ClusterRolloutStatus
+	existingClusters := make(map[string]bool)
+
+	for _, status := range existingClusterStatus {
+		if status.ClusterName == "" {
+			continue
+		}
+
+		existingClusters[status.ClusterName] = true
+		rolloutClusters, timeoutClusters = determineRolloutStatus(status, timeout, rolloutClusters, timeoutClusters)
+
+		if len(rolloutClusters) >= length {
+			return RolloutResult{
+				ClustersToRollout: rolloutClusters,
+				ClustersTimeOut:   timeoutClusters,
+			}
 		}
 	}
 
 	clusters := clusterGroupsMap.GetClusters().UnsortedList()
 	clusterToGroupKey := clusterGroupsMap.ClusterToGroupKey()
-
 	// Sort the clusters in alphabetical order to ensure consistency.
 	sort.Strings(clusters)
 	for _, cluster := range clusters {
-		status := statusFunc(cluster)
-		if groupKey, exists := clusterToGroupKey[cluster]; exists {
-			status.GroupKey = groupKey
+		if existingClusters[cluster] {
+			continue
 		}
 
-		newStatus, needToRollout := determineRolloutStatusAndContinue(status, timeout)
-		status.Status = newStatus.Status
-		status.TimeOutTime = newStatus.TimeOutTime
-
-		if needToRollout {
-			rolloutClusters[cluster] = status
+		status := ClusterRolloutStatus{
+			ClusterName: cluster,
+			Status:      ToApply,
+			GroupKey:    clusterToGroupKey[cluster],
 		}
-		if status.Status == TimeOut {
-			timeoutClusters[cluster] = status
-		}
+		rolloutClusters = append(rolloutClusters, status)
 
-		if len(rolloutClusters)%length == 0 && len(rolloutClusters) > 0 {
+		if len(rolloutClusters) >= length {
 			return RolloutResult{
 				ClustersToRollout: rolloutClusters,
 				ClustersTimeOut:   timeoutClusters,
@@ -236,32 +287,44 @@ func progressivePerCluster(clusterGroupsMap clusterv1beta1.ClusterGroupsMap, len
 	}
 }
 
-func progressivePerGroup(clusterGroupsMap clusterv1beta1.ClusterGroupsMap, timeout time.Duration, statusFunc ClusterRolloutStatusFunc) RolloutResult {
-	rolloutClusters := map[string]ClusterRolloutStatus{}
-	timeoutClusters := map[string]ClusterRolloutStatus{}
+func progressivePerGroup(clusterGroupsMap clusterv1beta1.ClusterGroupsMap, timeout time.Duration, existingClusterStatus []ClusterRolloutStatus) RolloutResult {
+	var rolloutClusters, timeoutClusters []ClusterRolloutStatus
+	existingClusters := make(map[string]bool)
+
+	for _, status := range existingClusterStatus {
+		if status.ClusterName == "" {
+			continue
+		}
+
+		if status.Status == ToApply {
+			// Set as false to consider the cluster in the decisionGroups iteration.
+			existingClusters[status.ClusterName] = false
+		} else {
+			existingClusters[status.ClusterName] = true
+			rolloutClusters, timeoutClusters = determineRolloutStatus(status, timeout, rolloutClusters, timeoutClusters)
+		}
+	}
 
 	clusterGroupKeys := clusterGroupsMap.GetOrderedGroupKeys()
-
 	for _, key := range clusterGroupKeys {
 		if subclusters, ok := clusterGroupsMap[key]; ok {
 			// Iterate through clusters in the group
-			for _, cluster := range subclusters.UnsortedList() {
-				status := statusFunc(cluster)
-				status.GroupKey = key
-
-				newStatus, needToRollout := determineRolloutStatusAndContinue(status, timeout)
-				status.Status = newStatus.Status
-				status.TimeOutTime = newStatus.TimeOutTime
-
-				if needToRollout {
-					rolloutClusters[cluster] = status
+			clusters := subclusters.UnsortedList()
+			sort.Strings(clusters)
+			for _, cluster := range clusters {
+				if existingClusters[cluster] {
+					continue
 				}
-				if status.Status == TimeOut {
-					timeoutClusters[cluster] = status
+
+				status := ClusterRolloutStatus{
+					ClusterName: cluster,
+					Status:      ToApply,
+					GroupKey:    key,
 				}
+				rolloutClusters = append(rolloutClusters, status)
 			}
 
-			// Return if there are clusters to rollout
+			// As it is perGroup Return if there are clusters to rollOut
 			if len(rolloutClusters) > 0 {
 				return RolloutResult{
 					ClustersToRollout: rolloutClusters,
@@ -277,36 +340,33 @@ func progressivePerGroup(clusterGroupsMap clusterv1beta1.ClusterGroupsMap, timeo
 	}
 }
 
-// determineRolloutStatusAndContinue checks whether a cluster should continue its rollout based on
-// its current status and timeout. The function returns an updated cluster status and a boolean
-// indicating whether the rollout should continue.
+// determineRolloutStatus checks whether a cluster should continue its rollout based on its current status and timeout.
+// The function update the cluster status and append it to the expected slice.
 //
-// The timeout parameter is utilized for handling progressing and failed statuses:
-//  1. If timeout is set to None (maxTimeDuration), the function will wait until cluster reaching a success status.
-//     It returns true to include the cluster in the result and halts the rollout of other clusters or groups.
-//  2. If timeout is set to 0, the function proceeds with upgrading other clusters without waiting.
-//     It returns false to skip waiting for the cluster to reach a success status and continues to rollout others.
-func determineRolloutStatusAndContinue(status ClusterRolloutStatus, timeout time.Duration) (*ClusterRolloutStatus, bool) {
-	newStatus := status.DeepCopy()
+// The timeout parameter is utilized for handling progressing and failed statuses and any other unknown status:
+//  1. If timeout is set to None (maxTimeDuration), the function will append the clusterStatus to the rollOut Clusters.
+//  2. If timeout is set to 0, the function append the clusterStatus to the timeOut clusters.
+func determineRolloutStatus(status ClusterRolloutStatus, timeout time.Duration, rolloutClusters []ClusterRolloutStatus, timeoutClusters []ClusterRolloutStatus) ([]ClusterRolloutStatus, []ClusterRolloutStatus) {
+
 	switch status.Status {
 	case ToApply:
-		return newStatus, true
+		rolloutClusters = append(rolloutClusters, status)
 	case TimeOut, Succeeded, Skip:
-		return newStatus, false
-	case Progressing, Failed:
+		return rolloutClusters, timeoutClusters
+	default: // For progressing, failed status and any other unknown status.
 		timeOutTime := getTimeOutTime(status.LastTransitionTime, timeout)
-		newStatus.TimeOutTime = timeOutTime
+		status.TimeOutTime = timeOutTime
 
 		// check if current time is before the timeout time
 		if RolloutClock.Now().Before(timeOutTime.Time) {
-			return newStatus, true
+			rolloutClusters = append(rolloutClusters, status)
 		} else {
-			newStatus.Status = TimeOut
-			return newStatus, false
+			status.Status = TimeOut
+			timeoutClusters = append(timeoutClusters, status)
 		}
-	default:
-		return newStatus, true
 	}
+
+	return rolloutClusters, timeoutClusters
 }
 
 // get the timeout time
@@ -320,7 +380,7 @@ func getTimeOutTime(startTime *metav1.Time, timeout time.Duration) *metav1.Time 
 	return &metav1.Time{Time: timeoutTime}
 }
 
-func calculateLength(maxConcurrency intstr.IntOrString, total int) (int, error) {
+func calculateRolloutSize(maxConcurrency intstr.IntOrString, total int) (int, error) {
 	length := total
 
 	switch maxConcurrency.Type {

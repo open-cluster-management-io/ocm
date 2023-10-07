@@ -50,9 +50,11 @@ type addonConfigMap map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigRe
 
 // set addon rollout status
 func (n *addonNode) setRolloutStatus() {
+	n.status = &clusterv1alpha1.ClusterRolloutStatus{ClusterName: n.mca.Namespace}
+
 	// desired configs doesn't match actual configs, set to ToApply
 	if len(n.mca.Status.ConfigReferences) != len(n.desiredConfigs) {
-		n.status = &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.ToApply}
+		n.status.Status = clusterv1alpha1.ToApply
 		return
 	}
 
@@ -68,38 +70,33 @@ func (n *addonNode) setRolloutStatus() {
 		if desired, ok := n.desiredConfigs[actual.ConfigGroupResource]; ok {
 			// desired config spec hash doesn't match actual, set to ToApply
 			if !equality.Semantic.DeepEqual(desired.DesiredConfig, actual.DesiredConfig) {
-				n.status = &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.ToApply}
+				n.status.Status = clusterv1alpha1.ToApply
 				return
 				// desired config spec hash matches actual, but last applied config spec hash doesn't match actual
 			} else if !equality.Semantic.DeepEqual(actual.LastAppliedConfig, actual.DesiredConfig) {
 				switch progressingCond.Reason {
 				case addonv1alpha1.ProgressingReasonInstallFailed, addonv1alpha1.ProgressingReasonUpgradeFailed:
-					n.status = &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.Failed, LastTransitionTime: &progressingCond.LastTransitionTime}
+					n.status.Status = clusterv1alpha1.Failed
+					n.status.LastTransitionTime = &progressingCond.LastTransitionTime
 				case addonv1alpha1.ProgressingReasonInstalling, addonv1alpha1.ProgressingReasonUpgrading:
-					n.status = &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.Progressing, LastTransitionTime: &progressingCond.LastTransitionTime}
+					n.status.Status = clusterv1alpha1.Progressing
+					n.status.LastTransitionTime = &progressingCond.LastTransitionTime
 				default:
-					n.status = &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.Progressing}
+					n.status.Status = clusterv1alpha1.Progressing
 				}
 				return
 			}
 		} else {
-			n.status = &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.ToApply}
+			n.status.Status = clusterv1alpha1.ToApply
 			return
 		}
 	}
 
 	// succeed
+	n.status.Status = clusterv1alpha1.Succeeded
 	if progressingCond.Reason == addonv1alpha1.ProgressingReasonInstallSucceed || progressingCond.Reason == addonv1alpha1.ProgressingReasonUpgradeSucceed {
-		n.status = &clusterv1alpha1.ClusterRolloutStatus{
-			Status:             clusterv1alpha1.Succeeded,
-			LastTransitionTime: &progressingCond.LastTransitionTime,
-		}
-	} else {
-		n.status = &clusterv1alpha1.ClusterRolloutStatus{
-			Status: clusterv1alpha1.Succeeded,
-		}
+		n.status.LastTransitionTime = &progressingCond.LastTransitionTime
 	}
-
 }
 
 func (d addonConfigMap) copy() addonConfigMap {
@@ -313,20 +310,39 @@ func (n *installStrategyNode) generateRolloutResult() error {
 	if n.placementRef.Name == "" {
 		// default addons
 		rolloutResult := clusterv1alpha1.RolloutResult{}
-		rolloutResult.ClustersToRollout = map[string]clusterv1alpha1.ClusterRolloutStatus{}
-		for k, addon := range n.children {
+		rolloutResult.ClustersToRollout = []clusterv1alpha1.ClusterRolloutStatus{}
+		for name, addon := range n.children {
+			if addon.status == nil {
+				return fmt.Errorf("failed to get rollout status on cluster %v", name)
+			}
 			if addon.status.Status != clusterv1alpha1.Succeeded {
-				rolloutResult.ClustersToRollout[k] = *addon.status
+				rolloutResult.ClustersToRollout = append(rolloutResult.ClustersToRollout, *addon.status)
 			}
 		}
 		n.rolloutResult = rolloutResult
 	} else {
 		// placement addons
-		rolloutHandler, err := clusterv1alpha1.NewRolloutHandler(n.pdTracker)
+		rolloutHandler, err := clusterv1alpha1.NewRolloutHandler(n.pdTracker, getClusterRolloutStatus)
 		if err != nil {
 			return err
 		}
-		_, rolloutResult, err := rolloutHandler.GetRolloutCluster(n.rolloutStrategy, n.getUpgradeStatus)
+
+		// get existing addons
+		existingRolloutClusters := []clusterv1alpha1.ClusterRolloutStatus{}
+		for name, addon := range n.children {
+			clsRolloutStatus, err := getClusterRolloutStatus(name, addon)
+			if err != nil {
+				return err
+			}
+			existingRolloutClusters = append(existingRolloutClusters, clsRolloutStatus)
+		}
+
+		// sort by cluster name
+		sort.SliceStable(existingRolloutClusters, func(i, j int) bool {
+			return existingRolloutClusters[i].ClusterName < existingRolloutClusters[j].ClusterName
+		})
+
+		_, rolloutResult, err := rolloutHandler.GetRolloutCluster(n.rolloutStrategy, existingRolloutClusters)
 		if err != nil {
 			return err
 		}
@@ -336,23 +352,16 @@ func (n *installStrategyNode) generateRolloutResult() error {
 	return nil
 }
 
-func (n *installStrategyNode) getUpgradeStatus(clusterName string) clusterv1alpha1.ClusterRolloutStatus {
-	if node, exist := n.children[clusterName]; exist {
-		return *node.status
-	} else {
-		// if children not exist, return succeed status to skip
-		return clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.Skip}
-	}
-}
-
 // addonToUpdate finds the addons to be updated by placement
 func (n *installStrategyNode) getAddonsToUpdate() []*addonNode {
 	var addons []*addonNode
 	var clusters []string
 
 	// get addon to update from rollout result
-	for c := range n.rolloutResult.ClustersToRollout {
-		clusters = append(clusters, c)
+	for _, c := range n.rolloutResult.ClustersToRollout {
+		if _, exist := n.children[c.ClusterName]; exist {
+			clusters = append(clusters, c.ClusterName)
+		}
 	}
 
 	// sort addons by name
@@ -385,6 +394,13 @@ func (n *installStrategyNode) countAddonUpgrading() int {
 
 func (n *installStrategyNode) countAddonTimeOut() int {
 	return len(n.rolloutResult.ClustersTimeOut)
+}
+
+func getClusterRolloutStatus(clusterName string, addonNode *addonNode) (clusterv1alpha1.ClusterRolloutStatus, error) {
+	if addonNode.status == nil {
+		return clusterv1alpha1.ClusterRolloutStatus{}, fmt.Errorf("failed to get rollout status on cluster %v", clusterName)
+	}
+	return *addonNode.status, nil
 }
 
 func desiredConfigsEqual(a, b addonConfigMap) bool {
