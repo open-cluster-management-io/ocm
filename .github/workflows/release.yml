@@ -59,7 +59,7 @@ jobs:
           cat /home/runner/work/changelog.txt
       - name: publish release
         if: github.event_name != 'pull_request'
-        uses: softprops/action-gh-release@v0.1.5
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
