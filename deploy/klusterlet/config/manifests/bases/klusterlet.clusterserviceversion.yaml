@@ -76,7 +76,7 @@ spec:
   - Klusterlet
   links:
   - name: Registration Operator
-    url: https://github.com/open-cluster-management-io/registration-operator
+    url: https://github.com/open-cluster-management-io/ocm
   maintainers:
   - email: zyin@redhat.com
     name: Zhiwei Yin
@@ -87,8 +87,8 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc.
-  replaces: klusterlet.v0.11.0
+  replaces: klusterlet.v0.12.0
   selector:
     matchLabels:
       app: klusterlet
-  version: 0.12.0
+  version: 0.13.0
