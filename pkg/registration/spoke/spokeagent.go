@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"reflect"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -82,6 +84,11 @@ func NewSpokeAgentConfig(commonOpts *commonoptions.AgentOptions, opts *SpokeAgen
 // and started if the hub kubeconfig does not exist or is invalid and used to
 // create a valid hub kubeconfig. Once the hub kubeconfig is valid, the
 // temporary controller is stopped and the main controllers are started.
+//
+// The agent will be restarted once any of the following happens:
+//   - the bootstrap hub kubeconfig changes (updated/deleted);
+//   - the client certificate referenced by the hub kubeconfig become expired (Return failure when
+//     checking the health of the agent);
 func (o *SpokeAgentConfig) RunSpokeAgent(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	kubeConfig := controllerContext.KubeConfig
 
@@ -184,11 +191,19 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	)
 	go spokeClusterCreatingController.Run(ctx, 1)
 
+	secretInformer := namespacedManagementKubeInformerFactory.Core().V1().Secrets()
+	if o.registrationOption.bootstrapKubeconfigHealthChecker != nil {
+		// registter bootstrapKubeconfigHealthChecker as an event handle of secret informer
+		if _, err = secretInformer.Informer().AddEventHandler(o.registrationOption.bootstrapKubeconfigHealthChecker); err != nil {
+			return err
+		}
+	}
+
 	hubKubeconfigSecretController := registration.NewHubKubeconfigSecretController(
 		o.agentOptions.HubKubeconfigDir, o.agentOptions.ComponentNamespace, o.registrationOption.HubKubeconfigSecret,
 		// the hub kubeconfig secret stored in the cluster where the agent pod runs
 		managementKubeClient.CoreV1(),
-		namespacedManagementKubeInformerFactory.Core().V1().Secrets(),
+		secretInformer,
 		recorder,
 	)
 	go hubKubeconfigSecretController.Run(ctx, 1)
@@ -206,6 +221,12 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	// in scenario #2 and #3, which results in an error message in log: 'Observed a panic: timeout waiting for
 	// informer cache'
 	if !ok {
+		// delete the hub kubeconfig secret if exits
+		if err := managementKubeClient.CoreV1().Secrets(o.agentOptions.ComponentNamespace).Delete(ctx,
+			o.registrationOption.HubKubeconfigSecret, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+
 		// create a ClientCertForHubController for spoke agent bootstrap
 		// the bootstrap informers are supposed to be terminated after completing the bootstrap process.
 		bootstrapInformerFactory := informers.NewSharedInformerFactory(bootstrapKubeClient, 10*time.Minute)
@@ -213,12 +234,11 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 			managementKubeClient, 10*time.Minute, informers.WithNamespace(o.agentOptions.ComponentNamespace))
 
 		// create a kubeconfig with references to the key/cert files in the same secret
-		proxyURL, err := getProxyURLFromKubeconfig(o.registrationOption.BootstrapKubeconfig)
+		srever, proxyURL, caData, err := parseKubeconfig(o.registrationOption.BootstrapKubeconfig)
 		if err != nil {
 			return err
 		}
-		kubeconfig := clientcert.BuildKubeconfig(bootstrapClientConfig.Host, bootstrapClientConfig.CAData, proxyURL,
-			clientcert.TLSCertFile, clientcert.TLSKeyFile)
+		kubeconfig := clientcert.BuildKubeconfig(srever, caData, proxyURL, clientcert.TLSCertFile, clientcert.TLSKeyFile)
 		kubeconfigData, err := clientcmd.Write(kubeconfig)
 		if err != nil {
 			return err
@@ -308,12 +328,11 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	recorder.Event("HubClientConfigReady", "Client config for hub is ready.")
 
 	// create a kubeconfig with references to the key/cert files in the same secret
-	proxyURL, err := getProxyURLFromKubeconfig(o.agentOptions.HubKubeconfigFile)
+	server, proxyURL, caData, err := parseKubeconfig(o.agentOptions.HubKubeconfigFile)
 	if err != nil {
 		return err
 	}
-	kubeconfig := clientcert.BuildKubeconfig(hubClientConfig.Host, hubClientConfig.CAData, proxyURL,
-		clientcert.TLSCertFile, clientcert.TLSKeyFile)
+	kubeconfig := clientcert.BuildKubeconfig(server, caData, proxyURL, clientcert.TLSCertFile, clientcert.TLSKeyFile)
 	kubeconfigData, err := clientcmd.Write(kubeconfig)
 	if err != nil {
 		return err
@@ -410,6 +429,12 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 		go addOnRegistrationController.Run(ctx, 1)
 	}
 
+	// start health checking of hub client certificate
+	if o.registrationOption.clientCertHealthChecker != nil {
+		tlsCertFile := path.Join(o.agentOptions.HubKubeconfigDir, clientcert.TLSCertFile)
+		go o.registrationOption.clientCertHealthChecker.start(ctx, tlsCertFile)
+	}
+
 	<-ctx.Done()
 	return nil
 }
@@ -420,6 +445,8 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 //  3. TLSCertFile exists;
 //  4. Certificate in TLSCertFile is issued for the current cluster/agent;
 //  5. Certificate in TLSCertFile is not expired;
+//  6. Hub kubeconfig and bootstrap hub kubeconfig include the same server, proxyURL
+//     and CA bundle.
 //
 // Normally, KubeconfigFile/TLSKeyFile/TLSCertFile will be created once the bootstrap process
 // completes. Changing the name of the cluster will make the existing hub kubeconfig invalid,
@@ -458,7 +485,33 @@ func (o *SpokeAgentConfig) HasValidHubClientConfig(ctx context.Context) (bool, e
 		return false, nil
 	}
 
-	return clientcert.IsCertificateValid(logger, certData, nil)
+	if valid, err := clientcert.IsCertificateValid(logger, certData, nil); err != nil || !valid {
+		return false, err
+	}
+
+	return o.isHubKubeconfigValid(ctx)
+}
+
+// The hub kubeconfig is valid when it shares the same value of the following with the
+// bootstrap hub kubeconfig.
+// 1. The hub server
+// 2. The proxy url
+// 3. The CA bundle
+func (o *SpokeAgentConfig) isHubKubeconfigValid(ctx context.Context) (bool, error) {
+	bootstrapServer, bootstrapProxyURL, bootstrapCABndle, err := parseKubeconfig(o.registrationOption.BootstrapKubeconfig)
+	if err != nil {
+		return false, err
+	}
+
+	server, proxyURL, caBundle, err := parseKubeconfig(o.agentOptions.HubKubeconfigFile)
+	switch {
+	case err != nil:
+		return false, err
+	case bootstrapServer != server, bootstrapProxyURL != proxyURL, !reflect.DeepEqual(bootstrapCABndle, caBundle):
+		return false, nil
+	default:
+		return true, nil
+	}
 }
 
 // getSpokeClusterCABundle returns the spoke cluster Kubernetes client CA data when SpokeExternalServerURLs is specified
@@ -476,21 +529,21 @@ func (o *SpokeAgentConfig) getSpokeClusterCABundle(kubeConfig *rest.Config) ([]b
 	return data, nil
 }
 
-func getProxyURLFromKubeconfig(filename string) (string, error) {
+func parseKubeconfig(filename string) (string, string, []byte, error) {
 	config, err := clientcmd.LoadFromFile(filename)
 	if err != nil {
-		return "", err
+		return "", "", nil, err
 	}
 
-	currentContext, ok := config.Contexts[config.CurrentContext]
+	context, ok := config.Contexts[config.CurrentContext]
 	if !ok {
-		return "", nil
+		return "", "", nil, fmt.Errorf("kubeconfig %q does not contains context: %s", filename, config.CurrentContext)
 	}
 
-	cluster, ok := config.Clusters[currentContext.Cluster]
+	cluster, ok := config.Clusters[context.Cluster]
 	if !ok {
-		return "", nil
+		return "", "", nil, fmt.Errorf("kubeconfig %q does not contains cluster: %s", filename, context.Cluster)
 	}
 
-	return cluster.ProxyURL, nil
+	return cluster.Server, cluster.ProxyURL, cluster.CertificateAuthorityData, nil
 }

@@ -13,10 +13,11 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 )
 
 OPERATOR_SDK?=$(PERMANENT_TMP_GOPATH)/bin/operator-sdk
-OPERATOR_SDK_VERSION?=v1.28.0
+OPERATOR_SDK_VERSION?=v1.32.0
 operatorsdk_gen_dir:=$(dir $(OPERATOR_SDK))
 # CSV_VERSION is used to generate new CSV manifests
-CSV_VERSION?=0.12.0
+CSV_VERSION?=0.13.0
+export CSV_VERSION
 
 OPERATOR_SDK_ARCHOS:=linux_amd64
 ifeq ($(GOHOSTOS),darwin)
@@ -54,8 +55,8 @@ copy-crd:
 update: copy-crd update-csv
 
 update-csv: ensure-operator-sdk
-	cd deploy/cluster-manager && ../../$(OPERATOR_SDK) generate bundle --version $(CSV_VERSION) --package cluster-manager --input-dir config --output-dir olm-catalog/cluster-manager
-	cd deploy/klusterlet && ../../$(OPERATOR_SDK) generate bundle --version $(CSV_VERSION) --package klusterlet --input-dir config --output-dir olm-catalog/klusterlet
+	cd deploy/cluster-manager && ../../$(OPERATOR_SDK) generate bundle --version $(CSV_VERSION) --package cluster-manager --channels stable --default-channel stable --input-dir config --output-dir olm-catalog/cluster-manager
+	cd deploy/klusterlet && ../../$(OPERATOR_SDK) generate bundle --version $(CSV_VERSION) --package klusterlet --channels stable --default-channel stable --input-dir config --output-dir olm-catalog/klusterlet
 
 	# delete bundle.Dockerfile since we do not use it to build image.
 	rm ./deploy/cluster-manager/bundle.Dockerfile
@@ -99,3 +100,4 @@ endif
 # Include the integration/e2e setup makefile.
 include ./test/integration-test.mk
 include ./test/e2e-test.mk
+include ./test/olm-test.mk

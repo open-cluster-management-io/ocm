@@ -315,14 +315,14 @@ func (in *RolloutResult) DeepCopyInto(out *RolloutResult) {
 	*out = *in
 	if in.ClustersToRollout != nil {
 		in, out := &in.ClustersToRollout, &out.ClustersToRollout
-		*out = make(map[string]ClusterRolloutStatus, len(*in))
+		*out = make([]ClusterRolloutStatus, len(*in))
 		for key, val := range *in {
 			(*out)[key] = *val.DeepCopy()
 		}
 	}
 	if in.ClustersTimeOut != nil {
 		in, out := &in.ClustersTimeOut, &out.ClustersTimeOut
-		*out = make(map[string]ClusterRolloutStatus, len(*in))
+		*out = make([]ClusterRolloutStatus, len(*in))
 		for key, val := range *in {
 			(*out)[key] = *val.DeepCopy()
 		}

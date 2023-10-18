@@ -31,13 +31,13 @@ metadata:
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
     containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2023-09-19T07:31:35Z"
+    createdAt: "2023-10-10T01:17:42Z"
     description: Manages the installation and upgrade of the Klusterlet.
-    operators.operatorframework.io/builder: operator-sdk-v1.28.0
+    operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/open-cluster-management-io/registration-operator
     support: Red Hat, Inc.
-  name: klusterlet.v0.12.0
+  name: klusterlet.v0.13.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -331,7 +331,7 @@ spec:
   - Klusterlet
   links:
   - name: Registration Operator
-    url: https://github.com/open-cluster-management-io/registration-operator
+    url: https://github.com/open-cluster-management-io/ocm
   maintainers:
   - email: zyin@redhat.com
     name: Zhiwei Yin
@@ -342,8 +342,8 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc.
-  replaces: klusterlet.v0.11.0
+  replaces: klusterlet.v0.12.0
   selector:
     matchLabels:
       app: klusterlet
-  version: 0.12.0
+  version: 0.13.0

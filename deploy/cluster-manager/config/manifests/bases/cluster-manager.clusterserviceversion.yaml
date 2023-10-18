@@ -34,6 +34,7 @@ spec:
     ```
     $ kubectl get pods -n open-cluster-management-hub
     NAME                                                       READY   STATUS    RESTARTS   AGE
+    cluster-manager-addon-manager-controller-7fcc67bfdf-x7hbz  1/1     Running   0          61m
     cluster-manager-placement-controller-dbcfd4975-26jpw       1/1     Running   0          61m
     cluster-manager-registration-controller-7949d97899-wwtg4   1/1     Running   0          61m
     cluster-manager-registration-webhook-7f675bc4bb-v4rhj      1/1     Running   0          61m
@@ -69,7 +70,7 @@ spec:
   - ClusterManager
   links:
   - name: Registration Operator
-    url: https://github.com/open-cluster-management-io/registration-operator
+    url: https://github.com/open-cluster-management-io/ocm
   maintainers:
   - email: zyin@redhat.com
     name: Zhiwei Yin
@@ -80,8 +81,8 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc.
-  replaces: cluster-manager.v0.11.0
+  replaces: cluster-manager.v0.12.0
   selector:
     matchLabels:
       app: cluster-manager
-  version: 0.12.0
+  version: 0.13.0
