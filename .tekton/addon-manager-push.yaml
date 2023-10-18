@@ -18,7 +18,7 @@ metadata:
 spec:
   params:
   - name: dockerfile
-    value: ./build/Dockerfile.addon
+    value: ./build/Dockerfile.addon.rhtap
   - name: git-url
     value: '{{repo_url}}'
   - name: output-image

@@ -18,7 +18,7 @@ metadata:
 spec:
   params:
   - name: dockerfile
-    value: ./build/Dockerfile.work
+    value: ./build/Dockerfile.work.rhtap
   - name: git-url
     value: '{{repo_url}}'
   - name: output-image
