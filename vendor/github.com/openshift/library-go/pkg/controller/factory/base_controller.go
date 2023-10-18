@@ -131,9 +131,14 @@ func (c *baseController) Run(ctx context.Context, workers int) {
 	// runPeriodicalResync is independent from queue
 	if c.resyncEvery > 0 {
 		workerWg.Add(1)
+		if c.resyncEvery < 60*time.Second {
+			// Warn about too fast resyncs as they might drain the operators QPS.
+			// This event is cheap as it is only emitted on operator startup.
+			c.syncContext.Recorder().Warningf("FastControllerResync", "Controller %q resync interval is set to %s which might lead to client request throttling", c.name, c.resyncEvery)
+		}
 		go func() {
 			defer workerWg.Done()
-			c.runPeriodicalResync(ctx, c.resyncEvery)
+			wait.UntilWithContext(ctx, func(ctx context.Context) { c.syncContext.Queue().Add(DefaultQueueKey) }, c.resyncEvery)
 		}()
 	}
 
@@ -169,15 +174,6 @@ func (c *baseController) Run(ctx context.Context, workers int) {
 
 func (c *baseController) Sync(ctx context.Context, syncCtx SyncContext) error {
 	return c.sync(ctx, syncCtx)
-}
-
-func (c *baseController) runPeriodicalResync(ctx context.Context, interval time.Duration) {
-	if interval == 0 {
-		return
-	}
-	go wait.UntilWithContext(ctx, func(ctx context.Context) {
-		c.syncContext.Queue().Add(DefaultQueueKey)
-	}, interval)
 }
 
 // runWorker runs a single worker

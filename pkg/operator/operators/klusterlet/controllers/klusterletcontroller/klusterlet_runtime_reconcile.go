@@ -33,19 +33,11 @@ type runtimeReconcile struct {
 
 func (r *runtimeReconcile) reconcile(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
 	config klusterletConfig) (*operatorapiv1.Klusterlet, reconcileState, error) {
-	// Check if the klusterlet is in rebootstrapping state
-	// Both registration agent and work agent are scaled to 0 if the klusterlet is
-	// in rebootstrapping state.
-	runtimeConfig := config
-	if meta.IsStatusConditionTrue(klusterlet.Status.Conditions, helpers.KlusterletRebootstrapProgressing) {
-		runtimeConfig.Replica = 0
-	}
-
 	if helpers.IsSingleton(config.InstallMode) {
-		return r.installSingletonAgent(ctx, klusterlet, runtimeConfig)
+		return r.installSingletonAgent(ctx, klusterlet, config)
 	}
 
-	return r.installAgent(ctx, klusterlet, runtimeConfig)
+	return r.installAgent(ctx, klusterlet, config)
 }
 
 func (r *runtimeReconcile) installAgent(ctx context.Context, klusterlet *operatorapiv1.Klusterlet,
@@ -99,13 +91,11 @@ func (r *runtimeReconcile) installAgent(ctx context.Context, klusterlet *operato
 	}
 
 	// Deploy work agent.
-	// Work agent is scaled to 0 when
-	//   1). the klusterlet is in re-bootstrapping state;
-	//   2). degrade is true with the reason is HubKubeConfigSecretMissing. It is to ensure a fast startup of work
-	//       agent when the klusterlet is bootstrapped at the first time. The work agent should not be scaled to 0
-	//       in degraded condition with other reasons, because we still need work agent running even though the hub
-	//       kubconfig is missing some certain permission. It can ensure work agent to clean up the resources defined
-	//       in manifestworks when cluster is detaching from the hub.
+	// * work agent is scaled to 0 only when degrade is true with the reason is HubKubeConfigSecretMissing.
+	//   It is to ensure a fast startup of work agent when the klusterlet is bootstrapped at the first time.
+	// * The work agent should not be scaled to 0 in degraded condition with other reasons,
+	//   because we still need work agent running even though the hub kubconfig is missing some certain permission.
+	//   It can ensure work agent to clean up the resources defined in manifestworks when cluster is detaching from the hub.
 	hubConnectionDegradedCondition := meta.FindStatusCondition(klusterlet.Status.Conditions, hubConnectionDegraded)
 	if hubConnectionDegradedCondition == nil {
 		workConfig.Replica = 0

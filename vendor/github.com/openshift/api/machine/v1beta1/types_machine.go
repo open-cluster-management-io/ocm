@@ -19,6 +19,11 @@ const (
 	// MachineClusterIDLabel is the label that a machine must have to identify the
 	// cluster to which it belongs.
 	MachineClusterIDLabel = "machine.openshift.io/cluster-api-cluster"
+
+	// IPClaimProtectionFinalizer is placed on an IPAddressClaim by the machine reconciler
+	// when an IPAddressClaim associated with a machine is created. This finalizer is removed
+	// from the IPAddressClaim when the associated machine is deleted.
+	IPClaimProtectionFinalizer = "machine.openshift.io/ip-claim-protection"
 )
 
 type MachineStatusError string
@@ -89,6 +94,9 @@ const (
 	// not result in a Node joining the cluster within a given timeout
 	// and that are managed by a MachineSet
 	JoinClusterTimeoutMachineError = "JoinClusterTimeoutError"
+
+	// IPAddressInvalidReason is set to indicate that the claimed IP address is not valid.
+	IPAddressInvalidReason MachineStatusError = "IPAddressInvalid"
 )
 
 type ClusterStatusError string
@@ -180,7 +188,10 @@ const (
 // Compatibility level 2: Stable within a major release for a minimum of 9 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=2
 type Machine struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   MachineSpec   `json:"spec,omitempty"`
@@ -368,6 +379,10 @@ type LastOperation struct {
 // +openshift:compatibility-gen:level=2
 type MachineList struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the standard list's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Machine `json:"items"`
+
+	Items []Machine `json:"items"`
 }

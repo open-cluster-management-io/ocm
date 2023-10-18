@@ -61,8 +61,10 @@ var testNamespace string
 
 var authn *util.TestAuthn
 
-var ctx context.Context
-var cancel context.CancelFunc
+var stopHub context.CancelFunc
+var stopProxy context.CancelFunc
+
+var startHub func()
 
 var CRDPaths = []string{
 	// hub
@@ -77,6 +79,11 @@ var CRDPaths = []string{
 
 func runAgent(name string, opt *spoke.SpokeAgentOptions, commOption *commonoptions.AgentOptions, cfg *rest.Config) context.CancelFunc {
 	ctx, cancel := context.WithCancel(context.Background())
+	runAgentWithContext(ctx, name, opt, commOption, cfg)
+	return cancel
+}
+
+func runAgentWithContext(ctx context.Context, name string, opt *spoke.SpokeAgentOptions, commOption *commonoptions.AgentOptions, cfg *rest.Config) {
 	go func() {
 		config := spoke.NewSpokeAgentConfig(commOption, opt)
 		err := config.RunSpokeAgent(ctx, &controllercmd.ControllerContext{
@@ -87,8 +94,6 @@ func runAgent(name string, opt *spoke.SpokeAgentOptions, commOption *commonoptio
 			return
 		}
 	}()
-
-	return cancel
 }
 
 func TestIntegration(t *testing.T) {
@@ -103,8 +108,6 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	var err error
 
-	ctx, cancel = context.WithCancel(context.TODO())
-
 	// crank up the sync speed
 	transport.CertCallbackRefreshDuration = 5 * time.Second
 	clientcert.ControllerResyncInterval = 5 * time.Second
@@ -112,6 +115,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	// crank up the addon lease sync and udpate speed
 	spoke.AddOnLeaseControllerSyncInterval = 5 * time.Second
+	spoke.ClientCertHealthCheckInterval = 5 * time.Second
 	addon.AddOnLeaseControllerLeaseDurationSeconds = 1
 
 	// install cluster CRD and start a local kube-apiserver
@@ -188,20 +192,27 @@ var _ = ginkgo.BeforeSuite(func() {
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	// start hub controller
-	go func() {
-		m := hub.NewHubManagerOptions()
-		m.ClusterAutoApprovalUsers = []string{util.AutoApprovalBootstrapUser}
-		err := m.RunControllerManager(ctx, &controllercmd.ControllerContext{
-			KubeConfig:    cfg,
-			EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
-		})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	}()
+	var ctx context.Context
+	startHub = func() {
+		ctx, stopHub = context.WithCancel(context.Background())
+		go func() {
+			m := hub.NewHubManagerOptions()
+			m.ClusterAutoApprovalUsers = []string{util.AutoApprovalBootstrapUser}
+			err := m.RunControllerManager(ctx, &controllercmd.ControllerContext{
+				KubeConfig:    cfg,
+				EventRecorder: util.NewIntegrationTestEventRecorder("hub"),
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		}()
+	}
+
+	startHub()
 
 	// start a proxy server
 	proxyCertData, proxyKeyData, err := authn.SignServerCert("proxyserver", 24*time.Hour)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	proxyServer := util.NewProxyServer(proxyCertData, proxyKeyData)
+	ctx, stopProxy = context.WithCancel(context.Background())
 	err = proxyServer.Start(ctx, 5*time.Second)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -219,8 +230,8 @@ var _ = ginkgo.BeforeSuite(func() {
 
 var _ = ginkgo.AfterSuite(func() {
 	ginkgo.By("tearing down the test environment")
-
-	cancel()
+	stopHub()
+	stopProxy()
 
 	err := testEnv.Stop()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())

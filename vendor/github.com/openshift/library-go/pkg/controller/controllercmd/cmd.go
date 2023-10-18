@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"k8s.io/apiserver/pkg/server/healthz"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,6 +62,7 @@ type ControllerCommandConfig struct {
 	RetryPeriod metav1.Duration
 
 	ComponentOwnerReference *corev1.ObjectReference
+	healthChecks            []healthz.HealthChecker
 }
 
 // NewControllerConfig returns a new ControllerCommandConfig which can be used to wire up all the boiler plate of a controller
@@ -81,6 +83,11 @@ func NewControllerCommandConfig(componentName string, version version.Info, star
 // WithComponentOwnerReference overrides controller reference resolution for event recording
 func (c *ControllerCommandConfig) WithComponentOwnerReference(reference *corev1.ObjectReference) *ControllerCommandConfig {
 	c.ComponentOwnerReference = reference
+	return c
+}
+
+func (c *ControllerCommandConfig) WithHealthChecks(healthChecks ...healthz.HealthChecker) *ControllerCommandConfig {
+	c.healthChecks = append(c.healthChecks, healthChecks...)
 	return c
 }
 
@@ -300,6 +307,7 @@ func (c *ControllerCommandConfig) StartController(ctx context.Context) error {
 		WithComponentNamespace(c.basicFlags.Namespace).
 		WithLeaderElection(config.LeaderElection, c.basicFlags.Namespace, c.componentName+"-lock").
 		WithVersion(c.version).
+		WithHealthChecks(c.healthChecks...).
 		WithEventRecorderOptions(events.RecommendedClusterSingletonCorrelatorOptions()).
 		WithRestartOnChange(exitOnChangeReactorCh, startingFileContent, observedFiles...).
 		WithComponentOwnerReference(c.ComponentOwnerReference)

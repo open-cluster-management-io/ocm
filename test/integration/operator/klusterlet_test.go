@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -12,10 +11,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/client-go/rest"
 
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
@@ -508,7 +505,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 					return false
 				}
 				gomega.Expect(len(actual.Spec.Template.Spec.Containers)).Should(gomega.Equal(1))
-				gomega.Expect(len(actual.Spec.Template.Spec.Containers[0].Args)).Should(gomega.Equal(7))
+				gomega.Expect(len(actual.Spec.Template.Spec.Containers[0].Args)).Should(gomega.Equal(6))
 				return actual.Spec.Template.Spec.Containers[0].Args[2] == "--spoke-cluster-name=cluster2"
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
@@ -752,9 +749,8 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "RegistrationDesiredDegraded", "DeploymentsFunctional", metav1.ConditionFalse)
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "WorkDesiredDegraded", "DeploymentsFunctional", metav1.ConditionFalse)
 
-			hubSecret.Data["cluster-name"] = []byte("testcluster")
-			hubSecret.Data["kubeconfig"] = util.NewKubeConfig(&rest.Config{Host: "https://nohost"})
-			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(), hubSecret, metav1.UpdateOptions{})
+			// Delete the hub kubeconfig secret
+			err = kubeClient.CoreV1().Secrets(klusterletNamespace).Delete(context.Background(), hubSecret.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// Update replica of deployment
@@ -810,163 +806,6 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			util.AssertKlusterletCondition(klusterlet.Name, operatorClient, "Available", "klusterletAvailable", metav1.ConditionTrue)
-		})
-	})
-
-	ginkgo.Context("rebootstrap", func() {
-		ginkgo.BeforeEach(func() {
-			registrationDeploymentName = fmt.Sprintf("%s-registration-agent", klusterlet.Name)
-			workDeploymentName = fmt.Sprintf("%s-work-agent", klusterlet.Name)
-		})
-		ginkgo.AfterEach(func() {
-			gomega.Expect(operatorClient.OperatorV1().Klusterlets().Delete(context.Background(), klusterlet.Name, metav1.DeleteOptions{})).To(gomega.BeNil())
-		})
-
-		assertRebootstrap := func() {
-			// Check if the rebootstrap is started
-			gomega.Eventually(func() error {
-				klusterlet, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-				if meta.IsStatusConditionTrue(klusterlet.Status.Conditions, helpers.KlusterletRebootstrapProgressing) {
-					return nil
-				}
-
-				return fmt.Errorf("Rebootstrap is not started yet")
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
-
-			// Make sure the deployments are scaled down to 0 during rebootstrapping;
-			gomega.Eventually(func() error {
-				// return if the rebootstrap is completed
-				klusterlet, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-				if meta.IsStatusConditionFalse(klusterlet.Status.Conditions, helpers.KlusterletRebootstrapProgressing) {
-					return nil
-				}
-
-				// check the Replicas of deployments
-				registrationDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(),
-					registrationDeploymentName, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-
-				if *registrationDeployment.Spec.Replicas != 0 {
-					return fmt.Errorf("registrationDeployment.Spec.Replicas is not 0: %d", *registrationDeployment.Spec.Replicas)
-				}
-
-				workDeployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), workDeploymentName, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-
-				if *workDeployment.Spec.Replicas != 0 {
-					return fmt.Errorf("workDeployment.Spec.Replicas is not 0: %d", *registrationDeployment.Spec.Replicas)
-				}
-
-				return nil
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
-
-			// check if the rebootstrap is completed
-			gomega.Eventually(func() error {
-				klusterlet, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-				if !meta.IsStatusConditionFalse(klusterlet.Status.Conditions, helpers.KlusterletRebootstrapProgressing) {
-					return fmt.Errorf("Rebootstrap is not completed yet")
-				}
-
-				_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.HubKubeConfig, metav1.GetOptions{})
-				if errors.IsNotFound(err) {
-					return nil
-				} else if err != nil {
-					return err
-				}
-				return fmt.Errorf("hub kubeconfig secret %s/%s is not deleted yet", klusterletNamespace, helpers.HubKubeConfig)
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
-		}
-
-		ginkgo.It("should reload the klusterlet after the bootstrap secret is changed", func() {
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			// Create a bootstrap secret
-			bootStrapSecret := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      helpers.BootstrapHubKubeConfig,
-					Namespace: klusterletNamespace,
-				},
-				Data: map[string][]byte{
-					"kubeconfig": util.NewKubeConfig(restConfig),
-				},
-			}
-			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(), bootStrapSecret, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-			// Update the hub secret and make it same with the bootstrap secret
-			gomega.Eventually(func() bool {
-				hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.HubKubeConfig, metav1.GetOptions{})
-				if err != nil {
-					return false
-				}
-				hubSecret.Data["cluster-name"] = []byte("testcluster")
-				hubSecret.Data["kubeconfig"] = util.NewKubeConfig(restConfig)
-				hubSecret.Data["tls.crt"] = util.NewCert(time.Now().Add(300 * time.Second).UTC())
-				if _, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(), hubSecret, metav1.UpdateOptions{}); err != nil {
-					return false
-				}
-				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
-			// Change the bootstrap secret server address
-			bootStrapSecret, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.BootstrapHubKubeConfig, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-			bootStrapSecret.Data["kubeconfig"] = util.NewKubeConfig(&rest.Config{Host: "https://127.0.0.10:33934"})
-			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(), bootStrapSecret, metav1.UpdateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-			assertRebootstrap()
-		})
-
-		ginkgo.It("should reload the klusterlet after the hub secret is expired", func() {
-			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			// Create a bootstrap secret
-			bootStrapSecret := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      helpers.BootstrapHubKubeConfig,
-					Namespace: klusterletNamespace,
-				},
-				Data: map[string][]byte{
-					"kubeconfig": util.NewKubeConfig(restConfig),
-				},
-			}
-			_, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Create(context.Background(), bootStrapSecret, metav1.CreateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-			// Update the hub secret and make it same with the bootstrap secret
-			gomega.Eventually(func() bool {
-				hubSecret, err := kubeClient.CoreV1().Secrets(klusterletNamespace).Get(context.Background(), helpers.HubKubeConfig, metav1.GetOptions{})
-				if err != nil {
-					return false
-				}
-				hubSecret.Data["cluster-name"] = []byte("testcluster")
-				hubSecret.Data["kubeconfig"] = util.NewKubeConfig(restConfig)
-				// the hub secret will be expired after 5 seconds
-				hubSecret.Data["tls.crt"] = util.NewCert(time.Now().Add(5 * time.Second).UTC())
-				if _, err = kubeClient.CoreV1().Secrets(klusterletNamespace).Update(context.Background(), hubSecret, metav1.UpdateOptions{}); err != nil {
-					return false
-				}
-				return true
-			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
-
-			assertRebootstrap()
 		})
 	})
 

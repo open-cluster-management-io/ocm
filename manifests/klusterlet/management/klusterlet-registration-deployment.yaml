@@ -66,7 +66,6 @@ spec:
           - "--spoke-kubeconfig=/spoke/config/kubeconfig"
           - "--terminate-on-files=/spoke/config/kubeconfig"
           {{end}}
-          - "--terminate-on-files=/spoke/hub-kubeconfig/kubeconfig"
           {{if eq .Replica 1}}
           - "--disable-leader-election"
           {{end}}

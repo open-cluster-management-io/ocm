@@ -79,35 +79,35 @@ func TestHasValidHubKubeconfig(t *testing.T) {
 		{
 			name: "no key",
 			secret: testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "", nil, map[string][]byte{
-				KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
+				KubeconfigFile: testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "", nil, nil, nil),
 			}),
 		},
 		{
 			name: "no cert",
 			secret: testinghelpers.NewHubKubeconfigSecret(
 				testNamespace, testSecretName, "", &testinghelpers.TestCert{Key: []byte("key")}, map[string][]byte{
-					KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
+					KubeconfigFile: testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "", nil, nil, nil),
 				}),
 		},
 		{
 			name: "bad cert",
 			secret: testinghelpers.NewHubKubeconfigSecret(
 				testNamespace, testSecretName, "", &testinghelpers.TestCert{Key: []byte("key"), Cert: []byte("bad cert")}, map[string][]byte{
-					KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
+					KubeconfigFile: testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "", nil, nil, nil),
 				}),
 		},
 		{
 			name: "expired cert",
 			secret: testinghelpers.NewHubKubeconfigSecret(
 				testNamespace, testSecretName, "", testinghelpers.NewTestCert("test", -60*time.Second), map[string][]byte{
-					KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
+					KubeconfigFile: testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "", nil, nil, nil),
 				}),
 		},
 		{
 			name: "invalid common name",
 			secret: testinghelpers.NewHubKubeconfigSecret(
 				testNamespace, testSecretName, "", testinghelpers.NewTestCert("test", 60*time.Second), map[string][]byte{
-					KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
+					KubeconfigFile: testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "", nil, nil, nil),
 				}),
 			subject: &pkix.Name{
 				CommonName: "wrong-common-name",
@@ -116,7 +116,7 @@ func TestHasValidHubKubeconfig(t *testing.T) {
 		{
 			name: "valid kubeconfig",
 			secret: testinghelpers.NewHubKubeconfigSecret(testNamespace, testSecretName, "", testinghelpers.NewTestCert("test", 60*time.Second), map[string][]byte{
-				KubeconfigFile: testinghelpers.NewKubeconfig(nil, nil),
+				KubeconfigFile: testinghelpers.NewKubeconfig("https://127.0.0.1:6001", "", nil, nil, nil),
 			}),
 			subject: &pkix.Name{
 				CommonName: "test",

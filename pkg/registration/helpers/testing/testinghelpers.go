@@ -374,7 +374,7 @@ func NewApprovedV1beta1CSR(holder CSRHolder) *certv1beta1.CertificateSigningRequ
 	return csr
 }
 
-func NewKubeconfig(key, cert []byte) []byte {
+func NewKubeconfig(server, proxyURL string, caData, key, cert []byte) []byte {
 	var clientKey, clientCertificate string
 	var clientKeyData, clientCertificateData []byte
 	if key != nil {
@@ -390,8 +390,9 @@ func NewKubeconfig(key, cert []byte) []byte {
 
 	kubeconfig := clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{"default-cluster": {
-			Server:                "https://127.0.0.1:6001",
-			InsecureSkipTLSVerify: true,
+			Server:                   server,
+			ProxyURL:                 proxyURL,
+			CertificateAuthorityData: caData,
 		}},
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{"default-auth": {
 			ClientCertificate:     clientCertificate,
