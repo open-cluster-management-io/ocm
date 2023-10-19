@@ -3,7 +3,9 @@ package steady
 import (
 	"context"
 	"reflect"
+	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -12,6 +14,7 @@ import (
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
+	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 	"open-cluster-management.io/ocm/pkg/placement/plugins"
 )
 
@@ -46,6 +49,13 @@ func (s *Steady) Description() string {
 
 func (s *Steady) Score(
 	ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) (plugins.PluginScoreResult, *framework.Status) {
+	startTime := time.Now()
+	defer func() {
+		metrics.PluginDuration.With(prometheus.Labels{
+			"name":   metrics.SchedulingName,
+			"plugin": s.Name(),
+		}).Observe(s.handle.MetricsRecorder().SinceInSeconds(startTime))
+	}()
 	// query placementdecisions with label selector
 	scores := map[string]int64{}
 	requirement, err := labels.NewRequirement(placementLabel, selection.Equals, []string{placement.Name})

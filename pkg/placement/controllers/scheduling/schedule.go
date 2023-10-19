@@ -18,6 +18,7 @@ import (
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
+	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 	"open-cluster-management.io/ocm/pkg/placement/plugins"
 	"open-cluster-management.io/ocm/pkg/placement/plugins/addon"
 	"open-cluster-management.io/ocm/pkg/placement/plugins/balance"
@@ -92,7 +93,8 @@ type scheduleResult struct {
 }
 
 type schedulerHandler struct {
-	recorder                kevents.EventRecorder
+	eventsRecorder          kevents.EventRecorder
+	metricsRecorder         *metrics.ScheduleMetrics
 	placementDecisionLister clusterlisterv1beta1.PlacementDecisionLister
 	scoreLister             clusterlisterv1alpha1.AddOnPlacementScoreLister
 	clusterLister           clusterlisterv1.ManagedClusterLister
@@ -104,10 +106,13 @@ func NewSchedulerHandler(
 	placementDecisionLister clusterlisterv1beta1.PlacementDecisionLister,
 	scoreLister clusterlisterv1alpha1.AddOnPlacementScoreLister,
 	clusterLister clusterlisterv1.ManagedClusterLister,
-	recorder kevents.EventRecorder) plugins.Handle {
+	eventsRecorder kevents.EventRecorder,
+	metricsRecorder *metrics.ScheduleMetrics,
+) plugins.Handle {
 
 	return &schedulerHandler{
-		recorder:                recorder,
+		eventsRecorder:          eventsRecorder,
+		metricsRecorder:         metricsRecorder,
 		placementDecisionLister: placementDecisionLister,
 		scoreLister:             scoreLister,
 		clusterLister:           clusterLister,
@@ -116,7 +121,7 @@ func NewSchedulerHandler(
 }
 
 func (s *schedulerHandler) EventRecorder() kevents.EventRecorder {
-	return s.recorder
+	return s.eventsRecorder
 }
 
 func (s *schedulerHandler) DecisionLister() clusterlisterv1beta1.PlacementDecisionLister {
@@ -133,6 +138,10 @@ func (s *schedulerHandler) ClusterLister() clusterlisterv1.ManagedClusterLister 
 
 func (s *schedulerHandler) ClusterClient() clusterclient.Interface {
 	return s.clusterClient
+}
+
+func (s *schedulerHandler) MetricsRecorder() *metrics.ScheduleMetrics {
+	return s.metricsRecorder
 }
 
 // Initialize the default prioritizer weight.

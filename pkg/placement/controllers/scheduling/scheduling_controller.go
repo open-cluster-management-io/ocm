@@ -41,6 +41,7 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
+	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 	"open-cluster-management.io/ocm/pkg/placement/helpers"
 )
 
@@ -67,7 +68,8 @@ type schedulingController struct {
 	placementLister         clusterlisterv1beta1.PlacementLister
 	placementDecisionLister clusterlisterv1beta1.PlacementDecisionLister
 	scheduler               Scheduler
-	recorder                kevents.EventRecorder
+	eventsRecorder          kevents.EventRecorder
+	metricsRecorder         *metrics.ScheduleMetrics
 }
 
 // NewSchedulingController return an instance of schedulingController
@@ -82,6 +84,7 @@ func NewSchedulingController(
 	placementScoreInformer clusterinformerv1alpha1.AddOnPlacementScoreInformer,
 	scheduler Scheduler,
 	recorder events.Recorder, krecorder kevents.EventRecorder,
+	metricsRecorder *metrics.ScheduleMetrics,
 ) factory.Controller {
 	syncCtx := factory.NewSyncContext(schedulingControllerName, recorder)
 
@@ -95,8 +98,9 @@ func NewSchedulingController(
 		clusterSetBindingLister: clusterSetBindingInformer.Lister(),
 		placementLister:         placementInformer.Lister(),
 		placementDecisionLister: placementDecisionInformer.Lister(),
-		recorder:                krecorder,
 		scheduler:               scheduler,
+		eventsRecorder:          krecorder,
+		metricsRecorder:         metricsRecorder,
 	}
 
 	// setup event handler for cluster informer.
@@ -189,7 +193,7 @@ func (c *schedulingController) sync(ctx context.Context, syncCtx factory.SyncCon
 		return err
 	}
 
-	return c.syncPlacement(ctx, syncCtx, placement)
+	return c.syncPlacement(ctx, syncCtx, queueKey, placement)
 }
 
 func (c *schedulingController) getPlacement(queueKey string) (*clusterapiv1beta1.Placement, error) {
@@ -208,7 +212,7 @@ func (c *schedulingController) getPlacement(queueKey string) (*clusterapiv1beta1
 	return placement, nil
 }
 
-func (c *schedulingController) syncPlacement(ctx context.Context, syncCtx factory.SyncContext, placement *clusterapiv1beta1.Placement) error {
+func (c *schedulingController) syncPlacement(ctx context.Context, syncCtx factory.SyncContext, queueKey string, placement *clusterapiv1beta1.Placement) error {
 	logger := klog.FromContext(ctx)
 	// no work if placement is deleting
 	if !placement.DeletionTimestamp.IsZero() {
@@ -236,6 +240,7 @@ func (c *schedulingController) syncPlacement(ctx context.Context, syncCtx factor
 	}
 
 	// schedule placement with scheduler
+	c.metricsRecorder.StartSchedule(queueKey)
 	scheduleResult, status := c.scheduler.Schedule(ctx, placement, clusters)
 	// generate placement decision and status
 	decisions, groupStatus, s := c.generatePlacementDecisionsAndStatus(placement, scheduleResult.Decisions())
@@ -262,6 +267,8 @@ func (c *schedulingController) syncPlacement(ctx context.Context, syncCtx factor
 	}
 
 	// create/update placement decisions
+	c.metricsRecorder.StartBind(queueKey)
+	defer c.metricsRecorder.Done(queueKey)
 	err = c.bind(ctx, placement, decisions, scheduleResult.PrioritizerScores(), status)
 	if err != nil {
 		return err
@@ -643,7 +650,7 @@ func (c *schedulingController) bind(
 		if err != nil {
 			errs = append(errs, err)
 		}
-		c.recorder.Eventf(
+		c.eventsRecorder.Eventf(
 			placement, pd, corev1.EventTypeNormal,
 			"DecisionDelete", "DecisionDeleted",
 			"Decision %s is deleted with placement %s in namespace %s", pd.Name, placement.Name, placement.Namespace)
@@ -676,7 +683,7 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 		if err != nil {
 			return err
 		}
-		c.recorder.Eventf(
+		c.eventsRecorder.Eventf(
 			placement, existPlacementDecision, corev1.EventTypeNormal,
 			"DecisionCreate", "DecisionCreated",
 			"Decision %s is created with placement %s in namespace %s", existPlacementDecision.Name, placement.Name, placement.Namespace)
@@ -705,14 +712,14 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 
 	// update the event with warning
 	if status.Code() == framework.Warning {
-		c.recorder.Eventf(
+		c.eventsRecorder.Eventf(
 			placement, existPlacementDecision, corev1.EventTypeWarning,
 			"DecisionUpdate", "DecisionUpdated",
 			"Decision %s is updated with placement %s in namespace %s: %s in plugin %s", existPlacementDecision.Name, placement.Name, placement.Namespace,
 			status.Message(),
 			status.Plugin())
 	} else {
-		c.recorder.Eventf(
+		c.eventsRecorder.Eventf(
 			placement, existPlacementDecision, corev1.EventTypeNormal,
 			"DecisionUpdate", "DecisionUpdated",
 			"Decision %s is updated with placement %s in namespace %s", existPlacementDecision.Name, placement.Name, placement.Namespace)
@@ -730,7 +737,7 @@ func (c *schedulingController) createOrUpdatePlacementDecision(
 		}
 	}
 
-	c.recorder.Eventf(
+	c.eventsRecorder.Eventf(
 		placement, existPlacementDecision, corev1.EventTypeNormal,
 		"ScoreUpdate", "ScoreUpdated",
 		scoreStr)

@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -16,6 +17,7 @@ import (
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
+	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 	"open-cluster-management.io/ocm/pkg/placement/plugins"
 )
 
@@ -47,6 +49,13 @@ func (pl *TaintToleration) Description() string {
 
 func (pl *TaintToleration) Filter(ctx context.Context, placement *clusterapiv1beta1.Placement,
 	clusters []*clusterapiv1.ManagedCluster) (plugins.PluginFilterResult, *framework.Status) {
+	startTime := time.Now()
+	defer func() {
+		metrics.PluginDuration.With(prometheus.Labels{
+			"name":   metrics.SchedulingName,
+			"plugin": pl.Name(),
+		}).Observe(pl.handle.MetricsRecorder().SinceInSeconds(startTime))
+	}()
 	status := framework.NewStatus(pl.Name(), framework.Success, "")
 
 	if len(clusters) == 0 {

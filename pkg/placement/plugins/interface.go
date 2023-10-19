@@ -15,6 +15,7 @@ import (
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
+	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 )
 
 const (
@@ -72,6 +73,9 @@ type Handle interface {
 
 	// EventRecorder returns an event recorder.
 	EventRecorder() events.EventRecorder
+
+	// MetricsRecorder record the metrics for plugins
+	MetricsRecorder() *metrics.ScheduleMetrics
 }
 
 // PluginFilterResult contains the details of a filter plugin result.

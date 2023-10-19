@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
+	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 	"open-cluster-management.io/ocm/pkg/placement/plugins"
 )
 
@@ -81,6 +85,13 @@ func (r *ResourcePrioritizer) Description() string {
 
 func (r *ResourcePrioritizer) Score(ctx context.Context, placement *clusterapiv1beta1.Placement,
 	clusters []*clusterapiv1.ManagedCluster) (plugins.PluginScoreResult, *framework.Status) {
+	startTime := time.Now()
+	defer func() {
+		metrics.PluginDuration.With(prometheus.Labels{
+			"name":   metrics.SchedulingName,
+			"plugin": r.Name(),
+		}).Observe(r.handle.MetricsRecorder().SinceInSeconds(startTime))
+	}()
 	status := framework.NewStatus(r.Name(), framework.Success, "")
 	if r.algorithm == "Allocatable" {
 		return mostResourceAllocatableScores(r.resource, clusters), status

@@ -3,11 +3,15 @@ package predicate
 import (
 	"context"
 	"reflect"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
+	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 	"open-cluster-management.io/ocm/pkg/placement/helpers"
 	"open-cluster-management.io/ocm/pkg/placement/plugins"
 )
@@ -16,10 +20,14 @@ var _ plugins.Filter = &Predicate{}
 
 const description = "Predicate filter filters the clusters based on predicate defined in placement"
 
-type Predicate struct{}
+type Predicate struct {
+	handle plugins.Handle
+}
 
 func New(handle plugins.Handle) *Predicate {
-	return &Predicate{}
+	return &Predicate{
+		handle: handle,
+	}
 }
 
 func (p *Predicate) Name() string {
@@ -32,6 +40,15 @@ func (p *Predicate) Description() string {
 
 func (p *Predicate) Filter(
 	ctx context.Context, placement *clusterapiv1beta1.Placement, clusters []*clusterapiv1.ManagedCluster) (plugins.PluginFilterResult, *framework.Status) {
+
+	startTime := time.Now()
+	defer func() {
+		metrics.PluginDuration.With(prometheus.Labels{
+			"name":   metrics.SchedulingName,
+			"plugin": p.Name(),
+		}).Observe(p.handle.MetricsRecorder().SinceInSeconds(startTime))
+	}()
+
 	status := framework.NewStatus(p.Name(), framework.Success, "")
 
 	if len(placement.Spec.Predicates) == 0 {
