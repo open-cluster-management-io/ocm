@@ -40,14 +40,7 @@ func TestSyncManagedCluster(t *testing.T) {
 			name:            "create a new spoke cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "patch")
-				patch := actions[0].(clienttesting.PatchAction).GetPatch()
-				managedCluster := &v1.ManagedCluster{}
-				err := json.Unmarshal(patch, managedCluster)
-				if err != nil {
-					t.Fatal(err)
-				}
-				testinghelpers.AssertFinalizers(t, managedCluster, []string{v1.ManagedClusterFinalizer})
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 		{
@@ -101,14 +94,7 @@ func TestSyncManagedCluster(t *testing.T) {
 			name:            "delete a spoke cluster",
 			startingObjects: []runtime.Object{testinghelpers.NewDeletingManagedCluster()},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				testingcommon.AssertActions(t, actions, "patch")
-				patch := actions[0].(clienttesting.PatchAction).GetPatch()
-				managedCluster := &v1.ManagedCluster{}
-				err := json.Unmarshal(patch, managedCluster)
-				if err != nil {
-					t.Fatal(err)
-				}
-				testinghelpers.AssertFinalizers(t, managedCluster, []string{})
+				testingcommon.AssertNoActions(t, actions)
 			},
 		},
 	}

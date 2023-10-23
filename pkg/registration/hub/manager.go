@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	"k8s.io/klog/v2"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -30,34 +31,46 @@ import (
 	"open-cluster-management.io/ocm/pkg/registration/hub/addon"
 	"open-cluster-management.io/ocm/pkg/registration/hub/clusterrole"
 	"open-cluster-management.io/ocm/pkg/registration/hub/csr"
+	"open-cluster-management.io/ocm/pkg/registration/hub/gc"
 	"open-cluster-management.io/ocm/pkg/registration/hub/lease"
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedcluster"
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedclusterset"
 	"open-cluster-management.io/ocm/pkg/registration/hub/managedclustersetbinding"
-	"open-cluster-management.io/ocm/pkg/registration/hub/rbacfinalizerdeletion"
 	"open-cluster-management.io/ocm/pkg/registration/hub/taint"
 )
 
 // HubManagerOptions holds configuration for hub manager controller
 type HubManagerOptions struct {
 	ClusterAutoApprovalUsers []string
+	GCResourceList           []string
 }
 
 // NewHubManagerOptions returns a HubManagerOptions
 func NewHubManagerOptions() *HubManagerOptions {
-	return &HubManagerOptions{}
+	return &HubManagerOptions{
+		GCResourceList: []string{"addon.open-cluster-management.io/v1alpha1/managedclusteraddons",
+			"work.open-cluster-management.io/v1/manifestworks"},
+	}
 }
 
 // AddFlags registers flags for manager
 func (m *HubManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&m.ClusterAutoApprovalUsers, "cluster-auto-approval-users", m.ClusterAutoApprovalUsers,
 		"A bootstrap user list whose cluster registration requests can be automatically approved.")
-
+	fs.StringSliceVar(&m.GCResourceList, "gc-resource-list", m.GCResourceList,
+		"A list GVR user can customize which are cleaned up after cluster is deleted. Format is group/version/resource, "+
+			"and the default are managedclusteraddon and manifestwork. The resources will be deleted in order."+
+			"The flag works only when ResourceCleanup feature gate is enable.")
 }
 
 // RunControllerManager starts the controllers on hub to manage spoke cluster registration.
 func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
+	if err != nil {
+		return err
+	}
+
+	metadataClient, err := metadata.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
 		return err
 	}
@@ -101,7 +114,7 @@ func (m *HubManagerOptions) RunControllerManager(ctx context.Context, controller
 
 	return m.RunControllerManagerWithInformers(
 		ctx, controllerContext,
-		kubeClient, clusterClient, addOnClient,
+		kubeClient, metadataClient, clusterClient, addOnClient,
 		kubeInfomers, clusterInformers, workInformers, addOnInformers,
 	)
 }
@@ -110,6 +123,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	ctx context.Context,
 	controllerContext *controllercmd.ControllerContext,
 	kubeClient kubernetes.Interface,
+	metadataClient metadata.Interface,
 	clusterClient clusterv1client.Interface,
 	addOnClient addonclient.Interface,
 	kubeInformers kubeinformers.SharedInformerFactory,
@@ -182,15 +196,6 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		controllerContext.EventRecorder,
 	)
 
-	rbacFinalizerController := rbacfinalizerdeletion.NewFinalizeController(
-		kubeInformers.Rbac().V1().RoleBindings().Lister(),
-		kubeInformers.Core().V1().Namespaces(),
-		clusterInformers.Cluster().V1().ManagedClusters(),
-		workInformers.Work().V1().ManifestWorks().Lister(),
-		kubeClient.RbacV1(),
-		controllerContext.EventRecorder,
-	)
-
 	managedClusterSetController := managedclusterset.NewManagedClusterSetController(
 		clusterClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
@@ -240,6 +245,20 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		)
 	}
 
+	gcController := gc.NewGCController(
+		kubeInformers.Rbac().V1().ClusterRoles().Lister(),
+		kubeInformers.Rbac().V1().ClusterRoleBindings().Lister(),
+		kubeInformers.Rbac().V1().RoleBindings().Lister(),
+		clusterInformers.Cluster().V1().ManagedClusters(),
+		workInformers.Work().V1().ManifestWorks().Lister(),
+		clusterClient,
+		kubeClient,
+		metadataClient,
+		controllerContext.EventRecorder,
+		m.GCResourceList,
+		features.HubMutableFeatureGate.Enabled(ocmfeature.ResourceCleanup),
+	)
+
 	go clusterInformers.Start(ctx.Done())
 	go workInformers.Start(ctx.Done())
 	go kubeInformers.Start(ctx.Done())
@@ -249,7 +268,6 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	go taintController.Run(ctx, 1)
 	go csrController.Run(ctx, 1)
 	go leaseController.Run(ctx, 1)
-	go rbacFinalizerController.Run(ctx, 1)
 	go managedClusterSetController.Run(ctx, 1)
 	go managedClusterSetBindingController.Run(ctx, 1)
 	go clusterroleController.Run(ctx, 1)
@@ -259,6 +277,8 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		go defaultManagedClusterSetController.Run(ctx, 1)
 		go globalManagedClusterSetController.Run(ctx, 1)
 	}
+
+	go gcController.Run(ctx, 1)
 
 	<-ctx.Done()
 	return nil
