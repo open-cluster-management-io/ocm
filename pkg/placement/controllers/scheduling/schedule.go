@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	kevents "k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 
@@ -193,7 +194,14 @@ func (s *pluginScheduler) Schedule(
 	var filterPipline []string
 
 	for _, f := range s.filters {
+		startTime := time.Now()
 		filterResult, status := f.Filter(ctx, placement, filtered)
+
+		metrics.PluginDuration.With(prometheus.Labels{
+			"name":   metrics.SchedulingName,
+			"plugin": f.Name(),
+		}).Observe(s.handle.MetricsRecorder().SinceInSeconds(startTime))
+
 		filtered = filterResult.Filtered
 
 		switch {
@@ -238,7 +246,14 @@ func (s *pluginScheduler) Schedule(
 	}
 	for sc, p := range prioritizers {
 		// Get cluster score.
+		startTime := time.Now()
 		scoreResult, status := p.Score(ctx, placement, filtered)
+
+		metrics.PluginDuration.With(prometheus.Labels{
+			"name":   metrics.SchedulingName,
+			"plugin": p.Name(),
+		}).Observe(s.handle.MetricsRecorder().SinceInSeconds(startTime))
+
 		score := scoreResult.Scores
 
 		switch {

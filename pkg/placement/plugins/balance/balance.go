@@ -3,16 +3,13 @@ package balance
 import (
 	"context"
 	"reflect"
-	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/labels"
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
-	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 	"open-cluster-management.io/ocm/pkg/placement/plugins"
 )
 
@@ -47,13 +44,6 @@ func (b *Balance) Description() string {
 
 func (b *Balance) Score(ctx context.Context, placement *clusterapiv1beta1.Placement,
 	clusters []*clusterapiv1.ManagedCluster) (plugins.PluginScoreResult, *framework.Status) {
-	startTime := time.Now()
-	defer func() {
-		metrics.PluginDuration.With(prometheus.Labels{
-			"name":   metrics.SchedulingName,
-			"plugin": b.Name(),
-		}).Observe(b.handle.MetricsRecorder().SinceInSeconds(startTime))
-	}()
 	scores := map[string]int64{}
 	for _, cluster := range clusters {
 		scores[cluster.Name] = plugins.MaxClusterScore
