@@ -198,8 +198,9 @@ func (s *pluginScheduler) Schedule(
 		filterResult, status := f.Filter(ctx, placement, filtered)
 
 		metrics.PluginDuration.With(prometheus.Labels{
-			"name":   metrics.SchedulingName,
-			"plugin": f.Name(),
+			"name":        metrics.SchedulingName,
+			"plugin_type": "filter",
+			"plugin_name": f.Name(),
 		}).Observe(s.handle.MetricsRecorder().SinceInSeconds(startTime))
 
 		filtered = filterResult.Filtered
@@ -250,8 +251,9 @@ func (s *pluginScheduler) Schedule(
 		scoreResult, status := p.Score(ctx, placement, filtered)
 
 		metrics.PluginDuration.With(prometheus.Labels{
-			"name":   metrics.SchedulingName,
-			"plugin": p.Name(),
+			"name":        metrics.SchedulingName,
+			"plugin_type": "prioritizer",
+			"plugin_name": p.Name(),
 		}).Observe(s.handle.MetricsRecorder().SinceInSeconds(startTime))
 
 		score := scoreResult.Scores

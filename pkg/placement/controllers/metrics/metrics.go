@@ -41,7 +41,7 @@ var (
 		StabilityLevel: k8smetrics.ALPHA,
 		Help:           "How long in seconds a plugin runs for a placement.",
 		Buckets:        k8smetrics.ExponentialBuckets(10e-7, 10, 10),
-	}, []string{"name", "plugin"})
+	}, []string{"name", "plugin_type", "plugin_name"})
 
 	metrics = []k8smetrics.Registerable{
 		schedulingDuration, bindDuration, PluginDuration,

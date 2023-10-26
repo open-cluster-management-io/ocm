@@ -29,9 +29,17 @@ func TestMetrics(t *testing.T) {
 
 	startTime := c.Now()
 	c.Step(50 * time.Second)
-	PluginDuration.With(prometheus.Labels{"name": SchedulingName, "plugin": "fakePlugin1"}).Observe(metrics.SinceInSeconds(startTime))
+	PluginDuration.With(prometheus.Labels{
+		"name":        SchedulingName,
+		"plugin_type": "filter",
+		"plugin_name": "fakePlugin1",
+	}).Observe(metrics.SinceInSeconds(startTime))
 	c.Step(30 * time.Second)
-	PluginDuration.With(prometheus.Labels{"name": SchedulingName, "plugin": "fakePlugin2"}).Observe(metrics.SinceInSeconds(startTime))
+	PluginDuration.With(prometheus.Labels{
+		"name":        SchedulingName,
+		"plugin_type": "prioritizer",
+		"plugin_name": "fakePlugin2",
+	}).Observe(metrics.SinceInSeconds(startTime))
 
 	mfs, err := legacyregistry.DefaultGatherer.Gather()
 	if err != nil {
