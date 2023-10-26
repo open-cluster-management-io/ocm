@@ -9,11 +9,13 @@ import (
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/utils/clock"
 
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterscheme "open-cluster-management.io/api/client/cluster/clientset/versioned/scheme"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 
+	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/scheduling"
 	"open-cluster-management.io/ocm/pkg/placement/debugger"
 )
@@ -47,6 +49,7 @@ func RunControllerManagerWithInformers(
 	broadcaster.StartRecordingToSink(ctx.Done())
 
 	recorder := broadcaster.NewRecorder(clusterscheme.Scheme, "placementController")
+	metrics := metrics.NewScheduleMetrics(clock.RealClock{})
 
 	scheduler := scheduling.NewPluginScheduler(
 		scheduling.NewSchedulerHandler(
@@ -54,7 +57,7 @@ func RunControllerManagerWithInformers(
 			clusterInformers.Cluster().V1beta1().PlacementDecisions().Lister(),
 			clusterInformers.Cluster().V1alpha1().AddOnPlacementScores().Lister(),
 			clusterInformers.Cluster().V1().ManagedClusters().Lister(),
-			recorder),
+			recorder, metrics),
 	)
 
 	if controllerContext.Server != nil {
@@ -77,7 +80,7 @@ func RunControllerManagerWithInformers(
 		clusterInformers.Cluster().V1beta1().PlacementDecisions(),
 		clusterInformers.Cluster().V1alpha1().AddOnPlacementScores(),
 		scheduler,
-		controllerContext.EventRecorder, recorder,
+		controllerContext.EventRecorder, recorder, metrics,
 	)
 
 	go clusterInformers.Start(ctx.Done())
