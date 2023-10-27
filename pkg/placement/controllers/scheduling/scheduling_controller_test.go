@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clienttesting "k8s.io/client-go/testing"
 	kevents "k8s.io/client-go/tools/events"
+	"k8s.io/utils/clock"
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
@@ -24,6 +25,7 @@ import (
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	"open-cluster-management.io/ocm/pkg/placement/controllers/framework"
+	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 	testinghelpers "open-cluster-management.io/ocm/pkg/placement/helpers/testing"
 	"open-cluster-management.io/ocm/test/integration/util"
 )
@@ -564,7 +566,8 @@ func TestSchedulingController_sync(t *testing.T) {
 				placementLister:         clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
 				placementDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
 				scheduler:               s,
-				recorder:                kevents.NewFakeRecorder(100),
+				eventsRecorder:          kevents.NewFakeRecorder(100),
+				metricsRecorder:         metrics.NewScheduleMetrics(clock.RealClock{}),
 			}
 
 			sysCtx := testingcommon.NewFakeSyncContext(t, c.placement.Namespace+"/"+c.placement.Name)
@@ -1398,7 +1401,8 @@ func TestBind(t *testing.T) {
 				placementLister:         clusterInformerFactory.Cluster().V1beta1().Placements().Lister(),
 				placementDecisionLister: clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister(),
 				scheduler:               s,
-				recorder:                kevents.NewFakeRecorder(100),
+				eventsRecorder:          kevents.NewFakeRecorder(100),
+				metricsRecorder:         metrics.NewScheduleMetrics(clock.RealClock{}),
 			}
 
 			decisions, _, _ := ctrl.generatePlacementDecisionsAndStatus(c.placement, c.clusters)

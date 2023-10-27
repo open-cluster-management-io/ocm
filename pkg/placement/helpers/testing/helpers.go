@@ -5,12 +5,15 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	kevents "k8s.io/client-go/tools/events"
+	"k8s.io/utils/clock"
 
 	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterlisterv1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterlisterv1alpha1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1alpha1"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
+
+	"open-cluster-management.io/ocm/pkg/placement/controllers/metrics"
 )
 
 type FakePluginHandle struct {
@@ -19,6 +22,7 @@ type FakePluginHandle struct {
 	scoreLister             clusterlisterv1alpha1.AddOnPlacementScoreLister
 	clusterLister           clusterlisterv1.ManagedClusterLister
 	client                  clusterclient.Interface
+	metricsRecorder         *metrics.ScheduleMetrics
 }
 
 func (f *FakePluginHandle) EventRecorder() kevents.EventRecorder { return f.recorder }
@@ -34,6 +38,9 @@ func (f *FakePluginHandle) ClusterLister() clusterlisterv1.ManagedClusterLister 
 func (f *FakePluginHandle) ClusterClient() clusterclient.Interface {
 	return f.client
 }
+func (f *FakePluginHandle) MetricsRecorder() *metrics.ScheduleMetrics {
+	return f.metricsRecorder
+}
 
 func NewFakePluginHandle(
 	t *testing.T, client *clusterfake.Clientset, objects ...runtime.Object) *FakePluginHandle {
@@ -44,5 +51,6 @@ func NewFakePluginHandle(
 		placementDecisionLister: informers.Cluster().V1beta1().PlacementDecisions().Lister(),
 		scoreLister:             informers.Cluster().V1alpha1().AddOnPlacementScores().Lister(),
 		clusterLister:           informers.Cluster().V1().ManagedClusters().Lister(),
+		metricsRecorder:         metrics.NewScheduleMetrics(clock.RealClock{}),
 	}
 }

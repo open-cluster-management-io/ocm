@@ -191,6 +191,10 @@ var _ = ginkgo.BeforeSuite(func() {
 	err = features.HubMutableFeatureGate.Set("ManagedClusterAutoApproval=true")
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
+	// enable resourceCleanup feature gate
+	err = features.HubMutableFeatureGate.Set("ResourceCleanup=true")
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 	// start hub controller
 	var ctx context.Context
 	startHub = func() {

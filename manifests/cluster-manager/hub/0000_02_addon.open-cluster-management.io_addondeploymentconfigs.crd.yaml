@@ -129,6 +129,12 @@ spec:
                 description: ProxyConfig holds proxy settings for add-on agent on
                   the managed cluster. Empty means no proxy settings is available.
                 properties:
+                  caBundle:
+                    description: CABundle is a CA certificate bundle to verify the
+                      proxy server. And it's only useful when HTTPSProxy is set and
+                      a HTTPS proxy server is specified.
+                    format: byte
+                    type: string
                   httpProxy:
                     description: HTTPProxy is the URL of the proxy for HTTP requests
                     type: string

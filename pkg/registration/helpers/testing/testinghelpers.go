@@ -28,6 +28,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
@@ -192,11 +193,14 @@ func NewNamespace(name string, terminated bool) *corev1.Namespace {
 	return namespace
 }
 
-func NewManifestWork(namespace, name string, finalizers []string, deletionTimestamp *metav1.Time) *workapiv1.ManifestWork {
+func NewManifestWork(namespace, name string, finalizers []string,
+	labels, annotations map[string]string, deletionTimestamp *metav1.Time) *workapiv1.ManifestWork {
 	work := &workapiv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:         namespace,
 			Name:              name,
+			Labels:            labels,
+			Annotations:       annotations,
 			Finalizers:        finalizers,
 			DeletionTimestamp: deletionTimestamp,
 		},
@@ -228,6 +232,30 @@ func NewRoleBinding(namespace, name string, finalizers []string, labels map[stri
 		rolebinding.DeletionTimestamp = &now
 	}
 	return rolebinding
+}
+
+func NewClusterRole(name string, finalizers []string, labels map[string]string, terminated bool) *rbacv1.ClusterRole {
+	clusterRole := &rbacv1.ClusterRole{}
+	clusterRole.Name = name
+	clusterRole.Finalizers = finalizers
+	clusterRole.Labels = labels
+	if terminated {
+		now := metav1.Now()
+		clusterRole.DeletionTimestamp = &now
+	}
+	return clusterRole
+}
+
+func NewClusterRoleBinding(name string, finalizers []string, labels map[string]string, terminated bool) *rbacv1.ClusterRoleBinding {
+	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
+	clusterRoleBinding.Name = name
+	clusterRoleBinding.Finalizers = finalizers
+	clusterRoleBinding.Labels = labels
+	if terminated {
+		now := metav1.Now()
+		clusterRoleBinding.DeletionTimestamp = &now
+	}
+	return clusterRoleBinding
 }
 
 func NewResourceList(cpu, mem int) corev1.ResourceList {
@@ -498,5 +526,16 @@ func NewTestCert(commonName string, duration time.Duration) *TestCert {
 func WriteFile(filename string, data []byte) {
 	if err := os.WriteFile(filename, data, 0600); err != nil {
 		panic(err)
+	}
+}
+
+func NewManagedClusterAddons(name, namespace string, finalizers []string, deletionTimestamp *metav1.Time) *addonv1alpha1.ManagedClusterAddOn {
+	return &addonv1alpha1.ManagedClusterAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              name,
+			Namespace:         namespace,
+			Finalizers:        finalizers,
+			DeletionTimestamp: deletionTimestamp,
+		},
 	}
 }

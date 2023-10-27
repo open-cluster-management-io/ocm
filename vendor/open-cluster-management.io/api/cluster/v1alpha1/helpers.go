@@ -63,6 +63,7 @@ type RolloutResult struct {
 }
 
 // ClusterRolloutStatusFunc defines a function that return the rollout status for a given workload.
+// +k8s:deepcopy-gen=false
 type ClusterRolloutStatusFunc[T any] func(clusterName string, workload T) (ClusterRolloutStatus, error)
 
 // The RolloutHandler required workload type (interface/struct) to be assigned to the generic type.
