@@ -18,7 +18,6 @@ const (
 )
 
 // Rollout strategy to apply workload to the selected clusters by Placement and DecisionStrategy.
-// +k8s:deepcopy-gen=true
 type RolloutStrategy struct {
 	// Rollout strategy Types are All, Progressive and ProgressivePerGroup
 	// 1) All means apply the workload to all clusters in the decision groups at once.
@@ -43,7 +42,6 @@ type RolloutStrategy struct {
 }
 
 // Timeout to consider while applying the workload.
-// +k8s:deepcopy-gen=true
 type Timeout struct {
 	// Timeout define how long workload applier controller will wait till workload reach successful state in the cluster.
 	// Timeout default value is None meaning the workload applier will not proceed apply workload to other clusters if did not reach the successful state.
@@ -56,7 +54,6 @@ type Timeout struct {
 
 // MandatoryDecisionGroup set the decision group name or group index.
 // GroupName is considered first to select the decisionGroups then GroupIndex.
-// +k8s:deepcopy-gen=true
 type MandatoryDecisionGroup struct {
 	// GroupName of the decision group should match the placementDecisions label value with label key cluster.open-cluster-management.io/decision-group-name
 	// +optional
@@ -68,7 +65,6 @@ type MandatoryDecisionGroup struct {
 }
 
 // MandatoryDecisionGroups
-// +k8s:deepcopy-gen=true
 type MandatoryDecisionGroups struct {
 	// List of the decision groups names or indexes to apply the workload first and fail if workload did not reach successful state.
 	// GroupName or GroupIndex must match with the decisionGroups defined in the placement's decisionStrategy
@@ -77,14 +73,12 @@ type MandatoryDecisionGroups struct {
 }
 
 // RolloutAll is a RolloutStrategy Type
-// +k8s:deepcopy-gen=true
 type RolloutAll struct {
 	// +optional
 	Timeout `json:",inline"`
 }
 
 // RolloutProgressivePerGroup is a RolloutStrategy Type
-// +k8s:deepcopy-gen=true
 type RolloutProgressivePerGroup struct {
 	// +optional
 	MandatoryDecisionGroups `json:",inline"`
@@ -94,7 +88,6 @@ type RolloutProgressivePerGroup struct {
 }
 
 // RolloutProgressive is a RolloutStrategy Type
-// +k8s:deepcopy-gen=true
 type RolloutProgressive struct {
 	// +optional
 	MandatoryDecisionGroups `json:",inline"`

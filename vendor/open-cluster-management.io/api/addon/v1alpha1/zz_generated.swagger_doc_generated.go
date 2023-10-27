@@ -76,6 +76,7 @@ var map_ProxyConfig = map[string]string{
 	"":           "ProxyConfig describes the proxy settings for the add-on agent",
 	"httpProxy":  "HTTPProxy is the URL of the proxy for HTTP requests",
 	"httpsProxy": "HTTPSProxy is the URL of the proxy for HTTPS requests",
+	"caBundle":   "CABundle is a CA certificate bundle to verify the proxy server. And it's only useful when HTTPSProxy is set and a HTTPS proxy server is specified.",
 	"noProxy":    "NoProxy is a comma-separated list of hostnames and/or CIDRs and/or IPs for which the proxy should not be used.",
 }
 

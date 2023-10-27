@@ -6,7 +6,6 @@ import (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:deepcopy-gen=true
 // +kubebuilder:resource:scope="Namespaced"
 // +kubebuilder:subresource:status
 
@@ -22,7 +21,6 @@ type AddOnPlacementScore struct {
 }
 
 // AddOnPlacementScoreStatus represents the current status of AddOnPlacementScore.
-// +k8s:deepcopy-gen=true
 type AddOnPlacementScoreStatus struct {
 	// Conditions contain the different condition statuses for this AddOnPlacementScore.
 	// +patchMergeKey=type
@@ -48,7 +46,6 @@ type AddOnPlacementScoreStatus struct {
 }
 
 // AddOnPlacementScoreItem represents the score name and value.
-// +k8s:deepcopy-gen=true
 type AddOnPlacementScoreItem struct {
 	// Name is the name of the score
 	// +kubebuilder:validation:Required
@@ -64,7 +61,6 @@ type AddOnPlacementScoreItem struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:deepcopy-gen=true
 
 // AddOnPlacementScoreList is a collection of AddOnPlacementScore.
 type AddOnPlacementScoreList struct {
