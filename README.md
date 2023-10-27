@@ -2,6 +2,8 @@
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/5376/badge)](https://bestpractices.coreinfrastructure.org/projects/5376)
+[![Artifact HUB Cluster Manager](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/cluster-manager)](https://artifacthub.io/packages/olm/community-operators/cluster-manager)
+[![Artifact HUB Klusterlet](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/klusterlet)](https://artifacthub.io/packages/olm/community-operators/klusterlet)
 
 Welcome! The open-cluster-management.io project is focused on enabling end-to-end visibility and control across your Kubernetes clusters.
 
