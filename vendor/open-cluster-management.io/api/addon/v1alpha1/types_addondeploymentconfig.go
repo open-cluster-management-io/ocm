@@ -111,6 +111,11 @@ type ProxyConfig struct {
 	// +optional
 	HTTPSProxy string `json:"httpsProxy,omitempty"`
 
+	// CABundle is a CA certificate bundle to verify the proxy server.
+	// And it's only useful when HTTPSProxy is set and a HTTPS proxy server is specified.
+	// +optional
+	CABundle []byte `json:"caBundle,omitempty"`
+
 	// NoProxy is a comma-separated list of hostnames and/or CIDRs and/or IPs for which the proxy
 	// should not be used.
 	// +optional
