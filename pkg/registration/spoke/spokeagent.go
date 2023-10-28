@@ -177,19 +177,21 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 	if err != nil {
 		return err
 	}
+
 	bootstrapClusterClient, err := clusterv1client.NewForConfig(bootstrapClientConfig)
 	if err != nil {
 		return err
 	}
-
-	// start a SpokeClusterCreatingController to make sure there is a spoke cluster on hub cluster
-	spokeClusterCreatingController := registration.NewManagedClusterCreatingController(
+	// start a temp SpokeClusterCreatingController to make sure there is a spoke cluster on hub cluster
+	tempSpokeClusterCreatingController := registration.NewManagedClusterCreatingController(
 		o.agentOptions.SpokeClusterName, o.registrationOption.SpokeExternalServerURLs, o.registrationOption.ClusterAnnotations,
 		spokeClusterCABundle,
-		bootstrapClusterClient,
+		bootstrapClusterClient, // temp controller using the bootstrap kubeconfig
 		recorder,
 	)
-	go spokeClusterCreatingController.Run(ctx, 1)
+	tempSpokeClusterCreatingControllerSyncCtx, tempSpokeClusterCreatingControllerSyncCancel := context.WithCancel(ctx)
+	defer tempSpokeClusterCreatingControllerSyncCancel()
+	go tempSpokeClusterCreatingController.Run(tempSpokeClusterCreatingControllerSyncCtx, 1)
 
 	secretInformer := namespacedManagementKubeInformerFactory.Core().V1().Secrets()
 	if o.registrationOption.bootstrapKubeconfigHealthChecker != nil {
@@ -410,6 +412,15 @@ func (o *SpokeAgentConfig) RunSpokeAgentWithSpokeInformers(ctx context.Context,
 			recorder,
 		)
 	}
+
+	spokeClusterCreatingController := registration.NewManagedClusterCreatingController(
+		o.agentOptions.SpokeClusterName, o.registrationOption.SpokeExternalServerURLs, o.registrationOption.ClusterAnnotations,
+		spokeClusterCABundle,
+		hubClusterClient,
+		recorder,
+	)
+	tempSpokeClusterCreatingControllerSyncCancel()
+	go spokeClusterCreatingController.Run(ctx, 1)
 
 	go hubKubeInformerFactory.Start(ctx.Done())
 	go hubClusterInformerFactory.Start(ctx.Done())
