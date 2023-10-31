@@ -5,8 +5,14 @@ on:
 
 # `stable` label will be added to issues and PRs that have been inactive for 120 days
 # Close stale issues and PRs after 14 days of inactivity
+permissions:
+  contents: read
+
 jobs:
   stale:
+    permissions:
+      issues: write  # for actions/stale to close stale issues
+      pull-requests: write  # for actions/stale to close stale PRs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/stale@v8

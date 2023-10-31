@@ -16,6 +16,9 @@ env:
   GO_VERSION: '1.20'
   GO_REQUIRED_MIN_VERSION: ''
 
+permissions:
+  contents: read
+
 jobs:
   coverage:
     name: coverage
