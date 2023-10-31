@@ -15,6 +15,9 @@ defaults:
   run:
     working-directory: go/src/open-cluster-management.io/ocm
 
+permissions:
+  contents: read
+
 jobs:
   env:
     name: prepare release env
