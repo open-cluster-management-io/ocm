@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
+	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -53,7 +54,15 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", func() {
 				util.NewConfigmap(ns1, "cm1", nil, nil),
 				util.NewConfigmap(ns1, "cm2", nil, nil),
 				newNamespace(ns1))
-			placementRef := workapiv1alpha1.LocalPlacementReference{Name: "placement-test"}
+			placementRef := workapiv1alpha1.LocalPlacementReference{
+				Name: "placement-test",
+				RolloutStrategy: clusterv1alpha1.RolloutStrategy{
+					Type: clusterv1alpha1.All,
+					All: &clusterv1alpha1.RolloutAll{
+						Timeout: clusterv1alpha1.Timeout{Timeout: "None"},
+					},
+				},
+			}
 			manifestWorkReplicaSet := &workapiv1alpha1.ManifestWorkReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "mwrset-",
@@ -261,7 +270,15 @@ var _ = ginkgo.Describe("Test ManifestWorkReplicaSet", func() {
 			ginkgo.By("Create manifestWorkReplicaSet")
 			manifest := workapiv1.Manifest{}
 			manifest.Object = util.NewConfigmap("default", "cm", map[string]string{"a": "b"}, nil)
-			placementRef := workapiv1alpha1.LocalPlacementReference{Name: placementName}
+			placementRef := workapiv1alpha1.LocalPlacementReference{
+				Name: placementName,
+				RolloutStrategy: clusterv1alpha1.RolloutStrategy{
+					Type: clusterv1alpha1.All,
+					All: &clusterv1alpha1.RolloutAll{
+						Timeout: clusterv1alpha1.Timeout{Timeout: "None"},
+					},
+				},
+			}
 			mwReplicaSet := &workapiv1alpha1.ManifestWorkReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      mwReplicaSetName,
