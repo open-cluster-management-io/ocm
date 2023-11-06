@@ -37,19 +37,21 @@ type templateFile struct {
 }
 
 type TemplateAgentAddon struct {
-	decoder            runtime.Decoder
-	templateFiles      []templateFile
-	getValuesFuncs     []GetValuesFunc
-	agentAddonOptions  agent.AgentAddonOptions
-	trimCRDDescription bool
+	decoder               runtime.Decoder
+	templateFiles         []templateFile
+	getValuesFuncs        []GetValuesFunc
+	agentAddonOptions     agent.AgentAddonOptions
+	trimCRDDescription    bool
+	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) string
 }
 
 func newTemplateAgentAddon(factory *AgentAddonFactory) *TemplateAgentAddon {
 	return &TemplateAgentAddon{
-		decoder:            serializer.NewCodecFactory(factory.scheme).UniversalDeserializer(),
-		getValuesFuncs:     factory.getValuesFuncs,
-		agentAddonOptions:  factory.agentAddonOptions,
-		trimCRDDescription: factory.trimCRDDescription,
+		decoder:               serializer.NewCodecFactory(factory.scheme).UniversalDeserializer(),
+		getValuesFuncs:        factory.getValuesFuncs,
+		agentAddonOptions:     factory.agentAddonOptions,
+		trimCRDDescription:    factory.trimCRDDescription,
+		agentInstallNamespace: factory.agentInstallNamespace,
 	}
 }
 
@@ -122,6 +124,12 @@ func (a *TemplateAgentAddon) getBuiltinValues(
 	installNamespace := addon.Spec.InstallNamespace
 	if len(installNamespace) == 0 {
 		installNamespace = AddonDefaultInstallNamespace
+	}
+	if a.agentInstallNamespace != nil {
+		ns := a.agentInstallNamespace(addon)
+		if len(ns) > 0 {
+			installNamespace = ns
+		}
 	}
 	builtinValues.AddonInstallNamespace = installNamespace
 

@@ -34,8 +34,9 @@ type AgentAddonFactory struct {
 	getValuesFuncs    []GetValuesFunc
 	agentAddonOptions agent.AgentAddonOptions
 	// trimCRDDescription flag is used to trim the description of CRDs in manifestWork. disabled by default.
-	trimCRDDescription bool
-	hostingCluster     *clusterv1.ManagedCluster
+	trimCRDDescription    bool
+	hostingCluster        *clusterv1.ManagedCluster
+	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) string
 }
 
 // NewAgentAddonFactory builds an addonAgentFactory instance with addon name and fs.
@@ -78,6 +79,8 @@ func (f *AgentAddonFactory) WithGetValuesFuncs(getValuesFuncs ...GetValuesFunc) 
 }
 
 // WithInstallStrategy defines the installation strategy of the manifests prescribed by Manifests(..).
+// Deprecated: add annotation "addon.open-cluster-management.io/lifecycle: addon-manager" to ClusterManagementAddon
+// and define install strategy in ClusterManagementAddon spec.installStrategy instead.
 func (f *AgentAddonFactory) WithInstallStrategy(strategy *agent.InstallStrategy) *AgentAddonFactory {
 	if strategy.InstallNamespace == "" {
 		strategy.InstallNamespace = AddonDefaultInstallNamespace
@@ -142,8 +145,29 @@ func (f *AgentAddonFactory) WithAgentDeployTriggerClusterFilter(
 	return f
 }
 
+// WithAgentInstallNamespace defines the namespace where the agent resources will be deployed, this will
+// override the default built-in namespace value; And if the registrationOption is not nil but the
+// registrationOption.AgentInstallNamespace is nil, this will also set it to this.
+func (f *AgentAddonFactory) WithAgentInstallNamespace(
+	nsFunc func(addon *addonapiv1alpha1.ManagedClusterAddOn) string,
+) *AgentAddonFactory {
+	f.agentInstallNamespace = nsFunc
+	return f
+}
+
+// preBuildAddon sets the default values for the agentAddonOptions.
+func (f *AgentAddonFactory) preBuildAddon() {
+	if f.agentInstallNamespace != nil {
+		if f.agentAddonOptions.Registration != nil && f.agentAddonOptions.Registration.AgentInstallNamespace == nil {
+			f.agentAddonOptions.Registration.AgentInstallNamespace = f.agentInstallNamespace
+		}
+	}
+}
+
 // BuildHelmAgentAddon builds a helm agentAddon instance.
 func (f *AgentAddonFactory) BuildHelmAgentAddon() (agent.AgentAddon, error) {
+	f.preBuildAddon()
+
 	if err := validateSupportedConfigGVRs(f.agentAddonOptions.SupportedConfigGVRs); err != nil {
 		return nil, err
 	}
@@ -160,6 +184,8 @@ func (f *AgentAddonFactory) BuildHelmAgentAddon() (agent.AgentAddon, error) {
 
 // BuildTemplateAgentAddon builds a template agentAddon instance.
 func (f *AgentAddonFactory) BuildTemplateAgentAddon() (agent.AgentAddon, error) {
+	f.preBuildAddon()
+
 	if err := validateSupportedConfigGVRs(f.agentAddonOptions.SupportedConfigGVRs); err != nil {
 		return nil, err
 	}
