@@ -13,6 +13,7 @@ The scripts provided in this doc help you to setup an Open Cluster Management (O
 
     sudo chmod +x /usr/local/bin/clusteradm
     ```
+    Note: In order to run the scripts provided in this doc successfully, the clusteradm version must be > 0.7.1. You can also build it from the latest [source code](https://github.com/open-cluster-management-io/clusteradm) that contains the desired bug fixes.
 
 ## Setup the first hub cluster
 

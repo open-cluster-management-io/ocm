@@ -18,11 +18,11 @@ joincmd=$(clusteradm init --use-bootstrap-token | grep clusteradm)
 kubectl wait --for=condition=HubRegistrationDegraded=false clustermanager cluster-manager --timeout=60s
 
 kubectl config use ${clusterctx}
-kubectl config view --flatten --minify | sed "s/127.0.0.1:[0-9]\{5\}/${cluster}-control-plane:6443/" > kubeconfig.${cluster}
+kubectl config view --flatten --minify > kubeconfig.${cluster}
 
 kubectl config use ${hostingctx}
 echo "Join ${cluster} to ${hub}"
-$(echo ${joincmd} --singleton --force-internal-endpoint-lookup --mode hosted --managed-cluster-kubeconfig kubeconfig.${cluster} --wait | sed "s/<cluster_name>/$cluster/g")
+$(echo ${joincmd} --singleton --force-internal-endpoint-lookup --mode hosted --force-internal-endpoint-lookup-managed --managed-cluster-kubeconfig kubeconfig.${cluster} --wait | sed "s/<cluster_name>/$cluster/g")
 rm kubeconfig.${cluster}
 
 kubectl config use ${hubctx}
