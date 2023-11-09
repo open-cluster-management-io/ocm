@@ -219,12 +219,7 @@ func TestDeployWithRolloutStrategyReconcileAsExpected(t *testing.T) {
 	}
 	placementLister := clusterInformerFactory.Cluster().V1beta1().Placements().Lister()
 	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
-	perGoupeRollOut := clusterv1alpha1.RolloutStrategy{
-		Type: clusterv1alpha1.ProgressivePerGroup,
-		ProgressivePerGroup: &clusterv1alpha1.RolloutProgressivePerGroup{
-			Timeout: clusterv1alpha1.Timeout{Timeout: "None"},
-		},
-	}
+	perGoupeRollOut := clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.ProgressivePerGroup}
 	mwrSet := helpertest.CreateTestManifestWorkReplicaSetWithRollOutStrategy("mwrSet-test", "default",
 		map[string]clusterv1alpha1.RolloutStrategy{placement.Name: perGoupeRollOut})
 	mw := helpertest.CreateTestManifestWork(mwrSet.Name, mwrSet.Namespace, placement.Name, "cls1")
@@ -355,18 +350,8 @@ func TestDeployWithMultiPlacementsReconcileAsExpected(t *testing.T) {
 
 	placementLister := clusterInformerFactory.Cluster().V1beta1().Placements().Lister()
 	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
-	perGoupeRollOut := clusterv1alpha1.RolloutStrategy{
-		Type: clusterv1alpha1.ProgressivePerGroup,
-		ProgressivePerGroup: &clusterv1alpha1.RolloutProgressivePerGroup{
-			Timeout: clusterv1alpha1.Timeout{Timeout: "None"},
-		},
-	}
-	allRollOut := clusterv1alpha1.RolloutStrategy{
-		Type: clusterv1alpha1.All,
-		All: &clusterv1alpha1.RolloutAll{
-			Timeout: clusterv1alpha1.Timeout{Timeout: "None"},
-		},
-	}
+	perGoupeRollOut := clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.ProgressivePerGroup}
+	allRollOut := clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All}
 
 	mwrSet := helpertest.CreateTestManifestWorkReplicaSetWithRollOutStrategy("mwrSet-test", "default",
 		map[string]clusterv1alpha1.RolloutStrategy{placement1.Name: allRollOut, placement2.Name: perGoupeRollOut})
@@ -471,12 +456,7 @@ func TestDeployMWRSetSpecChangesReconcile(t *testing.T) {
 	}
 	placementLister := clusterInformerFactory.Cluster().V1beta1().Placements().Lister()
 	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
-	perGoupeRollOut := clusterv1alpha1.RolloutStrategy{
-		Type: clusterv1alpha1.ProgressivePerGroup,
-		ProgressivePerGroup: &clusterv1alpha1.RolloutProgressivePerGroup{
-			Timeout: clusterv1alpha1.Timeout{Timeout: "None"},
-		},
-	}
+	perGoupeRollOut := clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.ProgressivePerGroup}
 	mwrSet := helpertest.CreateTestManifestWorkReplicaSetWithRollOutStrategy("mwrSet-test", "default",
 		map[string]clusterv1alpha1.RolloutStrategy{placement.Name: perGoupeRollOut})
 

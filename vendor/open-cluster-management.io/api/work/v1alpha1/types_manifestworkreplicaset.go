@@ -92,7 +92,7 @@ type LocalPlacementReference struct {
 	Name string `json:"name"`
 
 	// +optional
-	// +kubebuilder:default={type: All, all: {timeout: None}}
+	// +kubebuilder:default={type: All, all: {progressDeadline: None}}
 	RolloutStrategy cluster.RolloutStrategy `json:"rolloutStrategy"`
 }
 
