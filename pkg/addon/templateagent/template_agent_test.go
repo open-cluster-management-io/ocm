@@ -19,12 +19,14 @@ import (
 	"k8s.io/klog/v2/ktesting"
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1apha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
 func TestAddonTemplateAgentManifests(t *testing.T) {
@@ -382,6 +384,170 @@ func TestAgentInstallNamespace(t *testing.T) {
 
 		ns := agentAddon.GetAgentAddonOptions().Registration.AgentInstallNamespace(managedClusterAddon)
 		assert.Equal(t, tc.expected, ns, tc.name)
+	}
+}
+
+func TestAgentManifestConfigs(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	addonName := "hello"
+
+	s := runtime.NewScheme()
+	_ = scheme.AddToScheme(s)
+	_ = clusterv1apha1.Install(s)
+	_ = addonapiv1alpha1.Install(s)
+
+	cases := []struct {
+		name                   string
+		addonTemplate          *addonapiv1alpha1.AddOnTemplate
+		clusterManagementAddOn *addonapiv1alpha1.ClusterManagementAddOn
+		expected               []workapiv1.ManifestConfigOption
+	}{
+		{
+			name:                   "no addontemplate in cma status",
+			clusterManagementAddOn: addontesting.NewClusterManagementAddon("hello", "", "").Build(),
+			expected:               nil,
+		},
+		{
+			name: "no addontemplate",
+			clusterManagementAddOn: addontesting.NewClusterManagementAddon("hello", "", "").
+				WithDefaultConfigReferences(
+					addonapiv1alpha1.DefaultConfigReference{
+						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							Group:    utils.AddOnTemplateGVR.Group,
+							Resource: utils.AddOnTemplateGVR.Resource,
+						},
+						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{Name: "hello-template"},
+							SpecHash:       "hash",
+						},
+					},
+				).Build(),
+			expected: nil,
+		},
+		{
+			name: "addontemplate does not have manifestconfigs",
+			clusterManagementAddOn: addontesting.NewClusterManagementAddon("hello", "", "").
+				WithDefaultConfigReferences(
+					addonapiv1alpha1.DefaultConfigReference{
+						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							Group:    utils.AddOnTemplateGVR.Group,
+							Resource: utils.AddOnTemplateGVR.Resource,
+						},
+						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{Name: "hello-template"},
+							SpecHash:       "hash",
+						},
+					},
+				).Build(),
+			addonTemplate: &addonapiv1alpha1.AddOnTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "hello-template",
+				},
+			},
+			expected: nil,
+		},
+		{
+			name: "addontemplate has manifestconfigs",
+			clusterManagementAddOn: addontesting.NewClusterManagementAddon("hello", "", "").
+				WithDefaultConfigReferences(
+					addonapiv1alpha1.DefaultConfigReference{
+						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							Group:    utils.AddOnTemplateGVR.Group,
+							Resource: utils.AddOnTemplateGVR.Resource,
+						},
+						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{Name: "hello-template"},
+							SpecHash:       "hash",
+						},
+					},
+				).Build(),
+			addonTemplate: &addonapiv1alpha1.AddOnTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "hello-template",
+				},
+				Spec: addonapiv1alpha1.AddOnTemplateSpec{
+					AddonName: "hello",
+					AgentSpec: workapiv1.ManifestWorkSpec{
+						ManifestConfigs: []workapiv1.ManifestConfigOption{
+							{
+								ResourceIdentifier: workapiv1.ResourceIdentifier{
+									Group:     "apps",
+									Resource:  "deployment",
+									Name:      "hello",
+									Namespace: "default",
+								},
+								FeedbackRules: []workapiv1.FeedbackRule{
+									{
+										Type: workapiv1.WellKnownStatusType,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployment",
+						Name:      "hello",
+						Namespace: "default",
+					},
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.WellKnownStatusType,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		var objs []runtime.Object
+		if tc.clusterManagementAddOn != nil {
+			objs = append(objs, tc.clusterManagementAddOn)
+		}
+		if tc.addonTemplate != nil {
+			objs = append(objs, tc.addonTemplate)
+		}
+		hubKubeClient := fakekube.NewSimpleClientset()
+		addonClient := fakeaddon.NewSimpleClientset(objs...)
+
+		addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
+		if tc.clusterManagementAddOn != nil {
+			cmaStore := addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetStore()
+			if err := cmaStore.Add(tc.clusterManagementAddOn); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if tc.addonTemplate != nil {
+			atStore := addonInformerFactory.Addon().V1alpha1().AddOnTemplates().Informer().GetStore()
+			if err := atStore.Add(tc.addonTemplate); err != nil {
+				t.Fatal(err)
+			}
+		}
+		kubeInformers := kubeinformers.NewSharedInformerFactoryWithOptions(hubKubeClient, 10*time.Minute)
+
+		agentAddon := NewCRDTemplateAgentAddon(
+			ctx,
+			addonName,
+			"test-agent",
+			hubKubeClient,
+			addonClient,
+			addonInformerFactory,
+			kubeInformers.Rbac().V1().RoleBindings().Lister(),
+			addonfactory.GetAddOnDeploymentConfigValues(
+				addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
+				addonfactory.ToAddOnCustomizedVariableValues,
+				ToAddOnNodePlacementPrivateValues,
+				ToAddOnRegistriesPrivateValues,
+			),
+		)
+
+		agentManifestConfigs := agentAddon.GetAgentAddonOptions().ManifestConfigs
+		assert.Equal(t, tc.expected, agentManifestConfigs)
 	}
 }
 
