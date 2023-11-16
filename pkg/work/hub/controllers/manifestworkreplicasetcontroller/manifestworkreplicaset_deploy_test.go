@@ -222,7 +222,9 @@ func TestDeployWithRolloutStrategyReconcileAsExpected(t *testing.T) {
 	perGoupeRollOut := clusterv1alpha1.RolloutStrategy{
 		Type: clusterv1alpha1.ProgressivePerGroup,
 		ProgressivePerGroup: &clusterv1alpha1.RolloutProgressivePerGroup{
-			Timeout: clusterv1alpha1.Timeout{Timeout: "None"},
+			RolloutConfig: clusterv1alpha1.RolloutConfig{
+				Timeout: "None",
+			},
 		},
 	}
 	mwrSet := helpertest.CreateTestManifestWorkReplicaSetWithRollOutStrategy("mwrSet-test", "default",
@@ -358,13 +360,17 @@ func TestDeployWithMultiPlacementsReconcileAsExpected(t *testing.T) {
 	perGoupeRollOut := clusterv1alpha1.RolloutStrategy{
 		Type: clusterv1alpha1.ProgressivePerGroup,
 		ProgressivePerGroup: &clusterv1alpha1.RolloutProgressivePerGroup{
-			Timeout: clusterv1alpha1.Timeout{Timeout: "None"},
+			RolloutConfig: clusterv1alpha1.RolloutConfig{
+				Timeout: "None",
+			},
 		},
 	}
 	allRollOut := clusterv1alpha1.RolloutStrategy{
 		Type: clusterv1alpha1.All,
 		All: &clusterv1alpha1.RolloutAll{
-			Timeout: clusterv1alpha1.Timeout{Timeout: "None"},
+			RolloutConfig: clusterv1alpha1.RolloutConfig{
+				Timeout: "None",
+			},
 		},
 	}
 
@@ -474,7 +480,9 @@ func TestDeployMWRSetSpecChangesReconcile(t *testing.T) {
 	perGoupeRollOut := clusterv1alpha1.RolloutStrategy{
 		Type: clusterv1alpha1.ProgressivePerGroup,
 		ProgressivePerGroup: &clusterv1alpha1.RolloutProgressivePerGroup{
-			Timeout: clusterv1alpha1.Timeout{Timeout: "None"},
+			RolloutConfig: clusterv1alpha1.RolloutConfig{
+				Timeout: "None",
+			},
 		},
 	}
 	mwrSet := helpertest.CreateTestManifestWorkReplicaSetWithRollOutStrategy("mwrSet-test", "default",

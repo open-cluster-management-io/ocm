@@ -29,7 +29,7 @@ require (
 	k8s.io/kube-aggregator v0.28.1
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	open-cluster-management.io/addon-framework v0.8.1-0.20231009020812-e52774032b4c
-	open-cluster-management.io/api v0.12.1-0.20231027024433-bab1208e6889
+	open-cluster-management.io/api v0.12.1-0.20231116014932-8bf94241ddc0
 	sigs.k8s.io/controller-runtime v0.15.0
 	sigs.k8s.io/kube-storage-version-migrator v0.0.6-0.20230721195810-5c8923c5ff96
 )
@@ -113,12 +113,11 @@ require (
 	go.opentelemetry.io/otel/sdk v1.10.0 // indirect
 	go.opentelemetry.io/otel/trace v1.10.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
-	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.24.0 // indirect
+	go.uber.org/zap v1.26.0 // indirect
 	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
-	golang.org/x/sync v0.2.0 // indirect
+	golang.org/x/sync v0.5.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/term v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect

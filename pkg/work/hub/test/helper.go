@@ -21,7 +21,9 @@ func CreateTestManifestWorkReplicaSet(name string, ns string, placementNames ...
 	allRollOut := clusterv1alpha1.RolloutStrategy{
 		Type: clusterv1alpha1.All,
 		All: &clusterv1alpha1.RolloutAll{
-			Timeout: clusterv1alpha1.Timeout{Timeout: "None"},
+			RolloutConfig: clusterv1alpha1.RolloutConfig{
+				Timeout: "None",
+			},
 		},
 	}
 
