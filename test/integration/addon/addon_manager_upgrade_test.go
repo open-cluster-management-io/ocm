@@ -365,8 +365,10 @@ var _ = ginkgo.Describe("Addon upgrade", func() {
 			cma, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), cma.Name, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			cma.Spec.InstallStrategy.Placements[0].RolloutStrategy = clusterv1alpha1.RolloutStrategy{
-				Type:        clusterv1alpha1.Progressive,
-				Progressive: &clusterv1alpha1.RolloutProgressive{MaxConcurrency: intstr.FromInt(2)},
+				Type: clusterv1alpha1.Progressive,
+				Progressive: &clusterv1alpha1.RolloutProgressive{
+					MaxConcurrency: intstr.FromInt(2),
+				},
 			}
 			cma.Spec.InstallStrategy.Placements[0].Configs[0].ConfigReferent = addonapiv1alpha1.ConfigReferent{Namespace: configDefaultNamespace, Name: configUpdateName}
 			patchClusterManagementAddOn(context.Background(), cma)

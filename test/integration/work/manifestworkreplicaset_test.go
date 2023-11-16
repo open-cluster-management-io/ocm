@@ -57,13 +57,8 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 				util.ToManifest(util.NewConfigmap("defaut", cm1, map[string]string{"a": "b"}, nil)),
 			}
 			placementRef := workapiv1alpha1.LocalPlacementReference{
-				Name: placement.Name,
-				RolloutStrategy: clusterv1alpha1.RolloutStrategy{
-					Type: clusterv1alpha1.All,
-					All: &clusterv1alpha1.RolloutAll{
-						Timeout: clusterv1alpha1.Timeout{Timeout: "None"},
-					},
-				},
+				Name:            placement.Name,
+				RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All},
 			}
 
 			manifestWorkReplicaSet := &workapiv1alpha1.ManifestWorkReplicaSet{
