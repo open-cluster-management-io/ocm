@@ -5,6 +5,14 @@ metadata:
 spec:
   addonName: hello-template
   agentSpec:
+      manifestConfigs:
+        - resourceIdentifier:
+            group: apps
+            name: hello-template-agent
+            namespace: << AddonInstallNamespace >>
+            resource: deployments
+          updateStrategy:
+            type: ServerSideApply
       workload:
         manifests:
           - kind: Deployment

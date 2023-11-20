@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	rbacv1lister "k8s.io/client-go/listers/rbac/v1"
 	"k8s.io/klog/v2"
@@ -54,6 +55,7 @@ type CRDTemplateAgentAddon struct {
 	addonClient         addonv1alpha1client.Interface
 	addonLister         addonlisterv1alpha1.ManagedClusterAddOnLister
 	addonTemplateLister addonlisterv1alpha1.AddOnTemplateLister
+	cmaLister           addonlisterv1alpha1.ClusterManagementAddOnLister
 	rolebindingLister   rbacv1lister.RoleBindingLister
 	addonName           string
 	agentName           string
@@ -79,6 +81,7 @@ func NewCRDTemplateAgentAddon(
 		addonClient:         addonClient,
 		addonLister:         addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 		addonTemplateLister: addonInformers.Addon().V1alpha1().AddOnTemplates().Lister(),
+		cmaLister:           addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
 		rolebindingLister:   rolebindingLister,
 		addonName:           addonName,
 		agentName:           agentName,
@@ -91,7 +94,7 @@ func (a *CRDTemplateAgentAddon) Manifests(
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
 
-	template, err := a.GetDesiredAddOnTemplateByAddon(addon)
+	template, err := a.getDesiredAddOnTemplateInner(addon.Name, addon.Status.ConfigReferences)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +110,7 @@ func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 	for gvr := range utils.BuiltInAddOnConfigGVRs {
 		supportedConfigGVRs = append(supportedConfigGVRs, gvr)
 	}
-	return agent.AgentAddonOptions{
+	agentAddonOptions := agent.AgentAddonOptions{
 		AddonName:       a.addonName,
 		InstallStrategy: nil,
 		HealthProber: &agent.HealthProber{
@@ -124,6 +127,19 @@ func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 		},
 		AgentDeployTriggerClusterFilter: utils.ClusterImageRegistriesAnnotationChanged,
 	}
+
+	template, err := a.GetDesiredAddOnTemplate(nil, "", a.addonName)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("failed to get addon %s template: %v", a.addonName, err))
+		return agentAddonOptions
+	}
+	if template == nil {
+		utilruntime.HandleError(fmt.Errorf("addon %s template is nil", a.addonName))
+		return agentAddonOptions
+	}
+	agentAddonOptions.ManifestConfigs = template.Spec.AgentSpec.ManifestConfigs
+
+	return agentAddonOptions
 }
 
 func (a *CRDTemplateAgentAddon) renderObjects(
@@ -190,19 +206,20 @@ func (a *CRDTemplateAgentAddon) decorateObjects(
 	return objects, nil
 }
 
-// GetDesiredAddOnTemplateByAddon returns the desired template of the addon
-func (a *CRDTemplateAgentAddon) GetDesiredAddOnTemplateByAddon(
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnTemplate, error) {
-	ok, templateRef := AddonTemplateConfigRef(addon.Status.ConfigReferences)
+// getDesiredAddOnTemplateInner returns the desired template of the addon
+func (a *CRDTemplateAgentAddon) getDesiredAddOnTemplateInner(
+	addonName string, configReferences []addonapiv1alpha1.ConfigReference,
+) (*addonapiv1alpha1.AddOnTemplate, error) {
+	ok, templateRef := AddonTemplateConfigRef(configReferences)
 	if !ok {
-		a.logger.V(4).Info("Addon template config in status is empty", "addonName", addon.Name)
+		a.logger.V(4).Info("Addon template config in status is empty", "addonName", addonName)
 		return nil, nil
 	}
 
 	desiredTemplate := templateRef.DesiredConfig
 	if desiredTemplate == nil || desiredTemplate.SpecHash == "" {
-		a.logger.Info("Addon template spec hash is empty", "addonName", addon.Name)
-		return nil, fmt.Errorf("addon %s template desired spec hash is empty", addon.Name)
+		a.logger.Info("Addon template spec hash is empty", "addonName", addonName)
+		return nil, fmt.Errorf("addon %s template desired spec hash is empty", addonName)
 	}
 
 	template, err := a.addonTemplateLister.Get(desiredTemplate.Name)

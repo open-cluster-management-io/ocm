@@ -99,6 +99,7 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 
 	// wait until the mca's ownerref is set.
 	if !utils.IsOwnedByCMA(managedClusterAddonCopy) {
+		klog.Warningf("OwnerReferences is not set for %q", key)
 		return nil
 	}
 

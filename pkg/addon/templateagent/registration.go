@@ -52,16 +52,34 @@ func AddonManagerNamespace() string {
 
 func (a *CRDTemplateAgentAddon) GetDesiredAddOnTemplate(addon *addonapiv1alpha1.ManagedClusterAddOn,
 	clusterName, addonName string) (*addonapiv1alpha1.AddOnTemplate, error) {
+	if addon != nil {
+		return a.getDesiredAddOnTemplateInner(addon.Name, addon.Status.ConfigReferences)
+	}
 
-	if addon == nil {
-		var err error
-		addon, err = a.addonLister.ManagedClusterAddOns(clusterName).Get(addonName)
+	if len(clusterName) != 0 {
+		addon, err := a.addonLister.ManagedClusterAddOns(clusterName).Get(addonName)
 		if err != nil {
 			return nil, err
 		}
+
+		return a.getDesiredAddOnTemplateInner(addon.Name, addon.Status.ConfigReferences)
 	}
 
-	return a.GetDesiredAddOnTemplateByAddon(addon)
+	// clusterName and addon are both empty, backoff to get the template from the clusterManagementAddOn
+	cma, err := a.cmaLister.Get(addonName)
+	if err != nil {
+		return nil, err
+	}
+
+	// convert the DefaultConfigReference to ConfigReference
+	var configReferences []addonapiv1alpha1.ConfigReference
+	for _, configReference := range cma.Status.DefaultConfigReferences {
+		configReferences = append(configReferences, addonapiv1alpha1.ConfigReference{
+			ConfigGroupResource: configReference.ConfigGroupResource,
+			DesiredConfig:       configReference.DesiredConfig,
+		})
+	}
+	return a.getDesiredAddOnTemplateInner(cma.Name, configReferences)
 }
 
 func (a *CRDTemplateAgentAddon) TemplateCSRConfigurationsFunc() func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {

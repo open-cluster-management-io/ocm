@@ -19,6 +19,7 @@ import (
 
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/ocm/pkg/addon/templateagent"
 	"open-cluster-management.io/ocm/test/e2e/manifests"
@@ -208,6 +209,29 @@ var _ = ginkgo.Describe("Enable addon management feature gate", ginkgo.Ordered, 
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Make sure manifestwork config is configured")
+		manifestWork, err := t.HubWorkClient.WorkV1().ManifestWorks(clusterName).Get(context.Background(),
+			fmt.Sprintf("addon-%s-deploy-0", addOnName), metav1.GetOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		foundConfig := false
+		expectedResourceIdentifier := workapiv1.ResourceIdentifier{
+			Group:     "apps",
+			Resource:  "deployments",
+			Name:      "hello-template-agent",
+			Namespace: addonInstallNamespace,
+		}
+		for _, mc := range manifestWork.Spec.ManifestConfigs {
+			if mc.ResourceIdentifier == expectedResourceIdentifier {
+				foundConfig = true
+				gomega.Expect(mc.UpdateStrategy.Type).To(gomega.Equal(workapiv1.UpdateStrategyTypeServerSideApply))
+				break
+			}
+		}
+		if !foundConfig {
+			gomega.Expect(fmt.Errorf("expected manifestwork is not correct, %v",
+				manifestWork.Spec.ManifestConfigs)).ToNot(gomega.HaveOccurred())
+		}
 
 		ginkgo.By(fmt.Sprintf("delete the addon %v on the managed cluster namespace %v", addOnName, clusterName))
 		err = t.AddOnClinet.AddonV1alpha1().ManagedClusterAddOns(clusterName).Delete(
