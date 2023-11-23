@@ -29,7 +29,6 @@ var (
 		"cluster-manager/hub/cluster-manager-registration-webhook-validatingconfiguration.yaml",
 		"cluster-manager/hub/cluster-manager-registration-webhook-mutatingconfiguration.yaml",
 		"cluster-manager/hub/cluster-manager-registration-webhook-clustersetbinding-validatingconfiguration.yaml",
-		"cluster-manager/hub/cluster-manager-registration-webhook-clustersetbinding-validatingconfiguration-v1beta1.yaml",
 	}
 	hubWorkWebhookResourceFiles = []string{
 		"cluster-manager/hub/cluster-manager-work-webhook-validatingconfiguration.yaml",
