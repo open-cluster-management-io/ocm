@@ -147,8 +147,8 @@ type klusterletConfig struct {
 
 	HubApiServerHostAlias *operatorapiv1.HubApiServerHostAlias
 
-	// BestEffortResource is useful for the testing cluster with limited resources or enable resource quota.
-	BestEffortResource bool
+	//  is useful for the testing cluster with limited resources or enabled resource quota.
+	ResourceRequirement operatorapiv1.ResourceQosClass
 }
 
 func (n *klusterletController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
@@ -188,7 +188,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 		RegistrationServiceAccount: serviceAccountName("registration-sa", klusterlet),
 		WorkServiceAccount:         serviceAccountName("work-sa", klusterlet),
-		BestEffortResource:         klusterlet.Spec.BestEffortResource,
+		ResourceRequirement:        helpers.ResourceType(klusterlet),
 	}
 
 	managedClusterClients, err := n.managedClusterClientsBuilder.

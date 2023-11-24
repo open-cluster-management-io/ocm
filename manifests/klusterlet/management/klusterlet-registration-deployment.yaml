@@ -111,7 +111,7 @@ spec:
             scheme: HTTPS
             port: 8443
           initialDelaySeconds: 2
-        {{if not .BestEffortResource}}
+        {{if ne .ResourceRequirements "BestEffort"}}
         resources:
           requests:
             cpu: 2m
