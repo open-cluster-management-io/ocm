@@ -145,6 +145,16 @@ spec:
             registrationImagePullSpec:
               description: RegistrationImagePullSpec represents the desired image configuration of registration agent. quay.io/open-cluster-management.io/registration:latest will be used if unspecified.
               type: string
+            resourceRequirement:
+              description: ResourceRequirement specify QoS classes of klusterlet deployment
+              type: object
+              properties:
+                type:
+                  type: string
+                  default: Default
+                  enum:
+                    - Default
+                    - BestEffort
             workConfiguration:
               description: WorkConfiguration contains the configuration of work
               type: object

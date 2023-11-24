@@ -86,6 +86,26 @@ type KlusterletSpec struct {
 	// registration-agent and work-agent will use it to communicate with hub api server.
 	// +optional
 	HubApiServerHostAlias *HubApiServerHostAlias `json:"hubApiServerHostAlias,omitempty"`
+
+	// ResourceRequirement specify QoS classes of klusterlet deployment
+	// +optional
+	ResourceRequirement *ResourceRequirement `json:"resourceRequirement,omitempty"`
+}
+
+type ResourceQosClass string
+
+const (
+	// Default use resource setting in the template file
+	ResourceQosClassDefault ResourceQosClass = "Default"
+	// If all containers in the pod don't set resource request and limits, the pod is treated as BestEffort.
+	ResourceQosClassBestEffort ResourceQosClass = "BestEffort"
+)
+
+// ResourceRequirement allow user override the default pod QoS classes
+type ResourceRequirement struct {
+	// +kubebuilder:validation:Enum=Default;BestEffort
+	// +kubebuilder:default:=Default
+	Type ResourceQosClass `json:"type"`
 }
 
 // ServerURL represents the apiserver url and ca bundle that is accessible externally
