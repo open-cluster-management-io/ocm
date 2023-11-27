@@ -24,6 +24,9 @@ ifeq ($(GOHOSTOS),darwin)
 	ifeq ($(GOHOSTARCH),amd64)
 		OPERATOR_SDK_ARCHOS:=darwin_amd64
 	endif
+	ifeq ($(GOHOSTARCH),arm64)
+		OPERATOR_SDK_ARCHOS:=darwin_arm64
+	endif
 endif
 
 # Add packages to do unit test
