@@ -604,6 +604,14 @@ func AgentNamespace(klusterlet *operatorapiv1.Klusterlet) string {
 	return KlusterletNamespace(klusterlet)
 }
 
+// ResourceType set default and return resource requirements override by user
+func ResourceType(klusterlet *operatorapiv1.Klusterlet) operatorapiv1.ResourceQosClass {
+	if klusterlet.Spec.ResourceRequirement == nil {
+		return operatorapiv1.ResourceQosClassDefault
+	}
+	return klusterlet.Spec.ResourceRequirement.Type
+}
+
 // SyncSecret forked from:
 // https://github.com/openshift/library-go/blob/d9cdfbd844ea08465b938c46a16bed2ea23207e4/pkg/operator/resource/resourceapply/core.go#L357,
 // add an addition targetClient parameter to support sync secret to another cluster.

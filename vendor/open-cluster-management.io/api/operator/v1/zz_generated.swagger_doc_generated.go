@@ -213,6 +213,7 @@ var map_KlusterletSpec = map[string]string{
 	"registrationConfiguration": "RegistrationConfiguration contains the configuration of registration",
 	"workConfiguration":         "WorkConfiguration contains the configuration of work",
 	"hubApiServerHostAlias":     "HubApiServerHostAlias contains the host alias for hub api server. registration-agent and work-agent will use it to communicate with hub api server.",
+	"resourceRequirement":       "ResourceRequirement specify QoS classes of klusterlet deployment",
 }
 
 func (KlusterletSpec) SwaggerDoc() map[string]string {
@@ -239,6 +240,14 @@ var map_RegistrationConfiguration = map[string]string{
 
 func (RegistrationConfiguration) SwaggerDoc() map[string]string {
 	return map_RegistrationConfiguration
+}
+
+var map_ResourceRequirement = map[string]string{
+	"": "ResourceRequirement allow user override the default pod QoS classes",
+}
+
+func (ResourceRequirement) SwaggerDoc() map[string]string {
+	return map_ResourceRequirement
 }
 
 var map_ServerURL = map[string]string{

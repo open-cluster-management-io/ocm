@@ -229,6 +229,17 @@ spec:
                   configuration of registration agent. quay.io/open-cluster-management.io/registration:latest
                   will be used if unspecified.
                 type: string
+              resourceRequirement:
+                description: ResourceRequirement specify QoS classes of klusterlet
+                  deployment
+                properties:
+                  type:
+                    default: Default
+                    enum:
+                    - Default
+                    - BestEffort
+                    type: string
+                type: object
               workConfiguration:
                 description: WorkConfiguration contains the configuration of work
                 properties:

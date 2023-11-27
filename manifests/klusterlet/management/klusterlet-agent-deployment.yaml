@@ -118,10 +118,12 @@ spec:
             scheme: HTTPS
             port: 8443
           initialDelaySeconds: 2
+        {{if ne .ResourceRequirement "BestEffort"}}
         resources:
           requests:
             cpu: 2m
             memory: 16Mi
+        {{end}}
       volumes:
       - name: bootstrap-secret
         secret:

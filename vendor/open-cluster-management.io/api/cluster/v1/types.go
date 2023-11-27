@@ -200,6 +200,8 @@ const (
 	// cluster is available, the kube-apiserver is healthy and the Klusterlet agent is
 	// running with the minimum deployment on this managed cluster
 	ManagedClusterConditionAvailable string = "ManagedClusterConditionAvailable"
+	// ManagedClusterConditionClockSynced means the clock between the hub and the agent is synced.
+	ManagedClusterConditionClockSynced string = "ManagedClusterConditionClockSynced"
 )
 
 // ResourceName is the name identifying various resources in a ResourceList.
