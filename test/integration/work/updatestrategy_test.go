@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
@@ -34,9 +34,10 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 	ginkgo.BeforeEach(func() {
 		o = spoke.NewWorkloadAgentOptions()
 		o.StatusSyncInterval = 3 * time.Second
+		o.WorkloadSourceDriver.Type = sourceDriver
+		o.WorkloadSourceDriver.Config = sourceConfigFileName
 
 		commOptions = commonoptions.NewAgentOptions()
-		commOptions.HubKubeconfigFile = hubKubeconfigFileName
 		commOptions.SpokeClusterName = utilrand.String(5)
 
 		ns := &corev1.Namespace{}
@@ -210,7 +211,7 @@ var _ = ginkgo.Describe("ManifestWork Update Strategy", func() {
 			patch, err := object.MarshalJSON()
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			_, err = spokeKubeClient.AppsV1().Deployments(commOptions.SpokeClusterName).Patch(
-				context.Background(), "deploy1", types.ApplyPatchType, patch, metav1.PatchOptions{Force: pointer.Bool(true), FieldManager: "test-integration"})
+				context.Background(), "deploy1", types.ApplyPatchType, patch, metav1.PatchOptions{Force: ptr.To[bool](true), FieldManager: "test-integration"})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// Update deployment by work

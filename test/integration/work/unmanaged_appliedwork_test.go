@@ -38,9 +38,10 @@ var _ = ginkgo.Describe("Unmanaged ApplieManifestWork", func() {
 		o = spoke.NewWorkloadAgentOptions()
 		o.StatusSyncInterval = 3 * time.Second
 		o.AppliedManifestWorkEvictionGracePeriod = 10 * time.Second
+		o.WorkloadSourceDriver.Type = sourceDriver
+		o.WorkloadSourceDriver.Config = sourceConfigFileName
 
 		commOptions = commonoptions.NewAgentOptions()
-		commOptions.HubKubeconfigFile = hubKubeconfigFileName
 		commOptions.SpokeClusterName = utilrand.String(5)
 		commOptions.AgentID = utilrand.String(5)
 
@@ -133,9 +134,10 @@ var _ = ginkgo.Describe("Unmanaged ApplieManifestWork", func() {
 
 			newOption := spoke.NewWorkloadAgentOptions()
 			newOption.AppliedManifestWorkEvictionGracePeriod = 5 * time.Second
+			newOption.WorkloadSourceDriver.Type = sourceDriver
+			newOption.WorkloadSourceDriver.Config = newHubKubeConfigFile
 
 			newCommonOptions := commonoptions.NewAgentOptions()
-			newCommonOptions.HubKubeconfigFile = newHubKubeConfigFile
 			newCommonOptions.SpokeClusterName = commOptions.SpokeClusterName
 			newCommonOptions.AgentID = utilrand.String(5)
 
@@ -180,9 +182,10 @@ var _ = ginkgo.Describe("Unmanaged ApplieManifestWork", func() {
 
 			newOption := spoke.NewWorkloadAgentOptions()
 			newOption.AppliedManifestWorkEvictionGracePeriod = 5 * time.Second
+			newOption.WorkloadSourceDriver.Type = sourceDriver
+			newOption.WorkloadSourceDriver.Config = newHubKubeConfigFile
 
 			newCommonOptions := commonoptions.NewAgentOptions()
-			newCommonOptions.HubKubeconfigFile = newHubKubeConfigFile
 			newCommonOptions.SpokeClusterName = commOptions.SpokeClusterName
 			newCommonOptions.AgentID = commOptions.AgentID
 

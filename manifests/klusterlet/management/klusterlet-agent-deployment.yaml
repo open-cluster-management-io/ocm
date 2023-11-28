@@ -55,6 +55,8 @@ spec:
           - "--spoke-cluster-name={{ .ClusterName }}"
           - "--bootstrap-kubeconfig=/spoke/bootstrap/kubeconfig"
           - "--agent-id={{ .AgentID }}"
+          - "--workload-source-driver=kube"
+          - "--workload-source-config=/spoke/hub-kubeconfig/kubeconfig"
           {{ if gt (len .WorkFeatureGates) 0 }}
           {{range .WorkFeatureGates}}
           - {{ . }}

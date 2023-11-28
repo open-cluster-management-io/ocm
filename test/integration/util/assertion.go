@@ -103,8 +103,8 @@ func AssertWorkGeneration(namespace, name string, workClient workclientset.Inter
 }
 
 // AssertWorkDeleted check if work is deleted
-func AssertWorkDeleted(namespace, name, hubhash string, manifests []workapiv1.Manifest,
-	workClient workclientset.Interface, kubeClient kubernetes.Interface,
+func AssertWorkDeleted(namespace, name, appliedManifestWorkName string, manifests []workapiv1.Manifest,
+	workClient, spokeWorkClient workclientset.Interface, spokeKubeClient kubernetes.Interface,
 	eventuallyTimeout, eventuallyInterval int) {
 	// wait for deletion of manifest work
 	gomega.Eventually(func() error {
@@ -119,13 +119,12 @@ func AssertWorkDeleted(namespace, name, hubhash string, manifests []workapiv1.Ma
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())
 
 	// wait for deletion of appliedmanifestwork
-	appliedManifestWorkName := fmt.Sprintf("%s-%s", hubhash, name)
-	AssertAppliedManifestWorkDeleted(appliedManifestWorkName, workClient, eventuallyTimeout, eventuallyInterval)
+	AssertAppliedManifestWorkDeleted(appliedManifestWorkName, spokeWorkClient, eventuallyTimeout, eventuallyInterval)
 
 	// Once manifest work is deleted, all applied resources should have already been deleted too
 	for _, manifest := range manifests {
 		expected := manifest.Object.(*corev1.ConfigMap)
-		_, err := kubeClient.CoreV1().ConfigMaps(expected.Namespace).Get(context.Background(), expected.Name, metav1.GetOptions{})
+		_, err := spokeKubeClient.CoreV1().ConfigMaps(expected.Namespace).Get(context.Background(), expected.Name, metav1.GetOptions{})
 		gomega.Expect(apierrors.IsNotFound(err)).To(gomega.BeTrue())
 	}
 }

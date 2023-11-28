@@ -33,17 +33,24 @@ const (
 	cm1, cm2           = "cm1", "cm2"
 )
 
+// focus on hub is a kube cluster
+const sourceDriver = "kube"
+
 var tempDir string
-var hubKubeconfigFileName string
-var spokeRestConfig *rest.Config
+
 var testEnv *envtest.Environment
-var spokeKubeClient kubernetes.Interface
-var spokeWorkClient workclientset.Interface
-var hubWorkClient workclientset.Interface
-var hubClusterClient clusterclientset.Interface
-var hubHash string
 var envCtx context.Context
 var envCancel context.CancelFunc
+
+var sourceConfigFileName string
+var hubWorkClient workclientset.Interface
+
+var hubClusterClient clusterclientset.Interface
+var hubHash string
+
+var spokeRestConfig *rest.Config
+var spokeKubeClient kubernetes.Interface
+var spokeWorkClient workclientset.Interface
 
 var CRDPaths = []string{
 	// hub
@@ -78,8 +85,9 @@ var _ = ginkgo.BeforeSuite(func() {
 	tempDir, err = os.MkdirTemp("", "test")
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(tempDir).ToNot(gomega.BeEmpty())
-	hubKubeconfigFileName = path.Join(tempDir, "kubeconfig")
-	err = util.CreateKubeconfigFile(cfg, hubKubeconfigFileName)
+
+	sourceConfigFileName = path.Join(tempDir, "kubeconfig")
+	err = util.CreateKubeconfigFile(cfg, sourceConfigFileName)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	err = workapiv1.Install(scheme.Scheme)
