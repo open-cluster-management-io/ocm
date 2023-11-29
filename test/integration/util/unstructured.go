@@ -152,6 +152,18 @@ var (
 		Resource: "roles",
 	}
 
+	clusterRoleGVK = schema.GroupVersionKind{
+		Group:   "rbac.authorization.k8s.io",
+		Version: "v1",
+		Kind:    "ClusterRole",
+	}
+
+	clusterRoleGVR = schema.GroupVersionResource{
+		Group:    "rbac.authorization.k8s.io",
+		Version:  "v1",
+		Resource: "clusterroles",
+	}
+
 	roleBindingGVK = schema.GroupVersionKind{
 		Group:   "rbac.authorization.k8s.io",
 		Version: "v1",
@@ -239,6 +251,24 @@ func NewRole(namespace, name string) (*unstructured.Unstructured, schema.GroupVe
 	}
 
 	return toUnstructured(obj, roleGVK, scheme), roleGVR
+}
+
+func NewClusterRole(namespace, name string) (*unstructured.Unstructured, schema.GroupVersionResource) {
+	obj := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:     []string{"create", "get", "list", "watch"},
+				APIGroups: []string{""},
+				Resources: []string{"configmaps"},
+			},
+		},
+	}
+
+	return toUnstructured(obj, clusterRoleGVK, scheme), clusterRoleGVR
 }
 
 func NewRoleBinding(namespace, name, sa, role string) (*unstructured.Unstructured, schema.GroupVersionResource) {

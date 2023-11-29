@@ -468,6 +468,11 @@ func BuildResourceMeta(
 		return resourceMeta, schema.GroupVersionResource{}, fmt.Errorf("the server doesn't have a resource type %q", gvk.Kind)
 	}
 
+	// if resource scope is non-namespaces, set namespace to empty in resourceMeta
+	if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+		resourceMeta.Namespace = ""
+	}
+
 	resourceMeta.Resource = mapping.Resource.Resource
 	return resourceMeta, mapping.Resource, err
 }
