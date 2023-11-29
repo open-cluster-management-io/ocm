@@ -439,6 +439,47 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		})
 	})
 
+	ginkgo.Context("With cluster scoped resource in manifests", func() {
+		var spokeDynamicClient dynamic.Interface
+		var gvrs []schema.GroupVersionResource
+		var objects []*unstructured.Unstructured
+
+		ginkgo.BeforeEach(func() {
+			spokeDynamicClient, err = dynamic.NewForConfig(spokeRestConfig)
+			gvrs = nil
+			objects = nil
+
+			// Create a clusterrole with namespace in metadata
+			u, gvr := util.NewClusterRole(commOptions.SpokeClusterName, "work-clusterrole")
+			gvrs = append(gvrs, gvr)
+			objects = append(objects, u)
+
+			for _, obj := range objects {
+				manifests = append(manifests, util.ToManifest(obj))
+			}
+		})
+
+		ginkgo.It("should create Clusterrole successfully", func() {
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue},
+				eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
+				[]metav1.ConditionStatus{metav1.ConditionTrue},
+				eventuallyTimeout, eventuallyInterval)
+
+			var namespaces, names []string
+			for _, obj := range objects {
+				// the namespace should be empty for cluster scoped resource
+				namespaces = append(namespaces, "")
+				names = append(names, obj.GetName())
+			}
+
+			util.AssertExistenceOfResources(gvrs, namespaces, names, spokeDynamicClient, eventuallyTimeout, eventuallyInterval)
+			util.AssertAppliedResources(hubHash, work.Name, gvrs, namespaces, names, hubWorkClient, eventuallyTimeout, eventuallyInterval)
+		})
+
+	})
+
 	ginkgo.Context("With Service Account, Role, RoleBinding and Deployment in manifests", func() {
 		var spokeDynamicClient dynamic.Interface
 		var gvrs []schema.GroupVersionResource
