@@ -5,8 +5,11 @@ metadata:
 rules:
 # Allow controller to get/list/watch/create/delete configmaps/events
 - apiGroups: [""]
-  resources: ["configmaps", "events", "pods"]
+  resources: ["configmaps", "events"]
   verbs: ["get", "list", "watch", "create", "update", "delete", "deletecollection", "patch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get"]
 - apiGroups: ["apps"]
   resources: ["replicasets"]
   verbs: ["get"] 
