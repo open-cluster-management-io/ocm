@@ -85,6 +85,8 @@ spec:
         - name: hub-kubeconfig-secret
           mountPath: "/spoke/hub-kubeconfig"
           readOnly: true
+        - name: tmpdir
+          mountPath: /tmp
         {{if eq .InstallMode "Hosted"}}
         - name: spoke-kubeconfig-secret
           mountPath: "/spoke/config"
@@ -113,6 +115,8 @@ spec:
       - name: hub-kubeconfig-secret
         secret:
           secretName: {{ .HubKubeConfigSecret }}
+      - name: tmpdir
+        emptyDir: { }
       {{if eq .InstallMode "Hosted"}}
       - name: spoke-kubeconfig-secret
         secret:
