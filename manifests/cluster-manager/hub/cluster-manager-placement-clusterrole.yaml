@@ -5,8 +5,11 @@ metadata:
 rules:
 # Allow controller to get/list/watch/create/delete configmaps
 - apiGroups: [""]
-  resources: ["configmaps", "pods"]
+  resources: ["configmaps"]
   verbs: ["get", "list", "watch", "create", "delete", "update"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get"]
 - apiGroups: ["apps"]
   resources: ["replicasets"]
   verbs: ["get"] 

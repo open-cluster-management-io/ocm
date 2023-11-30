@@ -31,7 +31,7 @@ metadata:
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
     containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2023-11-28T10:34:20Z"
+    createdAt: "2023-11-30T08:06:17Z"
     description: Manages the installation and upgrade of the Klusterlet.
     operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -93,7 +93,6 @@ spec:
         - apiGroups:
           - ""
           resources:
-          - secrets
           - configmaps
           - serviceaccounts
           verbs:
@@ -103,6 +102,30 @@ spec:
           - update
           - watch
           - patch
+          - delete
+        - apiGroups:
+          - ""
+          resources:
+          - secrets
+          verbs:
+          - create
+        - apiGroups:
+          - ""
+          resourceNames:
+          - open-cluster-management-image-pull-credentials
+          - bootstrap-hub-kubeconfig
+          - hub-kubeconfig-secret
+          - external-managed-kubeconfig
+          - external-managed-kubeconfig-work
+          - external-managed-kubeconfig-registration
+          - external-managed-kubeconfig-agent
+          resources:
+          - secrets
+          verbs:
+          - update
+          - get
+          - list
+          - watch
           - delete
         - apiGroups:
           - ""
