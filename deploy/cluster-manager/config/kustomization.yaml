@@ -3,9 +3,12 @@ kind: Kustomization
 
 resources:
 - crds/0000_01_operator.open-cluster-management.io_clustermanagers.crd.yaml
+- operator/namespace.yaml
+- operator/hub_namespace.yaml
 - rbac/cluster_role.yaml
 - rbac/cluster_role_binding.yaml
-- operator/namespace.yaml
+- rbac/role.yaml
+- rbac/role_binding.yaml
 - operator/service_account.yaml
 - operator/operator.yaml
 

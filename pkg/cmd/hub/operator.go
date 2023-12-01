@@ -22,6 +22,7 @@ func NewHubOperatorCmd() *cobra.Command {
 
 	flags := cmd.Flags()
 	flags.BoolVar(&cmOptions.SkipRemoveCRDs, "skip-remove-crds", false, "Skip removing CRDs while ClusterManager is deleting.")
+	flags.BoolVar(&cmOptions.EnableHostedMode, "enable-hosted-mode", false, "Allow installing cluster manager in hosted mode.")
 	opts.AddFlags(flags)
 	return cmd
 }

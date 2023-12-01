@@ -5,10 +5,7 @@ metadata:
 rules:
 - apiGroups: [ "" ]
   resources: [ "configmaps"]
-  verbs: [ "get", "list", "watch"]
-- apiGroups: [""]
-  resources: ["pods"]
-  verbs: ["get"]
+  verbs: ["get", "list", "watch"]
 # Allow create subjectaccessreviews
 - apiGroups: ["authorization.k8s.io"]
   resources: ["subjectaccessreviews"]
@@ -40,6 +37,3 @@ rules:
 - apiGroups: ["config.openshift.io"]
   resources: ["infrastructures"]
   verbs: ["get"]
-- apiGroups: ["apps"]
-  resources: ["replicasets"]
-  verbs: ["get"] 

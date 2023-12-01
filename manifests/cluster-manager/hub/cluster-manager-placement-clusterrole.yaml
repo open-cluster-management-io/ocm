@@ -6,13 +6,7 @@ rules:
 # Allow controller to get/list/watch/create/delete configmaps
 - apiGroups: [""]
   resources: ["configmaps"]
-  verbs: ["get", "list", "watch", "create", "delete", "update"]
-- apiGroups: [""]
-  resources: ["pods"]
-  verbs: ["get"]
-- apiGroups: ["apps"]
-  resources: ["replicasets"]
-  verbs: ["get"] 
+  verbs: ["get", "list", "watch"]
 # Allow create subjectaccessreviews to access debug path
 - apiGroups: ["authorization.k8s.io"]
   resources: ["subjectaccessreviews"]
