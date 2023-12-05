@@ -165,6 +165,45 @@ var _ = ginkgo.Describe("Cluster Lease Update", func() {
 		gracePeriod := 2 * 5 * util.TestLeaseDurationSeconds
 		assertAvailableCondition(managedClusterName, metav1.ConditionUnknown, gracePeriod)
 	})
+
+	ginkgo.It("clock sync condition should work", func() {
+		// run registration agent
+		agentOptions := &spoke.SpokeAgentOptions{
+			BootstrapKubeconfig:      bootstrapKubeConfigFile,
+			HubKubeconfigSecret:      hubKubeconfigSecret,
+			ClusterHealthCheckPeriod: 1 * time.Minute,
+		}
+		commOptions := commonoptions.NewAgentOptions()
+		commOptions.HubKubeconfigDir = hubKubeconfigDir
+		commOptions.SpokeClusterName = managedClusterName
+
+		stop := runAgent("cluster-leasetest", agentOptions, commOptions, spokeCfg)
+		bootstrapManagedCluster(managedClusterName, hubKubeconfigSecret, util.TestLeaseDurationSeconds)
+
+		gracePeriod := 2 * 5 * util.TestLeaseDurationSeconds
+		assertCloclSyncedCondition(managedClusterName, metav1.ConditionTrue, gracePeriod)
+
+		// stop the agent in case agent update the lease.
+		stop()
+
+		// update the managed cluster lease renew time
+		now := time.Now()
+		gomega.Eventually(func() error {
+			lease, err := util.GetManagedClusterLease(kubeClient, managedClusterName)
+			if err != nil {
+				return err
+			}
+			// The default lease duration is 60s.
+			// The renewTime is 2 leaseDuration before the hub's now, so the clock should be out of sync.
+			// The renewTime + 5 * leaseDuration > now, so the available condition should be true
+			lease.Spec.RenewTime = &metav1.MicroTime{Time: now.Add(-120 * time.Second)}
+			_, err = kubeClient.CoordinationV1().Leases(managedClusterName).Update(context.TODO(), lease, metav1.UpdateOptions{})
+			return err
+		}, eventuallyInterval, eventuallyTimeout).ShouldNot(gomega.HaveOccurred())
+
+		assertAvailableCondition(managedClusterName, metav1.ConditionTrue, 0)
+		assertCloclSyncedCondition(managedClusterName, metav1.ConditionFalse, 0)
+	})
 })
 
 func bootstrapManagedCluster(managedClusterName, hubKubeconfigSecret string, leaseDuration int32) {
@@ -212,4 +251,22 @@ func updateManagedClusterLeaseDuration(clusterName string, leaseDuration int32) 
 
 	_, err = clusterClient.ClusterV1().ManagedClusters().Update(context.TODO(), cluster, metav1.UpdateOptions{})
 	return err
+}
+
+func assertCloclSyncedCondition(managedClusterName string, status metav1.ConditionStatus, d int) {
+	<-time.After(time.Duration(d) * time.Second)
+	gomega.Eventually(func() error {
+		managedCluster, err := util.GetManagedCluster(clusterClient, managedClusterName)
+		if err != nil {
+			return err
+		}
+		cond := meta.FindStatusCondition(managedCluster.Status.Conditions, clusterv1.ManagedClusterConditionClockSynced)
+		if cond == nil {
+			return fmt.Errorf("available condition is not found")
+		}
+		if cond.Status != status {
+			return fmt.Errorf("expected avaibale condition is %s, but %v", status, cond)
+		}
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
