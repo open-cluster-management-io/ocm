@@ -82,6 +82,7 @@ spec:
               - ALL
           privileged: false
           runAsNonRoot: true
+          readOnlyRootFilesystem: true
         volumeMounts:
         - name: hub-kubeconfig-secret
           mountPath: "/spoke/hub-kubeconfig"

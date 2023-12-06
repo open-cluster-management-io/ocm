@@ -96,6 +96,7 @@ spec:
               - ALL
           privileged: false
           runAsNonRoot: true
+          readOnlyRootFilesystem: true
         volumeMounts:
         - name: bootstrap-secret
           mountPath: "/spoke/bootstrap"
