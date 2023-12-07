@@ -1,0 +1,32 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cluster-manager
+  namespace: open-cluster-management-hub
+rules:
+# Allow the registration-operator to create workload
+- apiGroups: [""]
+  resources: ["serviceaccounts", "services"]
+  verbs: ["create", "get", "list", "update", "watch", "patch", "delete", "deletecollection"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch", "update", "patch", "delete"]
+  resourceNames:
+    - "signer-secret"
+    - "registration-webhook-serving-cert"
+    - "work-webhook-serving-cert"
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["create", "get", "list", "update", "watch", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["replicasets"]
+  verbs: ["get"]

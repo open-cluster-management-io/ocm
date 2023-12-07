@@ -23,7 +23,8 @@ import (
 )
 
 type Options struct {
-	SkipRemoveCRDs bool
+	SkipRemoveCRDs   bool
+	EnableHostedMode bool
 }
 
 // RunClusterManagerOperator starts a new cluster manager operator
@@ -38,14 +39,17 @@ func (o *Options) RunClusterManagerOperator(ctx context.Context, controllerConte
 	// After we introduced hosted mode, the hub components could be installed in a customized
 	// namespace.(Before that, it only inform from "open-cluster-management-hub" namespace)
 	// It requires us to add filter for each Informer respectively.
-	// TODO: Watch all namespace may cause performance issue.
-	kubeInformer := informers.NewSharedInformerFactoryWithOptions(kubeClient, 5*time.Minute)
+	var options []informers.SharedInformerOption
+	if !o.EnableHostedMode {
+		options = append(options, informers.WithNamespace("open-cluster-management-hub"))
+	}
+	kubeInformer := informers.NewSharedInformerFactoryWithOptions(kubeClient, 5*time.Minute, options...)
 
 	newOnTermInformer := func(name string) informers.SharedInformerFactory {
-		return informers.NewSharedInformerFactoryWithOptions(kubeClient, 5*time.Minute,
-			informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-				options.FieldSelector = fields.OneTermEqualSelector("metadata.name", name).String()
-			}))
+		onTermOptions := append(options, informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", name).String()
+		}))
+		return informers.NewSharedInformerFactoryWithOptions(kubeClient, 5*time.Minute, onTermOptions...)
 	}
 
 	signerSecretInformer := newOnTermInformer(helpers.SignerSecret)

@@ -1,0 +1,22 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: open-cluster-management:{{ .ClusterManagerName }}:controller
+  namespace: {{ .ClusterManagerNamespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: open-cluster-management:{{ .ClusterManagerName }}:controller
+subjects:
+- kind: ServiceAccount
+  namespace: {{ .ClusterManagerNamespace }}
+  name: addon-manager-controller-sa
+- kind: ServiceAccount
+  namespace: {{ .ClusterManagerNamespace }}
+  name: placement-controller-sa
+- kind: ServiceAccount
+  namespace: {{ .ClusterManagerNamespace }}
+  name: work-controller-sa
+- kind: ServiceAccount
+  namespace: {{ .ClusterManagerNamespace }}
+  name: registration-controller-sa

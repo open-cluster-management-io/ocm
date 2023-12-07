@@ -27,6 +27,8 @@ var (
 
 	// The hubRbacResourceFiles should be deployed in the hub cluster.
 	hubRbacResourceFiles = []string{
+		"cluster-manager/hub/cluster-manager-role.yaml",
+		"cluster-manager/hub/cluster-manager-rolebinding.yaml",
 		// registration
 		"cluster-manager/hub/cluster-manager-registration-clusterrole.yaml",
 		"cluster-manager/hub/cluster-manager-registration-clusterrolebinding.yaml",
