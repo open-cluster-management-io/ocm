@@ -104,8 +104,7 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 				clusterNames.Insert(clusterName)
 			}
 
-			decision, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).UpdateStatus(
-				context.TODO(), decision, metav1.UpdateOptions{})
+			_, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).UpdateStatus(context.TODO(), decision, metav1.UpdateOptions{})
 			return manifestWorkReplicaSet, clusterNames, err
 		}
 	})
@@ -132,8 +131,7 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			removedCluster := decision.Status.Decisions[2].ClusterName
 			decision.Status.Decisions = decision.Status.Decisions[:2]
-			decision, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).UpdateStatus(
-				context.TODO(), decision, metav1.UpdateOptions{})
+			_, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).UpdateStatus(context.TODO(), decision, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			clusterNames.Delete(removedCluster)
 			gomega.Eventually(assertWorksByReplicaSet(clusterNames, manifestWorkReplicaSet), eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())

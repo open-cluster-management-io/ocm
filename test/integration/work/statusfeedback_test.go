@@ -12,7 +12,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	ocmfeature "open-cluster-management.io/api/feature"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -36,9 +36,10 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 	ginkgo.BeforeEach(func() {
 		o = spoke.NewWorkloadAgentOptions()
 		o.StatusSyncInterval = 3 * time.Second
+		o.WorkloadSourceDriver.Type = sourceDriver
+		o.WorkloadSourceDriver.Config = sourceConfigFileName
 
 		commOptions = commonoptions.NewAgentOptions()
-		commOptions.HubKubeconfigFile = hubKubeconfigFileName
 		commOptions.SpokeClusterName = utilrand.String(5)
 
 		ns := &corev1.Namespace{}
@@ -135,21 +136,21 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 						Name: "ReadyReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(2),
+							Integer: ptr.To[int64](2),
 						},
 					},
 					{
 						Name: "Replicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(3),
+							Integer: ptr.To[int64](3),
 						},
 					},
 					{
 						Name: "AvailableReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(2),
+							Integer: ptr.To[int64](2),
 						},
 					},
 				}
@@ -197,21 +198,21 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 						Name: "ReadyReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(3),
+							Integer: ptr.To[int64](3),
 						},
 					},
 					{
 						Name: "Replicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(3),
+							Integer: ptr.To[int64](3),
 						},
 					},
 					{
 						Name: "AvailableReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(3),
+							Integer: ptr.To[int64](3),
 						},
 					},
 				}
@@ -297,7 +298,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 						Name: "Available",
 						Value: workapiv1.FieldValue{
 							Type:   workapiv1.String,
-							String: pointer.String("True"),
+							String: ptr.To[string]("True"),
 						},
 					},
 				}
@@ -313,7 +314,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 		})
 
-		ginkgo.It("should return none for resources with no wellKnowne status", func() {
+		ginkgo.It("should return none for resources with no wellknown status", func() {
 			sa, _ := util.NewServiceAccount(commOptions.SpokeClusterName, "sa")
 			work.Spec.Workload.Manifests = append(work.Spec.Workload.Manifests, util.ToManifest(sa))
 
@@ -387,21 +388,21 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 						Name: "ReadyReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(2),
+							Integer: ptr.To[int64](2),
 						},
 					},
 					{
 						Name: "Replicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(3),
+							Integer: ptr.To[int64](3),
 						},
 					},
 					{
 						Name: "AvailableReplicas",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.Integer,
-							Integer: pointer.Int64(2),
+							Integer: ptr.To[int64](2),
 						},
 					},
 				}
@@ -541,7 +542,7 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 						Name: "conditions",
 						Value: workapiv1.FieldValue{
 							Type:    workapiv1.JsonRaw,
-							JsonRaw: pointer.String(`[{"lastTransitionTime":null,"lastUpdateTime":null,"status":"True","type":"Available"}]`),
+							JsonRaw: ptr.To[string](`[{"lastTransitionTime":null,"lastUpdateTime":null,"status":"True","type":"Available"}]`),
 						},
 					},
 				}

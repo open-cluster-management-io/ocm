@@ -152,7 +152,7 @@ spec:
                                   anyOf:
                                   - type: integer
                                   - type: string
-                                  default: "0"
+                                  default: 0
                                   description: MaxFailures is a percentage or number
                                     of clusters in the current rollout that can fail
                                     before proceeding to the next rollout. MaxFailures
@@ -249,7 +249,7 @@ spec:
                                   anyOf:
                                   - type: integer
                                   - type: string
-                                  default: "0"
+                                  default: 0
                                   description: MaxFailures is a percentage or number
                                     of clusters in the current rollout that can fail
                                     before proceeding to the next rollout. MaxFailures
@@ -335,7 +335,7 @@ spec:
                                   anyOf:
                                   - type: integer
                                   - type: string
-                                  default: "0"
+                                  default: 0
                                   description: MaxFailures is a percentage or number
                                     of clusters in the current rollout that can fail
                                     before proceeding to the next rollout. MaxFailures

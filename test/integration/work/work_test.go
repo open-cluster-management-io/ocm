@@ -48,9 +48,10 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 		o = spoke.NewWorkloadAgentOptions()
 		o.StatusSyncInterval = 3 * time.Second
 		o.AppliedManifestWorkEvictionGracePeriod = 5 * time.Second
+		o.WorkloadSourceDriver.Type = sourceDriver
+		o.WorkloadSourceDriver.Config = sourceConfigFileName
 
 		commOptions = commonoptions.NewAgentOptions()
-		commOptions.HubKubeconfigFile = hubKubeconfigFileName
 		commOptions.SpokeClusterName = utilrand.String(5)
 
 		ns := &corev1.Namespace{}
@@ -159,7 +160,8 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			util.AssertWorkDeleted(work.Namespace, work.Name, hubHash, manifests, hubWorkClient, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkDeleted(work.Namespace, work.Name, fmt.Sprintf("%s-%s", hubHash, work.Name),
+				manifests, hubWorkClient, spokeWorkClient, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 	})
 
@@ -233,7 +235,8 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 			err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Delete(context.Background(), work.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			util.AssertWorkDeleted(work.Namespace, work.Name, hubHash, manifests, hubWorkClient, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkDeleted(work.Namespace, work.Name, fmt.Sprintf("%s-%s", hubHash, work.Name),
+				manifests, hubWorkClient, spokeWorkClient, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 	})
 
@@ -742,7 +745,8 @@ var _ = ginkgo.Describe("ManifestWork", func() {
 				}
 			}()
 
-			util.AssertWorkDeleted(work.Namespace, work.Name, hubHash, manifests, hubWorkClient, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
+			util.AssertWorkDeleted(work.Namespace, work.Name, fmt.Sprintf("%s-%s", hubHash, work.Name), manifests,
+				hubWorkClient, spokeWorkClient, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 		})
 
 		ginkgo.It("should delete applied manifest work if it is orphan", func() {

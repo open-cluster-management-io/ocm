@@ -53,7 +53,8 @@ spec:
           - "/work"
           - "agent"
           - "--spoke-cluster-name={{ .ClusterName }}"
-          - "--hub-kubeconfig=/spoke/hub-kubeconfig/kubeconfig"
+          - "--workload-source-driver=kube"
+          - "--workload-source-config=/spoke/hub-kubeconfig/kubeconfig"
           - "--agent-id={{ .AgentID }}"
           {{ if gt (len .WorkFeatureGates) 0 }}
           {{range .WorkFeatureGates}}

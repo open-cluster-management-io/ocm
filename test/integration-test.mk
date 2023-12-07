@@ -51,5 +51,10 @@ test-addon-integration: ensure-kubebuilder-tools
 	./addon-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast
 .PHONY: test-addon-integration
 
+test-cloudevents-integration: ensure-kubebuilder-tools
+	go test -c ./test/integration/cloudevents -o ./cloudevents-integration.test
+	./cloudevents-integration.test -ginkgo.slow-spec-threshold=15s -ginkgo.v -ginkgo.fail-fast
+.PHONY: test-cloudevents-integration
+
 test-integration: test-registration-operator-integration test-registration-integration test-placement-integration test-work-integration test-addon-integration
 .PHONY: test-integration

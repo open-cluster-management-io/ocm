@@ -25,6 +25,7 @@ munge-csv
 *.out
 _output/
 .idea/
+*.diff
 
 .kubeconfig
 .hub-kubeconfig

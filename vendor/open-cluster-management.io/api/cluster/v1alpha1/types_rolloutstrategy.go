@@ -81,7 +81,7 @@ type RolloutConfig struct {
 	// Default is that no failures are tolerated.
 	// +kubebuilder:validation:Pattern="^((100|[0-9]{1,2})%|[0-9]+)$"
 	// +kubebuilder:validation:XIntOrString
-	// +kubebuilder:default="0"
+	// +kubebuilder:default=0
 	// +optional
 	MaxFailures intstr.IntOrString `json:"maxFailures,omitempty"`
 	// Timeout defines how long the workload applier controller will wait until the workload reaches a

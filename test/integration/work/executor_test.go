@@ -40,11 +40,13 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 	ginkgo.BeforeEach(func() {
 		o = spoke.NewWorkloadAgentOptions()
 		o.StatusSyncInterval = 3 * time.Second
+		o.WorkloadSourceDriver.Type = sourceDriver
+		o.WorkloadSourceDriver.Config = sourceConfigFileName
+
 		err := features.SpokeMutableFeatureGate.Set("ExecutorValidatingCaches=true")
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		commOptions = commonoptions.NewAgentOptions()
-		commOptions.HubKubeconfigFile = hubKubeconfigFileName
 		commOptions.SpokeClusterName = utilrand.String(5)
 
 		ns := &corev1.Namespace{}
