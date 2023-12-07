@@ -108,12 +108,9 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 			return nil
 		}
 
-		// Hub cluster-admin denies the current spoke cluster, we remove its related resources and update its condition.
+		// Hub cluster-admin denies the current spoke cluster, update its condition.
+		// The resources applied on this spoke will keep there.
 		c.eventRecorder.Eventf("ManagedClusterDenied", "managed cluster %s is denied by hub cluster admin", managedClusterName)
-
-		if err := c.removeManagedClusterResources(ctx, managedClusterName); err != nil {
-			return err
-		}
 
 		meta.SetStatusCondition(&newManagedCluster.Status.Conditions, metav1.Condition{
 			Type:    v1.ManagedClusterConditionHubAccepted,
@@ -183,19 +180,6 @@ func (c *managedClusterController) sync(ctx context.Context, syncCtx factory.Syn
 	}
 	if updated {
 		c.eventRecorder.Eventf("ManagedClusterAccepted", "managed cluster %s is accepted by hub cluster admin", managedClusterName)
-	}
-	return operatorhelpers.NewMultiLineAggregate(errs)
-}
-
-func (c *managedClusterController) removeManagedClusterResources(ctx context.Context, managedClusterName string) error {
-	var errs []error
-	// Clean up managed cluster manifests
-	assetFn := helpers.ManagedClusterAssetFn(manifests.RBACManifests, managedClusterName)
-	resourceResults := resourceapply.DeleteAll(ctx, resourceapply.NewKubeClientHolder(c.kubeClient), c.eventRecorder, assetFn, staticFiles...)
-	for _, result := range resourceResults {
-		if result.Error != nil {
-			errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
-		}
 	}
 	return operatorhelpers.NewMultiLineAggregate(errs)
 }
