@@ -58,6 +58,8 @@ spec:
             drop:
               - ALL
           privileged: false
+          runAsNonRoot: true
+          readOnlyRootFilesystem: true
         livenessProbe:
           httpGet:
             path: /healthz
@@ -75,6 +77,13 @@ spec:
           requests:
             cpu: 2m
             memory: 16Mi
+        volumeMounts:
+        - name: tmpdir
+          mountPath: /tmp
+      volumes:
+      - name: tmpdir
+        emptyDir: { }
+
       # Uncomment the following configuration lines to add hostAliases for hub api server, 
       # if the server field in your hub cluster kubeconfig is a domain name instead of an ipv4 address.
       # For example, https://xxx.yyy.zzz.

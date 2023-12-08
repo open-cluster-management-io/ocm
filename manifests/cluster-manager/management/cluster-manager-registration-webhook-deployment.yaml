@@ -67,6 +67,7 @@ spec:
             - ALL
           privileged: false
           runAsNonRoot: true
+          readOnlyRootFilesystem: true
         livenessProbe:
           httpGet:
             path: /healthz
