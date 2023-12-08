@@ -146,6 +146,9 @@ type klusterletConfig struct {
 	WorkFeatureGates         []string
 
 	HubApiServerHostAlias *operatorapiv1.HubApiServerHostAlias
+
+	//  is useful for the testing cluster with limited resources or enabled resource quota.
+	ResourceRequirement operatorapiv1.ResourceQosClass
 }
 
 func (n *klusterletController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
@@ -185,6 +188,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 
 		RegistrationServiceAccount: serviceAccountName("registration-sa", klusterlet),
 		WorkServiceAccount:         serviceAccountName("work-sa", klusterlet),
+		ResourceRequirement:        helpers.ResourceType(klusterlet),
 	}
 
 	managedClusterClients, err := n.managedClusterClientsBuilder.

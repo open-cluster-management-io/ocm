@@ -2,6 +2,10 @@
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/5376/badge)](https://bestpractices.coreinfrastructure.org/projects/5376)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/open-cluster-management-io/ocm/badge)](https://api.securityscorecards.dev/projects/github.com/open-cluster-management-io/ocm)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fopen-cluster-management-io%2Focm.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fopen-cluster-management-io%2Focm?ref=badge_shield&issueType=license)
+[![Artifact HUB Cluster Manager](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/cluster-manager)](https://artifacthub.io/packages/olm/community-operators/cluster-manager)
+[![Artifact HUB Klusterlet](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/klusterlet)](https://artifacthub.io/packages/olm/community-operators/klusterlet)
 
 Welcome! The open-cluster-management.io project is focused on enabling end-to-end visibility and control across your Kubernetes clusters.
 

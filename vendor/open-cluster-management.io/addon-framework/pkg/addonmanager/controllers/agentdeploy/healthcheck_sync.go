@@ -221,6 +221,10 @@ func (s *healthCheckSyncer) analyzeDeploymentWorkProber(
 	deployments := utils.FilterDeployments(manifests)
 	for _, deployment := range deployments {
 		manifestConfig := utils.DeploymentWellKnowManifestConfig(deployment.Namespace, deployment.Name)
+		// only probe the deployment with non-zero replicas
+		if deployment.Spec.Replicas != nil && *deployment.Spec.Replicas == 0 {
+			continue
+		}
 		probeFields = append(probeFields, agent.ProbeField{
 			ResourceIdentifier: manifestConfig.ResourceIdentifier,
 			ProbeRules:         manifestConfig.FeedbackRules,

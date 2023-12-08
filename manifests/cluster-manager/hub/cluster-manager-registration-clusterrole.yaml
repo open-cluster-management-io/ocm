@@ -12,8 +12,11 @@ rules:
   verbs: ["update"]
 # Allow hub to get/list/watch/create/delete namespace and service account
 - apiGroups: [""]
-  resources: ["namespaces", "serviceaccounts", "configmaps", "pods"]
+  resources: ["namespaces", "serviceaccounts", "configmaps"]
   verbs: ["get", "list", "watch", "create", "delete", "update"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get"]
 - apiGroups: ["", "events.k8s.io"]
   resources: ["events"]
   verbs: ["create", "patch", "update"]

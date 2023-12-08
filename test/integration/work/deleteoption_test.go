@@ -19,7 +19,7 @@ import (
 	"open-cluster-management.io/ocm/test/integration/util"
 )
 
-var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
+var _ = ginkgo.Describe("ManifestWork Delete Option", func() {
 	var o *spoke.WorkloadAgentOptions
 	var commOptions *commonoptions.AgentOptions
 	var cancel context.CancelFunc
@@ -33,9 +33,10 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 	ginkgo.BeforeEach(func() {
 		o = spoke.NewWorkloadAgentOptions()
 		o.StatusSyncInterval = 3 * time.Second
+		o.WorkloadSourceDriver.Type = sourceDriver
+		o.WorkloadSourceDriver.Config = sourceConfigFileName
 
 		commOptions = commonoptions.NewAgentOptions()
-		commOptions.HubKubeconfigFile = hubKubeconfigFileName
 		commOptions.SpokeClusterName = utilrand.String(5)
 
 		ns := &corev1.Namespace{}
@@ -295,8 +296,6 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			appliedManifestWorkName = fmt.Sprintf("%s-%s", hubHash, work.Name)
-
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
@@ -364,8 +363,6 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			appliedManifestWorkName = fmt.Sprintf("%s-%s", hubHash, work.Name)
-
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkAvailable, metav1.ConditionTrue,
@@ -424,8 +421,6 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 
 			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-			appliedManifestWorkName = fmt.Sprintf("%s-%s", hubHash, work.Name)
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)
@@ -491,8 +486,6 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 
 			work, err = hubWorkClient.WorkV1().ManifestWorks(commOptions.SpokeClusterName).Create(context.Background(), work, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-			appliedManifestWorkName = fmt.Sprintf("%s-%s", hubHash, work.Name)
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied, metav1.ConditionTrue,
 				[]metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionTrue}, eventuallyTimeout, eventuallyInterval)

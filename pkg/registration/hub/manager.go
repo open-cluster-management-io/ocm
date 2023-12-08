@@ -196,6 +196,13 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 		controllerContext.EventRecorder,
 	)
 
+	clockSyncController := lease.NewClockSyncController(
+		clusterClient,
+		clusterInformers.Cluster().V1().ManagedClusters(),
+		kubeInformers.Coordination().V1().Leases(),
+		controllerContext.EventRecorder,
+	)
+
 	managedClusterSetController := managedclusterset.NewManagedClusterSetController(
 		clusterClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
@@ -268,6 +275,7 @@ func (m *HubManagerOptions) RunControllerManagerWithInformers(
 	go taintController.Run(ctx, 1)
 	go csrController.Run(ctx, 1)
 	go leaseController.Run(ctx, 1)
+	go clockSyncController.Run(ctx, 1)
 	go managedClusterSetController.Run(ctx, 1)
 	go managedClusterSetBindingController.Run(ctx, 1)
 	go clusterroleController.Run(ctx, 1)

@@ -5,8 +5,13 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   dco_check:
+    permissions:
+      pull-requests: read  # for tim-actions/get-pr-commits to get list of commits from the PR
     runs-on: ubuntu-latest
     name: DCO Check
     steps:

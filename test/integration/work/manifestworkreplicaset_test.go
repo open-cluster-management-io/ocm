@@ -12,6 +12,7 @@ import (
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
@@ -55,7 +56,10 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 			manifests := []workapiv1.Manifest{
 				util.ToManifest(util.NewConfigmap("defaut", cm1, map[string]string{"a": "b"}, nil)),
 			}
-			placementRef := workapiv1alpha1.LocalPlacementReference{Name: placement.Name}
+			placementRef := workapiv1alpha1.LocalPlacementReference{
+				Name:            placement.Name,
+				RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All},
+			}
 
 			manifestWorkReplicaSet := &workapiv1alpha1.ManifestWorkReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{
@@ -100,8 +104,7 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 				clusterNames.Insert(clusterName)
 			}
 
-			decision, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).UpdateStatus(
-				context.TODO(), decision, metav1.UpdateOptions{})
+			_, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).UpdateStatus(context.TODO(), decision, metav1.UpdateOptions{})
 			return manifestWorkReplicaSet, clusterNames, err
 		}
 	})
@@ -128,8 +131,7 @@ var _ = ginkgo.Describe("ManifestWorkReplicaSet", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			removedCluster := decision.Status.Decisions[2].ClusterName
 			decision.Status.Decisions = decision.Status.Decisions[:2]
-			decision, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).UpdateStatus(
-				context.TODO(), decision, metav1.UpdateOptions{})
+			_, err = hubClusterClient.ClusterV1beta1().PlacementDecisions(placementDecision.Namespace).UpdateStatus(context.TODO(), decision, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			clusterNames.Delete(removedCluster)
 			gomega.Eventually(assertWorksByReplicaSet(clusterNames, manifestWorkReplicaSet), eventuallyTimeout, eventuallyInterval).Should(gomega.Succeed())

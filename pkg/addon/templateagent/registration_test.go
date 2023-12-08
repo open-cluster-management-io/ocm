@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificates "k8s.io/api/certificates/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -663,5 +665,47 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 		if c.validatePermissionFunc != nil {
 			c.validatePermissionFunc(t, hubKubeClient)
 		}
+	}
+}
+
+func TestAddonManagerNamespace(t *testing.T) {
+	cases := []struct {
+		name         string
+		podNamespace string
+		envNs        string
+		expected     string
+	}{
+		{
+			name:         "pod namespace is not empty",
+			podNamespace: "test",
+			envNs:        "",
+			expected:     "test",
+		},
+		{
+			name:         "pod namespace is empty, env is not empty",
+			podNamespace: "",
+			envNs:        "test-env",
+			expected:     "test-env",
+		},
+		{
+			name:         "default namespace",
+			podNamespace: "",
+			envNs:        "",
+			expected:     "open-cluster-management-hub",
+		},
+	}
+
+	for _, c := range cases {
+		if c.podNamespace != "" {
+			podNamespace = c.podNamespace
+		}
+		if c.envNs != "" {
+			os.Setenv("POD_NAMESPACE", c.envNs)
+		}
+		ns := AddonManagerNamespace()
+		assert.Equal(t, c.expected, ns)
+		// reset podNamespace and env
+		podNamespace = ""
+		os.Setenv("POD_NAMESPACE", "")
 	}
 }

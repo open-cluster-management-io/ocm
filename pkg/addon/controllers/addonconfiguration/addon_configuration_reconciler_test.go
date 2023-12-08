@@ -437,7 +437,8 @@ func TestAddonConfigReconcile(t *testing.T) {
 				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
 				RolloutStrategy: clusterv1alpha1.RolloutStrategy{
 					Type:        clusterv1alpha1.Progressive,
-					Progressive: &clusterv1alpha1.RolloutProgressive{MaxConcurrency: intstr.FromInt(1)}},
+					Progressive: &clusterv1alpha1.RolloutProgressive{MaxConcurrency: intstr.FromInt(1)},
+				},
 			}).WithInstallProgression(addonv1alpha1.InstallProgression{
 				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
 				ConfigReferences: []addonv1alpha1.InstallConfigReference{
@@ -493,7 +494,8 @@ func TestAddonConfigReconcile(t *testing.T) {
 				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
 				RolloutStrategy: clusterv1alpha1.RolloutStrategy{
 					Type:        clusterv1alpha1.Progressive,
-					Progressive: &clusterv1alpha1.RolloutProgressive{MaxConcurrency: intstr.FromString("50%")}},
+					Progressive: &clusterv1alpha1.RolloutProgressive{MaxConcurrency: intstr.FromString("50%")},
+				},
 			}).WithInstallProgression(addonv1alpha1.InstallProgression{
 				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
 				ConfigReferences: []addonv1alpha1.InstallConfigReference{
@@ -546,10 +548,8 @@ func TestAddonConfigReconcile(t *testing.T) {
 				},
 			},
 			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", "").WithPlacementStrategy(addonv1alpha1.PlacementStrategy{
-				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
-				RolloutStrategy: clusterv1alpha1.RolloutStrategy{
-					Type:        clusterv1alpha1.Progressive,
-					Progressive: &clusterv1alpha1.RolloutProgressive{}},
+				PlacementRef:    addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.Progressive},
 			}).WithInstallProgression(addonv1alpha1.InstallProgression{
 				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
 				ConfigReferences: []addonv1alpha1.InstallConfigReference{
@@ -713,8 +713,8 @@ func TestAddonConfigReconcile(t *testing.T) {
 				addonv1alpha1.PlacementStrategy{
 					PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
 					RolloutStrategy: clusterv1alpha1.RolloutStrategy{
-						Type: clusterv1alpha1.ProgressivePerGroup,
-					}}).WithInstallProgression(addonv1alpha1.InstallProgression{
+						Type: clusterv1alpha1.ProgressivePerGroup},
+				}).WithInstallProgression(addonv1alpha1.InstallProgression{
 				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
 				ConfigReferences: []addonv1alpha1.InstallConfigReference{
 					{

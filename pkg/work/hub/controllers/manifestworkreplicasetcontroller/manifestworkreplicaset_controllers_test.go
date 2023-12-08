@@ -150,7 +150,7 @@ func TestManifestWorkReplicaSetControllerPatchStatus(t *testing.T) {
 				w.Finalizers = []string{ManifestWorkReplicaSetFinalizer}
 				return w
 			}(),
-			works: helpertest.CreateTestManifestWorks("test", "default", "cluster1", "cluster2"),
+			works: helpertest.CreateTestManifestWorks("test", "default", "placement", "cluster1", "cluster2"),
 			placement: func() *clusterv1beta1.Placement {
 				p, _ := helpertest.CreateTestPlacement("placement", "default", "cluster1", "cluster2")
 				return p
@@ -181,7 +181,7 @@ func TestManifestWorkReplicaSetControllerPatchStatus(t *testing.T) {
 				w.Finalizers = []string{ManifestWorkReplicaSetFinalizer}
 				return w
 			}(),
-			works: helpertest.CreateTestManifestWorks("test", "default", "cluster1", "cluster2"),
+			works: helpertest.CreateTestManifestWorks("test", "default", "placement", "cluster1", "cluster2"),
 			placement: func() *clusterv1beta1.Placement {
 				p, _ := helpertest.CreateTestPlacement("placement", "default", "cluster2", "cluster3", "cluster4")
 				return p

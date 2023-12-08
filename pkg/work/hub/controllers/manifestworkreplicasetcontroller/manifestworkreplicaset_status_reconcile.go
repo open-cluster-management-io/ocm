@@ -6,6 +6,7 @@ import (
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 
 	worklisterv1 "open-cluster-management.io/api/client/work/listers/work/v1"
+	"open-cluster-management.io/api/utils/work/v1/workapplier"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 )
@@ -29,33 +30,53 @@ func (d *statusReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 		return mwrSet, reconcileContinue, nil
 	}
 
-	manifestWorks, err := listManifestWorksByManifestWorkReplicaSet(mwrSet, d.manifestWorkLister)
-	if err != nil {
-		return mwrSet, reconcileContinue, err
-	}
-
 	appliedCount, availableCount, degradCount, processingCount := 0, 0, 0, 0
-	for _, mw := range manifestWorks {
-		if !mw.DeletionTimestamp.IsZero() {
-			continue
+	for id, plcSummary := range mwrSet.Status.PlacementsSummary {
+		manifestWorks, err := listManifestWorksByMWRSetPlacementRef(mwrSet, plcSummary.Name, d.manifestWorkLister)
+		if err != nil {
+			return mwrSet, reconcileContinue, err
 		}
 
-		// applied condition
-		if apimeta.IsStatusConditionTrue(mw.Status.Conditions, workapiv1.WorkApplied) {
-			appliedCount++
+		applied, available, degrad, processing := 0, 0, 0, 0
+		for _, mw := range manifestWorks {
+			if !mw.DeletionTimestamp.IsZero() {
+				continue
+			}
+
+			// Check if ManifestWorkTemplate changes, ManifestWork will need to be updated.
+			newMW := &workapiv1.ManifestWork{}
+			mw.ObjectMeta.DeepCopyInto(&newMW.ObjectMeta)
+			mwrSet.Spec.ManifestWorkTemplate.DeepCopyInto(&newMW.Spec)
+			if !workapplier.ManifestWorkEqual(newMW, mw) {
+				continue
+			}
+
+			// applied condition
+			if apimeta.IsStatusConditionTrue(mw.Status.Conditions, workapiv1.WorkApplied) {
+				applied++
+			}
+			// Progressing condition
+			if apimeta.IsStatusConditionTrue(mw.Status.Conditions, workapiv1.WorkProgressing) {
+				processing++
+			}
+			// Available condition
+			if apimeta.IsStatusConditionTrue(mw.Status.Conditions, workapiv1.WorkAvailable) {
+				available++
+			}
+			// Degraded condition
+			if apimeta.IsStatusConditionTrue(mw.Status.Conditions, workapiv1.WorkDegraded) {
+				degrad++
+			}
 		}
-		// Progressing condition
-		if apimeta.IsStatusConditionTrue(mw.Status.Conditions, workapiv1.WorkProgressing) {
-			processingCount++
-		}
-		// Available condition
-		if apimeta.IsStatusConditionTrue(mw.Status.Conditions, workapiv1.WorkAvailable) {
-			availableCount++
-		}
-		// Degraded condition
-		if apimeta.IsStatusConditionTrue(mw.Status.Conditions, workapiv1.WorkDegraded) {
-			degradCount++
-		}
+		mwrSet.Status.PlacementsSummary[id].Summary.Applied = applied
+		mwrSet.Status.PlacementsSummary[id].Summary.Progressing = processing
+		mwrSet.Status.PlacementsSummary[id].Summary.Available = available
+		mwrSet.Status.PlacementsSummary[id].Summary.Degraded = degrad
+		// Set the manifestWorkReplicaSet count
+		appliedCount = appliedCount + applied
+		processingCount = processingCount + processing
+		availableCount = availableCount + available
+		degradCount = degradCount + degrad
 	}
 
 	mwrSet.Status.Summary.Available = availableCount

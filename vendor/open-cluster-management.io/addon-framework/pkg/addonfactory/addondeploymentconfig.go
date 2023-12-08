@@ -154,6 +154,10 @@ func ToAddOnProxyConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Va
 		proxyConfig["NO_PROXY"] = config.Spec.ProxyConfig.NoProxy
 	}
 
+	if len(config.Spec.ProxyConfig.CABundle) > 0 {
+		proxyConfig["PROXY_CA_BUNDLE"] = string(config.Spec.ProxyConfig.CABundle)
+	}
+
 	type global struct {
 		ProxyConfig map[string]string `json:"proxyConfig"`
 	}
@@ -263,6 +267,9 @@ func ToAddOnDeploymentConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig
 	}
 	if len(config.Spec.ProxyConfig.NoProxy) > 0 {
 		values["NoProxy"] = config.Spec.ProxyConfig.NoProxy
+	}
+	if len(config.Spec.ProxyConfig.CABundle) > 0 {
+		values["ProxyCABundle"] = string(config.Spec.ProxyConfig.CABundle)
 	}
 
 	return values, nil

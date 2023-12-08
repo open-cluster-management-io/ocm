@@ -61,6 +61,7 @@ spec:
               - ALL
           privileged: false
           runAsNonRoot: true
+          readOnlyRootFilesystem: true
         livenessProbe:
           httpGet:
             path: /healthz
@@ -79,12 +80,16 @@ spec:
             cpu: 2m
             memory: 16Mi
         volumeMounts:
+        - name: tmpdir
+          mountPath: /tmp
         {{ if .HostedMode }}
         - mountPath: /var/run/secrets/hub
           name: kubeconfig
           readOnly: true
         {{ end }}
       volumes:
+      - name: tmpdir
+        emptyDir: { }
       {{ if .HostedMode }}
       - name: kubeconfig
         secret:

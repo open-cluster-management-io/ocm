@@ -208,19 +208,6 @@ func NewManifestWork(namespace, name string, finalizers []string,
 	return work
 }
 
-func NewRole(namespace, name string, finalizers []string, labels map[string]string, terminated bool) *rbacv1.Role {
-	role := &rbacv1.Role{}
-	role.Namespace = namespace
-	role.Name = name
-	role.Finalizers = finalizers
-	role.Labels = labels
-	if terminated {
-		now := metav1.Now()
-		role.DeletionTimestamp = &now
-	}
-	return role
-}
-
 func NewRoleBinding(namespace, name string, finalizers []string, labels map[string]string, terminated bool) *rbacv1.RoleBinding {
 	rolebinding := &rbacv1.RoleBinding{}
 	rolebinding.Namespace = namespace

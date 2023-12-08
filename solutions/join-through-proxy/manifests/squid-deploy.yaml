@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: squid
+  namespace: squid
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: squid
+  template:
+    metadata:
+      labels:
+        app: squid
+    spec:
+      containers:
+      - name: squid
+        image: ubuntu/squid:5.2-22.04_beta
+        ports:
+        - containerPort: 3128
+          name: http
+          protocol: TCP
+        - containerPort: 3129
+          name: https
+          protocol: TCP
+        volumeMounts:
+        - name: squid-config-volume
+          mountPath: /etc/squid/squid.conf
+          subPath: squid.conf
+        - name: squid-tls-volume
+          mountPath: /etc/squid/squid-cert-key.pem
+          subPath: squid-cert-key.pem
+        - name: squid-data-volume
+          mountPath: /var/spool/squid
+      volumes:
+        - name: squid-config-volume
+          configMap:
+            name: squid-config
+            items:
+            - key: squid
+              path: squid.conf
+        - name: squid-tls-volume
+          secret:
+            secretName: squid-cert-key
+            items:
+            - key: squid-cert-key.pem
+              path: squid-cert-key.pem
+        - name: squid-data-volume
+          emptyDir:
+            medium: Memory

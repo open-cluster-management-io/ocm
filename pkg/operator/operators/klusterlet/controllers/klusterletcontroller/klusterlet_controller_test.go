@@ -414,7 +414,8 @@ func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, cl
 		"/work",
 		"agent",
 		fmt.Sprintf("--spoke-cluster-name=%s", clusterName),
-		"--hub-kubeconfig=/spoke/hub-kubeconfig/kubeconfig",
+		"--workload-source-driver=kube",
+		"--workload-source-config=/spoke/hub-kubeconfig/kubeconfig",
 		"--agent-id=",
 	}
 

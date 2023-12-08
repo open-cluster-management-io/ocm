@@ -87,12 +87,15 @@ spec:
               - ALL
           privileged: false
           runAsNonRoot: true
+          readOnlyRootFilesystem: true
         volumeMounts:
         - name: bootstrap-secret
           mountPath: "/spoke/bootstrap"
           readOnly: true
         - name: hub-kubeconfig
           mountPath: "/spoke/hub-kubeconfig"
+        - name: tmpdir
+          mountPath: /tmp
         {{if eq .InstallMode "Hosted"}}
         - name: spoke-kubeconfig-secret
           mountPath: "/spoke/config"
@@ -111,10 +114,12 @@ spec:
             scheme: HTTPS
             port: 8443
           initialDelaySeconds: 2
+        {{if ne .ResourceRequirement "BestEffort"}}
         resources:
           requests:
             cpu: 2m
             memory: 16Mi
+        {{end}}
       volumes:
       - name: bootstrap-secret
         secret:
@@ -122,6 +127,8 @@ spec:
       - name: hub-kubeconfig
         emptyDir:
           medium: Memory
+      - name: tmpdir
+        emptyDir: { }
       {{if eq .InstallMode "Hosted"}}
       - name: spoke-kubeconfig-secret
         secret:

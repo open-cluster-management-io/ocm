@@ -18,7 +18,7 @@ import (
 func TestPlaceMWControllerIndex(t *testing.T) {
 	mwrSetTest := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
 	mwrSetTest.Status.Summary.Total = 1
-	mw, _ := CreateManifestWork(mwrSetTest, "cls1")
+	mw, _ := CreateManifestWork(mwrSetTest, "cls1", "place-test")
 	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSetTest, mw)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
 

@@ -3,6 +3,7 @@ package util
 import (
 	"context"
 
+	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,6 +20,14 @@ func GetManagedCluster(clusterClient clusterclientset.Interface, spokeClusterNam
 		return nil, err
 	}
 	return spokeCluster, nil
+}
+
+func GetManagedClusterLease(kubeClient kubernetes.Interface, spokeClusterName string) (*coordinationv1.Lease, error) {
+	lease, err := kubeClient.CoordinationV1().Leases(spokeClusterName).Get(context.TODO(), "managed-cluster-lease", metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return lease, nil
 }
 
 func AcceptManagedCluster(clusterClient clusterclientset.Interface, spokeClusterName string) error {

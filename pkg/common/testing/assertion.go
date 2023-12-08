@@ -51,7 +51,7 @@ func AssertErrorWithPrefix(t *testing.T, actual error, expectedErrorPrefix strin
 func AssertActions(t *testing.T, actualActions []clienttesting.Action, expectedVerbs ...string) {
 	t.Helper()
 	if len(actualActions) != len(expectedVerbs) {
-		t.Fatalf("expected %d call but got: %#v", len(expectedVerbs), actualActions)
+		t.Fatalf("expected %d call but got %d: %#v", len(expectedVerbs), len(actualActions), actualActions)
 	}
 	for i, expected := range expectedVerbs {
 		if actualActions[i].GetVerb() != expected {

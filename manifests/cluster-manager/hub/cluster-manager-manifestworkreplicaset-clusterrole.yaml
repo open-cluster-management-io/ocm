@@ -4,8 +4,11 @@ metadata:
   name: open-cluster-management:{{ .ClusterManagerName }}-work:controller
 rules:
 - apiGroups: [ "" ]
-  resources: [ "configmaps", "pods"]
+  resources: [ "configmaps"]
   verbs: [ "get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get"]
 # Allow create subjectaccessreviews
 - apiGroups: ["authorization.k8s.io"]
   resources: ["subjectaccessreviews"]
