@@ -29,12 +29,40 @@ import (
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
-var (
-	testMigrationRequestFiles = []string{
-		"cluster-manager/test/cluster-manager-managedclustersets-migration.yaml",
-		"cluster-manager/test/cluster-manager-managedclustersetbindings-migration.yaml",
+func newFakeCRD(name string, storageVersion string, versions ...string) runtime.Object {
+	crd := &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
 	}
-)
+	crd.Spec.Versions = make([]apiextensionsv1.CustomResourceDefinitionVersion, len(versions))
+	for i, version := range versions {
+		storage := false
+		if version == storageVersion {
+			storage = true
+		}
+		crd.Spec.Versions[i] = apiextensionsv1.CustomResourceDefinitionVersion{
+			Name:    version,
+			Storage: storage,
+		}
+	}
+	return crd
+}
+
+func newFakeMigration(name, group, resource, version string) *migrationv1alpha1.StorageVersionMigration {
+	return &migrationv1alpha1.StorageVersionMigration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: migrationv1alpha1.StorageVersionMigrationSpec{
+			Resource: migrationv1alpha1.GroupVersionResource{
+				Group:    group,
+				Version:  version,
+				Resource: resource,
+			},
+		},
+	}
+}
 
 func TestSupportStorageVersionMigration(t *testing.T) {
 	cases := []struct {
@@ -49,7 +77,7 @@ func TestSupportStorageVersionMigration(t *testing.T) {
 		{
 			name: "support",
 			existingObjects: []runtime.Object{
-				newCrd(migrationRequestCRDName),
+				newFakeCRD(migrationRequestCRDName, "v1", "v1"),
 			},
 			supported: true,
 		},
@@ -69,98 +97,180 @@ func TestSupportStorageVersionMigration(t *testing.T) {
 	}
 }
 
-func newCrd(name string) runtime.Object {
-	return &apiextensionsv1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-	}
-}
-
-func TestApplyStorageVersionMigrations(t *testing.T) {
+func TestCheckCRDStorageVersion(t *testing.T) {
 	cases := []struct {
-		name            string
-		existingObjects []runtime.Object
-		validateActions func(t *testing.T, actions []clienttesting.Action)
+		name               string
+		crds               []runtime.Object
+		toCreateMigrations []*migrationv1alpha1.StorageVersionMigration
+		expectErr          bool
 	}{
 		{
-			name: "created",
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertActions(t, actions, "get", "create", "get", "create")
-				actual := actions[1].(clienttesting.CreateActionImpl).Object
-				assertStorageVersionMigration(t, "managedclustersets.cluster.open-cluster-management.io", actual)
-				actual = actions[3].(clienttesting.CreateActionImpl).Object
-				assertStorageVersionMigration(t, "managedclustersetbindings.cluster.open-cluster-management.io", actual)
+			name: "CRDs with 2 versions: v1beta1, v1beta2; the storage version is v1beta2",
+			crds: []runtime.Object{
+				newFakeCRD("foos.cluster.open-cluster-management.io", "v1beta2", "v1beta1", "v1beta2"),
+				newFakeCRD("bars.cluster.open-cluster-management.io", "v1beta2", "v1beta1", "v1beta2"),
 			},
+			toCreateMigrations: []*migrationv1alpha1.StorageVersionMigration{
+				newFakeMigration("foo", "cluster.open-cluster-management.io", "foos", "v1beta1"),
+				newFakeMigration("bar", "cluster.open-cluster-management.io", "bars", "v1beta1"),
+			},
+			expectErr: false,
 		},
 		{
-			name: "created and updated",
-			existingObjects: []runtime.Object{
-				&migrationv1alpha1.StorageVersionMigration{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "managedclustersetbindings.cluster.open-cluster-management.io",
-					},
-				},
-				&migrationv1alpha1.StorageVersionMigration{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "placementdecisions.cluster.open-cluster-management.io",
-					},
-				},
+			name: "CRDs don't exist",
+			toCreateMigrations: []*migrationv1alpha1.StorageVersionMigration{
+				newFakeMigration("foo", "cluster.open-cluster-management.io", "foos", "v1beta1"),
+				newFakeMigration("bar", "cluster.open-cluster-management.io", "bars", "v1beta1"),
 			},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				assertActions(t, actions, "get", "create", "get", "update")
-				actual := actions[1].(clienttesting.CreateActionImpl).Object
-				assertStorageVersionMigration(t, "managedclustersets.cluster.open-cluster-management.io", actual)
-				actual = actions[3].(clienttesting.UpdateActionImpl).Object
-				assertStorageVersionMigration(t, "managedclustersetbindings.cluster.open-cluster-management.io", actual)
-			},
+			expectErr: true,
 		},
-	}
-
-	if len(migrationRequestFiles) == 0 {
-		t.Log("testing with test migrationRequestFiles")
-		migrationRequestFiles = testMigrationRequestFiles
+		{
+			name: "CRDs exist, but the storage version is still the previous one",
+			crds: []runtime.Object{
+				newFakeCRD("foos.cluster.open-cluster-management.io", "v1beta1", "v1beta1", "v1beta2"),
+				newFakeCRD("bars.cluster.open-cluster-management.io", "v1beta1", "v1beta1", "v1beta2"),
+			},
+			toCreateMigrations: []*migrationv1alpha1.StorageVersionMigration{
+				newFakeMigration("foo", "cluster.open-cluster-management.io", "foos", "v1beta1"),
+				newFakeMigration("bar", "cluster.open-cluster-management.io", "bars", "v1beta1"),
+			},
+			expectErr: true,
+		},
+		{
+			name: "CRDs exist, only have 1 version",
+			crds: []runtime.Object{
+				newFakeCRD("foos.cluster.open-cluster-management.io", "v1beta1", "v1beta1"),
+				newFakeCRD("bars.cluster.open-cluster-management.io", "v1beta1", "v1beta1"),
+			},
+			toCreateMigrations: []*migrationv1alpha1.StorageVersionMigration{
+				newFakeMigration("foo", "cluster.open-cluster-management.io", "foos", "v1beta1"),
+				newFakeMigration("bar", "cluster.open-cluster-management.io", "bars", "v1beta1"),
+			},
+			expectErr: true,
+		},
+		{
+			name: "CRDs exist, but the version in the migration CR is not included in the CRD",
+			crds: []runtime.Object{
+				newFakeCRD("foos.cluster.open-cluster-management.io", "v1beta2", "v1beta1", "v1beta2"),
+				newFakeCRD("bars.cluster.open-cluster-management.io", "v1beta2", "v1beta1", "v1beta2"),
+			},
+			toCreateMigrations: []*migrationv1alpha1.StorageVersionMigration{
+				newFakeMigration("foo", "cluster.open-cluster-management.io", "foos", "v1alpha1"),
+				newFakeMigration("bar", "cluster.open-cluster-management.io", "bars", "v1alpha1"),
+			},
+			expectErr: true,
+		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			fakeMigrationClient := fakemigrationclient.NewSimpleClientset(c.existingObjects...)
+			fakeCRDClient := fakeapiextensions.NewSimpleClientset(c.crds...)
 
-			err := applyStorageVersionMigrations(context.TODO(), fakeMigrationClient.MigrationV1alpha1(), eventstesting.NewTestingEventRecorder(t))
+			err := checkCRDStorageVersion(context.TODO(),
+				c.toCreateMigrations, fakeCRDClient)
+			if c.expectErr && err != nil {
+				return
+			}
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+		})
+	}
+}
+
+func TestCreateStorageVersionMigrations(t *testing.T) {
+	cases := []struct {
+		name               string
+		existingMigrations []runtime.Object
+		toCreateMigrations []*migrationv1alpha1.StorageVersionMigration
+		expectErr          bool
+		validateActions    func(t *testing.T, actions []clienttesting.Action)
+	}{
+		{
+			// No existing migrations been created
+			// Expect to create migration requests for the example CRD
+			name:               "No existing migrations been created",
+			existingMigrations: []runtime.Object{},
+			toCreateMigrations: []*migrationv1alpha1.StorageVersionMigration{
+				newFakeMigration("foo", "cluster.open-cluster-management.io", "foos", "v1beta1"),
+				newFakeMigration("bar", "cluster.open-cluster-management.io", "bars", "v1beta1"),
+			},
+			expectErr: false,
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				assertActions(t, actions, "get", "create", "get", "create")
+				actual := actions[1].(clienttesting.CreateActionImpl).Object
+				assertStorageVersionMigration(t, "foo", actual)
+				actual = actions[3].(clienttesting.CreateActionImpl).Object
+				assertStorageVersionMigration(t, "bar", actual)
+			},
+		},
+		{
+			// The existing migrations been created with different spec
+			// Expect to return err
+			name: "CRDs storage version not update",
+			existingMigrations: []runtime.Object{
+				newFakeMigration("foo", "cluster.open-cluster-management.io", "foos", "v1alpha1"),
+				newFakeMigration("bar", "cluster.open-cluster-management.io", "bars", "v1alpha1"),
+			},
+			toCreateMigrations: []*migrationv1alpha1.StorageVersionMigration{
+				newFakeMigration("foo", "cluster.open-cluster-management.io", "foos", "v1beta1"),
+				newFakeMigration("bar", "cluster.open-cluster-management.io", "bars", "v1beta1"),
+			},
+			expectErr: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fakeMigrationClient := fakemigrationclient.NewSimpleClientset(c.existingMigrations...)
+
+			err := createStorageVersionMigrations(context.TODO(),
+				c.toCreateMigrations, fakeMigrationClient.MigrationV1alpha1(),
+				eventstesting.NewTestingEventRecorder(t))
+			if c.expectErr && err != nil {
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
 			c.validateActions(t, fakeMigrationClient.Actions())
 		})
 	}
 }
 
 func TestRemoveStorageVersionMigrations(t *testing.T) {
-	names := []string{
-		"managedclustersets.cluster.open-cluster-management.io",
-		"managedclustersetbindings.cluster.open-cluster-management.io",
-		"placements.cluster.open-cluster-management.io",
-		"placementdecisions.cluster.open-cluster-management.io",
-	}
 	cases := []struct {
-		name            string
-		existingObjects []runtime.Object
-		validateActions func(t *testing.T, actions []clienttesting.Action)
+		name               string
+		existingMigrations []runtime.Object
+		toRemoveMigrations []*migrationv1alpha1.StorageVersionMigration
 	}{
 		{
 			name: "not exists",
 		},
 		{
 			name: "removed",
-			existingObjects: []runtime.Object{
+			existingMigrations: []runtime.Object{
 				&migrationv1alpha1.StorageVersionMigration{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "managedclustersetbindings.cluster.open-cluster-management.io",
+						Name: "foo.cluster.open-cluster-management.io",
 					},
 				},
 				&migrationv1alpha1.StorageVersionMigration{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "placementdecisions.cluster.open-cluster-management.io",
+						Name: "bar.cluster.open-cluster-management.io",
+					},
+				},
+			},
+			toRemoveMigrations: []*migrationv1alpha1.StorageVersionMigration{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo.cluster.open-cluster-management.io",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "bar.cluster.open-cluster-management.io",
 					},
 				},
 			},
@@ -169,14 +279,14 @@ func TestRemoveStorageVersionMigrations(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			fakeMigrationClient := fakemigrationclient.NewSimpleClientset(c.existingObjects...)
-			err := removeStorageVersionMigrations(context.TODO(), fakeMigrationClient.MigrationV1alpha1())
+			fakeMigrationClient := fakemigrationclient.NewSimpleClientset(c.existingMigrations...)
+			err := removeStorageVersionMigrations(context.TODO(), nil, fakeMigrationClient.MigrationV1alpha1())
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			for _, name := range names {
-				_, err := fakeMigrationClient.MigrationV1alpha1().StorageVersionMigrations().Get(context.TODO(), name, metav1.GetOptions{})
+			for _, m := range c.toRemoveMigrations {
+				_, err := fakeMigrationClient.MigrationV1alpha1().StorageVersionMigrations().Get(context.TODO(), m.Name, metav1.GetOptions{})
 				if errors.IsNotFound(err) {
 					continue
 				}
@@ -210,25 +320,29 @@ func assertStorageVersionMigration(t *testing.T, name string, object runtime.Obj
 	}
 }
 
-func Test_syncStorageVersionMigrationsCondition(t *testing.T) {
+func TestSyncStorageVersionMigrationsCondition(t *testing.T) {
+	toSyncMigrations := []*migrationv1alpha1.StorageVersionMigration{
+		newFakeMigration("foos.cluster.open-cluster-management.io", "cluster.open-cluster-management.io", "foos", "v1beta1"),
+		newFakeMigration("bars.cluster.open-cluster-management.io", "cluster.open-cluster-management.io", "bars", "v1beta1"),
+	}
 
-	tests := []struct {
-		name            string
-		existingObjects []runtime.Object
-		want            metav1.Condition
-		wantErr         bool
+	cases := []struct {
+		name               string
+		existingMigrations []runtime.Object
+		want               metav1.Condition
+		wantErr            bool
 	}{
 		{
 			name: "empty condition",
-			existingObjects: []runtime.Object{
+			existingMigrations: []runtime.Object{
 				&migrationv1alpha1.StorageVersionMigration{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "managedclustersetbindings.cluster.open-cluster-management.io",
+						Name: "foos.cluster.open-cluster-management.io",
 					},
 				},
 				&migrationv1alpha1.StorageVersionMigration{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "managedclustersets.cluster.open-cluster-management.io",
+						Name: "bars.cluster.open-cluster-management.io",
 					},
 				},
 			},
@@ -240,10 +354,10 @@ func Test_syncStorageVersionMigrationsCondition(t *testing.T) {
 		},
 		{
 			name: "all migration running condition",
-			existingObjects: []runtime.Object{
+			existingMigrations: []runtime.Object{
 				&migrationv1alpha1.StorageVersionMigration{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "managedclustersetbindings.cluster.open-cluster-management.io",
+						Name: "foos.cluster.open-cluster-management.io",
 					},
 					Status: migrationv1alpha1.StorageVersionMigrationStatus{
 						Conditions: []migrationv1alpha1.MigrationCondition{
@@ -256,7 +370,7 @@ func Test_syncStorageVersionMigrationsCondition(t *testing.T) {
 				},
 				&migrationv1alpha1.StorageVersionMigration{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "managedclustersets.cluster.open-cluster-management.io",
+						Name: "bars.cluster.open-cluster-management.io",
 					},
 					Status: migrationv1alpha1.StorageVersionMigrationStatus{
 						Conditions: []migrationv1alpha1.MigrationCondition{
@@ -276,10 +390,10 @@ func Test_syncStorageVersionMigrationsCondition(t *testing.T) {
 		},
 		{
 			name: "one migration running, one succeed",
-			existingObjects: []runtime.Object{
+			existingMigrations: []runtime.Object{
 				&migrationv1alpha1.StorageVersionMigration{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "managedclustersetbindings.cluster.open-cluster-management.io",
+						Name: "foos.cluster.open-cluster-management.io",
 					},
 					Status: migrationv1alpha1.StorageVersionMigrationStatus{
 						Conditions: []migrationv1alpha1.MigrationCondition{
@@ -292,7 +406,7 @@ func Test_syncStorageVersionMigrationsCondition(t *testing.T) {
 				},
 				&migrationv1alpha1.StorageVersionMigration{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "managedclustersets.cluster.open-cluster-management.io",
+						Name: "bars.cluster.open-cluster-management.io",
 					},
 					Status: migrationv1alpha1.StorageVersionMigrationStatus{
 						Conditions: []migrationv1alpha1.MigrationCondition{
@@ -312,10 +426,10 @@ func Test_syncStorageVersionMigrationsCondition(t *testing.T) {
 		},
 		{
 			name: "one migration failed, one succeed",
-			existingObjects: []runtime.Object{
+			existingMigrations: []runtime.Object{
 				&migrationv1alpha1.StorageVersionMigration{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "managedclustersetbindings.cluster.open-cluster-management.io",
+						Name: "foos.cluster.open-cluster-management.io",
 					},
 					Status: migrationv1alpha1.StorageVersionMigrationStatus{
 						Conditions: []migrationv1alpha1.MigrationCondition{
@@ -328,7 +442,7 @@ func Test_syncStorageVersionMigrationsCondition(t *testing.T) {
 				},
 				&migrationv1alpha1.StorageVersionMigration{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "managedclustersets.cluster.open-cluster-management.io",
+						Name: "bars.cluster.open-cluster-management.io",
 					},
 					Status: migrationv1alpha1.StorageVersionMigrationStatus{
 						Conditions: []migrationv1alpha1.MigrationCondition{
@@ -348,10 +462,10 @@ func Test_syncStorageVersionMigrationsCondition(t *testing.T) {
 		},
 		{
 			name: "all migration succeed",
-			existingObjects: []runtime.Object{
+			existingMigrations: []runtime.Object{
 				&migrationv1alpha1.StorageVersionMigration{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "managedclustersetbindings.cluster.open-cluster-management.io",
+						Name: "foos.cluster.open-cluster-management.io",
 					},
 					Status: migrationv1alpha1.StorageVersionMigrationStatus{
 						Conditions: []migrationv1alpha1.MigrationCondition{
@@ -364,7 +478,7 @@ func Test_syncStorageVersionMigrationsCondition(t *testing.T) {
 				},
 				&migrationv1alpha1.StorageVersionMigration{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "managedclustersets.cluster.open-cluster-management.io",
+						Name: "bars.cluster.open-cluster-management.io",
 					},
 					Status: migrationv1alpha1.StorageVersionMigrationStatus{
 						Conditions: []migrationv1alpha1.MigrationCondition{
@@ -384,16 +498,11 @@ func Test_syncStorageVersionMigrationsCondition(t *testing.T) {
 		},
 	}
 
-	if len(migrationRequestFiles) == 0 {
-		t.Log("testing with test migrationRequestFiles")
-		migrationRequestFiles = testMigrationRequestFiles
-	}
-
-	for _, tt := range tests {
+	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			fakeMigrationClient := fakemigrationclient.NewSimpleClientset(tt.existingObjects...)
+			fakeMigrationClient := fakemigrationclient.NewSimpleClientset(tt.existingMigrations...)
 
-			got, err := syncStorageVersionMigrationsCondition(context.Background(), fakeMigrationClient.MigrationV1alpha1())
+			got, err := syncStorageVersionMigrationsCondition(context.Background(), toSyncMigrations, fakeMigrationClient.MigrationV1alpha1())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("syncStorageVersionMigrationsCondition() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -406,11 +515,6 @@ func Test_syncStorageVersionMigrationsCondition(t *testing.T) {
 }
 
 func TestSync(t *testing.T) {
-	if len(migrationRequestFiles) == 0 {
-		t.Log("testing with test migrationRequestFiles")
-		migrationRequestFiles = testMigrationRequestFiles
-	}
-
 	clusterManager := newClusterManager("testhub")
 	tc, client := newTestController(t, clusterManager)
 
@@ -436,8 +540,11 @@ func TestSync(t *testing.T) {
 			Status: metav1.ConditionTrue,
 		},
 	}
-	migrateCrd := newCrd(migrationRequestCRDName)
-	tc, client = newTestController(t, clusterManager, migrateCrd)
+
+	tc, client = newTestController(t, clusterManager,
+		newFakeCRD(migrationRequestCRDName, "v1", "v1"),
+		newFakeCRD("foos.cluster.open-cluster-management.io", "v1beta2", "v1beta1", "v1beta2"),
+		newFakeCRD("bars.cluster.open-cluster-management.io", "v1beta2", "v1beta1", "v1beta2"))
 	err = tc.sync(context.Background(), syncContext)
 	if err != nil {
 		t.Fatalf("Expected no error when sync, %v", err)
@@ -470,6 +577,12 @@ func newTestController(
 	crdMigrationController.generateHubClusterClients = func(
 		hubKubeConfig *rest.Config) (apiextensionsclient.Interface, migrationv1alpha1client.StorageVersionMigrationsGetter, error) {
 		return fakeAPIExtensionClient, fakeMigrationClient.MigrationV1alpha1(), nil
+	}
+	crdMigrationController.parseMigrations = func() ([]*migrationv1alpha1.StorageVersionMigration, error) {
+		return []*migrationv1alpha1.StorageVersionMigration{
+			newFakeMigration("foo", "cluster.open-cluster-management.io", "foos", "v1beta1"),
+			newFakeMigration("bar", "cluster.open-cluster-management.io", "bars", "v1beta1"),
+		}, nil
 	}
 	store := operatorInformers.Operator().V1().ClusterManagers().Informer().GetStore()
 	if err := store.Add(clustermanager); err != nil {
