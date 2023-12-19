@@ -32,10 +32,10 @@ func init() {
 func (c *Options) RunWebhookServer() error {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
-		Port:                   c.Port,
 		HealthProbeBindAddress: ":8000",
-		CertDir:                c.CertDir,
 		WebhookServer: webhook.NewServer(webhook.Options{
+			Port:    c.Port,
+			CertDir: c.CertDir,
 			TLSOpts: []func(config *tls.Config){
 				func(config *tls.Config) {
 					config.MinVersion = tls.VersionTLS12
