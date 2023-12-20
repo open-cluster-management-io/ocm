@@ -263,6 +263,26 @@ spec:
                   - type
                   type: object
                 type: array
+              nodeStatus:
+                description: NodeStatus represents the status of nodes on the managed
+                  cluster.
+                properties:
+                  ready:
+                    description: Ready represents the number of ready nodes on the
+                      managed cluster.
+                    format: int32
+                    type: integer
+                  schedulable:
+                    description: Schedulable represents the number of schedulable
+                      nodes on the managed cluster.
+                    format: int32
+                    type: integer
+                  total:
+                    description: Total represents the total number of nodes on the
+                      managed cluster.
+                    format: int32
+                    type: integer
+                type: object
               version:
                 description: Version represents the kubernetes version of the managed
                   cluster.
