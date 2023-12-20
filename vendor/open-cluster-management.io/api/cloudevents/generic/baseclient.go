@@ -44,7 +44,13 @@ func (c *baseClient) connect(ctx context.Context) error {
 		var err error
 
 		// the reconnect backoff will stop at [1,5) min interval. If we don't backoff for 10min, we reset the backoff.
-		connBackoffManager := wait.NewExponentialBackoffManager(5*time.Second, 1*time.Minute, 10*time.Minute, 5.0, 1.0, &clock.RealClock{})
+		delayFn := wait.Backoff{
+			Duration: 5 * time.Second,
+			Cap:      1 * time.Minute,
+			Steps:    12, // now a required argument
+			Factor:   5.0,
+			Jitter:   1.0,
+		}.DelayWithReset(&clock.RealClock{}, 10*time.Minute)
 		cloudEventsClient := c.cloudEventsClient
 
 		for {
@@ -56,7 +62,7 @@ func (c *baseClient) connect(ctx context.Context) error {
 				if err != nil {
 					// failed to reconnect, try agin
 					runtime.HandleError(fmt.Errorf("the cloudevents client reconnect failed, %v", err))
-					<-connBackoffManager.Backoff().C()
+					<-wait.RealTimer(delayFn()).C()
 					continue
 				}
 
@@ -85,7 +91,7 @@ func (c *baseClient) connect(ctx context.Context) error {
 				cloudEventsClient = nil
 				c.resetClient(cloudEventsClient)
 
-				<-connBackoffManager.Backoff().C()
+				<-wait.RealTimer(delayFn()).C()
 			}
 		}
 	}()
