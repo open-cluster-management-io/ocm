@@ -59,9 +59,9 @@ metadata:
     categories: Integration & Delivery,OpenShift Optional
     certified: "false"
     containerImage: quay.io/open-cluster-management/registration-operator:latest
-    createdAt: "2023-12-07T15:16:47Z"
+    createdAt: "2024-01-02T07:57:59Z"
     description: Manages the installation and upgrade of the ClusterManager.
-    operators.operatorframework.io/builder: operator-sdk-v1.32.0
+    operators.operatorframework.io/builder: operator-sdk-v1.28.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/open-cluster-management-io/registration-operator
     support: Red Hat, Inc.

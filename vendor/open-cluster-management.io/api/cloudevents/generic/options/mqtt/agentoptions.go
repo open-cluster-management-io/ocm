@@ -22,15 +22,17 @@ type mqttAgentOptions struct {
 }
 
 func NewAgentOptions(mqttOptions *MQTTOptions, clusterName, agentID string) *options.CloudEventsAgentOptions {
+	mqttAgentOptions := &mqttAgentOptions{
+		MQTTOptions: *mqttOptions,
+		errorChan:   make(chan error),
+		clusterName: clusterName,
+		agentID:     agentID,
+	}
+
 	return &options.CloudEventsAgentOptions{
-		CloudEventsOptions: &mqttAgentOptions{
-			MQTTOptions: *mqttOptions,
-			errorChan:   make(chan error),
-			clusterName: clusterName,
-			agentID:     agentID,
-		},
-		AgentID:     agentID,
-		ClusterName: clusterName,
+		CloudEventsOptions: mqttAgentOptions,
+		AgentID:            mqttAgentOptions.agentID,
+		ClusterName:        mqttAgentOptions.clusterName,
 	}
 }
 

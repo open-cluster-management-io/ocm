@@ -90,7 +90,7 @@ func (m *MQTTSource) Start(ctx context.Context) error {
 	}
 	cloudEventsClient, err := generic.NewCloudEventSourceClient[*workv1.ManifestWork](
 		ctx,
-		mqtt.NewSourceOptions(mqttOptions, sourceID),
+		mqtt.NewSourceOptions(mqttOptions, "", sourceID),
 		workLister,
 		work.ManifestWorkStatusHash,
 		&ManifestCodec{},

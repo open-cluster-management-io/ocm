@@ -65,6 +65,8 @@ type RolloutResult struct {
 	ClustersRemoved []ClusterRolloutStatus
 	// MaxFailureBreach is a boolean signaling whether the rollout was cut short because of failed clusters.
 	MaxFailureBreach bool
+	// RecheckAfter is the time duration to recheck the rollout status.
+	RecheckAfter *time.Duration
 }
 
 // ClusterRolloutStatusFunc defines a function that return the rollout status for a given workload.
@@ -291,6 +293,9 @@ func progressivePerCluster(
 
 		// If there was a breach of MaxFailures, only handle clusters that have already had workload applied
 		if !failureBreach || failureBreach && status.Status != ToApply {
+			// The length of `rolloutClusters` will be compared with the target rollout size to determine whether to return or not.
+			// The `timeoutClusters` only records clusters that are timeout and is not used for comparison with the target rollout size.
+			// In other words, the timeouted clusters are skipped and continue rollout on other clusters.
 			rolloutClusters, timeoutClusters = determineRolloutStatus(&status, minSuccessTime, timeout, rolloutClusters, timeoutClusters)
 		}
 
@@ -307,15 +312,18 @@ func progressivePerCluster(
 				ClustersToRollout: rolloutClusters,
 				ClustersTimeOut:   timeoutClusters,
 				MaxFailureBreach:  failureBreach,
+				RecheckAfter:      minRecheckAfter(rolloutClusters, minSuccessTime),
 			}
 		}
 	}
 
+	// Return if the maxFailures is breached.
 	if failureBreach {
 		return RolloutResult{
 			ClustersToRollout: rolloutClusters,
 			ClustersTimeOut:   timeoutClusters,
 			MaxFailureBreach:  failureBreach,
+			RecheckAfter:      minRecheckAfter(rolloutClusters, minSuccessTime),
 		}
 	}
 
@@ -344,6 +352,7 @@ func progressivePerCluster(
 			return RolloutResult{
 				ClustersToRollout: rolloutClusters,
 				ClustersTimeOut:   timeoutClusters,
+				RecheckAfter:      minRecheckAfter(rolloutClusters, minSuccessTime),
 			}
 		}
 	}
@@ -351,6 +360,7 @@ func progressivePerCluster(
 	return RolloutResult{
 		ClustersToRollout: rolloutClusters,
 		ClustersTimeOut:   timeoutClusters,
+		RecheckAfter:      minRecheckAfter(rolloutClusters, minSuccessTime),
 	}
 }
 
@@ -371,6 +381,9 @@ func progressivePerGroup(
 
 		// ToApply will be reconsidered in the decisionGroups iteration.
 		if status.Status != ToApply {
+			// The length of `rolloutClusters` will be compared with the target rollout size to determine whether to return or not.
+			// The `timeoutClusters` only records clusters that are timeout and is not used for comparison with the target rollout size.
+			// In other words, the timeouted clusters are skipped and continue rollout on other clusters.
 			rolloutClusters, timeoutClusters = determineRolloutStatus(&status, minSuccessTime, timeout, rolloutClusters, timeoutClusters)
 			existingClusters[status.ClusterName] = status.Status
 		}
@@ -417,6 +430,7 @@ func progressivePerGroup(
 					ClustersToRollout: rolloutClusters,
 					ClustersTimeOut:   timeoutClusters,
 					MaxFailureBreach:  failureBreach,
+					RecheckAfter:      minRecheckAfter(rolloutClusters, minSuccessTime),
 				}
 			}
 		}
@@ -426,6 +440,7 @@ func progressivePerGroup(
 		ClustersToRollout: rolloutClusters,
 		ClustersTimeOut:   timeoutClusters,
 		MaxFailureBreach:  failureBreach,
+		RecheckAfter:      minRecheckAfter(rolloutClusters, minSuccessTime),
 	}
 }
 
@@ -467,7 +482,7 @@ func determineRolloutStatus(
 		timeOutTime := getTimeOutTime(status.LastTransitionTime, timeout)
 		status.TimeOutTime = timeOutTime
 		// check if current time is before the timeout time
-		if RolloutClock.Now().Before(timeOutTime.Time) {
+		if timeOutTime == nil || RolloutClock.Now().Before(timeOutTime.Time) {
 			rolloutClusters = append(rolloutClusters, *status)
 		} else {
 			status.Status = TimeOut
@@ -482,6 +497,10 @@ func determineRolloutStatus(
 // RolloutClock if a start time isn't provided.
 func getTimeOutTime(startTime *metav1.Time, timeout time.Duration) *metav1.Time {
 	var timeoutTime time.Time
+	// if timeout is not set (default to maxTimeDuration), the timeout time should not be set
+	if timeout == maxTimeDuration {
+		return nil
+	}
 	if startTime == nil {
 		timeoutTime = RolloutClock.Now().Add(timeout)
 	} else {
@@ -577,4 +596,21 @@ func decisionGroupsToGroupKeys(decisionsGroup []MandatoryDecisionGroup) []cluste
 		result = append(result, gk)
 	}
 	return result
+}
+
+func minRecheckAfter(rolloutClusters []ClusterRolloutStatus, minSuccessTime time.Duration) *time.Duration {
+	var minRecheckAfter *time.Duration
+	for _, r := range rolloutClusters {
+		if r.TimeOutTime != nil {
+			timeOut := r.TimeOutTime.Sub(RolloutClock.Now())
+			if minRecheckAfter == nil || *minRecheckAfter > timeOut {
+				minRecheckAfter = &timeOut
+			}
+		}
+	}
+	if minSuccessTime != 0 && minSuccessTime < *minRecheckAfter {
+		minRecheckAfter = &minSuccessTime
+	}
+
+	return minRecheckAfter
 }
