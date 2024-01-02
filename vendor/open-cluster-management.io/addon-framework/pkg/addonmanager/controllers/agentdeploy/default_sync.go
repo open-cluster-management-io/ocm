@@ -35,14 +35,18 @@ func (s *defaultSyncer) sync(ctx context.Context,
 
 	var errs []error
 
-	if !addon.DeletionTimestamp.IsZero() {
-		return addon, nil
-	}
+	// Don't skip syncing if the addon is deleting and there is a predelete hook, since the deployment manifests may
+	// need to be updated during the uninstall.
+	if !addonHasFinalizer(addon, addonapiv1alpha1.AddonPreDeleteHookFinalizer) {
+		if !addon.DeletionTimestamp.IsZero() {
+			return addon, nil
+		}
 
-	// waiting for the addon to be deleted when cluster is deleting.
-	// TODO: consider to delete addon in this scenario.
-	if !cluster.DeletionTimestamp.IsZero() {
-		return addon, nil
+		// waiting for the addon to be deleted when cluster is deleting.
+		// TODO: consider to delete addon in this scenario.
+		if !cluster.DeletionTimestamp.IsZero() {
+			return addon, nil
+		}
 	}
 
 	currentWorks, err := s.getWorkByAddon(addon.Name, addon.Namespace)
