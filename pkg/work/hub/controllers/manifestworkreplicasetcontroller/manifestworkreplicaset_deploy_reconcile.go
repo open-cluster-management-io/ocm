@@ -17,6 +17,7 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/work/helper"
 )
 
@@ -33,6 +34,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 	// Manifestwork create/update/delete logic.
 	var errs []error
 	var plcsSummary []workapiv1alpha1.PlacementSummary
+	minRequeue := maxRequeueTime
 	count, total := 0, 0
 	// Getting the placements and the created ManifestWorks related to each placement
 	for _, placementRef := range mwrSet.Spec.PlacementRefs {
@@ -96,6 +98,10 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 			apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetPlacementDecisionVerified(workapiv1alpha1.ReasonNotAsExpected, ""))
 
 			continue
+		}
+
+		if rolloutResult.RecheckAfter != nil && *rolloutResult.RecheckAfter < minRequeue {
+			minRequeue = *rolloutResult.RecheckAfter
 		}
 
 		// Create ManifestWorks
@@ -166,7 +172,15 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 		apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetPlacementRollOut(workapiv1alpha1.ReasonProgressing, ""))
 	}
 
-	return mwrSet, reconcileContinue, utilerrors.NewAggregate(errs)
+	if len(errs) > 0 {
+		return mwrSet, reconcileContinue, utilerrors.NewAggregate(errs)
+	}
+
+	if minRequeue < maxRequeueTime {
+		return mwrSet, reconcileContinue, helpers.NewRequeueError("Rollout requeue", minRequeue)
+	}
+
+	return mwrSet, reconcileContinue, nil
 }
 
 func (d *deployReconciler) clusterRolloutStatusFunc(clusterName string, manifestWork workv1.ManifestWork) (clusterv1alpha1.ClusterRolloutStatus, error) {
@@ -190,6 +204,7 @@ func (d *deployReconciler) clusterRolloutStatusFunc(clusterName string, manifest
 	} else if appliedCondition.Status == metav1.ConditionFalse {
 		// Applied Condition status false return status as failed
 		clsRolloutStatus.Status = clusterv1alpha1.Failed
+		clsRolloutStatus.LastTransitionTime = &appliedCondition.LastTransitionTime
 		return clsRolloutStatus, nil
 	}
 
@@ -203,6 +218,7 @@ func (d *deployReconciler) clusterRolloutStatusFunc(clusterName string, manifest
 	// ManifestWork Degraded status is not defined however the check is made for future work availability.
 	if apimeta.IsStatusConditionTrue(manifestWork.Status.Conditions, workv1.WorkDegraded) {
 		clsRolloutStatus.Status = clusterv1alpha1.Failed
+		clsRolloutStatus.LastTransitionTime = &appliedCondition.LastTransitionTime
 	}
 
 	return clsRolloutStatus, nil
