@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -327,6 +328,31 @@ func assertClusterManagementAddOnConditions(name string, expect ...metav1.Condit
 
 		return nil
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
+
+func assertClusterManagementAddOnNoConditions(name string, start metav1.Time, duration time.Duration, expect ...metav1.Condition) {
+	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s no conditions in duration %v", name, duration))
+
+	gomega.Consistently(func() error {
+		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		for i, ec := range expect {
+			cond := meta.FindStatusCondition(actual.Status.InstallProgressions[i].Conditions, ec.Type)
+
+			if cond != nil &&
+				cond.Status == ec.Status &&
+				cond.Reason == ec.Reason &&
+				cond.Message == ec.Message &&
+				metav1.Now().Sub(start.Time) < duration {
+				return fmt.Errorf("unexpected condition matches before duration")
+			}
+		}
+
+		return nil
+	}, duration, eventuallyInterval).Should(gomega.BeNil())
 }
 
 func assertManagedClusterAddOnConfigReferences(name, namespace string, expect ...addonapiv1alpha1.ConfigReference) {

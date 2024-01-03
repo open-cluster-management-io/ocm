@@ -8,6 +8,7 @@ import (
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 )
 
@@ -30,7 +31,15 @@ func (d *managedClusterAddonConfigurationReconciler) reconcile(
 		}
 	}
 
-	return cma, reconcileContinue, utilerrors.NewAggregate(errs)
+	if len(errs) > 0 {
+		return cma, reconcileContinue, utilerrors.NewAggregate(errs)
+	}
+
+	if graph.getRequeueTime() < maxRequeueTime {
+		return cma, reconcileContinue, helpers.NewRequeueError("Rollout requeue", graph.getRequeueTime())
+	}
+
+	return cma, reconcileContinue, nil
 }
 
 func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
