@@ -247,7 +247,7 @@ github.com/modern-go/reflect2
 # github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 ## explicit
 github.com/munnerz/goautoneg
-# github.com/onsi/ginkgo/v2 v2.9.5
+# github.com/onsi/ginkgo/v2 v2.11.0
 ## explicit; go 1.18
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
@@ -270,7 +270,7 @@ github.com/onsi/ginkgo/v2/internal/parallel_support
 github.com/onsi/ginkgo/v2/internal/testingtproxy
 github.com/onsi/ginkgo/v2/reporters
 github.com/onsi/ginkgo/v2/types
-# github.com/onsi/gomega v1.27.7
+# github.com/onsi/gomega v1.27.10
 ## explicit; go 1.18
 github.com/onsi/gomega
 github.com/onsi/gomega/format
@@ -582,6 +582,7 @@ golang.org/x/crypto/scrypt
 # golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
 ## explicit; go 1.20
 golang.org/x/exp/constraints
+golang.org/x/exp/maps
 golang.org/x/exp/slices
 # golang.org/x/net v0.17.0
 ## explicit; go 1.17
@@ -648,11 +649,11 @@ golang.org/x/text/width
 # golang.org/x/time v0.3.0
 ## explicit
 golang.org/x/time/rate
-# golang.org/x/tools v0.9.1
+# golang.org/x/tools v0.9.3
 ## explicit; go 1.18
 golang.org/x/tools/go/ast/inspector
 golang.org/x/tools/internal/typeparams
-# gomodules.xyz/jsonpatch/v2 v2.3.0
+# gomodules.xyz/jsonpatch/v2 v2.4.0
 ## explicit; go 1.20
 gomodules.xyz/jsonpatch/v2
 # google.golang.org/appengine v1.6.7
@@ -790,7 +791,7 @@ helm.sh/helm/v3/pkg/chart
 helm.sh/helm/v3/pkg/chart/loader
 helm.sh/helm/v3/pkg/chartutil
 helm.sh/helm/v3/pkg/engine
-# k8s.io/api v0.28.1
+# k8s.io/api v0.28.2
 ## explicit; go 1.20
 k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
@@ -859,7 +860,7 @@ k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextension
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1/fake
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1/fake
-# k8s.io/apimachinery v0.28.1
+# k8s.io/apimachinery v0.28.2
 ## explicit; go 1.20
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/api/errors
@@ -1062,7 +1063,7 @@ k8s.io/apiserver/plugin/pkg/audit/truncate
 k8s.io/apiserver/plugin/pkg/audit/webhook
 k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 k8s.io/apiserver/plugin/pkg/authorizer/webhook
-# k8s.io/client-go v0.28.1
+# k8s.io/client-go v0.28.2
 ## explicit; go 1.20
 k8s.io/client-go/applyconfigurations/admissionregistration/v1
 k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1
@@ -1381,7 +1382,7 @@ k8s.io/client-go/util/jsonpath
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/retry
 k8s.io/client-go/util/workqueue
-# k8s.io/component-base v0.28.1
+# k8s.io/component-base v0.28.2
 ## explicit; go 1.20
 k8s.io/component-base/cli/flag
 k8s.io/component-base/config
@@ -1472,7 +1473,7 @@ k8s.io/utils/pointer
 k8s.io/utils/ptr
 k8s.io/utils/strings/slices
 k8s.io/utils/trace
-# open-cluster-management.io/addon-framework v0.8.1-0.20231102082339-51742bc299f2
+# open-cluster-management.io/addon-framework v0.8.1-0.20240102072130-44852ea0722f
 ## explicit; go 1.20
 open-cluster-management.io/addon-framework/pkg/addonfactory
 open-cluster-management.io/addon-framework/pkg/addonmanager
@@ -1492,8 +1493,8 @@ open-cluster-management.io/addon-framework/pkg/index
 open-cluster-management.io/addon-framework/pkg/manager/controllers/addonconfiguration
 open-cluster-management.io/addon-framework/pkg/manager/controllers/addonowner
 open-cluster-management.io/addon-framework/pkg/utils
-# open-cluster-management.io/api v0.12.1-0.20231130134655-97a8a92a7f30
-## explicit; go 1.19
+# open-cluster-management.io/api v0.12.1-0.20231219024415-a2f58d68f4a9
+## explicit; go 1.20
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/client/addon/clientset/versioned
 open-cluster-management.io/api/client/addon/clientset/versioned/fake
@@ -1583,7 +1584,7 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client/metrics
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/common/metrics
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
-# sigs.k8s.io/controller-runtime v0.15.0
+# sigs.k8s.io/controller-runtime v0.16.2
 ## explicit; go 1.20
 sigs.k8s.io/controller-runtime
 sigs.k8s.io/controller-runtime/pkg/builder
@@ -1622,6 +1623,7 @@ sigs.k8s.io/controller-runtime/pkg/log/zap
 sigs.k8s.io/controller-runtime/pkg/manager
 sigs.k8s.io/controller-runtime/pkg/manager/signals
 sigs.k8s.io/controller-runtime/pkg/metrics
+sigs.k8s.io/controller-runtime/pkg/metrics/server
 sigs.k8s.io/controller-runtime/pkg/predicate
 sigs.k8s.io/controller-runtime/pkg/ratelimiter
 sigs.k8s.io/controller-runtime/pkg/reconcile

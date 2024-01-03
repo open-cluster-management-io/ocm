@@ -80,34 +80,33 @@ func (s *hostedSyncer) sync(ctx context.Context,
 		Message: fmt.Sprintf("hosting cluster %s is a managed cluster of the hub", hostingClusterName),
 	})
 
-	if !hostingCluster.DeletionTimestamp.IsZero() {
-		if err = s.cleanupDeployWork(ctx, addon); err != nil {
-			return addon, err
-		}
-		addonRemoveFinalizer(addon, addonapiv1alpha1.AddonHostingManifestFinalizer)
-		return addon, nil
-	}
-
-	if !addon.DeletionTimestamp.IsZero() {
-		// clean up the deploy work until the hook work is completed
-		if addonHasFinalizer(addon, addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer) {
+	// Don't skip syncing if the addon is deleting and there is a predelete hook, since the deployment manifests may
+	// need to be updated during the uninstall.
+	if !addonHasFinalizer(addon, addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer) {
+		if !hostingCluster.DeletionTimestamp.IsZero() {
+			if err = s.cleanupDeployWork(ctx, addon); err != nil {
+				return addon, err
+			}
+			addonRemoveFinalizer(addon, addonapiv1alpha1.AddonHostingManifestFinalizer)
 			return addon, nil
 		}
 
-		if err = s.cleanupDeployWork(ctx, addon); err != nil {
-			return addon, err
+		if !addon.DeletionTimestamp.IsZero() {
+			if err = s.cleanupDeployWork(ctx, addon); err != nil {
+				return addon, err
+			}
+			addonRemoveFinalizer(addon, addonapiv1alpha1.AddonHostingManifestFinalizer)
+			return addon, nil
 		}
-		addonRemoveFinalizer(addon, addonapiv1alpha1.AddonHostingManifestFinalizer)
-		return addon, nil
+
+		// waiting for the addon to be deleted when cluster is deleting.
+		// TODO: consider to delete addon in this scenario.
+		if !cluster.DeletionTimestamp.IsZero() {
+			return addon, nil
+		}
 	}
 
 	if addonAddFinalizer(addon, addonapiv1alpha1.AddonHostingManifestFinalizer) {
-		return addon, nil
-	}
-
-	// waiting for the addon to be deleted when cluster is deleting.
-	// TODO: consider to delete addon in this scenario.
-	if !cluster.DeletionTimestamp.IsZero() {
 		return addon, nil
 	}
 
