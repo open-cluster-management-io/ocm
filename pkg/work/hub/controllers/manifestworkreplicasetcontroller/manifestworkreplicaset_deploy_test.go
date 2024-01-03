@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	fakeclusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -464,12 +465,22 @@ func TestDeployMWRSetSpecChangesReconcile(t *testing.T) {
 	mwrSet := helpertest.CreateTestManifestWorkReplicaSetWithRollOutStrategy("mwrSet-test", "default",
 		map[string]clusterv1alpha1.RolloutStrategy{placement.Name: perGoupeRollOut})
 
-	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet)
+	var objs []runtime.Object
+	for i := 0; i < clsPerGroup; i++ {
+		mw := helpertest.CreateTestManifestWork(mwrSet.Name, mwrSet.Namespace, placement.Name, clusters[i])
+		objs = append(objs, mw)
+	}
+	objs = append(objs, mwrSet)
+
+	fWorkClient := fakeworkclient.NewSimpleClientset(objs...)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
 	// create manifestWorks
 	for i := 0; i < clsPerGroup; i++ {
 		mw := helpertest.CreateTestManifestWork(mwrSet.Name, mwrSet.Namespace, placement.Name, clusters[i])
 		err = workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw)
+		if err != nil {
+			t.Error(err)
+		}
 		assert.Nil(t, err)
 	}
 

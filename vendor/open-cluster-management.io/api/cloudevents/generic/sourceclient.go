@@ -64,10 +64,10 @@ func NewCloudEventSourceClient[T ResourceObject](
 	}, nil
 }
 
-// Resync the resources status by sending a status resync request from a source to all clusters.
-func (c *CloudEventSourceClient[T]) Resync(ctx context.Context) error {
-	// list the resource objects that are maintained by the current source from all clusters
-	objs, err := c.lister.List(types.ListOptions{ClusterName: types.ClusterAll, Source: c.sourceID})
+// Resync the resources status by sending a status resync request from a source to clusters with list options.
+func (c *CloudEventSourceClient[T]) Resync(ctx context.Context, listOptions types.ListOptions) error {
+	// list the resource objects that are maintained by the current source with list options
+	objs, err := c.lister.List(listOptions)
 	if err != nil {
 		return err
 	}

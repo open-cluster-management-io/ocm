@@ -65,10 +65,10 @@ func NewCloudEventAgentClient[T ResourceObject](
 	}, nil
 }
 
-// Resync the resources spec by sending a spec resync request from an agent to all sources.
-func (c *CloudEventAgentClient[T]) Resync(ctx context.Context) error {
-	// list the resource objects that are maintained by the current agent from all sources
-	objs, err := c.lister.List(types.ListOptions{ClusterName: c.clusterName, Source: types.SourceAll})
+// Resync the resources spec by sending a spec resync request from an agent to sources with list options.
+func (c *CloudEventAgentClient[T]) Resync(ctx context.Context, listOptions types.ListOptions) error {
+	// list the resource objects that are maintained by the current agent with list options
+	objs, err := c.lister.List(listOptions)
 	if err != nil {
 		return err
 	}
