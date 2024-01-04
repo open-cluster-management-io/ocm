@@ -31,6 +31,7 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/manifests"
+	commonhelper "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
@@ -241,7 +242,7 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 
 	for _, reconciler := range reconcilers {
 		var state reconcileState
-		var rqe *helpers.RequeueError
+		var rqe commonhelper.RequeueError
 		clusterManager, state, err = reconciler.reconcile(ctx, clusterManager, config)
 		if errorhelpers.As(err, &rqe) {
 			controllerContext.Queue().AddAfter(clusterManagerName, rqe.RequeueTime)

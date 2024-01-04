@@ -344,11 +344,14 @@ spec:
                               default: 0
                               description: MaxFailures is a percentage or number of
                                 clusters in the current rollout that can fail before
-                                proceeding to the next rollout. MaxFailures is only
-                                considered for rollout types Progressive and ProgressivePerGroup.
-                                For Progressive, this is considered over the total
-                                number of clusters. For ProgressivePerGroup, this
-                                is considered according to the size of the current
+                                proceeding to the next rollout. Fail means the cluster
+                                has a failed status or timeout status (does not reach
+                                successful status after ProgressDeadline). Once the
+                                MaxFailures is breached, the rollout will stop. MaxFailures
+                                is only considered for rollout types Progressive and
+                                ProgressivePerGroup. For Progressive, this is considered
+                                over the total number of clusters. For ProgressivePerGroup,
+                                this is considered according to the size of the current
                                 group. For both Progressive and ProgressivePerGroup,
                                 the MaxFailures does not apply for MandatoryDecisionGroups,
                                 which tolerate no failures. Default is that no failures
@@ -373,23 +376,15 @@ spec:
                               default: None
                               description: ProgressDeadline defines how long workload
                                 applier controller will wait for the workload to reach
-                                a successful state in the cluster. ProgressDeadline
+                                a successful state in the cluster. If the workload
+                                does not reach a successful state after ProgressDeadline,
+                                will stop waiting and workload will be treated as
+                                "timeout" and be counted into MaxFailures. Once the
+                                MaxFailures is breached, the rollout will stop. ProgressDeadline
                                 default value is "None", meaning the workload applier
                                 will wait for a successful state indefinitely. ProgressDeadline
                                 must be defined in [0-9h]|[0-9m]|[0-9s] format examples;
                                 2h , 90m , 360s
-                              pattern: ^(([0-9])+[h|m|s])|None$
-                              type: string
-                            timeout:
-                              default: None
-                              description: "Timeout defines how long the workload
-                                applier controller will wait until the workload reaches
-                                a successful state in the cluster. Timeout default
-                                value is None meaning the workload applier will not
-                                proceed apply workload to other clusters if did not
-                                reach the successful state. Timeout must be defined
-                                in [0-9h]|[0-9m]|[0-9s] format examples; 2h , 90m
-                                , 360s \n Deprecated: Use ProgressDeadline instead."
                               pattern: ^(([0-9])+[h|m|s])|None$
                               type: string
                           type: object
@@ -438,11 +433,14 @@ spec:
                               default: 0
                               description: MaxFailures is a percentage or number of
                                 clusters in the current rollout that can fail before
-                                proceeding to the next rollout. MaxFailures is only
-                                considered for rollout types Progressive and ProgressivePerGroup.
-                                For Progressive, this is considered over the total
-                                number of clusters. For ProgressivePerGroup, this
-                                is considered according to the size of the current
+                                proceeding to the next rollout. Fail means the cluster
+                                has a failed status or timeout status (does not reach
+                                successful status after ProgressDeadline). Once the
+                                MaxFailures is breached, the rollout will stop. MaxFailures
+                                is only considered for rollout types Progressive and
+                                ProgressivePerGroup. For Progressive, this is considered
+                                over the total number of clusters. For ProgressivePerGroup,
+                                this is considered according to the size of the current
                                 group. For both Progressive and ProgressivePerGroup,
                                 the MaxFailures does not apply for MandatoryDecisionGroups,
                                 which tolerate no failures. Default is that no failures
@@ -467,23 +465,15 @@ spec:
                               default: None
                               description: ProgressDeadline defines how long workload
                                 applier controller will wait for the workload to reach
-                                a successful state in the cluster. ProgressDeadline
+                                a successful state in the cluster. If the workload
+                                does not reach a successful state after ProgressDeadline,
+                                will stop waiting and workload will be treated as
+                                "timeout" and be counted into MaxFailures. Once the
+                                MaxFailures is breached, the rollout will stop. ProgressDeadline
                                 default value is "None", meaning the workload applier
                                 will wait for a successful state indefinitely. ProgressDeadline
                                 must be defined in [0-9h]|[0-9m]|[0-9s] format examples;
                                 2h , 90m , 360s
-                              pattern: ^(([0-9])+[h|m|s])|None$
-                              type: string
-                            timeout:
-                              default: None
-                              description: "Timeout defines how long the workload
-                                applier controller will wait until the workload reaches
-                                a successful state in the cluster. Timeout default
-                                value is None meaning the workload applier will not
-                                proceed apply workload to other clusters if did not
-                                reach the successful state. Timeout must be defined
-                                in [0-9h]|[0-9m]|[0-9s] format examples; 2h , 90m
-                                , 360s \n Deprecated: Use ProgressDeadline instead."
                               pattern: ^(([0-9])+[h|m|s])|None$
                               type: string
                           type: object
@@ -522,11 +512,14 @@ spec:
                               default: 0
                               description: MaxFailures is a percentage or number of
                                 clusters in the current rollout that can fail before
-                                proceeding to the next rollout. MaxFailures is only
-                                considered for rollout types Progressive and ProgressivePerGroup.
-                                For Progressive, this is considered over the total
-                                number of clusters. For ProgressivePerGroup, this
-                                is considered according to the size of the current
+                                proceeding to the next rollout. Fail means the cluster
+                                has a failed status or timeout status (does not reach
+                                successful status after ProgressDeadline). Once the
+                                MaxFailures is breached, the rollout will stop. MaxFailures
+                                is only considered for rollout types Progressive and
+                                ProgressivePerGroup. For Progressive, this is considered
+                                over the total number of clusters. For ProgressivePerGroup,
+                                this is considered according to the size of the current
                                 group. For both Progressive and ProgressivePerGroup,
                                 the MaxFailures does not apply for MandatoryDecisionGroups,
                                 which tolerate no failures. Default is that no failures
@@ -551,23 +544,15 @@ spec:
                               default: None
                               description: ProgressDeadline defines how long workload
                                 applier controller will wait for the workload to reach
-                                a successful state in the cluster. ProgressDeadline
+                                a successful state in the cluster. If the workload
+                                does not reach a successful state after ProgressDeadline,
+                                will stop waiting and workload will be treated as
+                                "timeout" and be counted into MaxFailures. Once the
+                                MaxFailures is breached, the rollout will stop. ProgressDeadline
                                 default value is "None", meaning the workload applier
                                 will wait for a successful state indefinitely. ProgressDeadline
                                 must be defined in [0-9h]|[0-9m]|[0-9s] format examples;
                                 2h , 90m , 360s
-                              pattern: ^(([0-9])+[h|m|s])|None$
-                              type: string
-                            timeout:
-                              default: None
-                              description: "Timeout defines how long the workload
-                                applier controller will wait until the workload reaches
-                                a successful state in the cluster. Timeout default
-                                value is None meaning the workload applier will not
-                                proceed apply workload to other clusters if did not
-                                reach the successful state. Timeout must be defined
-                                in [0-9h]|[0-9m]|[0-9s] format examples; 2h , 90m
-                                , 360s \n Deprecated: Use ProgressDeadline instead."
                               pattern: ^(([0-9])+[h|m|s])|None$
                               type: string
                           type: object

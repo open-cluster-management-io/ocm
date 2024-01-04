@@ -2,12 +2,15 @@ package manifestworkreplicasetcontroller
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	fakeclusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
@@ -15,8 +18,10 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	"open-cluster-management.io/api/utils/work/v1/workapplier"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 	helpertest "open-cluster-management.io/ocm/pkg/work/hub/test"
 )
 
@@ -460,12 +465,22 @@ func TestDeployMWRSetSpecChangesReconcile(t *testing.T) {
 	mwrSet := helpertest.CreateTestManifestWorkReplicaSetWithRollOutStrategy("mwrSet-test", "default",
 		map[string]clusterv1alpha1.RolloutStrategy{placement.Name: perGoupeRollOut})
 
-	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet)
+	var objs []runtime.Object
+	for i := 0; i < clsPerGroup; i++ {
+		mw := helpertest.CreateTestManifestWork(mwrSet.Name, mwrSet.Namespace, placement.Name, clusters[i])
+		objs = append(objs, mw)
+	}
+	objs = append(objs, mwrSet)
+
+	fWorkClient := fakeworkclient.NewSimpleClientset(objs...)
 	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
 	// create manifestWorks
 	for i := 0; i < clsPerGroup; i++ {
 		mw := helpertest.CreateTestManifestWork(mwrSet.Name, mwrSet.Namespace, placement.Name, clusters[i])
 		err = workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw)
+		if err != nil {
+			t.Error(err)
+		}
 		assert.Nil(t, err)
 	}
 
@@ -560,4 +575,57 @@ func TestDeployMWRSetSpecChangesReconcile(t *testing.T) {
 	assert.NotNil(t, rollOutCondition)
 	assert.Equal(t, rollOutCondition.Status, metav1.ConditionFalse)
 	assert.Equal(t, rollOutCondition.Reason, workapiv1alpha1.ReasonProgressing)
+}
+
+func TestRequeueWithProgressDeadline(t *testing.T) {
+	mwrSet := helpertest.CreateTestManifestWorkReplicaSet("mwrSet-test", "default", "place-test")
+	mwrSet.Spec.PlacementRefs[0].RolloutStrategy = clusterv1alpha1.RolloutStrategy{
+		Type: clusterv1alpha1.Progressive,
+		Progressive: &clusterv1alpha1.RolloutProgressive{
+			MaxConcurrency: intstr.FromInt32(1),
+			RolloutConfig: clusterv1alpha1.RolloutConfig{
+				ProgressDeadline: "5s",
+				MaxFailures:      intstr.FromInt32(1),
+			},
+		},
+	}
+	mw, _ := CreateManifestWork(mwrSet, "cls1", "place-test")
+	apimeta.SetStatusCondition(&mw.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionFalse, Reason: "ApplyTest"})
+	fWorkClient := fakeworkclient.NewSimpleClientset(mwrSet, mw)
+	workInformerFactory := workinformers.NewSharedInformerFactoryWithOptions(fWorkClient, 1*time.Second)
+
+	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(mw); err != nil {
+		t.Fatal(err)
+	}
+	if err := workInformerFactory.Work().V1alpha1().ManifestWorkReplicaSets().Informer().GetStore().Add(mwrSet); err != nil {
+		t.Fatal(err)
+	}
+	mwLister := workInformerFactory.Work().V1().ManifestWorks().Lister()
+
+	placement, placementDecision := helpertest.CreateTestPlacement("place-test", "default", "cls1", "cls2")
+	fClusterClient := fakeclusterclient.NewSimpleClientset(placement, placementDecision)
+	clusterInformerFactory := clusterinformers.NewSharedInformerFactoryWithOptions(fClusterClient, 1*time.Second)
+
+	if err := clusterInformerFactory.Cluster().V1beta1().Placements().Informer().GetStore().Add(placement); err != nil {
+		t.Fatal(err)
+	}
+	if err := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Informer().GetStore().Add(placementDecision); err != nil {
+		t.Fatal(err)
+	}
+
+	placementLister := clusterInformerFactory.Cluster().V1beta1().Placements().Lister()
+	placementDecisionLister := clusterInformerFactory.Cluster().V1beta1().PlacementDecisions().Lister()
+
+	pmwDeployController := deployReconciler{
+		workApplier:         workapplier.NewWorkApplierWithTypedClient(fWorkClient, mwLister),
+		manifestWorkLister:  mwLister,
+		placeDecisionLister: placementDecisionLister,
+		placementLister:     placementLister,
+	}
+
+	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	var rqe helpers.RequeueError
+	if !errors.As(err, &rqe) {
+		t.Errorf("expect to get err %t", err)
+	}
 }

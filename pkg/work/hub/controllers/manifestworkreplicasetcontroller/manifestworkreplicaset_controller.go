@@ -2,12 +2,14 @@ package manifestworkreplicasetcontroller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,6 +29,7 @@ import (
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 
+	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
@@ -44,6 +47,9 @@ const (
 	// ManifestWorkReplicaSetFinalizer is the name of the finalizer added to ManifestWorkReplicaSet. It is used to ensure
 	// related manifestworks is deleted
 	ManifestWorkReplicaSetFinalizer = "work.open-cluster-management.io/manifest-work-cleanup"
+
+	// maxRequeueTime is the same as the informer resync period
+	maxRequeueTime = 30 * time.Minute
 )
 
 type ManifestWorkReplicaSetController struct {
@@ -142,7 +148,7 @@ func (m *ManifestWorkReplicaSetController) sync(ctx context.Context, controllerC
 
 	oldManifestWorkReplicaSet, err := m.manifestWorkReplicaSetLister.ManifestWorkReplicaSets(namespace).Get(name)
 	switch {
-	case errors.IsNotFound(err):
+	case apierrors.IsNotFound(err):
 		return nil
 	case err != nil:
 		return err
@@ -152,9 +158,15 @@ func (m *ManifestWorkReplicaSetController) sync(ctx context.Context, controllerC
 
 	var state reconcileState
 	var errs []error
+	minRequeue := maxRequeueTime
 	for _, reconciler := range m.reconcilers {
 		manifestWorkReplicaSet, state, err = reconciler.reconcile(ctx, manifestWorkReplicaSet)
-		if err != nil {
+		var rqe helpers.RequeueError
+		if err != nil && errors.As(err, &rqe) {
+			if minRequeue > rqe.RequeueTime {
+				minRequeue = rqe.RequeueTime
+			}
+		} else if err != nil {
 			errs = append(errs, err)
 		}
 		if state == reconcileStop {
@@ -171,7 +183,14 @@ func (m *ManifestWorkReplicaSetController) sync(ctx context.Context, controllerC
 		errs = append(errs, err)
 	}
 
-	return utilerrors.NewAggregate(errs)
+	if len(errs) > 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+	if minRequeue < maxRequeueTime {
+		controllerContext.Queue().AddAfter(key, minRequeue)
+	}
+
+	return nil
 }
 
 func listManifestWorksByManifestWorkReplicaSet(mwrs *workapiv1alpha1.ManifestWorkReplicaSet,

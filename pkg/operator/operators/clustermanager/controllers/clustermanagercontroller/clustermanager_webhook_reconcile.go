@@ -19,6 +19,7 @@ import (
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/ocm/manifests"
+	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
 
@@ -48,7 +49,7 @@ func (c *webhookReconcile) reconcile(ctx context.Context, cm *operatorapiv1.Clus
 	var appliedErrs []error
 
 	if !meta.IsStatusConditionFalse(cm.Status.Conditions, clusterManagerProgressing) {
-		return cm, reconcileStop, helpers.NewRequeueError("Deployment is not ready", clusterManagerReSyncTime)
+		return cm, reconcileStop, commonhelpers.NewRequeueError("Deployment is not ready", clusterManagerReSyncTime)
 	}
 
 	webhookResources := hubRegistrationWebhookResourceFiles

@@ -46,6 +46,7 @@ func (c *ManifestBundleCodec) Encode(source string, eventType types.CloudEventsT
 
 	evt := types.NewEventBuilder(source, eventType).
 		WithResourceID(string(work.UID)).
+		WithStatusUpdateSequenceID(sequenceGenerator.Generate().String()).
 		WithResourceVersion(resourceVersion).
 		WithClusterName(work.Namespace).
 		WithOriginalSource(originalSource).

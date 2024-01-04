@@ -18,16 +18,20 @@ type mqttSourceOptions struct {
 	MQTTOptions
 	errorChan chan error
 	sourceID  string
+	clientID  string
 }
 
-func NewSourceOptions(mqttOptions *MQTTOptions, sourceID string) *options.CloudEventsSourceOptions {
+func NewSourceOptions(mqttOptions *MQTTOptions, clientID, sourceID string) *options.CloudEventsSourceOptions {
+	mqttSourceOptions := &mqttSourceOptions{
+		MQTTOptions: *mqttOptions,
+		errorChan:   make(chan error),
+		sourceID:    sourceID,
+		clientID:    clientID,
+	}
+
 	return &options.CloudEventsSourceOptions{
-		CloudEventsOptions: &mqttSourceOptions{
-			MQTTOptions: *mqttOptions,
-			errorChan:   make(chan error),
-			sourceID:    sourceID,
-		},
-		SourceID: sourceID,
+		CloudEventsOptions: mqttSourceOptions,
+		SourceID:           mqttSourceOptions.sourceID,
 	}
 }
 
@@ -56,7 +60,7 @@ func (o *mqttSourceOptions) WithContext(ctx context.Context, evtCtx cloudevents.
 func (o *mqttSourceOptions) Client(ctx context.Context) (cloudevents.Client, error) {
 	receiver, err := o.GetCloudEventsClient(
 		ctx,
-		fmt.Sprintf("%s-client", o.sourceID),
+		o.clientID,
 		func(err error) {
 			o.errorChan <- err
 		},

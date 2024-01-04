@@ -2,6 +2,7 @@ package source
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -90,7 +91,7 @@ func (m *MQTTSource) Start(ctx context.Context) error {
 	}
 	cloudEventsClient, err := generic.NewCloudEventSourceClient[*workv1.ManifestWork](
 		ctx,
-		mqtt.NewSourceOptions(mqttOptions, sourceID),
+		mqtt.NewSourceOptions(mqttOptions, fmt.Sprintf("%s-client", sourceID), sourceID),
 		workLister,
 		work.ManifestWorkStatusHash,
 		&ManifestCodec{},

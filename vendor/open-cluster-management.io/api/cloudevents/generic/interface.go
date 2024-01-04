@@ -54,7 +54,7 @@ type Codec[T ResourceObject] interface {
 
 type CloudEventsClient[T ResourceObject] interface {
 	// Resync the resources of one source/agent by sending resync request.
-	Resync(ctx context.Context) error
+	Resync(ctx context.Context, listOptions types.ListOptions) error
 
 	// Publish the resources spec/status event to the broker.
 	Publish(ctx context.Context, eventType types.CloudEventsType, obj T) error
