@@ -11,7 +11,6 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	fakeapiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -225,7 +224,12 @@ func TestCreateStorageVersionMigrations(t *testing.T) {
 			fakeMigrationClient := fakemigrationclient.NewSimpleClientset(c.existingMigrations...)
 
 			err := createStorageVersionMigrations(context.TODO(),
-				c.toCreateMigrations, fakeMigrationClient.MigrationV1alpha1(),
+				c.toCreateMigrations, newClusterManagerOwner(&operatorapiv1.ClusterManager{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testhub",
+						UID:  "testhub-uid",
+					},
+				}), fakeMigrationClient.MigrationV1alpha1(),
 				eventstesting.NewTestingEventRecorder(t))
 			if c.expectErr && err != nil {
 				return
@@ -235,65 +239,6 @@ func TestCreateStorageVersionMigrations(t *testing.T) {
 			}
 
 			c.validateActions(t, fakeMigrationClient.Actions())
-		})
-	}
-}
-
-func TestRemoveStorageVersionMigrations(t *testing.T) {
-	cases := []struct {
-		name               string
-		existingMigrations []runtime.Object
-		toRemoveMigrations []*migrationv1alpha1.StorageVersionMigration
-	}{
-		{
-			name: "not exists",
-		},
-		{
-			name: "removed",
-			existingMigrations: []runtime.Object{
-				&migrationv1alpha1.StorageVersionMigration{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "foo.cluster.open-cluster-management.io",
-					},
-				},
-				&migrationv1alpha1.StorageVersionMigration{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "bar.cluster.open-cluster-management.io",
-					},
-				},
-			},
-			toRemoveMigrations: []*migrationv1alpha1.StorageVersionMigration{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "foo.cluster.open-cluster-management.io",
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "bar.cluster.open-cluster-management.io",
-					},
-				},
-			},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			fakeMigrationClient := fakemigrationclient.NewSimpleClientset(c.existingMigrations...)
-			err := removeStorageVersionMigrations(context.TODO(), nil, fakeMigrationClient.MigrationV1alpha1())
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			for _, m := range c.toRemoveMigrations {
-				_, err := fakeMigrationClient.MigrationV1alpha1().StorageVersionMigrations().Get(context.TODO(), m.Name, metav1.GetOptions{})
-				if errors.IsNotFound(err) {
-					continue
-				}
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-			}
 		})
 	}
 }
