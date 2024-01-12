@@ -76,6 +76,11 @@ var _ = BeforeSuite(func() {
 	}
 	Expect(err).ToNot(HaveOccurred())
 
+	Eventually(func() error {
+		return t.EnableWorkFeature("ManifestWorkReplicaSet")
+	}, t.EventuallyTimeout*5, t.EventuallyInterval*5).Should(Succeed())
+	Eventually(t.CheckHubReady, t.EventuallyTimeout, t.EventuallyInterval).Should(Succeed())
+
 	if deployKlusterlet {
 		klusterletName = fmt.Sprintf("e2e-klusterlet-%s", rand.String(6))
 		clusterName = fmt.Sprintf("e2e-managedcluster-%s", rand.String(6))
