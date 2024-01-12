@@ -48,6 +48,10 @@ const (
 	// ExtensionResourceVersion is the cloud event extension key of the resource version.
 	ExtensionResourceVersion = "resourceversion"
 
+	// ExtensionStatusUpdateSequenceID is the cloud event extension key of the status update event sequence ID.
+	// The status update event sequence id represents the order in which status update events occur on a single agent.
+	ExtensionStatusUpdateSequenceID = "sequenceid"
+
 	// ExtensionDeletionTimestamp is the cloud event extension key of the deletion timestamp.
 	ExtensionDeletionTimestamp = "deletiontimestamp"
 
@@ -159,6 +163,7 @@ type EventBuilder struct {
 	clusterName       string
 	originalSource    string
 	resourceID        string
+	sequenceID        string
 	resourceVersion   *int64
 	eventType         CloudEventsType
 	deletionTimestamp time.Time
@@ -178,6 +183,11 @@ func (b *EventBuilder) WithResourceID(resourceID string) *EventBuilder {
 
 func (b *EventBuilder) WithResourceVersion(resourceVersion int64) *EventBuilder {
 	b.resourceVersion = &resourceVersion
+	return b
+}
+
+func (b *EventBuilder) WithStatusUpdateSequenceID(sequenceID string) *EventBuilder {
+	b.sequenceID = sequenceID
 	return b
 }
 
@@ -209,6 +219,10 @@ func (b *EventBuilder) NewEvent() cloudevents.Event {
 
 	if b.resourceVersion != nil {
 		evt.SetExtension(ExtensionResourceVersion, *b.resourceVersion)
+	}
+
+	if len(b.sequenceID) != 0 {
+		evt.SetExtension(ExtensionStatusUpdateSequenceID, b.sequenceID)
 	}
 
 	if len(b.clusterName) != 0 {

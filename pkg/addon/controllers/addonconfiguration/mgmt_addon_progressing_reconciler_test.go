@@ -95,7 +95,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonInstalling {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions[0].Reason)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "0/2 installing..., 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "0/2 installing..., 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions[0].Message)
 				}
 			},
@@ -188,7 +188,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonInstalling {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions[0].Reason)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/2 installing..., 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/2 installing..., 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions[0].Message)
 				}
 			},
@@ -271,7 +271,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonInstallSucceed {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/1 install completed with no errors, 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/1 install completed with no errors, 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
 			},
@@ -347,7 +347,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonUpgrading {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/2 upgrading..., 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/2 upgrading..., 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
 			},
@@ -434,7 +434,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonUpgradeSucceed {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/1 upgrade completed with no errors, 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/1 upgrade completed with no errors, 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
 			},
@@ -520,7 +520,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonUpgrading {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "0/1 upgrading..., 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "0/1 upgrading..., 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
 			},
@@ -595,7 +595,7 @@ func TestMgmtAddonProgressingReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonv1alpha1.ProgressingReasonInstalling {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/2 installing..., 0 timeout." {
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/2 installing..., 0 failed 0 timeout." {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions[0].Message)
 				}
 			},

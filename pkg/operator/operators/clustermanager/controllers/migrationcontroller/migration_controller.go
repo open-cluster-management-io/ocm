@@ -143,11 +143,6 @@ func (c *crdMigrationController) sync(ctx context.Context, controllerContext fac
 		return err
 	}
 
-	// if the ClusterManager is deleting, we remove its related resources on hub
-	if !clusterManager.DeletionTimestamp.IsZero() {
-		return removeStorageVersionMigrations(ctx, migrations, migrationClient)
-	}
-
 	// do not apply storage version migrations until other resources are applied
 	if applied := meta.IsStatusConditionTrue(clusterManager.Status.Conditions, clusterManagerApplied); !applied {
 		controllerContext.Queue().AddRateLimited(clusterManagerName)
@@ -189,7 +184,7 @@ func (c *crdMigrationController) sync(ctx context.Context, controllerContext fac
 		return nil
 	}
 
-	err = createStorageVersionMigrations(ctx, migrations, migrationClient, c.recorder)
+	err = createStorageVersionMigrations(ctx, migrations, newClusterManagerOwner(clusterManager), migrationClient, c.recorder)
 	if err != nil {
 		klog.Errorf("Failed to apply StorageVersionMigrations. %v", err)
 
@@ -221,22 +216,6 @@ func supportStorageVersionMigration(ctx context.Context, apiExtensionClient apie
 		return false, err
 	}
 	return true, nil
-}
-
-func removeStorageVersionMigrations(
-	ctx context.Context,
-	toRemoveMigrations []*migrationv1alpha1.StorageVersionMigration,
-	migrationClient migrationv1alpha1client.StorageVersionMigrationsGetter) error {
-	for _, migration := range toRemoveMigrations {
-		err := migrationClient.StorageVersionMigrations().Delete(ctx, migration.Name, metav1.DeleteOptions{})
-		if errors.IsNotFound(err) {
-			continue
-		}
-		if err != nil {
-			return nil
-		}
-	}
-	return nil
 }
 
 // 1.The CRD must exists before the migration CR is created.
@@ -299,10 +278,11 @@ func checkCRDStorageVersion(ctx context.Context, toCreateMigrations []*migration
 // https://github.com/kubernetes-sigs/kube-storage-version-migrator/blob/5c8923c5ff96ceb4435f66b986b5aec2dd0cbc22/pkg/controller/kubemigrator.go#L105-L108
 func createStorageVersionMigrations(ctx context.Context,
 	toCreateMigrations []*migrationv1alpha1.StorageVersionMigration,
+	ownerRef metav1.OwnerReference,
 	migrationClient migrationv1alpha1client.StorageVersionMigrationsGetter, recorder events.Recorder) error {
 	errs := []error{}
 	for _, migration := range toCreateMigrations {
-		err := createStorageVersionMigration(ctx, migrationClient, migration, recorder)
+		err := createStorageVersionMigration(ctx, migrationClient, migration, ownerRef, recorder)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -411,6 +391,7 @@ func createStorageVersionMigration(
 	ctx context.Context,
 	client migrationv1alpha1client.StorageVersionMigrationsGetter,
 	migration *migrationv1alpha1.StorageVersionMigration,
+	ownerRefs metav1.OwnerReference,
 	recorder events.Recorder,
 ) error {
 	if migration == nil {
@@ -418,6 +399,7 @@ func createStorageVersionMigration(
 	}
 	existing, err := client.StorageVersionMigrations().Get(ctx, migration.Name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
+		migration.ObjectMeta.OwnerReferences = append(migration.ObjectMeta.OwnerReferences, ownerRefs)
 		actual, err := client.StorageVersionMigrations().Create(context.TODO(), migration, metav1.CreateOptions{})
 		if err != nil {
 			recorder.Warningf("StorageVersionMigrationCreateFailed", "Failed to create %s: %v", resourcehelper.FormatResourceForCLIWithNamespace(migration), err)
@@ -478,4 +460,13 @@ func generateHubClients(hubKubeConfig *rest.Config) (apiextensionsclient.Interfa
 		return nil, nil, err
 	}
 	return hubApiExtensionClient, hubMigrationClient, nil
+}
+
+func newClusterManagerOwner(clusterManager *operatorapiv1.ClusterManager) metav1.OwnerReference {
+	return metav1.OwnerReference{
+		APIVersion: operatorapiv1.GroupVersion.WithKind("ClusterManager").GroupVersion().String(),
+		Kind:       operatorapiv1.GroupVersion.WithKind("ClusterManager").Kind,
+		Name:       clusterManager.Name,
+		UID:        clusterManager.UID,
+	}
 }

@@ -64,6 +64,9 @@ type RolloutConfig struct {
 	MinSuccessTime metav1.Duration `json:"minSuccessTime,omitempty"`
 	// ProgressDeadline defines how long workload applier controller will wait for the workload to
 	// reach a successful state in the cluster.
+	// If the workload does not reach a successful state after ProgressDeadline, will stop waiting
+	// and workload will be treated as "timeout" and be counted into MaxFailures. Once the MaxFailures
+	// is breached, the rollout will stop.
 	// ProgressDeadline default value is "None", meaning the workload applier will wait for a
 	// successful state indefinitely.
 	// ProgressDeadline must be defined in [0-9h]|[0-9m]|[0-9s] format examples; 2h , 90m , 360s
@@ -72,7 +75,9 @@ type RolloutConfig struct {
 	// +optional
 	ProgressDeadline string `json:"progressDeadline,omitempty"`
 	// MaxFailures is a percentage or number of clusters in the current rollout that can fail before
-	// proceeding to the next rollout.
+	// proceeding to the next rollout. Fail means the cluster has a failed status or timeout status
+	// (does not reach successful status after ProgressDeadline).
+	// Once the MaxFailures is breached, the rollout will stop.
 	// MaxFailures is only considered for rollout types Progressive and ProgressivePerGroup. For
 	// Progressive, this is considered over the total number of clusters. For ProgressivePerGroup,
 	// this is considered according to the size of the current group. For both Progressive and
@@ -84,17 +89,6 @@ type RolloutConfig struct {
 	// +kubebuilder:default=0
 	// +optional
 	MaxFailures intstr.IntOrString `json:"maxFailures,omitempty"`
-	// Timeout defines how long the workload applier controller will wait until the workload reaches a
-	// successful state in the cluster.
-	// Timeout default value is None meaning the workload applier will not proceed apply workload to
-	// other clusters if did not reach the successful state.
-	// Timeout must be defined in [0-9h]|[0-9m]|[0-9s] format examples; 2h , 90m , 360s
-	//
-	// Deprecated: Use ProgressDeadline instead.
-	// +kubebuilder:validation:Pattern="^(([0-9])+[h|m|s])|None$"
-	// +kubebuilder:default:="None"
-	// +optional
-	Timeout string `json:"timeout,omitempty"`
 }
 
 // MandatoryDecisionGroup set the decision group name or group index.

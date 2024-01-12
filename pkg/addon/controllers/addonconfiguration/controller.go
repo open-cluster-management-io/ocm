@@ -2,10 +2,12 @@ package addonconfiguration
 
 import (
 	"context"
+	"errors"
+	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -21,6 +23,11 @@ import (
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/common/queue"
+)
+
+const (
+	// maxRequeueTime is the minimum informer resync period
+	maxRequeueTime = 10 * time.Minute
 )
 
 // addonConfigurationController is a controller to update configuration of mca with the following order
@@ -104,7 +111,7 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 
 	cma, err := c.clusterManagementAddonLister.Get(addonName)
 	switch {
-	case errors.IsNotFound(err):
+	case apierrors.IsNotFound(err):
 		return nil
 	case err != nil:
 		return err
@@ -129,9 +136,15 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 
 	var state reconcileState
 	var errs []error
+	minRequeue := maxRequeueTime
 	for _, reconciler := range c.reconcilers {
 		cma, state, err = reconciler.reconcile(ctx, cma, graph)
-		if err != nil {
+		var rqe helpers.RequeueError
+		if err != nil && errors.As(err, &rqe) {
+			if minRequeue > rqe.RequeueTime {
+				minRequeue = rqe.RequeueTime
+			}
+		} else if err != nil {
 			errs = append(errs, err)
 		}
 		if state == reconcileStop {
@@ -139,7 +152,15 @@ func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory
 		}
 	}
 
-	return utilerrors.NewAggregate(errs)
+	if len(errs) > 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+
+	if minRequeue < maxRequeueTime {
+		syncCtx.Queue().AddAfter(key, minRequeue)
+	}
+
+	return nil
 }
 
 func (c *addonConfigurationController) buildConfigurationGraph(logger klog.Logger, cma *addonv1alpha1.ClusterManagementAddOn) (*configurationGraph, error) {

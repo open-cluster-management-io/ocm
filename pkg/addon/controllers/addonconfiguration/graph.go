@@ -3,6 +3,7 @@ package addonconfiguration
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -271,6 +272,19 @@ func (g *configurationGraph) getAddonsToUpdate() []*addonNode {
 	return addons
 }
 
+func (g *configurationGraph) getRequeueTime() time.Duration {
+	minRequeue := maxRequeueTime
+
+	for _, node := range g.nodes {
+		nodeRecheckAfter := node.rolloutResult.RecheckAfter
+		if nodeRecheckAfter != nil && *nodeRecheckAfter < minRequeue {
+			minRequeue = *nodeRecheckAfter
+		}
+	}
+
+	return minRequeue
+}
+
 func (n *installStrategyNode) addNode(addon *addonv1alpha1.ManagedClusterAddOn) {
 	n.children[addon.Namespace] = &addonNode{
 		mca:            addon,
@@ -372,26 +386,47 @@ func (n *installStrategyNode) getAddonsToUpdate() []*addonNode {
 	return addons
 }
 
+// Return the number of succeed addons.
+// Including the addons with status Succeed after MinSuccessTime.
 func (n *installStrategyNode) countAddonUpgradeSucceed() int {
 	count := 0
 	for _, addon := range n.children {
-		if desiredConfigsEqual(addon.desiredConfigs, n.desiredConfigs) && addon.status.Status == clusterv1alpha1.Succeeded {
+		if desiredConfigsEqual(addon.desiredConfigs, n.desiredConfigs) &&
+			addon.status.Status == clusterv1alpha1.Succeeded &&
+			!rolloutStatusHasCluster(n.rolloutResult.ClustersToRollout, addon.mca.Namespace) {
 			count += 1
 		}
 	}
 	return count
 }
 
+// Return the number of failed addons after ProgressDeadline.
+func (n *installStrategyNode) countAddonUpgradeFailed() int {
+	count := 0
+	for _, addon := range n.children {
+		if desiredConfigsEqual(addon.desiredConfigs, n.desiredConfigs) &&
+			addon.status.Status == clusterv1alpha1.Failed &&
+			!rolloutStatusHasCluster(n.rolloutResult.ClustersToRollout, addon.mca.Namespace) {
+			count += 1
+		}
+	}
+	return count
+}
+
+// Return the number of exiting addons in rolloutResult.ClustersToRollout.
+// Including the addons with status ToApply, Progressing within ProgressDeadline, Failed within ProgressDeadline and Succeed within MinSuccessTime.
 func (n *installStrategyNode) countAddonUpgrading() int {
 	count := 0
 	for _, addon := range n.children {
-		if desiredConfigsEqual(addon.desiredConfigs, n.desiredConfigs) && addon.status.Status == clusterv1alpha1.Progressing {
+		if rolloutStatusHasCluster(n.rolloutResult.ClustersToRollout, addon.mca.Namespace) {
 			count += 1
 		}
 	}
 	return count
 }
 
+// Return the number of addons in rolloutResult.ClustersTimeOut.
+// Including the addons with status Progressing after ProgressDeadline, Failed after ProgressDeadline.
 func (n *installStrategyNode) countAddonTimeOut() int {
 	return len(n.rolloutResult.ClustersTimeOut)
 }
@@ -415,4 +450,13 @@ func desiredConfigsEqual(a, b addonConfigMap) bool {
 	}
 
 	return true
+}
+
+func rolloutStatusHasCluster(clusterRolloutStatus []clusterv1alpha1.ClusterRolloutStatus, clusterName string) bool {
+	for _, s := range clusterRolloutStatus {
+		if s.ClusterName == clusterName {
+			return true
+		}
+	}
+	return false
 }

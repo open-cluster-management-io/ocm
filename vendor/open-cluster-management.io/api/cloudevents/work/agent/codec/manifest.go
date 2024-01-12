@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/bwmarrin/snowflake"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	cloudeventstypes "github.com/cloudevents/sdk-go/v2/types"
 
@@ -26,6 +27,18 @@ const (
 	// CloudEventsDataTypeAnnotationKey is the key of the cloudevents original source annotation.
 	CloudEventsOriginalSourceAnnotationKey = "cloudevents.open-cluster-management.io/originalsource"
 )
+
+var sequenceGenerator *snowflake.Node
+
+func init() {
+	// init the snowflake id generator with node id 1 for each single agent. Each single agent has its own consumer id
+	// to be identified, and we can ensure the order of status update event from the same agent via sequence id. The
+	// events from different agents are independent, hence the ordering among them needs not to be guaranteed.
+	//
+	// The snowflake `NewNode` returns error only when the snowflake node id is less than 1 or great than 1024, so the
+	// error can be ignored here.
+	sequenceGenerator, _ = snowflake.NewNode(1)
+}
 
 // ManifestCodec is a codec to encode/decode a ManifestWork/cloudevent with ManifestBundle for an agent.
 type ManifestCodec struct {
@@ -65,6 +78,7 @@ func (c *ManifestCodec) Encode(source string, eventType types.CloudEventsType, w
 
 	evt := types.NewEventBuilder(source, eventType).
 		WithResourceID(string(work.UID)).
+		WithStatusUpdateSequenceID(sequenceGenerator.Generate().String()).
 		WithResourceVersion(resourceVersion).
 		WithClusterName(work.Namespace).
 		WithOriginalSource(originalSource).
