@@ -8,8 +8,8 @@ import (
 
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	worklisterv1 "open-cluster-management.io/api/client/work/listers/work/v1"
-	"open-cluster-management.io/api/utils/work/v1/workapplier"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
+	workapplier "open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier"
 
 	"open-cluster-management.io/ocm/pkg/common/patcher"
 )
