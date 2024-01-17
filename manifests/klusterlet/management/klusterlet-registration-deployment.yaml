@@ -75,6 +75,12 @@ spec:
           {{if .ClusterAnnotationsString}}
           - "--cluster-annotations={{ .ClusterAnnotationsString }}"
           {{end}}
+          {{if gt .RegistrationKubeAPIQPS 0.0}}
+          - "--kube-api-qps={{ .RegistrationKubeAPIQPS }}"
+          {{end}}
+          {{if gt .RegistrationKubeAPIBurst 0}}
+          - "--kube-api-burst={{ .RegistrationKubeAPIBurst }}"
+          {{end}}
         env:
           - name: POD_NAME
             valueFrom:

@@ -821,7 +821,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 
 		ginkgo.It("feature gates configuration is nil or empty", func() {
 			klusterlet.Spec.RegistrationConfiguration = nil
-			klusterlet.Spec.WorkConfiguration = &operatorapiv1.WorkConfiguration{}
+			klusterlet.Spec.WorkConfiguration = &operatorapiv1.WorkAgentConfiguration{}
 
 			ginkgo.By("Create the klusterlet with RegistrationConfiguration nil and WorkConfiguration empty")
 			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(),
@@ -944,7 +944,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 					"agent.open-cluster-management.io/foo": "bar",
 				},
 			}
-			klusterlet.Spec.WorkConfiguration = &operatorapiv1.WorkConfiguration{
+			klusterlet.Spec.WorkConfiguration = &operatorapiv1.WorkAgentConfiguration{
 				FeatureGates: []operatorapiv1.FeatureGate{
 					{
 						Feature: string(ocmfeature.ExecutorValidatingCaches),
@@ -1026,7 +1026,7 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 					},
 				},
 			}
-			klusterlet.Spec.WorkConfiguration = &operatorapiv1.WorkConfiguration{
+			klusterlet.Spec.WorkConfiguration = &operatorapiv1.WorkAgentConfiguration{
 				FeatureGates: []operatorapiv1.FeatureGate{
 					{
 						Feature: "Bar",

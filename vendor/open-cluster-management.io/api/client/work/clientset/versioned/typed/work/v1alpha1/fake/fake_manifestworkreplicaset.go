@@ -7,7 +7,6 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -20,9 +19,9 @@ type FakeManifestWorkReplicaSets struct {
 	ns   string
 }
 
-var manifestworkreplicasetsResource = schema.GroupVersionResource{Group: "work.open-cluster-management.io", Version: "v1alpha1", Resource: "manifestworkreplicasets"}
+var manifestworkreplicasetsResource = v1alpha1.SchemeGroupVersion.WithResource("manifestworkreplicasets")
 
-var manifestworkreplicasetsKind = schema.GroupVersionKind{Group: "work.open-cluster-management.io", Version: "v1alpha1", Kind: "ManifestWorkReplicaSet"}
+var manifestworkreplicasetsKind = v1alpha1.SchemeGroupVersion.WithKind("ManifestWorkReplicaSet")
 
 // Get takes name of the manifestWorkReplicaSet, and returns the corresponding manifestWorkReplicaSet object, and an error if there is any.
 func (c *FakeManifestWorkReplicaSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ManifestWorkReplicaSet, err error) {
