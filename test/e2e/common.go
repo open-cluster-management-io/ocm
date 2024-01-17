@@ -1151,7 +1151,7 @@ func changeHostOfKubeconfigSecret(secret corev1.Secret, apiServerURL string) (*c
 		"kubeconfig": newKubeconfig,
 	}
 
-	klog.Info("Set the cluster server URL in %v secret", "apiServerURL", secret.Name, apiServerURL)
+	klog.Infof("Set the cluster server URL in %s secret with apiServerURL %s", secret.Name, apiServerURL)
 	return &secret, nil
 }
 

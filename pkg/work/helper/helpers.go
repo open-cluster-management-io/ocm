@@ -30,6 +30,7 @@ import (
 	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	clustersdkv1beta1 "open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1"
 )
 
 const (
@@ -485,16 +486,8 @@ func (pdl PlacementDecisionGetter) List(selector labels.Selector, namespace stri
 	return pdl.Client.PlacementDecisions(namespace).List(selector)
 }
 
-// Get added and deleted clusters names
-func GetClusters(client clusterlister.PlacementDecisionLister, placement *clusterv1beta1.Placement,
-	existingClusters sets.Set[string]) (sets.Set[string], sets.Set[string], error) {
-	pdtracker := GetPlacementTracker(client, placement, existingClusters)
-
-	return pdtracker.GetClusterChanges()
-}
-
 func GetPlacementTracker(client clusterlister.PlacementDecisionLister, placement *clusterv1beta1.Placement,
-	existingClusters sets.Set[string]) *clusterv1beta1.PlacementDecisionClustersTracker {
+	existingClusters sets.Set[string]) *clustersdkv1beta1.PlacementDecisionClustersTracker {
 
-	return clusterv1beta1.NewPlacementDecisionClustersTracker(placement, PlacementDecisionGetter{Client: client}, existingClusters)
+	return clustersdkv1beta1.NewPlacementDecisionClustersTracker(placement, PlacementDecisionGetter{Client: client}, existingClusters)
 }

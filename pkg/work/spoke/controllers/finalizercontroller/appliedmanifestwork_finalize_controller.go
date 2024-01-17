@@ -109,7 +109,7 @@ func (m *AppliedManifestWorkFinalizeController) syncAppliedManifestWork(ctx cont
 
 	// requeue the work until all applied resources are deleted and finalized if the appliedmanifestwork itself is not updated
 	if len(resourcesPendingFinalization) != 0 {
-		klog.V(4).Infof("%d resources pending deletions %v", len(resourcesPendingFinalization))
+		klog.V(4).Infof("%d resources pending deletions", len(resourcesPendingFinalization))
 		controllerContext.Queue().AddAfter(appliedManifestWork.Name, m.rateLimiter.When(appliedManifestWork.Name))
 		return nil
 	}
