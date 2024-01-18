@@ -15,9 +15,8 @@ import (
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
-
-	"open-cluster-management.io/ocm/pkg/common/patcher"
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	"open-cluster-management.io/sdk-go/pkg/patcher"
+	testingcommon "open-cluster-management.io/sdk-go/pkg/testing"
 )
 
 func TestSyncClusterSet(t *testing.T) {

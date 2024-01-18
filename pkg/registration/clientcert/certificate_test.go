@@ -15,7 +15,8 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2/ktesting"
 
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	testingcommon "open-cluster-management.io/sdk-go/pkg/testing"
+
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 

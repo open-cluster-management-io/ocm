@@ -23,8 +23,7 @@ import (
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	fakework "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
-
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	testingcommon "open-cluster-management.io/sdk-go/pkg/testing"
 )
 
 func TestReconcile(t *testing.T) {

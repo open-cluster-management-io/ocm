@@ -10,25 +10,11 @@ import (
 	certv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/diff"
 
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
-
-// AssertFinalizers asserts the given runtime object has the expected finalizers
-func AssertFinalizers(t *testing.T, obj runtime.Object, finalizers []string) {
-	accessor, _ := meta.Accessor(obj)
-	actual := accessor.GetFinalizers()
-	if len(actual) == 0 && len(finalizers) == 0 {
-		return
-	}
-	if !equality.Semantic.DeepEqual(actual, finalizers) {
-		t.Fatal(diff.ObjectDiff(actual, finalizers))
-	}
-}
 
 // AssertManagedClusterClientConfigs asserts the actual managed cluster client configs are the
 // same with the expected

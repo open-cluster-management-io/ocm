@@ -7,9 +7,9 @@ import (
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
-	"open-cluster-management.io/ocm/pkg/common/patcher"
 )
 
 type managedClusterAddonConfigurationReconciler struct {
