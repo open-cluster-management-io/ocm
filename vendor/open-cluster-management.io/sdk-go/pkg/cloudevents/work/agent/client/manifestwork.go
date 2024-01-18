@@ -14,12 +14,12 @@ import (
 
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	workv1lister "open-cluster-management.io/api/client/work/listers/work/v1"
-	"open-cluster-management.io/api/cloudevents/generic"
-	"open-cluster-management.io/api/cloudevents/generic/types"
-	"open-cluster-management.io/api/cloudevents/work/agent/codec"
-	"open-cluster-management.io/api/cloudevents/work/utils"
-	"open-cluster-management.io/api/cloudevents/work/watcher"
 	workv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/codec"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/utils"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/watcher"
 )
 
 const ManifestsDeleted = "Deleted"

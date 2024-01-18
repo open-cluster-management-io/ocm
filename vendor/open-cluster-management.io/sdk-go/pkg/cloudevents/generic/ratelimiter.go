@@ -5,7 +5,7 @@ import (
 
 	"k8s.io/client-go/util/flowcontrol"
 
-	"open-cluster-management.io/api/cloudevents/generic/options"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 )
 
 // longThrottleLatency defines threshold for logging requests. All requests being

@@ -3,8 +3,8 @@ package payload
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"open-cluster-management.io/api/cloudevents/generic/types"
 	workv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
 var ManifestBundleEventDataType = types.CloudEventsDataType{

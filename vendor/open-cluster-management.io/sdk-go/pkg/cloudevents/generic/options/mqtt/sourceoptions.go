@@ -10,8 +10,8 @@ import (
 	cloudeventscontext "github.com/cloudevents/sdk-go/v2/context"
 	"github.com/eclipse/paho.golang/paho"
 
-	"open-cluster-management.io/api/cloudevents/generic/options"
-	"open-cluster-management.io/api/cloudevents/generic/types"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
 type mqttSourceOptions struct {
@@ -43,7 +43,7 @@ func (o *mqttSourceOptions) WithContext(ctx context.Context, evtCtx cloudevents.
 
 	if eventType.Action == types.ResyncRequestAction {
 		// source publishes event to status resync topic to request to get resources status from all clusters
-		return cloudeventscontext.WithTopic(ctx, strings.Replace(StatusResyncTopic, "+", o.sourceID, -1)), nil
+		return cloudeventscontext.WithTopic(ctx, strings.Replace(o.Topics.StatusResync, "+", o.sourceID, -1)), nil
 	}
 
 	clusterName, err := evtCtx.GetExtension(types.ExtensionClusterName)
@@ -52,7 +52,7 @@ func (o *mqttSourceOptions) WithContext(ctx context.Context, evtCtx cloudevents.
 	}
 
 	// source publishes event to spec topic to send the resource spec to a specified cluster
-	specTopic := strings.Replace(SpecTopic, "+", o.sourceID, 1)
+	specTopic := strings.Replace(o.Topics.Spec, "+", o.sourceID, 1)
 	specTopic = strings.Replace(specTopic, "+", fmt.Sprintf("%s", clusterName), -1)
 	return cloudeventscontext.WithTopic(ctx, specTopic), nil
 }
@@ -69,9 +69,9 @@ func (o *mqttSourceOptions) Client(ctx context.Context) (cloudevents.Client, err
 			&paho.Subscribe{
 				Subscriptions: map[string]paho.SubscribeOptions{
 					// receiving the resources status from agents with status topic
-					strings.Replace(StatusTopic, "+", o.sourceID, 1): {QoS: byte(o.SubQoS)},
+					strings.Replace(o.Topics.Status, "+", o.sourceID, 1): {QoS: byte(o.SubQoS)},
 					// receiving the resources spec resync request from agents with spec resync topic
-					SpecResyncTopic: {QoS: byte(o.SubQoS)},
+					o.Topics.SpecResync: {QoS: byte(o.SubQoS)},
 				},
 			},
 		),

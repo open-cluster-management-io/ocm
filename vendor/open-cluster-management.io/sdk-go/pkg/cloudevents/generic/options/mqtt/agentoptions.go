@@ -10,8 +10,8 @@ import (
 	cloudeventscontext "github.com/cloudevents/sdk-go/v2/context"
 	"github.com/eclipse/paho.golang/paho"
 
-	"open-cluster-management.io/api/cloudevents/generic/options"
-	"open-cluster-management.io/api/cloudevents/generic/types"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
 type mqttAgentOptions struct {
@@ -44,7 +44,7 @@ func (o *mqttAgentOptions) WithContext(ctx context.Context, evtCtx cloudevents.E
 
 	if eventType.Action == types.ResyncRequestAction {
 		// agent publishes event to spec resync topic to request to get resources spec from all sources
-		topic := strings.Replace(SpecResyncTopic, "+", o.clusterName, -1)
+		topic := strings.Replace(o.Topics.SpecResync, "+", o.clusterName, -1)
 		return cloudeventscontext.WithTopic(ctx, topic), nil
 	}
 
@@ -54,7 +54,7 @@ func (o *mqttAgentOptions) WithContext(ctx context.Context, evtCtx cloudevents.E
 		return nil, err
 	}
 
-	statusTopic := strings.Replace(StatusTopic, "+", fmt.Sprintf("%s", originalSource), 1)
+	statusTopic := strings.Replace(o.Topics.Status, "+", fmt.Sprintf("%s", originalSource), 1)
 	statusTopic = strings.Replace(statusTopic, "+", o.clusterName, -1)
 	return cloudeventscontext.WithTopic(ctx, statusTopic), nil
 }
@@ -71,9 +71,9 @@ func (o *mqttAgentOptions) Client(ctx context.Context) (cloudevents.Client, erro
 			&paho.Subscribe{
 				Subscriptions: map[string]paho.SubscribeOptions{
 					// receiving the resources spec from sources with spec topic
-					replaceNth(SpecTopic, "+", o.clusterName, 2): {QoS: byte(o.SubQoS)},
+					replaceNth(o.Topics.Spec, "+", o.clusterName, 2): {QoS: byte(o.SubQoS)},
 					// receiving the resources status resync request from sources with status resync topic
-					StatusResyncTopic: {QoS: byte(o.SubQoS)},
+					o.Topics.StatusResync: {QoS: byte(o.SubQoS)},
 				},
 			},
 		),

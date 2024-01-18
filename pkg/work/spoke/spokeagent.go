@@ -16,10 +16,10 @@ import (
 
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
-	"open-cluster-management.io/api/cloudevents/generic/options/mqtt"
-	cloudeventswork "open-cluster-management.io/api/cloudevents/work"
-	"open-cluster-management.io/api/cloudevents/work/agent/codec"
 	ocmfeature "open-cluster-management.io/api/feature"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt"
+	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/work"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/codec"
 
 	commonoptions "open-cluster-management.io/ocm/pkg/common/options"
 	"open-cluster-management.io/ocm/pkg/features"

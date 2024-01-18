@@ -9,9 +9,9 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"open-cluster-management.io/api/cloudevents/generic/options"
-	"open-cluster-management.io/api/cloudevents/generic/payload"
-	"open-cluster-management.io/api/cloudevents/generic/types"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
 // CloudEventAgentClient is a client for an agent to resync/send/receive its resources with cloud events.

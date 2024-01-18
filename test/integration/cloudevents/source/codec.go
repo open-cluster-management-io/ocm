@@ -11,9 +11,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 
-	"open-cluster-management.io/api/cloudevents/generic/types"
-	"open-cluster-management.io/api/cloudevents/work/payload"
 	workv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload"
 )
 
 type ManifestCodec struct{}

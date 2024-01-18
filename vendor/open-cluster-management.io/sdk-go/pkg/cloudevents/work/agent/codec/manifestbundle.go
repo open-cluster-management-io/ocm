@@ -10,10 +10,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 
-	"open-cluster-management.io/api/cloudevents/generic/types"
-	"open-cluster-management.io/api/cloudevents/work/payload"
-	"open-cluster-management.io/api/utils/work/v1/workvalidator"
 	workv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/apis/work/v1/validator"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload"
 )
 
 // ManifestBundleCodec is a codec to encode/decode a ManifestWork/cloudevent with ManifestBundle for an agent.
@@ -130,7 +130,7 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 	}
 
 	// validate the manifests
-	if err := workvalidator.ManifestValidator.ValidateManifests(work.Spec.Workload.Manifests); err != nil {
+	if err := validator.ManifestValidator.ValidateManifests(work.Spec.Workload.Manifests); err != nil {
 		return nil, fmt.Errorf("manifests are invalid, %v", err)
 	}
 
