@@ -1498,7 +1498,7 @@ open-cluster-management.io/addon-framework/pkg/index
 open-cluster-management.io/addon-framework/pkg/manager/controllers/addonconfiguration
 open-cluster-management.io/addon-framework/pkg/manager/controllers/addonowner
 open-cluster-management.io/addon-framework/pkg/utils
-# open-cluster-management.io/api v0.12.1-0.20240103082609-f6404f30c42c
+# open-cluster-management.io/api v0.12.1-0.20240115071352-3d94ce8f3499
 ## explicit; go 1.20
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/client/addon/clientset/versioned

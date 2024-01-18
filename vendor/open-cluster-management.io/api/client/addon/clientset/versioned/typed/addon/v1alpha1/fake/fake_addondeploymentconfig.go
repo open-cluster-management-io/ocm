@@ -7,7 +7,6 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -20,9 +19,9 @@ type FakeAddOnDeploymentConfigs struct {
 	ns   string
 }
 
-var addondeploymentconfigsResource = schema.GroupVersionResource{Group: "addon.open-cluster-management.io", Version: "v1alpha1", Resource: "addondeploymentconfigs"}
+var addondeploymentconfigsResource = v1alpha1.SchemeGroupVersion.WithResource("addondeploymentconfigs")
 
-var addondeploymentconfigsKind = schema.GroupVersionKind{Group: "addon.open-cluster-management.io", Version: "v1alpha1", Kind: "AddOnDeploymentConfig"}
+var addondeploymentconfigsKind = v1alpha1.SchemeGroupVersion.WithKind("AddOnDeploymentConfig")
 
 // Get takes name of the addOnDeploymentConfig, and returns the corresponding addOnDeploymentConfig object, and an error if there is any.
 func (c *FakeAddOnDeploymentConfigs) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.AddOnDeploymentConfig, err error) {

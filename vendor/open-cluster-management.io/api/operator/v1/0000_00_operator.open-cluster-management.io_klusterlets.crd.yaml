@@ -223,6 +223,20 @@ spec:
                       - feature
                       type: object
                     type: array
+                  kubeAPIBurst:
+                    default: 100
+                    description: 'KubeAPIBurst indicates the maximum burst of the
+                      throttle while talking with apiserver of hub cluster from the
+                      spoke cluster. If it is set empty, use the default value: 100'
+                    format: int32
+                    type: integer
+                  kubeAPIQPS:
+                    default: 50
+                    description: 'KubeAPIQPS indicates the maximum QPS while talking
+                      with apiserver of hub cluster from the spoke cluster. If it
+                      is set empty, use the default value: 50'
+                    format: int32
+                    type: integer
                 type: object
               registrationImagePullSpec:
                 description: RegistrationImagePullSpec represents the desired image
@@ -274,6 +288,20 @@ spec:
                       - feature
                       type: object
                     type: array
+                  kubeAPIBurst:
+                    default: 100
+                    description: 'KubeAPIBurst indicates the maximum burst of the
+                      throttle while talking with apiserver of hub cluster from the
+                      spoke cluster. If it is set empty, use the default value: 100'
+                    format: int32
+                    type: integer
+                  kubeAPIQPS:
+                    default: 50
+                    description: 'KubeAPIQPS indicates the maximum QPS while talking
+                      with apiserver of hub cluster from the spoke cluster. If it
+                      is set empty, use the default value: 50'
+                    format: int32
+                    type: integer
                 type: object
               workImagePullSpec:
                 description: WorkImagePullSpec represents the desired image configuration

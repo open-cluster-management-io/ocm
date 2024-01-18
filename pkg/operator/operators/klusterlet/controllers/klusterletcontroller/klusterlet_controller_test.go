@@ -111,6 +111,12 @@ func newKlusterlet(name, namespace, clustername string) *operatorapiv1.Klusterle
 						Mode:    "Enable",
 					},
 				},
+				KubeAPIQPS:   10,
+				KubeAPIBurst: 60,
+			},
+			WorkConfiguration: &operatorapiv1.WorkAgentConfiguration{
+				KubeAPIQPS:   20,
+				KubeAPIBurst: 50,
 			},
 			HubApiServerHostAlias: &operatorapiv1.HubApiServerHostAlias{
 				IP:       "11.22.33.44",
@@ -388,6 +394,8 @@ func assertRegistrationDeployment(t *testing.T, actions []clienttesting.Action, 
 		expectedArgs = append(expectedArgs, "--disable-leader-election")
 	}
 
+	expectedArgs = append(expectedArgs, "--kube-api-qps=10", "--kube-api-burst=60")
+
 	if !equality.Semantic.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expect args %v, but got %v", expectedArgs, args)
 		return
@@ -429,6 +437,8 @@ func assertWorkDeployment(t *testing.T, actions []clienttesting.Action, verb, cl
 	if *deployment.Spec.Replicas == 1 {
 		expectArgs = append(expectArgs, "--disable-leader-election", "--status-sync-interval=60s")
 	}
+
+	expectArgs = append(expectArgs, "--kube-api-qps=20", "--kube-api-burst=50")
 
 	if !equality.Semantic.DeepEqual(args, expectArgs) {
 		t.Errorf("Expect args %v, but got %v", expectArgs, args)

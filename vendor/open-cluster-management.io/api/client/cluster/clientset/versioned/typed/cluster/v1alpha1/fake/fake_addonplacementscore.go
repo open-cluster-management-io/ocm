@@ -7,7 +7,6 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -20,9 +19,9 @@ type FakeAddOnPlacementScores struct {
 	ns   string
 }
 
-var addonplacementscoresResource = schema.GroupVersionResource{Group: "cluster.open-cluster-management.io", Version: "v1alpha1", Resource: "addonplacementscores"}
+var addonplacementscoresResource = v1alpha1.SchemeGroupVersion.WithResource("addonplacementscores")
 
-var addonplacementscoresKind = schema.GroupVersionKind{Group: "cluster.open-cluster-management.io", Version: "v1alpha1", Kind: "AddOnPlacementScore"}
+var addonplacementscoresKind = v1alpha1.SchemeGroupVersion.WithKind("AddOnPlacementScore")
 
 // Get takes name of the addOnPlacementScore, and returns the corresponding addOnPlacementScore object, and an error if there is any.
 func (c *FakeAddOnPlacementScores) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.AddOnPlacementScore, err error) {

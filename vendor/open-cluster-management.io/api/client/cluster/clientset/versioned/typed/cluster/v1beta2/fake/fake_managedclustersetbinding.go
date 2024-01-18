@@ -7,7 +7,6 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -20,9 +19,9 @@ type FakeManagedClusterSetBindings struct {
 	ns   string
 }
 
-var managedclustersetbindingsResource = schema.GroupVersionResource{Group: "cluster.open-cluster-management.io", Version: "v1beta2", Resource: "managedclustersetbindings"}
+var managedclustersetbindingsResource = v1beta2.SchemeGroupVersion.WithResource("managedclustersetbindings")
 
-var managedclustersetbindingsKind = schema.GroupVersionKind{Group: "cluster.open-cluster-management.io", Version: "v1beta2", Kind: "ManagedClusterSetBinding"}
+var managedclustersetbindingsKind = v1beta2.SchemeGroupVersion.WithKind("ManagedClusterSetBinding")
 
 // Get takes name of the managedClusterSetBinding, and returns the corresponding managedClusterSetBinding object, and an error if there is any.
 func (c *FakeManagedClusterSetBindings) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta2.ManagedClusterSetBinding, err error) {

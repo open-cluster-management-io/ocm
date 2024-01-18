@@ -7,7 +7,6 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -19,9 +18,9 @@ type FakeManagedClusterSets struct {
 	Fake *FakeClusterV1beta2
 }
 
-var managedclustersetsResource = schema.GroupVersionResource{Group: "cluster.open-cluster-management.io", Version: "v1beta2", Resource: "managedclustersets"}
+var managedclustersetsResource = v1beta2.SchemeGroupVersion.WithResource("managedclustersets")
 
-var managedclustersetsKind = schema.GroupVersionKind{Group: "cluster.open-cluster-management.io", Version: "v1beta2", Kind: "ManagedClusterSet"}
+var managedclustersetsKind = v1beta2.SchemeGroupVersion.WithKind("ManagedClusterSet")
 
 // Get takes name of the managedClusterSet, and returns the corresponding managedClusterSet object, and an error if there is any.
 func (c *FakeManagedClusterSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta2.ManagedClusterSet, err error) {

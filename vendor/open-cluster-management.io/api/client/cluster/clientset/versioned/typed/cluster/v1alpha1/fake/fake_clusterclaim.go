@@ -7,7 +7,6 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -19,9 +18,9 @@ type FakeClusterClaims struct {
 	Fake *FakeClusterV1alpha1
 }
 
-var clusterclaimsResource = schema.GroupVersionResource{Group: "cluster.open-cluster-management.io", Version: "v1alpha1", Resource: "clusterclaims"}
+var clusterclaimsResource = v1alpha1.SchemeGroupVersion.WithResource("clusterclaims")
 
-var clusterclaimsKind = schema.GroupVersionKind{Group: "cluster.open-cluster-management.io", Version: "v1alpha1", Kind: "ClusterClaim"}
+var clusterclaimsKind = v1alpha1.SchemeGroupVersion.WithKind("ClusterClaim")
 
 // Get takes name of the clusterClaim, and returns the corresponding clusterClaim object, and an error if there is any.
 func (c *FakeClusterClaims) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ClusterClaim, err error) {
