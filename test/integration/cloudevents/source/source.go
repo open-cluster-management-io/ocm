@@ -14,11 +14,11 @@ import (
 
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
-	"open-cluster-management.io/api/cloudevents/generic"
-	"open-cluster-management.io/api/cloudevents/generic/options/mqtt"
-	"open-cluster-management.io/api/cloudevents/work"
-	"open-cluster-management.io/api/cloudevents/work/watcher"
 	workv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/watcher"
 )
 
 const (

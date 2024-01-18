@@ -9,10 +9,10 @@ import (
 	"k8s.io/klog/v2"
 	workv1lister "open-cluster-management.io/api/client/work/listers/work/v1"
 
-	"open-cluster-management.io/api/cloudevents/generic"
-	"open-cluster-management.io/api/cloudevents/generic/types"
-	"open-cluster-management.io/api/cloudevents/work/watcher"
 	workv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/watcher"
 )
 
 // NewManifestWorkAgentHandler returns a ResourceHandler for a ManifestWork on managed cluster. It sends the kube events

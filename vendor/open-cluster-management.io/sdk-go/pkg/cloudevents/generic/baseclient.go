@@ -14,7 +14,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 
-	"open-cluster-management.io/api/cloudevents/generic/options"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 )
 
 const (

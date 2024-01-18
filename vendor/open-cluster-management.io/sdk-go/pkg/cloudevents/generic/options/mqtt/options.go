@@ -14,24 +14,26 @@ import (
 	"github.com/eclipse/paho.golang/packets"
 	"github.com/eclipse/paho.golang/paho"
 	"gopkg.in/yaml.v2"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
 const (
-	// SpecTopic is a MQTT topic for resource spec.
-	SpecTopic = "sources/+/clusters/+/spec"
+	// defaultSpecTopic is a default MQTT topic for resource spec.
+	defaultSpecTopic = "sources/+/clusters/+/spec"
 
-	// StatusTopic is a MQTT topic for resource status.
-	StatusTopic = "sources/+/clusters/+/status"
+	// defaultStatusTopic is a default MQTT topic for resource status.
+	defaultStatusTopic = "sources/+/clusters/+/status"
 
-	// SpecResyncTopic is a MQTT topic for resource spec resync.
-	SpecResyncTopic = "sources/clusters/+/specresync"
+	// defaultSpecResyncTopic is a default MQTT topic for resource spec resync.
+	defaultSpecResyncTopic = "sources/clusters/+/specresync"
 
-	// StatusResyncTopic is a MQTT topic for resource status resync.
-	StatusResyncTopic = "sources/+/clusters/statusresync"
+	// defaultStatusResyncTopic is a default MQTT topic for resource status resync.
+	defaultStatusResyncTopic = "sources/+/clusters/statusresync"
 )
 
 // MQTTOptions holds the options that are used to build MQTT client.
 type MQTTOptions struct {
+	Topics         types.Topics
 	BrokerHost     string
 	Username       string
 	Password       string
@@ -62,14 +64,24 @@ type MQTTConfig struct {
 
 	// KeepAlive is the keep alive time in seconds for MQTT clients, by default is 60s
 	KeepAlive *uint16 `json:"keepAlive,omitempty" yaml:"keepAlive,omitempty"`
+
 	// PubQoS is the QoS for publish, by default is 1
 	PubQoS *int `json:"pubQoS,omitempty" yaml:"pubQoS,omitempty"`
 	// SubQoS is the Qos for subscribe, by default is 1
 	SubQoS *int `json:"subQoS,omitempty" yaml:"subQoS,omitempty"`
+
+	// Topics are MQTT topics for resource spec, status and resync.
+	Topics *types.Topics `json:"topics,omitempty" yaml:"topics,omitempty"`
 }
 
 func NewMQTTOptions() *MQTTOptions {
 	return &MQTTOptions{
+		Topics: types.Topics{
+			Spec:         defaultSpecTopic,
+			Status:       defaultStatusTopic,
+			SpecResync:   defaultSpecResyncTopic,
+			StatusResync: defaultStatusResyncTopic,
+		},
 		KeepAlive: 60,
 		PubQoS:    1,
 		SubQoS:    1,
@@ -100,6 +112,11 @@ func BuildMQTTOptionsFromFlags(configPath string) (*MQTTOptions, error) {
 		return nil, fmt.Errorf("setting clientCertFile and clientKeyFile requires caFile")
 	}
 
+	if config.Topics != nil && (config.Topics.Spec == "" || config.Topics.Status == "" ||
+		config.Topics.SpecResync == "" || config.Topics.StatusResync == "") {
+		return nil, fmt.Errorf("topics must be set")
+	}
+
 	options := &MQTTOptions{
 		BrokerHost:     config.BrokerHost,
 		Username:       config.Username,
@@ -110,6 +127,12 @@ func BuildMQTTOptionsFromFlags(configPath string) (*MQTTOptions, error) {
 		KeepAlive:      60,
 		PubQoS:         1,
 		SubQoS:         1,
+		Topics: types.Topics{
+			Spec:         defaultSpecTopic,
+			Status:       defaultStatusTopic,
+			SpecResync:   defaultSpecResyncTopic,
+			StatusResync: defaultStatusResyncTopic,
+		},
 	}
 
 	if config.KeepAlive != nil {
@@ -122,6 +145,10 @@ func BuildMQTTOptionsFromFlags(configPath string) (*MQTTOptions, error) {
 
 	if config.SubQoS != nil {
 		options.SubQoS = *config.SubQoS
+	}
+
+	if config.Topics != nil {
+		options.Topics = *config.Topics
 	}
 
 	return options, nil

@@ -1557,19 +1557,6 @@ open-cluster-management.io/api/client/work/informers/externalversions/work/v1
 open-cluster-management.io/api/client/work/informers/externalversions/work/v1alpha1
 open-cluster-management.io/api/client/work/listers/work/v1
 open-cluster-management.io/api/client/work/listers/work/v1alpha1
-open-cluster-management.io/api/cloudevents/generic
-open-cluster-management.io/api/cloudevents/generic/options
-open-cluster-management.io/api/cloudevents/generic/options/mqtt
-open-cluster-management.io/api/cloudevents/generic/payload
-open-cluster-management.io/api/cloudevents/generic/types
-open-cluster-management.io/api/cloudevents/work
-open-cluster-management.io/api/cloudevents/work/agent/client
-open-cluster-management.io/api/cloudevents/work/agent/codec
-open-cluster-management.io/api/cloudevents/work/agent/handler
-open-cluster-management.io/api/cloudevents/work/internal
-open-cluster-management.io/api/cloudevents/work/payload
-open-cluster-management.io/api/cloudevents/work/utils
-open-cluster-management.io/api/cloudevents/work/watcher
 open-cluster-management.io/api/cluster/v1
 open-cluster-management.io/api/cluster/v1alpha1
 open-cluster-management.io/api/cluster/v1beta1
@@ -1589,6 +1576,20 @@ open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta2
 open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier
+open-cluster-management.io/sdk-go/pkg/apis/work/v1/validator
+open-cluster-management.io/sdk-go/pkg/cloudevents/generic
+open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options
+open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt
+open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload
+open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types
+open-cluster-management.io/sdk-go/pkg/cloudevents/work
+open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/client
+open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/codec
+open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/handler
+open-cluster-management.io/sdk-go/pkg/cloudevents/work/internal
+open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload
+open-cluster-management.io/sdk-go/pkg/cloudevents/work/utils
+open-cluster-management.io/sdk-go/pkg/cloudevents/work/watcher
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.1.2
 ## explicit; go 1.17
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client

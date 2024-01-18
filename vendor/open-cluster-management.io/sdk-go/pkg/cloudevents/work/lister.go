@@ -4,8 +4,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 
 	workv1lister "open-cluster-management.io/api/client/work/listers/work/v1"
-	"open-cluster-management.io/api/cloudevents/generic/types"
 	workv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
 // ManifestWorkLister list the ManifestWorks from a ManifestWorkInformer's local cache.

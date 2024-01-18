@@ -10,9 +10,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
-	"open-cluster-management.io/api/cloudevents/generic/options"
-	"open-cluster-management.io/api/cloudevents/generic/payload"
-	"open-cluster-management.io/api/cloudevents/generic/types"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
 // CloudEventSourceClient is a client for a source to resync/send/receive its resources with cloud events.

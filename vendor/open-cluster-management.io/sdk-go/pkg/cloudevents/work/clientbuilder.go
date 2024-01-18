@@ -11,13 +11,13 @@ import (
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
-	"open-cluster-management.io/api/cloudevents/generic"
-	"open-cluster-management.io/api/cloudevents/generic/options/mqtt"
-	agentclient "open-cluster-management.io/api/cloudevents/work/agent/client"
-	agenthandler "open-cluster-management.io/api/cloudevents/work/agent/handler"
-	"open-cluster-management.io/api/cloudevents/work/internal"
-	"open-cluster-management.io/api/cloudevents/work/watcher"
 	workv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt"
+	agentclient "open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/client"
+	agenthandler "open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/handler"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/internal"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/watcher"
 )
 
 const defaultInformerResyncTime = 10 * time.Minute
