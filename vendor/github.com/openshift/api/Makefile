@@ -49,6 +49,7 @@ verify-scripts:
 	bash -x hack/verify-integration-tests.sh
 	bash -x hack/verify-group-versions.sh
 	bash -x hack/verify-prerelease-lifecycle-gen.sh
+	hack/verify-payload-crds.sh
 
 .PHONY: verify
 verify: verify-scripts verify-crd-schema verify-codegen-crds
@@ -76,7 +77,7 @@ verify-%:
 ################################################################################################
 
 .PHONY: update-scripts
-update-scripts: update-compatibility update-openapi update-deepcopy update-protobuf update-swagger-docs tests-vendor update-prerelease-lifecycle-gen
+update-scripts: update-compatibility update-openapi update-deepcopy update-protobuf update-swagger-docs tests-vendor update-prerelease-lifecycle-gen update-payload-crds
 
 .PHONY: update-compatibility
 update-compatibility:
@@ -102,6 +103,10 @@ update-swagger-docs:
 update-prerelease-lifecycle-gen:
 	hack/update-prerelease-lifecycle-gen.sh
 
+.PHONY: update-payload-crds
+update-payload-crds:
+	hack/update-payload-crds.sh
+
 #####################
 #
 # END: Update scripts
@@ -125,3 +130,47 @@ integration:
 
 tests-vendor:
 	make -C tests vendor
+
+##################################
+#
+# BEGIN: Build binaries and images
+#
+##################################
+
+.PHONY: build
+build: render write-available-featuresets
+
+render:
+	go build --mod=vendor -trimpath github.com/openshift/api/payload-command/cmd/render
+
+write-available-featuresets:
+	go build --mod=vendor -trimpath github.com/openshift/api/payload-command/cmd/write-available-featuresets
+
+.PHONY: clean
+clean:
+	rm render write-available-featuresets
+
+VERSION     ?= $(shell git describe --always --abbrev=7)
+MUTABLE_TAG ?= latest
+IMAGE       ?= registry.ci.openshift.org/openshift/api
+
+ifeq ($(shell command -v podman > /dev/null 2>&1 ; echo $$? ), 0)
+	ENGINE=podman
+else ifeq ($(shell command -v docker > /dev/null 2>&1 ; echo $$? ), 0)
+	ENGINE=docker
+endif
+
+USE_DOCKER ?= 0
+ifeq ($(USE_DOCKER), 1)
+	ENGINE=docker
+endif
+
+.PHONY: images
+images:
+	$(ENGINE) build -f Dockerfile.rhel8 -t "$(IMAGE):$(VERSION)" -t "$(IMAGE):$(MUTABLE_TAG)" ./
+
+################################
+#
+# END: Build binaries and images
+#
+################################
