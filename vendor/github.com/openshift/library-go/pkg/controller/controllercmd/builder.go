@@ -94,7 +94,32 @@ type ControllerBuilder struct {
 	// Keep track if we defaulted leader election, used to make sure we don't stomp on the users intent for leader election
 	// We use this flag to determine at runtime if we can alter leader election for SNO configurations
 	userExplicitlySetLeaderElectionValues bool
+
+	// different deployment strategies will require sensing topologies in disjoint manners
+	topologyDetector TopologyDetector
+
+	// Allow enabling HTTP2
+	enableHTTP2 bool
 }
+
+type TopologyDetector interface {
+	DetectTopology(ctx context.Context, restClient *rest.Config) (configv1.TopologyMode, error)
+}
+
+type infrastructureStatusTopologyDetector struct{}
+
+func (i infrastructureStatusTopologyDetector) DetectTopology(ctx context.Context, restClient *rest.Config) (configv1.TopologyMode, error) {
+	infraStatus, err := clusterstatus.GetClusterInfraStatus(ctx, restClient)
+	if err != nil {
+		return "", err
+	}
+	if infraStatus == nil {
+		return "", nil
+	}
+	return infraStatus.ControlPlaneTopology, nil
+}
+
+var _ TopologyDetector = (*infrastructureStatusTopologyDetector)(nil)
 
 // NewController returns a builder struct for constructing the command you want to run
 func NewController(componentName string, startFunc StartFunc) *ControllerBuilder {
@@ -106,6 +131,7 @@ func NewController(componentName string, startFunc StartFunc) *ControllerBuilder
 			klog.Warning(args...)
 			os.Exit(1)
 		},
+		topologyDetector: infrastructureStatusTopologyDetector{},
 	}
 }
 
@@ -157,6 +183,11 @@ func (b *ControllerBuilder) WithLeaderElection(leaderElection configv1.LeaderEle
 	return b
 }
 
+func (b *ControllerBuilder) WithTopologyDetector(topologyDetector TopologyDetector) *ControllerBuilder {
+	b.topologyDetector = topologyDetector
+	return b
+}
+
 // WithVersion accepts a getting that provide binary version information that is used to report build_info information to prometheus
 func (b *ControllerBuilder) WithVersion(info version.Info) *ControllerBuilder {
 	b.versionInfo = &info
@@ -169,6 +200,12 @@ func (b *ControllerBuilder) WithServer(servingInfo configv1.HTTPServingInfo, aut
 	configdefaults.SetRecommendedHTTPServingInfoDefaults(b.servingInfo)
 	b.authenticationConfig = &authenticationConfig
 	b.authorizationConfig = &authorizationConfig
+	return b
+}
+
+// WithHTTP2 indicates that http2 should be enabled
+func (b *ControllerBuilder) WithHTTP2() *ControllerBuilder {
+	b.enableHTTP2 = true
 	return b
 }
 
@@ -269,7 +306,7 @@ func (b *ControllerBuilder) Run(ctx context.Context, config *unstructured.Unstru
 
 	var server *genericapiserver.GenericAPIServer
 	if b.servingInfo != nil {
-		serverConfig, err := serving.ToServerConfig(ctx, *b.servingInfo, *b.authenticationConfig, *b.authorizationConfig, kubeConfig, kubeClient, b.leaderElection)
+		serverConfig, err := serving.ToServerConfig(ctx, *b.servingInfo, *b.authenticationConfig, *b.authorizationConfig, kubeConfig, kubeClient, b.leaderElection, b.enableHTTP2)
 		if err != nil {
 			return err
 		}
@@ -315,12 +352,12 @@ func (b *ControllerBuilder) Run(ctx context.Context, config *unstructured.Unstru
 	}
 
 	if !b.userExplicitlySetLeaderElectionValues {
-		infraStatus, err := clusterstatus.GetClusterInfraStatus(ctx, clientConfig)
-		if err != nil || infraStatus == nil {
-			eventRecorder.Warningf("ClusterInfrastructureStatus", "unable to get cluster infrastructure status, using HA cluster values for leader election: %v", err)
-			klog.Warningf("unable to get cluster infrastructure status, using HA cluster values for leader election: %v", err)
+		topology, err := b.topologyDetector.DetectTopology(ctx, clientConfig)
+		if err != nil || topology == "" {
+			eventRecorder.Warningf("ControlPlaneTopology", "unable to get control plane topology, using HA cluster values for leader election: %v", err)
+			klog.Warningf("unable to get control plane topology, using HA cluster values for leader election: %v", err)
 		} else {
-			snoLeaderElection := infraStatusTopologyLeaderElection(infraStatus, *b.leaderElection)
+			snoLeaderElection := topologyLeaderElection(topology, *b.leaderElection)
 			b.leaderElection = &snoLeaderElection
 		}
 	}
@@ -392,14 +429,14 @@ func (b *ControllerBuilder) getClientConfig() (*rest.Config, error) {
 	return client.GetKubeConfigOrInClusterConfig(kubeconfig, b.clientOverrides)
 }
 
-func infraStatusTopologyLeaderElection(infraStatus *configv1.InfrastructureStatus, original configv1.LeaderElection) configv1.LeaderElection {
+func topologyLeaderElection(topology configv1.TopologyMode, original configv1.LeaderElection) configv1.LeaderElection {
 	// if we can't determine the infra toplogy, return original
-	if infraStatus == nil {
+	if topology == "" {
 		return original
 	}
 
 	// If we are running in a SingleReplicaTopologyMode and leader election is not disabled, configure leader election for SNO Toplogy
-	if infraStatus.ControlPlaneTopology == configv1.SingleReplicaTopologyMode && !original.Disable {
+	if topology == configv1.SingleReplicaTopologyMode && !original.Disable {
 		klog.Info("detected SingleReplicaTopologyMode, the original leader election has been altered for the default SingleReplicaToplogy")
 		return leaderelectionconverter.LeaderElectionSNOConfig(original)
 	}

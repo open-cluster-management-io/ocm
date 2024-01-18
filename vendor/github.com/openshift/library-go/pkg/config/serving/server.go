@@ -20,7 +20,7 @@ import (
 )
 
 func ToServerConfig(ctx context.Context, servingInfo configv1.HTTPServingInfo, authenticationConfig operatorv1alpha1.DelegatedAuthentication, authorizationConfig operatorv1alpha1.DelegatedAuthorization,
-	kubeConfigFile string, kubeClient *kubernetes.Clientset, le *configv1.LeaderElection) (*genericapiserver.Config, error) {
+	kubeConfigFile string, kubeClient *kubernetes.Clientset, le *configv1.LeaderElection, enableHTTP2 bool) (*genericapiserver.Config, error) {
 	scheme := runtime.NewScheme()
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
 	config := genericapiserver.NewConfig(serializer.NewCodecFactory(scheme))
@@ -81,6 +81,8 @@ func ToServerConfig(ctx context.Context, servingInfo configv1.HTTPServingInfo, a
 			return nil, fmt.Errorf("error initializing delegating authentication: %w", err)
 		}
 	}
+
+	config.SecureServing.DisableHTTP2 = !enableHTTP2
 
 	return config, nil
 }
