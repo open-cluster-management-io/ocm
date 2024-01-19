@@ -76,13 +76,14 @@ const (
 func NewManifestWorkReplicaSetController(
 	recorder events.Recorder,
 	workClient workclientset.Interface,
+	workApplier *workapplier.WorkApplier,
 	manifestWorkReplicaSetInformer workinformerv1alpha1.ManifestWorkReplicaSetInformer,
 	manifestWorkInformer workinformerv1.ManifestWorkInformer,
 	placementInformer clusterinformerv1beta1.PlacementInformer,
 	placeDecisionInformer clusterinformerv1beta1.PlacementDecisionInformer) factory.Controller {
 
 	controller := newController(
-		workClient, manifestWorkReplicaSetInformer, manifestWorkInformer, placementInformer, placeDecisionInformer)
+		workClient, workApplier, manifestWorkReplicaSetInformer, manifestWorkInformer, placementInformer, placeDecisionInformer)
 
 	err := manifestWorkReplicaSetInformer.Informer().AddIndexers(
 		cache.Indexers{
@@ -114,6 +115,7 @@ func NewManifestWorkReplicaSetController(
 }
 
 func newController(workClient workclientset.Interface,
+	workApplier *workapplier.WorkApplier,
 	manifestWorkReplicaSetInformer workinformerv1alpha1.ManifestWorkReplicaSetInformer,
 	manifestWorkInformer workinformerv1.ManifestWorkInformer,
 	placementInformer clusterinformerv1beta1.PlacementInformer,
@@ -124,11 +126,20 @@ func newController(workClient workclientset.Interface,
 		manifestWorkReplicaSetIndexer: manifestWorkReplicaSetInformer.Informer().GetIndexer(),
 
 		reconcilers: []ManifestWorkReplicaSetReconcile{
-			&finalizeReconciler{workApplier: workapplier.NewWorkApplierWithTypedClient(workClient, manifestWorkInformer.Lister()),
-				workClient: workClient, manifestWorkLister: manifestWorkInformer.Lister()},
-			&addFinalizerReconciler{workClient: workClient},
-			&deployReconciler{workApplier: workapplier.NewWorkApplierWithTypedClient(workClient, manifestWorkInformer.Lister()),
-				manifestWorkLister: manifestWorkInformer.Lister(), placementLister: placementInformer.Lister(), placeDecisionLister: placeDecisionInformer.Lister()},
+			&finalizeReconciler{
+				workApplier:        workApplier,
+				workClient:         workClient,
+				manifestWorkLister: manifestWorkInformer.Lister(),
+			},
+			&addFinalizerReconciler{
+				workClient: workClient,
+			},
+			&deployReconciler{
+				workApplier:         workApplier,
+				manifestWorkLister:  manifestWorkInformer.Lister(),
+				placementLister:     placementInformer.Lister(),
+				placeDecisionLister: placeDecisionInformer.Lister(),
+			},
 			&statusReconciler{manifestWorkLister: manifestWorkInformer.Lister()},
 		},
 	}

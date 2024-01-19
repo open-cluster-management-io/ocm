@@ -44,6 +44,7 @@ func NewCloudEventSourceClient[T ResourceObject](
 	baseClient := &baseClient{
 		cloudEventsOptions:     sourceOptions.CloudEventsOptions,
 		cloudEventsRateLimiter: NewRateLimiter(sourceOptions.EventRateLimit),
+		reconnectedChan:        make(chan struct{}),
 	}
 
 	if err := baseClient.connect(ctx); err != nil {
@@ -62,6 +63,10 @@ func NewCloudEventSourceClient[T ResourceObject](
 		statusHashGetter: statusHashGetter,
 		sourceID:         sourceOptions.SourceID,
 	}, nil
+}
+
+func (c *CloudEventSourceClient[T]) ReconnectedChan() <-chan struct{} {
+	return c.reconnectedChan
 }
 
 // Resync the resources status by sending a status resync request from the current source to a specified cluster.

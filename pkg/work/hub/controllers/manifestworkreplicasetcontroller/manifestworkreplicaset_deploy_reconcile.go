@@ -16,6 +16,8 @@ import (
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
 	clustersdkv1alpha1 "open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1"
 	workapplier "open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/common"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/work/helper"
@@ -271,8 +273,14 @@ func CreateManifestWork(mwrSet *workapiv1alpha1.ManifestWorkReplicaSet, clusterN
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mwrSet.Name,
 			Namespace: clusterNS,
-			Labels: map[string]string{ManifestWorkReplicaSetControllerNameLabelKey: manifestWorkReplicaSetKey(mwrSet),
-				ManifestWorkReplicaSetPlacementNameLabelKey: placementRefName},
+			Labels: map[string]string{
+				ManifestWorkReplicaSetControllerNameLabelKey: manifestWorkReplicaSetKey(mwrSet),
+				ManifestWorkReplicaSetPlacementNameLabelKey:  placementRefName,
+			},
+			Annotations: map[string]string{
+				common.CloudEventsDataTypeAnnotationKey:   payload.ManifestBundleEventDataType.String(),
+				common.CloudEventsGenerationAnnotationKey: fmt.Sprintf("%d", mwrSet.Generation),
+			},
 		},
 		Spec: mwrSet.Spec.ManifestWorkTemplate}, nil
 }

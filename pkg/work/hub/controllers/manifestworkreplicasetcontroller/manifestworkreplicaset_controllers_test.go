@@ -18,6 +18,7 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
+	workapplier "open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier"
 
 	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	helpertest "open-cluster-management.io/ocm/pkg/work/hub/test"
@@ -237,6 +238,7 @@ func TestManifestWorkReplicaSetControllerPatchStatus(t *testing.T) {
 
 			ctrl := newController(
 				fakeClient,
+				workapplier.NewWorkApplierWithTypedClient(fakeClient, workInformers.Work().V1().ManifestWorks().Lister()),
 				workInformers.Work().V1alpha1().ManifestWorkReplicaSets(),
 				workInformers.Work().V1().ManifestWorks(),
 				clusterInformers.Cluster().V1beta1().Placements(),

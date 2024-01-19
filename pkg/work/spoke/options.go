@@ -7,21 +7,19 @@ import (
 )
 
 const (
-	KubeDriver = "kube"
-	MQTTDriver = "mqtt"
+	manifestBundleCodecName = "manifestbundle"
+	manifestCodecName       = "manifest"
 )
-
-type WorkloadSourceDriver struct {
-	Type   string
-	Config string
-}
 
 // WorkloadAgentOptions defines the flags for workload agent
 type WorkloadAgentOptions struct {
 	StatusSyncInterval                     time.Duration
 	AppliedManifestWorkEvictionGracePeriod time.Duration
-	WorkloadSourceDriver                   WorkloadSourceDriver
 	MaxJSONRawLength                       int32
+	WorkloadSourceDriver                   string
+	WorkloadSourceConfig                   string
+	CloudEventsClientID                    string
+	CloudEventsClientCodecs                []string
 }
 
 // NewWorkloadAgentOptions returns the flags with default value set
@@ -41,8 +39,12 @@ func (o *WorkloadAgentOptions) AddFlags(fs *pflag.FlagSet) {
 		o.StatusSyncInterval, "Interval to sync resource status to hub.")
 	fs.DurationVar(&o.AppliedManifestWorkEvictionGracePeriod, "appliedmanifestwork-eviction-grace-period",
 		o.AppliedManifestWorkEvictionGracePeriod, "Grace period for appliedmanifestwork eviction")
-	fs.StringVar(&o.WorkloadSourceDriver.Type, "workload-source-driver",
-		o.WorkloadSourceDriver.Type, "The type of workload source driver, currently it can be kube or mqtt")
-	fs.StringVar(&o.WorkloadSourceDriver.Config, "workload-source-config",
-		o.WorkloadSourceDriver.Config, "The config file path of current workload source")
+	fs.StringVar(&o.WorkloadSourceDriver, "workload-source-driver",
+		o.WorkloadSourceDriver, "The type of workload source driver, currently it can be kube, mqtt or grpc")
+	fs.StringVar(&o.WorkloadSourceConfig, "workload-source-config",
+		o.WorkloadSourceConfig, "The config file path of current workload source")
+	fs.StringVar(&o.CloudEventsClientID, "cloudevents-client-id",
+		o.CloudEventsClientID, "The ID of the cloudevents client when workload source source is based on cloudevents")
+	fs.StringSliceVar(&o.CloudEventsClientCodecs, "cloudevents-client-codecs", o.CloudEventsClientCodecs,
+		"The codecs for cloudevents client when workload source source is based on cloudevents, the valid codecs: manifest or manifestbundle")
 }

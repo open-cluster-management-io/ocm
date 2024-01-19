@@ -143,6 +143,7 @@ github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
+github.com/golang/protobuf/ptypes/empty
 github.com/golang/protobuf/ptypes/timestamp
 # github.com/google/cel-go v0.17.7
 ## explicit; go 1.18
@@ -1578,7 +1579,7 @@ open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/utils/work/v1/workvalidator
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v0.13.0
+# open-cluster-management.io/sdk-go v0.13.1-0.20240306030534-3142983462d9
 ## explicit; go 1.21
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
@@ -1588,6 +1589,9 @@ open-cluster-management.io/sdk-go/pkg/apis/work/v1/builder
 open-cluster-management.io/sdk-go/pkg/apis/work/v1/validator
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options
+open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc
+open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protobuf/v1
+open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protocol
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types
@@ -1595,8 +1599,12 @@ open-cluster-management.io/sdk-go/pkg/cloudevents/work
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/client
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/codec
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/handler
+open-cluster-management.io/sdk-go/pkg/cloudevents/work/common
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/internal
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload
+open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/client
+open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/codec
+open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/handler
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/utils
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/watcher
 open-cluster-management.io/sdk-go/pkg/patcher

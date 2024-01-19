@@ -40,8 +40,8 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 	ginkgo.BeforeEach(func() {
 		o = spoke.NewWorkloadAgentOptions()
 		o.StatusSyncInterval = 3 * time.Second
-		o.WorkloadSourceDriver.Type = sourceDriver
-		o.WorkloadSourceDriver.Config = sourceConfigFileName
+		o.WorkloadSourceDriver = sourceDriver
+		o.WorkloadSourceConfig = sourceConfigFileName
 
 		err := features.SpokeMutableFeatureGate.Set("ExecutorValidatingCaches=true")
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -772,7 +772,7 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 				}, metav1.CreateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		}
-		deleteRBAC := func(clusterName, executorName string) {
+		deleteRBAC := func(clusterName string) {
 			err := spokeKubeClient.RbacV1().Roles(clusterName).Delete(
 				context.TODO(), roleName, metav1.DeleteOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -823,7 +823,7 @@ var _ = ginkgo.Describe("ManifestWork Executor Subject", func() {
 			ginkgo.By("ensure configmaps cm1 and cm2 exist")
 			util.AssertExistenceOfConfigMaps(manifests, spokeKubeClient, eventuallyTimeout, eventuallyInterval)
 
-			deleteRBAC(commOptions.SpokeClusterName, executorName)
+			deleteRBAC(commOptions.SpokeClusterName)
 			addConfigMapToManifestWork(hubWorkClient, work.Name, commOptions.SpokeClusterName, "cm3")
 
 			util.AssertWorkCondition(work.Namespace, work.Name, hubWorkClient, workapiv1.WorkApplied,

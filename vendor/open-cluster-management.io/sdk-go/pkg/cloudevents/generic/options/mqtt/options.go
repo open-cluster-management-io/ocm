@@ -30,7 +30,7 @@ type MQTTOptions struct {
 	ClientCertFile string
 	ClientKeyFile  string
 	KeepAlive      uint16
-	Timeout        time.Duration
+	DialTimeout    time.Duration
 	PubQoS         int
 	SubQoS         int
 }
@@ -54,6 +54,9 @@ type MQTTConfig struct {
 
 	// KeepAlive is the keep alive time in seconds for MQTT clients, by default is 60s
 	KeepAlive *uint16 `json:"keepAlive,omitempty" yaml:"keepAlive,omitempty"`
+
+	// DialTimeout is the timeout when establishing a MQTT TCP connection, by default is 60s
+	DialTimeout *time.Duration `json:"dialTimeout,omitempty" yaml:"dialTimeout,omitempty"`
 
 	// PubQoS is the QoS for publish, by default is 1
 	PubQoS *int `json:"pubQoS,omitempty" yaml:"pubQoS,omitempty"`
@@ -102,14 +105,16 @@ func BuildMQTTOptionsFromFlags(configPath string) (*MQTTOptions, error) {
 		KeepAlive:      60,
 		PubQoS:         1,
 		SubQoS:         1,
-		Timeout:        180 * time.Second,
+		DialTimeout:    60 * time.Second,
 		Topics:         *config.Topics,
 	}
 
 	if config.KeepAlive != nil {
 		options.KeepAlive = *config.KeepAlive
-		// Setting the mqtt tcp connection read and write timeouts to three times the mqtt keepalive
-		options.Timeout = 3 * time.Duration(*config.KeepAlive) * time.Second
+	}
+
+	if config.DialTimeout != nil {
+		options.DialTimeout = *config.DialTimeout
 	}
 
 	if config.PubQoS != nil {
@@ -144,7 +149,7 @@ func (o *MQTTOptions) GetNetConn() (net.Conn, error) {
 			return nil, err
 		}
 
-		conn, err := tls.Dial("tcp", o.BrokerHost, &tls.Config{
+		conn, err := tls.DialWithDialer(&net.Dialer{Timeout: o.DialTimeout}, "tcp", o.BrokerHost, &tls.Config{
 			RootCAs:      certPool,
 			Certificates: []tls.Certificate{clientCerts},
 		})
@@ -156,7 +161,7 @@ func (o *MQTTOptions) GetNetConn() (net.Conn, error) {
 		return packets.NewThreadSafeConn(conn), nil
 	}
 
-	conn, err := net.Dial("tcp", o.BrokerHost)
+	conn, err := net.DialTimeout("tcp", o.BrokerHost, o.DialTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to MQTT broker %s, %v", o.BrokerHost, err)
 	}
@@ -192,10 +197,6 @@ func (o *MQTTOptions) GetCloudEventsClient(
 	clientOpts ...cloudeventsmqtt.Option,
 ) (cloudevents.Client, error) {
 	netConn, err := o.GetNetConn()
-	if err != nil {
-		return nil, err
-	}
-	err = netConn.SetDeadline(time.Now().Add(o.Timeout))
 	if err != nil {
 		return nil, err
 	}
