@@ -12,7 +12,7 @@ import (
 	"k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	testingcommon "open-cluster-management.io/sdk-go/pkg/testing"
 )
 
 func TestSync(t *testing.T) {

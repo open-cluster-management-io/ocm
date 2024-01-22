@@ -20,8 +20,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
-
-	"open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/sdk-go/pkg/patcher"
 )
 
 // TODO: The spec hash is hardcoded here and will break the test once the API changes.

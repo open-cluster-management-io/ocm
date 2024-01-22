@@ -5,9 +5,12 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/diff"
 	clienttesting "k8s.io/client-go/testing"
 )
 
@@ -164,5 +167,17 @@ func AssertEqualNameNamespace(t *testing.T, actualName, actualNamespace, name, n
 
 	if actualNamespace != namespace {
 		t.Errorf("Namespace of the object does not match, expected %s, actual %s", namespace, actualNamespace)
+	}
+}
+
+// AssertFinalizers asserts the given runtime object has the expected finalizers
+func AssertFinalizers(t *testing.T, obj runtime.Object, finalizers []string) {
+	accessor, _ := meta.Accessor(obj)
+	actual := accessor.GetFinalizers()
+	if len(actual) == 0 && len(finalizers) == 0 {
+		return
+	}
+	if !equality.Semantic.DeepEqual(actual, finalizers) {
+		t.Fatal(diff.ObjectDiff(actual, finalizers))
 	}
 }
