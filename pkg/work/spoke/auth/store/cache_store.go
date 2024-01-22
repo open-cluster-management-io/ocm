@@ -254,7 +254,7 @@ func (c *DimensionCaches) getCacheItems() map[string]CacheValue {
 func (d *Dimension) Hash() string {
 	data, err := json.Marshal(d)
 	if err != nil {
-		klog.Error("json marshal for dimension %+v error %v", d, err)
+		klog.Error(fmt.Sprintf("json marshal for dimension %+v error %v", d, err))
 		return ""
 	}
 

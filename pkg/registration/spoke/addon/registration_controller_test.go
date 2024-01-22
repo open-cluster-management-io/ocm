@@ -17,8 +17,7 @@ import (
 	addonfake "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	testingcommon "open-cluster-management.io/sdk-go/pkg/testing"
 )
 
 func TestFilterCSREvents(t *testing.T) {

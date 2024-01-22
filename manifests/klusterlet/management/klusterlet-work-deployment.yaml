@@ -70,6 +70,12 @@ spec:
           - "--disable-leader-election"
           - "--status-sync-interval=60s"
           {{end}}
+          {{if gt .WorkKubeAPIQPS 0.0}}
+          - "--kube-api-qps={{ .WorkKubeAPIQPS }}"
+          {{end}}
+          {{if gt .WorkKubeAPIBurst 0}}
+          - "--kube-api-burst={{ .WorkKubeAPIBurst }}"
+          {{end}}
         env:
           - name: POD_NAME
             valueFrom:

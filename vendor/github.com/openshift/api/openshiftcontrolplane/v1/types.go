@@ -132,8 +132,6 @@ type ImagePolicyConfig struct {
 
 	// internalRegistryHostname sets the hostname for the default internal image
 	// registry. The value must be in "hostname[:port]" format.
-	// For backward compatibility, users can still use OPENSHIFT_DEFAULT_REGISTRY
-	// environment variable but this setting overrides the environment variable.
 	InternalRegistryHostname string `json:"internalRegistryHostname"`
 	// externalRegistryHostnames provides the hostnames for the default external image
 	// registry. The external hostname should be set only when the image registry
@@ -194,7 +192,7 @@ type JenkinsPipelineConfig struct {
 
 // OpenShiftControllerName defines a string type used to represent the various
 // OpenShift controllers within openshift-controller-manager. These constants serve as identifiers
-// for the controllers and are used on both openshift/openshift-controller-manager 
+// for the controllers and are used on both openshift/openshift-controller-manager
 // and openshift/cluster-openshift-controller-manager-operator repositories.
 type OpenShiftControllerName string
 
@@ -202,17 +200,21 @@ const (
 	OpenShiftServiceAccountController            OpenShiftControllerName = "openshift.io/serviceaccount"
 	OpenShiftDefaultRoleBindingsController       OpenShiftControllerName = "openshift.io/default-rolebindings"
 	OpenShiftServiceAccountPullSecretsController OpenShiftControllerName = "openshift.io/serviceaccount-pull-secrets"
-	OpenshiftOriginNamespaceController           OpenShiftControllerName = "openshift.io/origin-namespace"
-	OpenshiftBuildController                     OpenShiftControllerName = "openshift.io/build"
-	OpenshiftBuildConfigChangeController         OpenShiftControllerName = "openshift.io/build-config-change"
-	OpenshiftDeployerController                  OpenShiftControllerName = "openshift.io/deployer"
-	OpenshiftDeploymentConfigController          OpenShiftControllerName = "openshift.io/deploymentconfig"
-	OpenshiftImageTriggerController              OpenShiftControllerName = "openshift.io/image-trigger"
-	OpenshiftImageImportController               OpenShiftControllerName = "openshift.io/image-import"
-	OpenshiftImageSignatureImportController      OpenShiftControllerName = "openshift.io/image-signature-import"
-	OpenshiftTemplateInstanceController          OpenShiftControllerName = "openshift.io/templateinstance"
-	OpenshiftTemplateInstanceFinalizerController OpenShiftControllerName = "openshift.io/templateinstancefinalizer"
-	OpenshiftUnidlingController                  OpenShiftControllerName = "openshift.io/unidling"
+	OpenShiftOriginNamespaceController           OpenShiftControllerName = "openshift.io/origin-namespace"
+	OpenShiftBuildController                     OpenShiftControllerName = "openshift.io/build"
+	OpenShiftBuildConfigChangeController         OpenShiftControllerName = "openshift.io/build-config-change"
+	OpenShiftBuilderServiceAccountController     OpenShiftControllerName = "openshift.io/builder-serviceaccount"
+	OpenShiftDeployerController                  OpenShiftControllerName = "openshift.io/deployer"
+	OpenShiftDeployerServiceAccountController    OpenShiftControllerName = "openshift.io/deployer-serviceaccount"
+	OpenShiftDeploymentConfigController          OpenShiftControllerName = "openshift.io/deploymentconfig"
+	OpenShiftImageTriggerController              OpenShiftControllerName = "openshift.io/image-trigger"
+	OpenShiftImageImportController               OpenShiftControllerName = "openshift.io/image-import"
+	OpenShiftImageSignatureImportController      OpenShiftControllerName = "openshift.io/image-signature-import"
+	OpenShiftTemplateInstanceController          OpenShiftControllerName = "openshift.io/templateinstance"
+	OpenShiftTemplateInstanceFinalizerController OpenShiftControllerName = "openshift.io/templateinstancefinalizer"
+	OpenShiftUnidlingController                  OpenShiftControllerName = "openshift.io/unidling"
+	OpenShiftIngressIPController                 OpenShiftControllerName = "openshift.io/ingress-ip"
+	OpenShiftIngressToRouteController            OpenShiftControllerName = "openshift.io/ingress-to-route"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -365,7 +367,6 @@ type BuildDefaultsConfig struct {
 // SourceStrategyDefaultsConfig contains values that apply to builds using the
 // source strategy.
 type SourceStrategyDefaultsConfig struct {
-
 	// incremental indicates if s2i build strategies should perform an incremental
 	// build or not
 	Incremental *bool `json:"incremental,omitempty"`

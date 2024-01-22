@@ -7,7 +7,6 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -20,9 +19,9 @@ type FakePlacementDecisions struct {
 	ns   string
 }
 
-var placementdecisionsResource = schema.GroupVersionResource{Group: "cluster.open-cluster-management.io", Version: "v1beta1", Resource: "placementdecisions"}
+var placementdecisionsResource = v1beta1.SchemeGroupVersion.WithResource("placementdecisions")
 
-var placementdecisionsKind = schema.GroupVersionKind{Group: "cluster.open-cluster-management.io", Version: "v1beta1", Kind: "PlacementDecision"}
+var placementdecisionsKind = v1beta1.SchemeGroupVersion.WithKind("PlacementDecision")
 
 // Get takes name of the placementDecision, and returns the corresponding placementDecision object, and an error if there is any.
 func (c *FakePlacementDecisions) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.PlacementDecision, err error) {

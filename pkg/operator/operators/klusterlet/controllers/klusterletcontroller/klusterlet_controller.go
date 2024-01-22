@@ -27,9 +27,9 @@ import (
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	ocmfeature "open-cluster-management.io/api/feature"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	commonhelpers "open-cluster-management.io/ocm/pkg/common/helpers"
-	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 	"open-cluster-management.io/ocm/pkg/operator/helpers"
 )
@@ -120,22 +120,27 @@ type klusterletConfig struct {
 	//     namespace as KlusterletNamespace;
 	// 2). In the Hosted mode, it is on the management cluster and has the same name as
 	//     the klusterlet.
-	AgentNamespace              string
-	AgentID                     string
-	RegistrationImage           string
-	WorkImage                   string
-	SingletonImage              string
-	RegistrationServiceAccount  string
-	WorkServiceAccount          string
-	ClusterName                 string
-	ExternalServerURL           string
-	HubKubeConfigSecret         string
-	BootStrapKubeConfigSecret   string
-	OperatorNamespace           string
-	Replica                     int32
-	ClientCertExpirationSeconds int32
-	ClusterAnnotationsString    string
-
+	AgentNamespace                              string
+	AgentID                                     string
+	RegistrationImage                           string
+	WorkImage                                   string
+	SingletonImage                              string
+	RegistrationServiceAccount                  string
+	WorkServiceAccount                          string
+	ClusterName                                 string
+	ExternalServerURL                           string
+	HubKubeConfigSecret                         string
+	BootStrapKubeConfigSecret                   string
+	OperatorNamespace                           string
+	Replica                                     int32
+	ClientCertExpirationSeconds                 int32
+	ClusterAnnotationsString                    string
+	RegistrationKubeAPIQPS                      float32
+	RegistrationKubeAPIBurst                    int32
+	WorkKubeAPIQPS                              float32
+	WorkKubeAPIBurst                            int32
+	AgentKubeAPIQPS                             float32
+	AgentKubeAPIBurst                           int32
 	ExternalManagedKubeConfigSecret             string
 	ExternalManagedKubeConfigRegistrationSecret string
 	ExternalManagedKubeConfigWorkSecret         string
@@ -241,6 +246,8 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	if klusterlet.Spec.RegistrationConfiguration != nil {
 		registrationFeatureGates = klusterlet.Spec.RegistrationConfiguration.FeatureGates
 		config.ClientCertExpirationSeconds = klusterlet.Spec.RegistrationConfiguration.ClientCertExpirationSeconds
+		config.RegistrationKubeAPIQPS = float32(klusterlet.Spec.RegistrationConfiguration.KubeAPIQPS)
+		config.RegistrationKubeAPIBurst = klusterlet.Spec.RegistrationConfiguration.KubeAPIBurst
 
 		// construct cluster annotations string, the final format is "key1=value1,key2=value2"
 		var annotationsArray []string
@@ -255,9 +262,22 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 	var workFeatureGates []operatorapiv1.FeatureGate
 	if klusterlet.Spec.WorkConfiguration != nil {
 		workFeatureGates = klusterlet.Spec.WorkConfiguration.FeatureGates
+		config.WorkKubeAPIQPS = float32(klusterlet.Spec.WorkConfiguration.KubeAPIQPS)
+		config.WorkKubeAPIBurst = klusterlet.Spec.WorkConfiguration.KubeAPIBurst
 	}
+
 	config.WorkFeatureGates, workFeatureMsgs = helpers.ConvertToFeatureGateFlags("Work", workFeatureGates, ocmfeature.DefaultSpokeWorkFeatureGates)
 	meta.SetStatusCondition(&klusterlet.Status.Conditions, helpers.BuildFeatureCondition(registrationFeatureMsgs, workFeatureMsgs))
+
+	// for singleton agent, the QPS and Burst use the max one between the configurations of registration and work
+	config.AgentKubeAPIQPS = config.RegistrationKubeAPIQPS
+	if config.AgentKubeAPIQPS < config.WorkKubeAPIQPS {
+		config.AgentKubeAPIQPS = config.WorkKubeAPIQPS
+	}
+	config.AgentKubeAPIBurst = config.RegistrationKubeAPIBurst
+	if config.AgentKubeAPIBurst < config.WorkKubeAPIBurst {
+		config.AgentKubeAPIBurst = config.WorkKubeAPIBurst
+	}
 
 	reconcilers := []klusterletReconcile{
 		&crdReconcile{

@@ -20,7 +20,7 @@ import (
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	clienttesting "k8s.io/client-go/testing"
 
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
+	testingcommon "open-cluster-management.io/sdk-go/pkg/testing"
 )
 
 func TestApplyV1CRD(t *testing.T) {

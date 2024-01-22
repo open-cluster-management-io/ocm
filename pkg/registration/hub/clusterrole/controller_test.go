@@ -16,9 +16,9 @@ import (
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	"open-cluster-management.io/sdk-go/pkg/apply"
+	testingcommon "open-cluster-management.io/sdk-go/pkg/testing"
 
-	"open-cluster-management.io/ocm/pkg/common/apply"
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 

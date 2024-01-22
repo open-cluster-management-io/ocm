@@ -13,7 +13,7 @@ on:
 
 env:
   # Common versions
-  GO_VERSION: '1.20'
+  GO_VERSION: '1.21'
   GO_REQUIRED_MIN_VERSION: ''
 
 permissions:
@@ -35,7 +35,6 @@ jobs:
       - name: report coverage
         uses: codecov/codecov-action@v3
         with:
-          token: ${{ secrets.CODECOV_UPLOAD_TOKEN }}
           files: ./coverage.out
           flags: unit
           name: unit

@@ -12,10 +12,10 @@ import (
 
 	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	worklisterv1 "open-cluster-management.io/api/client/work/listers/work/v1"
-	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
-	"open-cluster-management.io/api/utils/work/v1/workapplier"
 	workv1 "open-cluster-management.io/api/work/v1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
+	clustersdkv1alpha1 "open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1"
+	workapplier "open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier"
 
 	"open-cluster-management.io/ocm/pkg/common/helpers"
 	"open-cluster-management.io/ocm/pkg/work/helper"
@@ -38,7 +38,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 	count, total := 0, 0
 	// Getting the placements and the created ManifestWorks related to each placement
 	for _, placementRef := range mwrSet.Spec.PlacementRefs {
-		var existingRolloutClsStatus []clusterv1alpha1.ClusterRolloutStatus
+		var existingRolloutClsStatus []clustersdkv1alpha1.ClusterRolloutStatus
 		existingClusterNames := sets.New[string]()
 		placement, err := d.placementLister.Placements(mwrSet.Namespace).Get(placementRef.Name)
 
@@ -78,7 +78,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 		}
 
 		placeTracker := helper.GetPlacementTracker(d.placeDecisionLister, placement, existingClusterNames)
-		rolloutHandler, err := clusterv1alpha1.NewRolloutHandler(placeTracker, d.clusterRolloutStatusFunc)
+		rolloutHandler, err := clustersdkv1alpha1.NewRolloutHandler(placeTracker, d.clusterRolloutStatusFunc)
 		if err != nil {
 			apimeta.SetStatusCondition(&mwrSet.Status.Conditions, GetPlacementDecisionVerified(workapiv1alpha1.ReasonNotAsExpected, ""))
 
@@ -106,7 +106,7 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 
 		// Create ManifestWorks
 		for _, rolloutStatue := range rolloutResult.ClustersToRollout {
-			if rolloutStatue.Status == clusterv1alpha1.ToApply {
+			if rolloutStatue.Status == clustersdkv1alpha1.ToApply {
 				mw, err := CreateManifestWork(mwrSet, rolloutStatue.ClusterName, placementRef.Name)
 				if err != nil {
 					errs = append(errs, err)
@@ -183,12 +183,12 @@ func (d *deployReconciler) reconcile(ctx context.Context, mwrSet *workapiv1alpha
 	return mwrSet, reconcileContinue, nil
 }
 
-func (d *deployReconciler) clusterRolloutStatusFunc(clusterName string, manifestWork workv1.ManifestWork) (clusterv1alpha1.ClusterRolloutStatus, error) {
-	clsRolloutStatus := clusterv1alpha1.ClusterRolloutStatus{
+func (d *deployReconciler) clusterRolloutStatusFunc(clusterName string, manifestWork workv1.ManifestWork) (clustersdkv1alpha1.ClusterRolloutStatus, error) {
+	clsRolloutStatus := clustersdkv1alpha1.ClusterRolloutStatus{
 		ClusterName:        clusterName,
 		LastTransitionTime: &manifestWork.CreationTimestamp,
 		// Default status is ToApply
-		Status: clusterv1alpha1.ToApply,
+		Status: clustersdkv1alpha1.ToApply,
 	}
 
 	appliedCondition := apimeta.FindStatusCondition(manifestWork.Status.Conditions, workv1.WorkApplied)
@@ -200,24 +200,24 @@ func (d *deployReconciler) clusterRolloutStatusFunc(clusterName string, manifest
 		apimeta.IsStatusConditionTrue(manifestWork.Status.Conditions, workv1.WorkProgressing) {
 		// Applied OR Progressing conditions status true return status as Progressing
 		// ManifestWork Progressing status is not defined however the check is made for future work availability.
-		clsRolloutStatus.Status = clusterv1alpha1.Progressing
+		clsRolloutStatus.Status = clustersdkv1alpha1.Progressing
 	} else if appliedCondition.Status == metav1.ConditionFalse {
 		// Applied Condition status false return status as failed
-		clsRolloutStatus.Status = clusterv1alpha1.Failed
+		clsRolloutStatus.Status = clustersdkv1alpha1.Failed
 		clsRolloutStatus.LastTransitionTime = &appliedCondition.LastTransitionTime
 		return clsRolloutStatus, nil
 	}
 
 	// Available condition return status as Succeeded
 	if apimeta.IsStatusConditionTrue(manifestWork.Status.Conditions, workv1.WorkAvailable) {
-		clsRolloutStatus.Status = clusterv1alpha1.Succeeded
+		clsRolloutStatus.Status = clustersdkv1alpha1.Succeeded
 		return clsRolloutStatus, nil
 	}
 
 	// Degraded condition return status as Failed
 	// ManifestWork Degraded status is not defined however the check is made for future work availability.
 	if apimeta.IsStatusConditionTrue(manifestWork.Status.Conditions, workv1.WorkDegraded) {
-		clsRolloutStatus.Status = clusterv1alpha1.Failed
+		clsRolloutStatus.Status = clustersdkv1alpha1.Failed
 		clsRolloutStatus.LastTransitionTime = &appliedCondition.LastTransitionTime
 	}
 

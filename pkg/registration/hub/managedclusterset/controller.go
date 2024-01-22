@@ -23,8 +23,9 @@ import (
 	clusterlisterv1beta2 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta2"
 	v1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+	clustersdkv1beta2 "open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta2"
+	"open-cluster-management.io/sdk-go/pkg/patcher"
 
-	"open-cluster-management.io/ocm/pkg/common/patcher"
 	"open-cluster-management.io/ocm/pkg/common/queue"
 )
 
@@ -153,7 +154,7 @@ func (c *managedClusterSetController) sync(ctx context.Context, syncCtx factory.
 // syncClusterSet syncs a particular cluster set
 func (c *managedClusterSetController) syncClusterSet(ctx context.Context, originalClusterSet *clusterv1beta2.ManagedClusterSet) error {
 	clusterSet := originalClusterSet.DeepCopy()
-	clusters, err := clusterv1beta2.GetClustersFromClusterSet(clusterSet, c.clusterLister)
+	clusters, err := clustersdkv1beta2.GetClustersFromClusterSet(clusterSet, c.clusterLister)
 	if err != nil {
 		return err
 	}
@@ -183,7 +184,7 @@ func (c *managedClusterSetController) syncClusterSet(ctx context.Context, origin
 
 // enqueueClusterClusterSet enqueue a cluster related clusterset
 func (c *managedClusterSetController) enqueueClusterClusterSet(cluster *v1.ManagedCluster) {
-	clusterSets, err := clusterv1beta2.GetClusterSetsOfCluster(cluster, c.clusterSetLister)
+	clusterSets, err := clustersdkv1beta2.GetClusterSetsOfCluster(cluster, c.clusterSetLister)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error to get GetClusterSetsOfCluster. Error %v", err))
 		return
@@ -196,12 +197,12 @@ func (c *managedClusterSetController) enqueueClusterClusterSet(cluster *v1.Manag
 // enqueueUpdateClusterClusterSet get the oldCluster related clustersets and newCluster related clustersets,
 // then enqueue the diff clustersets(added clustersets and removed clustersets)
 func (c *managedClusterSetController) enqueueUpdateClusterClusterSet(oldCluster, newCluster *v1.ManagedCluster) {
-	oldClusterSets, err := clusterv1beta2.GetClusterSetsOfCluster(oldCluster, c.clusterSetLister)
+	oldClusterSets, err := clustersdkv1beta2.GetClusterSetsOfCluster(oldCluster, c.clusterSetLister)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error to get GetClusterSetsOfCluster. Error %v", err))
 		return
 	}
-	newClusterSets, err := clusterv1beta2.GetClusterSetsOfCluster(newCluster, c.clusterSetLister)
+	newClusterSets, err := clustersdkv1beta2.GetClusterSetsOfCluster(newCluster, c.clusterSetLister)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error to get GetClusterSetsOfCluster. Error %v", err))
 		return

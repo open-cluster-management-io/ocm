@@ -7,7 +7,6 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -19,9 +18,9 @@ type FakeClusterManagementAddOns struct {
 	Fake *FakeAddonV1alpha1
 }
 
-var clustermanagementaddonsResource = schema.GroupVersionResource{Group: "addon.open-cluster-management.io", Version: "v1alpha1", Resource: "clustermanagementaddons"}
+var clustermanagementaddonsResource = v1alpha1.SchemeGroupVersion.WithResource("clustermanagementaddons")
 
-var clustermanagementaddonsKind = schema.GroupVersionKind{Group: "addon.open-cluster-management.io", Version: "v1alpha1", Kind: "ClusterManagementAddOn"}
+var clustermanagementaddonsKind = v1alpha1.SchemeGroupVersion.WithKind("ClusterManagementAddOn")
 
 // Get takes name of the clusterManagementAddOn, and returns the corresponding clusterManagementAddOn object, and an error if there is any.
 func (c *FakeClusterManagementAddOns) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ClusterManagementAddOn, err error) {

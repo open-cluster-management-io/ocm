@@ -18,8 +18,8 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workapiv1alpha1 "open-cluster-management.io/api/work/v1alpha1"
+	testingcommon "open-cluster-management.io/sdk-go/pkg/testing"
 
-	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	helpertest "open-cluster-management.io/ocm/pkg/work/hub/test"
 )
 

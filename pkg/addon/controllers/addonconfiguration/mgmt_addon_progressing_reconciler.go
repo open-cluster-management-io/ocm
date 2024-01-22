@@ -10,8 +10,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-
-	"open-cluster-management.io/ocm/pkg/common/patcher"
+	"open-cluster-management.io/sdk-go/pkg/patcher"
 )
 
 type clusterManagementAddonProgressingReconciler struct {

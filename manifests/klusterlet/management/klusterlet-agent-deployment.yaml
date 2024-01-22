@@ -84,6 +84,12 @@ spec:
           - "--spoke-kubeconfig=/spoke/config/kubeconfig"
           - "--terminate-on-files=/spoke/config/kubeconfig"
           {{end}}
+          {{if gt .AgentKubeAPIQPS 0.0}}
+          - "--kube-api-qps={{ .AgentKubeAPIQPS }}"
+          {{end}}
+          {{if gt .AgentKubeAPIBurst 0}}
+          - "--kube-api-burst={{ .AgentKubeAPIBurst }}"
+          {{end}}
         env:
           - name: POD_NAME
             valueFrom:

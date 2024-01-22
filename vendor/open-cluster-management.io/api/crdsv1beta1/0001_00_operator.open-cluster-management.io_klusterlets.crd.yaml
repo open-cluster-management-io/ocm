@@ -142,6 +142,16 @@ spec:
                         enum:
                           - Enable
                           - Disable
+                kubeAPIBurst:
+                  description: 'KubeAPIBurst indicates the maximum burst of the throttle while talking with apiserver of hub cluster from the spoke cluster. If it is set empty, use the default value: 100'
+                  type: integer
+                  format: int32
+                  default: 100
+                kubeAPIQPS:
+                  description: 'KubeAPIQPS indicates the maximum QPS while talking with apiserver of hub cluster from the spoke cluster. If it is set empty, use the default value: 50'
+                  type: integer
+                  format: int32
+                  default: 50
             registrationImagePullSpec:
               description: RegistrationImagePullSpec represents the desired image configuration of registration agent. quay.io/open-cluster-management.io/registration:latest will be used if unspecified.
               type: string
@@ -177,6 +187,16 @@ spec:
                         enum:
                           - Enable
                           - Disable
+                kubeAPIBurst:
+                  description: 'KubeAPIBurst indicates the maximum burst of the throttle while talking with apiserver of hub cluster from the spoke cluster. If it is set empty, use the default value: 100'
+                  type: integer
+                  format: int32
+                  default: 100
+                kubeAPIQPS:
+                  description: 'KubeAPIQPS indicates the maximum QPS while talking with apiserver of hub cluster from the spoke cluster. If it is set empty, use the default value: 50'
+                  type: integer
+                  format: int32
+                  default: 50
             workImagePullSpec:
               description: WorkImagePullSpec represents the desired image configuration of work agent. quay.io/open-cluster-management.io/work:latest will be used if unspecified.
               type: string

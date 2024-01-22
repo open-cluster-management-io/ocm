@@ -386,8 +386,36 @@ func MapValueChanged(old, new map[string]string, key string) bool {
 // ClusterImageRegistriesAnnotationChanged returns true if the value of the ClusterImageRegistriesAnnotationKey
 // in the new managed cluster annotation is different from the old managed cluster annotation
 func ClusterImageRegistriesAnnotationChanged(old, new *clusterv1.ManagedCluster) bool {
+	return ClusterAnnotationChanged(old, new, clusterv1.ClusterImageRegistriesAnnotationKey)
+}
+
+// ClusterAnnotationChanged returns true if the value of the specified annotation in the new managed cluster annotation
+// is different from the old managed cluster annotation
+func ClusterAnnotationChanged(old, new *clusterv1.ManagedCluster, annotation string) bool {
 	if new == nil || old == nil {
 		return false
 	}
-	return MapValueChanged(old.Annotations, new.Annotations, clusterv1.ClusterImageRegistriesAnnotationKey)
+	return MapValueChanged(old.Annotations, new.Annotations, annotation)
+}
+
+// ClusterAvailableConditionChanged returns true if the value of the Available condition in the new managed cluster
+// is different from the old managed cluster
+func ClusterAvailableConditionChanged(old, new *clusterv1.ManagedCluster) bool {
+	return ClusterConditionChanged(old, new, clusterv1.ManagedClusterConditionAvailable)
+}
+
+// ClusterAvailableConditionChanged returns true if the value of the specified conditionType in the new managed cluster
+// is different from the old managed cluster
+func ClusterConditionChanged(old, new *clusterv1.ManagedCluster, conditionType string) bool {
+	if new == nil || old == nil {
+		return false
+	}
+
+	oldAvailableCondition := meta.FindStatusCondition(old.Status.Conditions, conditionType)
+	newAvailableCondition := meta.FindStatusCondition(new.Status.Conditions, conditionType)
+
+	return (oldAvailableCondition == nil && newAvailableCondition != nil) ||
+		(oldAvailableCondition != nil && newAvailableCondition == nil) ||
+		(oldAvailableCondition != nil && newAvailableCondition != nil &&
+			oldAvailableCondition.Status != newAvailableCondition.Status)
 }
