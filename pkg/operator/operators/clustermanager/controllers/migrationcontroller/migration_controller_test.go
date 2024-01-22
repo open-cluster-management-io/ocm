@@ -24,7 +24,8 @@ import (
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
-	testingcommon "open-cluster-management.io/sdk-go/pkg/testing"
+
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 )
 
 func newFakeCRD(name string, storageVersion string, versions ...string) runtime.Object {
