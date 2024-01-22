@@ -110,6 +110,7 @@ func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 	for gvr := range utils.BuiltInAddOnConfigGVRs {
 		supportedConfigGVRs = append(supportedConfigGVRs, gvr)
 	}
+
 	agentAddonOptions := agent.AgentAddonOptions{
 		AddonName:       a.addonName,
 		InstallStrategy: nil,
@@ -125,7 +126,11 @@ func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 			AgentInstallNamespace: utils.AgentInstallNamespaceFromDeploymentConfigFunc(
 				utils.NewAddOnDeploymentConfigGetter(a.addonClient)),
 		},
-		AgentDeployTriggerClusterFilter: utils.ClusterImageRegistriesAnnotationChanged,
+		AgentDeployTriggerClusterFilter: func(old, new *clusterv1.ManagedCluster) bool {
+			return utils.ClusterImageRegistriesAnnotationChanged(old, new) ||
+				// if the cluster changes from unknow to true, recheck the health of the addon immediately
+				utils.ClusterAvailableConditionChanged(old, new)
+		},
 	}
 
 	template, err := a.GetDesiredAddOnTemplate(nil, "", a.addonName)
