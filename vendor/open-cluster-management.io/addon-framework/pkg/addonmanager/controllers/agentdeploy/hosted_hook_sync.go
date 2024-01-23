@@ -80,20 +80,33 @@ func (s *hostedHookSyncer) sync(ctx context.Context,
 		return addon, nil
 	}
 
-	// will deploy the pre-delete hook manifestWork when the addon is deleting
 	if addon.DeletionTimestamp.IsZero() {
 		addonAddFinalizer(addon, addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer)
 		return addon, nil
 	}
 
-	// the hook work is completed if there is no HostingPreDeleteHookFinalizer when the addon is deleting.
 	if !addonHasFinalizer(addon, addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer) {
 		return addon, nil
 	}
 
-	hookWork, err = s.applyWork(ctx, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied, hookWork, addon)
-	if err != nil {
-		return addon, err
+	// apply the pre-delete hook manifestWork when the addon is deleting and HookManifestCompleted condition is not true.
+	// there are 2 cases:
+	// 1. the HookManifestCompleted condition is false.
+	// 2. there is no this condition.
+	if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHookManifestCompleted) {
+		hookWork, err = s.applyWork(ctx, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied, hookWork, addon)
+		if err != nil {
+			return addon, err
+		}
+	} else {
+		// cleanup is safe here since there is no case which HookManifestCompleted condition is changed from true to false.
+		if err = s.cleanupHookWork(ctx, addon); err != nil {
+			return addon, err
+		}
+		if addonRemoveFinalizer(addon, addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer) {
+			return addon, err
+		}
+		return addon, nil
 	}
 
 	// TODO: will surface more message here
@@ -104,25 +117,16 @@ func (s *hostedHookSyncer) sync(ctx context.Context,
 			Reason:  "HookManifestIsCompleted",
 			Message: fmt.Sprintf("hook manifestWork %v is completed.", hookWork.Name),
 		})
-
-		if err = s.cleanupHookWork(ctx, addon); err != nil {
-			return addon, err
-		}
-		if addonRemoveFinalizer(addon, addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer) {
-			return addon, err
-		}
-		return addon, nil
+	} else {
+		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+			Type:    addonapiv1alpha1.ManagedClusterAddOnHookManifestCompleted,
+			Status:  metav1.ConditionFalse,
+			Reason:  "HookManifestIsNotCompleted",
+			Message: fmt.Sprintf("hook manifestWork %v is not completed.", hookWork.Name),
+		})
 	}
 
-	meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-		Type:    addonapiv1alpha1.ManagedClusterAddOnHookManifestCompleted,
-		Status:  metav1.ConditionFalse,
-		Reason:  "HookManifestIsNotCompleted",
-		Message: fmt.Sprintf("hook manifestWork %v is not completed.", hookWork.Name),
-	})
-
 	return addon, nil
-
 }
 
 // cleanupHookWork will delete the hosting pre-delete hook manifestWork and remove the finalizer,
