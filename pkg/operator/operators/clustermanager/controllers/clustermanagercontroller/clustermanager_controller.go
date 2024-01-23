@@ -128,6 +128,12 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 	clusterManagerMode := clusterManager.Spec.DeployOption.Mode
 	clusterManagerNamespace := helpers.ClusterManagerNamespace(clusterManagerName, clusterManagerMode)
 
+	resourceRequirements, err := helpers.ResourceRequirements(clusterManager)
+	if err != nil {
+		klog.Errorf("failed to parse resource requirements for cluster manager %s: %v", clusterManager.Name, err)
+		return err
+	}
+
 	// This config is used to render template of manifests.
 	config := manifests.HubConfig{
 		ClusterManagerName:      clusterManager.Name,
@@ -144,6 +150,8 @@ func (n *clusterManagerController) sync(ctx context.Context, controllerContext f
 		WorkWebhook: manifests.Webhook{
 			Port: defaultWebhookPort,
 		},
+		ResourceRequirementResourceType: helpers.ResourceType(clusterManager),
+		ResourceRequirements:            resourceRequirements,
 	}
 
 	var registrationFeatureMsgs, workFeatureMsgs, addonFeatureMsgs string
