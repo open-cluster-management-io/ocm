@@ -11,7 +11,8 @@ import (
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterv1sdkalpha1 "open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1"
+	clustersdkv1beta1 "open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1"
 )
 
 // configurationTree is a 2 level snapshot tree on the configuration of addons
@@ -27,9 +28,9 @@ type configurationGraph struct {
 // installStrategyNode is a node in configurationGraph defined by a install strategy
 type installStrategyNode struct {
 	placementRef    addonv1alpha1.PlacementRef
-	pdTracker       *clusterv1beta1.PlacementDecisionClustersTracker
+	pdTracker       *clustersdkv1beta1.PlacementDecisionClustersTracker
 	rolloutStrategy clusterv1alpha1.RolloutStrategy
-	rolloutResult   clusterv1alpha1.RolloutResult
+	rolloutResult   clusterv1sdkalpha1.RolloutResult
 	desiredConfigs  addonConfigMap
 	// children keeps a map of addons node as the children of this node
 	children map[string]*addonNode
@@ -41,18 +42,18 @@ type installStrategyNode struct {
 type addonNode struct {
 	desiredConfigs addonConfigMap
 	mca            *addonv1alpha1.ManagedClusterAddOn
-	status         *clusterv1alpha1.ClusterRolloutStatus
+	status         *clusterv1sdkalpha1.ClusterRolloutStatus
 }
 
 type addonConfigMap map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference
 
 // set addon rollout status
 func (n *addonNode) setRolloutStatus() {
-	n.status = &clusterv1alpha1.ClusterRolloutStatus{ClusterName: n.mca.Namespace}
+	n.status = &clusterv1sdkalpha1.ClusterRolloutStatus{ClusterName: n.mca.Namespace}
 
 	// desired configs doesn't match actual configs, set to ToApply
 	if len(n.mca.Status.ConfigReferences) != len(n.desiredConfigs) {
-		n.status.Status = clusterv1alpha1.ToApply
+		n.status.Status = clusterv1sdkalpha1.ToApply
 		return
 	}
 
@@ -68,30 +69,30 @@ func (n *addonNode) setRolloutStatus() {
 		if desired, ok := n.desiredConfigs[actual.ConfigGroupResource]; ok {
 			// desired config spec hash doesn't match actual, set to ToApply
 			if !equality.Semantic.DeepEqual(desired.DesiredConfig, actual.DesiredConfig) {
-				n.status.Status = clusterv1alpha1.ToApply
+				n.status.Status = clusterv1sdkalpha1.ToApply
 				return
 				// desired config spec hash matches actual, but last applied config spec hash doesn't match actual
 			} else if !equality.Semantic.DeepEqual(actual.LastAppliedConfig, actual.DesiredConfig) {
 				switch progressingCond.Reason {
 				case addonv1alpha1.ProgressingReasonInstallFailed, addonv1alpha1.ProgressingReasonUpgradeFailed:
-					n.status.Status = clusterv1alpha1.Failed
+					n.status.Status = clusterv1sdkalpha1.Failed
 					n.status.LastTransitionTime = &progressingCond.LastTransitionTime
 				case addonv1alpha1.ProgressingReasonInstalling, addonv1alpha1.ProgressingReasonUpgrading:
-					n.status.Status = clusterv1alpha1.Progressing
+					n.status.Status = clusterv1sdkalpha1.Progressing
 					n.status.LastTransitionTime = &progressingCond.LastTransitionTime
 				default:
-					n.status.Status = clusterv1alpha1.Progressing
+					n.status.Status = clusterv1sdkalpha1.Progressing
 				}
 				return
 			}
 		} else {
-			n.status.Status = clusterv1alpha1.ToApply
+			n.status.Status = clusterv1sdkalpha1.ToApply
 			return
 		}
 	}
 
 	// succeed
-	n.status.Status = clusterv1alpha1.Succeeded
+	n.status.Status = clusterv1sdkalpha1.Succeeded
 	if progressingCond.Reason == addonv1alpha1.ProgressingReasonInstallSucceed || progressingCond.Reason == addonv1alpha1.ProgressingReasonUpgradeSucceed {
 		n.status.LastTransitionTime = &progressingCond.LastTransitionTime
 	}
@@ -172,7 +173,7 @@ func (g *configurationGraph) addPlacementNode(
 	}
 
 	// new decision tracker
-	pdTracker := clusterv1beta1.NewPlacementDecisionClustersTracker(placement, placementDecisionGetter, nil)
+	pdTracker := clustersdkv1beta1.NewPlacementDecisionClustersTracker(placement, placementDecisionGetter, nil)
 
 	// refresh and get existing decision clusters
 	err = pdTracker.Refresh()
@@ -307,26 +308,26 @@ func (n *installStrategyNode) addNode(addon *addonv1alpha1.ManagedClusterAddOn) 
 func (n *installStrategyNode) generateRolloutResult() error {
 	if n.placementRef.Name == "" {
 		// default addons
-		rolloutResult := clusterv1alpha1.RolloutResult{}
-		rolloutResult.ClustersToRollout = []clusterv1alpha1.ClusterRolloutStatus{}
+		rolloutResult := clusterv1sdkalpha1.RolloutResult{}
+		rolloutResult.ClustersToRollout = []clusterv1sdkalpha1.ClusterRolloutStatus{}
 		for name, addon := range n.children {
 			if addon.status == nil {
 				return fmt.Errorf("failed to get rollout status on cluster %v", name)
 			}
-			if addon.status.Status != clusterv1alpha1.Succeeded {
+			if addon.status.Status != clusterv1sdkalpha1.Succeeded {
 				rolloutResult.ClustersToRollout = append(rolloutResult.ClustersToRollout, *addon.status)
 			}
 		}
 		n.rolloutResult = rolloutResult
 	} else {
 		// placement addons
-		rolloutHandler, err := clusterv1alpha1.NewRolloutHandler(n.pdTracker, getClusterRolloutStatus)
+		rolloutHandler, err := clusterv1sdkalpha1.NewRolloutHandler(n.pdTracker, getClusterRolloutStatus)
 		if err != nil {
 			return err
 		}
 
 		// get existing addons
-		existingRolloutClusters := []clusterv1alpha1.ClusterRolloutStatus{}
+		existingRolloutClusters := []clusterv1sdkalpha1.ClusterRolloutStatus{}
 		for name, addon := range n.children {
 			clsRolloutStatus, err := getClusterRolloutStatus(name, addon)
 			if err != nil {
@@ -373,7 +374,7 @@ func (n *installStrategyNode) getAddonsToUpdate() []*addonNode {
 func (n *installStrategyNode) countAddonUpgradeSucceed() int {
 	count := 0
 	for _, addon := range n.children {
-		if desiredConfigsEqual(addon.desiredConfigs, n.desiredConfigs) && addon.status.Status == clusterv1alpha1.Succeeded {
+		if desiredConfigsEqual(addon.desiredConfigs, n.desiredConfigs) && addon.status.Status == clusterv1sdkalpha1.Succeeded {
 			count += 1
 		}
 	}
@@ -383,7 +384,7 @@ func (n *installStrategyNode) countAddonUpgradeSucceed() int {
 func (n *installStrategyNode) countAddonUpgrading() int {
 	count := 0
 	for _, addon := range n.children {
-		if desiredConfigsEqual(addon.desiredConfigs, n.desiredConfigs) && addon.status.Status == clusterv1alpha1.Progressing {
+		if desiredConfigsEqual(addon.desiredConfigs, n.desiredConfigs) && addon.status.Status == clusterv1sdkalpha1.Progressing {
 			count += 1
 		}
 	}
@@ -394,9 +395,9 @@ func (n *installStrategyNode) countAddonTimeOut() int {
 	return len(n.rolloutResult.ClustersTimeOut)
 }
 
-func getClusterRolloutStatus(clusterName string, addonNode *addonNode) (clusterv1alpha1.ClusterRolloutStatus, error) {
+func getClusterRolloutStatus(clusterName string, addonNode *addonNode) (clusterv1sdkalpha1.ClusterRolloutStatus, error) {
 	if addonNode.status == nil {
-		return clusterv1alpha1.ClusterRolloutStatus{}, fmt.Errorf("failed to get rollout status on cluster %v", clusterName)
+		return clusterv1sdkalpha1.ClusterRolloutStatus{}, fmt.Errorf("failed to get rollout status on cluster %v", clusterName)
 	}
 	return *addonNode.status, nil
 }

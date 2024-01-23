@@ -33,9 +33,9 @@ require (
 	k8s.io/klog/v2 v2.110.1
 	k8s.io/kube-aggregator v0.29.0
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
-	open-cluster-management.io/addon-framework v0.8.1-0.20240119025526-d2afcef1ff66
-	open-cluster-management.io/api v0.12.1-0.20240115071352-3d94ce8f3499
-	open-cluster-management.io/sdk-go v0.0.0-20240118073603-6da392d39be0
+	open-cluster-management.io/addon-framework v0.8.1-0.20240123051722-71f1b13cbb63
+	open-cluster-management.io/api v0.12.1-0.20240122084346-e7bd1bd9ea6a
+	open-cluster-management.io/sdk-go v0.0.0-20240122034348-9793ade2466b
 	sigs.k8s.io/controller-runtime v0.16.2
 	sigs.k8s.io/kube-storage-version-migrator v0.0.6-0.20230721195810-5c8923c5ff96
 )

@@ -70,6 +70,11 @@ type ClusterManagerSpec struct {
 	// AddOnManagerConfiguration contains the configuration of addon manager
 	// +optional
 	AddOnManagerConfiguration *AddOnManagerConfiguration `json:"addOnManagerConfiguration,omitempty"`
+
+	// ResourceRequirement specify QoS classes of deployments managed by clustermanager.
+	// It applies to all the containers in the deployments.
+	// +optional
+	ResourceRequirement *ResourceRequirement `json:"resourceRequirement,omitempty"`
 }
 
 // NodePlacement describes node scheduling configuration for the pods.

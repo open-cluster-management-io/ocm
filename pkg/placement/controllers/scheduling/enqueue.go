@@ -18,6 +18,7 @@ import (
 	clusterapiv1 "open-cluster-management.io/api/cluster/v1"
 	clusterapiv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+	clustersdkv1beta2 "open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta2"
 )
 
 const (
@@ -144,7 +145,7 @@ func (e *enqueuer) enqueueCluster(obj interface{}) {
 		return
 	}
 
-	clusterSets, err := clusterapiv1beta2.GetClusterSetsOfCluster(cluster, e.clusterSetLister)
+	clusterSets, err := clustersdkv1beta2.GetClusterSetsOfCluster(cluster, e.clusterSetLister)
 	if err != nil {
 		e.logger.V(4).Error(err, "Unable to get clusterSets of cluster", "clusterName", cluster.GetName())
 		return
@@ -184,7 +185,7 @@ func (e *enqueuer) enqueuePlacementScore(obj interface{}) {
 		e.logger.V(4).Error(err, "Unable to get cluster", "clusterNamespace", namespace)
 	}
 
-	clusterSets, err := clusterapiv1beta2.GetClusterSetsOfCluster(cluster, e.clusterSetLister)
+	clusterSets, err := clustersdkv1beta2.GetClusterSetsOfCluster(cluster, e.clusterSetLister)
 	if err != nil {
 		e.logger.V(4).Error(err, "Unable to get clusterSets of cluster", "clusterName", cluster.GetName())
 		return
