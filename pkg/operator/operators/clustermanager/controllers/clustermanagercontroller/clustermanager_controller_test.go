@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ghodss/yaml"
+	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -16,6 +18,7 @@ import (
 	fakeapiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeinformers "k8s.io/client-go/informers"
@@ -23,6 +26,7 @@ import (
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
+	"open-cluster-management.io/ocm/manifests"
 	fakemigrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/fake"
 	migrationclient "sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/typed/migration/v1alpha1"
 
@@ -479,5 +483,125 @@ func TestIsIPFormat(t *testing.T) {
 		if isIPFormat(c.address) != c.isIPFormat {
 			t.Fatalf("expected %v, got %v", c.isIPFormat, isIPFormat(c.address))
 		}
+	}
+}
+
+func TestRenderingResourceRequirements(t *testing.T) {
+	defaultResource := &operatorapiv1.ResourceRequirement{
+		Type: operatorapiv1.ResourceQosClassDefault,
+		ResourceRequirements: &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("2m"),
+				corev1.ResourceMemory: resource.MustParse("16Mi"),
+			},
+		},
+	}
+	bestEffort := &operatorapiv1.ResourceRequirement{
+		Type:                 operatorapiv1.ResourceQosClassBestEffort,
+		ResourceRequirements: &corev1.ResourceRequirements{},
+	}
+	burstable := &operatorapiv1.ResourceRequirement{
+		Type: operatorapiv1.ResourceQosClassResourceRequirement,
+		ResourceRequirements: &corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("100Mi"),
+			},
+		},
+	}
+	tests := []struct {
+		name     string
+		resource *operatorapiv1.ResourceRequirement
+	}{
+		{
+			name:     "DefaultResourceRequirements",
+			resource: defaultResource,
+		},
+		{
+			name:     "BestEffortResourceRequirements",
+			resource: bestEffort,
+		},
+		{
+			name:     "SpecificResourceRequirements",
+			resource: burstable,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := newFakeHubConfigWithResourceRequirement(t, tt.resource)
+			for _, file := range getManifestFiles() {
+				manifest, err := manifests.ClusterManagerManifestFiles.ReadFile(file)
+				if err != nil {
+					t.Errorf("Failed to read file %s", file)
+				}
+				objData := assets.MustCreateAssetFromTemplate(file, manifest, config).Data
+				deploy := &appsv1.Deployment{}
+				if err = yaml.Unmarshal(objData, deploy); err != nil {
+					t.Errorf("Failed to unmarshal deployment: %v", err)
+				}
+				actual := deploy.Spec.Template.Spec.Containers[0].Resources
+				actualString := actual.String()
+				expectedStr := tt.resource.ResourceRequirements.String()
+				if actualString != expectedStr {
+					t.Errorf("expect:\n%s\nbut got:\n%s", expectedStr, actualString)
+				}
+			}
+		})
+	}
+}
+
+func newFakeHubConfigWithResourceRequirement(t *testing.T, r *operatorapiv1.ResourceRequirement) manifests.HubConfig {
+	clusterManager := &operatorapiv1.ClusterManager{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-cluster-manager",
+		},
+		Spec: operatorapiv1.ClusterManagerSpec{
+			RegistrationImagePullSpec: "fake-registration-image",
+			WorkImagePullSpec:         "fake-work-image",
+			PlacementImagePullSpec:    "fake-placement-image",
+			AddOnManagerImagePullSpec: "fake-addon-manager-image",
+			ResourceRequirement:       r,
+		},
+	}
+
+	resourceRequirements, err := helpers.ResourceRequirements(clusterManager)
+	if err != nil {
+		t.Errorf("Failed to parse resource requirements: %v", err)
+	}
+
+	hubConfig := manifests.HubConfig{
+		ClusterManagerName:      clusterManager.Name,
+		ClusterManagerNamespace: helpers.ClusterManagerNamespace(clusterManager.Name, clusterManager.Spec.DeployOption.Mode),
+		RegistrationImage:       clusterManager.Spec.RegistrationImagePullSpec,
+		WorkImage:               clusterManager.Spec.WorkImagePullSpec,
+		PlacementImage:          clusterManager.Spec.PlacementImagePullSpec,
+		AddOnManagerImage:       clusterManager.Spec.AddOnManagerImagePullSpec,
+		Replica:                 1,
+		HostedMode:              false,
+		RegistrationWebhook: manifests.Webhook{
+			Port: defaultWebhookPort,
+		},
+		WorkWebhook: manifests.Webhook{
+			Port: defaultWebhookPort,
+		},
+		ResourceRequirementResourceType: helpers.ResourceType(clusterManager),
+		ResourceRequirements:            resourceRequirements,
+	}
+	return hubConfig
+}
+
+func getManifestFiles() []string {
+	return []string{
+		"cluster-manager/management/cluster-manager-addon-manager-deployment.yaml",
+		"cluster-manager/management/cluster-manager-manifestworkreplicaset-deployment.yaml",
+		"cluster-manager/management/cluster-manager-placement-deployment.yaml",
+		"cluster-manager/management/cluster-manager-registration-deployment.yaml",
+		"cluster-manager/management/cluster-manager-registration-webhook-deployment.yaml",
+		"cluster-manager/management/cluster-manager-work-webhook-deployment.yaml",
 	}
 }

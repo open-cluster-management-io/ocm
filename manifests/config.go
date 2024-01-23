@@ -1,5 +1,7 @@
 package manifests
 
+import operatorapiv1 "open-cluster-management.io/api/operator/v1"
+
 type HubConfig struct {
 	ClusterManagerName             string
 	ClusterManagerNamespace        string
@@ -18,6 +20,11 @@ type HubConfig struct {
 	AddOnManagerEnabled            bool
 	MWReplicaSetEnabled            bool
 	AutoApproveUsers               string
+	// ResourceRequirementResourceType is the resource requirement resource type for the cluster manager managed containers.
+	ResourceRequirementResourceType operatorapiv1.ResourceQosClass
+	// ResourceRequirements is the resource requirements for the cluster manager managed containers.
+	// The type has to be []byte to use "indent" template function.
+	ResourceRequirements []byte
 }
 
 type Webhook struct {

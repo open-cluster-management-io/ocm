@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/ghodss/yaml"
 	"github.com/openshift/api"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -605,11 +606,26 @@ func AgentNamespace(klusterlet *operatorapiv1.Klusterlet) string {
 }
 
 // ResourceType set default and return resource requirements override by user
-func ResourceType(klusterlet *operatorapiv1.Klusterlet) operatorapiv1.ResourceQosClass {
-	if klusterlet.Spec.ResourceRequirement == nil {
+func ResourceType(resourceRequirementAcquirer operatorapiv1.ResourceRequirementAcquirer) operatorapiv1.ResourceQosClass {
+	r := resourceRequirementAcquirer.GetResourceRequirement()
+	if r == nil {
 		return operatorapiv1.ResourceQosClassDefault
 	}
-	return klusterlet.Spec.ResourceRequirement.Type
+	return r.Type
+}
+
+// ResourceRequirements get resource requirements overridden by user for ResourceQosClassResourceRequirement type
+func ResourceRequirements(resourceRequirementAcquirer operatorapiv1.ResourceRequirementAcquirer) ([]byte, error) {
+	r := resourceRequirementAcquirer.GetResourceRequirement()
+	if r == nil || r.Type == operatorapiv1.ResourceQosClassBestEffort {
+		return nil, nil
+	}
+	marshal, err := yaml.Marshal(r.ResourceRequirements)
+	if err != nil {
+		klog.Errorf("failed to marshal resource requirement: %v", err)
+		return nil, err
+	}
+	return marshal, nil
 }
 
 // SyncSecret forked from:

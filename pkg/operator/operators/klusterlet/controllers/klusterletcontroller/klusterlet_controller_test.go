@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ghodss/yaml"
+	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	appsv1 "k8s.io/api/apps/v1"
@@ -17,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -28,6 +31,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 	"k8s.io/klog/v2"
+	"open-cluster-management.io/ocm/manifests"
 
 	fakeoperatorclient "open-cluster-management.io/api/client/operator/clientset/versioned/fake"
 	operatorinformers "open-cluster-management.io/api/client/operator/informers/externalversions"
@@ -1051,6 +1055,75 @@ func TestDeployOnKube111(t *testing.T) {
 	}
 }
 
+func TestRenderingResourceRequirements(t *testing.T) {
+	defaultResource := &operatorapiv1.ResourceRequirement{
+		Type: operatorapiv1.ResourceQosClassDefault,
+		ResourceRequirements: &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("2m"),
+				corev1.ResourceMemory: resource.MustParse("16Mi"),
+			},
+		},
+	}
+	bestEffort := &operatorapiv1.ResourceRequirement{
+		Type:                 operatorapiv1.ResourceQosClassBestEffort,
+		ResourceRequirements: &corev1.ResourceRequirements{},
+	}
+	burstable := &operatorapiv1.ResourceRequirement{
+		Type: operatorapiv1.ResourceQosClassResourceRequirement,
+		ResourceRequirements: &corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("100Mi"),
+			},
+		},
+	}
+	tests := []struct {
+		name     string
+		resource *operatorapiv1.ResourceRequirement
+	}{
+		{
+			name:     "DefaultResourceRequirements",
+			resource: defaultResource,
+		},
+		{
+			name:     "BestEffortResourceRequirements",
+			resource: bestEffort,
+		},
+		{
+			name:     "CustomResourceRequirements",
+			resource: burstable,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := newFakeKlusterletConfigWithResourceRequirement(t, tt.resource)
+			for _, file := range getManifestFiles() {
+				manifest, err := manifests.KlusterletManifestFiles.ReadFile(file)
+				if err != nil {
+					t.Errorf("Failed to read file %s", file)
+				}
+				objData := assets.MustCreateAssetFromTemplate(file, manifest, config).Data
+				deploy := &appsv1.Deployment{}
+				if err = yaml.Unmarshal(objData, deploy); err != nil {
+					t.Errorf("Failed to unmarshal deployment: %v", err)
+				}
+				actual := deploy.Spec.Template.Spec.Containers[0].Resources
+				actualStr := actual.String()
+				expectedStr := tt.resource.ResourceRequirements.String()
+				if actualStr != expectedStr {
+					t.Errorf("expect:\n%s\nbut got:\n%s", expectedStr, actualStr)
+				}
+			}
+		})
+	}
+}
+
 func newKubeConfig(host string) []byte {
 	configData, _ := runtime.Encode(clientcmdlatest.Codec, &clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{"test-cluster": {
@@ -1079,6 +1152,65 @@ func newAppliedManifestWorks(host string, finalizers []string, terminated bool) 
 	}
 
 	return w
+}
+
+func getManifestFiles() []string {
+	return []string{
+		"klusterlet/management/klusterlet-agent-deployment.yaml",
+		"klusterlet/management/klusterlet-registration-deployment.yaml",
+		"klusterlet/management/klusterlet-work-deployment.yaml",
+	}
+}
+
+func newFakeKlusterletConfigWithResourceRequirement(t *testing.T, r *operatorapiv1.ResourceRequirement) klusterletConfig {
+	klusterlet := &operatorapiv1.Klusterlet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-name",
+		},
+		Spec: operatorapiv1.KlusterletSpec{
+			Namespace:                 "fake-namespace",
+			RegistrationImagePullSpec: "fake-registration-image",
+			WorkImagePullSpec:         "fake-work-image",
+			ClusterName:               "fake-cluster",
+			DeployOption: operatorapiv1.KlusterletDeployOption{
+				Mode: operatorapiv1.InstallModeDefault,
+			},
+			HubApiServerHostAlias: &operatorapiv1.HubApiServerHostAlias{
+				IP:       "10.99.199.199",
+				Hostname: "fake-hostname",
+			},
+			ResourceRequirement: r,
+		},
+	}
+
+	requirements, err := helpers.ResourceRequirements(klusterlet)
+	if err != nil {
+		t.Errorf("Failed to parse resource requirements: %v", err)
+	}
+
+	config := klusterletConfig{
+		KlusterletName:                  klusterlet.Name,
+		KlusterletNamespace:             helpers.KlusterletNamespace(klusterlet),
+		AgentNamespace:                  helpers.AgentNamespace(klusterlet),
+		RegistrationImage:               klusterlet.Spec.RegistrationImagePullSpec,
+		WorkImage:                       klusterlet.Spec.WorkImagePullSpec,
+		ClusterName:                     klusterlet.Spec.ClusterName,
+		BootStrapKubeConfigSecret:       helpers.BootstrapHubKubeConfig,
+		HubKubeConfigSecret:             helpers.HubKubeConfig,
+		ExternalServerURL:               getServersFromKlusterlet(klusterlet),
+		OperatorNamespace:               "fake-operator-namespace",
+		Replica:                         1,
+		ExternalManagedKubeConfigSecret: helpers.ExternalManagedKubeConfig,
+		ExternalManagedKubeConfigRegistrationSecret: helpers.ExternalManagedKubeConfigRegistration,
+		ExternalManagedKubeConfigWorkSecret:         helpers.ExternalManagedKubeConfigWork,
+		InstallMode:                                 klusterlet.Spec.DeployOption.Mode,
+		HubApiServerHostAlias:                       klusterlet.Spec.HubApiServerHostAlias,
+		RegistrationServiceAccount:                  serviceAccountName("fake-registration-sa", klusterlet),
+		WorkServiceAccount:                          serviceAccountName("fake-work-sa", klusterlet),
+		ResourceRequirementResourceType:             operatorapiv1.ResourceQosClassResourceRequirement,
+		ResourceRequirements:                        requirements,
+	}
+	return config
 }
 
 type fakeManagedClusterBuilder struct {

@@ -82,10 +82,19 @@ spec:
             scheme: HTTPS
             port: 8443
           initialDelaySeconds: 2
+        {{- if or (eq .ResourceRequirementResourceType "Default") (eq .ResourceRequirementResourceType "") }}
         resources:
           requests:
             cpu: 2m
             memory: 16Mi
+        {{- end }}
+        {{- if eq .ResourceRequirementResourceType "BestEffort" }}
+        resources: {}
+        {{- end }}
+        {{- if eq .ResourceRequirementResourceType "ResourceRequirement" }}
+        resources:
+          {{ .ResourceRequirements | indent 10 }}
+        {{- end }}
         volumeMounts:
         - name: tmpdir
           mountPath: /tmp
