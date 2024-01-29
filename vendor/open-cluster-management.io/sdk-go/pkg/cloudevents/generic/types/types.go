@@ -60,9 +60,6 @@ const (
 
 	// ExtensionOriginalSource is the cloud event extension key of the original source.
 	ExtensionOriginalSource = "originalsource"
-
-	// ExtensionResourceMeta is the cloud event extension key of the original resource meta.
-	ExtensionResourceMeta = "resourcemeta"
 )
 
 // ResourceAction represents an action on a resource object on the source or agent.
@@ -82,16 +79,50 @@ const (
 	Deleted ResourceAction = "DELETED"
 )
 
+const (
+	SourceEventsTopicPattern    = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/sourceevents$`
+	AgentEventsTopicPattern     = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/agentevents$`
+	SourceBroadcastTopicPattern = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/sourcebroadcast$`
+	AgentBroadcastTopicPattern  = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/agentbroadcast$`
+)
+
 // Topics represents required messaging system topics for a source or agent.
 type Topics struct {
-	// Spec is a topic for resource spec
-	Spec string `json:"spec" yaml:"spec"`
-	// Status is a  topic for resource status
-	Status string `json:"status" yaml:"status"`
-	// SpecResync is a topic for resource spec resync
-	SpecResync string `json:"specResync" yaml:"specResync"`
-	// StatusResync is a MQTT topic for resource status resync
-	StatusResync string `json:"statusResync" yaml:"statusResync"`
+	// SourceEvents topic is a topic for sources to publish their resource create/update/delete events or status resync events
+	//   - A source uses this topic to publish its resource create/update/delete request or status resync request with
+	//     its sourceID to a specified agent
+	//   - An agent subscribes to this topic with its cluster name to response sources resource create/update/delete
+	//     request or status resync request
+	// The topic format is `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/sourceevents$`, e.g.
+	// sources/+/clusters/+/sourceevents, sources/source1/clusters/+/sourceevents, sources/source1/clusters/cluster1/sourceevents
+	// or $share/source-group/sources/+/clusters/+/sourceevents
+	SourceEvents string `json:"sourceEvents" yaml:"sourceEvents"`
+
+	// AgentEvents topic is a topic for agents to publish their resource status update events or spec resync events
+	//   - An agent using this topic to publish the resource status update request or spec resync request with its
+	//     cluster name to a specified source.
+	//   - A source subscribe to this topic with its sourceID to response agents resource status update request or spec
+	//     resync request
+	// The topic format is `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/agentevents$`, e.g.
+	// sources/+/clusters/+/agentevents, sources/source1/clusters/+/agentevents, sources/source1/clusters/cluster1/agentevents
+	// or $share/agent-group/+/clusters/+/agentevents
+	AgentEvents string `json:"agentEvents" yaml:"agentEvents"`
+
+	// SourceBroadcast is an optional topic, it is for a source to publish its events to all agents, currently, we use
+	// this topic to resync resource status from all agents for a source that does not known the exact agents, e.g.
+	//   - A source uses this topic to publish its resource status resync request with its sourceID to all the agents
+	//   - Each agent subscribes to this topic to response sources resource status resync request
+	// The topic format is `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/sourcebroadcast$`, e.g.
+	// sources/+/sourcebroadcast, sources/source1/sourcebroadcast or $share/source-group/sources/+/sourcebroadcast
+	SourceBroadcast string `json:"sourceBroadcast,omitempty" yaml:"sourceBroadcast,omitempty"`
+
+	// AgentBroadcast is an optional topic, it is for a agent to publish its events to all sources, currently, we use
+	// this topic to resync resources from all sources for an agent that does not known the exact sources, e.g.
+	//   - An agent using this topic to publish the spec resync request with its cluster name to all the sources.
+	//   - Each source subscribe to this topic to response agents spec resync request
+	// The topic format is `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/agentbroadcast$`, e.g.
+	// clusters/+/agentbroadcast, clusters/cluster1/agentbroadcast or $share/agent-group/clusters/+/agentbroadcast
+	AgentBroadcast string `json:"agentBroadcast,omitempty" yaml:"agentBroadcast,omitempty"`
 }
 
 // ListOptions is the query options for listing the resource objects from the source/agent.
@@ -103,15 +134,6 @@ type ListOptions struct {
 	// Agent use the source ID to restrict the list of returned objects by their source ID.
 	// Defaults to all sources.
 	Source string
-}
-
-// ResourceMeta represents a resource original meta data on the source
-type ResourceMeta struct {
-	Group     string `json:"group"`
-	Version   string `json:"version"`
-	Resource  string `json:"resource"`
-	Namespace string `json:"namespace"`
-	Name      string `json:"name"`
 }
 
 // CloudEventsDataType uniquely identifies the type of cloud event data.
@@ -237,6 +259,9 @@ func (b *EventBuilder) NewEvent() cloudevents.Event {
 	evt.SetTime(time.Now())
 	evt.SetSource(b.source)
 
+	evt.SetExtension(ExtensionClusterName, b.clusterName)
+	evt.SetExtension(ExtensionOriginalSource, b.originalSource)
+
 	if len(b.resourceID) != 0 {
 		evt.SetExtension(ExtensionResourceID, b.resourceID)
 	}
@@ -247,14 +272,6 @@ func (b *EventBuilder) NewEvent() cloudevents.Event {
 
 	if len(b.sequenceID) != 0 {
 		evt.SetExtension(ExtensionStatusUpdateSequenceID, b.sequenceID)
-	}
-
-	if len(b.clusterName) != 0 {
-		evt.SetExtension(ExtensionClusterName, b.clusterName)
-	}
-
-	if len(b.originalSource) != 0 {
-		evt.SetExtension(ExtensionOriginalSource, b.originalSource)
 	}
 
 	if !b.deletionTimestamp.IsZero() {

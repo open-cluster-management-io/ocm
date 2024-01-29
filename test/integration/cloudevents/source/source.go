@@ -17,6 +17,7 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/watcher"
 )
@@ -72,6 +73,10 @@ func (m *MQTTSource) Start(ctx context.Context) error {
 	// write the mqtt broker config to a file
 	config := mqtt.MQTTConfig{
 		BrokerHost: mqttBrokerHost,
+		Topics: &types.Topics{
+			SourceEvents: fmt.Sprintf("sources/%s/clusters/+/sourceevents", sourceID),
+			AgentEvents:  fmt.Sprintf("sources/%s/clusters/+/agentevents", sourceID),
+		},
 	}
 
 	configData, err := yaml.Marshal(config)
