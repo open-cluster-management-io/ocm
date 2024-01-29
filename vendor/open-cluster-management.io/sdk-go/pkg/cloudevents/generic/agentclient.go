@@ -65,10 +65,10 @@ func NewCloudEventAgentClient[T ResourceObject](
 	}, nil
 }
 
-// Resync the resources spec by sending a spec resync request from an agent to sources with list options.
-func (c *CloudEventAgentClient[T]) Resync(ctx context.Context, listOptions types.ListOptions) error {
-	// list the resource objects that are maintained by the current agent with list options
-	objs, err := c.lister.List(listOptions)
+// Resync the resources spec by sending a spec resync request from the current to the given source.
+func (c *CloudEventAgentClient[T]) Resync(ctx context.Context, source string) error {
+	// list the resource objects that are maintained by the current agent with the given source
+	objs, err := c.lister.List(types.ListOptions{Source: source, ClusterName: c.clusterName})
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,10 @@ func (c *CloudEventAgentClient[T]) Resync(ctx context.Context, listOptions types
 			Action:              types.ResyncRequestAction,
 		}
 
-		evt := types.NewEventBuilder(c.agentID, eventType).WithClusterName(c.clusterName).NewEvent()
+		evt := types.NewEventBuilder(c.agentID, eventType).
+			WithOriginalSource(source).
+			WithClusterName(c.clusterName).
+			NewEvent()
 		if err := evt.SetData(cloudevents.ApplicationJSON, resources); err != nil {
 			return fmt.Errorf("failed to set data to cloud event: %v", err)
 		}

@@ -9,6 +9,7 @@ import (
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	cloudeventscontext "github.com/cloudevents/sdk-go/v2/context"
 	"github.com/eclipse/paho.golang/paho"
+	"k8s.io/klog/v2"
 
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
@@ -42,24 +43,51 @@ func (o *mqttAgentOptions) WithContext(ctx context.Context, evtCtx cloudevents.E
 		return nil, fmt.Errorf("unsupported event type %s, %v", eventType, err)
 	}
 
-	if eventType.Action == types.ResyncRequestAction {
-		// agent publishes event to spec resync topic to request to get resources spec from all sources
-		topic := strings.Replace(o.Topics.SpecResync, "+", o.clusterName, -1)
-		return cloudeventscontext.WithTopic(ctx, topic), nil
-	}
-
-	// agent publishes event to status topic to send the resource status from a specified cluster
 	originalSource, err := evtCtx.GetExtension(types.ExtensionOriginalSource)
 	if err != nil {
 		return nil, err
 	}
 
-	statusTopic := strings.Replace(o.Topics.Status, "+", fmt.Sprintf("%s", originalSource), 1)
-	statusTopic = strings.Replace(statusTopic, "+", o.clusterName, -1)
-	return cloudeventscontext.WithTopic(ctx, statusTopic), nil
+	// agent request to sync resource spec from all sources
+	if eventType.Action == types.ResyncRequestAction && originalSource == types.SourceAll {
+		if len(o.Topics.AgentBroadcast) == 0 {
+			klog.Warningf("the source wild card resync topic not set, fall back to the agent events topic")
+
+			// TODO after supporting multiple sources, we should list each source
+			eventsTopic := replaceLast(o.Topics.AgentEvents, "+", o.clusterName)
+			return cloudeventscontext.WithTopic(ctx, eventsTopic), nil
+		}
+
+		resyncTopic := strings.Replace(o.Topics.AgentBroadcast, "+", o.clusterName, 1)
+		return cloudeventscontext.WithTopic(ctx, resyncTopic), nil
+	}
+
+	topicSource, err := getSourceFromEventsTopic(o.Topics.AgentEvents)
+	if err != nil {
+		return nil, err
+	}
+
+	// agent publishes status events or spec resync events
+	eventsTopic := replaceLast(o.Topics.AgentEvents, "+", o.clusterName)
+	eventsTopic = replaceLast(eventsTopic, "+", topicSource)
+	return cloudeventscontext.WithTopic(ctx, eventsTopic), nil
 }
 
 func (o *mqttAgentOptions) Client(ctx context.Context) (cloudevents.Client, error) {
+	subscribe := &paho.Subscribe{
+		Subscriptions: map[string]paho.SubscribeOptions{
+			// TODO support multiple sources, currently the client require the source events topic has a sourceID, in
+			// the future, client may need a source list, it will subscribe to each source
+			// receiving the sources events
+			replaceLast(o.Topics.SourceEvents, "+", o.clusterName): {QoS: byte(o.SubQoS)},
+		},
+	}
+
+	if len(o.Topics.SourceBroadcast) != 0 {
+		// receiving status resync events from all sources
+		subscribe.Subscriptions[o.Topics.SourceBroadcast] = paho.SubscribeOptions{QoS: byte(o.SubQoS)}
+	}
+
 	receiver, err := o.GetCloudEventsClient(
 		ctx,
 		fmt.Sprintf("%s-client", o.agentID),
@@ -67,16 +95,7 @@ func (o *mqttAgentOptions) Client(ctx context.Context) (cloudevents.Client, erro
 			o.errorChan <- err
 		},
 		cloudeventsmqtt.WithPublish(&paho.Publish{QoS: byte(o.PubQoS)}),
-		cloudeventsmqtt.WithSubscribe(
-			&paho.Subscribe{
-				Subscriptions: map[string]paho.SubscribeOptions{
-					// receiving the resources spec from sources with spec topic
-					replaceNth(o.Topics.Spec, "+", o.clusterName, 2): {QoS: byte(o.SubQoS)},
-					// receiving the resources status resync request from sources with status resync topic
-					o.Topics.StatusResync: {QoS: byte(o.SubQoS)},
-				},
-			},
-		),
+		cloudeventsmqtt.WithSubscribe(subscribe),
 	)
 	if err != nil {
 		return nil, err

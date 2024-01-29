@@ -7,28 +7,17 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"strings"
+	"time"
 
 	cloudeventsmqtt "github.com/cloudevents/sdk-go/protocol/mqtt_paho/v2"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/eclipse/paho.golang/packets"
 	"github.com/eclipse/paho.golang/paho"
 	"gopkg.in/yaml.v2"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
-)
-
-const (
-	// defaultSpecTopic is a default MQTT topic for resource spec.
-	defaultSpecTopic = "sources/+/clusters/+/spec"
-
-	// defaultStatusTopic is a default MQTT topic for resource status.
-	defaultStatusTopic = "sources/+/clusters/+/status"
-
-	// defaultSpecResyncTopic is a default MQTT topic for resource spec resync.
-	defaultSpecResyncTopic = "sources/clusters/+/specresync"
-
-	// defaultStatusResyncTopic is a default MQTT topic for resource status resync.
-	defaultStatusResyncTopic = "sources/+/clusters/statusresync"
 )
 
 // MQTTOptions holds the options that are used to build MQTT client.
@@ -41,6 +30,7 @@ type MQTTOptions struct {
 	ClientCertFile string
 	ClientKeyFile  string
 	KeepAlive      uint16
+	Timeout        time.Duration
 	PubQoS         int
 	SubQoS         int
 }
@@ -74,20 +64,6 @@ type MQTTConfig struct {
 	Topics *types.Topics `json:"topics,omitempty" yaml:"topics,omitempty"`
 }
 
-func NewMQTTOptions() *MQTTOptions {
-	return &MQTTOptions{
-		Topics: types.Topics{
-			Spec:         defaultSpecTopic,
-			Status:       defaultStatusTopic,
-			SpecResync:   defaultSpecResyncTopic,
-			StatusResync: defaultStatusResyncTopic,
-		},
-		KeepAlive: 60,
-		PubQoS:    1,
-		SubQoS:    1,
-	}
-}
-
 // BuildMQTTOptionsFromFlags builds configs from a config filepath.
 func BuildMQTTOptionsFromFlags(configPath string) (*MQTTOptions, error) {
 	configData, err := os.ReadFile(configPath)
@@ -112,9 +88,8 @@ func BuildMQTTOptionsFromFlags(configPath string) (*MQTTOptions, error) {
 		return nil, fmt.Errorf("setting clientCertFile and clientKeyFile requires caFile")
 	}
 
-	if config.Topics != nil && (config.Topics.Spec == "" || config.Topics.Status == "" ||
-		config.Topics.SpecResync == "" || config.Topics.StatusResync == "") {
-		return nil, fmt.Errorf("topics must be set")
+	if err := validateTopics(config.Topics); err != nil {
+		return nil, err
 	}
 
 	options := &MQTTOptions{
@@ -127,16 +102,14 @@ func BuildMQTTOptionsFromFlags(configPath string) (*MQTTOptions, error) {
 		KeepAlive:      60,
 		PubQoS:         1,
 		SubQoS:         1,
-		Topics: types.Topics{
-			Spec:         defaultSpecTopic,
-			Status:       defaultStatusTopic,
-			SpecResync:   defaultSpecResyncTopic,
-			StatusResync: defaultStatusResyncTopic,
-		},
+		Timeout:        180 * time.Second,
+		Topics:         *config.Topics,
 	}
 
 	if config.KeepAlive != nil {
 		options.KeepAlive = *config.KeepAlive
+		// Setting the mqtt tcp connection read and write timeouts to three times the mqtt keepalive
+		options.Timeout = 3 * time.Duration(*config.KeepAlive) * time.Second
 	}
 
 	if config.PubQoS != nil {
@@ -145,10 +118,6 @@ func BuildMQTTOptionsFromFlags(configPath string) (*MQTTOptions, error) {
 
 	if config.SubQoS != nil {
 		options.SubQoS = *config.SubQoS
-	}
-
-	if config.Topics != nil {
-		options.Topics = *config.Topics
 	}
 
 	return options, nil
@@ -226,6 +195,10 @@ func (o *MQTTOptions) GetCloudEventsClient(
 	if err != nil {
 		return nil, err
 	}
+	err = netConn.SetDeadline(time.Now().Add(o.Timeout))
+	if err != nil {
+		return nil, err
+	}
 
 	config := &paho.ClientConfig{
 		ClientID:      clientID,
@@ -243,19 +216,53 @@ func (o *MQTTOptions) GetCloudEventsClient(
 	return cloudevents.NewClient(protocol)
 }
 
-// Replace the nth occurrence of old in str by new.
-func replaceNth(str, old, new string, n int) string {
-	i := 0
-	for m := 1; m <= n; m++ {
-		x := strings.Index(str[i:], old)
-		if x < 0 {
-			break
-		}
-		i += x
-		if m == n {
-			return str[:i] + new + str[i+len(old):]
-		}
-		i += len(old)
+func validateTopics(topics *types.Topics) error {
+	if topics == nil {
+		return fmt.Errorf("the topics must be set")
 	}
-	return str
+
+	var errs []error
+	if !regexp.MustCompile(types.SourceEventsTopicPattern).MatchString(topics.SourceEvents) {
+		errs = append(errs, fmt.Errorf("invalid source events topic %q, it should match `%s`",
+			topics.SourceEvents, types.SourceEventsTopicPattern))
+	}
+
+	if !regexp.MustCompile(types.AgentEventsTopicPattern).MatchString(topics.AgentEvents) {
+		errs = append(errs, fmt.Errorf("invalid agent events topic %q, it should match `%s`",
+			topics.AgentEvents, types.AgentEventsTopicPattern))
+	}
+
+	if len(topics.SourceBroadcast) != 0 {
+		if !regexp.MustCompile(types.SourceBroadcastTopicPattern).MatchString(topics.SourceBroadcast) {
+			errs = append(errs, fmt.Errorf("invalid source broadcast topic %q, it should match `%s`",
+				topics.SourceBroadcast, types.SourceBroadcastTopicPattern))
+		}
+	}
+
+	if len(topics.AgentBroadcast) != 0 {
+		if !regexp.MustCompile(types.AgentBroadcastTopicPattern).MatchString(topics.AgentBroadcast) {
+			errs = append(errs, fmt.Errorf("invalid agent broadcast topic %q, it should match `%s`",
+				topics.AgentBroadcast, types.AgentBroadcastTopicPattern))
+		}
+	}
+
+	return errors.NewAggregate(errs)
+}
+
+func getSourceFromEventsTopic(topic string) (string, error) {
+	subTopics := strings.Split(topic, "/")
+
+	if len(subTopics) != 5 {
+		return "", fmt.Errorf("bad format for topic %q", topic)
+	}
+
+	return subTopics[1], nil
+}
+
+func replaceLast(str, old, new string) string {
+	last := strings.LastIndex(str, old)
+	if last == -1 {
+		return str
+	}
+	return str[:last] + new + str[last+len(old):]
 }

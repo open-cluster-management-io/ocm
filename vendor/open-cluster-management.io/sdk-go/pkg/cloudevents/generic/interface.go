@@ -54,7 +54,12 @@ type Codec[T ResourceObject] interface {
 
 type CloudEventsClient[T ResourceObject] interface {
 	// Resync the resources of one source/agent by sending resync request.
-	Resync(ctx context.Context, listOptions types.ListOptions) error
+	// The second parameter is used to specify cluster name/source ID for a source/agent.
+	//   - A source sends the resource status resync request to a cluster with the given cluster name.
+	//     If setting this parameter to `types.ClusterAll`, the source will broadcast the resync request to all clusters.
+	//   - An agent sends the resources spec resync request to a source with the given source ID.
+	//     If setting this parameter to `types.SourceAll`, the agent will broadcast the resync request to all sources.
+	Resync(context.Context, string) error
 
 	// Publish the resources spec/status event to the broker.
 	Publish(ctx context.Context, eventType types.CloudEventsType, obj T) error
