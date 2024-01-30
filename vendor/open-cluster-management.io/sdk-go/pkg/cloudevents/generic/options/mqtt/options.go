@@ -250,12 +250,17 @@ func validateTopics(topics *types.Topics) error {
 }
 
 func getSourceFromEventsTopic(topic string) (string, error) {
-	subTopics := strings.Split(topic, "/")
-
-	if len(subTopics) != 5 {
-		return "", fmt.Errorf("bad format for topic %q", topic)
+	if !regexp.MustCompile(types.EventsTopicPattern).MatchString(topic) {
+		return "", fmt.Errorf("failed to get source from topic: %q", topic)
 	}
 
+	subTopics := strings.Split(topic, "/")
+	// get source form share topic, e.g. $share/group/sources/+/consumers/+/agentevents
+	if strings.HasPrefix(topic, "$share") {
+		return subTopics[3], nil
+	}
+
+	// get source form topic, e.g. sources/+/consumers/+/agentevents
 	return subTopics[1], nil
 }
 

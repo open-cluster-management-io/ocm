@@ -80,6 +80,7 @@ const (
 )
 
 const (
+	EventsTopicPattern          = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/(sourceevents|agentevents)$`
 	SourceEventsTopicPattern    = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/sourceevents$`
 	AgentEventsTopicPattern     = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/([a-z]+)/([a-z0-9-]+|\+)/agentevents$`
 	SourceBroadcastTopicPattern = `^(\$share/[a-z0-9-]+/)?([a-z]+)/([a-z0-9-]+|\+)/sourcebroadcast$`
