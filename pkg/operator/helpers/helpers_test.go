@@ -543,6 +543,75 @@ func TestDeterminReplica(t *testing.T) {
 	}
 }
 
+func TestAgentPriorityClassName(t *testing.T) {
+	kubeVersionV113, _ := version.ParseGeneric("v1.13.0")
+	kubeVersionV114, _ := version.ParseGeneric("v1.14.0")
+	kubeVersionV122, _ := version.ParseGeneric("v1.22.5+5c84e52")
+
+	cases := []struct {
+		name                      string
+		klusterlet                *operatorapiv1.Klusterlet
+		kubeVersion               *version.Version
+		expectedPriorityClassName string
+	}{
+		{
+			name:        "klusterlet is nil",
+			kubeVersion: kubeVersionV114,
+		},
+		{
+			name: "kubeVersion is nil",
+			klusterlet: &operatorapiv1.Klusterlet{
+				Spec: operatorapiv1.KlusterletSpec{
+					PriorityClassName: "test",
+				},
+			},
+		},
+		{
+			name:        "klusterlet without PriorityClass",
+			kubeVersion: kubeVersionV114,
+			klusterlet:  &operatorapiv1.Klusterlet{},
+		},
+		{
+			name:        "kube v1.13",
+			kubeVersion: kubeVersionV113,
+			klusterlet: &operatorapiv1.Klusterlet{
+				Spec: operatorapiv1.KlusterletSpec{
+					PriorityClassName: "test",
+				},
+			},
+		},
+		{
+			name:        "kube v1.14",
+			kubeVersion: kubeVersionV114,
+			klusterlet: &operatorapiv1.Klusterlet{
+				Spec: operatorapiv1.KlusterletSpec{
+					PriorityClassName: "test",
+				},
+			},
+			expectedPriorityClassName: "test",
+		},
+		{
+			name: "kube v1.22.5+5c84e52",
+			klusterlet: &operatorapiv1.Klusterlet{
+				Spec: operatorapiv1.KlusterletSpec{
+					PriorityClassName: "test",
+				},
+			},
+			kubeVersion:               kubeVersionV122,
+			expectedPriorityClassName: "test",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			priorityClassName := AgentPriorityClassName(c.klusterlet, c.kubeVersion)
+			if priorityClassName != c.expectedPriorityClassName {
+				t.Errorf("Unexpected priorityClassName, actual: %s, expected: %s", priorityClassName, c.expectedPriorityClassName)
+			}
+		})
+	}
+}
+
 func newNode(name string) *corev1.Node {
 	return &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{

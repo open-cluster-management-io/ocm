@@ -628,6 +628,23 @@ func ResourceRequirements(resourceRequirementAcquirer operatorapiv1.ResourceRequ
 	return marshal, nil
 }
 
+// AgentPriorityClassName return the name of the PriorityClass that should be used for the klusterlet agents
+func AgentPriorityClassName(klusterlet *operatorapiv1.Klusterlet, kubeVersion *version.Version) string {
+	if kubeVersion == nil || klusterlet == nil {
+		return ""
+	}
+
+	// priorityclass.scheduling.k8s.io/v1 is supported since v1.14.
+	if cnt, err := kubeVersion.Compare("v1.14.0"); err != nil {
+		klog.Warningf("Ignore PriorityClass because it's failed to check whether the cluster supports PriorityClass/v1 or not: %v", err)
+		return ""
+	} else if cnt == -1 {
+		return ""
+	}
+
+	return klusterlet.Spec.PriorityClassName
+}
+
 // SyncSecret forked from:
 // https://github.com/openshift/library-go/blob/d9cdfbd844ea08465b938c46a16bed2ea23207e4/pkg/operator/resource/resourceapply/core.go#L357,
 // add an addition targetClient parameter to support sync secret to another cluster.

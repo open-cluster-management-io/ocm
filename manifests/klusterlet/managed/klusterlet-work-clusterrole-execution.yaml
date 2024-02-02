@@ -33,3 +33,7 @@ rules:
 - apiGroups: ["oauth.openshift.io"]
   resources: ["oauthclients"]
   verbs: ["get", "list", "watch", "create", "patch","update", "delete"]
+# Allow agent to get/list/watch/create/patch/update/delete priorityclass.
+- apiGroups: ["scheduling.k8s.io"]
+  resources: ["priorityclasses"]
+  verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]

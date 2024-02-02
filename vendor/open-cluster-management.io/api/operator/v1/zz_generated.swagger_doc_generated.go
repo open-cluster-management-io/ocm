@@ -215,6 +215,7 @@ var map_KlusterletSpec = map[string]string{
 	"workConfiguration":         "WorkConfiguration contains the configuration of work",
 	"hubApiServerHostAlias":     "HubApiServerHostAlias contains the host alias for hub api server. registration-agent and work-agent will use it to communicate with hub api server.",
 	"resourceRequirement":       "ResourceRequirement specify QoS classes of deployments managed by klusterlet. It applies to all the containers in the deployments.",
+	"priorityClassName":         "PriorityClassName is the name of the PriorityClass that will be used by the deployed klusterlet agent. It will be ignored when the PriorityClass/v1 API is not available on the managed cluster.",
 }
 
 func (KlusterletSpec) SwaggerDoc() map[string]string {

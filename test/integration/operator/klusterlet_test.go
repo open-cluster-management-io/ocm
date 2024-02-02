@@ -319,6 +319,44 @@ var _ = ginkgo.Describe("Klusterlet", func() {
 			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 		})
 
+		ginkgo.It("Deployment should have priorityclass configurated when setting priorityclass in klusterlet", func() {
+			priorityClassName := "test-priority-class"
+			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// Check deployment without priorityclass
+			gomega.Eventually(func() bool {
+				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				if len(deployment.Spec.Template.Spec.PriorityClassName) != 0 {
+					return false
+				}
+				return true
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+
+			gomega.Eventually(func() error {
+				KlusterletObj, err := operatorClient.OperatorV1().Klusterlets().Get(context.Background(), klusterlet.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				KlusterletObj.Spec.PriorityClassName = priorityClassName
+				_, err = operatorClient.OperatorV1().Klusterlets().Update(context.Background(), KlusterletObj, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeNil())
+
+			// Check deployment with priorityclass
+			gomega.Eventually(func() bool {
+				deployment, err := kubeClient.AppsV1().Deployments(klusterletNamespace).Get(context.Background(), registrationDeploymentName, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				return deployment.Spec.Template.Spec.PriorityClassName == priorityClassName
+			}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		})
+
 		ginkgo.It("should have correct registration deployment when server url is empty", func() {
 			klusterlet.Spec.ExternalServerURLs = []operatorapiv1.ServerURL{}
 			_, err := operatorClient.OperatorV1().Klusterlets().Create(context.Background(), klusterlet, metav1.CreateOptions{})
