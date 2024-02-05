@@ -53,6 +53,7 @@ type AgentAddonOptions struct {
 	// Addon will not be installed automatically until a ManagedClusterAddon is applied to the cluster's
 	// namespace if InstallStrategy is nil.
 	// Deprecated: use installStrategy config in ClusterManagementAddOn API instead
+	// The migration plan refer to https://github.com/open-cluster-management-io/ocm/issues/355.
 	// +optional
 	InstallStrategy *InstallStrategy
 
