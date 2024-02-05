@@ -4,8 +4,7 @@ import (
 	"testing"
 	"time"
 
-	testingcommon "open-cluster-management.io/sdk-go/pkg/testing"
-
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 

@@ -1487,8 +1487,8 @@ k8s.io/utils/pointer
 k8s.io/utils/ptr
 k8s.io/utils/strings/slices
 k8s.io/utils/trace
-# open-cluster-management.io/addon-framework v0.8.1-0.20240119025526-d2afcef1ff66
-## explicit; go 1.20
+# open-cluster-management.io/addon-framework v0.8.1-0.20240205013730-13fbb6259464
+## explicit; go 1.21
 open-cluster-management.io/addon-framework/pkg/addonfactory
 open-cluster-management.io/addon-framework/pkg/addonmanager
 open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting
@@ -1497,6 +1497,7 @@ open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addoncon
 open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addoninstall
 open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/agentdeploy
 open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/certificate
+open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/managementaddon
 open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/managementaddonconfig
 open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/registration
 open-cluster-management.io/addon-framework/pkg/agent
@@ -1507,7 +1508,7 @@ open-cluster-management.io/addon-framework/pkg/index
 open-cluster-management.io/addon-framework/pkg/manager/controllers/addonconfiguration
 open-cluster-management.io/addon-framework/pkg/manager/controllers/addonowner
 open-cluster-management.io/addon-framework/pkg/utils
-# open-cluster-management.io/api v0.12.1-0.20240115071352-3d94ce8f3499
+# open-cluster-management.io/api v0.12.1-0.20240122084346-e7bd1bd9ea6a
 ## explicit; go 1.20
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/client/addon/clientset/versioned
@@ -1575,18 +1576,17 @@ open-cluster-management.io/api/feature
 open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/utils/work/v1/utils
 open-cluster-management.io/api/utils/work/v1/workapplier
-open-cluster-management.io/api/utils/work/v1/workbuilder
 open-cluster-management.io/api/utils/work/v1/workvalidator
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v0.0.0-20240118073603-6da392d39be0
+# open-cluster-management.io/sdk-go v0.0.0-20240130025514-7385f9baadf0
 ## explicit; go 1.21
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1alpha1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta1
 open-cluster-management.io/sdk-go/pkg/apis/cluster/v1beta2
 open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier
+open-cluster-management.io/sdk-go/pkg/apis/work/v1/builder
 open-cluster-management.io/sdk-go/pkg/apis/work/v1/validator
-open-cluster-management.io/sdk-go/pkg/apply
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt
@@ -1601,7 +1601,6 @@ open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/utils
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/watcher
 open-cluster-management.io/sdk-go/pkg/patcher
-open-cluster-management.io/sdk-go/pkg/testing
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.28.0
 ## explicit; go 1.20
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client

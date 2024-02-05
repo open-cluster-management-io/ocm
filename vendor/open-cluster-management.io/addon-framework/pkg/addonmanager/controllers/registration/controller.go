@@ -2,16 +2,12 @@ package registration
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
-	jsonpatch "github.com/evanphx/json-patch"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -20,6 +16,7 @@ import (
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
@@ -112,6 +109,11 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 	}
 	managedClusterAddonCopy.Status.SupportedConfigs = supportedConfigs
 
+	addonPatcher := patcher.NewPatcher[
+		*addonapiv1alpha1.ManagedClusterAddOn,
+		addonapiv1alpha1.ManagedClusterAddOnSpec,
+		addonapiv1alpha1.ManagedClusterAddOnStatus](c.addonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName))
+
 	registrationOption := agentAddon.GetAgentAddonOptions().Registration
 	if registrationOption == nil {
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
@@ -120,7 +122,8 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 			Reason:  addonapiv1alpha1.RegistrationAppliedNilRegistration,
 			Message: "Registration of the addon agent is configured",
 		})
-		return c.patchAddonStatus(ctx, managedClusterAddonCopy, managedClusterAddon)
+		_, err = addonPatcher.PatchStatus(ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status)
+		return err
 	}
 
 	if registrationOption.PermissionConfig != nil {
@@ -132,7 +135,8 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 				Reason:  addonapiv1alpha1.RegistrationAppliedSetPermissionFailed,
 				Message: fmt.Sprintf("Failed to set permission for hub agent: %v", err),
 			})
-			if patchErr := c.patchAddonStatus(ctx, managedClusterAddonCopy, managedClusterAddon); patchErr != nil {
+			if _, patchErr := addonPatcher.PatchStatus(
+				ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status); patchErr != nil {
 				return patchErr
 			}
 			return err
@@ -146,7 +150,8 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 			Reason:  addonapiv1alpha1.RegistrationAppliedNilRegistration,
 			Message: "Registration of the addon agent is configured",
 		})
-		return c.patchAddonStatus(ctx, managedClusterAddonCopy, managedClusterAddon)
+		_, err = addonPatcher.PatchStatus(ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status)
+		return err
 	}
 	configs := registrationOption.CSRConfigurations(managedCluster)
 
@@ -174,52 +179,7 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 		Message: "Registration of the addon agent is configured",
 	})
 
-	return c.patchAddonStatus(ctx, managedClusterAddonCopy, managedClusterAddon)
-}
+	_, err = addonPatcher.PatchStatus(ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status)
 
-func (c *addonRegistrationController) patchAddonStatus(ctx context.Context, new, old *addonapiv1alpha1.ManagedClusterAddOn) error {
-	if equality.Semantic.DeepEqual(new.Status.Registrations, old.Status.Registrations) &&
-		equality.Semantic.DeepEqual(new.Status.Conditions, old.Status.Conditions) &&
-		equality.Semantic.DeepEqual(new.Status.SupportedConfigs, old.Status.SupportedConfigs) &&
-		new.Status.Namespace == old.Status.Namespace {
-		return nil
-	}
-
-	oldData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
-		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-			Registrations:    old.Status.Registrations,
-			Namespace:        old.Status.Namespace,
-			SupportedConfigs: old.Status.SupportedConfigs,
-			Conditions:       old.Status.Conditions,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	newData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:             new.UID,
-			ResourceVersion: new.ResourceVersion,
-		},
-		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-			Registrations:    new.Status.Registrations,
-			Namespace:        new.Status.Namespace,
-			SupportedConfigs: new.Status.SupportedConfigs,
-			Conditions:       new.Status.Conditions,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
-	if err != nil {
-		return fmt.Errorf("failed to create patch for addon %s: %w", new.Name, err)
-	}
-
-	klog.V(2).Infof("Patching addon %s/%s status with %s", new.Namespace, new.Name, string(patchBytes))
-	_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Patch(
-		ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	return err
 }

@@ -113,12 +113,19 @@ spec:
             scheme: HTTPS
             port: 8443
           initialDelaySeconds: 2
-        {{if ne .ResourceRequirement "BestEffort"}}
+        {{- if or (eq .ResourceRequirementResourceType "Default") (eq .ResourceRequirementResourceType "") }}
         resources:
           requests:
             cpu: 2m
             memory: 16Mi
-        {{end}}
+        {{- end }}
+        {{- if eq .ResourceRequirementResourceType "BestEffort" }}
+        resources: {}
+        {{- end }}
+        {{- if eq .ResourceRequirementResourceType "ResourceRequirement" }}
+        resources:
+          {{ .ResourceRequirements | indent 10 }}
+        {{- end }}
       volumes:
       - name: hub-kubeconfig-secret
         secret:

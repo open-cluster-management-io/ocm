@@ -64,10 +64,10 @@ func NewCloudEventSourceClient[T ResourceObject](
 	}, nil
 }
 
-// Resync the resources status by sending a status resync request from a source to clusters with list options.
-func (c *CloudEventSourceClient[T]) Resync(ctx context.Context, listOptions types.ListOptions) error {
-	// list the resource objects that are maintained by the current source with list options
-	objs, err := c.lister.List(listOptions)
+// Resync the resources status by sending a status resync request from the current source to a specified cluster.
+func (c *CloudEventSourceClient[T]) Resync(ctx context.Context, clusterName string) error {
+	// list the resource objects that are maintained by the current source with a specified cluster
+	objs, err := c.lister.List(types.ListOptions{Source: c.sourceID, ClusterName: clusterName})
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func (c *CloudEventSourceClient[T]) Resync(ctx context.Context, listOptions type
 			Action:              types.ResyncRequestAction,
 		}
 
-		evt := types.NewEventBuilder(c.sourceID, eventType).NewEvent()
+		evt := types.NewEventBuilder(c.sourceID, eventType).WithClusterName(clusterName).NewEvent()
 		if err := evt.SetData(cloudevents.ApplicationJSON, hashes); err != nil {
 			return fmt.Errorf("failed to set data to cloud event: %v", err)
 		}

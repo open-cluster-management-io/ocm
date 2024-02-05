@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
      - 'pkg/work/spoke/*.go'
+     - 'test/integration/cloudevents/**'
     branches:
       - main
       - release-*

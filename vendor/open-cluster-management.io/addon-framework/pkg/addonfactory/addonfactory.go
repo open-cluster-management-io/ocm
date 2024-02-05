@@ -81,6 +81,7 @@ func (f *AgentAddonFactory) WithGetValuesFuncs(getValuesFuncs ...GetValuesFunc) 
 // WithInstallStrategy defines the installation strategy of the manifests prescribed by Manifests(..).
 // Deprecated: add annotation "addon.open-cluster-management.io/lifecycle: addon-manager" to ClusterManagementAddon
 // and define install strategy in ClusterManagementAddon spec.installStrategy instead.
+// The migration plan refer to https://github.com/open-cluster-management-io/ocm/issues/355.
 func (f *AgentAddonFactory) WithInstallStrategy(strategy *agent.InstallStrategy) *AgentAddonFactory {
 	if strategy.InstallNamespace == "" {
 		strategy.InstallNamespace = AddonDefaultInstallNamespace

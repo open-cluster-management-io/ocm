@@ -192,7 +192,7 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 		Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
 		Status:  metav1.ConditionTrue,
 		Reason:  addonapiv1alpha1.AddonAvailableReasonProbeAvailable,
-		Message: "Addon is available",
+		Message: fmt.Sprintf("%s add-on is available.", addon.Name),
 	})
 	return nil
 }

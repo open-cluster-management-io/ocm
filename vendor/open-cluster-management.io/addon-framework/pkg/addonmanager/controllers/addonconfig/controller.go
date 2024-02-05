@@ -2,31 +2,25 @@ package addonconfig
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
-	jsonpatch "github.com/evanphx/json-patch"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/dynamic/dynamiclister"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2"
+	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
+	"open-cluster-management.io/addon-framework/pkg/index"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
-
-	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
-	"open-cluster-management.io/addon-framework/pkg/index"
-	"open-cluster-management.io/addon-framework/pkg/utils"
+	"open-cluster-management.io/sdk-go/pkg/patcher"
 )
 
 const (
@@ -166,7 +160,13 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return err
 	}
 
-	return c.patchConfigReferences(ctx, addon, addonCopy)
+	addonPatcher := patcher.NewPatcher[
+		*addonapiv1alpha1.ManagedClusterAddOn,
+		addonapiv1alpha1.ManagedClusterAddOnSpec,
+		addonapiv1alpha1.ManagedClusterAddOnStatus](c.addonClient.AddonV1alpha1().ManagedClusterAddOns(addonNamespace))
+
+	_, err = addonPatcher.PatchStatus(ctx, addonCopy, addonCopy.Status, addon.Status)
+	return err
 }
 
 func (c *addonConfigController) updateConfigSpecHashAndGenerations(addon *addonapiv1alpha1.ManagedClusterAddOn) error {
@@ -229,48 +229,4 @@ func (c *addonConfigController) updateConfigSpecHashAndGenerations(addon *addona
 	}
 
 	return nil
-}
-
-func (c *addonConfigController) patchConfigReferences(ctx context.Context, old, new *addonapiv1alpha1.ManagedClusterAddOn) error {
-	if equality.Semantic.DeepEqual(new.Status.ConfigReferences, old.Status.ConfigReferences) {
-		return nil
-	}
-
-	oldData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
-		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-			ConfigReferences: old.Status.ConfigReferences,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	newData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:             new.UID,
-			ResourceVersion: new.ResourceVersion,
-		},
-		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-			ConfigReferences: new.Status.ConfigReferences,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
-	if err != nil {
-		return fmt.Errorf("failed to create patch for addon %s: %w", new.Name, err)
-	}
-
-	klog.V(4).Infof("Patching addon %s/%s config reference with %s", new.Namespace, new.Name, string(patchBytes))
-	_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Patch(
-		ctx,
-		new.Name,
-		types.MergePatchType,
-		patchBytes,
-		metav1.PatchOptions{},
-		"status",
-	)
-	return err
 }

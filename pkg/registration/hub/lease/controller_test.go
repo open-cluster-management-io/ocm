@@ -18,8 +18,8 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	v1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
-	testingcommon "open-cluster-management.io/sdk-go/pkg/testing"
 
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/registration/helpers/testing"
 )
 

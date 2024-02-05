@@ -13,8 +13,8 @@ import (
 
 	clusterfake "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterapiv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
-	testingcommon "open-cluster-management.io/sdk-go/pkg/testing"
 
+	testingcommon "open-cluster-management.io/ocm/pkg/common/testing"
 	testinghelpers "open-cluster-management.io/ocm/pkg/placement/helpers/testing"
 )
 

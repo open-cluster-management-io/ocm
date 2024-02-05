@@ -2,27 +2,22 @@ package managementaddonconfig
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
-	jsonpatch "github.com/evanphx/json-patch"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/dynamic/dynamiclister"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	"open-cluster-management.io/addon-framework/pkg/index"
@@ -44,6 +39,9 @@ type clusterManagementAddonConfigController struct {
 	queue                         workqueue.RateLimitingInterface
 	addonFilterFunc               factory.EventFilterFunc
 	configGVRs                    map[schema.GroupVersionResource]bool
+	addonPatcher                  patcher.Patcher[*addonapiv1alpha1.ClusterManagementAddOn,
+		addonapiv1alpha1.ClusterManagementAddOnSpec,
+		addonapiv1alpha1.ClusterManagementAddOnStatus]
 }
 
 func NewManagementAddonConfigController(
@@ -63,6 +61,9 @@ func NewManagementAddonConfigController(
 		queue:                         syncCtx.Queue(),
 		addonFilterFunc:               addonFilterFunc,
 		configGVRs:                    configGVRs,
+		addonPatcher: patcher.NewPatcher[*addonapiv1alpha1.ClusterManagementAddOn,
+			addonapiv1alpha1.ClusterManagementAddOnSpec,
+			addonapiv1alpha1.ClusterManagementAddOnStatus](addonClient.AddonV1alpha1().ClusterManagementAddOns()),
 	}
 
 	configInformers := c.buildConfigInformers(configInformerFactory, configGVRs)
@@ -153,7 +154,8 @@ func (c *clusterManagementAddonConfigController) sync(ctx context.Context, syncC
 		return err
 	}
 
-	return c.patchConfigReferences(ctx, cma, cmaCopy)
+	_, err = c.addonPatcher.PatchStatus(ctx, cmaCopy, cmaCopy.Status, cma.Status)
+	return err
 }
 
 func (c *clusterManagementAddonConfigController) updateConfigSpecHash(cma *addonapiv1alpha1.ClusterManagementAddOn) error {
@@ -199,53 +201,6 @@ func (c *clusterManagementAddonConfigController) updateConfigSpecHash(cma *addon
 	}
 
 	return nil
-}
-
-func (c *clusterManagementAddonConfigController) patchConfigReferences(ctx context.Context, old, new *addonapiv1alpha1.ClusterManagementAddOn) error {
-	if equality.Semantic.DeepEqual(new.Status.DefaultConfigReferences, old.Status.DefaultConfigReferences) &&
-		equality.Semantic.DeepEqual(new.Status.InstallProgressions, old.Status.InstallProgressions) {
-		return nil
-	}
-
-	oldData, err := json.Marshal(&addonapiv1alpha1.ClusterManagementAddOn{
-		Status: addonapiv1alpha1.ClusterManagementAddOnStatus{
-			DefaultConfigReferences: old.Status.DefaultConfigReferences,
-			InstallProgressions:     old.Status.InstallProgressions,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	newData, err := json.Marshal(&addonapiv1alpha1.ClusterManagementAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:             new.UID,
-			ResourceVersion: new.ResourceVersion,
-		},
-		Status: addonapiv1alpha1.ClusterManagementAddOnStatus{
-			DefaultConfigReferences: new.Status.DefaultConfigReferences,
-			InstallProgressions:     new.Status.InstallProgressions,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
-	if err != nil {
-		return fmt.Errorf("failed to create patch for addon %s: %w", new.Name, err)
-	}
-
-	klog.V(4).Infof("Patching addon %s/%s config reference with %s", new.Namespace, new.Name, string(patchBytes))
-	_, err = c.addonClient.AddonV1alpha1().ClusterManagementAddOns().Patch(
-		ctx,
-		new.Name,
-		types.MergePatchType,
-		patchBytes,
-		metav1.PatchOptions{},
-		"status",
-	)
-	return err
 }
 
 func (c *clusterManagementAddonConfigController) getConfigSpecHash(gr addonapiv1alpha1.ConfigGroupResource,

@@ -1,4 +1,4 @@
-package workbuilder
+package builder
 
 import (
 	"context"

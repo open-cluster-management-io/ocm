@@ -153,7 +153,10 @@ type klusterletConfig struct {
 	HubApiServerHostAlias *operatorapiv1.HubApiServerHostAlias
 
 	//  is useful for the testing cluster with limited resources or enabled resource quota.
-	ResourceRequirement operatorapiv1.ResourceQosClass
+	ResourceRequirementResourceType operatorapiv1.ResourceQosClass
+	// ResourceRequirements is the resource requirements for the klusterlet managed containers.
+	// The type has to be []byte to use "indent" template function.
+	ResourceRequirements []byte
 }
 
 func (n *klusterletController) sync(ctx context.Context, controllerContext factory.SyncContext) error {
@@ -168,6 +171,12 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		return err
 	}
 	klusterlet := originalKlusterlet.DeepCopy()
+
+	resourceRequirements, err := helpers.ResourceRequirements(klusterlet)
+	if err != nil {
+		klog.Errorf("Failed to parse resource requirements for klusterlet %s: %v", klusterlet.Name, err)
+		return err
+	}
 
 	config := klusterletConfig{
 		KlusterletName:            klusterlet.Name,
@@ -191,9 +200,10 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		InstallMode:                                 klusterlet.Spec.DeployOption.Mode,
 		HubApiServerHostAlias:                       klusterlet.Spec.HubApiServerHostAlias,
 
-		RegistrationServiceAccount: serviceAccountName("registration-sa", klusterlet),
-		WorkServiceAccount:         serviceAccountName("work-sa", klusterlet),
-		ResourceRequirement:        helpers.ResourceType(klusterlet),
+		RegistrationServiceAccount:      serviceAccountName("registration-sa", klusterlet),
+		WorkServiceAccount:              serviceAccountName("work-sa", klusterlet),
+		ResourceRequirementResourceType: helpers.ResourceType(klusterlet),
+		ResourceRequirements:            resourceRequirements,
 	}
 
 	managedClusterClients, err := n.managedClusterClientsBuilder.
