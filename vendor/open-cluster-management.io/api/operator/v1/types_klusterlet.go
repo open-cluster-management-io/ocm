@@ -93,6 +93,12 @@ type KlusterletSpec struct {
 	// It applies to all the containers in the deployments.
 	// +optional
 	ResourceRequirement *ResourceRequirement `json:"resourceRequirement,omitempty"`
+
+	// PriorityClassName is the name of the PriorityClass that will be used by the
+	// deployed klusterlet agent. It will be ignored when the PriorityClass/v1 API
+	// is not available on the managed cluster.
+	// +optional
+	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 // ServerURL represents the apiserver url and ca bundle that is accessible externally

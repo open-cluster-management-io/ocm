@@ -147,6 +147,9 @@ type klusterletConfig struct {
 	ExternalManagedKubeConfigAgentSecret        string
 	InstallMode                                 operatorapiv1.InstallMode
 
+	// PriorityClassName is the name of the PriorityClass used by the deployed agents
+	PriorityClassName string
+
 	RegistrationFeatureGates []string
 	WorkFeatureGates         []string
 
@@ -192,6 +195,7 @@ func (n *klusterletController) sync(ctx context.Context, controllerContext facto
 		ExternalServerURL:         getServersFromKlusterlet(klusterlet),
 		OperatorNamespace:         n.operatorNamespace,
 		Replica:                   helpers.DetermineReplica(ctx, n.kubeClient, klusterlet.Spec.DeployOption.Mode, n.kubeVersion),
+		PriorityClassName:         helpers.AgentPriorityClassName(klusterlet, n.kubeVersion),
 
 		ExternalManagedKubeConfigSecret:             helpers.ExternalManagedKubeConfig,
 		ExternalManagedKubeConfigRegistrationSecret: helpers.ExternalManagedKubeConfigRegistration,

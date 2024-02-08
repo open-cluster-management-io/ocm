@@ -126,6 +126,9 @@ spec:
         resources:
           {{ .ResourceRequirements | indent 10 }}
         {{- end }}
+      {{- if .PriorityClassName }}
+      priorityClassName: "{{ .PriorityClassName }}"
+      {{- end }}
       volumes:
       - name: hub-kubeconfig-secret
         secret:

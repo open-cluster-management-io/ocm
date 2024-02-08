@@ -172,6 +172,11 @@ spec:
                       type: object
                     type: array
                 type: object
+              priorityClassName:
+                description: PriorityClassName is the name of the PriorityClass that
+                  will be used by the deployed klusterlet agent. It will be ignored
+                  when the PriorityClass/v1 API is not available on the managed cluster.
+                type: string
               registrationConfiguration:
                 description: RegistrationConfiguration contains the configuration
                   of registration
