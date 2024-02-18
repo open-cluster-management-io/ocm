@@ -11,11 +11,10 @@ import (
 // +kubebuilder:storageversion
 
 // ManagedClusterSetBinding projects a ManagedClusterSet into a certain namespace.
-// User is able to create a ManagedClusterSetBinding in a namespace and bind it to a
-// ManagedClusterSet if they have an RBAC rule to CREATE on the virtual subresource of
-// managedclustersets/bind. Workloads created in the same namespace can only be
-// distributed to ManagedClusters in ManagedClusterSets bound in this namespace by
-// higher level controllers.
+// You can create a ManagedClusterSetBinding in a namespace and bind it to a
+// ManagedClusterSet if both have a RBAC rules to CREATE on the virtual subresource of managedclustersets/bind.
+// Workloads that you create in the same namespace can only be distributed to ManagedClusters
+// in ManagedClusterSets that are bound in this namespace by higher-level controllers.
 type ManagedClusterSetBinding struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

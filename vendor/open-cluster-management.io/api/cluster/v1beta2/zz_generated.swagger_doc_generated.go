@@ -22,7 +22,7 @@ func (ManagedClusterSelector) SwaggerDoc() map[string]string {
 }
 
 var map_ManagedClusterSet = map[string]string{
-	"":       "ManagedClusterSet defines a group of ManagedClusters that user's workload can run on. A workload can be defined to deployed on a ManagedClusterSet, which mean:\n 1. The workload can run on any ManagedCluster in the ManagedClusterSet\n 2. The workload cannot run on any ManagedCluster outside the ManagedClusterSet\n 3. The service exposed by the workload can be shared in any ManagedCluster in the ManagedClusterSet\n\nIn order to assign a ManagedCluster to a certian ManagedClusterSet, add a label with name `cluster.open-cluster-management.io/clusterset` on the ManagedCluster to refers to the ManagedClusterSet. User is not allow to add/remove this label on a ManagedCluster unless they have a RBAC rule to CREATE on a virtual subresource of managedclustersets/join. In order to update this label, user must have the permission on both the old and new ManagedClusterSet.",
+	"":       "ManagedClusterSet defines a group of ManagedClusters that you can run workloads on. You can define a workload to be deployed on a ManagedClusterSet. See the following options  for the workload: - The workload can run on any ManagedCluster in the ManagedClusterSet - The workload cannot run on any ManagedCluster outside the ManagedClusterSet - The service exposed by the workload can be shared in any ManagedCluster in the ManagedClusterSet\n\nTo assign a ManagedCluster to a certain ManagedClusterSet, add a label with the name cluster.open-cluster-management.io/clusterset on the ManagedCluster to refer to the ManagedClusterSet. You are not allowed to add or remove this label on a ManagedCluster unless you have an RBAC rule to CREATE on a virtual subresource of managedclustersets/join. To update this label, you must have the permission on both the old and new ManagedClusterSet.",
 	"spec":   "Spec defines the attributes of the ManagedClusterSet",
 	"status": "Status represents the current status of the ManagedClusterSet",
 }
@@ -60,7 +60,7 @@ func (ManagedClusterSetStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ManagedClusterSetBinding = map[string]string{
-	"":       "ManagedClusterSetBinding projects a ManagedClusterSet into a certain namespace. User is able to create a ManagedClusterSetBinding in a namespace and bind it to a ManagedClusterSet if they have an RBAC rule to CREATE on the virtual subresource of managedclustersets/bind. Workloads created in the same namespace can only be distributed to ManagedClusters in ManagedClusterSets bound in this namespace by higher level controllers.",
+	"":       "ManagedClusterSetBinding projects a ManagedClusterSet into a certain namespace. You can create a ManagedClusterSetBinding in a namespace and bind it to a ManagedClusterSet if both have a RBAC rules to CREATE on the virtual subresource of managedclustersets/bind. Workloads that you create in the same namespace can only be distributed to ManagedClusters in ManagedClusterSets that are bound in this namespace by higher-level controllers.",
 	"spec":   "Spec defines the attributes of ManagedClusterSetBinding.",
 	"status": "Status represents the current status of the ManagedClusterSetBinding",
 }
