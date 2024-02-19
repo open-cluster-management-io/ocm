@@ -12,7 +12,7 @@ package v1alpha1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_AddOnDeploymentConfig = map[string]string{
-	"":     "AddOnDeploymentConfig represents a deployment configuration for an add-on.",
+	"":     "AddOnDeploymentConfig represents a configuration to customize the deployments of an add-on. For example, you can specify the NodePlacement to control the scheduling of the add-on agents.",
 	"spec": "spec represents a desired configuration for an add-on.",
 }
 
@@ -191,7 +191,7 @@ func (AddOnMeta) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterManagementAddOn = map[string]string{
-	"":       "ClusterManagementAddOn represents the registration of an add-on to the cluster manager. This resource allows the user to discover which add-on is available for the cluster manager and also provides metadata information about the add-on. This resource also provides a linkage to ManagedClusterAddOn, the name of the ClusterManagementAddOn resource will be used for the namespace-scoped ManagedClusterAddOn resource. ClusterManagementAddOn is a cluster-scoped resource.",
+	"":       "ClusterManagementAddOn represents the registration of an add-on to the cluster manager. This resource allows you to discover which add-ons are available for the cluster manager and provides metadata information about the add-ons. The ClusterManagementAddOn name is used for the namespace-scoped ManagedClusterAddOn resource. ClusterManagementAddOn is a cluster-scoped resource.",
 	"spec":   "spec represents a desired configuration for the agent on the cluster management add-on.",
 	"status": "status represents the current status of cluster management add-on.",
 }

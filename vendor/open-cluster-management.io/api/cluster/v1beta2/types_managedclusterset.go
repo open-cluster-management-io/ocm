@@ -16,17 +16,18 @@ const ClusterSetLabel = "cluster.open-cluster-management.io/clusterset"
 // +kubebuilder:printcolumn:name="Empty",type="string",JSONPath=".status.conditions[?(@.type==\"ClusterSetEmpty\")].status"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
-// ManagedClusterSet defines a group of ManagedClusters that user's workload can run on.
-// A workload can be defined to deployed on a ManagedClusterSet, which mean:
-//  1. The workload can run on any ManagedCluster in the ManagedClusterSet
-//  2. The workload cannot run on any ManagedCluster outside the ManagedClusterSet
-//  3. The service exposed by the workload can be shared in any ManagedCluster in the ManagedClusterSet
+// ManagedClusterSet defines a group of ManagedClusters that you can run
+// workloads on. You can define a workload to be deployed on a ManagedClusterSet. See the following options  for the workload:
+// - The workload can run on any ManagedCluster in the ManagedClusterSet
+// - The workload cannot run on any ManagedCluster outside the ManagedClusterSet
+// - The service exposed by the workload can be shared in any ManagedCluster in the ManagedClusterSet
 //
-// In order to assign a ManagedCluster to a certian ManagedClusterSet, add a label with name
-// `cluster.open-cluster-management.io/clusterset` on the ManagedCluster to refers to the ManagedClusterSet.
-// User is not allow to add/remove this label on a ManagedCluster unless they have a RBAC rule to CREATE on
-// a virtual subresource of managedclustersets/join. In order to update this label, user must have the permission
-// on both the old and new ManagedClusterSet.
+// To assign a ManagedCluster to a certain ManagedClusterSet, add a label with the name cluster.open-cluster-management.io/clusterset
+// on the ManagedCluster to refer to the ManagedClusterSet. You are not
+// allowed to add or remove this label on a ManagedCluster unless you have an
+// RBAC rule to CREATE on a virtual subresource of managedclustersets/join.
+// To update this label, you must have the permission on both
+// the old and new ManagedClusterSet.
 type ManagedClusterSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

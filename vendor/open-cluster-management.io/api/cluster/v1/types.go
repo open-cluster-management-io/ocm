@@ -16,20 +16,20 @@ import (
 // +kubebuilder:printcolumn:JSONPath=`.status.conditions[?(@.type=="ManagedClusterConditionAvailable")].status`,name="Available",type=string
 // +kubebuilder:printcolumn:JSONPath=`.metadata.creationTimestamp`,name="Age",type=date
 
-// ManagedCluster represents the desired state and current status of managed
-// cluster. ManagedCluster is a cluster scoped resource. The name is the cluster
-// UID.
+// ManagedCluster represents the desired state and current status
+// of a managed cluster. ManagedCluster is a cluster-scoped resource. The name
+// is the cluster UID.
 //
-// The cluster join process follows a double opt-in process:
+// The cluster join process is a double opt-in process. See the following join process steps:
 //
-// 1. Agent on managed cluster creates CSR on hub with cluster UID and agent name.
-// 2. Agent on managed cluster creates ManagedCluster on hub.
-// 3. Cluster admin on hub approves the CSR for UID and agent name of the ManagedCluster.
-// 4. Cluster admin sets spec.acceptClient of ManagedCluster to true.
-// 5. Cluster admin on managed cluster creates credential of kubeconfig to hub.
+// 1. The agent on the managed cluster creates a CSR on the hub with the cluster UID and agent name.
+// 2. The agent on the managed cluster creates a ManagedCluster on the hub.
+// 3. The cluster admin on the hub cluster approves the CSR for the UID and agent name of the ManagedCluster.
+// 4. The cluster admin sets the spec.acceptClient of the ManagedCluster to true.
+// 5. The cluster admin on the managed cluster creates a credential of the kubeconfig for the hub cluster.
 //
-// Once the hub creates the cluster namespace, the Klusterlet agent on the ManagedCluster
-// pushes the credential to the hub to use against the kube-apiserver of the ManagedCluster.
+// After the hub cluster creates the cluster namespace, the klusterlet agent on the ManagedCluster pushes
+// the credential to the hub cluster to use against the kube-apiserver of the ManagedCluster.
 type ManagedCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

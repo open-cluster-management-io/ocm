@@ -8,7 +8,8 @@ import (
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// AddOnDeploymentConfig represents a deployment configuration for an add-on.
+// AddOnDeploymentConfig represents a configuration to customize the deployments of an add-on.
+// For example, you can specify the NodePlacement to control the scheduling of the add-on agents.
 type AddOnDeploymentConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
