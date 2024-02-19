@@ -26,12 +26,12 @@ import (
 //     of potential ManagedClusters;
 //  5. Then Placements subselect from that working set using label/claim selection.
 //
-// No ManagedCluster will be selected if no ManagedClusterSet is bound to the placement
-// namespace. User is able to bind a ManagedClusterSet to a namespace by creating a
-// ManagedClusterSetBinding in that namespace if they have a RBAC rule to CREATE on the virtual
+// A ManagedCluster will not be selected if no ManagedClusterSet is bound to the placement
+// namespace. A user is able to bind a ManagedClusterSet to a namespace by creating a
+// ManagedClusterSetBinding in that namespace if they have an RBAC rule to CREATE on the virtual
 // subresource of `managedclustersets/bind`.
 //
-// A slice of PlacementDecisions with label cluster.open-cluster-management.io/placement={placement name}
+// A slice of PlacementDecisions with the label cluster.open-cluster-management.io/placement={placement name}
 // will be created to represent the ManagedClusters selected by this placement.
 //
 // If a ManagedCluster is selected and added into the PlacementDecisions, other components may

@@ -14,10 +14,9 @@ import (
 // +kubebuilder:printcolumn:name="CRD NAME",type=string,JSONPath=`.spec.addOnConfiguration.crdName`
 
 // ClusterManagementAddOn represents the registration of an add-on to the cluster manager.
-// This resource allows the user to discover which add-on is available for the cluster manager and
-// also provides metadata information about the add-on.
-// This resource also provides a linkage to ManagedClusterAddOn, the name of the ClusterManagementAddOn
-// resource will be used for the namespace-scoped ManagedClusterAddOn resource.
+// This resource allows you to discover which add-ons are available for the cluster manager
+// and provides metadata information about the add-ons. The ClusterManagementAddOn name is used
+// for the namespace-scoped ManagedClusterAddOn resource.
 // ClusterManagementAddOn is a cluster-scoped resource.
 type ClusterManagementAddOn struct {
 	metav1.TypeMeta   `json:",inline"`

@@ -7,16 +7,15 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // +kubebuilder:resource:scope="Namespaced"
 // +kubebuilder:subresource:status
 
-// PlacementDecision indicates a decision from a placement
-// PlacementDecision should has a label cluster.open-cluster-management.io/placement={placement name}
-// to reference a certain placement.
+// PlacementDecision indicates a decision from a placement.
+// PlacementDecision must have a cluster.open-cluster-management.io/placement={placement name} label to reference a certain placement.
 //
 // If a placement has spec.numberOfClusters specified, the total number of decisions contained in
-// status.decisions of PlacementDecisions should always be NumberOfClusters; otherwise, the total
-// number of decisions should be the number of ManagedClusters which match the placement requirements.
+// the status.decisions of PlacementDecisions must be the same as NumberOfClusters. Otherwise, the
+// total number of decisions must equal the number of ManagedClusters that
+// match the placement requirements.
 //
-// Some of the decisions might be empty when there are no enough ManagedClusters meet the placement
-// requirements.
+// Some of the decisions might be empty when there are not enough ManagedClusters to meet the placement requirements.
 type PlacementDecision struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
