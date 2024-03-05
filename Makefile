@@ -16,7 +16,7 @@ OPERATOR_SDK?=$(PERMANENT_TMP_GOPATH)/bin/operator-sdk
 OPERATOR_SDK_VERSION?=v1.32.0
 operatorsdk_gen_dir:=$(dir $(OPERATOR_SDK))
 # CSV_VERSION is used to generate new CSV manifests
-CSV_VERSION?=0.13.0
+CSV_VERSION?=0.14.0
 export CSV_VERSION
 
 OPERATOR_SDK_ARCHOS:=linux_amd64
