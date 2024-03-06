@@ -171,6 +171,7 @@ func (o *WorkAgentConfig) RunWorkloadAgent(ctx context.Context, controllerContex
 		hubWorkClient,
 		hubWorkInformer,
 		hubWorkInformer.Lister().ManifestWorks(o.agentOptions.SpokeClusterName),
+		o.workOptions.MaxJSONRawLength,
 		o.workOptions.StatusSyncInterval,
 	)
 
