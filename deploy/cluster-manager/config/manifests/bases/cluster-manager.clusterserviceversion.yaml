@@ -9,7 +9,7 @@ metadata:
     containerImage: quay.io/open-cluster-management/registration-operator:latest
     createdAt: "2023-05-24T20:00:31Z"
     description: Manages the installation and upgrade of the ClusterManager.
-    repository: https://github.com/open-cluster-management-io/registration-operator
+    repository: https://github.com/open-cluster-management-io/ocm
     support: Red Hat, Inc.
   name: cluster-manager.vX.Y.Z
   namespace: placeholder
@@ -81,8 +81,8 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc.
-  replaces: cluster-manager.v0.12.0
+  replaces: cluster-manager.v0.13.0
   selector:
     matchLabels:
       app: cluster-manager
-  version: 0.13.0
+  version: 0.14.0
