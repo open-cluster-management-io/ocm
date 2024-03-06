@@ -49,6 +49,7 @@ func NewAvailableStatusController(
 	manifestWorkClient workv1client.ManifestWorkInterface,
 	manifestWorkInformer workinformer.ManifestWorkInformer,
 	manifestWorkLister worklister.ManifestWorkNamespaceLister,
+	maxJSONRawLength int32,
 	syncInterval time.Duration,
 ) factory.Controller {
 	controller := &AvailableStatusController{
@@ -57,7 +58,7 @@ func NewAvailableStatusController(
 			manifestWorkClient),
 		manifestWorkLister: manifestWorkLister,
 		spokeDynamicClient: spokeDynamicClient,
-		statusReader:       statusfeedback.NewStatusReader(),
+		statusReader:       statusfeedback.NewStatusReader().WithMaxJsonRawLength(maxJSONRawLength),
 	}
 
 	return factory.New().

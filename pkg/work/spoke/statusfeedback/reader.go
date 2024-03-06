@@ -17,16 +17,23 @@ import (
 	"open-cluster-management.io/ocm/pkg/work/spoke/statusfeedback/rules"
 )
 
-const maxJsonRawLength = 1024
+const maxJSONRawLength = 1024
 
 type StatusReader struct {
-	wellKnownStatus rules.WellKnownStatusRuleResolver
+	wellKnownStatus  rules.WellKnownStatusRuleResolver
+	maxJSONRawLength int32
 }
 
 func NewStatusReader() *StatusReader {
 	return &StatusReader{
-		wellKnownStatus: rules.DefaultWellKnownStatusRule(),
+		wellKnownStatus:  rules.DefaultWellKnownStatusRule(),
+		maxJSONRawLength: maxJSONRawLength,
 	}
+}
+
+func (s *StatusReader) WithMaxJsonRawLength(length int32) *StatusReader {
+	s.maxJSONRawLength = length
+	return s
 }
 
 func (s *StatusReader) GetValuesByRule(obj *unstructured.Unstructured, rule workapiv1.FeedbackRule) ([]workapiv1.FeedbackValue, error) {
@@ -41,7 +48,7 @@ func (s *StatusReader) GetValuesByRule(obj *unstructured.Unstructured, rule work
 		}
 
 		for _, path := range paths {
-			value, err := getValueByJsonPath(path.Name, path.Path, obj)
+			value, err := s.getValueByJsonPath(path.Name, path.Path, obj)
 			if err != nil {
 				errs = append(errs, err)
 				continue
@@ -59,7 +66,7 @@ func (s *StatusReader) GetValuesByRule(obj *unstructured.Unstructured, rule work
 				continue
 			}
 
-			value, err := getValueByJsonPath(path.Name, path.Path, obj)
+			value, err := s.getValueByJsonPath(path.Name, path.Path, obj)
 			if err != nil {
 				errs = append(errs, err)
 				continue
@@ -74,7 +81,7 @@ func (s *StatusReader) GetValuesByRule(obj *unstructured.Unstructured, rule work
 	return values, utilerrors.NewAggregate(errs)
 }
 
-func getValueByJsonPath(name, path string, obj *unstructured.Unstructured) (*workapiv1.FeedbackValue, error) {
+func (s *StatusReader) getValueByJsonPath(name, path string, obj *unstructured.Unstructured) (*workapiv1.FeedbackValue, error) {
 	j := jsonpath.New(name).AllowMissingKeys(true)
 	err := j.Parse(fmt.Sprintf("{%s}", path))
 	if err != nil {
@@ -147,8 +154,8 @@ func getValueByJsonPath(name, path string, obj *unstructured.Unstructured) (*wor
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse the resource to json string for name %s: %v", name, err)
 			}
-			if len(jsonRaw) > maxJsonRawLength {
-				return nil, fmt.Errorf("the length of returned json raw string for name %s is larger than the maximum length %d", name, maxJsonRawLength)
+			if len(jsonRaw) > int(s.maxJSONRawLength) {
+				return nil, fmt.Errorf("the length of returned json raw string for name %s is larger than the maximum length %d", name, s.maxJSONRawLength)
 			}
 			fieldValue = workapiv1.FieldValue{
 				Type:    workapiv1.JsonRaw,

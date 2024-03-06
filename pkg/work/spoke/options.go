@@ -21,11 +21,13 @@ type WorkloadAgentOptions struct {
 	StatusSyncInterval                     time.Duration
 	AppliedManifestWorkEvictionGracePeriod time.Duration
 	WorkloadSourceDriver                   WorkloadSourceDriver
+	MaxJSONRawLength                       int32
 }
 
 // NewWorkloadAgentOptions returns the flags with default value set
 func NewWorkloadAgentOptions() *WorkloadAgentOptions {
 	return &WorkloadAgentOptions{
+		MaxJSONRawLength:                       1024,
 		StatusSyncInterval:                     10 * time.Second,
 		AppliedManifestWorkEvictionGracePeriod: 60 * time.Minute,
 	}
@@ -33,6 +35,8 @@ func NewWorkloadAgentOptions() *WorkloadAgentOptions {
 
 // AddFlags register and binds the default flags
 func (o *WorkloadAgentOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.Int32Var(&o.MaxJSONRawLength, "max-json-raw-length",
+		o.MaxJSONRawLength, "The maximum size of the JSON raw string returned from status feedback")
 	fs.DurationVar(&o.StatusSyncInterval, "status-sync-interval",
 		o.StatusSyncInterval, "Interval to sync resource status to hub.")
 	fs.DurationVar(&o.AppliedManifestWorkEvictionGracePeriod, "appliedmanifestwork-eviction-grace-period",
