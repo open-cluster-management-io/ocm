@@ -36,8 +36,8 @@ var _ = ginkgo.Describe("ManifestWork Status Feedback", func() {
 	ginkgo.BeforeEach(func() {
 		o = spoke.NewWorkloadAgentOptions()
 		o.StatusSyncInterval = 3 * time.Second
-		o.WorkloadSourceDriver.Type = sourceDriver
-		o.WorkloadSourceDriver.Config = sourceConfigFileName
+		o.WorkloadSourceDriver = sourceDriver
+		o.WorkloadSourceConfig = sourceConfigFileName
 
 		commOptions = commonoptions.NewAgentOptions()
 		commOptions.SpokeClusterName = utilrand.String(5)

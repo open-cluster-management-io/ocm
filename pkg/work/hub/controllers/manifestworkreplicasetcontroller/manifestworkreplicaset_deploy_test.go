@@ -623,7 +623,7 @@ func TestRequeueWithProgressDeadline(t *testing.T) {
 		placementLister:     placementLister,
 	}
 
-	mwrSet, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
+	_, _, err := pmwDeployController.reconcile(context.TODO(), mwrSet)
 	var rqe helpers.RequeueError
 	if !errors.As(err, &rqe) {
 		t.Errorf("expect to get err %t", err)

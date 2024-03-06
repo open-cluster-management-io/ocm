@@ -44,6 +44,7 @@ func NewCloudEventAgentClient[T ResourceObject](
 	baseClient := &baseClient{
 		cloudEventsOptions:     agentOptions.CloudEventsOptions,
 		cloudEventsRateLimiter: NewRateLimiter(agentOptions.EventRateLimit),
+		reconnectedChan:        make(chan struct{}),
 	}
 
 	if err := baseClient.connect(ctx); err != nil {
@@ -63,6 +64,12 @@ func NewCloudEventAgentClient[T ResourceObject](
 		agentID:          agentOptions.AgentID,
 		clusterName:      agentOptions.ClusterName,
 	}, nil
+}
+
+// ReconnectedChan returns a chan which indicates the source/agent client is reconnected.
+// The source/agent client callers should consider sending a resync request when receiving this signal.
+func (c *CloudEventAgentClient[T]) ReconnectedChan() <-chan struct{} {
+	return c.reconnectedChan
 }
 
 // Resync the resources spec by sending a spec resync request from the current to the given source.

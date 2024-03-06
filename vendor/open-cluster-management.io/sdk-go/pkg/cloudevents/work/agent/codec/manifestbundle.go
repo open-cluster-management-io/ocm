@@ -13,6 +13,7 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 	"open-cluster-management.io/sdk-go/pkg/apis/work/v1/validator"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/common"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload"
 )
 
@@ -39,7 +40,7 @@ func (c *ManifestBundleCodec) Encode(source string, eventType types.CloudEventsT
 		return nil, fmt.Errorf("failed to parse the resourceversion of the work %s, %v", work.UID, err)
 	}
 
-	originalSource, ok := work.Annotations[CloudEventsOriginalSourceAnnotationKey]
+	originalSource, ok := work.Labels[common.CloudEventsOriginalSourceLabelKey]
 	if !ok {
 		return nil, fmt.Errorf("failed to find originalsource from the work %s", work.UID)
 	}
@@ -82,7 +83,7 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 		return nil, fmt.Errorf("failed to get resourceid extension: %v", err)
 	}
 
-	resourceVersion, err := cloudeventstypes.ToString(evtExtensions[types.ExtensionResourceVersion])
+	resourceVersion, err := cloudeventstypes.ToInteger(evtExtensions[types.ExtensionResourceVersion])
 	if err != nil {
 		return nil, fmt.Errorf("failed to get resourceversion extension: %v", err)
 	}
@@ -96,12 +97,14 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             kubetypes.UID(resourceID),
-			ResourceVersion: resourceVersion,
+			ResourceVersion: fmt.Sprintf("%d", resourceVersion),
 			Name:            resourceID,
 			Namespace:       clusterName,
+			Labels: map[string]string{
+				common.CloudEventsOriginalSourceLabelKey: evt.Source(),
+			},
 			Annotations: map[string]string{
-				CloudEventsDataTypeAnnotationKey:       eventType.CloudEventsDataType.String(),
-				CloudEventsOriginalSourceAnnotationKey: evt.Source(),
+				common.CloudEventsDataTypeAnnotationKey: eventType.CloudEventsDataType.String(),
 			},
 		},
 	}

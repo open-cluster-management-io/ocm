@@ -46,6 +46,7 @@ spec:
         args:
           - "/work"
           - "manager"
+          - "--work-driver=kube"
           {{ if .HostedMode }}
           - "--kubeconfig=/var/run/secrets/hub/kubeconfig"
           {{ end }}

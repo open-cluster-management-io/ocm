@@ -47,9 +47,9 @@ func (o *mqttSourceOptions) WithContext(ctx context.Context, evtCtx cloudevents.
 	}
 
 	if eventType.Action == types.ResyncRequestAction && clusterName == types.ClusterAll {
-		// source request to get resources status from all sources
+		// source request to get resources status from all agents
 		if len(o.Topics.SourceBroadcast) == 0 {
-			return nil, fmt.Errorf("the source wild card resync topic not set")
+			return nil, fmt.Errorf("the source broadcast topic not set")
 		}
 
 		resyncTopic := strings.Replace(o.Topics.SourceBroadcast, "+", o.sourceID, 1)

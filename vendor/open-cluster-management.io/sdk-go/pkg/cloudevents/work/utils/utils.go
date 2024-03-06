@@ -5,8 +5,10 @@ import (
 	"fmt"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/google/uuid"
 	"k8s.io/apimachinery/pkg/types"
 	workv1 "open-cluster-management.io/api/work/v1"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/common"
 )
 
 // Patch applies the patch to a work with the patch type.
@@ -44,4 +46,10 @@ func Patch(patchType types.PatchType, work *workv1.ManifestWork, patchData []byt
 	}
 
 	return patchedWork, nil
+}
+
+// UID returns a v5 UUID based on sourceID, work name and namespace to make sure it is consistent
+func UID(sourceID, namespace, name string) string {
+	id := fmt.Sprintf("%s-%s-%s-%s", sourceID, common.ManifestWorkGR.String(), namespace, name)
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(id)).String()
 }

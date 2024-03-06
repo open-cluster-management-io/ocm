@@ -24,6 +24,7 @@ require (
 	go.uber.org/zap v1.26.0
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
 	golang.org/x/net v0.19.0
+	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.29.1
 	k8s.io/apiextensions-apiserver v0.29.0
 	k8s.io/apimachinery v0.29.1
@@ -35,7 +36,7 @@ require (
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
 	open-cluster-management.io/addon-framework v0.8.1-0.20240205013730-13fbb6259464
 	open-cluster-management.io/api v0.13.0
-	open-cluster-management.io/sdk-go v0.13.0
+	open-cluster-management.io/sdk-go v0.13.1-0.20240306030534-3142983462d9
 	sigs.k8s.io/controller-runtime v0.16.2
 	sigs.k8s.io/kube-storage-version-migrator v0.0.6-0.20230721195810-5c8923c5ff96
 )
@@ -142,7 +143,6 @@ require (
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	helm.sh/helm/v3 v3.11.1 // indirect
 	k8s.io/kms v0.29.0 // indirect
