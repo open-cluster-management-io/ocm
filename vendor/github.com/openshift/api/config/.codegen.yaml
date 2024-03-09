@@ -1,8 +1,56 @@
 schemapatch:
-  requiredFeatureSets:
-  - ""
-  - "Default"
-  - "TechPreviewNoUpgrade"
-  - "CustomNoUpgrade"
 swaggerdocs:
   commentPolicy: Warn
+manifestMerge:
+  tupleOverrides:
+    - crdName: clusteroperators.config.openshift.io
+      ungated: true
+      clusterProfilesToInject:
+        - include.release.openshift.io/self-managed-high-availability
+        - include.release.openshift.io/single-node-developer
+    - crdName: clusterversions.config.openshift.io
+      featureSet: CustomNoUpgrade
+      clusterProfilesToInject:
+        - include.release.openshift.io/self-managed-high-availability
+        - include.release.openshift.io/single-node-developer
+    - crdName: clusterversions.config.openshift.io
+      featureSet: Default
+      clusterProfilesToInject:
+        - include.release.openshift.io/self-managed-high-availability
+        - include.release.openshift.io/single-node-developer
+    - crdName: clusterversions.config.openshift.io
+      featureSet: TechPreviewNoUpgrade
+      clusterProfilesToInject:
+        - include.release.openshift.io/self-managed-high-availability
+        - include.release.openshift.io/single-node-developer
+    - crdName: authentications.config.openshift.io
+      featureSet: Default
+      clusterProfilesToInject:
+        - include.release.openshift.io/self-managed-high-availability
+        - include.release.openshift.io/single-node-developer
+    - crdName: proxies.config.openshift.io
+      ungated: true
+    - crdName: operatorhubs.config.openshift.io
+      ungated: true
+    - crdName: consoles.config.openshift.io
+      ungated: true
+    - crdName: featuregates.config.openshift.io
+      ungated: true
+    - crdName: images.config.openshift.io
+      ungated: true
+    - crdName: imagecontentpolicies.config.openshift.io
+      ungated: true
+    - crdName: imagedigestmirrorsets.config.openshift.io
+      ungated: true
+    - crdName: imagetagmirrorsets.config.openshift.io
+      ungated: true
+    - crdName: ingresses.config.openshift.io
+      ungated: true
+    - crdName: nodes.config.openshift.io
+      ungated: true
+    - crdName: oauths.config.openshift.io
+      ungated: true
+    - crdName: projects.config.openshift.io
+      ungated: true
+    - crdName: builds.config.openshift.io
+      ungated: true

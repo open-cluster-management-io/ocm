@@ -6,3 +6,18 @@ schemapatch:
   - "CustomNoUpgrade"
 swaggerdocs:
   commentPolicy: Warn
+manifestMerge:
+  tupleOverrides:
+    - crdName: controlplanemachinesets.machine.openshift.io
+      clusterProfilesToInject:
+        - include.release.openshift.io/self-managed-high-availability
+      featureSet: CustomNoUpgrade
+    - crdName: controlplanemachinesets.machine.openshift.io
+      clusterProfilesToInject:
+        - include.release.openshift.io/self-managed-high-availability
+      featureSet: TechPreviewNoUpgrade
+    - crdName: controlplanemachinesets.machine.openshift.io
+      clusterProfilesToInject:
+        - include.release.openshift.io/self-managed-high-availability
+      featureSet: Default
+

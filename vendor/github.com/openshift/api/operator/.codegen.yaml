@@ -1,8 +1,60 @@
 schemapatch:
-  requiredFeatureSets:
-    - ""
-    - "Default"
-    - "TechPreviewNoUpgrade"
-    - "CustomNoUpgrade"
 swaggerdocs:
   commentPolicy: Warn
+manifestMerge:
+  tupleOverrides:
+    - crdName: authentications.operator.openshift.io
+      clusterProfilesToInject:
+        - include.release.openshift.io/self-managed-high-availability
+        - include.release.openshift.io/single-node-developer
+      ungated: true
+    - crdName: consoles.operator.openshift.io
+      ungated: true
+    - crdName: configs.operator.openshift.io
+      ungated: true
+    - crdName: kubeapiservers.operator.openshift.io
+      ungated: true
+    - crdName: kubecontrollermanagers.operator.openshift.io
+      ungated: true
+    - crdName: kubeschedulers.operator.openshift.io
+      ungated: true
+    - crdName: openshiftapiservers.operator.openshift.io
+      ungated: true
+    - crdName: cloudcredentials.operator.openshift.io
+      ungated: true
+    - crdName: kubestorageversionmigrators.operator.openshift.io
+      ungated: true
+    - crdName: openshiftcontrollermanagers.operator.openshift.io
+      ungated: true
+    - crdName: storages.operator.openshift.io
+      ungated: true
+    - crdName: ingresscontrollers.operator.openshift.io
+      ungated: true
+    - crdName: insightsoperators.operator.openshift.io
+      ungated: true
+    - crdName: servicecas.operator.openshift.io
+      ungated: true
+    - crdName: dnses.operator.openshift.io
+      ungated: true
+    - crdName: csisnapshotcontrollers.operator.openshift.io
+      ungated: true
+    - crdName: clustercsidrivers.operator.openshift.io
+      ungated: true
+    - crdName: networks.operator.openshift.io
+      featureSet: Default
+      clusterProfilesToInject:
+        - include.release.openshift.io/self-managed-high-availability
+        - include.release.openshift.io/single-node-developer
+    - crdName: networks.operator.openshift.io
+      featureSet: CustomNoUpgrade
+      clusterProfilesToInject:
+        - include.release.openshift.io/self-managed-high-availability
+        - include.release.openshift.io/single-node-developer
+    - crdName: networks.operator.openshift.io
+      featureSet: TechPreviewNoUpgrade
+      clusterProfilesToInject:
+        - include.release.openshift.io/self-managed-high-availability
+        - include.release.openshift.io/single-node-developer
+
+
+

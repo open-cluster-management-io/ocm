@@ -282,6 +282,16 @@ var (
 		OwningProduct:       ocpSpecific,
 	}
 
+	FeatureGateHardwareSpeed = FeatureGateName("HardwareSpeed")
+	hardwareSpeed            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateHardwareSpeed,
+		},
+		OwningJiraComponent: "etcd",
+		ResponsiblePerson:   "hasbro17",
+		OwningProduct:       ocpSpecific,
+	}
+
 	FeatureGateMachineAPIOperatorDisableMachineHealthCheckController = FeatureGateName("MachineAPIOperatorDisableMachineHealthCheckController")
 	machineAPIOperatorDisableMachineHealthCheckController            = FeatureGateDescription{
 		FeatureGateAttributes: FeatureGateAttributes{
@@ -407,7 +417,7 @@ var (
 		FeatureGateAttributes: FeatureGateAttributes{
 			Name: FeatureGateSignatureStores,
 		},
-		OwningJiraComponent: "over-the-air-updates",
+		OwningJiraComponent: "Cluster Version Operator",
 		ResponsiblePerson:   "lmohanty",
 		OwningProduct:       ocpSpecific,
 	}
@@ -420,5 +430,115 @@ var (
 		OwningJiraComponent: "kube-apiserver",
 		ResponsiblePerson:   "dgrisonnet",
 		OwningProduct:       kubernetes,
+	}
+
+	FeatureGatePinnedImages = FeatureGateName("PinnedImages")
+	pinnedImages            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGatePinnedImages,
+		},
+		OwningJiraComponent: "MachineConfigOperator",
+		ResponsiblePerson:   "jhernand",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateUpgradeStatus = FeatureGateName("UpgradeStatus")
+	upgradeStatus            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateUpgradeStatus,
+		},
+		OwningJiraComponent: "Cluster Version Operator",
+		ResponsiblePerson:   "pmuller",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateTranslateStreamCloseWebsocketRequests = FeatureGateName("TranslateStreamCloseWebsocketRequests")
+	translateStreamCloseWebsocketRequests            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateTranslateStreamCloseWebsocketRequests,
+		},
+		OwningJiraComponent: "kube-apiserver",
+		ResponsiblePerson:   "akashem",
+		OwningProduct:       kubernetes,
+	}
+
+	FeatureGateVolumeGroupSnapshot = FeatureGateName("VolumeGroupSnapshot")
+	volumeGroupSnapshot            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateVolumeGroupSnapshot,
+		},
+		OwningJiraComponent: "Storage / Kubernetes External Components",
+		ResponsiblePerson:   "fbertina",
+		OwningProduct:       kubernetes,
+	}
+
+	FeatureGateExternalOIDC = FeatureGateName("ExternalOIDC")
+	externalOIDC            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateExternalOIDC,
+		},
+		OwningJiraComponent: "authentication",
+		ResponsiblePerson:   "stlaz",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateExample = FeatureGateName("Example")
+	example            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateExample,
+		},
+		OwningJiraComponent: "cluster-config",
+		ResponsiblePerson:   "deads",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGatePlatformOperators = FeatureGateName("PlatformOperators")
+	platformOperators            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGatePlatformOperators,
+		},
+		OwningJiraComponent: "olm",
+		ResponsiblePerson:   "joe",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateExternalRouteCertificate = FeatureGateName("ExternalRouteCertificate")
+	externalRouteCertificate            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateExternalRouteCertificate,
+		},
+		OwningJiraComponent: "network-edge",
+		ResponsiblePerson:   "miciah",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateInsightsOnDemandDataGather = FeatureGateName("InsightsOnDemandDataGather")
+	insightsOnDemandDataGather            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateInsightsOnDemandDataGather,
+		},
+		OwningJiraComponent: "insights",
+		ResponsiblePerson:   "tremes",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateAlertingRules = FeatureGateName("AlertingRules")
+	alertingRules            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateAlertingRules,
+		},
+		OwningJiraComponent: "Monitoring",
+		ResponsiblePerson:   "simon",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateBareMetalLoadBalancer = FeatureGateName("BareMetalLoadBalancer")
+	bareMetalLoadBalancer            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateBareMetalLoadBalancer,
+		},
+		OwningJiraComponent: "metal",
+		ResponsiblePerson:   "EmilienM",
+		OwningProduct:       ocpSpecific,
 	}
 )
