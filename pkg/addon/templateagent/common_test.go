@@ -30,7 +30,7 @@ func TestGetAddOnTemplateSpecHash(t *testing.T) {
 				},
 				Spec: addonapiv1alpha1.AddOnTemplateSpec{},
 			},
-			expected: "aa3e489402ac2e99c4aef0ddc8cc2fdf1d3b6c34c7b8d040dc3fae5db60478cb",
+			expected: "3c2de0761c7df5d6a864280a8aa44d1f4d91eecbbcd2ce5af3efb4b76d91d3cd",
 		},
 		{
 			name: "addon template spec is not nil",
@@ -42,7 +42,7 @@ func TestGetAddOnTemplateSpecHash(t *testing.T) {
 					AddonName: "test1",
 				},
 			},
-			expected: "00730aa8aa1826c9a3cfd8d6858b45e1e16bcdade5cc57070ea8089c6764285e",
+			expected: "b59db5673238c791a826f0a8f8710f3d6e49cd4c7a5ee73e186c91412f26fc85",
 		},
 	}
 
