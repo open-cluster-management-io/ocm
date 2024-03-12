@@ -25,10 +25,10 @@ import (
 
 // TODO: The spec hash is hardcoded here and will break the test once the API changes.
 // We need a better way to handle the spec hash.
-const addOnDefaultConfigSpecHash = "19afba0192e93f738a3b6e118f177dffbc6546f7d32a3aed79cba761e6123a1f" //nolint:gosec
-const addOnTest1ConfigSpecHash = "1eef585d8f4d92a0d1aa5ac3a61337dd03c2723f9f8d1c56f339e0af0becd4af"   //nolint:gosec
-const addOnTest2ConfigSpecHash = "c0f1c4105357e7a298a8789d88c7acffc83704f407a35d73fa0b83a079958440"   //nolint:gosec
-const addOnTest3ConfigSpecHash = "83ca9715ea80ec4b88438607e17f15aaf1c2db8e469dfa933ceb5887cc49328d"   //nolint:gosec
+const addOnDefaultConfigSpecHash = "ea4e6089e8b2f584c1cd8b86e16a15df3186b30744f433ede7436091c93a4cc7" //nolint:gosec
+const addOnTest1ConfigSpecHash = "b746cc98936955dd2168640f0011a14f2a74be306c747bc8ba829328cc772690"   //nolint:gosec
+const addOnTest2ConfigSpecHash = "3e6348b0c0f0a341ce28d0a2f99bc41fc63fb17d947eb5a45284729fbeb63b32"   //nolint:gosec
+const addOnTest3ConfigSpecHash = "9b3c6d09731ed254589fa4fc2936e6fb00537de92da5e035183da313eb98d27e"   //nolint:gosec
 
 var addOnDefaultConfigSpec = addonapiv1alpha1.AddOnDeploymentConfigSpec{
 	CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
