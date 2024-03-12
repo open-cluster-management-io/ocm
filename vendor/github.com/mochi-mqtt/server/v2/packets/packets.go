@@ -12,9 +12,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/mochi-mqtt/server/v2/mempool"
 )
 
-// All of the valid packet types and their packet identifier.
+// All valid packet types and their packet identifiers.
 const (
 	Reserved       byte = iota // 0 - we use this in packet tests to indicate special-test or all packets.
 	Connect                    // 1
@@ -37,9 +39,9 @@ const (
 
 var (
 	// ErrNoValidPacketAvailable indicates the packet type byte provided does not exist in the mqtt specification.
-	ErrNoValidPacketAvailable error = errors.New("no valid packet available")
+	ErrNoValidPacketAvailable = errors.New("no valid packet available")
 
-	// PacketNames is a map of packet bytes to human readable names, for easier debugging.
+	// PacketNames is a map of packet bytes to human-readable names, for easier debugging.
 	PacketNames = map[byte]string{
 		0:  "Reserved",
 		1:  "Connect",
@@ -272,33 +274,34 @@ func (s Subscription) Merge(n Subscription) Subscription {
 }
 
 // encode encodes a subscription and properties into bytes.
-func (p Subscription) encode() byte {
+func (s Subscription) encode() byte {
 	var flag byte
-	flag |= p.Qos
+	flag |= s.Qos
 
-	if p.NoLocal {
+	if s.NoLocal {
 		flag |= 1 << 2
 	}
 
-	if p.RetainAsPublished {
+	if s.RetainAsPublished {
 		flag |= 1 << 3
 	}
 
-	flag |= p.RetainHandling << 4
+	flag |= s.RetainHandling << 4
 	return flag
 }
 
 // decode decodes subscription bytes into a subscription struct.
-func (p *Subscription) decode(b byte) {
-	p.Qos = b & 3                      // byte
-	p.NoLocal = 1&(b>>2) > 0           // bool
-	p.RetainAsPublished = 1&(b>>3) > 0 // bool
-	p.RetainHandling = 3 & (b >> 4)    // byte
+func (s *Subscription) decode(b byte) {
+	s.Qos = b & 3                      // byte
+	s.NoLocal = 1&(b>>2) > 0           // bool
+	s.RetainAsPublished = 1&(b>>3) > 0 // bool
+	s.RetainHandling = 3 & (b >> 4)    // byte
 }
 
 // ConnectEncode encodes a connect packet.
 func (pk *Packet) ConnectEncode(buf *bytes.Buffer) error {
-	nb := bytes.NewBuffer([]byte{})
+	nb := mempool.GetBuffer()
+	defer mempool.PutBuffer(nb)
 	nb.Write(encodeBytes(pk.Connect.ProtocolName))
 	nb.WriteByte(pk.ProtocolVersion)
 
@@ -315,7 +318,8 @@ func (pk *Packet) ConnectEncode(buf *bytes.Buffer) error {
 	nb.Write(encodeUint16(pk.Connect.Keepalive))
 
 	if pk.ProtocolVersion == 5 {
-		pb := bytes.NewBuffer([]byte{})
+		pb := mempool.GetBuffer()
+		defer mempool.PutBuffer(pb)
 		(&pk.Properties).Encode(pk.FixedHeader.Type, pk.Mods, pb, 0)
 		nb.Write(pb.Bytes())
 	}
@@ -324,7 +328,8 @@ func (pk *Packet) ConnectEncode(buf *bytes.Buffer) error {
 
 	if pk.Connect.WillFlag {
 		if pk.ProtocolVersion == 5 {
-			pb := bytes.NewBuffer([]byte{})
+			pb := mempool.GetBuffer()
+			defer mempool.PutBuffer(pb)
 			(&pk.Connect).WillProperties.Encode(WillProperties, pk.Mods, pb, 0)
 			nb.Write(pb.Bytes())
 		}
@@ -343,7 +348,7 @@ func (pk *Packet) ConnectEncode(buf *bytes.Buffer) error {
 
 	pk.FixedHeader.Remaining = nb.Len()
 	pk.FixedHeader.Encode(buf)
-	nb.WriteTo(buf)
+	buf.Write(nb.Bytes())
 
 	return nil
 }
@@ -493,19 +498,22 @@ func (pk *Packet) ConnectValidate() Code {
 
 // ConnackEncode encodes a Connack packet.
 func (pk *Packet) ConnackEncode(buf *bytes.Buffer) error {
-	nb := bytes.NewBuffer([]byte{})
+	nb := mempool.GetBuffer()
+	defer mempool.PutBuffer(nb)
 	nb.WriteByte(encodeBool(pk.SessionPresent))
 	nb.WriteByte(pk.ReasonCode)
 
 	if pk.ProtocolVersion == 5 {
-		pb := bytes.NewBuffer([]byte{})
+		pb := mempool.GetBuffer()
+		defer mempool.PutBuffer(pb)
 		pk.Properties.Encode(pk.FixedHeader.Type, pk.Mods, pb, nb.Len()+2) // +SessionPresent +ReasonCode
 		nb.Write(pb.Bytes())
 	}
 
 	pk.FixedHeader.Remaining = nb.Len()
 	pk.FixedHeader.Encode(buf)
-	nb.WriteTo(buf)
+	buf.Write(nb.Bytes())
+
 	return nil
 }
 
@@ -536,19 +544,21 @@ func (pk *Packet) ConnackDecode(buf []byte) error {
 
 // DisconnectEncode encodes a Disconnect packet.
 func (pk *Packet) DisconnectEncode(buf *bytes.Buffer) error {
-	nb := bytes.NewBuffer([]byte{})
+	nb := mempool.GetBuffer()
+	defer mempool.PutBuffer(nb)
 
 	if pk.ProtocolVersion == 5 {
 		nb.WriteByte(pk.ReasonCode)
 
-		pb := bytes.NewBuffer([]byte{})
+		pb := mempool.GetBuffer()
+		defer mempool.PutBuffer(pb)
 		pk.Properties.Encode(pk.FixedHeader.Type, pk.Mods, pb, nb.Len())
 		nb.Write(pb.Bytes())
 	}
 
 	pk.FixedHeader.Remaining = nb.Len()
 	pk.FixedHeader.Encode(buf)
-	nb.WriteTo(buf)
+	buf.Write(nb.Bytes())
 
 	return nil
 }
@@ -598,7 +608,8 @@ func (pk *Packet) PingrespDecode(buf []byte) error {
 
 // PublishEncode encodes a Publish packet.
 func (pk *Packet) PublishEncode(buf *bytes.Buffer) error {
-	nb := bytes.NewBuffer([]byte{})
+	nb := mempool.GetBuffer()
+	defer mempool.PutBuffer(nb)
 
 	nb.Write(encodeString(pk.TopicName)) // [MQTT-3.3.2-1]
 
@@ -610,16 +621,16 @@ func (pk *Packet) PublishEncode(buf *bytes.Buffer) error {
 	}
 
 	if pk.ProtocolVersion == 5 {
-		pb := bytes.NewBuffer([]byte{})
+		pb := mempool.GetBuffer()
+		defer mempool.PutBuffer(pb)
 		pk.Properties.Encode(pk.FixedHeader.Type, pk.Mods, pb, nb.Len()+len(pk.Payload))
 		nb.Write(pb.Bytes())
 	}
 
-	nb.Write(pk.Payload)
-
-	pk.FixedHeader.Remaining = nb.Len()
+	pk.FixedHeader.Remaining = nb.Len() + len(pk.Payload)
 	pk.FixedHeader.Encode(buf)
-	nb.WriteTo(buf)
+	buf.Write(nb.Bytes())
+	buf.Write(pk.Payload)
 
 	return nil
 }
@@ -690,11 +701,13 @@ func (pk *Packet) PublishValidate(topicAliasMaximum uint16) Code {
 
 // encodePubAckRelRecComp encodes a Puback, Pubrel, Pubrec, or Pubcomp packet.
 func (pk *Packet) encodePubAckRelRecComp(buf *bytes.Buffer) error {
-	nb := bytes.NewBuffer([]byte{})
+	nb := mempool.GetBuffer()
+	defer mempool.PutBuffer(nb)
 	nb.Write(encodeUint16(pk.PacketID))
 
 	if pk.ProtocolVersion == 5 {
-		pb := bytes.NewBuffer([]byte{})
+		pb := mempool.GetBuffer()
+		defer mempool.PutBuffer(pb)
 		pk.Properties.Encode(pk.FixedHeader.Type, pk.Mods, pb, nb.Len())
 		if pk.ReasonCode >= ErrUnspecifiedError.Code || pb.Len() > 1 {
 			nb.WriteByte(pk.ReasonCode)
@@ -707,7 +720,7 @@ func (pk *Packet) encodePubAckRelRecComp(buf *bytes.Buffer) error {
 
 	pk.FixedHeader.Remaining = nb.Len()
 	pk.FixedHeader.Encode(buf)
-	nb.WriteTo(buf)
+	buf.Write(nb.Bytes())
 	return nil
 }
 
@@ -831,11 +844,13 @@ func (pk *Packet) ReasonCodeValid() bool {
 
 // SubackEncode encodes a Suback packet.
 func (pk *Packet) SubackEncode(buf *bytes.Buffer) error {
-	nb := bytes.NewBuffer([]byte{})
+	nb := mempool.GetBuffer()
+	defer mempool.PutBuffer(nb)
 	nb.Write(encodeUint16(pk.PacketID))
 
 	if pk.ProtocolVersion == 5 {
-		pb := bytes.NewBuffer([]byte{})
+		pb := mempool.GetBuffer()
+		defer mempool.PutBuffer(pb)
 		pk.Properties.Encode(pk.FixedHeader.Type, pk.Mods, pb, nb.Len()+len(pk.ReasonCodes))
 		nb.Write(pb.Bytes())
 	}
@@ -844,7 +859,7 @@ func (pk *Packet) SubackEncode(buf *bytes.Buffer) error {
 
 	pk.FixedHeader.Remaining = nb.Len()
 	pk.FixedHeader.Encode(buf)
-	nb.WriteTo(buf)
+	buf.Write(nb.Bytes())
 
 	return nil
 }
@@ -878,10 +893,12 @@ func (pk *Packet) SubscribeEncode(buf *bytes.Buffer) error {
 		return ErrProtocolViolationNoPacketID
 	}
 
-	nb := bytes.NewBuffer([]byte{})
+	nb := mempool.GetBuffer()
+	defer mempool.PutBuffer(nb)
 	nb.Write(encodeUint16(pk.PacketID))
 
-	xb := bytes.NewBuffer([]byte{}) // capture and write filters after length checks
+	xb := mempool.GetBuffer() // capture and write filters after length checks
+	defer mempool.PutBuffer(xb)
 	for _, opts := range pk.Filters {
 		xb.Write(encodeString(opts.Filter)) // [MQTT-3.8.3-1]
 		if pk.ProtocolVersion == 5 {
@@ -892,7 +909,8 @@ func (pk *Packet) SubscribeEncode(buf *bytes.Buffer) error {
 	}
 
 	if pk.ProtocolVersion == 5 {
-		pb := bytes.NewBuffer([]byte{})
+		pb := mempool.GetBuffer()
+		defer mempool.PutBuffer(pb)
 		pk.Properties.Encode(pk.FixedHeader.Type, pk.Mods, pb, nb.Len()+xb.Len())
 		nb.Write(pb.Bytes())
 	}
@@ -901,7 +919,7 @@ func (pk *Packet) SubscribeEncode(buf *bytes.Buffer) error {
 
 	pk.FixedHeader.Remaining = nb.Len()
 	pk.FixedHeader.Encode(buf)
-	nb.WriteTo(buf)
+	buf.Write(nb.Bytes())
 
 	return nil
 }
@@ -983,20 +1001,21 @@ func (pk *Packet) SubscribeValidate() Code {
 
 // UnsubackEncode encodes an Unsuback packet.
 func (pk *Packet) UnsubackEncode(buf *bytes.Buffer) error {
-	nb := bytes.NewBuffer([]byte{})
+	nb := mempool.GetBuffer()
+	defer mempool.PutBuffer(nb)
 	nb.Write(encodeUint16(pk.PacketID))
 
 	if pk.ProtocolVersion == 5 {
-		pb := bytes.NewBuffer([]byte{})
+		pb := mempool.GetBuffer()
+		defer mempool.PutBuffer(pb)
 		pk.Properties.Encode(pk.FixedHeader.Type, pk.Mods, pb, nb.Len())
 		nb.Write(pb.Bytes())
+		nb.Write(pk.ReasonCodes)
 	}
-
-	nb.Write(pk.ReasonCodes)
 
 	pk.FixedHeader.Remaining = nb.Len()
 	pk.FixedHeader.Encode(buf)
-	nb.WriteTo(buf)
+	buf.Write(nb.Bytes())
 
 	return nil
 }
@@ -1031,16 +1050,19 @@ func (pk *Packet) UnsubscribeEncode(buf *bytes.Buffer) error {
 		return ErrProtocolViolationNoPacketID
 	}
 
-	nb := bytes.NewBuffer([]byte{})
+	nb := mempool.GetBuffer()
+	defer mempool.PutBuffer(nb)
 	nb.Write(encodeUint16(pk.PacketID))
 
-	xb := bytes.NewBuffer([]byte{}) // capture filters and write after length checks
+	xb := mempool.GetBuffer() // capture filters and write after length checks
+	defer mempool.PutBuffer(xb)
 	for _, sub := range pk.Filters {
 		xb.Write(encodeString(sub.Filter)) // [MQTT-3.10.3-1]
 	}
 
 	if pk.ProtocolVersion == 5 {
-		pb := bytes.NewBuffer([]byte{})
+		pb := mempool.GetBuffer()
+		defer mempool.PutBuffer(pb)
 		pk.Properties.Encode(pk.FixedHeader.Type, pk.Mods, pb, nb.Len()+xb.Len())
 		nb.Write(pb.Bytes())
 	}
@@ -1049,7 +1071,7 @@ func (pk *Packet) UnsubscribeEncode(buf *bytes.Buffer) error {
 
 	pk.FixedHeader.Remaining = nb.Len()
 	pk.FixedHeader.Encode(buf)
-	nb.WriteTo(buf)
+	buf.Write(nb.Bytes())
 
 	return nil
 }
@@ -1100,16 +1122,18 @@ func (pk *Packet) UnsubscribeValidate() Code {
 
 // AuthEncode encodes an Auth packet.
 func (pk *Packet) AuthEncode(buf *bytes.Buffer) error {
-	nb := bytes.NewBuffer([]byte{})
+	nb := mempool.GetBuffer()
+	defer mempool.PutBuffer(nb)
 	nb.WriteByte(pk.ReasonCode)
 
-	pb := bytes.NewBuffer([]byte{})
+	pb := mempool.GetBuffer()
+	defer mempool.PutBuffer(pb)
 	pk.Properties.Encode(pk.FixedHeader.Type, pk.Mods, pb, nb.Len())
 	nb.Write(pb.Bytes())
 
 	pk.FixedHeader.Remaining = nb.Len()
 	pk.FixedHeader.Encode(buf)
-	nb.WriteTo(buf)
+	buf.Write(nb.Bytes())
 	return nil
 }
 

@@ -66,16 +66,13 @@ message CloudEventAttributeValue {
 }
 
 message PublishRequest {
-  // Required. The topic to which event should be published.
-  // Format is `myhome/groundfloor/livingroom/temperature`.
-  string topic = 1;
-  CloudEvent event = 2;
+  // Required. Define the CloudEvent to be published
+  CloudEvent event = 1;
 }
 
 message SubscriptionRequest {
-  // Required. The topic from which event should be pulled.
-  // Format is `myhome/groundfloor/livingroom/temperature`.
-  string topic = 1;
+  // Required. The original source of the respond CloudEvent(s).
+  string source = 1;
 }
 
 service CloudEventService {
