@@ -22,7 +22,6 @@ import (
 type managementAddonInstallProgressionController struct {
 	patcher patcher.Patcher[
 		*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus]
-	managedClusterAddonLister    addonlisterv1alpha1.ManagedClusterAddOnLister
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
 	addonFilterFunc              factory.EventFilterFunc
 }
@@ -38,7 +37,6 @@ func NewManagementAddonInstallProgressionController(
 		patcher: patcher.NewPatcher[
 			*addonv1alpha1.ClusterManagementAddOn, addonv1alpha1.ClusterManagementAddOnSpec, addonv1alpha1.ClusterManagementAddOnStatus](
 			addonClient.AddonV1alpha1().ClusterManagementAddOns()),
-		managedClusterAddonLister:    addonInformers.Lister(),
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
 		addonFilterFunc:              addonFilterFunc,
 	}
@@ -64,15 +62,6 @@ func (c *managementAddonInstallProgressionController) sync(ctx context.Context, 
 
 	mgmtAddonCopy := mgmtAddon.DeepCopy()
 
-	clusterManagementAddon, err := c.clusterManagementAddonLister.Get(addonName)
-	if errors.IsNotFound(err) {
-		return nil
-	}
-
-	if err != nil {
-		return err
-	}
-
 	// set default config reference
 	mgmtAddonCopy.Status.DefaultConfigReferences = setDefaultConfigReference(mgmtAddonCopy.Spec.SupportedConfigs, mgmtAddonCopy.Status.DefaultConfigReferences)
 
@@ -84,7 +73,7 @@ func (c *managementAddonInstallProgressionController) sync(ctx context.Context, 
 	}
 
 	// only update default config references and skip updating install progression for self-managed addon
-	if !c.addonFilterFunc(clusterManagementAddon) {
+	if !c.addonFilterFunc(mgmtAddon) {
 		_, err = c.patcher.PatchStatus(ctx, mgmtAddonCopy, mgmtAddonCopy.Status, mgmtAddon.Status)
 		return err
 	}
