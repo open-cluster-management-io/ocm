@@ -38,6 +38,15 @@ func NewAgentOptions(mqttOptions *MQTTOptions, clusterName, agentID string) *opt
 }
 
 func (o *mqttAgentOptions) WithContext(ctx context.Context, evtCtx cloudevents.EventContext) (context.Context, error) {
+	topic, err := getAgentPubTopic(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if topic != nil {
+		return cloudeventscontext.WithTopic(ctx, string(*topic)), nil
+	}
+
 	eventType, err := types.ParseCloudEventsType(evtCtx.GetType())
 	if err != nil {
 		return nil, fmt.Errorf("unsupported event type %s, %v", eventType, err)
