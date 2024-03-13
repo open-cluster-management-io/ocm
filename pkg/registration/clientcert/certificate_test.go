@@ -162,12 +162,42 @@ func TestIsCertificateValid(t *testing.T) {
 			},
 		},
 		{
-			name: "valid cert",
+			name: "invalid organization",
 			testCert: testinghelpers.NewTestCertWithSubject(pkix.Name{
-				CommonName: "test",
+				CommonName:   "test",
+				Organization: []string{"org_foo"},
 			}, 60*time.Second),
 			subject: &pkix.Name{
-				CommonName: "test",
+				CommonName:   "test",
+				Organization: []string{"org_bar"},
+			},
+			isValid: false,
+		},
+		{
+			name: "invalid organization unit",
+			testCert: testinghelpers.NewTestCertWithSubject(pkix.Name{
+				CommonName:         "test",
+				Organization:       []string{"org"},
+				OrganizationalUnit: []string{"ou_foo"},
+			}, 60*time.Second),
+			subject: &pkix.Name{
+				CommonName:         "test",
+				Organization:       []string{"org"},
+				OrganizationalUnit: []string{"ou_bar"},
+			},
+			isValid: false,
+		},
+		{
+			name: "valid cert",
+			testCert: testinghelpers.NewTestCertWithSubject(pkix.Name{
+				CommonName:         "test",
+				Organization:       []string{"org"},
+				OrganizationalUnit: []string{"ou"},
+			}, 60*time.Second),
+			subject: &pkix.Name{
+				CommonName:         "test",
+				Organization:       []string{"org"},
+				OrganizationalUnit: []string{"ou"},
 			},
 			isValid: true,
 		},
